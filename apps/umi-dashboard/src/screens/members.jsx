@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatDate, formatMoney, formatNumber } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
 import { registerMember, useMembersData } from '@/data.jsx';
 
@@ -12,7 +15,16 @@ const DIAL_CODES = [
   { dial: '+57', label: '🇨🇴 +57' },
 ];
 
+const SORT_OPTIONS = [
+  { value: 'recent', label: msg`Más recientes` },
+  { value: 'visits', label: msg`Más visitas` },
+  { value: 'balance', label: msg`Mayor saldo` },
+  { value: 'ltv', label: msg`Mayor gasto` },
+  { value: 'inactive', label: msg`Más inactivos` },
+];
+
 function RegisterMemberDialog({ onClose, onRegistered }) {
+  const { t } = useLingui();
   const [name, setName] = useState('');
   const [dial, setDial] = useState('+52');
   const [national, setNational] = useState('');
@@ -33,7 +45,7 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
       setResult(res);
       onRegistered();
     } catch (err) {
-      setError(err?.message || 'No se pudo registrar al miembro.');
+      setError(err?.message || t`No se pudo registrar al miembro.`);
       setPending(false);
     }
   }
@@ -44,35 +56,41 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Registrar miembro"
+        aria-label={t`Registrar miembro`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>Registrar miembro</h3>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Registrar miembro</Trans>
+            </h3>
             <p style={{ color: 'var(--ink-3)' }}>
-              Inscribe a un cliente en el programa de lealtad.
+              <Trans>Inscribe a un cliente en el programa de lealtad.</Trans>
             </p>
           </div>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         {result ? (
           <div style={{ marginTop: 16 }}>
             <p>
-              {result.message || 'Miembro registrado.'} Tarjeta:{' '}
-              <strong>{result.cardNumber}</strong>.
+              {result.message || t`Miembro registrado.`}{' '}
+              <Trans>
+                Tarjeta: <strong>{result.cardNumber}</strong>.
+              </Trans>
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
               <button className="btn" type="button" onClick={onClose}>
-                Listo
+                <Trans>Listo</Trans>
               </button>
             </div>
           </div>
         ) : (
           <>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>Nombre</span>
+              <span>
+                <Trans>Nombre</Trans>
+              </span>
               <input
                 type="text"
                 maxLength={100}
@@ -92,14 +110,16 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
               <input
                 style={{ flex: 1 }}
                 type="tel"
-                placeholder="Número, sin código de país"
+                placeholder={t`Número, sin código de país`}
                 value={national}
                 onChange={(e) => setNational(e.target.value)}
                 disabled={pending}
               />
             </div>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>Fecha de nacimiento</span>
+              <span>
+                <Trans>Fecha de nacimiento</Trans>
+              </span>
               <input
                 type="date"
                 value={birthDate}
@@ -119,10 +139,10 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
                 onClick={onClose}
                 disabled={pending}
               >
-                Cancelar
+                <Trans>Cancelar</Trans>
               </button>
               <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
-                {pending ? 'Registrando…' : 'Registrar'}
+                {pending ? <Trans>Registrando…</Trans> : <Trans>Registrar</Trans>}
               </button>
             </div>
           </>
@@ -137,6 +157,7 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
 // Schema: User + LoyaltyCard (balanceCentavos, totalVisits, visitsThisCycle, pendingRewards)
 
 const MembersScreen = () => {
+  const { t, i18n } = useLingui();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent');
@@ -165,44 +186,32 @@ const MembersScreen = () => {
 
   function fmtBalance(centavos) {
     if (!centavos && centavos !== 0) return '—';
-    return '$ ' + (centavos / 100).toLocaleString('es-MX', { minimumFractionDigits: 0 });
+    return formatMoney(centavos, 'MXN', { minimumFractionDigits: 0 });
   }
 
   function fmtDate(iso) {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('es-MX', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDate(iso, { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
   function fmtAgo(iso) {
     if (!iso) return '—';
     var ms = Date.now() - new Date(iso).getTime();
-    if (ms < 3600000) return Math.floor(ms / 60000) + ' min';
-    if (ms < 86400000) return Math.floor(ms / 3600000) + 'h';
-    return Math.floor(ms / 86400000) + 'd';
+    if (ms < 3600000) return t`hace ${Math.floor(ms / 60000)} min`;
+    if (ms < 86400000) return t`hace ${Math.floor(ms / 3600000)} h`;
+    return t`hace ${Math.floor(ms / 86400000)} d`;
   }
-
-  const SORT_OPTIONS = [
-    { value: 'recent', label: 'Más recientes' },
-    { value: 'visits', label: 'Más visitas' },
-    { value: 'balance', label: 'Mayor saldo' },
-    { value: 'ltv', label: 'Mayor gasto' },
-    { value: 'inactive', label: 'Más inactivos' },
-  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
-        title="Miembros activos"
-        note="Clientes inscritos en el programa de lealtad."
-        count={{ value: total.toLocaleString('es-MX'), label: 'miembros' }}
+        title={t`Miembros activos`}
+        note={t`Clientes inscritos en el programa de lealtad.`}
+        count={{ value: formatNumber(total), label: t`miembros` }}
         actions={
           <>
             <select
-              aria-label="Ordenar clientes"
+              aria-label={t`Ordenar clientes`}
               className="select"
               style={{ height: 38, fontSize: 13, padding: '0 32px 0 12px' }}
               value={sort}
@@ -213,12 +222,12 @@ const MembersScreen = () => {
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
-                  {o.label}
+                  {i18n._(o.label)}
                 </option>
               ))}
             </select>
             <button className="btn" type="button" onClick={() => setShowRegister(true)}>
-              <I.Plus size={14} /> Registrar miembro
+              <I.Plus size={14} /> <Trans>Registrar miembro</Trans>
             </button>
           </>
         }
@@ -248,7 +257,7 @@ const MembersScreen = () => {
           <input
             className="input"
             style={{ height: 40, paddingLeft: 36, fontSize: 13 }}
-            placeholder="Buscar por nombre, teléfono o tarjeta…"
+            placeholder={t`Buscar por nombre, teléfono o tarjeta…`}
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -276,11 +285,13 @@ const MembersScreen = () => {
                 background: 'var(--umi-blue)',
               }}
             />
-            Cargando…
+            <Trans>Cargando…</Trans>
           </span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'var(--ink-3)' }}>
-          {customers.length} de {total.toLocaleString('es-MX')} miembros
+          <Trans>
+            {customers.length} de {formatNumber(total)} miembros
+          </Trans>
         </span>
       </div>
 
@@ -289,14 +300,30 @@ const MembersScreen = () => {
         <table className="matrix">
           <thead>
             <tr>
-              <th style={{ width: '22%' }}>Miembro</th>
-              <th>Tarjeta</th>
-              <th style={{ textAlign: 'right' }}>Saldo</th>
-              <th style={{ textAlign: 'center' }}>Visitas</th>
-              <th style={{ textAlign: 'center' }}>Progreso</th>
-              <th style={{ textAlign: 'center' }}>Pendientes</th>
-              <th>Última visita</th>
-              <th style={{ textAlign: 'right' }}>Gasto total</th>
+              <th style={{ width: '22%' }}>
+                <Trans>Miembro</Trans>
+              </th>
+              <th>
+                <Trans>Tarjeta</Trans>
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                <Trans>Saldo</Trans>
+              </th>
+              <th style={{ textAlign: 'center' }}>
+                <Trans>Visitas</Trans>
+              </th>
+              <th style={{ textAlign: 'center' }}>
+                <Trans>Progreso</Trans>
+              </th>
+              <th style={{ textAlign: 'center' }}>
+                <Trans>Pendientes</Trans>
+              </th>
+              <th>
+                <Trans>Última visita</Trans>
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                <Trans>Gasto total</Trans>
+              </th>
               <th style={{ width: 44 }}></th>
             </tr>
           </thead>
@@ -307,7 +334,7 @@ const MembersScreen = () => {
                   colSpan={9}
                   style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--ink-3)' }}
                 >
-                  Sin miembros en este filtro.
+                  <Trans>Sin miembros en este filtro.</Trans>
                 </td>
               </tr>
             )}
@@ -335,7 +362,7 @@ const MembersScreen = () => {
             style={{ opacity: page <= 1 ? 0.4 : 1 }}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            <I.ChevronLeft size={14} /> Anterior
+            <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
           </button>
           <span style={{ fontSize: 13, color: 'var(--ink-2)', fontFamily: 'var(--font-mono)' }}>
             {page} / {totalPages}
@@ -346,7 +373,7 @@ const MembersScreen = () => {
             style={{ opacity: page >= totalPages ? 0.4 : 1 }}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Siguiente <I.ChevronRight size={14} />
+            <Trans>Siguiente</Trans> <I.ChevronRight size={14} />
           </button>
         </div>
       )}
@@ -365,6 +392,7 @@ const MembersScreen = () => {
 };
 
 const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelected }) => {
+  const { t } = useLingui();
   const hue = Math.abs(c.id.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 360;
   const initials = (c.name || 'UN')
     .split(' ')
@@ -390,7 +418,7 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
             {initials}
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.name || 'Sin nombre'}</div>
+            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{c.name || t`Sin nombre`}</div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
               {c.phone || '—'}
             </div>
@@ -417,14 +445,16 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
       {/* Visits */}
       <td style={{ textAlign: 'center' }}>
         <div style={{ fontWeight: 700, fontSize: 16 }}>{c.totalVisits || 0}</div>
-        <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>total</div>
+        <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>
+          <Trans>total</Trans>
+        </div>
       </td>
       {/* Cycle progress bar */}
       <td style={{ textAlign: 'center', minWidth: 80 }}>
         <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 4, color: 'var(--ink-2)' }}>
           {visitsRequired
             ? `${c.visitsThisCycle || 0} / ${visitsRequired}`
-            : `${c.visitsThisCycle || 0} ciclo`}
+            : t`${c.visitsThisCycle || 0} ciclo`}
         </div>
         <div
           style={{ height: 5, borderRadius: 3, background: 'var(--line-soft)', overflow: 'hidden' }}
@@ -455,12 +485,12 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
             {c.pendingRewards} 🎁
           </span>
         ) : (
-          <span className="no-value" style={{ fontSize: 12 }} aria-label="Sin dato" />
+          <span className="no-value" style={{ fontSize: 12 }} aria-label={t`Sin dato`} />
         )}
       </td>
       {/* Last visit */}
       <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-        {c.lastVisit ? fmtAgo(c.lastVisit) + ' atrás' : 'Nunca'}
+        {c.lastVisit ? fmtAgo(c.lastVisit) : t`Nunca`}
       </td>
       {/* LTV */}
       <td style={{ textAlign: 'right', fontWeight: 600, fontSize: 13, color: 'var(--ink-2)' }}>
@@ -471,7 +501,7 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
         <button
           className={'btn-icon focusable' + (isSelected ? ' active' : '')}
           onClick={onDetail}
-          aria-label="Ver detalle"
+          aria-label={t`Ver detalle`}
           style={{ opacity: isSelected ? 1 : undefined }}
         >
           <I.ChevronRight size={15} />
@@ -482,6 +512,7 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
 };
 
 const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
+  const { t } = useLingui();
   const hue = Math.abs(c.id.split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % 360;
   const initials = (c.name || 'UN')
     .split(' ')
@@ -509,13 +540,15 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
               {initials}
             </div>
             <div>
-              <div className="eyebrow">Miembro · Umi Cash</div>
+              <div className="eyebrow">
+                <Trans>Miembro · Umi Cash</Trans>
+              </div>
               <h2 className="h-section" style={{ marginTop: 2, fontSize: 17 }}>
-                {c.name || 'Sin nombre'}
+                {c.name || t`Sin nombre`}
               </h2>
             </div>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
@@ -524,15 +557,19 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
           {/* Key stats */}
           <div className="split even tight">
             <StatCard
-              label="Saldo · monedero"
+              label={t`Saldo · monedero`}
               value={fmtBalance(c.balanceCentavos)}
               unit="MXN"
               accent="var(--umi-blue)"
             />
-            <StatCard label="Visitas totales" value={c.totalVisits || 0} accent="var(--success)" />
-            <StatCard label="LTV estimado" value={c.ltvMXN || '—'} accent="var(--ink-2)" />
             <StatCard
-              label="Recompensas pendientes"
+              label={t`Visitas totales`}
+              value={c.totalVisits || 0}
+              accent="var(--success)"
+            />
+            <StatCard label={t`LTV estimado`} value={c.ltvMXN || '—'} accent="var(--ink-2)" />
+            <StatCard
+              label={t`Recompensas pendientes`}
               value={c.pendingRewards || 0}
               accent={c.pendingRewards > 0 ? 'var(--warning)' : 'var(--ink-3)'}
             />
@@ -541,10 +578,10 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
           {/* Info rows */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 4 }}>
             {[
-              { label: 'Teléfono', value: c.phone || '—', mono: true },
-              { label: 'Número de tarjeta', value: c.cardNumber || '—', mono: true },
-              { label: 'Última visita', value: c.lastVisit ? fmtDate(c.lastVisit) : 'Nunca' },
-              { label: 'Miembro desde', value: fmtDate(c.createdAt) },
+              { label: t`Teléfono`, value: c.phone || '—', mono: true },
+              { label: t`Número de tarjeta`, value: c.cardNumber || '—', mono: true },
+              { label: t`Última visita`, value: c.lastVisit ? fmtDate(c.lastVisit) : t`Nunca` },
+              { label: t`Miembro desde`, value: fmtDate(c.createdAt) },
             ].map((row) => (
               <div
                 key={row.label}
@@ -576,7 +613,7 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
           {/* Cycle progress */}
           <div style={{ marginTop: 8 }}>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              Progreso en ciclo actual
+              <Trans>Progreso en ciclo actual</Trans>
             </div>
             <div
               style={{
@@ -587,9 +624,15 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
                 fontWeight: 600,
               }}
             >
-              <span>{c.visitsThisCycle || 0} visitas completadas</span>
+              <span>
+                <Plural
+                  value={c.visitsThisCycle || 0}
+                  one="# visita completada"
+                  other="# visitas completadas"
+                />
+              </span>
               <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>
-                {c.visitsRequired ? `meta: ${c.visitsRequired}` : 'meta sin configurar'}
+                {c.visitsRequired ? t`meta: ${c.visitsRequired}` : t`meta sin configurar`}
               </span>
             </div>
             <div
@@ -617,7 +660,7 @@ const MemberDetail = ({ member: c, fmtBalance, fmtDate, onClose }) => {
 
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cerrar
+            <Trans>Cerrar</Trans>
           </button>
         </div>
       </aside>

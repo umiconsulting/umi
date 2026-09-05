@@ -7,14 +7,21 @@
     "node": "22.x"
   },
   "scripts": {
+    "predev": "lingui compile",
     "dev": "vite --host 127.0.0.1",
+    "prebuild": "lingui compile --strict",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "vitest run"
+    "pretest": "lingui compile",
+    "test": "vitest run",
+    "i18n:extract": "lingui extract",
+    "i18n:compile": "lingui compile --strict"
   },
   "dependencies": {
+    "@lingui/core": "^6.6.0",
+    "@lingui/react": "^6.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
@@ -22,8 +29,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@lingui/babel-plugin-lingui-macro": "^6.6.0",
+    "@lingui/cli": "^6.6.0",
+    "@lingui/format-po": "^6.6.0",
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^10.7.0",
+    "eslint-plugin-lingui": "^0.15.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",

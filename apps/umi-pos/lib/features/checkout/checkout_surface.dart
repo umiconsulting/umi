@@ -640,7 +640,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ? () => _requestApproval(context)
                       : state.phase == CheckoutPhase.confirmationRequired &&
                             !dirty
-                      ? () => _confirm(context)
+                      ? () => _confirm()
                       : () => _review(totals),
                   child: Text(
                     state.phase == CheckoutPhase.awaitingApproval
@@ -648,7 +648,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         : state.phase == CheckoutPhase.confirmationRequired &&
                               !dirty
                         ? l.confirmAndPayAction
-                        : l.reviewTotalsAction,
+                        : l.checkoutAction,
                   ),
                 ),
                 TextButton(
@@ -1498,6 +1498,25 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         'customerContactId': null,
       },
     );
+    if (!mounted) return;
+    // One-tap checkout: the cashier saw and verified this total before tapping
+    // Cobrar. The preview is a server recompute for integrity — if it matches
+    // what they saw, commit now in the same action. If UMI recomputed a
+    // DIFFERENT total, fall through to the confirmation screen so the cashier
+    // sees the new number (an inaccurate charge is the costly error to prevent).
+    final reviewed = widget.checkout.state;
+    if (reviewed.phase == CheckoutPhase.confirmationRequired && !dirty) {
+      final repriced =
+          reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
+      final newTotal = repriced == null
+          ? null
+          : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits'] as num?)
+                ?.toInt();
+      final shownTotal = (totals.grandTotal['minorUnits']! as num).toInt();
+      if (newTotal != null && newTotal == shownTotal) {
+        await widget.checkout.confirm();
+      }
+    }
   }
 
   Future<void> _requestApproval(BuildContext context) async {
@@ -1692,26 +1711,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     );
   }
 
-  Future<void> _confirm(BuildContext context) async {
-    final l = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l.confirmSaleTitle),
-        content: Text(l.confirmSaleBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l.closeAction),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l.confirmAction),
-          ),
-        ],
-      ),
-    );
-    if (confirmed ?? false) await widget.checkout.confirm();
+  Future<void> _confirm() async {
+    // The confirmationRequired screen already shows the recomputed totals and
+    // the "Confirmar y cobrar" button, so a second modal asking the same thing
+    // was pure friction — commit directly.
+    await widget.checkout.confirm();
   }
 
   Widget _unknown(BuildContext context, CheckoutResult result) {

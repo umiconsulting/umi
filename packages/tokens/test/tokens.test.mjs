@@ -105,14 +105,76 @@ const EXPECTED_LANDING = {
   letterSpacing: { 'wider-2': '0.2em', 'wider-3': '0.22em' },
 };
 
+// The dark theme adds a second and third block of --vars to dashboard.css, so a
+// whole-file scan would collapse light + dark into one map (last write wins).
+// Scope every dashboard assertion to a single selector block instead.
+function block(css, header) {
+  const start = css.indexOf(header);
+  assert.ok(start >= 0, `block "${header}" not found`);
+  const open = css.indexOf('{', start);
+  const close = css.indexOf('}', open);
+  return css.slice(open + 1, close);
+}
+
 function parseCssVars(css) {
   const map = {};
   for (const [, name, value] of css.matchAll(/--([\w-]+):\s*([^;]+);/g)) map[name] = value.trim();
   return map;
 }
 
-test('dashboard.css reproduces the styles.css :root token set 1:1', () => {
-  assert.deepEqual(parseCssVars(distText('dashboard.css')), EXPECTED_DASHBOARD);
+// Only the tokens the Midnight theme overrides. Every other token keeps its Umi
+// (:root) value in every theme (see dashboard.json — a leaf's $themes map).
+const EXPECTED_DASHBOARD_MIDNIGHT = {
+  canvas: '#000000',
+  'canvas-2': '#0D0D0D',
+  surface: '#000000',
+  'surface-warm': '#000000',
+  'surface-warm-border': '#2A2A2A',
+  'sidebar-bg': '#000000',
+  'sidebar-bg-deep': '#000000',
+  'ink-1': '#F2F2F2',
+  'ink-2': '#B0B0B0',
+  'ink-3': '#8A8A8A',
+  'ink-4': '#6A6A6A',
+  'ink-warm': '#EDEDED',
+  'ink-warm-soft': '#A0A0A0',
+  'ink-warm-mute': '#6E6E6E',
+  line: '#2A2A2A',
+  'line-soft': '#1C1C1C',
+  'line-strong': '#3A3A3A',
+  success: '#62B36B',
+  'success-soft': '#12211A',
+  danger: '#E5706B',
+  'danger-soft': '#251312',
+  warning: '#D9A441',
+  'warning-soft': '#241D10',
+  info: '#7FA2E0',
+  'info-soft': '#131A26',
+  'tenant-brand': '#C77B72',
+  'shadow-card': '0 1px 2px rgba(0, 0, 0, 0.5)',
+  'shadow-pop': '0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)',
+  'shadow-inner': 'inset 0 0 0 1px rgba(255, 255, 255, 0.06)',
+};
+
+test('dashboard.css :root reproduces the default Umi token set 1:1', () => {
+  assert.deepEqual(parseCssVars(block(distText('dashboard.css'), ':root {')), EXPECTED_DASHBOARD);
+});
+
+test('dashboard.css Midnight theme overrides exactly the tokens that declare it', () => {
+  const css = distText('dashboard.css');
+  const choice = parseCssVars(block(css, '[data-theme="midnight"] {'));
+  assert.deepEqual(choice, EXPECTED_DASHBOARD_MIDNIGHT);
+  // The OS-preference block must carry the identical override set, so the picker
+  // and the system setting can never resolve to different palettes.
+  const osPref = parseCssVars(block(css, ':root:not([data-theme]) {'));
+  assert.deepEqual(osPref, EXPECTED_DASHBOARD_MIDNIGHT);
+});
+
+test('every Midnight override names a real Umi token (no orphan theme-only vars)', () => {
+  const umi = parseCssVars(block(distText('dashboard.css'), ':root {'));
+  for (const name of Object.keys(EXPECTED_DASHBOARD_MIDNIGHT)) {
+    assert.ok(name in umi, `Midnight override --${name} has no :root base`);
+  }
 });
 
 test('landing.cjs (require) matches tailwind.config.js theme.extend', () => {
@@ -125,7 +187,7 @@ test('landing.mjs default export equals the CJS export (dual-format parity)', as
 });
 
 test('shared brand hues resolve from core in BOTH apps (single source, no drift)', () => {
-  const dash = parseCssVars(distText('dashboard.css'));
+  const dash = parseCssVars(block(distText('dashboard.css'), ':root {'));
   const land = require('../dist/landing.cjs');
   assert.equal(dash['umi-navy'], '#223979');
   assert.equal(dash['umi-navy'], land.colors['umi-blue'].dark);

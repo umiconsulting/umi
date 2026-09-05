@@ -1502,6 +1502,11 @@ export class PosCashRepository {
           policy.handoffAllowed &&
           policy.handoffCountRequired &&
           latestCount !== null &&
+          // Once the shift is reconciled, the path forward is CLOSE, not handoff.
+          // Without this, a balanced, handoff-enabled shift keeps returning the
+          // handoff branch and never offers 'close' — so it cannot be closed, and
+          // a mid-flow reload strands it in 'closing'.
+          reconciliationHeader === null &&
           (latestCount.variance.signedVariance.minorUnits === 0 || resolutionRow !== null);
         const reconciliation =
           reconciliationHeader && expected && latestCount

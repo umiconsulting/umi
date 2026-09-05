@@ -236,7 +236,10 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         ],
         const SizedBox(height: UmiSpacing.lg),
         DropdownButtonFormField<String>(
-          initialValue: _reason,
+          key: ValueKey(_exceptionType == 'void'),
+          initialValue: _reasons(_exceptionType == 'void').contains(_reason)
+              ? _reason
+              : _reasons(_exceptionType == 'void').first,
           decoration: InputDecoration(labelText: l.refundReasonLabel),
           items: _reasons(_exceptionType == 'void')
               .map(

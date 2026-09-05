@@ -570,6 +570,81 @@ begin
   end loop;
 end $$;
 
+-- ---- cash_shift: device scoping on WRITES ONLY (refines the sweep above). ----
+-- The loop just scoped cash_shift FOR ALL, which also hides the row on SELECT from
+-- any session that cannot prove a device — i.e. the owner/admin Dashboard, which
+-- authenticates a USER, not a terminal. That silently blanked
+-- "Caja y turnos → Turnos de caja" for every owner, even though the shift's own
+-- child facts (cash_ledger_entry, cash_movement, cash_count_attempt,
+-- cash_reconciliation, cash_shift_close, no_sale_drawer_event, …) carry NO device
+-- scoping and were already visible to the owner. The parent shift row was the lone
+-- exception, so an admin could read every movement of a shift but not the shift.
+--
+-- The invariant device scoping actually protects is a WRITE one: a terminal may only
+-- create or mutate ITS OWN shift, or an authorised pending refund command may. Reads
+-- are authorised at the app layer (`cash.shift.read`, dashboard-operations.policy.ts)
+-- and isolated at the DB layer by merchant_isolation + location_narrowing — the same
+-- two guards the child fact tables already rely on. So we keep a policy named
+-- device_scoping (the DECISION guard below still finds it and stays fail-closed) but
+-- move the device predicate off SELECT: USING is open, so reads fall through to tenant
+-- isolation; WITH CHECK still pins every INSERT/UPDATE to the acting device or a
+-- pending refund administrative command. cash_shift is never DELETEd (closed shifts
+-- are frozen by tg_closed_cash_shift_immutable and no repository issues a delete), so
+-- the open USING carries no delete exposure.
+drop policy if exists device_scoping on merchant.cash_shift;
+create policy device_scoping on merchant.cash_shift as restrictive
+  using (true)
+  with check (
+    (umi.current_device() is not null and cash_shift.device_id = umi.current_device())
+    or
+    (nullif(current_setting('app.administrative_command_id', true), '') is not null
+      and exists (
+        select 1
+          from merchant.administrative_command ac
+         where ac.id = nullif(current_setting('app.administrative_command_id', true), '')::uuid
+           and ac.merchant_id = umi.current_merchant()
+           and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+           and ac.location_id = umi.current_location()
+           and ac.operation in ('refund.preview', 'refund.commit')
+           and ac.status = 'pending'
+      ))
+  );
+
+-- ---- pos_sale_exception: device scoping on WRITES ONLY (refines the sweep). ----
+-- Same shape, same reason as cash_shift above. The loop scoped pos_sale_exception
+-- FOR ALL, which also hid the committed refund/void row on SELECT from any session
+-- that cannot prove a device — i.e. the owner/admin Dashboard, which authenticates a
+-- USER, not a terminal. That silently blanked "Caja y turnos → Reembolsos" for every
+-- owner: a POS refund/void carries device_id (its terminal) and a NULL
+-- administrative_command_id (it was not a dashboard command), so neither USING branch
+-- ever held for a user session and the owner saw zero exceptions.
+--
+-- The invariant device scoping protects here is a WRITE one: a terminal may only write
+-- ITS OWN exception, or an authorised dashboard refund command may. Reads are gated at
+-- the app layer (`sale.exception.read`, dashboard-operations.policy.ts) and isolated at
+-- the DB layer by merchant_isolation + location_narrowing. So keep a policy named
+-- device_scoping (the DECISION guard below still finds it) but move the device
+-- predicate off SELECT: USING is open; WITH CHECK still pins every INSERT to the acting
+-- device or an authorised dashboard administrative command. pos_sale_exception is
+-- append-only (tg_pos_exception_append_only), so the open USING carries no update or
+-- delete exposure.
+drop policy if exists device_scoping on merchant.pos_sale_exception;
+create policy device_scoping on merchant.pos_sale_exception as restrictive
+  using (true)
+  with check (
+    (umi.current_device() is not null and pos_sale_exception.device_id = umi.current_device())
+    or
+    (pos_sale_exception.administrative_command_id is not null and exists (
+      select 1
+        from merchant.administrative_command ac
+       where ac.id = pos_sale_exception.administrative_command_id
+         and ac.merchant_id = umi.current_merchant()
+         and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+         and (ac.location_id is null or umi.current_location() is null
+              or ac.location_id = umi.current_location())
+    ))
+  );
+
 -- Every merchant table carrying a device_id must have made a DECISION about device
 -- scoping — either it is scoped above, or it is named here as deliberately not. A new
 -- table that does neither aborts the build rather than shipping unscoped.

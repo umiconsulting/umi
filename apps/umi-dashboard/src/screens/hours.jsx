@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { useBusinessHours, saveBusinessHours } from '@/data.jsx';
 
 // Screen 4 — Business Hours & Availability
 
 const DAYS = [
-  { id: 'mon', es: 'Lunes', en: 'Monday', abbr: 'Lun' },
-  { id: 'tue', es: 'Martes', en: 'Tuesday', abbr: 'Mar' },
-  { id: 'wed', es: 'Miércoles', en: 'Wednesday', abbr: 'Mié' },
-  { id: 'thu', es: 'Jueves', en: 'Thursday', abbr: 'Jue' },
-  { id: 'fri', es: 'Viernes', en: 'Friday', abbr: 'Vie' },
-  { id: 'sat', es: 'Sábado', en: 'Saturday', abbr: 'Sáb' },
-  { id: 'sun', es: 'Domingo', en: 'Sunday', abbr: 'Dom' },
+  { id: 'mon', label: msg`Lunes`, abbr: msg`Lun` },
+  { id: 'tue', label: msg`Martes`, abbr: msg`Mar` },
+  { id: 'wed', label: msg`Miércoles`, abbr: msg`Mié` },
+  { id: 'thu', label: msg`Jueves`, abbr: msg`Jue` },
+  { id: 'fri', label: msg`Viernes`, abbr: msg`Vie` },
+  { id: 'sat', label: msg`Sábado`, abbr: msg`Sáb` },
+  { id: 'sun', label: msg`Domingo`, abbr: msg`Dom` },
 ];
 
 const DEFAULT_HOURS = {
@@ -74,6 +76,7 @@ function normalizeHours(input) {
 }
 
 const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
+  const { t, i18n } = useLingui();
   const { data: hoursData, loading: hoursLoading } = useBusinessHours();
   const [hours, setHours] = useState(DEFAULT_HOURS);
   const [savedJson, setSavedJson] = useState(null);
@@ -225,18 +228,27 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 className="eyebrow"
                 style={{ color: ordersPaused ? 'var(--warning)' : 'var(--success)' }}
               >
-                ConversaFlow · WhatsApp orders
+                <Trans>ConversaFlow · Pedidos WhatsApp</Trans>
               </span>
             </div>
             <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>
-              {ordersPaused
-                ? 'Orders are paused globally'
-                : 'Orders are open · accepting incoming WhatsApp messages'}
+              {ordersPaused ? (
+                <Trans>Los pedidos están en pausa global</Trans>
+              ) : (
+                <Trans>Pedidos abiertos · se reciben mensajes de WhatsApp</Trans>
+              )}
             </div>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>
-              {ordersPaused
-                ? 'New customers receive your special notice. Existing in-flight orders continue normally.'
-                : `Cutoff active · WhatsApp orders stop ${cutoff} min before closing time.`}
+              {ordersPaused ? (
+                <Trans>
+                  Los clientes nuevos reciben tu aviso especial. Los pedidos en curso siguen con
+                  normalidad.
+                </Trans>
+              ) : (
+                <Trans>
+                  Corte activo · los pedidos por WhatsApp se detienen {cutoff} min antes del cierre.
+                </Trans>
+              )}
             </div>
           </div>
           <button
@@ -246,11 +258,11 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
           >
             {ordersPaused ? (
               <>
-                <I.Play size={15} /> Resume orders
+                <I.Play size={15} /> <Trans>Reanudar pedidos</Trans>
               </>
             ) : (
               <>
-                <I.Pause size={15} /> Pause orders
+                <I.Pause size={15} /> <Trans>Pausar pedidos</Trans>
               </>
             )}
           </button>
@@ -262,15 +274,21 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
         <div className="card" style={{ padding: '22px 22px 14px' }}>
           <div className="ed-head" style={{ marginBottom: 14 }}>
             <div className="titles">
-              <h2>Horas de apertura</h2>
+              <h2>
+                <Trans>Horas de apertura</Trans>
+              </h2>
               <div className="en">
-                {hoursLoading ? 'Cargando…' : 'Cuándo abre y cierra cada día de la semana.'}
+                {hoursLoading ? (
+                  <Trans>Cargando…</Trans>
+                ) : (
+                  <Trans>Cuándo abre y cierra cada día de la semana.</Trans>
+                )}
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <I.Clock size={14} style={{ color: 'var(--ink-3)' }} />
               <select
-                aria-label="Zona horaria"
+                aria-label={t`Zona horaria`}
                 className="select"
                 style={{ height: 36, fontSize: 13, padding: '0 32px 0 12px' }}
                 value={tz}
@@ -289,10 +307,10 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                   disabled={saving}
                 >
                   {saving ? (
-                    'Guardando…'
+                    <Trans>Guardando…</Trans>
                   ) : (
                     <>
-                      <I.Check size={14} /> Guardar
+                      <I.Check size={14} /> <Trans>Guardar</Trans>
                     </>
                   )}
                 </button>
@@ -307,11 +325,13 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                     gap: 4,
                   }}
                 >
-                  <I.Check size={13} /> Guardado
+                  <I.Check size={13} /> <Trans>Guardado</Trans>
                 </span>
               )}
               {saveMsg === 'error' && (
-                <span style={{ fontSize: 12, color: 'var(--danger)' }}>Error al guardar</span>
+                <span style={{ fontSize: 12, color: 'var(--danger)' }}>
+                  <Trans>Error al guardar</Trans>
+                </span>
               )}
             </div>
           </div>
@@ -319,11 +339,12 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
           <div>
             {DAYS.map((d) => {
               const h = hours[d.id] || DEFAULT_HOURS[d.id];
+              const dayName = i18n._(d.label);
               return (
                 <div className="day-row" key={d.id}>
                   <div className="dn">
-                    {d.es}
-                    <small>{d.abbr}</small>
+                    {dayName}
+                    <small>{i18n._(d.abbr)}</small>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div
@@ -338,13 +359,13 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                         minWidth: 50,
                       }}
                     >
-                      {h.open ? 'OPEN' : 'CLOSED'}
+                      {h.open ? <Trans>ABIERTO</Trans> : <Trans>CERRADO</Trans>}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
                       type="time"
-                      aria-label={`${d.label} · abre`}
+                      aria-label={t`${dayName} · abre`}
                       className="input"
                       style={{
                         height: 38,
@@ -361,7 +382,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                     </span>
                     <input
                       type="time"
-                      aria-label={`${d.label} · cierra`}
+                      aria-label={t`${dayName} · cierra`}
                       className="input"
                       style={{
                         height: 38,
@@ -377,8 +398,8 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                   <div style={{ textAlign: 'right' }}>
                     <button
                       className="btn-icon focusable"
-                      aria-label={`Copiar el horario de ${d.label} a los demás días`}
-                      title="Copiar a los demás días"
+                      aria-label={t`Copiar el horario de ${dayName} a los demás días`}
+                      title={t`Copiar a los demás días`}
                       disabled={!h.open}
                       onClick={() => copyToAll(d.id)}
                     >
@@ -397,10 +418,10 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
           <div className="card" style={{ padding: '22px' }}>
             <div className="eyebrow">ConversaFlow</div>
             <h3 className="h-section" style={{ marginTop: 6, marginBottom: 14, fontSize: 16 }}>
-              Order cutoff
+              <Trans>Corte de pedidos</Trans>
             </h3>
             <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 0, marginBottom: 18 }}>
-              Deja de aceptar pedidos por WhatsApp estos minutos antes de cerrar.
+              <Trans>Deja de aceptar pedidos por WhatsApp estos minutos antes de cerrar.</Trans>
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div
@@ -416,11 +437,13 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 <div className="display" style={{ fontSize: 32, color: 'var(--ink-warm)' }}>
                   {cutoff}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>min</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>
+                  <Trans>min</Trans>
+                </div>
               </div>
               <input
                 type="range"
-                aria-label="Minutos antes del cierre para dejar de aceptar pedidos"
+                aria-label={t`Minutos antes del cierre para dejar de aceptar pedidos`}
                 min={0}
                 max={120}
                 step={5}
@@ -446,8 +469,12 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 letterSpacing: '0.06em',
               }}
             >
-              <span>0 MIN</span>
-              <span>120 MIN</span>
+              <span>
+                <Trans>0 MIN</Trans>
+              </span>
+              <span>
+                <Trans>120 MIN</Trans>
+              </span>
             </div>
           </div>
 
@@ -455,16 +482,18 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
           <div className="card" style={{ padding: '22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
               <I.Megaphone size={16} style={{ color: 'var(--ink-2)' }} />
-              <div className="eyebrow">Broadcast</div>
+              <div className="eyebrow">
+                <Trans>Difusión</Trans>
+              </div>
             </div>
             <h3 className="h-section" style={{ marginTop: 2, marginBottom: 14, fontSize: 16 }}>
-              Special notice
+              <Trans>Aviso especial</Trans>
             </h3>
             <textarea
               className="input"
               value={notice}
               onChange={(e) => setNotice(e.target.value)}
-              placeholder="Mensaje que verán los clientes en su próxima interacción..."
+              placeholder={t`Mensaje que verán los clientes en su próxima interacción...`}
               style={{ minHeight: 90 }}
             />
             <div
@@ -476,14 +505,16 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               }}
             >
               <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                Sent on next customer interaction · {notice.length} / 280
+                <Trans>
+                  Se envía en la próxima interacción del cliente · {notice.length} / 280
+                </Trans>
               </span>
               <button
                 className="btn-sm btn btn-ghost focusable"
                 disabled={!notice}
                 onClick={() => setNotice('')}
               >
-                <I.X size={13} /> Borrar
+                <I.X size={13} /> <Trans>Borrar</Trans>
               </button>
             </div>
           </div>
@@ -495,9 +526,13 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
         <div className="ed-head" style={{ marginBottom: 14, paddingBottom: 12 }}>
           <div className="titles">
             {' '}
-            <h2>Teléfonos exentos</h2>
+            <h2>
+              <Trans>Teléfonos exentos</Trans>
+            </h2>
             <div className="en">
-              Pueden hacer pedidos de prueba aunque el negocio esté cerrado o en pausa.
+              <Trans>
+                Pueden hacer pedidos de prueba aunque el negocio esté cerrado o en pausa.
+              </Trans>
             </div>
           </div>
         </div>
@@ -517,7 +552,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               <button
                 className="x focusable"
                 onClick={() => setBypass((prev) => prev.filter((x) => x !== p))}
-                aria-label="Remove"
+                aria-label={t`Quitar`}
               >
                 <I.X size={12} />
               </button>
@@ -542,7 +577,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 background: 'transparent',
                 flex: 1,
               }}
-              placeholder="Add a phone number and press Enter..."
+              placeholder={t`Escribe un teléfono y presiona Enter...`}
               value={bypassInput}
               onChange={(e) => setBypassInput(e.target.value)}
             />
@@ -580,9 +615,15 @@ const PauseConfirm = ({ to, onConfirm, onCancel }) => (
           {to ? <I.AlertTriangle size={20} /> : <I.Play size={20} />}
         </div>
         <div>
-          <div className="eyebrow">{to ? 'Confirm pause' : 'Resume orders'}</div>
+          <div className="eyebrow">
+            {to ? <Trans>Confirmar pausa</Trans> : <Trans>Reanudar pedidos</Trans>}
+          </div>
           <div style={{ fontWeight: 600, fontSize: 17, marginTop: 2 }}>
-            {to ? 'Pause WhatsApp orders globally?' : 'Resume accepting WhatsApp orders?'}
+            {to ? (
+              <Trans>¿Pausar los pedidos de WhatsApp en todo el negocio?</Trans>
+            ) : (
+              <Trans>¿Volver a aceptar pedidos de WhatsApp?</Trans>
+            )}
           </div>
         </div>
       </div>
@@ -596,28 +637,28 @@ const PauseConfirm = ({ to, onConfirm, onCancel }) => (
         }}
       >
         {to ? (
-          <>
-            New customers will receive your special notice. <b>In-flight orders</b> continue
-            normally on the KDS. Bypass phones can still place test orders. You can resume at any
-            time.
-          </>
+          <Trans>
+            Los clientes nuevos recibirán tu aviso especial. <b>Los pedidos en curso</b> siguen con
+            normalidad en el KDS. Los teléfonos exentos aún pueden hacer pedidos de prueba. Puedes
+            reanudar en cualquier momento.
+          </Trans>
         ) : (
-          <>
-            Customers will be able to place WhatsApp orders again, subject to your business hours
-            and order cutoff.
-          </>
+          <Trans>
+            Los clientes podrán hacer pedidos por WhatsApp otra vez, según tu horario y el corte de
+            pedidos.
+          </Trans>
         )}
       </p>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         <button className="btn btn-ghost" onClick={onCancel}>
-          Cancel
+          <Trans>Cancelar</Trans>
         </button>
         <button
           className={'btn btn-primary'}
           style={to ? { background: 'var(--warning)' } : undefined}
           onClick={onConfirm}
         >
-          {to ? 'Pause orders' : 'Resume orders'}
+          {to ? <Trans>Pausar pedidos</Trans> : <Trans>Reanudar pedidos</Trans>}
         </button>
       </div>
     </div>

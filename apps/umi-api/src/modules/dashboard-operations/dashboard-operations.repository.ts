@@ -14,6 +14,7 @@ interface ItemRow {
   currency: string | null;
   version: string | number | null;
   correlationId: string | null;
+  facts: Record<string, unknown> | null;
 }
 
 const row = (source: string, where: string, order: string) => ({ source, where, order });
@@ -53,7 +54,7 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
   ),
   registers: row(
     `SELECT r.id::text,r.public_reference AS "publicReference",r.display_name AS title,
-    r.currency AS detail,r.status,r.location_id::text AS "locationId",coalesce(r.archived_at,r.created_at)::text AS "occurredAt",
+    concat_ws(' · ',r.currency,(SELECT 'Movimientos '||count(*) FROM merchant.cash_movement m WHERE m.register_id=r.id),(SELECT CASE WHEN count(*)>0 THEN 'Sin venta '||count(*) END FROM merchant.no_sale_drawer_event n WHERE n.register_id=r.id)) AS detail,r.status,r.location_id::text AS "locationId",coalesce(r.archived_at,r.created_at)::text AS "occurredAt",
     NULL::bigint AS "amountMinorUnits",r.currency,r.version,NULL::text AS "correlationId" FROM merchant.physical_register r`,
     'r.merchant_id=$1::uuid',
     'r.created_at DESC,r.id',
@@ -89,10 +90,13 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
   ),
   sales: row(
     `SELECT s.id::text,r.receipt_number AS "publicReference",concat('Venta ',r.receipt_number) AS title,
-    concat('Fecha comercial ',r.business_date::text) AS detail,'committed' AS status,s.location_id::text AS "locationId",
+    concat_ws(' · ',concat('Fecha comercial ',r.business_date::text),st.name,CASE WHEN coalesce(disc.total,0)>0 THEN 'Desc '||trim(to_char(disc.total/100.0,'FM999990.00')) END) AS detail,'committed' AS status,s.location_id::text AS "locationId",
     s.committed_at::text AS "occurredAt",r.grand_total AS "amountMinorUnits",r.currency,
     NULL::bigint AS version,NULL::text AS "correlationId" FROM merchant.pos_committed_sale s
-    JOIN merchant.receipt_snapshot r ON r.id=s.receipt_snapshot_id`,
+    JOIN merchant.receipt_snapshot r ON r.id=s.receipt_snapshot_id
+    LEFT JOIN merchant.cash_shift cs ON cs.id=s.cash_shift_id
+    LEFT JOIN merchant.staff st ON st.user_id=cs.responsible_operator_id AND st.merchant_id=s.merchant_id
+    LEFT JOIN (SELECT order_id,sum(amount) total FROM merchant.order_discount GROUP BY order_id) disc ON disc.order_id=s.order_id`,
     's.merchant_id=$1::uuid',
     's.committed_at DESC,s.id',
   ),
@@ -118,9 +122,10 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
     'r.issued_at DESC,r.id',
   ),
   refunds_voids: row(
-    `SELECT x.id::text,x.id::text AS "publicReference",x.exception_type AS title,x.reason_code AS detail,
+    `SELECT x.id::text,x.id::text AS "publicReference",x.exception_type AS title,concat_ws(' · ',x.reason_code,st.name,CASE WHEN x.approval_id IS NOT NULL THEN 'aprobado' END) AS detail,
     x.status,x.location_id::text AS "locationId",x.committed_at::text AS "occurredAt",x.total_minor_units AS "amountMinorUnits",
-    x.currency,NULL::bigint AS version,x.correlation_id AS "correlationId" FROM merchant.pos_sale_exception x`,
+    x.currency,NULL::bigint AS version,x.correlation_id AS "correlationId" FROM merchant.pos_sale_exception x
+    LEFT JOIN merchant.staff st ON st.user_id=x.operator_id AND st.merchant_id=x.merchant_id`,
     'x.merchant_id=$1::uuid',
     'x.committed_at DESC,x.id',
   ),
@@ -128,7 +133,7 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
     `SELECT s.id::text,s.id::text AS "publicReference",concat('Turno ',r.public_reference) AS title,
     concat('Fecha comercial ',s.business_date::text) AS detail,s.status,s.location_id::text AS "locationId",
     coalesce(s.closed_at,s.opened_at)::text AS "occurredAt",s.opening_float_minor_units AS "amountMinorUnits",s.currency,
-    s.version,NULL::text AS "correlationId" FROM merchant.cash_shift s JOIN merchant.physical_register r ON r.id=s.register_id`,
+    s.version,NULL::text AS "correlationId",jsonb_build_object('operator',st.name,'register',r.public_reference,'openingFloatMinorUnits',s.opening_float_minor_units,'expectedCashMinorUnits',(SELECT coalesce(sum(CASE le.entry_type WHEN 'opening_float' THEN le.amount_minor_units WHEN 'cash_sale' THEN coalesce(le.cash_received_minor_units,0)-coalesce(le.change_given_minor_units,0) WHEN 'cash_refund' THEN -le.amount_minor_units WHEN 'paid_in' THEN le.amount_minor_units WHEN 'paid_out' THEN -le.amount_minor_units WHEN 'safe_drop' THEN -le.amount_minor_units WHEN 'drawer_correction' THEN le.amount_minor_units WHEN 'handoff_transfer' THEN le.amount_minor_units ELSE 0 END),0) FROM merchant.cash_ledger_entry le WHERE le.shift_id=s.id),'countedCashMinorUnits',(CASE WHEN s.status IN ('counting','reconciliation_required','closing','closed') THEN (SELECT cca.counted_minor_units FROM merchant.cash_count_attempt cca WHERE cca.shift_id=s.id ORDER BY cca.attempt_number DESC LIMIT 1) ELSE NULL END),'status',s.status) AS facts FROM merchant.cash_shift s JOIN merchant.physical_register r ON r.id=s.register_id LEFT JOIN merchant.staff st ON st.user_id=s.responsible_operator_id AND st.merchant_id=s.merchant_id`,
     's.merchant_id=$1::uuid',
     's.opened_at DESC,s.id',
   ),
@@ -253,6 +258,7 @@ export class DashboardOperationsRepository {
             amountMinorUnits: amount !== null && Number.isSafeInteger(amount) ? amount : null,
             version:
               version !== null && Number.isSafeInteger(version) && version >= 0 ? version : null,
+            facts: item.facts ?? null,
           };
         });
       },

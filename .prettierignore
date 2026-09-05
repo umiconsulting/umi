@@ -50,3 +50,6 @@ apps/umi-cash/
 # NOTE: Markdown IS formatted. `docs/` and the root .md files are covered by
 # Prettier like any other source. The one carve-out is `.agents/skills/` above,
 # which is excluded for the symlink invariant, not for being prose.
+
+# Lingui compiled catalogs (generated)
+apps/umi-dashboard/src/locales/**/*.mjs

@@ -1,3 +1,4 @@
+import { t } from '@lingui/core/macro';
 import { useState as useStateD, useEffect as useEffectD } from 'react';
 import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import { getAuthHeaders, refreshSession, handleSessionExpired } from '@/lib/auth.jsx';
@@ -92,7 +93,7 @@ async function _apiFetch(path, opts, _retried) {
     const ok = await refreshSession();
     if (ok) return _apiFetch(path, opts, true);
     handleSessionExpired();
-    const dead = new Error('Sesión expirada');
+    const dead = new Error(t`Sesión expirada`);
     dead.status = 401;
     dead.code = 'session_expired';
     dead.path = path;
@@ -130,7 +131,7 @@ async function _apiFetch(path, opts, _retried) {
 
 function _merchantPath(ctx, suffix) {
   const merchantId = _merchantId(ctx);
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return `${routes.merchants.base(merchantId)}${suffix}`;
 }
 
@@ -194,12 +195,12 @@ function _deviceStatus(lastUsedAt) {
 }
 
 function _fmtLastSeen(lastUsedAt) {
-  if (!lastUsedAt) return 'never';
+  if (!lastUsedAt) return t`nunca`;
   var ms = Date.now() - new Date(lastUsedAt).getTime();
-  if (ms < 10000) return 'just now';
-  if (ms < 60000) return Math.floor(ms / 1000) + ' s ago';
-  if (ms < 3600000) return Math.floor(ms / 60000) + ' min ago';
-  return Math.floor(ms / 3600000) + 'h ago';
+  if (ms < 10000) return t`hace un momento`;
+  if (ms < 60000) return t`hace ${Math.floor(ms / 1000)} s`;
+  if (ms < 3600000) return t`hace ${Math.floor(ms / 60000)} min`;
+  return t`hace ${Math.floor(ms / 3600000)} h`;
 }
 
 async function _loadOverviewAndStations(ctx) {
@@ -436,13 +437,13 @@ async function _loadCustomerInsights(ctx) {
 
 async function _loadStaff(ctx) {
   const merchantId = _merchantId(ctx);
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.staff.list(merchantId));
 }
 
 async function _loadRoles(ctx) {
   const merchantId = _merchantId(ctx);
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.roles.list(merchantId));
 }
 
@@ -473,7 +474,7 @@ async function _loadOperations(ctx, domain, cursor, merchantWide) {
 async function executeAdministrativeCommand(operation, targetAggregateId, options) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const input = options || {};
   const commandId = input.commandId || crypto.randomUUID();
   const idempotencyKey = input.idempotencyKey || crypto.randomUUID();
@@ -506,7 +507,7 @@ async function _loadVoiceConfig(ctx) {
 async function saveMerchantSettings(patch) {
   const headers = await getAuthHeaders();
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/settings`, {
     method: 'PATCH',
     headers,
@@ -516,7 +517,7 @@ async function saveMerchantSettings(patch) {
 
 async function saveRewardConfig(patch) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/cash/reward-config`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
@@ -534,7 +535,7 @@ async function saveRewardConfig(patch) {
 async function saveBusinessHours(hours, timezone, ordering) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const path = `/api/merchants/${encodeURIComponent(merchantId)}/conversaflow/hours${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
   const body = {};
   if (hours !== undefined && hours !== null) body.hours = hours;
@@ -548,7 +549,7 @@ async function saveBusinessHours(hours, timezone, ordering) {
 
 async function saveMerchantVoice(patch) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/conversaflow/voice`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
@@ -557,7 +558,7 @@ async function saveMerchantVoice(patch) {
 
 async function createStaffMember(staff) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.staff.create(merchantId), {
     method: 'POST',
     body: JSON.stringify(staff),
@@ -566,7 +567,7 @@ async function createStaffMember(staff) {
 
 async function updateStaffMember(id, patch) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.staff.update(merchantId, id), {
     method: 'PATCH',
     body: JSON.stringify(patch),
@@ -575,13 +576,13 @@ async function updateStaffMember(id, patch) {
 
 async function deleteStaffMember(id) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.staff.remove(merchantId, id), { method: 'DELETE' });
 }
 
 async function createMerchantRole(role) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.roles.create(merchantId), {
     method: 'POST',
     body: JSON.stringify(role),
@@ -590,7 +591,7 @@ async function createMerchantRole(role) {
 
 async function updateMerchantRole(id, role) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.roles.update(merchantId, id), {
     method: 'PATCH',
     body: JSON.stringify(role),
@@ -599,7 +600,7 @@ async function updateMerchantRole(id, role) {
 
 async function archiveMerchantRole(id, expectedRevision) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.roles.archive(merchantId, id, expectedRevision), { method: 'DELETE' });
 }
 
@@ -614,7 +615,7 @@ async function archiveMerchantRole(id, expectedRevision) {
 // again. A fresh key per click would double-credit a money-adjacent balance.
 async function creditLoyaltySeals({ cardId, seals, note, idempotencyKey }) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.scanSeals(merchantId), {
     method: 'POST',
     body: JSON.stringify({
@@ -631,7 +632,7 @@ async function creditLoyaltySeals({ cardId, seals, note, idempotencyKey }) {
 // top-up after a lost response lands once, not twice, on a money balance.
 async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.topup(merchantId), {
     method: 'POST',
     body: JSON.stringify({
@@ -650,7 +651,7 @@ async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
 // API enforces the reward-cycle math and rejects a redeem with nothing to claim.
 async function loyaltyScan({ cardNumber, action }) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.scan(merchantId), {
     method: 'POST',
     body: JSON.stringify({ qrPayload: cardNumber, action }),
@@ -663,7 +664,7 @@ async function loyaltyScan({ cardNumber, action }) {
 function merchantScopedPath(basePath) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return `/api/merchants/${encodeURIComponent(merchantId)}${basePath}${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
 }
 
@@ -683,7 +684,7 @@ async function generateDevicePairingPin(device) {
 
 async function createPosEnrollmentRequest(device) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.devices.beginEnrollment(merchantId), {
     method: 'POST',
     body: JSON.stringify(device),
@@ -697,7 +698,7 @@ function deviceEnrollmentPath(path, locationId) {
 
 async function getPosEnrollmentRequests(locationId) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(deviceEnrollmentPath(routes.devices.enrollmentRequests(merchantId), locationId));
 }
 
@@ -706,13 +707,13 @@ async function getPosEnrollmentRequests(locationId) {
 // a request until it completes and the terminal itself from then on.
 async function getPosDevices(locationId) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(deviceEnrollmentPath(routes.devices.list(merchantId), locationId));
 }
 
 async function updatePosDevice(deviceId, patch, locationId) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(deviceEnrollmentPath(routes.devices.update(merchantId, deviceId), locationId), {
     method: 'PATCH',
     body: JSON.stringify(patch),
@@ -721,7 +722,7 @@ async function updatePosDevice(deviceId, patch, locationId) {
 
 async function revokePosDevice(deviceId, reason) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.devices.revoke(merchantId, deviceId), {
     method: 'POST',
     body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), reason }),
@@ -730,7 +731,7 @@ async function revokePosDevice(deviceId, reason) {
 
 async function approvePosEnrollmentRequest(requestId, locationId) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(
     deviceEnrollmentPath(routes.devices.approveEnrollment(merchantId, requestId), locationId),
     {
@@ -742,7 +743,7 @@ async function approvePosEnrollmentRequest(requestId, locationId) {
 
 async function denyPosEnrollmentRequest(requestId, locationId) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(
     deviceEnrollmentPath(routes.devices.denyEnrollment(merchantId, requestId), locationId),
     {
@@ -806,7 +807,7 @@ async function revokeDevice(deviceId, reason) {
 async function transitionOrder(orderId, targetStatus, extra) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const path = `/api/merchants/${encodeURIComponent(merchantId)}/orders/${encodeURIComponent(orderId)}/transition${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
   return _apiFetch(path, {
     method: 'POST',
@@ -1001,7 +1002,7 @@ async function issueGiftCard({
   message,
 }) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.giftCards(merchantId), {
     method: 'POST',
     body: JSON.stringify({
@@ -1021,7 +1022,7 @@ async function issueGiftCard({
 // `+<dial><national>` the API validates against the country's digit count.
 async function registerMember({ name, phone, birthDate }) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.registerMember(merchantId), {
     method: 'POST',
     body: JSON.stringify({ name, phone, birthDate }),
@@ -1033,7 +1034,7 @@ async function registerMember({ name, phone, birthDate }) {
 // phone or email. The API rejects an already-redeemed / expired / empty code.
 async function redeemGiftCardByCode({ code, phone, email }) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.gift(merchantId, code.trim().toUpperCase()), {
     method: 'POST',
     body: JSON.stringify({ phone: phone || undefined, email: email || undefined }),
@@ -1127,7 +1128,7 @@ function useKdsConnection() {
 
 async function getLocationProfiles() {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const res = await _apiFetch(
     `/api/merchants/${encodeURIComponent(merchantId)}/locations/profiles`,
   );
@@ -1136,7 +1137,7 @@ async function getLocationProfiles() {
 
 async function saveLocationProfile(locationId, patch) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const res = await _apiFetch(
     `/api/merchants/${encodeURIComponent(merchantId)}/locations/${encodeURIComponent(locationId)}`,
     {
@@ -1149,7 +1150,7 @@ async function saveLocationProfile(locationId, patch) {
 
 async function createLocation(input) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
-  if (!merchantId) throw new Error('No active merchant selected');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   const res = await _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/locations`, {
     method: 'POST',
     body: JSON.stringify(input),

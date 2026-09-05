@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I, UmiX } from '@/icons.jsx';
+import { formatNumber, formatTime } from '@/lib/format.js';
 import { RegionHead, Spark, XSep } from '@/shell.jsx';
 import { useOverviewData } from '@/data.jsx';
 
@@ -9,6 +11,7 @@ import { useOverviewData } from '@/data.jsx';
 //   stations: kds.tickets + kds.device_sessions from Supabase
 
 const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
+  const { t } = useLingui();
   const [refresh, setRefresh] = useState(0);
   const { data, loading } = useOverviewData(refresh);
 
@@ -18,7 +21,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
 
   const supportMetrics = [
     {
-      lbl: 'Ingresos del mes',
+      lbl: t`Ingresos del mes`,
       val: ov.revenueThisMonth || '–',
       delta:
         ov.revenueDeltaPct != null
@@ -27,7 +30,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
       up: ov.revenueDeltaPct == null || ov.revenueDeltaPct >= 0,
     },
     {
-      lbl: 'Visitas hoy',
+      lbl: t`Visitas hoy`,
       val: ov.visitsToday != null ? String(ov.visitsToday) : '–',
       delta:
         ov.visitsDeltaPct != null
@@ -36,7 +39,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
       up: ov.visitsDeltaPct == null || ov.visitsDeltaPct >= 0,
     },
     {
-      lbl: 'Tarjetas de regalo abiertas',
+      lbl: t`Tarjetas de regalo abiertas`,
       val: ov.openGiftCards != null ? String(ov.openGiftCards) : '–',
       delta:
         ov.openGiftCardsDelta != null
@@ -45,7 +48,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
       up: ov.openGiftCardsDelta == null || ov.openGiftCardsDelta >= 0,
     },
     {
-      lbl: 'Recompensas canjeadas · 7d',
+      lbl: t`Recompensas canjeadas · 7d`,
       val: ov.rewardsRedeemed7d != null ? String(ov.rewardsRedeemed7d) : '–',
       delta:
         ov.rewardsDelta7d != null ? (ov.rewardsDelta7d > 0 ? '+' : '') + ov.rewardsDelta7d : '–',
@@ -53,14 +56,14 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
     },
   ];
 
-  const nowLabel = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+  const nowLabel = formatTime(new Date());
   const alerts = [
     ordersPaused && {
       kind: 'warn',
       time: nowLabel,
-      ttl: 'Pedidos WhatsApp pausados',
-      sub: 'Pausado · aviso especial activo',
-      cta: ordersPaused ? 'Reanudar' : 'Pausar',
+      ttl: t`Pedidos WhatsApp pausados`,
+      sub: t`Pausado · aviso especial activo`,
+      cta: ordersPaused ? t`Reanudar` : t`Pausar`,
       onCta: () => setOrdersPaused((p) => !p),
     },
   ].filter(Boolean);
@@ -78,16 +81,22 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
         <div className="hero-metric">
           <div className="h-head">
             <div>
-              <div className="lbl-es">Miembros activos</div>
-              <div className="lbl-en">Inscritos en el programa de lealtad</div>
+              <div className="lbl-es">
+                <Trans>Miembros activos</Trans>
+              </div>
+              <div className="lbl-en">
+                <Trans>Inscritos en el programa de lealtad</Trans>
+              </div>
             </div>
             {ov.memberHistory?.length > 1 && (
               <Spark data={ov.memberHistory} up={true} width={140} height={36} />
             )}
           </div>
           <div className="big">
-            {ov.activeMembers != null ? ov.activeMembers.toLocaleString('es-MX') : '–'}
-            <span className="unit">total</span>
+            {ov.activeMembers != null ? formatNumber(ov.activeMembers) : '–'}
+            <span className="unit">
+              <Trans>total</Trans>
+            </span>
           </div>
           <div className="h-foot">
             {/* `delta up` is the GREEN pill. "Sin cambio calculado" is not good news
@@ -97,21 +106,29 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
               className={'delta ' + (ov.memberDeltaPct == null ? 'none' : 'up')}
               style={{ padding: '4px 10px', fontSize: 13 }}
             >
-              {ov.memberDeltaPct != null ? `↑ ${ov.memberDeltaPct}%` : 'Sin cambio calculado'}
-              <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: 4 }}>· 28 días</span>
+              {ov.memberDeltaPct != null ? `↑ ${ov.memberDeltaPct}%` : t`Sin cambio calculado`}
+              <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: 4 }}>
+                · <Trans>28 días</Trans>
+              </span>
             </span>
             <span className="compare">
-              {ov.newThisWeek != null
-                ? '+' + ov.newThisWeek.toLocaleString('es-MX') + ' nuevos esta semana'
-                : 'Nuevos sin calcular'}
+              {ov.newThisWeek != null ? (
+                <Trans>+{formatNumber(ov.newThisWeek)} nuevos esta semana</Trans>
+              ) : (
+                <Trans>Nuevos sin calcular</Trans>
+              )}
               {' · '}
-              {ov.birthdayActivatable != null
-                ? ov.birthdayActivatable + ' cumpleaños activables'
-                : 'Cumpleaños sin calcular'}
+              {ov.birthdayActivatable != null ? (
+                <Trans>{ov.birthdayActivatable} cumpleaños activables</Trans>
+              ) : (
+                <Trans>Cumpleaños sin calcular</Trans>
+              )}
               {' · '}
-              {ov.highBalanceCount != null
-                ? ov.highBalanceCount + ' con saldo > $1,000'
-                : 'Saldos altos sin calcular'}
+              {ov.highBalanceCount != null ? (
+                <Trans>{ov.highBalanceCount} con saldo &gt; $1,000</Trans>
+              ) : (
+                <Trans>Saldos altos sin calcular</Trans>
+              )}
             </span>
           </div>
         </div>
@@ -125,7 +142,9 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
               {/* An arrow next to an unknown delta claims a direction the data does
                   not have. When there is no comparison, the slot stays empty. */}
               {m.delta === '–' ? (
-                <span className="delta-mini none">sin comparar</span>
+                <span className="delta-mini none">
+                  <Trans>sin comparar</Trans>
+                </span>
               ) : (
                 <span className={'delta-mini ' + (m.up ? 'up' : 'down')}>
                   {m.up ? '↑' : '↓'} {m.delta}
@@ -139,9 +158,9 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
       {/* KDS station rail */}
       <section>
         <RegionHead
-          title="Estaciones de cocina"
-          note={loading ? 'Actualizando…' : 'Cada estación del KDS y cómo responde ahora.'}
-          count={{ value: stations.length, label: 'estaciones' }}
+          title={t`Estaciones de cocina`}
+          note={loading ? t`Actualizando…` : t`Cada estación del KDS y cómo responde ahora.`}
+          count={{ value: stations.length, label: t`estaciones` }}
           actions={
             <>
               {/* The legend for the dots the rail below uses. Each pairs the dot
@@ -149,20 +168,20 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
                   apart. */}
               <span className="dot-legend">
                 <span>
-                  <span className="s-dot live" /> En vivo
+                  <span className="s-dot live" /> <Trans>En vivo</Trans>
                 </span>
                 <span>
-                  <span className="s-dot slow" /> Lento
+                  <span className="s-dot slow" /> <Trans>Lento</Trans>
                 </span>
                 <span>
-                  <span className="s-dot offline" /> Sin conexión
+                  <span className="s-dot offline" /> <Trans>Sin conexión</Trans>
                 </span>
               </span>
               <button
                 className="btn-icon focusable"
                 onClick={() => setRefresh((r) => r + 1)}
-                aria-label="Actualizar las estaciones"
-                title="Actualizar"
+                aria-label={t`Actualizar las estaciones`}
+                title={t`Actualizar`}
               >
                 <I.Refresh size={13} />
               </button>
@@ -181,7 +200,7 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
               <div className="station-name">{s.station_name}</div>
               <div className="station-num">
                 {s.open}
-                <em>{s.status === 'offline' ? 'cerrado' : 'abiertos'}</em>
+                <em>{s.status === 'offline' ? <Trans>cerrado</Trans> : <Trans>abiertos</Trans>}</em>
               </div>
               <div className="station-foot">{s.foot}</div>
             </div>
@@ -194,22 +213,26 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
         <div>
           <div className="ed-head">
             <div className="titles">
-              <h2>Centro de acción</h2>
+              <h2>
+                <Trans>Centro de acción</Trans>
+              </h2>
               <div className="en">
-                {alerts.length === 0
-                  ? 'Nada pendiente ahora mismo.'
-                  : `${alerts.length} pendiente${alerts.length === 1 ? '' : 's'}.`}
+                {alerts.length === 0 ? (
+                  <Trans>Nada pendiente ahora mismo.</Trans>
+                ) : (
+                  <Plural value={alerts.length} one="# pendiente." other="# pendientes." />
+                )}
               </div>
             </div>
             <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('orders')}>
-              Ver pedidos <I.ArrowRight size={14} />
+              <Trans>Ver pedidos</Trans> <I.ArrowRight size={14} />
             </button>
           </div>
 
           <div className="log-list">
             {alerts.length === 0 && (
               <div className="card" style={{ padding: '28px 22px', color: 'var(--ink-3)' }}>
-                Sin alertas operativas.
+                <Trans>Sin alertas operativas.</Trans>
               </div>
             )}
             {alerts.map((a, i) => (
@@ -262,11 +285,10 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
                 gap: 8,
               }}
             >
-              Escaneo cada 60 s · última verificación{' '}
-              {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+              <Trans>Escaneo cada 60 s · última verificación {nowLabel}</Trans>
             </div>
             <button className="btn btn-ghost btn-sm" onClick={() => setRefresh((r) => r + 1)}>
-              <I.Refresh size={13} /> Re-escanear
+              <I.Refresh size={13} /> <Trans>Re-escanear</Trans>
             </button>
           </div>
         </div>
@@ -274,23 +296,24 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
         {/* Context panels */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <ContextPanel
-            eyebrow="Hoy · ConversaFlow"
-            title="Pedidos WhatsApp"
+            eyebrow={t`Hoy · ConversaFlow`}
+            title={t`Pedidos WhatsApp`}
             primary={ov.ordersToday != null ? String(ov.ordersToday) : '–'}
             sub={
-              'pedidos · ticket promedio ' +
-              (ov.avgTicketMXN != null ? '$ ' + ov.avgTicketMXN : 'sin calcular')
+              ov.avgTicketMXN != null
+                ? t`pedidos · ticket promedio $ ${ov.avgTicketMXN}`
+                : t`pedidos · ticket promedio sin calcular`
             }
             rows={[
               {
-                lbl: 'Aceptados',
+                lbl: t`Aceptados`,
                 val: ov.ordersAccepted != null ? String(ov.ordersAccepted) : '–',
                 sub: ov.ordersToday
                   ? Math.round(((ov.ordersAccepted || 0) / ov.ordersToday) * 100) + '%'
                   : '–',
               },
               {
-                lbl: 'Cancelados',
+                lbl: t`Cancelados`,
                 val: ov.ordersCancelled != null ? String(ov.ordersCancelled) : '–',
                 sub: ov.ordersToday
                   ? Math.round(((ov.ordersCancelled || 0) / ov.ordersToday) * 100) + '%'
@@ -299,18 +322,18 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
             ]}
           />
           <ContextPanel
-            eyebrow="Hoy · Umi Cash"
-            title="Actividad del monedero"
+            eyebrow={t`Hoy · Umi Cash`}
+            title={t`Actividad del monedero`}
             primary={ov.walletProcessedToday || '–'}
-            sub="MXN procesado hoy"
+            sub={t`MXN procesado hoy`}
             rows={[
               {
-                lbl: 'Top-ups',
+                lbl: t`Recargas`,
                 val: ov.topupsTodayMXN || '–',
                 sub: ov.topupsTodayCount != null ? ov.topupsTodayCount + ' tx' : '–',
               },
               {
-                lbl: 'Canjes',
+                lbl: t`Canjes`,
                 val: ov.redemptionsTodayMXN || '–',
                 sub: ov.redemptionsTodayCount != null ? ov.redemptionsTodayCount + ' tx' : '–',
               },
@@ -328,7 +351,7 @@ const LiveTicker = ({ events }) => {
     <div className="ticker">
       <div className="ticker-tag">
         <span className="pulse" />
-        EN VIVO
+        <Trans>EN VIVO</Trans>
       </div>
       <div className="ticker-rail">
         <div className="ticker-track">

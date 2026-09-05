@@ -12,6 +12,7 @@ export default defineConfig({
     'src/route-table.ts',
     'src/entitlements.ts',
     'src/platform.ts',
+    'src/realtime-channels.ts',
   ],
   format: ['cjs', 'esm'],
   dts: true,

@@ -1,5 +1,8 @@
 import { useState, useEffect, useId } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatTime } from '@/lib/format.js';
 import { RegionHead, XSep } from '@/shell.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { REALTIME_STATE, useDevicesRealtime } from '@/lib/device-realtime.js';
@@ -39,13 +42,13 @@ const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
 
 // Derive human-readable last-seen from last_used_at timestamp
-function fmtLastSeen(lastUsedAt) {
-  if (!lastUsedAt) return 'never';
+function fmtLastSeen(t, lastUsedAt) {
+  if (!lastUsedAt) return t`nunca`;
   var ms = Date.now() - new Date(lastUsedAt).getTime();
-  if (ms < 10000) return 'just now';
-  if (ms < 60000) return Math.floor(ms / 1000) + ' s ago';
-  if (ms < 3600000) return Math.floor(ms / 60000) + ' min ago';
-  return Math.floor(ms / 3600000) + 'h ago';
+  if (ms < 10000) return t`hace un momento`;
+  if (ms < 60000) return t`hace ${Math.floor(ms / 1000)} s`;
+  if (ms < 3600000) return t`hace ${Math.floor(ms / 60000)} min`;
+  return t`hace ${Math.floor(ms / 3600000)} h`;
 }
 
 function deriveStatus(lastUsedAt) {
@@ -61,6 +64,7 @@ const POLL_INTERVAL = 10; // seconds — REST fallback and offline detection. Th
 // primary freshness source.
 
 const DevicesScreen = () => {
+  const { t } = useLingui();
   const [refresh, setRefresh] = useState(0);
   const [stationOpen, setStationOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -122,10 +126,10 @@ const DevicesScreen = () => {
   });
   const realtimeChip =
     realtimeState === REALTIME_STATE.LIVE
-      ? { text: 'En vivo', cls: 'live' }
+      ? { text: t`En vivo`, cls: 'live' }
       : realtimeState === REALTIME_STATE.CONNECTING
-        ? { text: 'Conectando…', cls: 'connecting' }
-        : { text: 'Sondeo 10 s', cls: 'polling' };
+        ? { text: t`Conectando…`, cls: 'connecting' }
+        : { text: t`Sondeo 10 s`, cls: 'polling' };
   useEffect(
     function () {
       if (!posProductEnabled) {
@@ -171,7 +175,9 @@ const DevicesScreen = () => {
       status: connectionStatus,
       hasHeartbeat: !!hbStatus,
       open: d.open || 0,
-      last: hbSeenMs ? fmtLastSeen(new Date(hbSeenMs).toISOString()) : fmtLastSeen(d.last_used_at),
+      last: hbSeenMs
+        ? fmtLastSeen(t, new Date(hbSeenMs).toISOString())
+        : fmtLastSeen(t, d.last_used_at),
       pin: d.pin || '• • • • • •',
       model: d.model || 'iPad',
       ip: d.ip || '—',
@@ -187,16 +193,21 @@ const DevicesScreen = () => {
     return d.status === 'live';
   }).length;
   const totalDevices = devices.length + posCards.length;
-  const headNote = posCards.length
-    ? `${liveCount} KDS en vivo · ${posCards.length} ${posCards.length === 1 ? 'caja' : 'cajas'} UmiPOS`
-    : `${liveCount} en vivo ahora mismo.`;
+  const headNote = posCards.length ? (
+    <>
+      <Trans>{liveCount} KDS en vivo</Trans> ·{' '}
+      <Plural value={posCards.length} one="# caja UmiPOS" other="# cajas UmiPOS" />
+    </>
+  ) : (
+    <Trans>{liveCount} en vivo ahora mismo.</Trans>
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
-        title="Dispositivos pareados"
-        note={loaded ? headNote : 'Actualizando…'}
-        count={{ value: totalDevices, label: 'dispositivos' }}
+        title={t`Dispositivos pareados`}
+        note={loaded ? headNote : t`Actualizando…`}
+        count={{ value: totalDevices, label: t`dispositivos` }}
         actions={
           <>
             <span
@@ -204,8 +215,8 @@ const DevicesScreen = () => {
               style={{ fontSize: 10.5, height: 22, alignSelf: 'center' }}
               title={
                 realtimeState === REALTIME_STATE.LIVE
-                  ? 'Actualización en vivo por el canal en tiempo real.'
-                  : 'El canal en tiempo real no responde; la lista se actualiza cada 10 s.'
+                  ? t`Actualización en vivo por el canal en tiempo real.`
+                  : t`El canal en tiempo real no responde; la lista se actualiza cada 10 s.`
               }
             >
               {realtimeChip.text}
@@ -216,13 +227,13 @@ const DevicesScreen = () => {
                 setRefresh((r) => r + 1);
               }}
             >
-              <I.Refresh size={14} /> Actualizar
+              <I.Refresh size={14} /> <Trans>Actualizar</Trans>
             </button>
             <button className="btn btn-secondary focusable" onClick={() => setStationOpen(true)}>
-              <I.Layout size={16} /> Estaciones
+              <I.Layout size={16} /> <Trans>Estaciones</Trans>
             </button>
             <button className="btn btn-primary focusable" onClick={() => setAddOpen(true)}>
-              <I.Plus size={16} /> Añadir dispositivo
+              <I.Plus size={16} /> <Trans>Añadir dispositivo</Trans>
             </button>
           </>
         }
@@ -305,7 +316,7 @@ const DevicesScreen = () => {
                         flexShrink: 0,
                       }}
                     >
-                      {d.station || 'SIN ASIGNAR'}
+                      {d.station || t`SIN ASIGNAR`}
                     </span>
                     <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
                       {d.locationName}
@@ -332,26 +343,28 @@ const DevicesScreen = () => {
                       <span className={'s-dot ' + d.status} />
                       {!loaded && d.status !== 'live' ? (
                         <span style={{ color: 'var(--warning)', fontStyle: 'italic' }}>
-                          Reconectando…
+                          <Trans>Reconectando…</Trans>
                         </span>
                       ) : d.status === 'live' ? (
-                        'Live'
+                        <Trans>En vivo</Trans>
                       ) : d.status === 'slow' ? (
-                        'Slow'
+                        <Trans>Lento</Trans>
                       ) : (
-                        'Offline'
+                        <Trans>Sin conexión</Trans>
                       )}
                     </span>
                     <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
                       ·
                     </span>
-                    <span style={{ whiteSpace: 'nowrap' }}>Visto {d.last}</span>
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                      <Trans>Visto {d.last}</Trans>
+                    </span>
                   </div>
                 </div>
 
                 <div style={{ textAlign: 'center', flexShrink: 0 }}>
                   <div className="eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>
-                    ÓRDENES
+                    <Trans>ÓRDENES</Trans>
                   </div>
                   <div
                     style={{
@@ -372,7 +385,7 @@ const DevicesScreen = () => {
                     e.stopPropagation();
                     setEditDevice(d);
                   }}
-                  aria-label="Editar dispositivo"
+                  aria-label={t`Editar dispositivo`}
                 >
                   <I.Edit size={15} />
                 </button>
@@ -457,8 +470,8 @@ const DevicesScreen = () => {
 };
 
 const POS_STATUS_LABELS = {
-  registered: 'Registrado',
-  rotation: 'Rotación pendiente',
+  registered: msg`Registrado`,
+  rotation: msg`Rotación pendiente`,
 };
 
 /**
@@ -467,126 +480,133 @@ const POS_STATUS_LABELS = {
  * platform and a floor-use label where an iPad carries a station, and it reports no
  * order count because it never had one to report.
  */
-export const PosDeviceCard = ({ device, onEdit }) => (
-  <div
-    className={'list-card ' + device.status}
-    style={{ padding: 0, paddingRight: 16, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
-    onClick={onEdit}
-    onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'var(--shadow-pop)')}
-    onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '')}
-  >
-    <div className="l-strip" />
+export const PosDeviceCard = ({ device, onEdit }) => {
+  const { t, i18n } = useLingui();
+  return (
     <div
-      style={{
-        paddingTop: 14,
-        paddingBottom: 14,
-        flex: 1,
-        display: 'flex',
-        gap: 14,
-        alignItems: 'center',
-        minWidth: 0,
-      }}
+      className={'list-card ' + device.status}
+      style={{ padding: 0, paddingRight: 16, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+      onClick={onEdit}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'var(--shadow-pop)')}
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '')}
     >
+      <div className="l-strip" />
       <div
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          background: 'var(--canvas-2)',
-          color: 'var(--umi-navy)',
+          paddingTop: 14,
+          paddingBottom: 14,
+          flex: 1,
           display: 'flex',
+          gap: 14,
           alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
+          minWidth: 0,
         }}
       >
-        <I.Monitor size={18} />
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: 'var(--canvas-2)',
+            color: 'var(--umi-navy)',
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            marginBottom: 3,
-            flexWrap: 'wrap',
+            justifyContent: 'center',
+            flexShrink: 0,
           }}
         >
-          <span
-            style={{
-              fontWeight: 600,
-              fontSize: 14,
-              color: 'var(--ink-1)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {device.name}
-          </span>
-          <span
-            className="chip"
-            style={{
-              fontSize: 10,
-              height: 20,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              flexShrink: 0,
-            }}
-          >
-            {device.platformLabel.toUpperCase()}
-          </span>
-          <span
-            className="chip"
-            style={{
-              fontSize: 10,
-              height: 20,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              flexShrink: 0,
-            }}
-          >
-            {device.mobilityLabel.toUpperCase()}
-          </span>
-          <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
-            {device.locationName}
-          </span>
+          <I.Monitor size={18} />
         </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 12,
-            color: 'var(--ink-3)',
-            flexWrap: 'nowrap',
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-            <span className={'s-dot ' + device.status} />
-            {POS_STATUS_LABELS[device.status] || device.status}
-          </span>
-          <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
-            ·
-          </span>
-          <span style={{ whiteSpace: 'nowrap' }}>Visto {device.last}</span>
-        </div>
-      </div>
 
-      <button
-        className="btn-icon focusable"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit();
-        }}
-        aria-label="Editar caja"
-      >
-        <I.Edit size={15} />
-      </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 3,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: 14,
+                color: 'var(--ink-1)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {device.name}
+            </span>
+            <span
+              className="chip"
+              style={{
+                fontSize: 10,
+                height: 20,
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                flexShrink: 0,
+              }}
+            >
+              {device.platformLabel.toUpperCase()}
+            </span>
+            <span
+              className="chip"
+              style={{
+                fontSize: 10,
+                height: 20,
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                flexShrink: 0,
+              }}
+            >
+              {device.mobilityLabel.toUpperCase()}
+            </span>
+            <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
+              {device.locationName}
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              color: 'var(--ink-3)',
+              flexWrap: 'nowrap',
+            }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <span className={'s-dot ' + device.status} />
+              {POS_STATUS_LABELS[device.status]
+                ? i18n._(POS_STATUS_LABELS[device.status])
+                : device.status}
+            </span>
+            <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
+              ·
+            </span>
+            <span style={{ whiteSpace: 'nowrap' }}>
+              <Trans>Visto {device.last}</Trans>
+            </span>
+          </div>
+        </div>
+
+        <button
+          className="btn-icon focusable"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          aria-label={t`Editar caja`}
+        >
+          <I.Edit size={15} />
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * The POS detail sheet. It is a sibling of `EditDevicePanel`, not a branch inside it:
@@ -594,6 +614,7 @@ export const PosDeviceCard = ({ device, onEdit }) => (
  * has neither. Sharing it was what made the edit button open a blank sheet.
  */
 export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
+  const { t, i18n } = useLingui();
   const uid = useId();
   const [name, setName] = useState(device.name);
   const [mobility, setMobility] = useState(device.mobility || 'static');
@@ -611,7 +632,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
       onSaved && onSaved();
     } catch (failure) {
       console.error('[umipos] device update failed', failure);
-      setError('No se pudieron guardar los cambios. Intenta de nuevo.');
+      setError(t`No se pudieron guardar los cambios. Intenta de nuevo.`);
       setSaving(false);
     }
   }
@@ -624,7 +645,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
       onSaved && onSaved();
     } catch (failure) {
       console.error('[umipos] device revoke failed', failure);
-      setError('No se pudo revocar la caja. Intenta de nuevo.');
+      setError(t`No se pudo revocar la caja. Intenta de nuevo.`);
       setRemoving(false);
     }
   }
@@ -635,12 +656,14 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">UmiPOS · Dispositivo</div>
+            <div className="eyebrow">
+              <Trans>UmiPOS · Dispositivo</Trans>
+            </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Gestionar caja
+              <Trans>Gestionar caja</Trans>
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
@@ -668,14 +691,18 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                 <span className={'s-dot ' + device.status} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
-                  {POS_STATUS_LABELS[device.status] || device.status}
+                  {POS_STATUS_LABELS[device.status]
+                    ? i18n._(POS_STATUS_LABELS[device.status])
+                    : device.status}
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Visto {device.last}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                <Trans>Visto {device.last}</Trans>
+              </div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>
-                CREDENCIAL
+                <Trans>CREDENCIAL</Trans>
               </div>
               <div
                 style={{
@@ -692,19 +719,23 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
           </div>
 
           <div className="field">
-            <label htmlFor={`${uid}-pos-device-name`}>Nombre del dispositivo</label>
+            <label htmlFor={`${uid}-pos-device-name`}>
+              <Trans>Nombre del dispositivo</Trans>
+            </label>
             <input
               id={`${uid}-pos-device-name`}
               className="input tall"
               maxLength={120}
-              placeholder="Caja principal"
+              placeholder={t`Caja principal`}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="field">
-            <label htmlFor={`${uid}-pos-device-mobility`}>Modalidad</label>
+            <label htmlFor={`${uid}-pos-device-mobility`}>
+              <Trans>Modalidad</Trans>
+            </label>
             <select
               id={`${uid}-pos-device-mobility`}
               className="select"
@@ -716,30 +747,38 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
               <option value="mobile">{mobilityLabel('mobile')}</option>
             </select>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva a la
-              mesa.
+              <Trans>
+                Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva a la
+                mesa.
+              </Trans>
             </span>
           </div>
 
           <div className="field">
-            <span className="field-label">Plataforma</span>
+            <span className="field-label">
+              <Trans>Plataforma</Trans>
+            </span>
             <div className="input tall" style={{ display: 'flex', alignItems: 'center' }}>
               {platformLabel(device.platform)}
             </div>
           </div>
 
           <div className="field">
-            <span className="field-label">Sucursal</span>
+            <span className="field-label">
+              <Trans>Sucursal</Trans>
+            </span>
             <div className="input tall" style={{ display: 'flex', alignItems: 'center' }}>
               {device.locationName}
             </div>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              Para cambiar la sucursal, registra el dispositivo otra vez.
+              <Trans>Para cambiar la sucursal, registra el dispositivo otra vez.</Trans>
             </span>
           </div>
 
           <div className="field">
-            <span className="field-label">ID público</span>
+            <span className="field-label">
+              <Trans>ID público</Trans>
+            </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 className="pin-box"
@@ -757,7 +796,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
               <button
                 className="pin-reveal focusable"
                 onClick={() => setReveal((r) => !r)}
-                aria-label={reveal ? 'Ocultar' : 'Mostrar'}
+                aria-label={reveal ? t`Ocultar` : t`Mostrar`}
               >
                 {reveal ? <I.EyeOff size={15} /> : <I.Eye size={15} />}
               </button>
@@ -785,13 +824,14 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
               disabled={removing}
               onClick={() => setConfirmingRevoke(true)}
             >
-              <I.Trash size={14} /> {removing ? 'Revocando…' : 'Revocar caja'}
+              <I.Trash size={14} />{' '}
+              {removing ? <Trans>Revocando…</Trans> : <Trans>Revocar caja</Trans>}
             </button>
           </div>
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cancelar
+            <Trans>Cancelar</Trans>
           </button>
           <button
             className="btn btn-primary focusable"
@@ -799,7 +839,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
             style={{ opacity: name.trim() && !saving ? 1 : 0.5 }}
             onClick={save}
           >
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+            {saving ? <Trans>Guardando…</Trans> : <Trans>Guardar cambios</Trans>}
           </button>
         </div>
       </aside>
@@ -815,23 +855,27 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
               }}
             >
               <div>
-                <div className="eyebrow">UmiPOS · Acceso</div>
+                <div className="eyebrow">
+                  <Trans>UmiPOS · Acceso</Trans>
+                </div>
                 <h2 className="h-section" style={{ marginTop: 4 }}>
-                  Revocar caja
+                  <Trans>Revocar caja</Trans>
                 </h2>
               </div>
               <button
                 className="btn-icon"
                 disabled={removing}
                 onClick={() => setConfirmingRevoke(false)}
-                aria-label="Cerrar"
+                aria-label={t`Cerrar`}
               >
                 <I.X size={16} />
               </button>
             </div>
             <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
-              Esta caja pierde su credencial de inmediato. Para volver a usarla, crea un código de
-              registro nuevo y regístrala otra vez.
+              <Trans>
+                Esta caja pierde su credencial de inmediato. Para volver a usarla, crea un código de
+                registro nuevo y regístrala otra vez.
+              </Trans>
             </p>
             {error && (
               <div
@@ -853,10 +897,10 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
                 disabled={removing}
                 onClick={() => setConfirmingRevoke(false)}
               >
-                Cancelar
+                <Trans>Cancelar</Trans>
               </button>
               <button className="btn btn-primary focusable" disabled={removing} onClick={remove}>
-                {removing ? 'Revocando…' : 'Revocar'}
+                {removing ? <Trans>Revocando…</Trans> : <Trans>Revocar</Trans>}
               </button>
             </div>
           </div>
@@ -867,19 +911,19 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
 };
 
 const PAIRING_ERROR_MESSAGES = {
-  pairing_not_pending: 'Esta solicitud ya expiró o fue atendida. Actualiza la lista.',
-  invalid_pairing_id: 'Solicitud inválida.',
+  pairing_not_pending: msg`Esta solicitud ya expiró o fue atendida. Actualiza la lista.`,
+  invalid_pairing_id: msg`Solicitud inválida.`,
 };
 
 // Show operators friendly copy; the raw error (code, status, path) goes to the
 // console for debugging.
-function pairingErrorMessage(err) {
-  return (
-    PAIRING_ERROR_MESSAGES[err && err.code] || 'No se pudo completar la acción. Intenta de nuevo.'
-  );
+function pairingErrorMessage(i18n, err) {
+  const known = PAIRING_ERROR_MESSAGES[err && err.code];
+  return known ? i18n._(known) : i18n._(msg`No se pudo completar la acción. Intenta de nuevo.`);
 }
 
 const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => {
+  const { t, i18n } = useLingui();
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const stationById = Object.fromEntries(
@@ -895,7 +939,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
       await approveDevicePairing(id);
     } catch (err) {
       console.error('[kds] approve pairing failed', err);
-      setError(pairingErrorMessage(err));
+      setError(pairingErrorMessage(i18n, err));
     } finally {
       setBusy(null);
       onChanged && onChanged();
@@ -909,7 +953,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
       await denyDevicePairing(id);
     } catch (err) {
       console.error('[kds] deny pairing failed', err);
-      setError(pairingErrorMessage(err));
+      setError(pairingErrorMessage(i18n, err));
     } finally {
       setBusy(null);
       onChanged && onChanged();
@@ -925,13 +969,15 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
       >
         <div>
-          <div className="eyebrow">Primer pareo</div>
+          <div className="eyebrow">
+            <Trans>Primer pareo</Trans>
+          </div>
           <h2 className="h-section" style={{ marginTop: 4 }}>
-            Solicitudes KDS pendientes
+            <Trans>Solicitudes KDS pendientes</Trans>
           </h2>
         </div>
         <button className="btn btn-ghost btn-sm" onClick={onChanged}>
-          <I.Refresh size={14} /> Actualizar
+          <I.Refresh size={14} /> <Trans>Actualizar</Trans>
         </button>
       </div>
       {error && (
@@ -950,7 +996,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {pairings.map(function (p) {
           const station = stationById[p.station_id];
-          const requested = p.requested_name || 'Esperando iPad';
+          const requested = p.requested_name || t`Esperando iPad`;
           const pendingApproval = p.status === 'pending' && p.requested_name;
           const expired =
             p.status === 'pending' &&
@@ -987,20 +1033,17 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
                     }}
                   >
                     {p.status === 'approved'
-                      ? 'Aprobado'
+                      ? t`Aprobado`
                       : expired
-                        ? 'Expirada'
+                        ? t`Expirada`
                         : pendingApproval
-                          ? 'Confirmar'
-                          : 'Esperando'}
+                          ? t`Confirmar`
+                          : t`Esperando`}
                   </span>
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-                  iPad · {requested} <XSep /> expira{' '}
-                  {new Date(p.expires_at).toLocaleTimeString('es-MX', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  <Trans>iPad · {requested}</Trans> <XSep />{' '}
+                  <Trans>expira {formatTime(p.expires_at)}</Trans>
                 </div>
               </div>
               {p.status === 'pending' && (
@@ -1010,7 +1053,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
                     disabled={busy === p.id + ':deny'}
                     onClick={() => deny(p.id)}
                   >
-                    <I.X size={14} /> Rechazar
+                    <I.X size={14} /> <Trans>Rechazar</Trans>
                   </button>
                   <button
                     className="btn btn-primary btn-sm"
@@ -1018,7 +1061,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
                     style={{ opacity: p.requested_name && !expired ? 1 : 0.5 }}
                     onClick={() => approve(p.id)}
                   >
-                    <I.Check size={14} /> Aprobar
+                    <I.Check size={14} /> <Trans>Aprobar</Trans>
                   </button>
                 </div>
               )}
@@ -1031,6 +1074,7 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
 };
 
 const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
+  const { t } = useLingui();
   const uid = useId();
   const [name, setName] = useState(device.name);
   const [station, setStation] = useState(device.stationId || '');
@@ -1065,7 +1109,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
   }
 
   const statusLabel =
-    device.status === 'live' ? 'En vivo' : device.status === 'slow' ? 'Lento' : 'Sin conexión';
+    device.status === 'live' ? t`En vivo` : device.status === 'slow' ? t`Lento` : t`Sin conexión`;
 
   return (
     <>
@@ -1073,12 +1117,14 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">KDS · Dispositivo</div>
+            <div className="eyebrow">
+              <Trans>KDS · Dispositivo</Trans>
+            </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Gestionar dispositivo
+              <Trans>Gestionar dispositivo</Trans>
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
@@ -1110,11 +1156,13 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
                   {statusLabel}
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Visto {device.last}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                <Trans>Visto {device.last}</Trans>
+              </div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div className="eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>
-                ÓRDENES ABIERTAS
+                <Trans>ÓRDENES ABIERTAS</Trans>
               </div>
               <div
                 style={{
@@ -1131,18 +1179,22 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
           </div>
 
           <div className="field">
-            <label htmlFor={`${uid}-nombre-del-dispositivo`}>Nombre del dispositivo</label>
+            <label htmlFor={`${uid}-nombre-del-dispositivo`}>
+              <Trans>Nombre del dispositivo</Trans>
+            </label>
             <input
               id={`${uid}-nombre-del-dispositivo`}
               className="input tall"
-              placeholder="e.g. Cocina Caliente 1"
+              placeholder={t`p. ej. Cocina Caliente 1`}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </div>
 
           <div className="field">
-            <label htmlFor={`${uid}-estacion-asignada`}>Estación asignada</label>
+            <label htmlFor={`${uid}-estacion-asignada`}>
+              <Trans>Estación asignada</Trans>
+            </label>
             <select
               id={`${uid}-estacion-asignada`}
               className="select"
@@ -1150,7 +1202,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
               value={station}
               onChange={(e) => setStation(e.target.value)}
             >
-              <option value="">Sin asignar</option>
+              <option value="">{t`Sin asignar`}</option>
               {(stations || []).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -1160,17 +1212,21 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
           </div>
 
           <div className="field">
-            <span className="field-label">Sucursal</span>
+            <span className="field-label">
+              <Trans>Sucursal</Trans>
+            </span>
             <div className="input tall" style={{ display: 'flex', alignItems: 'center' }}>
               {device.locationName}
             </div>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              Para cambiar la sucursal, registra el dispositivo otra vez.
+              <Trans>Para cambiar la sucursal, registra el dispositivo otra vez.</Trans>
             </span>
           </div>
 
           <div className="field">
-            <span className="field-label">ID de sesión</span>
+            <span className="field-label">
+              <Trans>ID de sesión</Trans>
+            </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 className="pin-box"
@@ -1188,7 +1244,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
               <button
                 className="pin-reveal focusable"
                 onClick={() => setReveal((r) => !r)}
-                aria-label={reveal ? 'Ocultar' : 'Mostrar'}
+                aria-label={reveal ? t`Ocultar` : t`Mostrar`}
               >
                 {reveal ? <I.EyeOff size={15} /> : <I.Eye size={15} />}
               </button>
@@ -1216,13 +1272,14 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
               disabled={removing}
               onClick={() => setConfirmingRevoke(true)}
             >
-              <I.Trash size={14} /> {removing ? 'Revocando…' : 'Revocar dispositivo'}
+              <I.Trash size={14} />{' '}
+              {removing ? <Trans>Revocando…</Trans> : <Trans>Revocar dispositivo</Trans>}
             </button>
           </div>
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cancelar
+            <Trans>Cancelar</Trans>
           </button>
           <button
             className="btn btn-primary focusable"
@@ -1230,7 +1287,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
             style={{ opacity: name.trim() && !saving ? 1 : 0.5 }}
             onClick={save}
           >
-            {saving ? 'Guardando…' : 'Guardar cambios'}
+            {saving ? <Trans>Guardando…</Trans> : <Trans>Guardar cambios</Trans>}
           </button>
         </div>
       </aside>
@@ -1246,22 +1303,24 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
               }}
             >
               <div>
-                <div className="eyebrow">KDS · Acceso</div>
+                <div className="eyebrow">
+                  <Trans>KDS · Acceso</Trans>
+                </div>
                 <h2 className="h-section" style={{ marginTop: 4 }}>
-                  Revocar dispositivo
+                  <Trans>Revocar dispositivo</Trans>
                 </h2>
               </div>
               <button
                 className="btn-icon"
                 disabled={removing}
                 onClick={() => setConfirmingRevoke(false)}
-                aria-label="Cerrar"
+                aria-label={t`Cerrar`}
               >
                 <I.X size={16} />
               </button>
             </div>
             <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
-              Este iPad se cerrará y tendrá que parearse de nuevo con un PIN.
+              <Trans>Este iPad se cerrará y tendrá que parearse de nuevo con un PIN.</Trans>
             </p>
             {error && (
               <div
@@ -1283,10 +1342,10 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
                 disabled={removing}
                 onClick={() => setConfirmingRevoke(false)}
               >
-                Cancelar
+                <Trans>Cancelar</Trans>
               </button>
               <button className="btn btn-primary focusable" disabled={removing} onClick={remove}>
-                {removing ? 'Revocando…' : 'Revocar'}
+                {removing ? <Trans>Revocando…</Trans> : <Trans>Revocar</Trans>}
               </button>
             </div>
           </div>
@@ -1321,6 +1380,7 @@ function useCreateStation(onCreated) {
 }
 
 const StationRow = ({ station, count, onChanged, onError }) => {
+  const { t } = useLingui();
   const [name, setName] = useState(station.name);
   const [busy, setBusy] = useState(false);
 
@@ -1358,7 +1418,7 @@ const StationRow = ({ station, count, onChanged, onError }) => {
     if (busy) return;
     if (
       !window.confirm(
-        `¿Archivar la estación "${station.name}"? Dejará de aparecer al asignar dispositivos.`,
+        t`¿Archivar la estación "${station.name}"? Dejará de aparecer al asignar dispositivos.`,
       )
     )
       return;
@@ -1413,12 +1473,18 @@ const StationRow = ({ station, count, onChanged, onError }) => {
             }}
           />
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)', paddingLeft: 8, marginTop: -2 }}>
-            {count} device{count !== 1 ? 's' : ''} assigned{dirty ? ' · sin guardar' : ''}
+            <Plural value={count} one="# dispositivo asignado" other="# dispositivos asignados" />
+            {dirty ? (
+              <>
+                {' · '}
+                <Trans>sin guardar</Trans>
+              </>
+            ) : null}
           </div>
         </div>
         <button
           className="btn-icon"
-          aria-label="Archivar estación"
+          aria-label={t`Archivar estación`}
           onClick={remove}
           disabled={busy}
         >
@@ -1430,6 +1496,7 @@ const StationRow = ({ station, count, onChanged, onError }) => {
 };
 
 const StationPanel = ({ onClose, devices, stations, onChanged }) => {
+  const { t } = useLingui();
   const uid = useId();
   const [error, setError] = useState(null);
   const list = stations || [];
@@ -1451,23 +1518,27 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">Devices · KDS</div>
+            <div className="eyebrow">
+              <Trans>Dispositivos · KDS</Trans>
+            </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Estaciones
+              <Trans>Estaciones</Trans>
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Close">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
         <div className="sheet-body">
           <p style={{ color: 'var(--ink-2)', margin: 0, fontSize: 13.5 }}>
-            Los tickets se enrutan a estaciones según la categoría del menú. Cada estación puede
-            asignarse a uno o más iPads.
+            <Trans>
+              Los tickets se enrutan a estaciones según la categoría del menú. Cada estación puede
+              asignarse a uno o más iPads.
+            </Trans>
           </p>
           {list.length === 0 && (
             <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
-              Aún no hay estaciones. Crea la primera abajo.
+              <Trans>Aún no hay estaciones. Crea la primera abajo.</Trans>
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1500,12 +1571,14 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
             </div>
           )}
           <div className="field">
-            <label htmlFor={`${uid}-nueva-estacion`}>Nueva estación</label>
+            <label htmlFor={`${uid}-nueva-estacion`}>
+              <Trans>Nueva estación</Trans>
+            </label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 id={`${uid}-nueva-estacion`}
                 className="input"
-                placeholder="e.g. Cocina Caliente"
+                placeholder={t`p. ej. Cocina Caliente`}
                 value={newName}
                 onChange={function (e) {
                   setNewName(e.target.value);
@@ -1520,14 +1593,14 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
                 disabled={saving || !newName.trim()}
                 style={{ whiteSpace: 'nowrap' }}
               >
-                <I.Plus size={16} /> {saving ? 'Creando…' : 'Crear'}
+                <I.Plus size={16} /> {saving ? <Trans>Creando…</Trans> : <Trans>Crear</Trans>}
               </button>
             </div>
           </div>
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cerrar
+            <Trans>Cerrar</Trans>
           </button>
         </div>
       </aside>
@@ -1545,6 +1618,7 @@ const AddDevicePanel = ({
   onBranchChange,
   onProvisioned,
 }) => {
+  const { t } = useLingui();
   const uid = useId();
   const purchaseMessageId = `${uid}-purchase-message`;
   const kdsEnabled = products?.kds === true;
@@ -1622,7 +1696,7 @@ const AddDevicePanel = ({
       onProvisioned && onProvisioned();
     } catch (failure) {
       console.error('[umipos] enrollment request failed', failure);
-      setPosError('No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.');
+      setPosError(t`No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.`);
     } finally {
       setPosSaving(false);
     }
@@ -1641,18 +1715,22 @@ const AddDevicePanel = ({
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">Dispositivos</div>
+            <div className="eyebrow">
+              <Trans>Dispositivos</Trans>
+            </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Añadir dispositivo
+              <Trans>Añadir dispositivo</Trans>
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Close">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label htmlFor={`${uid}-device-location`}>Sucursal</label>
+            <label htmlFor={`${uid}-device-location`}>
+              <Trans>Sucursal</Trans>
+            </label>
             <select
               id={`${uid}-device-location`}
               className="select"
@@ -1668,7 +1746,7 @@ const AddDevicePanel = ({
                 onBranchChange?.(event.target.value);
               }}
             >
-              <option value="">Selecciona una sucursal</option>
+              <option value="">{t`Selecciona una sucursal`}</option>
               {(locations || []).map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
@@ -1676,12 +1754,14 @@ const AddDevicePanel = ({
               ))}
             </select>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              El dispositivo y sus estaciones quedarán vinculados a esta sucursal.
+              <Trans>El dispositivo y sus estaciones quedarán vinculados a esta sucursal.</Trans>
             </span>
           </div>
 
           <div className="field">
-            <label htmlFor={`${uid}-device-product`}>Producto del dispositivo</label>
+            <label htmlFor={`${uid}-device-product`}>
+              <Trans>Producto del dispositivo</Trans>
+            </label>
             <select
               id={`${uid}-device-product`}
               className="select"
@@ -1694,20 +1774,20 @@ const AddDevicePanel = ({
                 setPosError(null);
               }}
             >
-              {!activeDeviceProduct && <option value="">Selecciona un producto</option>}
+              {!activeDeviceProduct && <option value="">{t`Selecciona un producto`}</option>}
               <option
                 value="kds"
                 disabled={!kdsEnabled}
-                title={!kdsEnabled ? 'Necesitas comprar este producto primero.' : undefined}
+                title={!kdsEnabled ? t`Necesitas comprar este producto primero.` : undefined}
               >
-                UmiKDS{!kdsEnabled ? ' — producto no activo' : ''}
+                {kdsEnabled ? 'UmiKDS' : t`UmiKDS — producto no activo`}
               </option>
               <option
                 value="pos"
                 disabled={!posEnabled}
-                title={!posEnabled ? 'Necesitas comprar este producto primero.' : undefined}
+                title={!posEnabled ? t`Necesitas comprar este producto primero.` : undefined}
               >
-                UmiPOS{!posEnabled ? ' — producto no activo' : ''}
+                {posEnabled ? 'UmiPOS' : t`UmiPOS — producto no activo`}
               </option>
             </select>
             {(!kdsEnabled || !posEnabled) && (
@@ -1715,14 +1795,18 @@ const AddDevicePanel = ({
                 <span aria-hidden="true">
                   <I.Lock size={14} />
                 </span>
-                <span>Las opciones en gris requieren un producto activo.</span>
+                <span>
+                  <Trans>Las opciones en gris requieren un producto activo.</Trans>
+                </span>
                 <button
                   type="button"
                   className="device-product-tooltip"
-                  aria-label="Información sobre productos no activos"
+                  aria-label={t`Información sobre productos no activos`}
                 >
-                  ¿Por qué?
-                  <span role="tooltip">Necesitas comprar este producto primero.</span>
+                  <Trans>¿Por qué?</Trans>
+                  <span role="tooltip">
+                    <Trans>Necesitas comprar este producto primero.</Trans>
+                  </span>
                 </button>
               </div>
             )}
@@ -1731,11 +1815,13 @@ const AddDevicePanel = ({
           {activeDeviceProduct === 'kds' && (
             <>
               <div className="field">
-                <label htmlFor={`${uid}-device-name`}>Nombre del dispositivo</label>
+                <label htmlFor={`${uid}-device-name`}>
+                  <Trans>Nombre del dispositivo</Trans>
+                </label>
                 <input
                   id={`${uid}-device-name`}
                   className="input tall"
-                  placeholder="e.g. Cocina Caliente 2"
+                  placeholder={t`p. ej. Cocina Caliente 2`}
                   value={name}
                   onChange={function (e) {
                     setName(e.target.value);
@@ -1743,7 +1829,9 @@ const AddDevicePanel = ({
                 />
               </div>
               <div className="field">
-                <label htmlFor={`${uid}-assign-to-station`}>Estación asignada</label>
+                <label htmlFor={`${uid}-assign-to-station`}>
+                  <Trans>Estación asignada</Trans>
+                </label>
                 {hasStations ? (
                   <select
                     id={`${uid}-assign-to-station`}
@@ -1765,12 +1853,14 @@ const AddDevicePanel = ({
                 ) : (
                   <>
                     <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
-                      No hay estaciones todavía. Crea una para asignar este dispositivo.
+                      <Trans>
+                        No hay estaciones todavía. Crea una para asignar este dispositivo.
+                      </Trans>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
                         className="input"
-                        placeholder="Nombre de la estación"
+                        placeholder={t`Nombre de la estación`}
                         value={newStationName}
                         onChange={function (e) {
                           setNewStationName(e.target.value);
@@ -1785,7 +1875,8 @@ const AddDevicePanel = ({
                         disabled={creatingStation || !newStationName.trim()}
                         style={{ whiteSpace: 'nowrap' }}
                       >
-                        <I.Plus size={16} /> {creatingStation ? 'Creando…' : 'Crear estación'}
+                        <I.Plus size={16} />{' '}
+                        {creatingStation ? <Trans>Creando…</Trans> : <Trans>Crear estación</Trans>}
                       </button>
                     </div>
                   </>
@@ -1806,7 +1897,9 @@ const AddDevicePanel = ({
               )}
               {pairing && (
                 <div className="field">
-                  <span className="field-label">PIN de primer pareo</span>
+                  <span className="field-label">
+                    <Trans>PIN de primer pareo</Trans>
+                  </span>
                   <div
                     className="card-warm"
                     style={{
@@ -1831,34 +1924,34 @@ const AddDevicePanel = ({
                         {pairing.pin.slice(0, 3)} {pairing.pin.slice(3)}
                       </div>
                       <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-warm-soft)' }}>
-                        Esperando solicitud del iPad
+                        <Trans>Esperando solicitud del iPad</Trans>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div className="eyebrow on-warm" style={{ marginBottom: 4 }}>
-                        station
+                        <Trans>estación</Trans>
                       </div>
                       <div style={{ fontWeight: 600, color: 'var(--ink-warm)' }}>
                         {selectedStation?.name || pairing.station_id}
                       </div>
                       <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-warm-soft)' }}>
-                        Expira{' '}
-                        {new Date(pairing.expires_at).toLocaleTimeString('es-MX', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        <Trans>Expira {formatTime(pairing.expires_at)}</Trans>
                       </div>
                     </div>
                   </div>
                   <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-3)' }}>
-                    Enter this PIN on the KDS iPad. When it appears in pending requests, approve it
-                    from this screen.
+                    <Trans>
+                      Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes
+                      pendientes, apruébalo desde esta pantalla.
+                    </Trans>
                   </p>
                 </div>
               )}
               {activePairings.length > 0 && (
                 <div className="field">
-                  <span className="field-label">Solicitudes activas</span>
+                  <span className="field-label">
+                    <Trans>Solicitudes activas</Trans>
+                  </span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {activePairings.map(function (p) {
                       return (
@@ -1866,7 +1959,7 @@ const AddDevicePanel = ({
                           <div style={{ paddingLeft: 12, flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.device_name}</div>
                             <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                              {p.requested_name || 'Esperando iPad'} <XSep /> {p.status}
+                              {p.requested_name || t`Esperando iPad`} <XSep /> {p.status}
                             </div>
                           </div>
                         </div>
@@ -1883,18 +1976,22 @@ const AddDevicePanel = ({
               {!posCreated ? (
                 <>
                   <div className="field">
-                    <label htmlFor={`${uid}-pos-name`}>Nombre del dispositivo</label>
+                    <label htmlFor={`${uid}-pos-name`}>
+                      <Trans>Nombre del dispositivo</Trans>
+                    </label>
                     <input
                       id={`${uid}-pos-name`}
                       className="input tall"
                       value={posName}
                       maxLength={120}
                       onChange={(event) => setPosName(event.target.value)}
-                      placeholder="Caja principal"
+                      placeholder={t`Caja principal`}
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor={`${uid}-pos-platform`}>Plataforma</label>
+                    <label htmlFor={`${uid}-pos-platform`}>
+                      <Trans>Plataforma</Trans>
+                    </label>
                     <select
                       id={`${uid}-pos-platform`}
                       className="select"
@@ -1910,7 +2007,9 @@ const AddDevicePanel = ({
                     </select>
                   </div>
                   <div className="field">
-                    <label htmlFor={`${uid}-pos-mobility`}>Modalidad</label>
+                    <label htmlFor={`${uid}-pos-mobility`}>
+                      <Trans>Modalidad</Trans>
+                    </label>
                     <select
                       id={`${uid}-pos-mobility`}
                       className="select"
@@ -1921,19 +2020,25 @@ const AddDevicePanel = ({
                       <option value="mobile">{mobilityLabel('mobile')}</option>
                     </select>
                     <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-                      Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva
-                      a la mesa.
+                      <Trans>
+                        Estático es una caja fija en el mostrador. Móvil es una terminal que se
+                        lleva a la mesa.
+                      </Trans>
                     </span>
                   </div>
                   <p style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                    La solicitud queda vinculada al negocio y a la sucursal seleccionada.
+                    <Trans>
+                      La solicitud queda vinculada al negocio y a la sucursal seleccionada.
+                    </Trans>
                   </p>
                 </>
               ) : (
                 <div className="card-warm" style={{ padding: 24, textAlign: 'center' }}>
-                  <div className="eyebrow on-warm">Código de configuración</div>
+                  <div className="eyebrow on-warm">
+                    <Trans>Código de configuración</Trans>
+                  </div>
                   <div
-                    aria-label={`Código ${posCreated.setupCode}`}
+                    aria-label={t`Código ${posCreated.setupCode}`}
                     style={{
                       fontFamily: 'var(--font-mono)',
                       fontSize: 38,
@@ -1945,10 +2050,12 @@ const AddDevicePanel = ({
                     {posCreated.setupCode.slice(0, 4)} {posCreated.setupCode.slice(4)}
                   </div>
                   <p style={{ color: 'var(--ink-warm-soft)', marginBottom: 0 }}>
-                    Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla.
+                    <Trans>
+                      Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla.
+                    </Trans>
                   </p>
                   <p style={{ color: 'var(--ink-warm-soft)', fontSize: 12 }}>
-                    Expira a las {new Date(posCreated.expiresAt).toLocaleTimeString('es-MX')}.
+                    <Trans>Expira a las {formatTime(posCreated.expiresAt)}.</Trans>
                   </p>
                 </div>
               )}
@@ -1962,7 +2069,7 @@ const AddDevicePanel = ({
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cerrar
+            <Trans>Cerrar</Trans>
           </button>
           {activeDeviceProduct === 'kds' && (
             <button
@@ -1975,7 +2082,13 @@ const AddDevicePanel = ({
               onClick={createDevice}
             >
               <I.Refresh size={15} />{' '}
-              {saving ? 'Generando…' : pairing ? 'PIN generado' : 'Generar PIN'}
+              {saving ? (
+                <Trans>Generando…</Trans>
+              ) : pairing ? (
+                <Trans>PIN generado</Trans>
+              ) : (
+                <Trans>Generar PIN</Trans>
+              )}
             </button>
           )}
           {activeDeviceProduct === 'pos' && !posCreated && (
@@ -1984,7 +2097,7 @@ const AddDevicePanel = ({
               disabled={!branchId || !posName.trim() || posSaving}
               onClick={createPosRequest}
             >
-              {posSaving ? 'Creando…' : 'Crear código'}
+              {posSaving ? <Trans>Creando…</Trans> : <Trans>Crear código</Trans>}
             </button>
           )}
         </div>
@@ -1994,17 +2107,18 @@ const AddDevicePanel = ({
 };
 
 const POS_STATE_LABELS = {
-  created: 'Código creado',
-  awaiting_approval: 'Requiere aprobación',
-  credential_ready: 'Aprobado',
-  credential_delivered: 'Credencial entregada',
-  completed: 'Completado',
-  denied: 'Denegado',
-  expired: 'Expirado',
-  cancelled: 'Cancelado',
+  created: msg`Código creado`,
+  awaiting_approval: msg`Requiere aprobación`,
+  credential_ready: msg`Aprobado`,
+  credential_delivered: msg`Credencial entregada`,
+  completed: msg`Completado`,
+  denied: msg`Denegado`,
+  expired: msg`Expirado`,
+  cancelled: msg`Cancelado`,
 };
 
 const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onChanged }) => {
+  const { t, i18n } = useLingui();
   const [busy, setBusy] = useState(null);
   const [actionError, setActionError] = useState(null);
   const visible = visiblePosEnrollmentRequests(requests);
@@ -2017,7 +2131,7 @@ const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onCha
       else await denyPosEnrollmentRequest(request.id, branchId);
     } catch (failure) {
       console.error('[umipos] enrollment decision failed', failure);
-      setActionError('No se pudo guardar la decisión. Actualiza y vuelve a intentarlo.');
+      setActionError(t`No se pudo guardar la decisión. Actualiza y vuelve a intentarlo.`);
     } finally {
       setBusy(null);
       onChanged && onChanged();
@@ -2032,11 +2146,11 @@ const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onCha
         <div>
           <div className="eyebrow">UmiPOS</div>
           <h2 className="h-section" style={{ marginTop: 4 }}>
-            Solicitudes de registro
+            <Trans>Solicitudes de registro</Trans>
           </h2>
         </div>
         <button className="btn btn-ghost btn-sm focusable" onClick={onChanged}>
-          <I.Refresh size={14} /> Actualizar
+          <I.Refresh size={14} /> <Trans>Actualizar</Trans>
         </button>
       </div>
       {(error || actionError) && (
@@ -2054,7 +2168,9 @@ const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onCha
         </div>
       )}
       {visible.length === 0 ? (
-        <p style={{ color: 'var(--ink-3)', marginBottom: 0 }}>No hay solicitudes de UmiPOS.</p>
+        <p style={{ color: 'var(--ink-3)', marginBottom: 0 }}>
+          <Trans>No hay solicitudes de UmiPOS.</Trans>
+        </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
           {visible.map(function (request) {
@@ -2064,15 +2180,24 @@ const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onCha
                 <div style={{ paddingLeft: 14, flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <b>{request.displayName}</b>
-                    <span className="chip">{POS_STATE_LABELS[request.state] || request.state}</span>
+                    <span className="chip">
+                      {POS_STATE_LABELS[request.state]
+                        ? i18n._(POS_STATE_LABELS[request.state])
+                        : request.state}
+                    </span>
                     <span className="chip">{locationName(locations, request.locationId)}</span>
                   </div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 4 }}>
                     {platformLabel(request.requestedPlatform || request.platform)} ·{' '}
                     {mobilityLabel(request.mobility)}
-                    {request.installationReference
-                      ? ` · Instalación ${request.installationReference}`
-                      : ''}
+                    {request.installationReference ? (
+                      <>
+                        {' · '}
+                        <Trans>Instalación {request.installationReference}</Trans>
+                      </>
+                    ) : (
+                      ''
+                    )}
                   </div>
                 </div>
                 {pending && (
@@ -2082,14 +2207,14 @@ const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onCha
                       disabled={busy === request.id}
                       onClick={() => decide(request, false)}
                     >
-                      Denegar
+                      <Trans>Denegar</Trans>
                     </button>
                     <button
                       className="btn btn-primary btn-sm focusable"
                       disabled={busy === request.id}
                       onClick={() => decide(request, true)}
                     >
-                      Aprobar
+                      <Trans>Aprobar</Trans>
                     </button>
                   </div>
                 )}

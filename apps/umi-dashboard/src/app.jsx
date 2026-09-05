@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Trans, useLingui } from '@lingui/react/macro';
+import { msg } from '@lingui/core/macro';
+import { applyMerchantLocale, activateLocale } from '@/lib/i18n.js';
 
 import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
@@ -34,8 +37,11 @@ import CashShiftsScreen from '@/screens/cash-shifts.jsx';
 import CatalogInventoryScreen from '@/screens/catalog-inventory.jsx';
 import DiagnosticsScreen from '@/screens/diagnostics.jsx';
 import CocinaScreen from '@/screens/cocina.jsx';
+import ProfileScreen from '@/screens/profile.jsx';
 
-const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
+const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy' };
+
+const msgCloseMenu = msg`Cerrar el menú`;
 
 /** Product keys as an operator reads them, not as the entitlement table stores them. */
 const PRODUCT_LABELS = {
@@ -46,7 +52,10 @@ const PRODUCT_LABELS = {
 };
 
 /** Refusal for a screen the café does not own the product for. */
-function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
+function ProductUnavailable({ moduleName, product }) {
+  const { t } = useLingui();
+  const name = moduleName || t`Módulo`;
+  const productName = product || t`producto`;
   return (
     <div
       className="card"
@@ -60,11 +69,13 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
     >
       <div>
         <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
-          {moduleName} no está activo en este café
+          <Trans>{name} no está activo en este café</Trans>
         </h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
-          Esta sección necesita {product}. El super admin lo puede revisar en Productos y
-          facturación; no hay controles hasta activar el producto.
+          <Trans>
+            Esta sección necesita {productName}. El super admin lo puede revisar en Productos y
+            facturación; no hay controles hasta activar el producto.
+          </Trans>
         </div>
       </div>
     </div>
@@ -72,14 +83,20 @@ function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
 }
 
 /** Refusal for a screen that needs a platform grant — an axis cafés do not carry. */
-function PlatformOnly({ moduleName = 'Esta pantalla' }) {
+function PlatformOnly({ moduleName }) {
+  const { t } = useLingui();
+  const name = moduleName || t`Esta pantalla`;
   return (
     <div className="alert danger">
       <span className="strip" />
       <I.AlertTriangle className="ico" size={18} />
       <div className="body">
-        <div className="ttl">Acceso de plataforma requerido</div>
-        <div className="sub">{moduleName} es para operadores de Umi.</div>
+        <div className="ttl">
+          <Trans>Acceso de plataforma requerido</Trans>
+        </div>
+        <div className="sub">
+          <Trans>{name} es para operadores de Umi.</Trans>
+        </div>
       </div>
     </div>
   );
@@ -94,15 +111,16 @@ function PlatformOnly({ moduleName = 'Esta pantalla' }) {
  */
 function GuardedScreen({ moduleKey, children }) {
   const merchantState = useMerchant();
+  const { i18n } = useLingui();
   if (!merchantState?.canShowModule?.(moduleKey)) {
     const mod = MODULES[moduleKey] || {};
-    const label = mod.label || moduleKey;
+    const label = mod.label ? i18n._(mod.label) : moduleKey;
     return mod.platform && !mod.product ? (
       <PlatformOnly moduleName={label} />
     ) : (
       <ProductUnavailable
         moduleName={label}
-        product={PRODUCT_LABELS[mod.product] || mod.product || 'este producto'}
+        product={PRODUCT_LABELS[mod.product] || mod.product || undefined}
       />
     );
   }
@@ -116,6 +134,8 @@ function DashboardLayout() {
   const [navOpen, setNavOpen] = useState(false);
   const [ordersPaused, setOrdersPaused] = useState(false);
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const { i18n } = useLingui();
+  const { session } = useAuth();
   const merchantState = useMerchant();
   const { data: merchant } = useMerchantData();
   const merchantName = merchantState?.selectedMerchant?.name || merchant?.name;
@@ -129,6 +149,13 @@ function DashboardLayout() {
     if (merchant?.primaryColor)
       document.documentElement.style.setProperty('--merchant-brand', merchant.primaryColor);
   }, [merchant?.primaryColor]);
+
+  // The café record carries a locale ("es-MX"). It only speaks when the owner has
+  // not picked a language in this browser; a saved choice always wins.
+  const merchantLocale = merchantState?.selectedMerchant?.locale || merchant?.locale;
+  useEffect(() => {
+    if (merchantLocale) applyMerchantLocale(merchantLocale);
+  }, [merchantLocale]);
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -154,7 +181,7 @@ function DashboardLayout() {
           fontSize: 14,
         }}
       >
-        Cargando negocio…
+        <Trans>Cargando negocio…</Trans>
       </div>
     );
   }
@@ -169,7 +196,7 @@ function DashboardLayout() {
         onClick={() => setNavOpen(false)}
         role="button"
         tabIndex={-1}
-        aria-label="Cerrar el menú"
+        aria-label={i18n._(msgCloseMenu)}
       />
       <Sidebar
         active={screen}
@@ -194,6 +221,10 @@ function DashboardLayout() {
           selectedLocationId={merchantState?.selectedLocationId}
           onLocationChange={merchantState?.setSelectedLocationId}
           connection={connection}
+          onProfile={() => nav('profile')}
+          profileActive={screen === 'profile'}
+          userName={session?.user?.displayName}
+          userEmail={session?.user?.email}
         />
         <div className="screen-body" key={screen}>
           <Routes>
@@ -216,11 +247,7 @@ function DashboardLayout() {
             <Route
               path="operations"
               element={
-                <GuardedScreen
-                  moduleKey="operations"
-                  moduleName="Centro operativo"
-                  product="Dashboard"
-                >
+                <GuardedScreen moduleKey="operations">
                   <OperationsScreen />
                 </GuardedScreen>
               }
@@ -341,11 +368,17 @@ function DashboardLayout() {
                 </GuardedScreen>
               }
             />
+            {/* Personal, not café-scoped: every signed-in operator reaches their
+                own profile, whatever product the selected café owns. RequireAuth
+                already gates it, so it needs no GuardedScreen. */}
+            <Route path="profile" element={<ProfileScreen />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </main>
 
+      {/* Developer-only panel: its labels are not owner copy, so they stay in English. */}
+      {/* eslint-disable lingui/no-unlocalized-strings */}
       {CFG.environment === 'development' && (
         <TweaksPanel title="Ajustes de desarrollo">
           <TweakSection title="Wallet card brand">
@@ -369,10 +402,10 @@ function DashboardLayout() {
           </TweakSection>
           <TweakSection title="Language">
             <TweakRadio
-              label="Greeting"
-              value={tweaks.lang}
+              label="Locale"
+              value={i18n.locale}
               options={['es', 'en']}
-              onChange={(v) => setTweak('lang', v)}
+              onChange={(v) => activateLocale(v)}
             />
           </TweakSection>
           <TweakSection title="Sidebar">
@@ -391,6 +424,7 @@ function DashboardLayout() {
           </TweakSection>
         </TweaksPanel>
       )}
+      {/* eslint-enable lingui/no-unlocalized-strings */}
     </div>
   );
 }
@@ -409,7 +443,7 @@ function RequireAuth({ children }) {
           fontSize: 14,
         }}
       >
-        Cargando…
+        <Trans>Cargando…</Trans>
       </div>
     );
   return session ? children : <Navigate to="/login" replace />;

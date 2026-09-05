@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "ebf698377c0e9030814fbc1afc06e55bc058cc4ac5764aef6d7cec77115ac419",
+  "contentHash": "195893f1dbf3098e6556d6d4ed6b7d29068f26d83cf5cb2f15712c768edeecf5",
   "contractVersion": "2.17.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -27011,6 +27011,17 @@
             }
           ]
         },
+        "facts": {
+          "anyOf": [
+            {
+              "additionalProperties": {},
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "id": {
           "maxLength": 160,
           "minLength": 1,
@@ -27275,6 +27286,17 @@
                   {
                     "maxLength": 500,
                     "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "facts": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {},
+                    "type": "object"
                   },
                   {
                     "type": "null"

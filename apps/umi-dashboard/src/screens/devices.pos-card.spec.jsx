@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { withI18n } from '@/test/i18n.jsx';
 import { EditPosDevicePanel, PosDeviceCard } from './devices.jsx';
 import { posDeviceCard } from './device-utils.js';
 
@@ -7,25 +8,27 @@ const locations = [{ id: 'loc-1', name: 'Chapultepec' }];
 
 const render = (overrides = {}) =>
   renderToStaticMarkup(
-    <PosDeviceCard
-      device={posDeviceCard(
-        {
-          id: 'dev-1',
-          publicId: '6108ac30-4860-469a-b07f-8b94eed6a58e',
-          displayName: 'zaza',
-          platform: 'web',
-          mobility: 'static',
-          locationId: 'loc-1',
-          state: 'active',
-          rotationRequired: false,
-          credentialVersion: 1,
-          lastSeenAt: null,
-          ...overrides,
-        },
-        locations,
-      )}
-      onEdit={() => {}}
-    />,
+    withI18n(
+      <PosDeviceCard
+        device={posDeviceCard(
+          {
+            id: 'dev-1',
+            publicId: '6108ac30-4860-469a-b07f-8b94eed6a58e',
+            displayName: 'zaza',
+            platform: 'web',
+            mobility: 'static',
+            locationId: 'loc-1',
+            state: 'active',
+            rotationRequired: false,
+            credentialVersion: 1,
+            lastSeenAt: null,
+            ...overrides,
+          },
+          locations,
+        )}
+        onEdit={() => {}}
+      />,
+    ),
   );
 
 describe('Tarjeta de caja UmiPOS', () => {
@@ -61,26 +64,28 @@ describe('Panel de la caja UmiPOS', () => {
   // the sheet came up blank. This asserts the POS panel arrives populated.
   it('abre con los datos de la caja y con la acción de revocar', () => {
     const markup = renderToStaticMarkup(
-      <EditPosDevicePanel
-        device={posDeviceCard(
-          {
-            id: 'dev-1',
-            publicId: '6108ac30-4860-469a-b07f-8b94eed6a58e',
-            displayName: 'zaza',
-            platform: 'web',
-            mobility: 'mobile',
-            locationId: 'loc-1',
-            state: 'active',
-            rotationRequired: false,
-            credentialVersion: 3,
-            lastSeenAt: null,
-          },
-          locations,
-        )}
-        branchId="loc-1"
-        onClose={() => {}}
-        onSaved={() => {}}
-      />,
+      withI18n(
+        <EditPosDevicePanel
+          device={posDeviceCard(
+            {
+              id: 'dev-1',
+              publicId: '6108ac30-4860-469a-b07f-8b94eed6a58e',
+              displayName: 'zaza',
+              platform: 'web',
+              mobility: 'mobile',
+              locationId: 'loc-1',
+              state: 'active',
+              rotationRequired: false,
+              credentialVersion: 3,
+              lastSeenAt: null,
+            },
+            locations,
+          )}
+          branchId="loc-1"
+          onClose={() => {}}
+          onSaved={() => {}}
+        />,
+      ),
     );
 
     expect(markup).toContain('Gestionar caja');

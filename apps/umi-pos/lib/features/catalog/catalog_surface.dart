@@ -237,7 +237,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     scheduleMicrotask(() async {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).sessionEndedReauth)),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).sessionEndedReauth),
+        ),
       );
       await widget.entry.lock();
     });
@@ -901,20 +903,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     try {
       final detail = await widget.catalog.detail(id);
       if (!mounted) return;
+      // Single-tap add: a product with no size/variant and no modifier group
+      // needs no choices, so adding it should not cost a sheet plus a second
+      // tap. Add it straight to the cart; products that require a choice still
+      // open the sheet. (Editing an existing line always opens the sheet.)
+      final canAdd =
+          canWrite ??
+          OperatorPermissions(
+            widget.entry.state.operator?.permissions ?? const [],
+          ).allows('cart.write');
+      if (item == null &&
+          canAdd &&
+          detail.variants.isEmpty &&
+          detail.optionGroups.isEmpty) {
+        await widget.cart.add(productId: detail.id);
+        return;
+      }
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         constraints: const BoxConstraints(maxWidth: 760),
-        builder: (_) => _Detail(
-          detail,
-          cart: widget.cart,
-          item: item,
-          canWrite:
-              canWrite ??
-              OperatorPermissions(
-                widget.entry.state.operator?.permissions ?? const [],
-              ).allows('cart.write'),
-        ),
+        builder: (_) =>
+            _Detail(detail, cart: widget.cart, item: item, canWrite: canAdd),
       );
     } on AppException catch (error) {
       if (!mounted) return;

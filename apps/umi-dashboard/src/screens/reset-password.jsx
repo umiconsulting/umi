@@ -1,9 +1,11 @@
 import { useState, useId } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import '@/styles.css';
 
 export default function ResetPasswordScreen() {
+  const { t } = useLingui();
   const uid = useId();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -19,17 +21,17 @@ export default function ResetPasswordScreen() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirm) {
-      setError('Las contraseñas no coinciden');
+      setError(t`Las contraseñas no coinciden`);
       return;
     }
     if (password.length < 8) {
-      setError('Mínimo 8 caracteres');
+      setError(t`Mínimo 8 caracteres`);
       return;
     }
     setError(null);
     setLoading(true);
     try {
-      if (!localToken) throw new Error('El enlace de recuperación no es válido');
+      if (!localToken) throw new Error(t`El enlace de recuperación no es válido`);
       const res = await fetch(
         apiUrl('/api/auth/local/reset-password'),
         withCreds({
@@ -39,7 +41,7 @@ export default function ResetPasswordScreen() {
         }),
       );
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(errMessage(data, 'Error al reestablecer la contraseña'));
+      if (!res.ok) throw new Error(errMessage(data, t`Error al reestablecer la contraseña`));
       setDone(true);
     } catch (err) {
       setError(err.message);
@@ -70,17 +72,17 @@ export default function ResetPasswordScreen() {
           }}
         >
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
-            Contraseña actualizada
+            <Trans>Contraseña actualizada</Trans>
           </h2>
           <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginBottom: 28 }}>
-            Tu contraseña fue reestablecida correctamente. Ya puedes iniciar sesión.
+            <Trans>Tu contraseña fue reestablecida correctamente. Ya puedes iniciar sesión.</Trans>
           </p>
           <button
             className="btn btn-primary focusable"
             onClick={() => navigate('/login', { replace: true })}
             style={{ height: 46, fontSize: 15 }}
           >
-            Ir al inicio de sesión
+            <Trans>Ir al inicio de sesión</Trans>
           </button>
         </div>
       </div>
@@ -108,12 +110,14 @@ export default function ResetPasswordScreen() {
         }}
       >
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
-          Nueva contraseña
+          <Trans>Nueva contraseña</Trans>
         </h2>
         <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginBottom: 28 }}>
-          {ready
-            ? 'Elige una nueva contraseña para tu cuenta.'
-            : 'Verificando enlace de recuperación…'}
+          {ready ? (
+            <Trans>Elige una nueva contraseña para tu cuenta.</Trans>
+          ) : (
+            <Trans>Verificando enlace de recuperación…</Trans>
+          )}
         </p>
 
         {ready && (
@@ -122,12 +126,14 @@ export default function ResetPasswordScreen() {
             style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           >
             <div className="field">
-              <label htmlFor={`${uid}-nueva-contrasena`}>Nueva contraseña</label>
+              <label htmlFor={`${uid}-nueva-contrasena`}>
+                <Trans>Nueva contraseña</Trans>
+              </label>
               <input
                 id={`${uid}-nueva-contrasena`}
                 className="input tall"
                 type="password"
-                placeholder="Mínimo 8 caracteres"
+                placeholder={t`Mínimo 8 caracteres`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -135,12 +141,14 @@ export default function ResetPasswordScreen() {
               />
             </div>
             <div className="field">
-              <label htmlFor={`${uid}-confirmar-contrasena`}>Confirmar contraseña</label>
+              <label htmlFor={`${uid}-confirmar-contrasena`}>
+                <Trans>Confirmar contraseña</Trans>
+              </label>
               <input
                 id={`${uid}-confirmar-contrasena`}
                 className="input tall"
                 type="password"
-                placeholder="Repite la contraseña"
+                placeholder={t`Repite la contraseña`}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required
@@ -166,7 +174,7 @@ export default function ResetPasswordScreen() {
               disabled={loading}
               style={{ height: 46, fontSize: 15, marginTop: 4 }}
             >
-              {loading ? 'Guardando…' : 'Guardar contraseña'}
+              {loading ? <Trans>Guardando…</Trans> : <Trans>Guardar contraseña</Trans>}
             </button>
           </form>
         )}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useId } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
 import {
@@ -20,13 +22,13 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 //       saveRewardConfig(patch)   → PATCH /api/[merchantRef]/admin/reward-config
 
 const DOW = [
-  { id: 'dom', l: 'Dom' },
-  { id: 'lun', l: 'Lun' },
-  { id: 'mar', l: 'Mar' },
-  { id: 'mie', l: 'Mié' },
-  { id: 'jue', l: 'Jue' },
-  { id: 'vie', l: 'Vie' },
-  { id: 'sab', l: 'Sáb' },
+  { id: 'dom', l: msg`Dom` },
+  { id: 'lun', l: msg`Lun` },
+  { id: 'mar', l: msg`Mar` },
+  { id: 'mie', l: msg`Mié` },
+  { id: 'jue', l: msg`Jue` },
+  { id: 'vie', l: msg`Vie` },
+  { id: 'sab', l: msg`Sáb` },
 ];
 
 // promoDays stored as "0,2,4" (getDay() values). Map DOW ids ↔ day numbers.
@@ -45,10 +47,13 @@ const PRESET_COLORS = [
 
 // Mirror of umi-api TONE_PRESETS labels — used only until the live GET resolves.
 const VOICE_PRESET_FALLBACK = [
-  { key: 'casual', label: 'Casual' },
-  { key: 'friendly', label: 'Amigable' },
-  { key: 'formal', label: 'Formal' },
+  { key: 'casual', label: msg`Casual` },
+  { key: 'friendly', label: msg`Amigable` },
+  { key: 'formal', label: msg`Formal` },
 ];
+
+/** API presets carry a plain `label`; the fallback carries a descriptor. */
+const presetLabel = (i18n, value) => (typeof value === 'string' ? value : i18n._(value));
 const MIN_STAMP_TARGET = 1;
 const MAX_STAMP_TARGET = 10;
 const MAX_REWARD_NAME_LENGTH = 30;
@@ -81,14 +86,15 @@ function contrastWithWhite(hex) {
 }
 
 const SUBSCRIPTION_WORDS = {
-  active: 'Activa',
-  trialing: 'En periodo de prueba',
-  past_due: 'Con pago pendiente',
-  canceled: 'Cancelada',
-  paused: 'En pausa',
+  active: msg`Activa`,
+  trialing: msg`En periodo de prueba`,
+  past_due: msg`Con pago pendiente`,
+  canceled: msg`Cancelada`,
+  paused: msg`En pausa`,
 };
 
 const SettingsScreen = () => {
+  const { t, i18n } = useLingui();
   const uid = useId();
   const [copied, setCopied] = useState(false);
 
@@ -142,7 +148,7 @@ const SettingsScreen = () => {
     setSelfReg(merchant.selfRegistration !== false);
     setBirthday({
       on: merchant.birthdayRewardEnabled !== false,
-      rewardName: merchant.birthdayRewardName || 'Regalo de cumpleaños',
+      rewardName: merchant.birthdayRewardName || t`Regalo de cumpleaños`,
     });
     const visitsRequired = clampStampTarget(merchant.rewardConfig?.visitsRequired ?? 10);
     setLoyalty(
@@ -153,7 +159,7 @@ const SettingsScreen = () => {
             rewardCost: Math.round(merchant.rewardConfig.rewardCostCentavos / 100),
           }
         : {
-            rewardName: 'Recompensa de temporada',
+            rewardName: t`Recompensa de temporada`,
             visitsRequired,
             rewardCost: 0,
           },
@@ -173,7 +179,7 @@ const SettingsScreen = () => {
       to: merchant.promoEndsAt ? merchant.promoEndsAt.slice(0, 10) : '2026-06-30',
       days: days,
     });
-  }, [merchant]);
+  }, [merchant, t]);
 
   // Seed the voice editor independently of the cash-gated merchant skeleton, so a
   // conversaflow-only merchant (e.g. Kalala, cashActive=false) still gets its chips.
@@ -271,7 +277,7 @@ const SettingsScreen = () => {
           className="card"
           style={{ padding: '40px 26px', textAlign: 'center', color: 'var(--ink-3)' }}
         >
-          {loading ? 'Cargando ajustes…' : 'Sin datos de configuración.'}
+          {loading ? <Trans>Cargando ajustes…</Trans> : <Trans>Sin datos de configuración.</Trans>}
         </div>
       </div>
     );
@@ -292,11 +298,13 @@ const SettingsScreen = () => {
       >
         <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>
           {saved ? (
-            <span style={{ color: 'var(--success)', fontWeight: 600 }}>✓ Cambios guardados</span>
+            <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+              ✓ <Trans>Cambios guardados</Trans>
+            </span>
           ) : cashActive ? (
-            'Los cambios de Cash se guardan solo porque Umi Cash está activo.'
+            <Trans>Los cambios de Cash se guardan solo porque Umi Cash está activo.</Trans>
           ) : (
-            'Cash no está activo: solo se guardan ajustes de negocio y operación.'
+            <Trans>Cash no está activo: solo se guardan ajustes de negocio y operación.</Trans>
           )}
         </div>
         <button
@@ -306,13 +314,13 @@ const SettingsScreen = () => {
           style={{ opacity: saving ? 0.7 : 1, minWidth: 120 }}
         >
           {saving ? (
-            'Guardando…'
+            <Trans>Guardando…</Trans>
           ) : saved ? (
             <>
-              <I.Check size={15} /> Guardado
+              <I.Check size={15} /> <Trans>Guardado</Trans>
             </>
           ) : (
-            'Guardar cambios'
+            <Trans>Guardar cambios</Trans>
           )}
         </button>
       </div>
@@ -325,7 +333,9 @@ const SettingsScreen = () => {
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
             {' '}
-            <h2>Información del negocio</h2>
+            <h2>
+              <Trans>Información del negocio</Trans>
+            </h2>
           </div>
           <span className="sub-pill">
             <span className="sd" />
@@ -334,7 +344,9 @@ const SettingsScreen = () => {
         </div>
         <div className="grid grid-3" style={{ gap: 18 }}>
           <div className="field">
-            <label htmlFor={`${uid}-business-name`}>Nombre del negocio</label>
+            <label htmlFor={`${uid}-business-name`}>
+              <Trans>Nombre del negocio</Trans>
+            </label>
             <input
               id={`${uid}-business-name`}
               className="input tall"
@@ -343,7 +355,9 @@ const SettingsScreen = () => {
             />
           </div>
           <div className="field">
-            <label htmlFor={`${uid}-city`}>Ciudad</label>
+            <label htmlFor={`${uid}-city`}>
+              <Trans>Ciudad</Trans>
+            </label>
             <input
               id={`${uid}-city`}
               className="input tall"
@@ -352,7 +366,9 @@ const SettingsScreen = () => {
             />
           </div>
           <div className="field">
-            <span className="field-label">Estado de la cuenta</span>
+            <span className="field-label">
+              <Trans>Estado de la cuenta</Trans>
+            </span>
             <span
               className="chip read"
               style={{
@@ -362,20 +378,22 @@ const SettingsScreen = () => {
                 justifyContent: 'flex-start',
               }}
             >
-              {SUBSCRIPTION_WORDS[biz.subscription] || SUBSCRIPTION_WORDS.active} · Se administra en
-              Productos y facturación
+              {i18n._(SUBSCRIPTION_WORDS[biz.subscription] || SUBSCRIPTION_WORDS.active)} ·{' '}
+              <Trans>Se administra en Productos y facturación</Trans>
             </span>
           </div>
           <div className="field">
-            <span className="field-label">Handle</span>
+            <span className="field-label">
+              <Trans>Dirección pública</Trans>
+            </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="chip read" style={{ height: 44, fontSize: 13 }}>
-                {biz.handle ? `umi.app/${biz.handle}` : 'Sin dirección publicada'}
+                {biz.handle ? `umi.app/${biz.handle}` : t`Sin dirección publicada`}
               </span>
               <button
                 className="btn-icon focusable"
-                aria-label="Copiar dirección"
-                title="Copiar dirección"
+                aria-label={t`Copiar dirección`}
+                title={t`Copiar dirección`}
                 disabled={!biz.handle}
                 onClick={() => copyHandle(biz.handle)}
               >
@@ -384,13 +402,17 @@ const SettingsScreen = () => {
             </div>
           </div>
           <div className="field">
-            <span className="field-label">Prefijo de tarjeta</span>
+            <span className="field-label">
+              <Trans>Prefijo de tarjeta</Trans>
+            </span>
             <span className="chip read" style={{ height: 44, fontSize: 13 }}>
-              {cashActive ? `${biz.cardPrefix} · • • • •` : 'No disponible sin Umi Cash'}
+              {cashActive ? `${biz.cardPrefix} · • • • •` : t`No disponible sin Umi Cash`}
             </span>
           </div>
           <div className="field">
-            <span className="field-label">ID de cuenta</span>
+            <span className="field-label">
+              <Trans>ID de cuenta</Trans>
+            </span>
             <span
               className="chip read"
               style={{
@@ -413,14 +435,20 @@ const SettingsScreen = () => {
           <div className="ed-head" style={{ marginBottom: 18 }}>
             <div className="titles">
               {' '}
-              <h2>Voz y tono del asistente</h2>
-              <div className="en">Cómo saluda y responde el asistente en WhatsApp.</div>
+              <h2>
+                <Trans>Voz y tono del asistente</Trans>
+              </h2>
+              <div className="en">
+                <Trans>Cómo saluda y responde el asistente en WhatsApp.</Trans>
+              </div>
             </div>
           </div>
 
           {/* Tone chips — single select */}
           <div className="field" style={{ marginBottom: 18 }}>
-            <span className="field-label">Tono · cómo le habla el asistente a tus clientes</span>
+            <span className="field-label">
+              <Trans>Tono · cómo le habla el asistente a tus clientes</Trans>
+            </span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map((p) => (
                 <button
@@ -432,7 +460,7 @@ const SettingsScreen = () => {
                   // otherwise make the chip inert.
                   onClick={() => setVoice((v) => ({ ...v, tonePreset: p.key, customTone: '' }))}
                 >
-                  {p.label}
+                  {presetLabel(i18n, p.label)}
                 </button>
               ))}
             </div>
@@ -440,7 +468,7 @@ const SettingsScreen = () => {
               <div
                 style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8, fontStyle: 'italic' }}
               >
-                Usando tono personalizado — anula el chip seleccionado.
+                <Trans>Usando tono personalizado — anula el chip seleccionado.</Trans>
               </div>
             ) : (
               voiceData?.presets?.find((p) => p.key === voice.tonePreset)?.description && (
@@ -454,12 +482,14 @@ const SettingsScreen = () => {
           {/* Advanced */}
           <div className="grid grid-2" style={{ gap: 14 }}>
             <div className="field">
-              <label htmlFor={`${uid}-nombre-del-asistente`}>Nombre del asistente · opcional</label>
+              <label htmlFor={`${uid}-nombre-del-asistente`}>
+                <Trans>Nombre del asistente · opcional</Trans>
+              </label>
               <input
                 id={`${uid}-nombre-del-asistente`}
                 className="input tall"
                 value={voice.assistantName}
-                placeholder={bizName || 'Asistente'}
+                placeholder={bizName || t`Asistente`}
                 onChange={(e) =>
                   setVoice((v) => ({ ...v, assistantName: e.target.value.slice(0, 60) }))
                 }
@@ -467,13 +497,13 @@ const SettingsScreen = () => {
             </div>
             <div className="field">
               <label htmlFor={`${uid}-tono-personalizado-opcional`}>
-                Tono personalizado · opcional (anula el chip)
+                <Trans>Tono personalizado · opcional (anula el chip)</Trans>
               </label>
               <input
                 id={`${uid}-tono-personalizado-opcional`}
                 className="input tall"
                 value={voice.customTone}
-                placeholder="Ej. relajado, con modismos del norte"
+                placeholder={t`Ej. relajado, con modismos del norte`}
                 onChange={(e) =>
                   setVoice((v) => ({ ...v, customTone: e.target.value.slice(0, 280) }))
                 }
@@ -481,7 +511,7 @@ const SettingsScreen = () => {
             </div>
             <div className="field" style={{ gridColumn: '1 / -1' }}>
               <label htmlFor={`${uid}-notas-de-estilo`}>
-                Notas de estilo · una por línea (máx. 8)
+                <Trans>Notas de estilo · una por línea (máx. 8)</Trans>
               </label>
               <textarea
                 id={`${uid}-notas-de-estilo`}
@@ -500,18 +530,24 @@ const SettingsScreen = () => {
           <div className="ed-head" style={{ marginBottom: 14 }}>
             <div className="titles">
               {' '}
-              <h2>Umi Cash no está activo</h2>
+              <h2>
+                <Trans>Umi Cash no está activo</Trans>
+              </h2>
               <div className="en">
-                Sin Umi Cash no hay monedero, lealtad, tarjetas de regalo ni pase en Wallet.
+                <Trans>
+                  Sin Umi Cash no hay monedero, lealtad, tarjetas de regalo ni pase en Wallet.
+                </Trans>
               </div>
             </div>
             <span className="sub-pill">
-              <span className="sd" /> Sin activar
+              <span className="sd" /> <Trans>Sin activar</Trans>
             </span>
           </div>
           <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
-            Kalala tiene activos ConversaFlow y KDS. La configuración de wallet pass, sellos,
-            recompensas, miembros y gift cards queda oculta hasta activar Umi Cash.
+            <Trans>
+              La configuración de pase en Wallet, sellos, recompensas, miembros y tarjetas de regalo
+              queda oculta hasta activar Umi Cash.
+            </Trans>
           </div>
         </div>
       )}
@@ -523,16 +559,18 @@ const SettingsScreen = () => {
             <div className="ed-head" style={{ marginBottom: 18 }}>
               <div className="titles">
                 {' '}
-                <h2>Apariencia de la tarjeta</h2>
+                <h2>
+                  <Trans>Apariencia de la tarjeta</Trans>
+                </h2>
                 <div className="en">
-                  Cómo se ve la tarjeta del cliente en Apple Wallet y Google Wallet.
+                  <Trans>Cómo se ve la tarjeta del cliente en Apple Wallet y Google Wallet.</Trans>
                 </div>
               </div>
             </div>
 
             <div className="field" style={{ marginBottom: 18 }}>
               <label htmlFor={`${uid}-primary-color-card`}>
-                Color principal · fondo de la tarjeta
+                <Trans>Color principal · fondo de la tarjeta</Trans>
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <input
@@ -578,10 +616,14 @@ const SettingsScreen = () => {
                     role="status"
                     style={{ fontSize: 12.5, color: 'var(--warning)', marginTop: 2 }}
                   >
-                    El texto blanco de la tarjeta queda en {c.toFixed(1)}:1 sobre este color.
-                    {c < 3
-                      ? ' Tu cliente casi no podrá leer su saldo.'
-                      : ' Un color más oscuro se lee mejor en la mano.'}
+                    <Trans>
+                      El texto blanco de la tarjeta queda en {c.toFixed(1)}:1 sobre este color.
+                    </Trans>{' '}
+                    {c < 3 ? (
+                      <Trans>Tu cliente casi no podrá leer su saldo.</Trans>
+                    ) : (
+                      <Trans>Un color más oscuro se lee mejor en la mano.</Trans>
+                    )}
                   </div>
                 );
               })()}
@@ -589,7 +631,7 @@ const SettingsScreen = () => {
 
             <div className="field" style={{ marginBottom: 18 }}>
               <label htmlFor={`${uid}-secondary-color-accents`}>
-                Color secundario · acentos y detalles
+                <Trans>Color secundario · acentos y detalles</Trans>
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <input
@@ -625,7 +667,7 @@ const SettingsScreen = () => {
               {' '}
               <div style={{ marginBottom: 14 }}>
                 <h3 style={{ margin: '0 0 4px', fontSize: 16, lineHeight: 1.1 }}>
-                  Recompensas por sellos
+                  <Trans>Recompensas por sellos</Trans>
                 </h3>
                 <div
                   className="en"
@@ -637,13 +679,13 @@ const SettingsScreen = () => {
                     fontWeight: 600,
                   }}
                 >
-                  Premios por sellos
+                  <Trans>Premios por sellos</Trans>
                 </div>
               </div>
               <div className="grid grid-2" style={{ gap: 14 }}>
                 <div className="field" style={{ gridColumn: '1 / -1' }}>
                   <label htmlFor={`${uid}-reward-name-shown`}>
-                    Nombre del premio · lo ve el cliente
+                    <Trans>Nombre del premio · lo ve el cliente</Trans>
                   </label>
                   <input
                     id={`${uid}-reward-name-shown`}
@@ -662,7 +704,9 @@ const SettingsScreen = () => {
                   </div>
                 </div>
                 <div className="field">
-                  <label htmlFor={`${uid}-visits-required`}>Visitas necesarias</label>
+                  <label htmlFor={`${uid}-visits-required`}>
+                    <Trans>Visitas necesarias</Trans>
+                  </label>
                   <input
                     id={`${uid}-visits-required`}
                     type="number"
@@ -674,7 +718,9 @@ const SettingsScreen = () => {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor={`${uid}-reward-cost-mxn`}>Costo del premio · MXN</label>
+                  <label htmlFor={`${uid}-reward-cost-mxn`}>
+                    <Trans>Costo del premio · MXN</Trans>
+                  </label>
                   <input
                     id={`${uid}-reward-cost-mxn`}
                     type="number"
@@ -703,11 +749,13 @@ const SettingsScreen = () => {
             }}
           >
             <div style={{ position: 'absolute', top: 18, left: 22 }}>
-              <div className="eyebrow on-warm">Vista previa</div>
+              <div className="eyebrow on-warm">
+                <Trans>Vista previa</Trans>
+              </div>
               <div
                 style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink-warm)', marginTop: 2 }}
               >
-                Pase de Apple Wallet
+                <Trans>Pase de Apple Wallet</Trans>
               </div>
             </div>
             <div style={{ paddingTop: 28 }} />
@@ -720,10 +768,12 @@ const SettingsScreen = () => {
               topupEnabled={merchant.topupEnabled !== false}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>Sellos máximos</span>
+              <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>
+                <Trans>Sellos máximos</Trans>
+              </span>
               <input
                 type="range"
-                aria-label="Sellos máximos en la tarjeta"
+                aria-label={t`Sellos máximos en la tarjeta`}
                 min={MIN_STAMP_TARGET}
                 max={MAX_STAMP_TARGET}
                 step={1}
@@ -752,9 +802,11 @@ const SettingsScreen = () => {
           <div className="ed-head" style={{ marginBottom: 18 }}>
             <div className="titles">
               {' '}
-              <h2>Boost de cumpleaños</h2>
+              <h2>
+                <Trans>Boost de cumpleaños</Trans>
+              </h2>
               <div className="en">
-                Un premio que se emite solo el día del cumpleaños del cliente.
+                <Trans>Un premio que se emite solo el día del cumpleaños del cliente.</Trans>
               </div>
             </div>
             <div
@@ -764,7 +816,7 @@ const SettingsScreen = () => {
           </div>
           <div className="field">
             <label htmlFor={`${uid}-reward-name-auto`}>
-              Nombre del premio · se emite solo en el cumpleaños
+              <Trans>Nombre del premio · se emite solo en el cumpleaños</Trans>
             </label>
             <input
               id={`${uid}-reward-name-auto`}
@@ -775,8 +827,10 @@ const SettingsScreen = () => {
             />
           </div>
           <p style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 10, marginBottom: 0 }}>
-            Se envía solo a las 09:00 (hora local) y vale 7 días. El cliente recibe un aviso por
-            WhatsApp.
+            <Trans>
+              Se envía solo a las 09:00 (hora local) y vale 7 días. El cliente recibe un aviso por
+              WhatsApp.
+            </Trans>
           </p>
         </div>
       )}
@@ -786,13 +840,15 @@ const SettingsScreen = () => {
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
             {' '}
-            <h2>Promoción del momento</h2>
+            <h2>
+              <Trans>Promoción del momento</Trans>
+            </h2>
           </div>
         </div>
         <div className="split">
           <div className="field">
             <label htmlFor={`${uid}-message-sent-on`}>
-              Mensaje · se envía por WhatsApp · máx. 200 caracteres
+              <Trans>Mensaje · se envía por WhatsApp · máx. 200 caracteres</Trans>
             </label>
             <textarea
               id={`${uid}-message-sent-on`}
@@ -810,12 +866,14 @@ const SettingsScreen = () => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="field">
-              <label htmlFor={`${uid}-active-range-business`}>Vigencia · desde / hasta</label>
+              <label htmlFor={`${uid}-active-range-business`}>
+                <Trans>Vigencia · desde / hasta</Trans>
+              </label>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input
                   id={`${uid}-active-range-business`}
                   type="date"
-                  aria-label="Inicio de la vigencia"
+                  aria-label={t`Inicio de la vigencia`}
                   className="input"
                   style={{ flex: 1 }}
                   value={promo.from}
@@ -826,7 +884,7 @@ const SettingsScreen = () => {
                 </span>
                 <input
                   type="date"
-                  aria-label="Fin de la vigencia"
+                  aria-label={t`Fin de la vigencia`}
                   className="input"
                   style={{ flex: 1 }}
                   value={promo.to}
@@ -835,7 +893,9 @@ const SettingsScreen = () => {
               </div>
             </div>
             <div className="field">
-              <span className="field-label">Días de la semana</span>
+              <span className="field-label">
+                <Trans>Días de la semana</Trans>
+              </span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {DOW.map((d) => (
                   <button
@@ -843,7 +903,7 @@ const SettingsScreen = () => {
                     className={'day-pill focusable' + (promo.days.includes(d.id) ? ' on' : '')}
                     onClick={() => toggleDay(d.id)}
                   >
-                    {d.l}
+                    {i18n._(d.l)}
                   </button>
                 ))}
               </div>
@@ -873,11 +933,17 @@ const SettingsScreen = () => {
             <I.Users size={20} />
           </div>
           <div style={{ flex: 1 }}>
-            <div className="eyebrow">Alta de clientes</div>
-            <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>Self-registration</div>
+            <div className="eyebrow">
+              <Trans>Alta de clientes</Trans>
+            </div>
+            <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>
+              <Trans>Autorregistro</Trans>
+            </div>
             <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
-              El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda
-              del personal.
+              <Trans>
+                El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin
+                ayuda del personal.
+              </Trans>
             </div>
           </div>
           <div
@@ -892,6 +958,7 @@ const SettingsScreen = () => {
 
 // ── Live wallet pass component ─────────────────────────────────────────────────
 const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => {
+  const { t } = useLingui();
   const remaining = Math.max(0, loyalty.visitsRequired - stamps);
   const logo = normalizeAssetUrl(brand.logoUrl) || assetPath(biz.handle, 'wallet-logo');
   const filledStamp = assetPath(biz.handle, 'stamp-filled');
@@ -900,7 +967,7 @@ const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => 
   const barcode = `${biz.cardPrefix || 'UMI'}-0004821`;
 
   return (
-    <div className="wallet-device" aria-label="iOS Wallet pass preview">
+    <div className="wallet-device" aria-label={t`Vista previa del pase de Wallet`}>
       <div
         className="wallet-pass"
         style={{ '--wallet-bg': brand.primary, '--wallet-label': brand.secondary || '#FAEBDC' }}
@@ -913,7 +980,9 @@ const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => 
           </div>
           {topupEnabled && (
             <div className="wallet-header-field">
-              <div>SALDO</div>
+              <div>
+                <Trans>SALDO</Trans>
+              </div>
               <strong>$245.00</strong>
             </div>
           )}
@@ -937,11 +1006,13 @@ const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => 
 
         <div className="wallet-fields">
           <PassField
-            label="VISITAS FALTANTES"
-            value={`${remaining} visita${remaining === 1 ? '' : 's'}`}
+            label={t`VISITAS FALTANTES`}
+            value={<Plural value={remaining} one="# visita" other="# visitas" />}
           />
-          <PassField label="TIPO DE RECOMPENSA" value={loyalty.rewardName} />
-          {birthday?.on && <PassField label="REGALO DE CUMPLEANOS" value={birthday.rewardName} />}
+          <PassField label={t`TIPO DE RECOMPENSA`} value={loyalty.rewardName} />
+          {birthday?.on && (
+            <PassField label={t`REGALO DE CUMPLEAÑOS`} value={birthday.rewardName} />
+          )}
         </div>
 
         <div className="wallet-barcode">
@@ -1011,6 +1082,7 @@ function hideBrokenImage(e) {
  * conditions survive where they still apply: the nickname fields.
  */
 function LocationProfilesCard({ conversaflowActive }) {
+  const { t } = useLingui();
   const [profiles, setProfiles] = useState(null);
   const [adding, setAdding] = useState(false);
 
@@ -1048,11 +1120,15 @@ function LocationProfilesCard({ conversaflowActive }) {
         <div className="ed-head" style={{ marginBottom: 18 }}>
           <div className="titles">
             {' '}
-            <h2>Sucursales</h2>
-            <div className="en">Los locales de este café. Cada uno tiene su propio horario.</div>
+            <h2>
+              <Trans>Sucursales</Trans>
+            </h2>
+            <div className="en">
+              <Trans>Los locales de este café. Cada uno tiene su propio horario.</Trans>
+            </div>
           </div>
           <button className="btn btn-secondary btn-sm focusable" onClick={() => setAdding(true)}>
-            + Agregar sucursal
+            + {t`Agregar sucursal`}
           </button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1075,6 +1151,7 @@ function LocationProfilesCard({ conversaflowActive }) {
 }
 
 function NewLocationSheet({ onClose, onCreated }) {
+  const { t } = useLingui();
   const uid = useId();
   const [form, setForm] = useState({ name: '', address: '', latitude: '', longitude: '' });
   const [saving, setSaving] = useState(false);
@@ -1090,7 +1167,7 @@ function NewLocationSheet({ onClose, onCreated }) {
   const valid = form.name.trim().length > 0;
 
   async function create() {
-    const problem = coordProblem(form);
+    const problem = coordProblem(t, form);
     if (problem) {
       setError(problem);
       return;
@@ -1107,7 +1184,7 @@ function NewLocationSheet({ onClose, onCreated }) {
       onCreated();
     } catch (e) {
       console.error('location create failed', e);
-      setError(e.message || 'No se pudo agregar la sucursal.');
+      setError(e.message || t`No se pudo agregar la sucursal.`);
     } finally {
       setSaving(false);
     }
@@ -1119,22 +1196,26 @@ function NewLocationSheet({ onClose, onCreated }) {
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">Sucursales</div>
+            <div className="eyebrow">
+              <Trans>Sucursales</Trans>
+            </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Agregar una sucursal
+              <Trans>Agregar una sucursal</Trans>
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label htmlFor={`${uid}-nombre`}>Nombre</label>
+            <label htmlFor={`${uid}-nombre`}>
+              <Trans>Nombre</Trans>
+            </label>
             <input
               id={`${uid}-nombre`}
               className="input tall"
-              placeholder="Chapultepec"
+              placeholder={t`Chapultepec`}
               value={form.name}
               onChange={update('name')}
               maxLength={100}
@@ -1149,7 +1230,7 @@ function NewLocationSheet({ onClose, onCreated }) {
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cancelar
+            <Trans>Cancelar</Trans>
           </button>
           <button
             className="btn btn-primary focusable"
@@ -1157,7 +1238,7 @@ function NewLocationSheet({ onClose, onCreated }) {
             style={{ opacity: valid && !saving ? 1 : 0.5 }}
             onClick={create}
           >
-            {saving ? 'Agregando…' : 'Agregar sucursal'}
+            {saving ? <Trans>Agregando…</Trans> : <Trans>Agregar sucursal</Trans>}
           </button>
         </div>
       </aside>
@@ -1175,18 +1256,21 @@ function NewLocationSheet({ onClose, onCreated }) {
  * must always be able to correct it by hand.
  */
 function AddressFields({ form, update, setForm, geo }) {
+  const { t } = useLingui();
   const uid = useId();
   const hasPin = Boolean(form.latitude || form.longitude);
   return (
     <>
       <div className="field" style={{ margin: 0 }}>
-        <label htmlFor={`${uid}-direccion`}>Dirección</label>
+        <label htmlFor={`${uid}-direccion`}>
+          <Trans>Dirección</Trans>
+        </label>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             id={`${uid}-direccion`}
             className="input tall"
             style={{ flex: 1 }}
-            placeholder="Av. Chapultepec 1, Guadalajara"
+            placeholder={t`Av. Chapultepec 1, Guadalajara`}
             value={form.address}
             onChange={update('address')}
             maxLength={200}
@@ -1196,7 +1280,7 @@ function AddressFields({ form, update, setForm, geo }) {
             onClick={geo.run}
             disabled={geo.busy || form.address.trim().length < 3}
           >
-            {geo.busy ? 'Buscando…' : 'Buscar'}
+            {geo.busy ? <Trans>Buscando…</Trans> : <Trans>Buscar</Trans>}
           </button>
         </div>
         {geo.message && (
@@ -1213,11 +1297,13 @@ function AddressFields({ form, update, setForm, geo }) {
         className="field"
         style={{ margin: 0, flexDirection: 'row', alignItems: 'center', gap: 10 }}
       >
-        <label style={{ margin: 0, minWidth: 26 }}>Pin</label>
+        <label style={{ margin: 0, minWidth: 26 }}>
+          <Trans>Pin</Trans>
+        </label>
         <input
           className="input"
           inputMode="decimal"
-          aria-label="Latitud"
+          aria-label={t`Latitud`}
           placeholder="20.6736"
           value={form.latitude}
           onChange={update('latitude')}
@@ -1226,7 +1312,7 @@ function AddressFields({ form, update, setForm, geo }) {
         <input
           className="input"
           inputMode="decimal"
-          aria-label="Longitud"
+          aria-label={t`Longitud`}
           placeholder="-103.3440"
           value={form.longitude}
           onChange={update('longitude')}
@@ -1237,7 +1323,7 @@ function AddressFields({ form, update, setForm, geo }) {
             className="btn btn-ghost btn-sm"
             onClick={() => setForm((f) => ({ ...f, latitude: '', longitude: '' }))}
           >
-            Quitar
+            <Trans>Quitar</Trans>
           </button>
         )}
       </div>
@@ -1253,6 +1339,7 @@ function AddressFields({ form, update, setForm, geo }) {
  * answer and the operator can type the pin regardless.
  */
 function useGeocoder(address, onHit) {
+  const { t } = useLingui();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -1265,11 +1352,11 @@ function useGeocoder(address, onHit) {
         onHit(hit);
         setMessage(hit.formattedAddress);
       } else {
-        setMessage('No encontramos esa dirección. Puedes escribir el pin a mano.');
+        setMessage(t`No encontramos esa dirección. Puedes escribir el pin a mano.`);
       }
     } catch (e) {
       console.error('geocode failed', e);
-      setMessage('No se pudo buscar ahora. Puedes escribir el pin a mano.');
+      setMessage(t`No se pudo buscar ahora. Puedes escribir el pin a mano.`);
     } finally {
       setBusy(false);
     }
@@ -1297,17 +1384,17 @@ function coordOrNull(v) {
  * The ranges are the ones the schema and `@IsLatitude`/`@IsLongitude` enforce, so a
  * number that would come back 400 is caught here with a sentence instead.
  */
-function coordProblem(form) {
+function coordProblem(t, form) {
   const pairs = [
-    ['latitude', 'La latitud', 90],
-    ['longitude', 'La longitud', 180],
+    ['latitude', t`La latitud`, 90],
+    ['longitude', t`La longitud`, 180],
   ];
   for (const [key, label, limit] of pairs) {
-    const t = String(form[key] ?? '').trim();
-    if (!t) continue;
-    const n = Number(t);
-    if (!Number.isFinite(n)) return `${label} debe ser un número.`;
-    if (Math.abs(n) > limit) return `${label} debe estar entre -${limit} y ${limit}.`;
+    const raw = String(form[key] ?? '').trim();
+    if (!raw) continue;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return t`${label} debe ser un número.`;
+    if (Math.abs(n) > limit) return t`${label} debe estar entre -${limit} y ${limit}.`;
   }
   return null;
 }
@@ -1321,6 +1408,7 @@ function coordProblem(form) {
  * a row that posted every field on every save would clear the ones it never showed.
  */
 function LocationProfileRow({ profile, showAliases }) {
+  const { t } = useLingui();
   const uid = useId();
   const [open, setOpen] = useState(false);
   /**
@@ -1373,7 +1461,7 @@ function LocationProfileRow({ profile, showAliases }) {
   }
 
   async function save() {
-    const problem = coordProblem(form);
+    const problem = coordProblem(t, form);
     if (problem) {
       setError(problem);
       return;
@@ -1402,7 +1490,7 @@ function LocationProfileRow({ profile, showAliases }) {
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
       console.error('location save failed', e);
-      setError(e.message || 'No se pudo guardar. Reintenta.');
+      setError(e.message || t`No se pudo guardar. Reintenta.`);
     } finally {
       setSaving(false);
     }
@@ -1432,7 +1520,7 @@ function LocationProfileRow({ profile, showAliases }) {
         {open ? (
           <input
             className="input"
-            aria-label="Nombre de la sucursal"
+            aria-label={t`Nombre de la sucursal`}
             value={form.name}
             onChange={update('name')}
             maxLength={100}
@@ -1446,16 +1534,16 @@ function LocationProfileRow({ profile, showAliases }) {
         {open ? (
           <div className="seg">
             <button className={!closed ? 'on' : ''} onClick={() => setStatus('active')}>
-              Abierta
+              <Trans>Abierta</Trans>
             </button>
             <button className={closed ? 'on' : ''} onClick={() => setStatus('closed')}>
-              Cerrada
+              <Trans>Cerrada</Trans>
             </button>
           </div>
         ) : (
           closed && (
             <span className="chip read" style={{ fontSize: 11 }}>
-              Cerrada
+              <Trans>Cerrada</Trans>
             </span>
           )
         )}
@@ -1469,10 +1557,12 @@ function LocationProfileRow({ profile, showAliases }) {
             whiteSpace: 'nowrap',
           }}
         >
-          {open ? '' : form.address || 'Sin dirección'}
+          {open ? '' : form.address || t`Sin dirección`}
         </div>
         {!open && dirty && (
-          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Sin guardar</span>
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+            <Trans>Sin guardar</Trans>
+          </span>
         )}
         {open && error && (
           <span role="alert" style={{ color: '#c0392b', fontSize: 12 }}>
@@ -1481,11 +1571,19 @@ function LocationProfileRow({ profile, showAliases }) {
         )}
         {open && (
           <button className="btn btn-secondary btn-sm" onClick={save} disabled={!dirty || saving}>
-            {saving ? 'Guardando…' : saved ? '✓ Guardado' : error ? 'Reintentar' : 'Guardar'}
+            {saving ? (
+              <Trans>Guardando…</Trans>
+            ) : saved ? (
+              <Trans>✓ Guardado</Trans>
+            ) : error ? (
+              <Trans>Reintentar</Trans>
+            ) : (
+              <Trans>Guardar</Trans>
+            )}
           </button>
         )}
         <button className="btn btn-ghost btn-sm" onClick={() => setOpen((o) => !o)}>
-          {open ? 'Cerrar' : 'Editar'}
+          {open ? <Trans>Cerrar</Trans> : <Trans>Editar</Trans>}
         </button>
       </div>
 
@@ -1495,7 +1593,9 @@ function LocationProfileRow({ profile, showAliases }) {
           {showAliases && (
             <>
               <div className="field" style={{ margin: 0 }}>
-                <span className="field-label">Apodos (cómo la llaman los clientes)</span>
+                <span className="field-label">
+                  <Trans>Apodos (cómo la llaman los clientes)</Trans>
+                </span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                   {aliases.map((a, i) => (
                     <span
@@ -1506,7 +1606,7 @@ function LocationProfileRow({ profile, showAliases }) {
                       {a}
                       <button
                         onClick={() => removeAlias(i)}
-                        aria-label={'Quitar ' + a}
+                        aria-label={t`Quitar ${a}`}
                         style={{
                           border: 'none',
                           background: 'none',
@@ -1532,7 +1632,7 @@ function LocationProfileRow({ profile, showAliases }) {
                       }
                     }}
                     onBlur={() => addAlias(draft)}
-                    placeholder="+ apodo"
+                    placeholder={t`+ apodo`}
                     maxLength={40}
                     style={{ width: 150, height: 32, fontSize: 12.5 }}
                   />
@@ -1540,14 +1640,14 @@ function LocationProfileRow({ profile, showAliases }) {
               </div>
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor={`${uid}-descripcion-zona-referencia`}>
-                  Descripción (zona / referencia)
+                  <Trans>Descripción (zona / referencia)</Trans>
                 </label>
                 <input
                   id={`${uid}-descripcion-zona-referencia`}
                   className="input tall"
                   value={descriptor}
                   onChange={(e) => setDescriptor(e.target.value.slice(0, 160))}
-                  placeholder="p. ej. la del centro, junto al parque"
+                  placeholder={t`p. ej. la del centro, junto al parque`}
                 />
               </div>
             </>
