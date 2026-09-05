@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getModuleAvailability, getVisibleModules } from './module-registry.js';
+import { i18n, activateTestLocale } from '@/test/i18n.jsx';
 
 const capabilities = (permissions) => ({
   products: {
@@ -32,8 +33,17 @@ describe('Dashboard permission navigation', () => {
   });
 
   it('uses operator language in visible navigation', () => {
-    const labels = getVisibleModules(capabilities(['customer.read'])).map((item) => item.label);
+    activateTestLocale('es');
+    const labels = getVisibleModules(capabilities(['customer.read'])).map((item) =>
+      i18n._(item.label),
+    );
     expect(labels).toContain('Clientes');
     expect(labels).not.toContain('Customers');
+    activateTestLocale('en');
+    const english = getVisibleModules(capabilities(['customer.read'])).map((item) =>
+      i18n._(item.label),
+    );
+    expect(english).toContain('Customers');
+    activateTestLocale('es');
   });
 });

@@ -17,7 +17,14 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react()],
+    plugins: [
+      react({
+        // Lingui macros (`t`, `Trans`, `msg`, `useLingui`) compile to plain
+        // `i18n._()` calls here. `@vitejs/plugin-react` ignores project Babel
+        // config, so the plugin is declared inline (Lingui setup-vite guide).
+        babel: { plugins: ['@lingui/babel-plugin-lingui-macro'] },
+      }),
+    ],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

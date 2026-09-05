@@ -1,3 +1,4 @@
+import { t } from '@lingui/core/macro';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { COOKIE_AUTH, LOCAL_SESSION, apiUrl, withCreds, errMessage } from './config.js';
 import { routes } from '@umi/contract/routes';
@@ -201,7 +202,7 @@ export async function signIn(email, password, remember = false) {
     }),
   );
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(errMessage(payload, 'Credenciales incorrectas'));
+  if (!res.ok) throw new Error(errMessage(payload, t`Credenciales incorrectas`));
   if (isMfaChallenge(payload)) return payload;
   return completeLocalSignIn(payload);
 }
@@ -231,7 +232,7 @@ export function isMfaChallenge(payload) {
  */
 function completeLocalSignIn(payload) {
   if (!payload || !payload.session) {
-    throw new Error('El servidor no devolvió una sesión. Inténtalo otra vez.');
+    throw new Error(t`El servidor no devolvió una sesión. Inténtalo otra vez.`);
   }
   setLocalSession(payload.session);
   window.location.assign('/');
@@ -255,7 +256,7 @@ export async function verifyMfaCode(challengeToken, code, remember = false) {
     }),
   );
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(errMessage(payload, 'Código incorrecto o vencido.'));
+  if (!res.ok) throw new Error(errMessage(payload, t`Código incorrecto o vencido.`));
   return completeLocalSignIn(payload);
 }
 

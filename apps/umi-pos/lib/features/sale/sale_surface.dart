@@ -433,7 +433,7 @@ final class _SaleCenterState extends State<_SaleCenter> {
                                     onPressed: () => showSaleExceptionDialog(
                                       context,
                                       controller: widget.exceptions!,
-                                      saleId: sale.id,
+                                      saleId: sale.committedSaleId ?? sale.id,
                                     ),
                                     icon: const Icon(
                                       Icons.assignment_return_outlined,

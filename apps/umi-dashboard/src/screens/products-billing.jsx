@@ -1,4 +1,6 @@
 import React from 'react';
+import { msg } from '@lingui/core/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { isProductStatusActive } from '@umi/contract/entitlements';
 import { I } from '@/icons.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
@@ -6,42 +8,46 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 const PRODUCT_COPY = {
   dashboard: {
     title: 'Umi Dashboard',
-    body: 'La consola del dueño: cambiar de café, elegir sucursal y administrar la cuenta.',
+    body: msg`La consola del dueño: cambiar de café, elegir sucursal y administrar la cuenta.`,
     icon: 'Home',
   },
   conversaflow: {
     title: 'ConversaFlow',
-    body: 'Conversaciones de WhatsApp, pedidos automáticos, horarios y flujo de trabajo.',
+    body: msg`Conversaciones de WhatsApp, pedidos automáticos, horarios y flujo de trabajo.`,
     icon: 'WhatsApp',
   },
   kds: {
     title: 'KDS',
-    body: 'Comandas de cocina, estaciones, alta de dispositivos y cambios de estado.',
+    body: msg`Comandas de cocina, estaciones, alta de dispositivos y cambios de estado.`,
     icon: 'Tablet',
   },
   cash: {
     title: 'Umi Cash',
-    body: 'Pases en Wallet, clientes del programa, sellos, abonos y tarjetas de regalo.',
+    body: msg`Pases en Wallet, clientes del programa, sellos, abonos y tarjetas de regalo.`,
     icon: 'CreditCard',
   },
   observability: {
-    title: 'Observabilidad',
-    body: 'Registros de operación, trazas, diagnóstico y revisión de soporte.',
+    title: msg`Observabilidad`,
+    body: msg`Registros de operación, trazas, diagnóstico y revisión de soporte.`,
     icon: 'Activity',
   },
 };
 
 /** Entitlement statuses as the owner reads them, not as the table stores them. */
 const STATUS_WORDS = {
-  active: 'Activo',
-  trialing: 'En prueba',
-  past_due: 'Pago pendiente',
-  canceled: 'Cancelado',
-  paused: 'En pausa',
-  missing: 'Sin contratar',
+  active: msg`Activo`,
+  trialing: msg`En prueba`,
+  past_due: msg`Pago pendiente`,
+  canceled: msg`Cancelado`,
+  paused: msg`En pausa`,
+  missing: msg`Sin contratar`,
 };
 
+/** Product names are brands, so they stay as strings; descriptions are messages. */
+const text = (i18n, value) => (typeof value === 'string' ? value : value ? i18n._(value) : '');
+
 function ProductCard({ productKey, product }) {
+  const { i18n } = useLingui();
   const copy = PRODUCT_COPY[productKey] || { title: productKey, body: '', icon: 'Settings' };
   const Icon = I[copy.icon] || I.Settings;
   const active = isProductStatusActive(product?.status);
@@ -73,18 +79,18 @@ function ProductCard({ productKey, product }) {
             gap: 12,
           }}
         >
-          <h3 style={{ margin: 0, fontSize: 18 }}>{copy.title}</h3>
+          <h3 style={{ margin: 0, fontSize: 18 }}>{text(i18n, copy.title)}</h3>
           <span className={'sub-pill' + (active ? '' : ' muted')}>
             <span className="sd" />
-            {STATUS_WORDS[product?.status] || STATUS_WORDS.missing}
+            {i18n._(STATUS_WORDS[product?.status] || STATUS_WORDS.missing)}
           </span>
         </div>
         <div style={{ fontSize: 13.5, color: 'var(--ink-3)', marginTop: 7, lineHeight: 1.45 }}>
-          {copy.body}
+          {text(i18n, copy.body)}
         </div>
         {!active && (
           <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 12 }}>
-            Sin este producto activo, la consola no muestra controles para operarlo.
+            <Trans>Sin este producto activo, la consola no muestra controles para operarlo.</Trans>
           </div>
         )}
       </div>
@@ -93,7 +99,9 @@ function ProductCard({ productKey, product }) {
 }
 
 export default function ProductsBillingScreen() {
+  const { t } = useLingui();
   const merchantState = useMerchant();
+  const merchantName = merchantState?.selectedMerchant?.name || t`este café`;
   const products = merchantState?.capabilities?.products || {};
   const ordered = ['dashboard', 'conversaflow', 'kds', 'cash', 'observability'];
 
@@ -102,11 +110,13 @@ export default function ProductsBillingScreen() {
       <div className="card" style={{ padding: '24px 26px' }}>
         {' '}
         <h2 style={{ margin: '0 0 8px', fontSize: 26 }}>
-          Productos de {merchantState?.selectedMerchant?.name || 'este café'}
+          <Trans>Productos de {merchantName}</Trans>
         </h2>
         <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 68 * 1 + 'ch' }}>
-          Un producto activo decide qué secciones existen en la consola. El rol de cada persona
-          decide qué puede hacer dentro de ellas — pero un rol no activa un producto que falta.
+          <Trans>
+            Un producto activo decide qué secciones existen en la consola. El rol de cada persona
+            decide qué puede hacer dentro de ellas — pero un rol no activa un producto que falta.
+          </Trans>
         </div>
       </div>
 

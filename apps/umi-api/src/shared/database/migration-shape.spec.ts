@@ -87,12 +87,12 @@ describe('90_rls.sql · re-runnable by construction', () => {
   const sql = readFileSync(join(BUILD_V3, '90_rls.sql'), 'utf8');
 
   it('guards every `create policy` with a drop OF THE SAME POLICY ON THE SAME TABLE', () => {
-    // Counting is not enough. 21 drops that all name the wrong table would keep
+    // Counting is not enough. 22 drops that all name the wrong table would keep
     // the totals equal, remove live policies, and still let the second apply
     // fail. Bind each create to a drop by name AND table.
     const creates = pairs(sql, CREATE_POLICY);
     const drops = new Set(pairs(sql, DROP_POLICY));
-    expect(creates.length, 'the file must still create policies').toBe(21);
+    expect(creates.length, 'the file must still create policies').toBe(23);
     const unguarded = creates.filter((c) => !drops.has(c));
     expect(
       unguarded,

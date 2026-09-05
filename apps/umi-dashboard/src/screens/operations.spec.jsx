@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import '@/test/i18n.jsx';
 import { formatOperationDate, formatOperationMoney } from './operations-format.js';
 
 describe('Operations presentation', () => {

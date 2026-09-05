@@ -1,11 +1,12 @@
+import { formatDateTime, formatMoney } from '@/lib/format.js';
+
+/** Money in an operations row. The API sends centavos plus the ISO currency. */
 export function formatOperationMoney(value, currency) {
   if (value == null || !currency) return '—';
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency }).format(value / 100);
+  return formatMoney(value, currency);
 }
 
 export function formatOperationDate(value) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  );
+  return formatDateTime(value);
 }

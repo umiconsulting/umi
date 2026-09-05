@@ -1,5 +1,8 @@
 import { useId, useState } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatDate } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
 import {
   archiveMerchantRole,
@@ -13,7 +16,7 @@ import {
 } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
-const ROLE_LABELS = { ADMIN: 'Admin', STAFF: 'Barista' };
+const ROLE_LABELS = { ADMIN: msg`Admin`, STAFF: msg`Barista` };
 
 function nameToHue(name) {
   let hue = 0;
@@ -23,17 +26,18 @@ function nameToHue(name) {
   return hue;
 }
 
-function fmtRelative(iso) {
+function fmtRelative(t, iso) {
   if (!iso) return '—';
   const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 60000) return 'ahora';
-  if (ms < 3600000) return `${Math.floor(ms / 60000)} min`;
-  if (ms < 86400000) return `${Math.floor(ms / 3600000)} h`;
-  if (ms < 7 * 86400000) return `${Math.floor(ms / 86400000)} d`;
-  return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  if (ms < 60000) return t`ahora`;
+  if (ms < 3600000) return t`${Math.floor(ms / 60000)} min`;
+  if (ms < 86400000) return t`${Math.floor(ms / 3600000)} h`;
+  if (ms < 7 * 86400000) return t`${Math.floor(ms / 86400000)} d`;
+  return formatDate(iso);
 }
 
 const StaffScreen = () => {
+  const { t, i18n } = useLingui();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [filter, setFilter] = useState('ALL');
@@ -63,35 +67,35 @@ const StaffScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div className="seg" role="tablist" aria-label="Secciones de equipo y acceso">
+      <div className="seg" role="tablist" aria-label={t`Secciones de equipo y acceso`}>
         <button className={section === 'people' ? 'on' : ''} onClick={() => setSection('people')}>
-          Personas
+          <Trans>Personas</Trans>
         </button>
         <button className={section === 'roles' ? 'on' : ''} onClick={() => setSection('roles')}>
-          Roles y permisos
+          <Trans>Roles y permisos</Trans>
         </button>
       </div>
       <RegionHead
-        title={section === 'people' ? 'Equipo y acceso al POS' : 'Roles y permisos'}
+        title={section === 'people' ? t`Equipo y acceso al POS` : t`Roles y permisos`}
         note={
           section === 'people'
             ? loading
-              ? 'Cargando…'
-              : `${activeStaff.filter((person) => person.role === 'ADMIN').length} con rol Admin.`
+              ? t`Cargando…`
+              : t`${activeStaff.filter((person) => person.role === 'ADMIN').length} con rol Admin.`
             : rolesLoading
-              ? 'Cargando…'
-              : 'Define lo que cada rol puede hacer en el POS y el Dashboard.'
+              ? t`Cargando…`
+              : t`Define lo que cada rol puede hacer en el POS y el Dashboard.`
         }
         count={
           section === 'people'
-            ? { value: activeStaff.length, label: 'personas' }
-            : { value: roles.length, label: 'roles' }
+            ? { value: activeStaff.length, label: t`personas` }
+            : { value: roles.length, label: t`roles` }
         }
         actions={
           section === 'people' ? (
             <>
-              <div className="seg" role="tablist" aria-label="Filtrar el equipo por rol">
-                {[{ id: 'ALL', name: 'Todos' }, ...roles].map((role) => (
+              <div className="seg" role="tablist" aria-label={t`Filtrar el equipo por rol`}>
+                {[{ id: 'ALL', name: t`Todos` }, ...roles].map((role) => (
                   <button
                     key={role.id}
                     className={filter === role.id ? 'on' : ''}
@@ -102,7 +106,7 @@ const StaffScreen = () => {
                 ))}
               </div>
               <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
-                <I.Plus size={16} /> Añadir persona
+                <I.Plus size={16} /> <Trans>Añadir persona</Trans>
               </button>
             </>
           ) : null
@@ -128,20 +132,32 @@ const StaffScreen = () => {
             {filtered.length === 0 && !loading ? (
               <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
                 {filter === 'ALL'
-                  ? 'No hay personas activas en el equipo.'
-                  : `No hay personas con el rol ${roles.find((role) => role.id === filter)?.name || ''}.`}
+                  ? t`No hay personas activas en el equipo.`
+                  : t`No hay personas con el rol ${roles.find((role) => role.id === filter)?.name || ''}.`}
               </div>
             ) : (
               <table className="matrix">
                 <thead>
                   <tr>
-                    <th style={{ width: '32%' }}>Persona</th>
-                    <th>Rol</th>
-                    <th>Acceso al POS</th>
-                    <th>Teléfono</th>
-                    <th>Desde</th>
+                    <th style={{ width: '32%' }}>
+                      <Trans>Persona</Trans>
+                    </th>
+                    <th>
+                      <Trans>Rol</Trans>
+                    </th>
+                    <th>
+                      <Trans>Acceso al POS</Trans>
+                    </th>
+                    <th>
+                      <Trans>Teléfono</Trans>
+                    </th>
+                    <th>
+                      <Trans>Desde</Trans>
+                    </th>
                     <th style={{ width: 104 }}>
-                      <span className="sr-only">Acciones</span>
+                      <span className="sr-only">
+                        <Trans>Acciones</Trans>
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -170,7 +186,7 @@ const StaffScreen = () => {
                             <div>
                               <div style={{ fontWeight: 600, fontSize: 14 }}>{person.name}</div>
                               <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-                                {person.email || 'Sin correo'}
+                                {person.email || t`Sin correo`}
                               </div>
                             </div>
                           </div>
@@ -180,29 +196,31 @@ const StaffScreen = () => {
                             className={`badge ${person.role === 'ADMIN' ? 'badge-admin' : 'badge-staff'}`}
                           >
                             {person.role === 'ADMIN' ? <I.Lock size={10} /> : null}
-                            {person.roleName || ROLE_LABELS[person.role] || person.role}
+                            {person.roleName ||
+                              (ROLE_LABELS[person.role] && i18n._(ROLE_LABELS[person.role])) ||
+                              person.role}
                           </span>
                         </td>
                         <td>
                           <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
-                            {person.hasOperatorPin ? 'PIN configurado' : 'Sin PIN'}
+                            {person.hasOperatorPin ? t`PIN configurado` : t`Sin PIN`}
                           </span>
                         </td>
                         <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
                           {person.phone || '—'}
                         </td>
                         <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-                          {fmtRelative(person.createdAt)}
+                          {fmtRelative(t, person.createdAt)}
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                             <button
                               className="btn-icon"
-                              aria-label={`Administrar acceso de ${person.name}`}
+                              aria-label={t`Administrar acceso de ${person.name}`}
                               title={
                                 person.role === 'ADMIN' && !canAssignAdmin
-                                  ? 'Solo el propietario puede administrar un acceso Admin.'
-                                  : 'Administrar rol y PIN'
+                                  ? t`Solo el propietario puede administrar un acceso Admin.`
+                                  : t`Administrar rol y PIN`
                               }
                               disabled={person.role === 'ADMIN' && !canAssignAdmin}
                               onClick={() => setSelectedStaff(person)}
@@ -211,11 +229,11 @@ const StaffScreen = () => {
                             </button>
                             <button
                               className="btn-icon"
-                              aria-label={`Desactivar a ${person.name}`}
+                              aria-label={t`Desactivar a ${person.name}`}
                               title={
                                 person.role === 'ADMIN' && !canAssignAdmin
-                                  ? 'Solo el propietario puede administrar un acceso Admin.'
-                                  : 'Desactivar acceso'
+                                  ? t`Solo el propietario puede administrar un acceso Admin.`
+                                  : t`Desactivar acceso`
                               }
                               disabled={person.role === 'ADMIN' && !canAssignAdmin}
                               onClick={async () => {
@@ -225,7 +243,7 @@ const StaffScreen = () => {
                                   reload();
                                 } catch (error) {
                                   setRosterError(
-                                    error.message || 'No se pudo desactivar el acceso.',
+                                    error.message || t`No se pudo desactivar el acceso.`,
                                   );
                                 }
                               }}
@@ -281,6 +299,7 @@ const StaffScreen = () => {
 };
 
 function RolesWorkspace({ roles, permissions, canManage, onReload }) {
+  const { t } = useLingui();
   const [selectedId, setSelectedId] = useState(
     roles.find((role) => role.key === 'admin')?.id || roles[0]?.id || '',
   );
@@ -294,14 +313,14 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
     setError(null);
     try {
       const result = await createMerchantRole({
-        name: 'Nuevo rol',
-        description: 'Configura los permisos de este rol.',
+        name: t`Nuevo rol`,
+        description: t`Configura los permisos de este rol.`,
         permissionKeys: [],
       });
       setSelectedId(result.role.id);
       onReload();
     } catch (createError) {
-      setError(createError.message || 'No se pudo crear el rol.');
+      setError(createError.message || t`No se pudo crear el rol.`);
     } finally {
       setCreating(false);
     }
@@ -311,11 +330,13 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
     <div className="roles-workspace">
       <div className="card" style={{ padding: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 6px 12px' }}>
-          <strong>Roles del comercio</strong>
+          <strong>
+            <Trans>Roles del comercio</Trans>
+          </strong>
           <button
             className="btn-icon"
-            aria-label="Crear un rol"
-            title={canManage ? 'Crear un rol' : 'Solo el propietario puede crear roles.'}
+            aria-label={t`Crear un rol`}
+            title={canManage ? t`Crear un rol` : t`Solo el propietario puede crear roles.`}
             disabled={!canManage || creating}
             onClick={createRole}
           >
@@ -341,7 +362,8 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
                 {role.name}
               </span>
               <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>
-                {role.assignedCount} personas · {role.permissionKeys.length} permisos
+                <Plural value={role.assignedCount} one="# persona" other="# personas" /> ·{' '}
+                <Plural value={role.permissionKeys.length} one="# permiso" other="# permisos" />
               </span>
             </button>
           ))}
@@ -357,7 +379,7 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
         />
       ) : (
         <div className="card" style={{ padding: 32, color: 'var(--ink-3)' }}>
-          No hay roles disponibles.
+          <Trans>No hay roles disponibles.</Trans>
         </div>
       )}
     </div>
@@ -365,6 +387,7 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
 }
 
 function RoleEditor({ role, permissions, canManage, onReload }) {
+  const { t } = useLingui();
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description || '');
   const [selectedKeys, setSelectedKeys] = useState(new Set(role.permissionKeys));
@@ -405,7 +428,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
       });
       onReload();
     } catch (saveError) {
-      setError(saveError.message || 'No se pudo guardar el rol.');
+      setError(saveError.message || t`No se pudo guardar el rol.`);
     } finally {
       setSaving(false);
     }
@@ -419,7 +442,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
       await archiveMerchantRole(role.id, role.revision);
       onReload();
     } catch (archiveError) {
-      setError(archiveError.message || 'No se pudo archivar el rol.');
+      setError(archiveError.message || t`No se pudo archivar el rol.`);
       setSaving(false);
     }
   };
@@ -431,7 +454,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
           <div style={{ flex: 1 }}>
             <input
               className="sheet-title-input"
-              aria-label="Nombre del rol"
+              aria-label={t`Nombre del rol`}
               maxLength={80}
               value={name}
               disabled={locked}
@@ -439,7 +462,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
             />
             <input
               className="input"
-              aria-label="Descripción del rol"
+              aria-label={t`Descripción del rol`}
               maxLength={300}
               value={description}
               disabled={locked}
@@ -448,26 +471,38 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
             />
           </div>
           <div style={{ textAlign: 'right', color: 'var(--ink-3)', fontSize: 12 }}>
-            <div>{role.assignedCount} personas afectadas</div>
-            <div>Revisión {role.revision}</div>
-            {role.sourceTemplateKey ? <div>Plantilla {role.sourceTemplateKey}</div> : null}
+            <div>
+              <Plural
+                value={role.assignedCount}
+                one="# persona afectada"
+                other="# personas afectadas"
+              />
+            </div>
+            <div>
+              <Trans>Revisión {role.revision}</Trans>
+            </div>
+            {role.sourceTemplateKey ? (
+              <div>
+                <Trans>Plantilla {role.sourceTemplateKey}</Trans>
+              </div>
+            ) : null}
           </div>
         </div>
         {role.isSystem ? (
           <div style={{ marginTop: 12, color: 'var(--ink-3)', fontSize: 12 }}>
-            El rol Owner está protegido.
+            <Trans>El rol Owner está protegido.</Trans>
           </div>
         ) : null}
       </div>
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)' }}>
-        <div className="seg" role="tablist" aria-label="Filtrar permisos por producto">
+        <div className="seg" role="tablist" aria-label={t`Filtrar permisos por producto`}>
           {['all', 'pos', 'dashboard', 'kds', 'cash'].map((value) => (
             <button
               key={value}
               className={product === value ? 'on' : ''}
               onClick={() => setProduct(value)}
             >
-              {value === 'all' ? 'Todos' : value.toUpperCase()}
+              {value === 'all' ? t`Todos` : value.toUpperCase()}
             </button>
           ))}
         </div>
@@ -521,7 +556,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
           ) : null}
           {!error && role.assignedCount ? (
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              Reasigna al equipo antes de archivar.
+              <Trans>Reasigna al equipo antes de archivar.</Trans>
             </span>
           ) : null}
         </div>
@@ -531,14 +566,14 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
             disabled={locked || Boolean(role.assignedCount) || saving}
             onClick={archive}
           >
-            Archivar
+            <Trans>Archivar</Trans>
           </button>
           <button
             className="btn btn-primary"
             disabled={!changed || locked || saving || !name.trim()}
             onClick={save}
           >
-            {saving ? 'Guardando…' : 'Guardar rol'}
+            {saving ? <Trans>Guardando…</Trans> : <Trans>Guardar rol</Trans>}
           </button>
         </div>
       </div>
@@ -547,11 +582,14 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
 }
 
 function RolePicker({ roles, roleId, setRoleId, canAssignAdmin, currentRoleId }) {
+  const { t } = useLingui();
   const selected = roles.find((role) => role.id === roleId);
   return (
     <div className="field">
-      <span className="field-label">Rol</span>
-      <div className="role-tabs" role="tablist" aria-label="Seleccionar el rol">
+      <span className="field-label">
+        <Trans>Rol</Trans>
+      </span>
+      <div className="role-tabs" role="tablist" aria-label={t`Seleccionar el rol`}>
         {roles.map((role) => {
           const protectedRole = role.key === 'owner' || role.key === 'admin';
           const disabled = protectedRole && !canAssignAdmin && currentRoleId !== role.id;
@@ -563,7 +601,7 @@ function RolePicker({ roles, roleId, setRoleId, canAssignAdmin, currentRoleId })
               aria-selected={roleId === role.id}
               className={`badge ${protectedRole ? 'badge-admin' : 'badge-staff'} role-tab ${roleId === role.id ? 'on' : ''}`}
               disabled={disabled}
-              title={disabled ? 'Solo el propietario puede asignar este rol.' : undefined}
+              title={disabled ? t`Solo el propietario puede asignar este rol.` : undefined}
               onClick={() => setRoleId(role.id)}
             >
               {protectedRole ? <I.Lock size={10} /> : null} {role.name}
@@ -572,13 +610,14 @@ function RolePicker({ roles, roleId, setRoleId, canAssignAdmin, currentRoleId })
         })}
       </div>
       <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-        {selected?.description || 'Los permisos del rol se administran en Roles y permisos.'}
+        {selected?.description || t`Los permisos del rol se administran en Roles y permisos.`}
       </div>
     </div>
   );
 }
 
 function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistingPin }) {
+  const { t } = useLingui();
   return (
     <>
       <div className="field">
@@ -590,7 +629,9 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
             gap: 12,
           }}
         >
-          <label htmlFor={`${uid}-pin`}>PIN del POS (opcional)</label>
+          <label htmlFor={`${uid}-pin`}>
+            <Trans>PIN del POS (opcional)</Trans>
+          </label>
           {hasExistingPin !== undefined ? (
             <span
               role="status"
@@ -607,7 +648,7 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
               }}
             >
               {hasExistingPin ? <I.Check size={12} /> : <I.X size={11} />}
-              {hasExistingPin ? 'PIN activo' : 'Sin PIN'}
+              {hasExistingPin ? <Trans>PIN activo</Trans> : <Trans>Sin PIN</Trans>}
             </span>
           ) : null}
         </div>
@@ -618,13 +659,15 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
           inputMode="numeric"
           autoComplete="new-password"
           maxLength={8}
-          placeholder="4 a 8 dígitos"
+          placeholder={t`4 a 8 dígitos`}
           value={pin}
           onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
         />
       </div>
       <div className="field">
-        <label htmlFor={`${uid}-pin-confirmation`}>Confirmar el PIN</label>
+        <label htmlFor={`${uid}-pin-confirmation`}>
+          <Trans>Confirmar el PIN</Trans>
+        </label>
         <input
           id={`${uid}-pin-confirmation`}
           className="input tall"
@@ -636,7 +679,7 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
           onChange={(event) => setConfirmation(event.target.value.replace(/\D/g, ''))}
         />
         <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-          El Dashboard nunca muestra un PIN guardado.
+          <Trans>El Dashboard nunca muestra un PIN guardado.</Trans>
         </div>
       </div>
     </>
@@ -644,6 +687,7 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
 }
 
 const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
+  const { t } = useLingui();
   const uid = useId();
   const defaultRoleId = roles.find((role) => role.key === 'staff')?.id || roles[0]?.id || '';
   const [form, setForm] = useState({
@@ -669,26 +713,30 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
         ...(form.pin ? { operatorPin: form.pin } : {}),
       });
     } catch (submitError) {
-      setError(submitError.message || 'No se pudo añadir a la persona.');
+      setError(submitError.message || t`No se pudo añadir a la persona.`);
     } finally {
       setSaving(false);
     }
   };
   return (
-    <Sheet title="Añadir una persona" eyebrow="Equipo y accesos" onClose={onClose}>
+    <Sheet title={t`Añadir una persona`} eyebrow={t`Equipo y accesos`} onClose={onClose}>
       <div className="sheet-body">
         <div className="field">
-          <label htmlFor={`${uid}-name`}>Nombre completo</label>
+          <label htmlFor={`${uid}-name`}>
+            <Trans>Nombre completo</Trans>
+          </label>
           <input
             id={`${uid}-name`}
             className="input tall"
-            placeholder="María García"
+            placeholder={t`María García`}
             value={form.name}
             onChange={(event) => setForm((value) => ({ ...value, name: event.target.value }))}
           />
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-phone`}>Teléfono</label>
+          <label htmlFor={`${uid}-phone`}>
+            <Trans>Teléfono</Trans>
+          </label>
           <input
             id={`${uid}-phone`}
             className="input tall"
@@ -713,18 +761,21 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
         />
       </div>
       <SheetFooter
-        error={error || (!validPin ? 'El PIN debe tener de 4 a 8 dígitos y debe coincidir.' : null)}
+        error={
+          error || (!validPin ? t`El PIN debe tener de 4 a 8 dígitos y debe coincidir.` : null)
+        }
         saving={saving}
         valid={Boolean(valid)}
         onClose={onClose}
         onSave={submit}
-        saveLabel="Añadir persona"
+        saveLabel={t`Añadir persona`}
       />
     </Sheet>
   );
 };
 
 const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
+  const { t } = useLingui();
   const uid = useId();
   const [name, setName] = useState(person.name);
   const [roleId, setRoleId] = useState(person.roleId || '');
@@ -746,7 +797,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
         ...(pin ? { operatorPin: pin } : {}),
       });
     } catch (submitError) {
-      setError(submitError.message || 'No se pudo guardar el acceso.');
+      setError(submitError.message || t`No se pudo guardar el acceso.`);
       setSaving(false);
     }
   };
@@ -757,7 +808,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
     try {
       await onUpdate({ operatorPin: null });
     } catch (submitError) {
-      setError(submitError.message || 'No se pudo quitar el PIN.');
+      setError(submitError.message || t`No se pudo quitar el PIN.`);
       setSaving(false);
     }
   };
@@ -766,13 +817,13 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
       title={
         <input
           className="sheet-title-input"
-          aria-label="Nombre de la persona"
+          aria-label={t`Nombre de la persona`}
           maxLength={160}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
       }
-      eyebrow="Administrar acceso al POS"
+      eyebrow={t`Administrar acceso al POS`}
       onClose={onClose}
       topContent={
         <RolePicker
@@ -795,7 +846,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
         />
         {person.hasOperatorPin ? (
           <button className="btn btn-ghost" disabled={saving} onClick={clearPin}>
-            Quitar el PIN actual
+            <Trans>Quitar el PIN actual</Trans>
           </button>
         ) : null}
       </div>
@@ -803,26 +854,27 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
         error={
           error ||
           (!validName
-            ? 'Escribe el nombre de la persona.'
+            ? t`Escribe el nombre de la persona.`
             : !validPin
-              ? 'El PIN debe tener de 4 a 8 dígitos y debe coincidir.'
+              ? t`El PIN debe tener de 4 a 8 dígitos y debe coincidir.`
               : null)
         }
         saving={saving}
         valid={changed && validPin && validName}
         onClose={onClose}
         onSave={save}
-        saveLabel="Guardar acceso"
+        saveLabel={t`Guardar acceso`}
       />
     </Sheet>
   );
 };
 
 function Sheet({ title, eyebrow, onClose, topContent, children }) {
+  const { t } = useLingui();
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} />
-      <aside className="sheet" aria-label={title}>
+      <aside className="sheet" aria-label={typeof title === 'string' ? title : eyebrow}>
         <div className="sheet-head">
           <div>
             <div className="eyebrow">{eyebrow}</div>
@@ -830,7 +882,7 @@ function Sheet({ title, eyebrow, onClose, topContent, children }) {
               {title}
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
@@ -861,7 +913,7 @@ function SheetFooter({ error, saving, valid, onClose, onSave, saveLabel }) {
         <span style={{ flex: 1 }} />
       )}
       <button className="btn btn-ghost" onClick={onClose} disabled={saving}>
-        Cancelar
+        <Trans>Cancelar</Trans>
       </button>
       <button
         className="btn btn-primary focusable"
@@ -869,7 +921,7 @@ function SheetFooter({ error, saving, valid, onClose, onSave, saveLabel }) {
         style={{ opacity: valid && !saving ? 1 : 0.5 }}
         onClick={onSave}
       >
-        {saving ? 'Guardando…' : saveLabel}
+        {saving ? <Trans>Guardando…</Trans> : saveLabel}
       </button>
     </div>
   );

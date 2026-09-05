@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatDate, formatMoney, formatNumber } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
 import { issueGiftCard, redeemGiftCardByCode, useGiftCardsData } from '@/data.jsx';
 
 function RedeemGiftCardDialog({ onClose, onRedeemed }) {
+  const { t } = useLingui();
   const [code, setCode] = useState('');
   const [channel, setChannel] = useState('phone');
   const [contact, setContact] = useState('');
@@ -25,7 +28,7 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
       setResult(res);
       onRedeemed();
     } catch (err) {
-      setError(err?.message || 'No se pudo canjear la tarjeta.');
+      setError(err?.message || t`No se pudo canjear la tarjeta.`);
       setPending(false);
     }
   }
@@ -36,32 +39,40 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Canjear tarjeta de regalo"
+        aria-label={t`Canjear tarjeta de regalo`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>Canjear tarjeta de regalo</h3>
-            <p style={{ color: 'var(--ink-3)' }}>El saldo se abona al monedero del cliente.</p>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Canjear tarjeta de regalo</Trans>
+            </h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              <Trans>El saldo se abona al monedero del cliente.</Trans>
+            </p>
           </div>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         {result ? (
           <div style={{ marginTop: 16 }}>
             <p>
-              Canjeada por {result.amountMXN}. Nuevo saldo del cliente: {result.newBalanceMXN}.
+              <Trans>
+                Canjeada por {result.amountMXN}. Nuevo saldo del cliente: {result.newBalanceMXN}.
+              </Trans>
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
               <button className="btn" type="button" onClick={onClose}>
-                Listo
+                <Trans>Listo</Trans>
               </button>
             </div>
           </div>
         ) : (
           <>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>Código</span>
+              <span>
+                <Trans>Código</Trans>
+              </span>
               <input
                 type="text"
                 value={code}
@@ -76,8 +87,8 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
                 onChange={(e) => setChannel(e.target.value)}
                 disabled={pending}
               >
-                <option value="phone">Teléfono</option>
-                <option value="email">Email</option>
+                <option value="phone">{t`Teléfono`}</option>
+                <option value="email">{t`Correo`}</option>
               </select>
               <input
                 style={{ flex: 1 }}
@@ -100,10 +111,10 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
                 onClick={onClose}
                 disabled={pending}
               >
-                Cancelar
+                <Trans>Cancelar</Trans>
               </button>
               <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
-                {pending ? 'Canjeando…' : 'Canjear'}
+                {pending ? <Trans>Canjeando…</Trans> : <Trans>Canjear</Trans>}
               </button>
             </div>
           </>
@@ -114,6 +125,7 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
 }
 
 function IssueGiftCardDialog({ onClose, onIssued }) {
+  const { t } = useLingui();
   const [amount, setAmount] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [channel, setChannel] = useState('email');
@@ -143,7 +155,7 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
       setIssued(res.giftCard || res);
       onIssued();
     } catch (err) {
-      setError(err?.message || 'No se pudo emitir la tarjeta.');
+      setError(err?.message || t`No se pudo emitir la tarjeta.`);
       setPending(false);
     }
   }
@@ -154,16 +166,18 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Emitir tarjeta de regalo"
+        aria-label={t`Emitir tarjeta de regalo`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>Emitir tarjeta de regalo</h3>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Emitir tarjeta de regalo</Trans>
+            </h3>
             <p style={{ color: 'var(--ink-3)' }}>
-              La API genera el código; se muestra una sola vez.
+              <Trans>La API genera el código; se muestra una sola vez.</Trans>
             </p>
           </div>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
@@ -171,7 +185,10 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
         {issued ? (
           <div style={{ marginTop: 16 }}>
             <p>
-              Tarjeta emitida por {issued.amountMXN || `$${pesos}`}. Entrega este código al cliente:
+              <Trans>
+                Tarjeta emitida por {issued.amountMXN || `$${pesos}`}. Entrega este código al
+                cliente:
+              </Trans>
             </p>
             <div
               style={{
@@ -185,18 +202,20 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
               {issued.code}
             </div>
             <p style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              No se vuelve a mostrar. Cópialo ahora.
+              <Trans>No se vuelve a mostrar. Cópialo ahora.</Trans>
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
               <button className="btn" type="button" onClick={onClose}>
-                Listo
+                <Trans>Listo</Trans>
               </button>
             </div>
           </div>
         ) : (
           <>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>Monto (MXN)</span>
+              <span>
+                <Trans>Monto (MXN)</Trans>
+              </span>
               <input
                 type="number"
                 min={1}
@@ -207,7 +226,9 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
               />
             </label>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>Nombre del destinatario (opcional)</span>
+              <span>
+                <Trans>Nombre del destinatario (opcional)</Trans>
+              </span>
               <input
                 type="text"
                 maxLength={100}
@@ -222,8 +243,8 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
                 onChange={(e) => setChannel(e.target.value)}
                 disabled={pending}
               >
-                <option value="email">Email</option>
-                <option value="phone">Teléfono</option>
+                <option value="email">{t`Correo`}</option>
+                <option value="phone">{t`Teléfono`}</option>
               </select>
               <input
                 style={{ flex: 1 }}
@@ -235,7 +256,9 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
               />
             </div>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>De parte de (opcional)</span>
+              <span>
+                <Trans>De parte de (opcional)</Trans>
+              </span>
               <input
                 type="text"
                 maxLength={100}
@@ -245,7 +268,9 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
               />
             </label>
             <label style={{ display: 'block', marginTop: 12 }}>
-              <span>Mensaje (opcional)</span>
+              <span>
+                <Trans>Mensaje (opcional)</Trans>
+              </span>
               <input
                 type="text"
                 maxLength={300}
@@ -266,10 +291,10 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
                 onClick={onClose}
                 disabled={pending}
               >
-                Cancelar
+                <Trans>Cancelar</Trans>
               </button>
               <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
-                {pending ? 'Emitiendo…' : 'Emitir'}
+                {pending ? <Trans>Emitiendo…</Trans> : <Trans>Emitir</Trans>}
               </button>
             </div>
           </>
@@ -280,6 +305,7 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
 }
 
 const GiftCardsScreen = () => {
+  const { t } = useLingui();
   const [page, setPage] = useState(1);
   const [refresh, setRefresh] = useState(0);
   const [showIssue, setShowIssue] = useState(false);
@@ -303,16 +329,16 @@ const GiftCardsScreen = () => {
         }}
       >
         <RegionHead
-          title="Tarjetas de regalo"
-          note={loading ? 'Cargando…' : 'Emitidas desde Umi Cash.'}
-          count={{ value: total.toLocaleString('es-MX'), label: 'emitidas' }}
+          title={t`Tarjetas de regalo`}
+          note={loading ? t`Cargando…` : t`Emitidas desde Umi Cash.`}
+          count={{ value: formatNumber(total), label: t`emitidas` }}
         />
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-secondary" type="button" onClick={() => setShowRedeem(true)}>
-            <I.Check size={14} /> Canjear
+            <I.Check size={14} /> <Trans>Canjear</Trans>
           </button>
           <button className="btn" type="button" onClick={() => setShowIssue(true)}>
-            <I.Plus size={14} /> Emitir tarjeta
+            <I.Plus size={14} /> <Trans>Emitir tarjeta</Trans>
           </button>
         </div>
       </div>
@@ -334,19 +360,29 @@ const GiftCardsScreen = () => {
       <div className="grid grid-2" style={{ gap: 14 }}>
         <div className="strip-metric">
           <div>
-            <div className="lbl">Abiertas</div>
-            <div className="en">Saldo abierto en esta página</div>
+            <div className="lbl">
+              <Trans>Abiertas</Trans>
+            </div>
+            <div className="en">
+              <Trans>Saldo abierto en esta página</Trans>
+            </div>
           </div>
-          <div className="val">$ {(openTotal / 100).toLocaleString('es-MX')}</div>
+          <div className="val">{formatMoney(openTotal)}</div>
           <span className="delta-mini up">{cards.filter((c) => !c.isRedeemed).length}</span>
         </div>
         <div className="strip-metric">
           <div>
-            <div className="lbl">Canjeadas</div>
-            <div className="en">Canjeado en esta página</div>
+            <div className="lbl">
+              <Trans>Canjeadas</Trans>
+            </div>
+            <div className="en">
+              <Trans>Canjeado en esta página</Trans>
+            </div>
           </div>
           <div className="val">{cards.filter((c) => c.isRedeemed).length}</div>
-          <span className="delta-mini">{cards.length} shown</span>
+          <span className="delta-mini">
+            <Trans>{cards.length} en pantalla</Trans>
+          </span>
         </div>
       </div>
 
@@ -354,18 +390,28 @@ const GiftCardsScreen = () => {
         <table className="matrix">
           <thead>
             <tr>
-              <th>Code</th>
-              <th>Recipient</th>
-              <th style={{ textAlign: 'right' }}>Amount</th>
-              <th>Estado</th>
-              <th>Created</th>
+              <th>
+                <Trans>Código</Trans>
+              </th>
+              <th>
+                <Trans>Destinatario</Trans>
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                <Trans>Monto</Trans>
+              </th>
+              <th>
+                <Trans>Estado</Trans>
+              </th>
+              <th>
+                <Trans>Creada</Trans>
+              </th>
             </tr>
           </thead>
           <tbody>
             {cards.length === 0 && !loading && (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: 40, color: 'var(--ink-3)' }}>
-                  No hay tarjetas de regalo emitidas.
+                  <Trans>No hay tarjetas de regalo emitidas.</Trans>
                 </td>
               </tr>
             )}
@@ -375,22 +421,17 @@ const GiftCardsScreen = () => {
                 <td>
                   <div style={{ fontWeight: 600 }}>{card.recipientName || '—'}</div>
                   <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                    {card.recipientEmail || card.recipientPhone || 'No contact'}
+                    {card.recipientEmail || card.recipientPhone || t`Sin contacto`}
                   </div>
                 </td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{card.amountMXN}</td>
                 <td>
                   <span className={'badge ' + (card.isRedeemed ? 'badge-staff' : 'badge-admin')}>
-                    {card.isRedeemed ? 'REDEEMED' : 'OPEN'}
+                    {card.isRedeemed ? <Trans>CANJEADA</Trans> : <Trans>ABIERTA</Trans>}
                   </span>
                 </td>
                 <td style={{ color: 'var(--ink-2)' }}>
-                  {card.createdAt
-                    ? new Date(card.createdAt).toLocaleDateString('es-MX', {
-                        day: 'numeric',
-                        month: 'short',
-                      })
-                    : '—'}
+                  {card.createdAt ? formatDate(card.createdAt) : '—'}
                 </td>
               </tr>
             ))}
@@ -405,7 +446,7 @@ const GiftCardsScreen = () => {
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            <I.ChevronLeft size={14} /> Anterior
+            <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
           </button>
           <span
             style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', alignSelf: 'center' }}
@@ -417,7 +458,7 @@ const GiftCardsScreen = () => {
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Siguiente <I.ChevronRight size={14} />
+            <Trans>Siguiente</Trans> <I.ChevronRight size={14} />
           </button>
         </div>
       )}

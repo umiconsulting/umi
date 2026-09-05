@@ -2,19 +2,24 @@
 // (zero-dep, so no zod enters this browser bundle; resolved via the Vite source
 // alias). Re-exported to keep this module's public surface unchanged.
 import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements';
+import { msg } from '@lingui/core/macro';
 export { PRODUCT_ACTIVE_STATUSES };
+
+// `label` is a Lingui message descriptor, not a string: this module runs at import
+// time, before a locale is active, so the text is resolved where it renders with
+// `i18n._(module.label)` (Sidebar, Topbar, GuardedScreen).
 
 export const MODULES = {
   overview: {
     id: 'overview',
-    label: 'Resumen',
+    label: msg`Resumen`,
     icon: 'Home',
     section: 'HOME',
     product: 'dashboard',
   },
   operations: {
     id: 'operations',
-    label: 'Centro operativo',
+    label: msg`Centro operativo`,
     icon: 'Activity',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -37,7 +42,7 @@ export const MODULES = {
   },
   orders: {
     id: 'orders',
-    label: 'Pedidos',
+    label: msg`Pedidos`,
     icon: 'Receipt',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -46,7 +51,7 @@ export const MODULES = {
   },
   devices: {
     id: 'devices',
-    label: 'Dispositivos',
+    label: msg`Dispositivos`,
     icon: 'Tablet',
     section: 'BUSINESS',
     product: 'dashboard',
@@ -55,7 +60,7 @@ export const MODULES = {
   },
   staff: {
     id: 'staff',
-    label: 'Equipo y accesos',
+    label: msg`Equipo y accesos`,
     icon: 'Users',
     section: 'BUSINESS',
     product: 'dashboard',
@@ -63,7 +68,7 @@ export const MODULES = {
   },
   customers: {
     id: 'customers',
-    label: 'Clientes',
+    label: msg`Clientes`,
     icon: 'Users2',
     section: 'CUSTOMERS',
     product: 'dashboard',
@@ -73,7 +78,7 @@ export const MODULES = {
   // redirect there, so they no longer need their own module entries.
   hours: {
     id: 'hours',
-    label: 'Horarios',
+    label: msg`Horarios`,
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
@@ -82,7 +87,7 @@ export const MODULES = {
   },
   settings: {
     id: 'settings',
-    label: 'Ajustes',
+    label: msg`Ajustes`,
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
@@ -90,7 +95,7 @@ export const MODULES = {
   },
   'products-billing': {
     id: 'products-billing',
-    label: 'Productos y facturación',
+    label: msg`Productos y facturación`,
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
@@ -112,7 +117,7 @@ export const MODULES = {
   },
   cafes: {
     id: 'cafes',
-    label: 'Cafés',
+    label: msg`Cafés`,
     // Its own section because it is the one screen NOT scoped to the café in the
     // switcher — it opens new ones. Filing it under CONFIGURATION would say it
     // configures the selected café, which is the opposite of what it does.
@@ -124,7 +129,7 @@ export const MODULES = {
   },
   'cash-shifts': {
     id: 'cash-shifts',
-    label: 'Caja y turnos',
+    label: msg`Caja y turnos`,
     icon: 'DollarSign',
     section: 'OPERATIONS',
     product: 'dashboard',
@@ -133,7 +138,7 @@ export const MODULES = {
   },
   'catalog-inventory': {
     id: 'catalog-inventory',
-    label: 'Catálogo e inventario',
+    label: msg`Catálogo e inventario`,
     icon: 'Package',
     section: 'BUSINESS',
     product: 'dashboard',
@@ -142,7 +147,7 @@ export const MODULES = {
   },
   diagnostics: {
     id: 'diagnostics',
-    label: 'Diagnóstico',
+    label: msg`Diagnóstico`,
     icon: 'Activity',
     section: 'CONFIGURATION',
     product: 'dashboard',
@@ -151,7 +156,7 @@ export const MODULES = {
   },
   'loyalty-value': {
     id: 'loyalty-value',
-    label: 'Lealtad y valor',
+    label: msg`Lealtad y valor`,
     icon: 'CreditCard',
     section: 'CUSTOMERS',
     product: 'cash',
@@ -160,7 +165,7 @@ export const MODULES = {
   },
   kitchen: {
     id: 'kitchen',
-    label: 'Cocina',
+    label: msg`Cocina`,
     icon: 'Monitor',
     section: 'OPERATIONS',
     product: 'dashboard',

@@ -198,4 +198,83 @@ describe('build-v3 RLS · live-DB harness', () => {
     // capabilities read and per-request gating share one source → can't disagree.
     expect(await merchants.loadProducts(id('Néctar Café'))).toEqual({});
   });
+
+  // A cash_shift row carries a device_id, but device_scoping on it is WRITE-only
+  // (90_rls.sql). The owner/admin Dashboard authenticates a user, not a terminal,
+  // so it never sets app.current_device — yet "Caja y turnos → Turnos de caja"
+  // must still list the branch's shifts. Only INSERT/UPDATE stay pinned to the
+  // acting device. Every write here is rolled back, so the harness rows are
+  // untouched. (Behaviour also verified live against the rehearsal DB when this
+  // was written; here it runs through the real api pool the handlers use.)
+  it('cash_shift device RLS: owner (no device) reads; a device writes only its own', async () => {
+    // Fixtures come from the BYPASSRLS worker pool. A clone may hold no OPEN shift
+    // (POS pilot is café-specific); when it does not, there is nothing to prove.
+    const shiftRow = await pg.query<{
+      id: string;
+      merchant_id: string;
+      location_id: string;
+      device_id: string;
+    }>(
+      `select id, merchant_id, location_id, device_id
+         from merchant.cash_shift
+        where status = 'open'
+        order by opened_at desc
+        limit 1`,
+    );
+    const shift = shiftRow.rows[0];
+    if (!shift) return; // no open cash shift in this harness build — skip cleanly
+
+    // A second device at the same merchant stands in for "another terminal".
+    const otherDevice = await pg.query<{ id: string }>(
+      `select id from merchant.device
+        where merchant_id = $1 and id <> $2
+        order by id
+        limit 1`,
+      [shift.merchant_id, shift.device_id],
+    );
+
+    const c = await pg.app.connect();
+    const scope = (deviceId: string) =>
+      c.query(
+        `select set_config('app.current_merchant', $1, true),
+                set_config('app.current_location', $2, true),
+                set_config('app.current_device',   $3, true),
+                set_config('app.user_id',           '', true)`,
+        [shift.merchant_id, shift.location_id, deviceId],
+      );
+    try {
+      // 1) OWNER — merchant + location, NO device — can SELECT the shift.
+      await c.query('begin');
+      await scope('');
+      const ownerRead = await c.query<{ n: number }>(
+        'select count(*)::int n from merchant.cash_shift where id = $1',
+        [shift.id],
+      );
+      expect(ownerRead.rows[0].n).toBe(1);
+      await c.query('rollback');
+
+      // 2) DEVICE — its OWN shift — may write (WITH CHECK passes). Rolled back.
+      await c.query('begin');
+      await scope(shift.device_id);
+      const ownWrite = await c.query(
+        'update merchant.cash_shift set status = status where id = $1',
+        [shift.id],
+      );
+      expect(ownWrite.rowCount).toBe(1);
+      await c.query('rollback');
+
+      // 3) ANOTHER device — same shift — is REJECTED by WITH CHECK, not silently
+      //    ignored: the row is visible (open USING) but the write violates policy.
+      if (otherDevice.rows[0]) {
+        await c.query('begin');
+        await scope(otherDevice.rows[0].id);
+        await expect(
+          c.query('update merchant.cash_shift set status = status where id = $1', [shift.id]),
+        ).rejects.toThrow(/row-level security/i);
+        await c.query('rollback');
+      }
+    } finally {
+      c.release();
+    }
+  });
 });

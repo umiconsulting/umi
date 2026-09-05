@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
 import { XSep } from '@/shell.jsx';
 import {
   creditLoyaltySeals,
@@ -12,34 +15,33 @@ import {
 } from '@/data.jsx';
 
 const FILTERS = [
-  { id: '', label: 'Todos' },
+  { id: '', label: msg`Todos` },
   { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'cash', label: 'Lealtad' },
-  { id: 'memory', label: 'Notas' },
-  { id: 'review', label: 'Review' },
+  { id: 'cash', label: msg`Lealtad` },
+  { id: 'memory', label: msg`Notas` },
+  { id: 'review', label: msg`Revisión` },
 ];
 
 const TABS = [
-  { id: 'overview', label: 'Resumen' },
+  { id: 'overview', label: msg`Resumen` },
   { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'orders', label: 'Orders' },
-  { id: 'loyalty', label: 'Lealtad' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'data', label: 'Data' },
+  { id: 'orders', label: msg`Pedidos` },
+  { id: 'loyalty', label: msg`Lealtad` },
+  { id: 'notes', label: msg`Notas` },
+  { id: 'data', label: msg`Datos` },
 ];
+
+/** Brand names stay as strings; everything else is a message descriptor. */
+const text = (i18n, value) => (typeof value === 'string' ? value : i18n._(value));
 
 function fmtDate(value) {
   if (!value) return '-';
-  return new Date(value).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtTime(value) {
   if (!value) return '-';
-  return new Date(value).toLocaleString('en-US', {
+  return formatDateTime(value, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -79,11 +81,12 @@ function ProductChip({ product, icon, label }) {
 }
 
 function CustomerRow({ customer, selected, onOpen }) {
+  const { t } = useLingui();
   return (
     <button className={'customer-row focusable' + (selected ? ' selected' : '')} onClick={onOpen}>
       <span className="avatar-lg customer-avatar">{initials(customer.displayName)}</span>
       <span className="customer-main">
-        <span className="customer-name">{customer.displayName || 'Unknown customer'}</span>
+        <span className="customer-name">{customer.displayName || t`Cliente sin nombre`}</span>
         <span className="customer-meta">
           <I.Phone size={12} />
           {customer.normalizedPhone || customer.phone || '-'}
@@ -98,13 +101,16 @@ function CustomerRow({ customer, selected, onOpen }) {
       </span>
       <span className="customer-value">
         <strong>{customer.value?.totalSpend || '$0.00'}</strong>
-        <small>{customer.value?.visits || 0} visits</small>
+        <small>
+          <Plural value={customer.value?.visits || 0} one="# visita" other="# visitas" />
+        </small>
       </span>
     </button>
   );
 }
 
 function CustomersList({ selectedId }) {
+  const { t, i18n } = useLingui();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(Number(params.get('page') || 1));
@@ -163,7 +169,7 @@ function CustomersList({ selectedId }) {
           <I.Search size={15} />
           <input
             className="input"
-            placeholder="Search customers, phone, email"
+            placeholder={t`Buscar clientes, teléfono, correo`}
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
@@ -171,22 +177,28 @@ function CustomersList({ selectedId }) {
             }}
           />
         </div>
-        <div className="seg customer-filter" role="tablist" aria-label="Customer filters">
+        <div className="seg customer-filter" role="tablist" aria-label={t`Filtros de clientes`}>
           {FILTERS.map((item) => (
             <button
               key={item.id}
               className={filter === item.id ? 'on' : ''}
               onClick={() => changeFilter(item.id)}
             >
-              {item.label}
+              {text(i18n, item.label)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="customer-list-head">
-        <span>{loading ? 'Cargando…' : `${total.toLocaleString('es-MX')} clientes`}</span>
-        <span>{data?.source || 'customer platform'}</span>
+        <span>
+          {loading ? (
+            <Trans>Cargando…</Trans>
+          ) : (
+            <Plural value={total} one="# cliente" other="# clientes" />
+          )}
+        </span>
+        <span>{data?.source || t`plataforma de clientes`}</span>
       </div>
 
       {error && (
@@ -194,7 +206,9 @@ function CustomersList({ selectedId }) {
           <span className="strip" />
           <I.AlertTriangle className="ico" size={18} />
           <div className="body">
-            <div className="ttl">Customer data unavailable</div>
+            <div className="ttl">
+              <Trans>Datos de clientes no disponibles</Trans>
+            </div>
             <div className="sub">{error}</div>
           </div>
         </div>
@@ -204,8 +218,12 @@ function CustomersList({ selectedId }) {
         {customers.length === 0 && !loading && !error && (
           <div className="customer-empty">
             <I.Users2 size={28} />
-            <strong>No customers found</strong>
-            <span>Try another search or filter.</span>
+            <strong>
+              <Trans>No hay clientes</Trans>
+            </strong>
+            <span>
+              <Trans>Prueba otra búsqueda u otro filtro.</Trans>
+            </span>
           </div>
         )}
         {customers.map((customer) => (
@@ -225,7 +243,7 @@ function CustomersList({ selectedId }) {
             disabled={page <= 1}
             onClick={() => setPage((value) => Math.max(1, value - 1))}
           >
-            <I.ChevronLeft size={14} /> Prev
+            <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
           </button>
           <span>
             {page} / {totalPages}
@@ -235,7 +253,7 @@ function CustomersList({ selectedId }) {
             disabled={page >= totalPages}
             onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
           >
-            Next <I.ChevronRight size={14} />
+            <Trans>Siguiente</Trans> <I.ChevronRight size={14} />
           </button>
         </div>
       )}
@@ -257,12 +275,13 @@ function Metric({ label, value, note, icon }) {
 }
 
 function Timeline({ items }) {
+  const { t } = useLingui();
   if (!items?.length)
     return (
       <EmptyState
         icon={<I.Activity size={24} />}
-        title="No recent activity"
-        detail="Orders, messages, memory, and data-quality events will appear here."
+        title={t`Sin actividad reciente`}
+        detail={t`Aquí aparecerán pedidos, mensajes, memoria y eventos de calidad de datos.`}
       />
     );
   return (
@@ -282,12 +301,13 @@ function Timeline({ items }) {
 }
 
 function ConversationList({ conversations }) {
+  const { t } = useLingui();
   if (!conversations?.length)
     return (
       <EmptyState
         icon={<I.WhatsApp size={24} />}
-        title="No WhatsApp conversations"
-        detail="Conversation history is nested under each customer."
+        title={t`Sin conversaciones de WhatsApp`}
+        detail={t`El historial de conversaciones vive dentro de cada cliente.`}
       />
     );
   return (
@@ -298,14 +318,15 @@ function ConversationList({ conversations }) {
             <I.WhatsApp size={17} />
           </span>
           <div>
-            <strong>{conversation.summary || 'WhatsApp conversation'}</strong>
+            <strong>{conversation.summary || t`Conversación de WhatsApp`}</strong>
             <span>
-              {conversation.messageCount || 0} messages <XSep /> last{' '}
-              {fmtTime(conversation.lastMessageAt || conversation.updatedAt)}
+              <Plural value={conversation.messageCount || 0} one="# mensaje" other="# mensajes" />{' '}
+              <XSep />{' '}
+              <Trans>último {fmtTime(conversation.lastMessageAt || conversation.updatedAt)}</Trans>
             </span>
           </div>
           <span className={'badge ' + statusBadge(conversation.status)}>
-            {conversation.status || 'unknown'}
+            {conversation.status || t`desconocido`}
           </span>
         </div>
       ))}
@@ -314,12 +335,13 @@ function ConversationList({ conversations }) {
 }
 
 function OrdersList({ orders }) {
+  const { t } = useLingui();
   if (!orders?.length)
     return (
       <EmptyState
         icon={<I.Receipt size={24} />}
-        title="No linked orders"
-        detail="Commerce orders linked to this contact will appear here."
+        title={t`Sin pedidos vinculados`}
+        detail={t`Aquí aparecerán los pedidos vinculados a este contacto.`}
       />
     );
   return (
@@ -332,7 +354,7 @@ function OrdersList({ orders }) {
           <div>
             <strong>{order.orderNumber || order.id}</strong>
             <span>
-              {order.channel || order.sourceProduct || 'order'} <XSep /> {fmtTime(order.placedAt)}
+              {order.channel || order.sourceProduct || t`pedido`} <XSep /> {fmtTime(order.placedAt)}
             </span>
           </div>
           <strong className="profile-money">{order.total || '$0.00'}</strong>
@@ -343,6 +365,7 @@ function OrdersList({ orders }) {
 }
 
 function SealsDialog({ account, onClose, onCredited }) {
+  const { t } = useLingui();
   const [seals, setSeals] = useState(1);
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
@@ -369,7 +392,7 @@ function SealsDialog({ account, onClose, onCredited }) {
       });
       onCredited();
     } catch (err) {
-      setError(err?.message || 'No se pudieron acreditar los sellos.');
+      setError(err?.message || t`No se pudieron acreditar los sellos.`);
       setPending(false);
     }
   }
@@ -380,22 +403,28 @@ function SealsDialog({ account, onClose, onCredited }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Agregar sellos"
+        aria-label={t`Agregar sellos`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>Agregar sellos</h3>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Agregar sellos</Trans>
+            </h3>
             <p style={{ color: 'var(--ink-3)' }}>
-              Acredita sellos a la tarjeta {account.cardNumber || 'de lealtad'}. Úsalo para poner al
-              día a un cliente que llega de otro programa.
+              <Trans>
+                Acredita sellos a la tarjeta {account.cardNumber || t`de lealtad`}. Úsalo para poner
+                al día a un cliente que llega de otro programa.
+              </Trans>
             </p>
           </div>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         <label style={{ display: 'block', marginTop: 12 }}>
-          <span>Sellos (1–50)</span>
+          <span>
+            <Trans>Sellos (1–50)</Trans>
+          </span>
           <input
             type="number"
             min={1}
@@ -406,12 +435,14 @@ function SealsDialog({ account, onClose, onCredited }) {
           />
         </label>
         <label style={{ display: 'block', marginTop: 12 }}>
-          <span>Nota (opcional)</span>
+          <span>
+            <Trans>Nota (opcional)</Trans>
+          </span>
           <input
             type="text"
             maxLength={200}
             value={note}
-            placeholder="p. ej. migración de cartón físico"
+            placeholder={t`p. ej. migración de cartón físico`}
             onChange={(event) => setNote(event.target.value)}
             disabled={pending}
           />
@@ -423,10 +454,16 @@ function SealsDialog({ account, onClose, onCredited }) {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
-            Cancelar
+            <Trans>Cancelar</Trans>
           </button>
           <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
-            {pending ? 'Acreditando…' : `Acreditar ${valid ? count : ''} sellos`}
+            {pending ? (
+              <Trans>Acreditando…</Trans>
+            ) : valid ? (
+              <Plural value={count} one="Acreditar # sello" other="Acreditar # sellos" />
+            ) : (
+              <Trans>Acreditar sellos</Trans>
+            )}
           </button>
         </div>
       </section>
@@ -435,6 +472,7 @@ function SealsDialog({ account, onClose, onCredited }) {
 }
 
 function TopupDialog({ account, onClose, onCredited }) {
+  const { t } = useLingui();
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [pending, setPending] = useState(false);
@@ -459,7 +497,7 @@ function TopupDialog({ account, onClose, onCredited }) {
       });
       onCredited();
     } catch (err) {
-      setError(err?.message || 'No se pudo recargar el saldo.');
+      setError(err?.message || t`No se pudo recargar el saldo.`);
       setPending(false);
     }
   }
@@ -470,21 +508,27 @@ function TopupDialog({ account, onClose, onCredited }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Recargar saldo"
+        aria-label={t`Recargar saldo`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>Recargar saldo</h3>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Recargar saldo</Trans>
+            </h3>
             <p style={{ color: 'var(--ink-3)' }}>
-              Agrega saldo al monedero de la tarjeta {account.cardNumber || 'de lealtad'}.
+              <Trans>
+                Agrega saldo al monedero de la tarjeta {account.cardNumber || t`de lealtad`}.
+              </Trans>
             </p>
           </div>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         <label style={{ display: 'block', marginTop: 12 }}>
-          <span>Monto (MXN)</span>
+          <span>
+            <Trans>Monto (MXN)</Trans>
+          </span>
           <input
             type="number"
             min={1}
@@ -495,7 +539,9 @@ function TopupDialog({ account, onClose, onCredited }) {
           />
         </label>
         <label style={{ display: 'block', marginTop: 12 }}>
-          <span>Nota (opcional)</span>
+          <span>
+            <Trans>Nota (opcional)</Trans>
+          </span>
           <input
             type="text"
             maxLength={200}
@@ -511,10 +557,16 @@ function TopupDialog({ account, onClose, onCredited }) {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
-            Cancelar
+            <Trans>Cancelar</Trans>
           </button>
           <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
-            {pending ? 'Recargando…' : `Recargar${valid ? ` $${pesos}` : ''}`}
+            {pending ? (
+              <Trans>Recargando…</Trans>
+            ) : valid ? (
+              <Trans>Recargar ${pesos}</Trans>
+            ) : (
+              <Trans>Recargar</Trans>
+            )}
           </button>
         </div>
       </section>
@@ -523,6 +575,7 @@ function TopupDialog({ account, onClose, onCredited }) {
 }
 
 function LoyaltyPanel({ cash, onCredited }) {
+  const { t } = useLingui();
   const [showSeals, setShowSeals] = useState(false);
   const [showTopup, setShowTopup] = useState(false);
   const [scanBusy, setScanBusy] = useState(null); // 'VISIT' | 'REDEEM' | null
@@ -531,8 +584,8 @@ function LoyaltyPanel({ cash, onCredited }) {
     return (
       <EmptyState
         icon={<I.Lock size={24} />}
-        title="Umi Cash not active"
-        detail="Los datos de lealtad y monedero se ocultan hasta activar el producto."
+        title={t`Umi Cash no está activo`}
+        detail={t`Los datos de lealtad y monedero se ocultan hasta activar el producto.`}
       />
     );
   const account = cash?.account;
@@ -540,8 +593,8 @@ function LoyaltyPanel({ cash, onCredited }) {
     return (
       <EmptyState
         icon={<I.Wallet size={24} />}
-        title="No loyalty account"
-        detail="This customer does not have an active loyalty account yet."
+        title={t`Sin cuenta de lealtad`}
+        detail={t`Este cliente todavía no tiene una cuenta de lealtad activa.`}
       />
     );
 
@@ -559,7 +612,7 @@ function LoyaltyPanel({ cash, onCredited }) {
       await loyaltyScan({ cardNumber: account.cardNumber, action });
       onCredited?.();
     } catch (err) {
-      setScanError(err?.message || 'No se pudo registrar la acción.');
+      setScanError(err?.message || t`No se pudo registrar la acción.`);
     } finally {
       setScanBusy(null);
     }
@@ -569,21 +622,21 @@ function LoyaltyPanel({ cash, onCredited }) {
     <div className="loyalty-panel">
       <div className="loyalty-grid">
         <Metric
-          label="Wallet balance"
+          label={t`Saldo del monedero`}
           value={account.balance || '$0.00'}
-          note={account.cardNumber || 'No card'}
+          note={account.cardNumber || t`Sin tarjeta`}
           icon={<I.Wallet size={18} />}
         />
         <Metric
-          label="Total visits"
+          label={t`Visitas totales`}
           value={account.totalVisits || 0}
-          note={`${account.visitsThisCycle || 0} this cycle`}
+          note={t`${account.visitsThisCycle || 0} en este ciclo`}
           icon={<I.Stamp size={18} />}
         />
         <Metric
-          label="Pending rewards"
+          label={t`Recompensas pendientes`}
           value={account.pendingRewards || 0}
-          note={account.status || 'loyalty'}
+          note={account.status || t`lealtad`}
           icon={<I.Gift size={18} />}
         />
       </div>
@@ -594,14 +647,14 @@ function LoyaltyPanel({ cash, onCredited }) {
             type="button"
             onClick={() => setShowSeals(true)}
           >
-            <I.Plus size={14} /> Agregar sellos
+            <I.Plus size={14} /> <Trans>Agregar sellos</Trans>
           </button>
           <button
             className="btn btn-secondary btn-sm"
             type="button"
             onClick={() => setShowTopup(true)}
           >
-            <I.Wallet size={14} /> Recargar saldo
+            <I.Wallet size={14} /> <Trans>Recargar saldo</Trans>
           </button>
           <button
             className="btn btn-secondary btn-sm"
@@ -609,7 +662,8 @@ function LoyaltyPanel({ cash, onCredited }) {
             disabled={scanBusy != null}
             onClick={() => runScan('VISIT')}
           >
-            <I.Activity size={14} /> {scanBusy === 'VISIT' ? 'Registrando…' : 'Registrar visita'}
+            <I.Activity size={14} />{' '}
+            {scanBusy === 'VISIT' ? <Trans>Registrando…</Trans> : <Trans>Registrar visita</Trans>}
           </button>
           {account.pendingRewards > 0 && (
             <button
@@ -618,7 +672,12 @@ function LoyaltyPanel({ cash, onCredited }) {
               disabled={scanBusy != null}
               onClick={() => runScan('REDEEM')}
             >
-              <I.Gift size={14} /> {scanBusy === 'REDEEM' ? 'Canjeando…' : 'Canjear recompensa'}
+              <I.Gift size={14} />{' '}
+              {scanBusy === 'REDEEM' ? (
+                <Trans>Canjeando…</Trans>
+              ) : (
+                <Trans>Canjear recompensa</Trans>
+              )}
             </button>
           )}
         </div>
@@ -639,19 +698,22 @@ function LoyaltyPanel({ cash, onCredited }) {
 }
 
 function IdentityPanel({ customer, identity }) {
+  const { t } = useLingui();
   const identities = identity?.identities || customer?.identities || [];
   const findings = identity?.findings || [];
   const candidates = identity?.mergeCandidates || [];
   return (
     <div className="profile-split">
       <section>
-        <h3>Identities</h3>
+        <h3>
+          <Trans>Identidades</Trans>
+        </h3>
         <div className="profile-stack">
           {identities.length === 0 && (
             <EmptyState
               icon={<I.Info size={22} />}
-              title="No identity rows"
-              detail="Phone or WhatsApp identities will appear here."
+              title={t`Sin identidades`}
+              detail={t`Aquí aparecerán las identidades de teléfono o WhatsApp.`}
             />
           )}
           {identities.map((item) => (
@@ -660,7 +722,7 @@ function IdentityPanel({ customer, identity }) {
               key={item.id || `${item.identity_type}:${item.normalized_value}`}
             >
               <div>
-                <strong>{item.identity_type || item.identityType || 'identity'}</strong>
+                <strong>{item.identity_type || item.identityType || t`identidad`}</strong>
                 <span>
                   {item.normalized_value ||
                     item.normalizedValue ||
@@ -670,39 +732,41 @@ function IdentityPanel({ customer, identity }) {
                 </span>
               </div>
               <span className="badge badge-neutral">
-                {item.verification_status || item.verificationStatus || 'recorded'}
+                {item.verification_status || item.verificationStatus || t`registrada`}
               </span>
             </div>
           ))}
         </div>
       </section>
       <section>
-        <h3>Data quality</h3>
+        <h3>
+          <Trans>Calidad de datos</Trans>
+        </h3>
         <div className="profile-stack">
           {candidates.length === 0 && findings.length === 0 && (
             <EmptyState
               icon={<I.Check size={22} />}
-              title="No open review items"
-              detail="Ambiguous matches are surfaced here for owner review, never silently merged."
+              title={t`Sin pendientes de revisión`}
+              detail={t`Las coincidencias ambiguas se muestran aquí para que el dueño las revise; nunca se fusionan en silencio.`}
             />
           )}
           {candidates.map((item) => (
             <div className="profile-row compact" key={item.id}>
               <div>
-                <strong>{item.match_type || 'merge candidate'}</strong>
-                <span>{item.detail || 'Possible duplicate identity'}</span>
+                <strong>{item.match_type || t`candidato a fusión`}</strong>
+                <span>{item.detail || t`Posible identidad duplicada`}</span>
               </div>
-              <span className="badge badge-trial">{item.confidence || 'candidate'}</span>
+              <span className="badge badge-trial">{item.confidence || t`candidato`}</span>
             </div>
           ))}
           {findings.map((item) => (
             <div className="profile-row compact" key={item.id}>
               <div>
-                <strong>{item.finding_key || 'data finding'}</strong>
-                <span>{item.detail || item.status || 'Needs review'}</span>
+                <strong>{item.finding_key || t`hallazgo de datos`}</strong>
+                <span>{item.detail || item.status || t`Necesita revisión`}</span>
               </div>
               <span className={'badge ' + statusBadge(item.severity)}>
-                {item.severity || 'open'}
+                {item.severity || t`abierto`}
               </span>
             </div>
           ))}
@@ -723,6 +787,7 @@ function EmptyState({ icon, title, detail }) {
 }
 
 function CustomerProfile({ customerId }) {
+  const { t, i18n } = useLingui();
   const [tab, setTab] = useState('overview');
   const [refresh, setRefresh] = useState(0);
   const { data, loading, error } = useCustomerDetail(customerId, refresh);
@@ -732,10 +797,14 @@ function CustomerProfile({ customerId }) {
     return (
       <section className="customer-profile placeholder">
         <I.Users2 size={34} />
-        <strong>Elige un cliente</strong>
+        <strong>
+          <Trans>Elige un cliente</Trans>
+        </strong>
         <span>
-          Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, su lealtad y tus
-          notas, todo junto.
+          <Trans>
+            Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, su lealtad y tus
+            notas, todo junto.
+          </Trans>
         </span>
       </section>
     );
@@ -745,7 +814,9 @@ function CustomerProfile({ customerId }) {
     return (
       <section className="customer-profile placeholder">
         <span className="pulse" />
-        <strong>Loading customer</strong>
+        <strong>
+          <Trans>Cargando cliente</Trans>
+        </strong>
       </section>
     );
   }
@@ -754,10 +825,12 @@ function CustomerProfile({ customerId }) {
     return (
       <section className="customer-profile placeholder danger-state">
         <I.AlertTriangle size={30} />
-        <strong>Customer not found</strong>
-        <span>{error || 'El cliente seleccionado no está disponible para este negocio.'}</span>
+        <strong>
+          <Trans>Cliente no encontrado</Trans>
+        </strong>
+        <span>{error || t`El cliente seleccionado no está disponible para este negocio.`}</span>
         <Link className="btn btn-secondary btn-sm" to="/customers">
-          Back to Customers
+          <Trans>Volver a Clientes</Trans>
         </Link>
       </section>
     );
@@ -772,7 +845,7 @@ function CustomerProfile({ customerId }) {
           <span className="avatar-lg customer-avatar large">{initials(customer.displayName)}</span>
           <div>
             {' '}
-            <h2>{customer.displayName || 'Unknown customer'}</h2>
+            <h2>{customer.displayName || t`Cliente sin nombre`}</h2>
             <p>
               {customer.normalizedPhone || customer.phone || '-'}
               {customer.email ? ` / ${customer.email}` : ''}
@@ -781,9 +854,13 @@ function CustomerProfile({ customerId }) {
         </div>
         <div className="profile-actions">
           <span className={'badge ' + statusBadge(customer.status)}>
-            {customer.status || 'active'}
+            {customer.status || t`activo`}
           </span>
-          {customer.dataQuality?.needsReview && <span className="badge badge-trial">Review</span>}
+          {customer.dataQuality?.needsReview && (
+            <span className="badge badge-trial">
+              <Trans>Revisión</Trans>
+            </span>
+          )}
         </div>
       </header>
 
@@ -796,28 +873,28 @@ function CustomerProfile({ customerId }) {
         <ProductChip
           product={customer.products?.cash}
           icon={<I.Wallet size={14} />}
-          label="Lealtad"
+          label={t`Lealtad`}
         />
         <ProductChip
           product={customer.products?.orders}
           icon={<I.Receipt size={14} />}
-          label="Orders"
+          label={t`Pedidos`}
         />
         <ProductChip
           product={customer.products?.giftCards}
           icon={<I.Gift size={14} />}
-          label="Gift cards"
+          label={t`Tarjetas de regalo`}
         />
       </div>
 
-      <div className="profile-tabs" role="tablist" aria-label="Customer profile">
+      <div className="profile-tabs" role="tablist" aria-label={t`Perfil del cliente`}>
         {TABS.map((item) => (
           <button
             key={item.id}
             className={activeTab === item.id ? 'on' : ''}
             onClick={() => setTab(item.id)}
           >
-            {item.label}
+            {text(i18n, item.label)}
           </button>
         ))}
       </div>
@@ -827,21 +904,21 @@ function CustomerProfile({ customerId }) {
           <>
             <div className="customer-metrics">
               <Metric
-                label="Orders"
+                label={t`Pedidos`}
                 value={customer.value?.orders || 0}
                 note={customer.value?.totalSpend || '$0.00'}
                 icon={<I.Receipt size={18} />}
               />
               <Metric
-                label="Visits"
+                label={t`Visitas`}
                 value={customer.value?.visits || 0}
-                note={customer.value?.walletBalance || '$0.00 wallet'}
+                note={customer.value?.walletBalance || t`$0.00 en monedero`}
                 icon={<I.Activity size={18} />}
               />
               <Metric
-                label="Memory facts"
+                label={t`Datos de memoria`}
                 value={customer.memory?.factsCount || 0}
-                note={customer.memory?.embeddingHealth || 'not indexed'}
+                note={customer.memory?.embeddingHealth || t`sin indexar`}
                 icon={<I.Sparkles size={18} />}
               />
             </div>
@@ -873,20 +950,28 @@ export default function CustomersScreen() {
       <div className="ed-head">
         <div className="titles">
           {' '}
-          <h2>Clientes</h2>
+          <h2>
+            <Trans>Clientes</Trans>
+          </h2>
           <div className="en">
-            Un perfil por cliente: WhatsApp, pedidos, lealtad, monedero y notas.
+            <Trans>Un perfil por cliente: WhatsApp, pedidos, lealtad, monedero y notas.</Trans>
           </div>
         </div>
         <div className="customer-head-stats">
           <span>
-            <b>{metrics.totalCustomers || 0}</b> total
+            <Trans>
+              <b>{formatNumber(metrics.totalCustomers || 0)}</b> en total
+            </Trans>
           </span>
           <span>
-            <b>{metrics.needsReview || 0}</b> review
+            <Trans>
+              <b>{formatNumber(metrics.needsReview || 0)}</b> por revisar
+            </Trans>
           </span>
           <span>
-            <b>{metrics.memoryReady || 0}</b> memory
+            <Trans>
+              <b>{formatNumber(metrics.memoryReady || 0)}</b> con memoria
+            </Trans>
           </span>
         </div>
       </div>

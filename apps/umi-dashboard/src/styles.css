@@ -5,6 +5,77 @@
 
 @import '@umi/tokens/dashboard.css';
 
+/* Native UI (scrollbars, form controls, spellcheck) follows the active theme.
+   The selectors mirror the token theme blocks in @umi/tokens/dashboard.css so an
+   explicit choice wins over the OS. The color tokens come from that generated
+   file; only color-scheme is declared here. Umi (the :root default) is light;
+   Midnight is dark. List every dark theme here as it is added. */
+:root {
+  color-scheme: light;
+}
+[data-theme='midnight'] {
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+  }
+}
+
+/* Midnight neutralizes the sidebar's brand-blue glow so the rail reads as warm
+   graphite, not navy. The linear layer already tracks the themed --sidebar-bg
+   tokens; only the radial accent is hard-coded, so it is overridden here. */
+[data-theme='midnight'] .side {
+  background-image:
+    radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+    linear-gradient(180deg, var(--sidebar-bg), var(--sidebar-bg-deep));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .side {
+    background-image:
+      radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+      linear-gradient(180deg, var(--sidebar-bg), var(--sidebar-bg-deep));
+  }
+}
+
+/* Midnight is black with ONE accent. Surfaces are all #000 and cards are drawn
+   by their 1px line alone; the brand blue appears only on the primary action
+   and on accent text (eyebrow captions, links), never as a surface. The sidebar
+   shares the black canvas, so a 1px line marks where the rail ends. Shapes and
+   borders are the Umi defaults on purpose — only color changes. */
+[data-theme='midnight'] .btn-primary {
+  background: var(--umi-blue);
+  color: var(--umi-navy-ink);
+  box-shadow: none;
+}
+[data-theme='midnight'] .btn-primary:hover {
+  background: var(--umi-blue-soft);
+}
+[data-theme='midnight'] .eyebrow,
+[data-theme='midnight'] .as-text {
+  color: var(--umi-blue);
+}
+[data-theme='midnight'] .side {
+  border-right-color: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .btn-primary {
+    background: var(--umi-blue);
+    color: var(--umi-navy-ink);
+    box-shadow: none;
+  }
+  :root:not([data-theme]) .btn-primary:hover {
+    background: var(--umi-blue-soft);
+  }
+  :root:not([data-theme]) .eyebrow,
+  :root:not([data-theme]) .as-text {
+    color: var(--umi-blue);
+  }
+  :root:not([data-theme]) .side {
+    border-right-color: var(--line);
+  }
+}
+
 /* Reset / base */
 * {
   box-sizing: border-box;
@@ -457,6 +528,60 @@ table th {
   padding: 0 12px;
   font-size: 12.5px;
   border-radius: 10px;
+}
+/* Square icon-only ghost button — the topbar theme switch. Hover reads in both
+   themes because canvas-2 tracks the theme, unlike the fixed navy tint that
+   .btn-ghost:hover uses. */
+.theme-toggle {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+  color: var(--ink-2);
+}
+.theme-toggle:hover {
+  background: var(--canvas-2);
+  color: var(--ink-1);
+}
+/* The topbar profile control — an initials monogram beside the theme toggle. It
+   is round, so it reads as an account and not another square icon button. */
+.profile-toggle {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--r-pill);
+}
+.profile-toggle-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--umi-blue), var(--umi-blue-soft));
+  color: var(--umi-navy-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.profile-toggle:hover .profile-toggle-avatar {
+  filter: brightness(1.05);
+}
+.profile-toggle.active {
+  box-shadow: 0 0 0 2px var(--canvas-2);
+}
+/* The language control in the topbar corner: compact, sized to sit level with
+   the theme toggle and profile button rather than the full-height form select. */
+.locale-select-topbar {
+  height: 32px;
+  width: auto;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.locale-select-topbar:hover {
+  color: var(--ink-1);
 }
 .btn-icon {
   width: 36px;
@@ -3464,4 +3589,148 @@ time,
   background: var(--surface);
   color: var(--ink-1);
   box-shadow: 0 1px 2px rgba(19, 31, 68, 0.08);
+}
+
+/* Language control on the login form: right-aligned, narrow, quiet. */
+.login-locale {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+.login-locale .locale-select {
+  width: auto !important;
+  min-width: 120px;
+}
+
+/* ============================================================
+   PROFILE — "Tu perfil", the one screen about the person
+   ============================================================ */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+  background: linear-gradient(135deg, var(--umi-blue), var(--umi-blue-soft));
+  color: var(--umi-navy-ink);
+}
+.profile-head-body {
+  flex: 1;
+  min-width: 0;
+}
+.profile-name {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+}
+.profile-email {
+  color: var(--ink-3);
+  font-size: 13px;
+  margin-top: 2px;
+  word-break: break-word;
+}
+.profile-head-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.profile-signout {
+  flex-shrink: 0;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.profile-section-title {
+  margin: 0 0 14px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.profile-field {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.profile-field:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.profile-field-label {
+  flex: 0 0 150px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.profile-field-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--ink-1);
+  word-break: break-word;
+}
+.profile-mono {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.profile-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--canvas-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.profile-chip.mono {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 11px;
+}
+.profile-chip.platform {
+  border-color: var(--umi-blue);
+  color: var(--umi-blue);
+  background: transparent;
+}
+.profile-merchants {
+  display: grid;
+  gap: 10px;
+}
+.profile-merchant {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+.profile-merchant.current {
+  border-color: var(--umi-blue);
+}
+.profile-merchant-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.profile-merchant-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.profile-tag-current {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--umi-blue);
+  border: 1px solid var(--umi-blue);
+  border-radius: var(--r-pill);
+  padding: 1px 7px;
 }

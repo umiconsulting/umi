@@ -1,0 +1,3810 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-09-05 04:43-0700\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: en\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: \n"
+
+#: src/app.jsx
+msgid "Cerrar el menú"
+msgstr "Close the menu"
+
+#: src/app.jsx
+msgid "Módulo"
+msgstr "Module"
+
+#: src/app.jsx
+msgid "producto"
+msgstr "product"
+
+#: src/app.jsx
+msgid "{name} no está activo en este café"
+msgstr "{name} is not active for this café"
+
+#: src/app.jsx
+msgid "Esta sección necesita {productName}. El super admin lo puede revisar en Productos y facturación; no hay controles hasta activar el producto."
+msgstr "This section needs {productName}. The super admin can review it under Products and billing; there are no controls until the product is active."
+
+#: src/app.jsx
+msgid "Esta pantalla"
+msgstr "This screen"
+
+#: src/app.jsx
+#: src/screens/cafes.jsx
+msgid "Acceso de plataforma requerido"
+msgstr "Platform access required"
+
+#: src/app.jsx
+msgid "{name} es para operadores de Umi."
+msgstr "{name} is for Umi operators."
+
+#: src/app.jsx
+msgid "Cargando negocio…"
+msgstr "Loading business…"
+
+#: src/app.jsx
+#: src/screens/cafes.jsx
+#: src/screens/conversations.jsx
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/hours.jsx
+#: src/screens/members.jsx
+#: src/screens/orders.jsx
+#: src/screens/staff.jsx
+msgid "Cargando…"
+msgstr "Loading…"
+
+#: src/data.jsx
+msgid "Sesión expirada"
+msgstr "Session expired"
+
+#: src/data.jsx
+msgid "No hay un negocio seleccionado"
+msgstr "No business selected"
+
+#: src/data.jsx
+#: src/screens/device-utils.js
+msgid "nunca"
+msgstr "never"
+
+#: src/data.jsx
+#: src/screens/device-utils.js
+msgid "hace un momento"
+msgstr "just now"
+
+#. placeholder {0}: Math.floor(ms / 1000)
+#: src/data.jsx
+msgid "hace {0} s"
+msgstr "{0} s ago"
+
+#. placeholder {0}: Math.floor(ms / 60000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
+#: src/data.jsx
+#: src/screens/device-utils.js
+#: src/screens/members.jsx
+msgid "hace {0} min"
+msgstr "{0} min ago"
+
+#. placeholder {0}: Math.floor(ms / 3600000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
+#: src/data.jsx
+#: src/screens/device-utils.js
+#: src/screens/members.jsx
+msgid "hace {0} h"
+msgstr "{0} h ago"
+
+#: src/lib/auth.jsx
+msgid "Credenciales incorrectas"
+msgstr "Incorrect credentials"
+
+#: src/lib/auth.jsx
+msgid "El servidor no devolvió una sesión. Inténtalo otra vez."
+msgstr "The server did not return a session. Try again."
+
+#: src/lib/auth.jsx
+#: src/screens/login.jsx
+msgid "Código incorrecto o vencido."
+msgstr "Incorrect or expired code."
+
+#: src/lib/module-registry.js
+#: src/screens/customers.jsx
+msgid "Resumen"
+msgstr "Overview"
+
+#: src/lib/module-registry.js
+#: src/screens/operations.jsx
+#: src/shell.jsx
+msgid "Centro operativo"
+msgstr "Operations center"
+
+#: src/lib/module-registry.js
+#: src/screens/customers.jsx
+#: src/screens/orders.jsx
+#: src/shell.jsx
+msgid "Pedidos"
+msgstr "Orders"
+
+#: src/lib/module-registry.js
+#: src/screens/devices.jsx
+#: src/shell.jsx
+msgid "Dispositivos"
+msgstr "Devices"
+
+#: src/lib/module-registry.js
+#: src/screens/staff.jsx
+msgid "Equipo y accesos"
+msgstr "Team and access"
+
+#: src/lib/module-registry.js
+#: src/screens/customers.jsx
+#: src/shell.jsx
+msgid "Clientes"
+msgstr "Customers"
+
+#: src/lib/module-registry.js
+msgid "Horarios"
+msgstr "Hours"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Ajustes"
+msgstr "Settings"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Productos y facturación"
+msgstr "Products and billing"
+
+#: src/lib/module-registry.js
+#: src/shell.jsx
+msgid "Cafés"
+msgstr "Cafés"
+
+#: src/lib/module-registry.js
+#: src/screens/cash-shifts.jsx
+#: src/shell.jsx
+msgid "Caja y turnos"
+msgstr "Cash and shifts"
+
+#: src/lib/module-registry.js
+#: src/screens/catalog-inventory.jsx
+#: src/shell.jsx
+msgid "Catálogo e inventario"
+msgstr "Catalog and inventory"
+
+#: src/lib/module-registry.js
+#: src/screens/diagnostics.jsx
+#: src/shell.jsx
+msgid "Diagnóstico"
+msgstr "Diagnostics"
+
+#: src/lib/module-registry.js
+#: src/screens/loyalty-value.jsx
+#: src/shell.jsx
+msgid "Lealtad y valor"
+msgstr "Loyalty and value"
+
+#: src/lib/module-registry.js
+#: src/screens/orders.jsx
+#: src/shell.jsx
+msgid "Cocina"
+msgstr "Kitchen"
+
+#: src/screens/cafes.jsx
+msgid "Starter · solo lealtad"
+msgstr "Starter · loyalty only"
+
+#: src/screens/cafes.jsx
+msgid "Growth · lealtad + dashboard"
+msgstr "Growth · loyalty + dashboard"
+
+#: src/screens/cafes.jsx
+msgid "Pro · todo"
+msgstr "Pro · everything"
+
+#: src/screens/cafes.jsx
+msgid "No se pudo abrir el café."
+msgstr "The café could not be opened."
+
+#: src/screens/cafes.jsx
+msgid "Abrir café"
+msgstr "Open café"
+
+#: src/screens/cafes.jsx
+#: src/screens/customers.jsx
+#: src/screens/devices.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/settings.jsx
+#: src/screens/staff.jsx
+msgid "Cerrar"
+msgstr "Close"
+
+#: src/screens/cafes.jsx
+msgid "El café"
+msgstr "The café"
+
+#: src/screens/cafes.jsx
+msgid "Nombre del café"
+msgstr "Café name"
+
+#: src/screens/cafes.jsx
+msgid "Ciudad · opcional"
+msgstr "City · optional"
+
+#: src/screens/cafes.jsx
+#: src/screens/hours.jsx
+msgid "Zona horaria"
+msgstr "Time zone"
+
+#: src/screens/cafes.jsx
+msgid "Primera sucursal · opcional"
+msgstr "First location · optional"
+
+#: src/screens/cafes.jsx
+msgid "Plan y marca"
+msgstr "Plan and brand"
+
+#: src/screens/cafes.jsx
+msgid "Plan · decide qué productos tiene el café"
+msgstr "Plan · decides which products the café owns"
+
+#: src/screens/cafes.jsx
+msgid "Prefijo de tarjeta · solo letras"
+msgstr "Card prefix · letters only"
+
+#: src/screens/cafes.jsx
+#: src/screens/settings.jsx
+msgid "Color principal · fondo de la tarjeta"
+msgstr "Primary color · card background"
+
+#: src/screens/cafes.jsx
+msgid "Color principal {c}"
+msgstr "Primary color {c}"
+
+#: src/screens/cafes.jsx
+msgid "Quién lo administra"
+msgstr "Who administers it"
+
+#: src/screens/cafes.jsx
+msgid "Nombre del dueño · opcional"
+msgstr "Owner name · optional"
+
+#: src/screens/cafes.jsx
+msgid "Correo del dueño · su acceso"
+msgstr "Owner email · their login"
+
+#: src/screens/cafes.jsx
+msgid "Contraseña · 8 caracteres o más"
+msgstr "Password · 8 characters or more"
+
+#: src/screens/cafes.jsx
+#: src/screens/customers.jsx
+#: src/screens/devices.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/hours.jsx
+#: src/screens/members.jsx
+#: src/screens/settings.jsx
+#: src/screens/staff.jsx
+msgid "Cancelar"
+msgstr "Cancel"
+
+#: src/screens/cafes.jsx
+msgid "Abriendo…"
+msgstr "Opening…"
+
+#: src/screens/cafes.jsx
+msgid "Esta pantalla es para operadores de Umi."
+msgstr "This screen is for Umi operators."
+
+#: src/screens/cafes.jsx
+msgid "Cafés en la plataforma"
+msgstr "Cafés on the platform"
+
+#: src/screens/cafes.jsx
+msgid "Todos los cafés que opera Umi."
+msgstr "Every café Umi operates."
+
+#: src/screens/cafes.jsx
+msgid "cafés"
+msgstr "cafés"
+
+#: src/screens/cafes.jsx
+msgid "No se pudieron cargar los cafés"
+msgstr "The cafés could not be loaded"
+
+#: src/screens/cafes.jsx
+msgid "Todavía no hay cafés."
+msgstr "There are no cafés yet."
+
+#: src/screens/cafes.jsx
+msgid "Abrir el primero"
+msgstr "Open the first one"
+
+#: src/screens/cafes.jsx
+#: src/screens/profile.jsx
+msgid "Café"
+msgstr "Café"
+
+#: src/screens/cafes.jsx
+#: src/screens/settings.jsx
+msgid "Dirección pública"
+msgstr "Public address"
+
+#: src/screens/cafes.jsx
+msgid "por id"
+msgstr "by id"
+
+#: src/screens/cash-shifts.jsx
+msgid "Ventas"
+msgstr "Sales"
+
+#: src/screens/cash-shifts.jsx
+msgid "Recibos"
+msgstr "Receipts"
+
+#: src/screens/cash-shifts.jsx
+msgid "Reembolsos"
+msgstr "Refunds"
+
+#: src/screens/cash-shifts.jsx
+msgid "Turnos de caja"
+msgstr "Cash shifts"
+
+#: src/screens/cash-shifts.jsx
+msgid "Registros"
+msgstr "Registers"
+
+#: src/screens/catalog-inventory.jsx
+msgid "Catálogo"
+msgstr "Catalog"
+
+#: src/screens/catalog-inventory.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Inventario"
+msgstr "Inventory"
+
+#: src/screens/conversations.jsx
+msgid "Conversaciones WhatsApp"
+msgstr "WhatsApp conversations"
+
+#: src/screens/conversations.jsx
+msgid "{active, plural, one {# conversación activa ahora mismo.} other {# conversaciones activas ahora mismo.}}"
+msgstr "{active, plural, one {# active conversation right now.} other {# active conversations right now.}}"
+
+#: src/screens/conversations.jsx
+msgid "en total"
+msgstr "in total"
+
+#: src/screens/conversations.jsx
+msgid "No hay conversaciones."
+msgstr "No conversations."
+
+#: src/screens/conversations.jsx
+msgid "Cliente WhatsApp"
+msgstr "WhatsApp customer"
+
+#: src/screens/conversations.jsx
+msgid "Sin resumen"
+msgstr "No summary"
+
+#. placeholder {0}: conversation.messageCount || 0
+#: src/screens/conversations.jsx
+#: src/screens/customers.jsx
+msgid "{0, plural, one {# mensaje} other {# mensajes}}"
+msgstr "{0, plural, one {# message} other {# messages}}"
+
+#: src/screens/conversations.jsx
+#: src/screens/customers.jsx
+#: src/screens/operations-workspace.jsx
+msgid "desconocido"
+msgstr "unknown"
+
+#: src/screens/conversations.jsx
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Anterior"
+msgstr "Previous"
+
+#: src/screens/conversations.jsx
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Siguiente"
+msgstr "Next"
+
+#: src/screens/customers.jsx
+#: src/screens/orders.jsx
+#: src/screens/staff.jsx
+msgid "Todos"
+msgstr "All"
+
+#: src/screens/customers.jsx
+#: src/screens/loyalty-value.jsx
+#: src/shell.jsx
+msgid "Lealtad"
+msgstr "Loyalty"
+
+#: src/screens/customers.jsx
+msgid "Notas"
+msgstr "Notes"
+
+#: src/screens/customers.jsx
+msgid "Revisión"
+msgstr "Review"
+
+#: src/screens/customers.jsx
+msgid "Datos"
+msgstr "Data"
+
+#: src/screens/customers.jsx
+msgid "Cliente sin nombre"
+msgstr "Unnamed customer"
+
+#. placeholder {0}: customer.value?.visits || 0
+#: src/screens/customers.jsx
+msgid "{0, plural, one {# visita} other {# visitas}}"
+msgstr "{0, plural, one {# visit} other {# visits}}"
+
+#: src/screens/customers.jsx
+msgid "Buscar clientes, teléfono, correo"
+msgstr "Search customers, phone, email"
+
+#: src/screens/customers.jsx
+msgid "Filtros de clientes"
+msgstr "Customer filters"
+
+#: src/screens/customers.jsx
+msgid "{total, plural, one {# cliente} other {# clientes}}"
+msgstr "{total, plural, one {# customer} other {# customers}}"
+
+#: src/screens/customers.jsx
+msgid "plataforma de clientes"
+msgstr "customer platform"
+
+#: src/screens/customers.jsx
+msgid "Datos de clientes no disponibles"
+msgstr "Customer data unavailable"
+
+#: src/screens/customers.jsx
+msgid "No hay clientes"
+msgstr "No customers found"
+
+#: src/screens/customers.jsx
+msgid "Prueba otra búsqueda u otro filtro."
+msgstr "Try another search or filter."
+
+#: src/screens/customers.jsx
+msgid "Sin actividad reciente"
+msgstr "No recent activity"
+
+#: src/screens/customers.jsx
+msgid "Aquí aparecerán pedidos, mensajes, memoria y eventos de calidad de datos."
+msgstr "Orders, messages, memory, and data-quality events will appear here."
+
+#: src/screens/customers.jsx
+msgid "Sin conversaciones de WhatsApp"
+msgstr "No WhatsApp conversations"
+
+#: src/screens/customers.jsx
+msgid "El historial de conversaciones vive dentro de cada cliente."
+msgstr "Conversation history lives under each customer."
+
+#: src/screens/customers.jsx
+msgid "Conversación de WhatsApp"
+msgstr "WhatsApp conversation"
+
+#. placeholder {0}: fmtTime(conversation.lastMessageAt || conversation.updatedAt)
+#: src/screens/customers.jsx
+msgid "último {0}"
+msgstr "last {0}"
+
+#: src/screens/customers.jsx
+msgid "Sin pedidos vinculados"
+msgstr "No linked orders"
+
+#: src/screens/customers.jsx
+msgid "Aquí aparecerán los pedidos vinculados a este contacto."
+msgstr "Orders linked to this contact will appear here."
+
+#: src/screens/customers.jsx
+msgid "pedido"
+msgstr "order"
+
+#: src/screens/customers.jsx
+msgid "No se pudieron acreditar los sellos."
+msgstr "The stamps could not be credited."
+
+#: src/screens/customers.jsx
+msgid "Agregar sellos"
+msgstr "Add stamps"
+
+#. placeholder {0}: account.cardNumber || t`de lealtad`
+#: src/screens/customers.jsx
+msgid "Acredita sellos a la tarjeta {0}. Úsalo para poner al día a un cliente que llega de otro programa."
+msgstr "Credit stamps to card {0}. Use it to bring a customer from another program up to date."
+
+#: src/screens/customers.jsx
+msgid "de lealtad"
+msgstr "loyalty"
+
+#: src/screens/customers.jsx
+msgid "Sellos (1–50)"
+msgstr "Stamps (1–50)"
+
+#: src/screens/customers.jsx
+msgid "Nota (opcional)"
+msgstr "Note (optional)"
+
+#: src/screens/customers.jsx
+msgid "p. ej. migración de cartón físico"
+msgstr "e.g. migration from a paper card"
+
+#: src/screens/customers.jsx
+msgid "Acreditando…"
+msgstr "Crediting…"
+
+#: src/screens/customers.jsx
+msgid "{count, plural, one {Acreditar # sello} other {Acreditar # sellos}}"
+msgstr "{count, plural, one {Credit # stamp} other {Credit # stamps}}"
+
+#: src/screens/customers.jsx
+msgid "Acreditar sellos"
+msgstr "Credit stamps"
+
+#: src/screens/customers.jsx
+msgid "No se pudo recargar el saldo."
+msgstr "The balance could not be topped up."
+
+#: src/screens/customers.jsx
+msgid "Recargar saldo"
+msgstr "Top up balance"
+
+#. placeholder {0}: account.cardNumber || t`de lealtad`
+#: src/screens/customers.jsx
+msgid "Agrega saldo al monedero de la tarjeta {0}."
+msgstr "Add balance to the wallet of card {0}."
+
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+msgid "Monto (MXN)"
+msgstr "Amount (MXN)"
+
+#: src/screens/customers.jsx
+msgid "Recargando…"
+msgstr "Topping up…"
+
+#: src/screens/customers.jsx
+msgid "Recargar ${pesos}"
+msgstr "Top up ${pesos}"
+
+#: src/screens/customers.jsx
+msgid "Recargar"
+msgstr "Top up"
+
+#: src/screens/customers.jsx
+#: src/screens/settings.jsx
+msgid "Umi Cash no está activo"
+msgstr "Umi Cash is not active"
+
+#: src/screens/customers.jsx
+msgid "Los datos de lealtad y monedero se ocultan hasta activar el producto."
+msgstr "Loyalty and wallet data stay hidden until the product is active."
+
+#: src/screens/customers.jsx
+msgid "Sin cuenta de lealtad"
+msgstr "No loyalty account"
+
+#: src/screens/customers.jsx
+msgid "Este cliente todavía no tiene una cuenta de lealtad activa."
+msgstr "This customer does not have an active loyalty account yet."
+
+#: src/screens/customers.jsx
+msgid "No se pudo registrar la acción."
+msgstr "The action could not be recorded."
+
+#: src/screens/customers.jsx
+msgid "Saldo del monedero"
+msgstr "Wallet balance"
+
+#: src/screens/customers.jsx
+msgid "Sin tarjeta"
+msgstr "No card"
+
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Visitas totales"
+msgstr "Total visits"
+
+#. placeholder {0}: account.visitsThisCycle || 0
+#: src/screens/customers.jsx
+msgid "{0} en este ciclo"
+msgstr "{0} this cycle"
+
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Recompensas pendientes"
+msgstr "Pending rewards"
+
+#: src/screens/customers.jsx
+msgid "lealtad"
+msgstr "loyalty"
+
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Registrando…"
+msgstr "Recording…"
+
+#: src/screens/customers.jsx
+msgid "Registrar visita"
+msgstr "Record visit"
+
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+msgid "Canjeando…"
+msgstr "Redeeming…"
+
+#: src/screens/customers.jsx
+msgid "Canjear recompensa"
+msgstr "Redeem reward"
+
+#: src/screens/customers.jsx
+msgid "Identidades"
+msgstr "Identities"
+
+#: src/screens/customers.jsx
+msgid "Sin identidades"
+msgstr "No identity rows"
+
+#: src/screens/customers.jsx
+msgid "Aquí aparecerán las identidades de teléfono o WhatsApp."
+msgstr "Phone or WhatsApp identities will appear here."
+
+#: src/screens/customers.jsx
+msgid "identidad"
+msgstr "identity"
+
+#: src/screens/customers.jsx
+msgid "registrada"
+msgstr "recorded"
+
+#: src/screens/customers.jsx
+msgid "Calidad de datos"
+msgstr "Data quality"
+
+#: src/screens/customers.jsx
+msgid "Sin pendientes de revisión"
+msgstr "No open review items"
+
+#: src/screens/customers.jsx
+msgid "Las coincidencias ambiguas se muestran aquí para que el dueño las revise; nunca se fusionan en silencio."
+msgstr "Ambiguous matches are surfaced here for the owner to review; they are never merged silently."
+
+#: src/screens/customers.jsx
+msgid "candidato a fusión"
+msgstr "merge candidate"
+
+#: src/screens/customers.jsx
+msgid "Posible identidad duplicada"
+msgstr "Possible duplicate identity"
+
+#: src/screens/customers.jsx
+msgid "candidato"
+msgstr "candidate"
+
+#: src/screens/customers.jsx
+msgid "hallazgo de datos"
+msgstr "data finding"
+
+#: src/screens/customers.jsx
+msgid "Necesita revisión"
+msgstr "Needs review"
+
+#: src/screens/customers.jsx
+msgid "abierto"
+msgstr "open"
+
+#: src/screens/customers.jsx
+msgid "Elige un cliente"
+msgstr "Choose a customer"
+
+#: src/screens/customers.jsx
+msgid "Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, su lealtad y tus notas, todo junto."
+msgstr "Here you will see their history, WhatsApp conversations, orders, loyalty, and your notes, all in one place."
+
+#: src/screens/customers.jsx
+msgid "Cargando cliente"
+msgstr "Loading customer"
+
+#: src/screens/customers.jsx
+msgid "Cliente no encontrado"
+msgstr "Customer not found"
+
+#: src/screens/customers.jsx
+msgid "El cliente seleccionado no está disponible para este negocio."
+msgstr "The selected customer is not available for this business."
+
+#: src/screens/customers.jsx
+msgid "Volver a Clientes"
+msgstr "Back to Customers"
+
+#: src/screens/customers.jsx
+msgid "activo"
+msgstr "active"
+
+#: src/screens/customers.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/loyalty-value.jsx
+#: src/shell.jsx
+msgid "Tarjetas de regalo"
+msgstr "Gift cards"
+
+#: src/screens/customers.jsx
+msgid "Perfil del cliente"
+msgstr "Customer profile"
+
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Visitas"
+msgstr "Visits"
+
+#: src/screens/customers.jsx
+msgid "$0.00 en monedero"
+msgstr "$0.00 in wallet"
+
+#: src/screens/customers.jsx
+msgid "Datos de memoria"
+msgstr "Memory facts"
+
+#: src/screens/customers.jsx
+msgid "sin indexar"
+msgstr "not indexed"
+
+#: src/screens/customers.jsx
+msgid "Un perfil por cliente: WhatsApp, pedidos, lealtad, monedero y notas."
+msgstr "One profile per customer: WhatsApp, orders, loyalty, wallet, and notes."
+
+#. placeholder {0}: formatNumber(metrics.totalCustomers || 0)
+#: src/screens/customers.jsx
+msgid "<0>{0}</0> en total"
+msgstr "<0>{0}</0> total"
+
+#. placeholder {0}: formatNumber(metrics.needsReview || 0)
+#: src/screens/customers.jsx
+msgid "<0>{0}</0> por revisar"
+msgstr "<0>{0}</0> to review"
+
+#. placeholder {0}: formatNumber(metrics.memoryReady || 0)
+#: src/screens/customers.jsx
+msgid "<0>{0}</0> con memoria"
+msgstr "<0>{0}</0> with memory"
+
+#: src/screens/device-utils.js
+msgid "Sin sucursal"
+msgstr "No location"
+
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+#: src/shell.jsx
+msgid "Sucursal"
+msgstr "Location"
+
+#: src/screens/device-utils.js
+msgid "Sin plataforma"
+msgstr "No platform"
+
+#: src/screens/device-utils.js
+msgid "Móvil"
+msgstr "Mobile"
+
+#: src/screens/device-utils.js
+msgid "Estático"
+msgstr "Static"
+
+#. placeholder {0}: Math.floor(ms / 86400000)
+#. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
+#: src/screens/device-utils.js
+#: src/screens/members.jsx
+msgid "hace {0} d"
+msgstr "{0} d ago"
+
+#: src/screens/devices.jsx
+#: src/screens/overview.jsx
+msgid "En vivo"
+msgstr "Live"
+
+#: src/screens/devices.jsx
+msgid "Conectando…"
+msgstr "Connecting…"
+
+#: src/screens/devices.jsx
+msgid "Sondeo 10 s"
+msgstr "Polling 10 s"
+
+#: src/screens/devices.jsx
+msgid "{liveCount} KDS en vivo"
+msgstr "{liveCount} KDS live"
+
+#. placeholder {0}: posCards.length
+#: src/screens/devices.jsx
+msgid "{0, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
+msgstr "{0, plural, one {# UmiPOS register} other {# UmiPOS registers}}"
+
+#: src/screens/devices.jsx
+msgid "{liveCount} en vivo ahora mismo."
+msgstr "{liveCount} live right now."
+
+#: src/screens/devices.jsx
+msgid "Dispositivos pareados"
+msgstr "Paired devices"
+
+#: src/screens/devices.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/overview.jsx
+msgid "Actualizando…"
+msgstr "Updating…"
+
+#: src/screens/devices.jsx
+msgid "dispositivos"
+msgstr "devices"
+
+#: src/screens/devices.jsx
+msgid "Actualización en vivo por el canal en tiempo real."
+msgstr "Live updates over the realtime channel."
+
+#: src/screens/devices.jsx
+msgid "El canal en tiempo real no responde; la lista se actualiza cada 10 s."
+msgstr "The realtime channel is not responding; the list refreshes every 10 s."
+
+#: src/screens/devices.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/overview.jsx
+msgid "Actualizar"
+msgstr "Refresh"
+
+#: src/screens/devices.jsx
+msgid "Estaciones"
+msgstr "Stations"
+
+#: src/screens/devices.jsx
+msgid "Añadir dispositivo"
+msgstr "Add device"
+
+#: src/screens/devices.jsx
+msgid "SIN ASIGNAR"
+msgstr "UNASSIGNED"
+
+#: src/screens/devices.jsx
+msgid "Reconectando…"
+msgstr "Reconnecting…"
+
+#: src/screens/devices.jsx
+#: src/screens/overview.jsx
+msgid "Lento"
+msgstr "Slow"
+
+#: src/screens/devices.jsx
+#: src/screens/overview.jsx
+#: src/shell.jsx
+msgid "Sin conexión"
+msgstr "Offline"
+
+#. placeholder {0}: d.last
+#. placeholder {0}: device.last
+#: src/screens/devices.jsx
+msgid "Visto {0}"
+msgstr "Seen {0}"
+
+#: src/screens/devices.jsx
+msgid "ÓRDENES"
+msgstr "ORDERS"
+
+#: src/screens/devices.jsx
+msgid "Editar dispositivo"
+msgstr "Edit device"
+
+#: src/screens/devices.jsx
+msgid "Registrado"
+msgstr "Registered"
+
+#: src/screens/devices.jsx
+msgid "Rotación pendiente"
+msgstr "Rotation pending"
+
+#: src/screens/devices.jsx
+msgid "Editar caja"
+msgstr "Edit register"
+
+#: src/screens/devices.jsx
+msgid "No se pudieron guardar los cambios. Intenta de nuevo."
+msgstr "The changes could not be saved. Try again."
+
+#: src/screens/devices.jsx
+msgid "No se pudo revocar la caja. Intenta de nuevo."
+msgstr "The register could not be revoked. Try again."
+
+#: src/screens/devices.jsx
+msgid "UmiPOS · Dispositivo"
+msgstr "UmiPOS · Device"
+
+#: src/screens/devices.jsx
+msgid "Gestionar caja"
+msgstr "Manage register"
+
+#: src/screens/devices.jsx
+msgid "CREDENCIAL"
+msgstr "CREDENTIAL"
+
+#: src/screens/devices.jsx
+msgid "Nombre del dispositivo"
+msgstr "Device name"
+
+#: src/screens/devices.jsx
+msgid "Caja principal"
+msgstr "Main register"
+
+#: src/screens/devices.jsx
+msgid "Modalidad"
+msgstr "Mode"
+
+#: src/screens/devices.jsx
+msgid "Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva a la mesa."
+msgstr "Static is a fixed register at the counter. Mobile is a terminal carried to the table."
+
+#: src/screens/devices.jsx
+msgid "Plataforma"
+msgstr "Platform"
+
+#: src/screens/devices.jsx
+msgid "Para cambiar la sucursal, registra el dispositivo otra vez."
+msgstr "To change the location, enroll the device again."
+
+#: src/screens/devices.jsx
+msgid "ID público"
+msgstr "Public ID"
+
+#: src/screens/devices.jsx
+msgid "Ocultar"
+msgstr "Hide"
+
+#: src/screens/devices.jsx
+msgid "Mostrar"
+msgstr "Show"
+
+#: src/screens/devices.jsx
+msgid "Revocando…"
+msgstr "Revoking…"
+
+#: src/screens/devices.jsx
+msgid "Revocar caja"
+msgstr "Revoke register"
+
+#: src/screens/devices.jsx
+#: src/screens/hours.jsx
+#: src/screens/reset-password.jsx
+#: src/screens/settings.jsx
+#: src/screens/staff.jsx
+msgid "Guardando…"
+msgstr "Saving…"
+
+#: src/screens/devices.jsx
+#: src/screens/settings.jsx
+msgid "Guardar cambios"
+msgstr "Save changes"
+
+#: src/screens/devices.jsx
+msgid "UmiPOS · Acceso"
+msgstr "UmiPOS · Access"
+
+#: src/screens/devices.jsx
+msgid "Esta caja pierde su credencial de inmediato. Para volver a usarla, crea un código de registro nuevo y regístrala otra vez."
+msgstr "This register loses its credential immediately. To use it again, create a new enrollment code and enroll it again."
+
+#: src/screens/devices.jsx
+msgid "Revocar"
+msgstr "Revoke"
+
+#: src/screens/devices.jsx
+msgid "Esta solicitud ya expiró o fue atendida. Actualiza la lista."
+msgstr "This request already expired or was handled. Refresh the list."
+
+#: src/screens/devices.jsx
+msgid "Solicitud inválida."
+msgstr "Invalid request."
+
+#: src/screens/devices.jsx
+msgid "No se pudo completar la acción. Intenta de nuevo."
+msgstr "The action could not be completed. Try again."
+
+#: src/screens/devices.jsx
+msgid "Primer pareo"
+msgstr "First pairing"
+
+#: src/screens/devices.jsx
+msgid "Solicitudes KDS pendientes"
+msgstr "Pending KDS requests"
+
+#: src/screens/devices.jsx
+msgid "Esperando iPad"
+msgstr "Waiting for iPad"
+
+#: src/screens/devices.jsx
+msgid "Aprobado"
+msgstr "Approved"
+
+#: src/screens/devices.jsx
+msgid "Expirada"
+msgstr "Expired"
+
+#: src/screens/devices.jsx
+msgid "Confirmar"
+msgstr "Confirm"
+
+#: src/screens/devices.jsx
+msgid "Esperando"
+msgstr "Waiting"
+
+#: src/screens/devices.jsx
+msgid "iPad · {requested}"
+msgstr "iPad · {requested}"
+
+#. placeholder {0}: formatTime(p.expires_at)
+#: src/screens/devices.jsx
+msgid "expira {0}"
+msgstr "expires {0}"
+
+#: src/screens/devices.jsx
+msgid "Rechazar"
+msgstr "Reject"
+
+#: src/screens/devices.jsx
+msgid "Aprobar"
+msgstr "Approve"
+
+#: src/screens/devices.jsx
+msgid "KDS · Dispositivo"
+msgstr "KDS · Device"
+
+#: src/screens/devices.jsx
+msgid "Gestionar dispositivo"
+msgstr "Manage device"
+
+#: src/screens/devices.jsx
+msgid "ÓRDENES ABIERTAS"
+msgstr "OPEN ORDERS"
+
+#: src/screens/devices.jsx
+msgid "p. ej. Cocina Caliente 1"
+msgstr "e.g. Hot Kitchen 1"
+
+#: src/screens/devices.jsx
+msgid "Estación asignada"
+msgstr "Assigned station"
+
+#: src/screens/devices.jsx
+msgid "Sin asignar"
+msgstr "Unassigned"
+
+#: src/screens/devices.jsx
+msgid "ID de sesión"
+msgstr "Session ID"
+
+#: src/screens/devices.jsx
+msgid "Revocar dispositivo"
+msgstr "Revoke device"
+
+#: src/screens/devices.jsx
+msgid "KDS · Acceso"
+msgstr "KDS · Access"
+
+#: src/screens/devices.jsx
+msgid "Este iPad se cerrará y tendrá que parearse de nuevo con un PIN."
+msgstr "This iPad will sign out and will need to pair again with a PIN."
+
+#. placeholder {0}: station.name
+#: src/screens/devices.jsx
+msgid "¿Archivar la estación \"{0}\"? Dejará de aparecer al asignar dispositivos."
+msgstr "Archive station \"{0}\"? It will no longer appear when assigning devices."
+
+#: src/screens/devices.jsx
+msgid "{count, plural, one {# dispositivo asignado} other {# dispositivos asignados}}"
+msgstr "{count, plural, one {# device assigned} other {# devices assigned}}"
+
+#: src/screens/devices.jsx
+msgid "sin guardar"
+msgstr "unsaved"
+
+#: src/screens/devices.jsx
+msgid "Archivar estación"
+msgstr "Archive station"
+
+#: src/screens/devices.jsx
+msgid "Dispositivos · KDS"
+msgstr "Devices · KDS"
+
+#: src/screens/devices.jsx
+msgid "Los tickets se enrutan a estaciones según la categoría del menú. Cada estación puede asignarse a uno o más iPads."
+msgstr "Tickets route to stations by menu category. Each station can be assigned to one or more iPads."
+
+#: src/screens/devices.jsx
+msgid "Aún no hay estaciones. Crea la primera abajo."
+msgstr "There are no stations yet. Create the first one below."
+
+#: src/screens/devices.jsx
+msgid "Nueva estación"
+msgstr "New station"
+
+#: src/screens/devices.jsx
+msgid "p. ej. Cocina Caliente"
+msgstr "e.g. Hot Kitchen"
+
+#: src/screens/devices.jsx
+msgid "Creando…"
+msgstr "Creating…"
+
+#: src/screens/devices.jsx
+msgid "Crear"
+msgstr "Create"
+
+#: src/screens/devices.jsx
+msgid "No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo."
+msgstr "The code could not be created. Check the location and try again."
+
+#: src/screens/devices.jsx
+msgid "Selecciona una sucursal"
+msgstr "Select a location"
+
+#: src/screens/devices.jsx
+msgid "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
+msgstr "The device and its stations will be linked to this location."
+
+#: src/screens/devices.jsx
+msgid "Producto del dispositivo"
+msgstr "Device product"
+
+#: src/screens/devices.jsx
+msgid "Selecciona un producto"
+msgstr "Select a product"
+
+#: src/screens/devices.jsx
+msgid "Necesitas comprar este producto primero."
+msgstr "You need to purchase this product first."
+
+#: src/screens/devices.jsx
+msgid "UmiKDS — producto no activo"
+msgstr "UmiKDS — product not active"
+
+#: src/screens/devices.jsx
+msgid "UmiPOS — producto no activo"
+msgstr "UmiPOS — product not active"
+
+#: src/screens/devices.jsx
+msgid "Las opciones en gris requieren un producto activo."
+msgstr "Greyed-out options require an active product."
+
+#: src/screens/devices.jsx
+msgid "Información sobre productos no activos"
+msgstr "Information about inactive products"
+
+#: src/screens/devices.jsx
+msgid "¿Por qué?"
+msgstr "Why?"
+
+#: src/screens/devices.jsx
+msgid "p. ej. Cocina Caliente 2"
+msgstr "e.g. Hot Kitchen 2"
+
+#: src/screens/devices.jsx
+msgid "No hay estaciones todavía. Crea una para asignar este dispositivo."
+msgstr "There are no stations yet. Create one to assign this device."
+
+#: src/screens/devices.jsx
+msgid "Nombre de la estación"
+msgstr "Station name"
+
+#: src/screens/devices.jsx
+msgid "Crear estación"
+msgstr "Create station"
+
+#: src/screens/devices.jsx
+msgid "PIN de primer pareo"
+msgstr "First-pairing PIN"
+
+#: src/screens/devices.jsx
+msgid "Esperando solicitud del iPad"
+msgstr "Waiting for the iPad request"
+
+#: src/screens/devices.jsx
+msgid "estación"
+msgstr "station"
+
+#. placeholder {0}: formatTime(pairing.expires_at)
+#: src/screens/devices.jsx
+msgid "Expira {0}"
+msgstr "Expires {0}"
+
+#: src/screens/devices.jsx
+msgid "Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes pendientes, apruébalo desde esta pantalla."
+msgstr "Enter this PIN on the KDS iPad. When it appears in pending requests, approve it from this screen."
+
+#: src/screens/devices.jsx
+msgid "Solicitudes activas"
+msgstr "Active requests"
+
+#: src/screens/devices.jsx
+msgid "La solicitud queda vinculada al negocio y a la sucursal seleccionada."
+msgstr "The request is linked to the business and the selected location."
+
+#: src/screens/devices.jsx
+msgid "Código de configuración"
+msgstr "Setup code"
+
+#. placeholder {0}: posCreated.setupCode
+#: src/screens/devices.jsx
+msgid "Código {0}"
+msgstr "Code {0}"
+
+#: src/screens/devices.jsx
+msgid "Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla."
+msgstr "Enter this code in UmiPOS. Then approve the request on this screen."
+
+#. placeholder {0}: formatTime(posCreated.expiresAt)
+#: src/screens/devices.jsx
+msgid "Expira a las {0}."
+msgstr "Expires at {0}."
+
+#: src/screens/devices.jsx
+msgid "Generando…"
+msgstr "Generating…"
+
+#: src/screens/devices.jsx
+msgid "PIN generado"
+msgstr "PIN generated"
+
+#: src/screens/devices.jsx
+msgid "Generar PIN"
+msgstr "Generate PIN"
+
+#: src/screens/devices.jsx
+msgid "Crear código"
+msgstr "Create code"
+
+#: src/screens/devices.jsx
+msgid "Código creado"
+msgstr "Code created"
+
+#: src/screens/devices.jsx
+msgid "Requiere aprobación"
+msgstr "Needs approval"
+
+#: src/screens/devices.jsx
+msgid "Credencial entregada"
+msgstr "Credential delivered"
+
+#: src/screens/devices.jsx
+#: src/screens/orders.jsx
+msgid "Completado"
+msgstr "Completed"
+
+#: src/screens/devices.jsx
+msgid "Denegado"
+msgstr "Denied"
+
+#: src/screens/devices.jsx
+msgid "Expirado"
+msgstr "Expired"
+
+#: src/screens/devices.jsx
+#: src/screens/orders.jsx
+#: src/screens/products-billing.jsx
+msgid "Cancelado"
+msgstr "Canceled"
+
+#: src/screens/devices.jsx
+msgid "No se pudo guardar la decisión. Actualiza y vuelve a intentarlo."
+msgstr "The decision could not be saved. Refresh and try again."
+
+#: src/screens/devices.jsx
+msgid "Solicitudes de registro"
+msgstr "Enrollment requests"
+
+#: src/screens/devices.jsx
+msgid "No hay solicitudes de UmiPOS."
+msgstr "There are no UmiPOS requests."
+
+#. placeholder {0}: request.installationReference
+#: src/screens/devices.jsx
+msgid "Instalación {0}"
+msgstr "Installation {0}"
+
+#: src/screens/devices.jsx
+msgid "Denegar"
+msgstr "Deny"
+
+#: src/screens/diagnostics.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Recuperación"
+msgstr "Recovery"
+
+#: src/screens/diagnostics.jsx
+msgid "Auditoría"
+msgstr "Audit"
+
+#: src/screens/gift-cards.jsx
+msgid "No se pudo canjear la tarjeta."
+msgstr "The card could not be redeemed."
+
+#: src/screens/gift-cards.jsx
+msgid "Canjear tarjeta de regalo"
+msgstr "Redeem gift card"
+
+#: src/screens/gift-cards.jsx
+msgid "El saldo se abona al monedero del cliente."
+msgstr "The balance is credited to the customer's wallet."
+
+#. placeholder {0}: result.amountMXN
+#. placeholder {1}: result.newBalanceMXN
+#: src/screens/gift-cards.jsx
+msgid "Canjeada por {0}. Nuevo saldo del cliente: {1}."
+msgstr "Redeemed for {0}. New customer balance: {1}."
+
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+msgid "Listo"
+msgstr "Done"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/login.jsx
+msgid "Código"
+msgstr "Code"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/staff.jsx
+msgid "Teléfono"
+msgstr "Phone"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/login.jsx
+#: src/screens/profile.jsx
+msgid "Correo"
+msgstr "Email"
+
+#: src/screens/gift-cards.jsx
+msgid "Canjear"
+msgstr "Redeem"
+
+#: src/screens/gift-cards.jsx
+msgid "No se pudo emitir la tarjeta."
+msgstr "The card could not be issued."
+
+#: src/screens/gift-cards.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Emitir tarjeta de regalo"
+msgstr "Issue gift card"
+
+#: src/screens/gift-cards.jsx
+msgid "La API genera el código; se muestra una sola vez."
+msgstr "The API generates the code; it is shown only once."
+
+#. placeholder {0}: issued.amountMXN || `$${pesos}`
+#: src/screens/gift-cards.jsx
+msgid "Tarjeta emitida por {0}. Entrega este código al cliente:"
+msgstr "Card issued for {0}. Give this code to the customer:"
+
+#: src/screens/gift-cards.jsx
+msgid "No se vuelve a mostrar. Cópialo ahora."
+msgstr "It will not be shown again. Copy it now."
+
+#: src/screens/gift-cards.jsx
+msgid "Nombre del destinatario (opcional)"
+msgstr "Recipient name (optional)"
+
+#: src/screens/gift-cards.jsx
+msgid "De parte de (opcional)"
+msgstr "From (optional)"
+
+#: src/screens/gift-cards.jsx
+msgid "Mensaje (opcional)"
+msgstr "Message (optional)"
+
+#: src/screens/gift-cards.jsx
+msgid "Emitiendo…"
+msgstr "Issuing…"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Emitir"
+msgstr "Issue"
+
+#: src/screens/gift-cards.jsx
+msgid "Emitidas desde Umi Cash."
+msgstr "Issued from Umi Cash."
+
+#: src/screens/gift-cards.jsx
+msgid "emitidas"
+msgstr "issued"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Emitir tarjeta"
+msgstr "Issue card"
+
+#: src/screens/gift-cards.jsx
+msgid "Abiertas"
+msgstr "Open"
+
+#: src/screens/gift-cards.jsx
+msgid "Saldo abierto en esta página"
+msgstr "Open balance on this page"
+
+#: src/screens/gift-cards.jsx
+msgid "Canjeadas"
+msgstr "Redeemed"
+
+#: src/screens/gift-cards.jsx
+msgid "Canjeado en esta página"
+msgstr "Redeemed on this page"
+
+#. placeholder {0}: cards.length
+#: src/screens/gift-cards.jsx
+msgid "{0} en pantalla"
+msgstr "{0} shown"
+
+#: src/screens/gift-cards.jsx
+msgid "Destinatario"
+msgstr "Recipient"
+
+#: src/screens/gift-cards.jsx
+msgid "Monto"
+msgstr "Amount"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Estado"
+msgstr "Status"
+
+#: src/screens/gift-cards.jsx
+msgid "Creada"
+msgstr "Created"
+
+#: src/screens/gift-cards.jsx
+msgid "No hay tarjetas de regalo emitidas."
+msgstr "No gift cards have been issued."
+
+#: src/screens/gift-cards.jsx
+msgid "Sin contacto"
+msgstr "No contact"
+
+#: src/screens/gift-cards.jsx
+msgid "CANJEADA"
+msgstr "REDEEMED"
+
+#: src/screens/gift-cards.jsx
+msgid "ABIERTA"
+msgstr "OPEN"
+
+#: src/screens/hours.jsx
+msgid "Lunes"
+msgstr "Monday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Lun"
+msgstr "Mon"
+
+#: src/screens/hours.jsx
+msgid "Martes"
+msgstr "Tuesday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mar"
+msgstr "Tue"
+
+#: src/screens/hours.jsx
+msgid "Miércoles"
+msgstr "Wednesday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Mié"
+msgstr "Wed"
+
+#: src/screens/hours.jsx
+msgid "Jueves"
+msgstr "Thursday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Jue"
+msgstr "Thu"
+
+#: src/screens/hours.jsx
+msgid "Viernes"
+msgstr "Friday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Vie"
+msgstr "Fri"
+
+#: src/screens/hours.jsx
+msgid "Sábado"
+msgstr "Saturday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Sáb"
+msgstr "Sat"
+
+#: src/screens/hours.jsx
+msgid "Domingo"
+msgstr "Sunday"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Dom"
+msgstr "Sun"
+
+#: src/screens/hours.jsx
+msgid "ConversaFlow · Pedidos WhatsApp"
+msgstr "ConversaFlow · WhatsApp orders"
+
+#: src/screens/hours.jsx
+msgid "Los pedidos están en pausa global"
+msgstr "Orders are paused globally"
+
+#: src/screens/hours.jsx
+msgid "Pedidos abiertos · se reciben mensajes de WhatsApp"
+msgstr "Orders are open · incoming WhatsApp messages are accepted"
+
+#: src/screens/hours.jsx
+msgid "Los clientes nuevos reciben tu aviso especial. Los pedidos en curso siguen con normalidad."
+msgstr "New customers receive your special notice. In-flight orders continue normally."
+
+#: src/screens/hours.jsx
+msgid "Corte activo · los pedidos por WhatsApp se detienen {cutoff} min antes del cierre."
+msgstr "Cutoff active · WhatsApp orders stop {cutoff} min before closing time."
+
+#: src/screens/hours.jsx
+msgid "Reanudar pedidos"
+msgstr "Resume orders"
+
+#: src/screens/hours.jsx
+msgid "Pausar pedidos"
+msgstr "Pause orders"
+
+#: src/screens/hours.jsx
+msgid "Horas de apertura"
+msgstr "Opening hours"
+
+#: src/screens/hours.jsx
+msgid "Cuándo abre y cierra cada día de la semana."
+msgstr "When each day of the week opens and closes."
+
+#: src/screens/hours.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/settings.jsx
+msgid "Guardar"
+msgstr "Save"
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Guardado"
+msgstr "Saved"
+
+#: src/screens/hours.jsx
+msgid "Error al guardar"
+msgstr "Error while saving"
+
+#: src/screens/hours.jsx
+msgid "ABIERTO"
+msgstr "OPEN"
+
+#: src/screens/hours.jsx
+msgid "CERRADO"
+msgstr "CLOSED"
+
+#: src/screens/hours.jsx
+msgid "{dayName} · abre"
+msgstr "{dayName} · opens"
+
+#: src/screens/hours.jsx
+msgid "{dayName} · cierra"
+msgstr "{dayName} · closes"
+
+#: src/screens/hours.jsx
+msgid "Copiar el horario de {dayName} a los demás días"
+msgstr "Copy the {dayName} hours to the other days"
+
+#: src/screens/hours.jsx
+msgid "Copiar a los demás días"
+msgstr "Copy to the other days"
+
+#: src/screens/hours.jsx
+msgid "Corte de pedidos"
+msgstr "Order cutoff"
+
+#: src/screens/hours.jsx
+msgid "Deja de aceptar pedidos por WhatsApp estos minutos antes de cerrar."
+msgstr "Stop accepting WhatsApp orders this many minutes before closing."
+
+#: src/screens/hours.jsx
+msgid "min"
+msgstr "min"
+
+#: src/screens/hours.jsx
+msgid "Minutos antes del cierre para dejar de aceptar pedidos"
+msgstr "Minutes before closing to stop accepting orders"
+
+#: src/screens/hours.jsx
+msgid "0 MIN"
+msgstr "0 MIN"
+
+#: src/screens/hours.jsx
+msgid "120 MIN"
+msgstr "120 MIN"
+
+#: src/screens/hours.jsx
+msgid "Difusión"
+msgstr "Broadcast"
+
+#: src/screens/hours.jsx
+msgid "Aviso especial"
+msgstr "Special notice"
+
+#: src/screens/hours.jsx
+msgid "Mensaje que verán los clientes en su próxima interacción..."
+msgstr "Message customers will see on their next interaction..."
+
+#. placeholder {0}: notice.length
+#: src/screens/hours.jsx
+msgid "Se envía en la próxima interacción del cliente · {0} / 280"
+msgstr "Sent on the customer's next interaction · {0} / 280"
+
+#: src/screens/hours.jsx
+msgid "Borrar"
+msgstr "Clear"
+
+#: src/screens/hours.jsx
+msgid "Teléfonos exentos"
+msgstr "Bypass phones"
+
+#: src/screens/hours.jsx
+msgid "Pueden hacer pedidos de prueba aunque el negocio esté cerrado o en pausa."
+msgstr "They can place test orders even when the business is closed or paused."
+
+#: src/screens/hours.jsx
+#: src/screens/settings.jsx
+msgid "Quitar"
+msgstr "Remove"
+
+#: src/screens/hours.jsx
+msgid "Escribe un teléfono y presiona Enter..."
+msgstr "Type a phone number and press Enter..."
+
+#: src/screens/hours.jsx
+msgid "Confirmar pausa"
+msgstr "Confirm pause"
+
+#: src/screens/hours.jsx
+msgid "¿Pausar los pedidos de WhatsApp en todo el negocio?"
+msgstr "Pause WhatsApp orders across the whole business?"
+
+#: src/screens/hours.jsx
+msgid "¿Volver a aceptar pedidos de WhatsApp?"
+msgstr "Resume accepting WhatsApp orders?"
+
+#: src/screens/hours.jsx
+msgid "Los clientes nuevos recibirán tu aviso especial. <0>Los pedidos en curso</0> siguen con normalidad en el KDS. Los teléfonos exentos aún pueden hacer pedidos de prueba. Puedes reanudar en cualquier momento."
+msgstr "New customers will receive your special notice. <0>In-flight orders</0> continue normally on the KDS. Bypass phones can still place test orders. You can resume at any time."
+
+#: src/screens/hours.jsx
+msgid "Los clientes podrán hacer pedidos por WhatsApp otra vez, según tu horario y el corte de pedidos."
+msgstr "Customers will be able to place WhatsApp orders again, subject to your business hours and order cutoff."
+
+#: src/screens/login.jsx
+msgid "Te enviamos un código de seis dígitos a tu correo."
+msgstr "We sent a six-digit code to your email."
+
+#: src/screens/login.jsx
+msgid "Escribe el código de seis dígitos de tu aplicación de autenticación."
+msgstr "Enter the six-digit code from your authenticator app."
+
+#: src/screens/login.jsx
+msgid "Escribe tu código de seis dígitos."
+msgstr "Enter your six-digit code."
+
+#: src/screens/login.jsx
+msgid "Tu código venció. Inicia sesión otra vez."
+msgstr "Your code expired. Sign in again."
+
+#: src/screens/login.jsx
+msgid "Correo o contraseña incorrectos. Revísalos e inténtalo otra vez."
+msgstr "Incorrect email or password. Check them and try again."
+
+#: src/screens/login.jsx
+msgid "Error al enviar el correo"
+msgstr "Error while sending the email"
+
+#: src/screens/login.jsx
+msgid "Tu operación,<0/>en tiempo real."
+msgstr "Your operation,<0/>in real time."
+
+#: src/screens/login.jsx
+msgid "Supervisa la operación de tu negocio al momento, desde un solo panel."
+msgstr "Oversee your business as it happens, from one panel."
+
+#: src/screens/login.jsx
+msgid "Hola de nuevo"
+msgstr "Welcome back"
+
+#: src/screens/login.jsx
+msgid "Inicia sesión para entrar a tu panel."
+msgstr "Sign in to open your dashboard."
+
+#: src/screens/login.jsx
+msgid "Contraseña"
+msgstr "Password"
+
+#: src/screens/login.jsx
+msgid "Tu contraseña"
+msgstr "Your password"
+
+#: src/screens/login.jsx
+msgid "Ocultar contraseña"
+msgstr "Hide password"
+
+#: src/screens/login.jsx
+msgid "Mostrar contraseña"
+msgstr "Show password"
+
+#: src/screens/login.jsx
+msgid "Recordarme"
+msgstr "Remember me"
+
+#: src/screens/login.jsx
+msgid "¿Olvidaste tu contraseña?"
+msgstr "Forgot your password?"
+
+#: src/screens/login.jsx
+msgid "Entrar"
+msgstr "Sign in"
+
+#: src/screens/login.jsx
+msgid "Entrando…"
+msgstr "Signing in…"
+
+#: src/screens/login.jsx
+msgid "Verifica que eres tú"
+msgstr "Verify it is you"
+
+#: src/screens/login.jsx
+msgid "Verificar"
+msgstr "Verify"
+
+#: src/screens/login.jsx
+msgid "Verificando…"
+msgstr "Verifying…"
+
+#: src/screens/login.jsx
+msgid "Volver a iniciar sesión"
+msgstr "Back to sign in"
+
+#: src/screens/login.jsx
+msgid "Escríbenos tu correo y te mandamos un enlace para recuperarla."
+msgstr "Enter your email and we will send you a link to recover it."
+
+#: src/screens/login.jsx
+msgid "Enviar enlace"
+msgstr "Send link"
+
+#: src/screens/login.jsx
+msgid "Enviando…"
+msgstr "Sending…"
+
+#: src/screens/login.jsx
+msgid "Revisa tu correo"
+msgstr "Check your email"
+
+#: src/screens/login.jsx
+msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu contraseña. Caduca en 15 minutos."
+msgstr "If there is an account with that email, we sent a link to reset your password. It expires in 15 minutes."
+
+#: src/screens/loyalty-value.jsx
+msgid "Recompensas"
+msgstr "Rewards"
+
+#: src/screens/loyalty-value.jsx
+msgid "Monedero"
+msgstr "Wallet"
+
+#: src/screens/members.jsx
+msgid "Más recientes"
+msgstr "Most recent"
+
+#: src/screens/members.jsx
+msgid "Más visitas"
+msgstr "Most visits"
+
+#: src/screens/members.jsx
+msgid "Mayor saldo"
+msgstr "Highest balance"
+
+#: src/screens/members.jsx
+msgid "Mayor gasto"
+msgstr "Highest spend"
+
+#: src/screens/members.jsx
+msgid "Más inactivos"
+msgstr "Most inactive"
+
+#: src/screens/members.jsx
+msgid "No se pudo registrar al miembro."
+msgstr "The member could not be registered."
+
+#: src/screens/members.jsx
+msgid "Registrar miembro"
+msgstr "Register member"
+
+#: src/screens/members.jsx
+msgid "Inscribe a un cliente en el programa de lealtad."
+msgstr "Enroll a customer in the loyalty program."
+
+#: src/screens/members.jsx
+msgid "Miembro registrado."
+msgstr "Member registered."
+
+#. placeholder {0}: result.cardNumber
+#: src/screens/members.jsx
+msgid "Tarjeta: <0>{0}</0>."
+msgstr "Card: <0>{0}</0>."
+
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/profile.jsx
+#: src/screens/settings.jsx
+msgid "Nombre"
+msgstr "Name"
+
+#: src/screens/members.jsx
+msgid "Número, sin código de país"
+msgstr "Number, without country code"
+
+#: src/screens/members.jsx
+msgid "Fecha de nacimiento"
+msgstr "Date of birth"
+
+#: src/screens/members.jsx
+msgid "Registrar"
+msgstr "Register"
+
+#: src/screens/members.jsx
+#: src/screens/overview.jsx
+msgid "Miembros activos"
+msgstr "Active members"
+
+#: src/screens/members.jsx
+msgid "Clientes inscritos en el programa de lealtad."
+msgstr "Customers enrolled in the loyalty program."
+
+#: src/screens/members.jsx
+msgid "miembros"
+msgstr "members"
+
+#: src/screens/members.jsx
+msgid "Ordenar clientes"
+msgstr "Sort customers"
+
+#: src/screens/members.jsx
+msgid "Buscar por nombre, teléfono o tarjeta…"
+msgstr "Search by name, phone, or card…"
+
+#. placeholder {0}: customers.length
+#. placeholder {1}: formatNumber(total)
+#: src/screens/members.jsx
+msgid "{0} de {1} miembros"
+msgstr "{0} of {1} members"
+
+#: src/screens/members.jsx
+msgid "Miembro"
+msgstr "Member"
+
+#: src/screens/members.jsx
+msgid "Tarjeta"
+msgstr "Card"
+
+#: src/screens/members.jsx
+msgid "Saldo"
+msgstr "Balance"
+
+#: src/screens/members.jsx
+msgid "Progreso"
+msgstr "Progress"
+
+#: src/screens/members.jsx
+msgid "Pendientes"
+msgstr "Pending"
+
+#: src/screens/members.jsx
+msgid "Última visita"
+msgstr "Last visit"
+
+#: src/screens/members.jsx
+msgid "Gasto total"
+msgstr "Total spend"
+
+#: src/screens/members.jsx
+msgid "Sin miembros en este filtro."
+msgstr "No members in this filter."
+
+#: src/screens/members.jsx
+#: src/screens/orders.jsx
+#: src/screens/profile.jsx
+msgid "Sin nombre"
+msgstr "No name"
+
+#: src/screens/members.jsx
+#: src/screens/overview.jsx
+msgid "total"
+msgstr "total"
+
+#. placeholder {0}: c.visitsThisCycle || 0
+#: src/screens/members.jsx
+msgid "{0} ciclo"
+msgstr "{0} cycle"
+
+#: src/screens/members.jsx
+msgid "Sin dato"
+msgstr "No data"
+
+#: src/screens/members.jsx
+msgid "Nunca"
+msgstr "Never"
+
+#: src/screens/members.jsx
+msgid "Ver detalle"
+msgstr "View detail"
+
+#: src/screens/members.jsx
+msgid "Miembro · Umi Cash"
+msgstr "Member · Umi Cash"
+
+#: src/screens/members.jsx
+msgid "Saldo · monedero"
+msgstr "Balance · wallet"
+
+#: src/screens/members.jsx
+msgid "LTV estimado"
+msgstr "Estimated LTV"
+
+#: src/screens/members.jsx
+msgid "Número de tarjeta"
+msgstr "Card number"
+
+#: src/screens/members.jsx
+msgid "Miembro desde"
+msgstr "Member since"
+
+#: src/screens/members.jsx
+msgid "Progreso en ciclo actual"
+msgstr "Progress in current cycle"
+
+#. placeholder {0}: c.visitsThisCycle || 0
+#: src/screens/members.jsx
+msgid "{0, plural, one {# visita completada} other {# visitas completadas}}"
+msgstr "{0, plural, one {# visit completed} other {# visits completed}}"
+
+#. placeholder {0}: c.visitsRequired
+#: src/screens/members.jsx
+msgid "meta: {0}"
+msgstr "goal: {0}"
+
+#: src/screens/members.jsx
+msgid "meta sin configurar"
+msgstr "goal not set"
+
+#: src/screens/operations-workspace.jsx
+msgid "No tienes el permiso requerido para esta operación."
+msgstr "You do not have the permission required for this operation."
+
+#: src/screens/operations-workspace.jsx
+msgid "La ubicación no pertenece a tu alcance."
+msgstr "The location is outside your scope."
+
+#: src/screens/operations-workspace.jsx
+msgid "Los datos cambiaron. Actualiza la vista antes de continuar."
+msgstr "The data changed. Refresh the view before continuing."
+
+#: src/screens/operations-workspace.jsx
+msgid "El resultado físico es desconocido. Verifica el equipo antes de repetir."
+msgstr "The physical outcome is unknown. Check the equipment before retrying."
+
+#: src/screens/operations-workspace.jsx
+msgid "Consulta el comando original en el Centro de recuperación."
+msgstr "Look up the original command in the Recovery center."
+
+#: src/screens/operations-workspace.jsx
+msgid "El servicio no está disponible. Intenta de nuevo después."
+msgstr "The service is unavailable. Try again later."
+
+#: src/screens/operations-workspace.jsx
+msgid "PIN del aprobador"
+msgstr "Approver PIN"
+
+#: src/screens/operations-workspace.jsx
+msgid "Reembolso"
+msgstr "Refund"
+
+#. placeholder {0}: sale.publicReference
+#: src/screens/operations-workspace.jsx
+msgid "Reembolso de {0}"
+msgstr "Refund for {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "La API calcula todos los importes."
+msgstr "The API calculates every amount."
+
+#: src/screens/operations-workspace.jsx
+msgid "Consultando…"
+msgstr "Checking…"
+
+#: src/screens/operations-workspace.jsx
+msgid "Consultar elegibilidad"
+msgstr "Check eligibility"
+
+#: src/screens/operations-workspace.jsx
+msgid "Tipo"
+msgstr "Type"
+
+#: src/screens/operations-workspace.jsx
+msgid "Motivo"
+msgstr "Reason"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cambio de decisión"
+msgstr "Customer changed mind"
+
+#: src/screens/operations-workspace.jsx
+msgid "Artículo incorrecto"
+msgstr "Incorrect item"
+
+#: src/screens/operations-workspace.jsx
+msgid "Defecto del producto"
+msgstr "Product defect"
+
+#. placeholder {0}: line.displayName
+#: src/screens/operations-workspace.jsx
+msgid "Cantidad para {0}"
+msgstr "Quantity for {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Calculando…"
+msgstr "Calculating…"
+
+#: src/screens/operations-workspace.jsx
+msgid "Crear vista previa"
+msgstr "Create preview"
+
+#. placeholder {0}: formatOperationMoney( preview.allocation.total.minorUnits, preview.allocation.total.currency, )
+#: src/screens/operations-workspace.jsx
+msgid "Total: {0}"
+msgstr "Total: {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Obtener aprobación"
+msgstr "Get approval"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ejecutando…"
+msgstr "Executing…"
+
+#: src/screens/operations-workspace.jsx
+msgid "Confirmar reembolso"
+msgstr "Confirm refund"
+
+#: src/screens/operations-workspace.jsx
+msgid "Operación de inventario confirmada."
+msgstr "Inventory operation committed."
+
+#: src/screens/operations-workspace.jsx
+msgid "Conteo reconciliado."
+msgstr "Count reconciled."
+
+#. placeholder {0}: row.title
+#: src/screens/operations-workspace.jsx
+msgid "Inventario: {0}"
+msgstr "Inventory: {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cargar datos autorizados"
+msgstr "Load authorized data"
+
+#: src/screens/operations-workspace.jsx
+msgid "Operación"
+msgstr "Operation"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ajuste"
+msgstr "Adjustment"
+
+#: src/screens/operations-workspace.jsx
+msgid "Merma"
+msgstr "Waste"
+
+#: src/screens/operations-workspace.jsx
+msgid "Daño"
+msgstr "Damage"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cuarentena"
+msgstr "Quarantine"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/settings.jsx
+msgid "Dirección"
+msgstr "Direction"
+
+#: src/screens/operations-workspace.jsx
+msgid "Aumentar"
+msgstr "Increase"
+
+#: src/screens/operations-workspace.jsx
+msgid "Reducir"
+msgstr "Decrease"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cantidad"
+msgstr "Quantity"
+
+#: src/screens/operations-workspace.jsx
+msgid "Revisar operación"
+msgstr "Review operation"
+
+#: src/screens/operations-workspace.jsx
+msgid "Confirmar operación"
+msgstr "Confirm operation"
+
+#: src/screens/operations-workspace.jsx
+msgid "Crear conteo del artículo"
+msgstr "Create item count"
+
+#: src/screens/operations-workspace.jsx
+msgid "Enviar conteo"
+msgstr "Submit count"
+
+#: src/screens/operations-workspace.jsx
+msgid "Reconciliar conteo"
+msgstr "Reconcile count"
+
+#. placeholder {0}: result.command.status
+#. placeholder {1}: result.command.commandId
+#: src/screens/operations-workspace.jsx
+msgid "COPIA en estado {0}. Referencia {1}."
+msgstr "COPY in status {0}. Reference {1}."
+
+#: src/screens/operations-workspace.jsx
+msgid "Reimpresión"
+msgstr "Reprint"
+
+#. placeholder {0}: row.publicReference
+#: src/screens/operations-workspace.jsx
+msgid "Reimprimir {0}"
+msgstr "Reprint {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Confirmo una copia controlada."
+msgstr "I confirm a controlled copy."
+
+#: src/screens/operations-workspace.jsx
+msgid "Crear COPIA"
+msgstr "Create COPY"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ajuste de puntos"
+msgstr "Points adjustment"
+
+#: src/screens/operations-workspace.jsx
+msgid "Puntos"
+msgstr "Points"
+
+#: src/screens/operations-workspace.jsx
+msgid "Revisar ajuste"
+msgstr "Review adjustment"
+
+#. placeholder {0}: planned.preview.projectedAvailable
+#: src/screens/operations-workspace.jsx
+msgid "Saldo proyectado: {0}"
+msgstr "Projected balance: {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Confirmar ajuste"
+msgstr "Confirm adjustment"
+
+#: src/screens/operations-workspace.jsx
+msgid "Emisión promocional"
+msgstr "Promotional issue"
+
+#: src/screens/operations-workspace.jsx
+msgid "Código de entrega única:"
+msgstr "One-time delivery code:"
+
+#: src/screens/operations-workspace.jsx
+msgid "Terminar"
+msgstr "Finish"
+
+#: src/screens/operations-workspace.jsx
+msgid "Importe en centavos"
+msgstr "Amount in cents"
+
+#: src/screens/operations-workspace.jsx
+msgid "Revisar emisión"
+msgstr "Review issue"
+
+#. placeholder {0}: planned.preview.maximumValueMinorUnits
+#: src/screens/operations-workspace.jsx
+msgid "Límite: {0}"
+msgstr "Limit: {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Emitir y revelar"
+msgstr "Issue and reveal"
+
+#: src/screens/operations-workspace.jsx
+msgid "Producto"
+msgstr "Product"
+
+#: src/screens/operations-workspace.jsx
+msgid "Editar producto"
+msgstr "Edit product"
+
+#: src/screens/operations-workspace.jsx
+msgid "Crear producto"
+msgstr "Create product"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cargar datos actuales"
+msgstr "Load current data"
+
+#: src/screens/operations-workspace.jsx
+msgid "Precio en centavos"
+msgstr "Price in cents"
+
+#: src/screens/operations-workspace.jsx
+msgid "Código de barras"
+msgstr "Barcode"
+
+#: src/screens/operations-workspace.jsx
+msgid "Categoría"
+msgstr "Category"
+
+#: src/screens/operations-workspace.jsx
+msgid "UUID opcional"
+msgstr "Optional UUID"
+
+#: src/screens/operations-workspace.jsx
+msgid "Requiere preparación"
+msgstr "Requires preparation"
+
+#: src/screens/operations-workspace.jsx
+msgid "Artículo de inventario"
+msgstr "Inventory item"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/staff.jsx
+msgid "Archivar"
+msgstr "Archive"
+
+#: src/screens/operations-workspace.jsx
+msgid "Registro"
+msgstr "Register"
+
+#: src/screens/operations-workspace.jsx
+msgid "Configurar registro"
+msgstr "Configure register"
+
+#: src/screens/operations-workspace.jsx
+msgid "Política"
+msgstr "Policy"
+
+#: src/screens/operations-workspace.jsx
+msgid "Dispositivo requerido"
+msgstr "Device required"
+
+#: src/screens/operations-workspace.jsx
+msgid "Selección del operador"
+msgstr "Operator selects"
+
+#: src/screens/operations-workspace.jsx
+msgid "Dispositivo POS asignado"
+msgstr "Assigned POS device"
+
+#: src/screens/operations-workspace.jsx
+msgid "Habilitado"
+msgstr "Enabled"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ruta de cocina"
+msgstr "Kitchen route"
+
+#: src/screens/operations-workspace.jsx
+msgid "Configurar ruta de cocina"
+msgstr "Configure kitchen route"
+
+#: src/screens/operations-workspace.jsx
+msgid "Estación"
+msgstr "Station"
+
+#: src/screens/operations-workspace.jsx
+msgid "UUID de estación"
+msgstr "Station UUID"
+
+#: src/screens/operations-workspace.jsx
+msgid "Predeterminada"
+msgstr "Default"
+
+#: src/screens/operations-workspace.jsx
+msgid "Objetivo"
+msgstr "Target"
+
+#: src/screens/operations-workspace.jsx
+msgid "UUID del objetivo"
+msgstr "Target UUID"
+
+#: src/screens/operations-workspace.jsx
+msgid "Prioridad"
+msgstr "Priority"
+
+#: src/screens/operations-workspace.jsx
+msgid "Guardar ruta"
+msgstr "Save route"
+
+#: src/screens/operations-workspace.jsx
+msgid "Comando original"
+msgstr "Original command"
+
+#: src/screens/operations-workspace.jsx
+msgid "Consultar el registro"
+msgstr "Look up the record"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ejecutar recuperación del dominio"
+msgstr "Run domain recovery"
+
+#: src/screens/operations-workspace.jsx
+msgid "Correlación"
+msgstr "Correlation"
+
+#: src/screens/operations-workspace.jsx
+msgid "Acción"
+msgstr "Action"
+
+#: src/screens/operations-workspace.jsx
+msgid "Usa la acción del dominio."
+msgstr "Use the domain action."
+
+#: src/screens/operations-workspace.jsx
+msgid "Consulta antes de repetir."
+msgstr "Check before retrying."
+
+#. placeholder {0}: formatOperationMoney(f.openingFloatMinorUnits, it.currency)
+#: src/screens/operations-workspace.jsx
+msgid "Fondo {0}"
+msgstr "Float {0}"
+
+#. placeholder {0}: formatOperationMoney(expected, it.currency)
+#: src/screens/operations-workspace.jsx
+msgid "Esperado <0>{0}</0>"
+msgstr "Expected <0>{0}</0>"
+
+#. placeholder {0}: formatOperationMoney(counted, it.currency)
+#: src/screens/operations-workspace.jsx
+msgid "Contado {0}"
+msgstr "Counted {0}"
+
+#. placeholder {0}: formatOperationMoney(variance, it.currency)
+#: src/screens/operations-workspace.jsx
+msgid "Diferencia {0}"
+msgstr "Variance {0}"
+
+#. placeholder {0}: selected?.requiredPermissions?.join(t` o `) || '—'
+#: src/screens/operations-workspace.jsx
+msgid "Permiso: {0}"
+msgstr "Permission: {0}"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/operations.jsx
+msgid " o "
+msgstr " or "
+
+#: src/screens/operations-workspace.jsx
+msgid "Configurar ruta"
+msgstr "Configure route"
+
+#: src/screens/operations-workspace.jsx
+msgid "Administrar"
+msgstr "Manage"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ubicación"
+msgstr "Location"
+
+#: src/screens/operations-workspace.jsx
+msgid "Todo el negocio"
+msgstr "Whole business"
+
+#. placeholder {0}: selected.requiredPermissions?.join(t` o `) || '—'
+#: src/screens/operations-workspace.jsx
+msgid "Requiere permiso: {0}"
+msgstr "Requires permission: {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "No fue posible cargar esta operación."
+msgstr "This operation could not be loaded."
+
+#: src/screens/operations-workspace.jsx
+msgid "Cargando datos autorizados…"
+msgstr "Loading authorized data…"
+
+#: src/screens/operations-workspace.jsx
+msgid "No hay datos para este alcance."
+msgstr "There is no data for this scope."
+
+#: src/screens/operations-workspace.jsx
+msgid "Referencia"
+msgstr "Reference"
+
+#: src/screens/operations-workspace.jsx
+msgid "Detalle"
+msgstr "Detail"
+
+#: src/screens/operations-workspace.jsx
+msgid "Importe"
+msgstr "Amount"
+
+#: src/screens/operations-workspace.jsx
+msgid "Fecha"
+msgstr "Date"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/staff.jsx
+msgid "Acciones"
+msgstr "Actions"
+
+#: src/screens/operations-workspace.jsx
+msgid "Reembolsar"
+msgstr "Refund"
+
+#: src/screens/operations-workspace.jsx
+msgid "Operar"
+msgstr "Operate"
+
+#: src/screens/operations-workspace.jsx
+msgid "Reimprimir"
+msgstr "Reprint"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ajustar"
+msgstr "Adjust"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/settings.jsx
+msgid "Editar"
+msgstr "Edit"
+
+#: src/screens/operations-workspace.jsx
+msgid "Configurar"
+msgstr "Configure"
+
+#: src/screens/operations-workspace.jsx
+msgid "Recuperar"
+msgstr "Recover"
+
+#. placeholder {0}: item.publicReference
+#: src/screens/operations-workspace.jsx
+msgid "Copiar referencia {0}"
+msgstr "Copy reference {0}"
+
+#. placeholder {0}: Math.floor(cursor / 20) + 1
+#: src/screens/operations-workspace.jsx
+msgid "Página {0}"
+msgstr "Page {0}"
+
+#. placeholder {0}: permissions.length
+#: src/screens/operations-workspace.jsx
+msgid "{0, plural, one {# permiso efectivo} other {# permisos efectivos}}"
+msgstr "{0, plural, one {# effective permission} other {# effective permissions}}"
+
+#: src/screens/operations.jsx
+msgid "Vista puente. Cada dominio se está moviendo a su propia sección. La API mantiene la autoridad; el Dashboard muestra datos seguros y acciones autorizadas."
+msgstr "Bridge view. Each domain is moving to its own section. The API keeps the authority; the Dashboard shows safe data and authorized actions."
+
+#: src/screens/operations.jsx
+msgid "Dominios operativos"
+msgstr "Operational domains"
+
+#. placeholder {0}: item.requiredPermissions.join(t` o `)
+#: src/screens/operations.jsx
+msgid "Requiere {0}"
+msgstr "Requires {0}"
+
+#: src/screens/orders.jsx
+msgid "Nuevo"
+msgstr "New"
+
+#: src/screens/orders.jsx
+msgid "Preparando"
+msgstr "Preparing"
+
+#: src/screens/orders.jsx
+msgctxt "order status"
+msgid "Listo"
+msgstr "Ready"
+
+#: src/screens/orders.jsx
+msgid "Nuevos"
+msgstr "New"
+
+#: src/screens/orders.jsx
+msgid "En preparación"
+msgstr "In preparation"
+
+#: src/screens/orders.jsx
+msgid "Listos"
+msgstr "Ready"
+
+#: src/screens/orders.jsx
+msgid "Completados"
+msgstr "Completed"
+
+#: src/screens/orders.jsx
+#: src/screens/overview.jsx
+msgid "Cancelados"
+msgstr "Canceled"
+
+#: src/screens/orders.jsx
+msgid "Activos"
+msgstr "Active"
+
+#: src/screens/orders.jsx
+msgid "Consola"
+msgstr "Console"
+
+#. placeholder {0}: displayed.length
+#: src/screens/orders.jsx
+msgid "{0} de {totalToday} mostrados."
+msgstr "{0} of {totalToday} shown."
+
+#: src/screens/orders.jsx
+msgid "hoy"
+msgstr "today"
+
+#: src/screens/orders.jsx
+msgid "Ticket promedio"
+msgstr "Average ticket"
+
+#: src/screens/orders.jsx
+msgid "Cancelaciones"
+msgstr "Cancellations"
+
+#: src/screens/orders.jsx
+msgid "Origen"
+msgstr "Source"
+
+#: src/screens/orders.jsx
+msgid "Sin pedidos"
+msgstr "No orders"
+
+#: src/screens/orders.jsx
+msgid "No hay pedidos en este filtro."
+msgstr "There are no orders in this filter."
+
+#: src/screens/orders.jsx
+msgid "Ref."
+msgstr "Ref."
+
+#: src/screens/orders.jsx
+msgid "Artículos"
+msgstr "Items"
+
+#: src/screens/orders.jsx
+msgid "Total"
+msgstr "Total"
+
+#: src/screens/orders.jsx
+msgid "Hace"
+msgstr "Ago"
+
+#: src/screens/orders.jsx
+msgid "Detalle del pedido"
+msgstr "Order detail"
+
+#: src/screens/orders.jsx
+msgid "Pedido · {channelLabel}"
+msgstr "Order · {channelLabel}"
+
+#: src/screens/orders.jsx
+msgid "Cliente"
+msgstr "Customer"
+
+#. placeholder {0}: order.pickup_person
+#: src/screens/orders.jsx
+msgid "Recoge: {0}"
+msgstr "Pickup: {0}"
+
+#: src/screens/orders.jsx
+msgid "No hay artículos disponibles para este pedido."
+msgstr "There are no items available for this order."
+
+#: src/screens/orders.jsx
+msgid "Avanzar estado"
+msgstr "Advance status"
+
+#: src/screens/overview.jsx
+msgid "Ingresos del mes"
+msgstr "Revenue this month"
+
+#: src/screens/overview.jsx
+msgid "Visitas hoy"
+msgstr "Visits today"
+
+#: src/screens/overview.jsx
+msgid "Tarjetas de regalo abiertas"
+msgstr "Open gift cards"
+
+#: src/screens/overview.jsx
+msgid "Recompensas canjeadas · 7d"
+msgstr "Rewards redeemed · 7d"
+
+#: src/screens/overview.jsx
+msgid "Pedidos WhatsApp pausados"
+msgstr "WhatsApp orders paused"
+
+#: src/screens/overview.jsx
+msgid "Pausado · aviso especial activo"
+msgstr "Paused · special notice active"
+
+#: src/screens/overview.jsx
+msgid "Reanudar"
+msgstr "Resume"
+
+#: src/screens/overview.jsx
+msgid "Pausar"
+msgstr "Pause"
+
+#: src/screens/overview.jsx
+msgid "Inscritos en el programa de lealtad"
+msgstr "Enrolled in the loyalty program"
+
+#: src/screens/overview.jsx
+msgid "Sin cambio calculado"
+msgstr "No change calculated"
+
+#: src/screens/overview.jsx
+msgid "28 días"
+msgstr "28 days"
+
+#. placeholder {0}: formatNumber(ov.newThisWeek)
+#: src/screens/overview.jsx
+msgid "+{0} nuevos esta semana"
+msgstr "+{0} new this week"
+
+#: src/screens/overview.jsx
+msgid "Nuevos sin calcular"
+msgstr "New not calculated"
+
+#. placeholder {0}: ov.birthdayActivatable
+#: src/screens/overview.jsx
+msgid "{0} cumpleaños activables"
+msgstr "{0} birthdays activatable"
+
+#: src/screens/overview.jsx
+msgid "Cumpleaños sin calcular"
+msgstr "Birthdays not calculated"
+
+#. placeholder {0}: ov.highBalanceCount
+#: src/screens/overview.jsx
+msgid "{0} con saldo > $1,000"
+msgstr "{0} with balance > $1,000"
+
+#: src/screens/overview.jsx
+msgid "Saldos altos sin calcular"
+msgstr "High balances not calculated"
+
+#: src/screens/overview.jsx
+msgid "sin comparar"
+msgstr "no comparison"
+
+#: src/screens/overview.jsx
+msgid "Estaciones de cocina"
+msgstr "Kitchen stations"
+
+#: src/screens/overview.jsx
+msgid "Cada estación del KDS y cómo responde ahora."
+msgstr "Every KDS station and how it responds right now."
+
+#: src/screens/overview.jsx
+msgid "estaciones"
+msgstr "stations"
+
+#: src/screens/overview.jsx
+msgid "Actualizar las estaciones"
+msgstr "Refresh the stations"
+
+#: src/screens/overview.jsx
+msgid "cerrado"
+msgstr "closed"
+
+#: src/screens/overview.jsx
+msgid "abiertos"
+msgstr "open"
+
+#: src/screens/overview.jsx
+msgid "Centro de acción"
+msgstr "Action center"
+
+#: src/screens/overview.jsx
+msgid "Nada pendiente ahora mismo."
+msgstr "Nothing pending right now."
+
+#. placeholder {0}: alerts.length
+#: src/screens/overview.jsx
+msgid "{0, plural, one {# pendiente.} other {# pendientes.}}"
+msgstr "{0, plural, one {# pending.} other {# pending.}}"
+
+#: src/screens/overview.jsx
+msgid "Ver pedidos"
+msgstr "View orders"
+
+#: src/screens/overview.jsx
+msgid "Sin alertas operativas."
+msgstr "No operational alerts."
+
+#: src/screens/overview.jsx
+msgid "Escaneo cada 60 s · última verificación {nowLabel}"
+msgstr "Scan every 60 s · last check {nowLabel}"
+
+#: src/screens/overview.jsx
+msgid "Re-escanear"
+msgstr "Rescan"
+
+#: src/screens/overview.jsx
+msgid "Hoy · ConversaFlow"
+msgstr "Today · ConversaFlow"
+
+#: src/screens/overview.jsx
+msgid "Pedidos WhatsApp"
+msgstr "WhatsApp orders"
+
+#. placeholder {0}: ov.avgTicketMXN
+#: src/screens/overview.jsx
+msgid "pedidos · ticket promedio $ {0}"
+msgstr "orders · average ticket $ {0}"
+
+#: src/screens/overview.jsx
+msgid "pedidos · ticket promedio sin calcular"
+msgstr "orders · average ticket not calculated"
+
+#: src/screens/overview.jsx
+msgid "Aceptados"
+msgstr "Accepted"
+
+#: src/screens/overview.jsx
+msgid "Hoy · Umi Cash"
+msgstr "Today · Umi Cash"
+
+#: src/screens/overview.jsx
+msgid "Actividad del monedero"
+msgstr "Wallet activity"
+
+#: src/screens/overview.jsx
+msgid "MXN procesado hoy"
+msgstr "MXN processed today"
+
+#: src/screens/overview.jsx
+msgid "Recargas"
+msgstr "Top-ups"
+
+#: src/screens/overview.jsx
+msgid "Canjes"
+msgstr "Redemptions"
+
+#: src/screens/overview.jsx
+msgid "EN VIVO"
+msgstr "LIVE"
+
+#: src/screens/products-billing.jsx
+msgid "La consola del dueño: cambiar de café, elegir sucursal y administrar la cuenta."
+msgstr "The owner console: switch cafés, pick a location, and manage the account."
+
+#: src/screens/products-billing.jsx
+msgid "Conversaciones de WhatsApp, pedidos automáticos, horarios y flujo de trabajo."
+msgstr "WhatsApp conversations, automated orders, hours, and workflow."
+
+#: src/screens/products-billing.jsx
+msgid "Comandas de cocina, estaciones, alta de dispositivos y cambios de estado."
+msgstr "Kitchen tickets, stations, device enrollment, and status changes."
+
+#: src/screens/products-billing.jsx
+msgid "Pases en Wallet, clientes del programa, sellos, abonos y tarjetas de regalo."
+msgstr "Wallet passes, program customers, stamps, top-ups, and gift cards."
+
+#: src/screens/products-billing.jsx
+msgid "Observabilidad"
+msgstr "Observability"
+
+#: src/screens/products-billing.jsx
+msgid "Registros de operación, trazas, diagnóstico y revisión de soporte."
+msgstr "Operation logs, traces, diagnostics, and support review."
+
+#: src/screens/products-billing.jsx
+#: src/screens/profile.jsx
+msgid "Activo"
+msgstr "Active"
+
+#: src/screens/products-billing.jsx
+msgid "En prueba"
+msgstr "Trialing"
+
+#: src/screens/products-billing.jsx
+msgid "Pago pendiente"
+msgstr "Payment due"
+
+#: src/screens/products-billing.jsx
+#: src/screens/settings.jsx
+msgid "En pausa"
+msgstr "Paused"
+
+#: src/screens/products-billing.jsx
+msgid "Sin contratar"
+msgstr "Not purchased"
+
+#: src/screens/products-billing.jsx
+msgid "Sin este producto activo, la consola no muestra controles para operarlo."
+msgstr "Without this product active, the console shows no controls to operate it."
+
+#: src/screens/products-billing.jsx
+msgid "este café"
+msgstr "this café"
+
+#: src/screens/products-billing.jsx
+msgid "Productos de {merchantName}"
+msgstr "Products for {merchantName}"
+
+#: src/screens/products-billing.jsx
+msgid "Un producto activo decide qué secciones existen en la consola. El rol de cada persona decide qué puede hacer dentro de ellas — pero un rol no activa un producto que falta."
+msgstr "An active product decides which sections exist in the console. Each person's role decides what they can do inside them — but a role does not activate a missing product."
+
+#: src/screens/profile.jsx
+#: src/shell.jsx
+msgid "Dueño"
+msgstr "Owner"
+
+#: src/screens/profile.jsx
+msgid "Administrador"
+msgstr "Administrator"
+
+#: src/screens/profile.jsx
+msgid "Encargado"
+msgstr "Manager"
+
+#: src/screens/profile.jsx
+msgid "Personal"
+msgstr "Staff"
+
+#: src/screens/profile.jsx
+msgid "Solo lectura"
+msgstr "Read only"
+
+#: src/screens/profile.jsx
+msgid "Super administrador"
+msgstr "Super administrator"
+
+#: src/screens/profile.jsx
+msgid "Desarrollador"
+msgstr "Developer"
+
+#: src/screens/profile.jsx
+msgid "Correo y contraseña"
+msgstr "Email and password"
+
+#: src/screens/profile.jsx
+msgid "No hay una sesión activa."
+msgstr "No active session."
+
+#: src/screens/profile.jsx
+#: src/shell.jsx
+msgid "Cerrar sesión"
+msgstr "Sign out"
+
+#: src/screens/profile.jsx
+msgid "Tu cuenta"
+msgstr "Your account"
+
+#: src/screens/profile.jsx
+msgid "ID de usuario"
+msgstr "User ID"
+
+#: src/screens/profile.jsx
+msgid "Acceso en este café"
+msgstr "Access at this café"
+
+#: src/screens/profile.jsx
+#: src/screens/staff.jsx
+msgid "Rol"
+msgstr "Role"
+
+#: src/screens/profile.jsx
+msgid "Permisos"
+msgstr "Permissions"
+
+#: src/screens/profile.jsx
+msgid "Todos los permisos"
+msgstr "All permissions"
+
+#: src/screens/profile.jsx
+msgid "Sin permisos asignados"
+msgstr "No permissions assigned"
+
+#: src/screens/profile.jsx
+msgid "Selecciona un café para ver tu acceso."
+msgstr "Select a café to see your access."
+
+#: src/screens/profile.jsx
+msgid "Tus negocios"
+msgstr "Your businesses"
+
+#: src/screens/profile.jsx
+msgid "No perteneces a ningún negocio todavía."
+msgstr "You do not belong to any business yet."
+
+#: src/screens/profile.jsx
+msgid "Sesión"
+msgstr "Session"
+
+#: src/screens/profile.jsx
+msgid "Método de acceso"
+msgstr "Sign-in method"
+
+#: src/screens/profile.jsx
+msgid "La sesión se renueva"
+msgstr "Session renews"
+
+#: src/screens/reset-password.jsx
+msgid "Las contraseñas no coinciden"
+msgstr "The passwords do not match"
+
+#: src/screens/reset-password.jsx
+msgid "Mínimo 8 caracteres"
+msgstr "At least 8 characters"
+
+#: src/screens/reset-password.jsx
+msgid "El enlace de recuperación no es válido"
+msgstr "The recovery link is not valid"
+
+#: src/screens/reset-password.jsx
+msgid "Error al reestablecer la contraseña"
+msgstr "Error while resetting the password"
+
+#: src/screens/reset-password.jsx
+msgid "Contraseña actualizada"
+msgstr "Password updated"
+
+#: src/screens/reset-password.jsx
+msgid "Tu contraseña fue reestablecida correctamente. Ya puedes iniciar sesión."
+msgstr "Your password was reset successfully. You can sign in now."
+
+#: src/screens/reset-password.jsx
+msgid "Ir al inicio de sesión"
+msgstr "Go to sign in"
+
+#: src/screens/reset-password.jsx
+msgid "Nueva contraseña"
+msgstr "New password"
+
+#: src/screens/reset-password.jsx
+msgid "Elige una nueva contraseña para tu cuenta."
+msgstr "Choose a new password for your account."
+
+#: src/screens/reset-password.jsx
+msgid "Verificando enlace de recuperación…"
+msgstr "Verifying recovery link…"
+
+#: src/screens/reset-password.jsx
+msgid "Confirmar contraseña"
+msgstr "Confirm password"
+
+#: src/screens/reset-password.jsx
+msgid "Repite la contraseña"
+msgstr "Repeat the password"
+
+#: src/screens/reset-password.jsx
+msgid "Guardar contraseña"
+msgstr "Save password"
+
+#: src/screens/settings.jsx
+msgid "Casual"
+msgstr "Casual"
+
+#: src/screens/settings.jsx
+msgid "Amigable"
+msgstr "Friendly"
+
+#: src/screens/settings.jsx
+msgid "Formal"
+msgstr "Formal"
+
+#: src/screens/settings.jsx
+msgid "Activa"
+msgstr "Active"
+
+#: src/screens/settings.jsx
+msgid "En periodo de prueba"
+msgstr "In trial period"
+
+#: src/screens/settings.jsx
+msgid "Con pago pendiente"
+msgstr "Payment due"
+
+#: src/screens/settings.jsx
+msgid "Cancelada"
+msgstr "Canceled"
+
+#: src/screens/settings.jsx
+msgid "Regalo de cumpleaños"
+msgstr "Birthday gift"
+
+#: src/screens/settings.jsx
+msgid "Recompensa de temporada"
+msgstr "Seasonal reward"
+
+#: src/screens/settings.jsx
+msgid "Cargando ajustes…"
+msgstr "Loading settings…"
+
+#: src/screens/settings.jsx
+msgid "Sin datos de configuración."
+msgstr "No configuration data."
+
+#: src/screens/settings.jsx
+msgid "Cambios guardados"
+msgstr "Changes saved"
+
+#: src/screens/settings.jsx
+msgid "Los cambios de Cash se guardan solo porque Umi Cash está activo."
+msgstr "Cash changes are saved only because Umi Cash is active."
+
+#: src/screens/settings.jsx
+msgid "Cash no está activo: solo se guardan ajustes de negocio y operación."
+msgstr "Cash is not active: only business and operation settings are saved."
+
+#: src/screens/settings.jsx
+msgid "Información del negocio"
+msgstr "Business information"
+
+#: src/screens/settings.jsx
+msgid "Nombre del negocio"
+msgstr "Business name"
+
+#: src/screens/settings.jsx
+msgid "Ciudad"
+msgstr "City"
+
+#: src/screens/settings.jsx
+msgid "Estado de la cuenta"
+msgstr "Account status"
+
+#: src/screens/settings.jsx
+msgid "Se administra en Productos y facturación"
+msgstr "Managed under Products and billing"
+
+#: src/screens/settings.jsx
+msgid "Sin dirección publicada"
+msgstr "No published address"
+
+#: src/screens/settings.jsx
+msgid "Copiar dirección"
+msgstr "Copy address"
+
+#: src/screens/settings.jsx
+msgid "Prefijo de tarjeta"
+msgstr "Card prefix"
+
+#: src/screens/settings.jsx
+msgid "No disponible sin Umi Cash"
+msgstr "Not available without Umi Cash"
+
+#: src/screens/settings.jsx
+msgid "ID de cuenta"
+msgstr "Account ID"
+
+#: src/screens/settings.jsx
+msgid "Voz y tono del asistente"
+msgstr "Assistant voice and tone"
+
+#: src/screens/settings.jsx
+msgid "Cómo saluda y responde el asistente en WhatsApp."
+msgstr "How the assistant greets and replies on WhatsApp."
+
+#: src/screens/settings.jsx
+msgid "Tono · cómo le habla el asistente a tus clientes"
+msgstr "Tone · how the assistant speaks to your customers"
+
+#: src/screens/settings.jsx
+msgid "Usando tono personalizado — anula el chip seleccionado."
+msgstr "Using a custom tone — it overrides the selected chip."
+
+#: src/screens/settings.jsx
+msgid "Nombre del asistente · opcional"
+msgstr "Assistant name · optional"
+
+#: src/screens/settings.jsx
+msgid "Asistente"
+msgstr "Assistant"
+
+#: src/screens/settings.jsx
+msgid "Tono personalizado · opcional (anula el chip)"
+msgstr "Custom tone · optional (overrides the chip)"
+
+#: src/screens/settings.jsx
+msgid "Ej. relajado, con modismos del norte"
+msgstr "E.g. relaxed, with northern slang"
+
+#: src/screens/settings.jsx
+msgid "Notas de estilo · una por línea (máx. 8)"
+msgstr "Style notes · one per line (max. 8)"
+
+#: src/screens/settings.jsx
+msgid "Sin Umi Cash no hay monedero, lealtad, tarjetas de regalo ni pase en Wallet."
+msgstr "Without Umi Cash there is no wallet, loyalty, gift cards, or Wallet pass."
+
+#: src/screens/settings.jsx
+msgid "Sin activar"
+msgstr "Not active"
+
+#: src/screens/settings.jsx
+msgid "La configuración de pase en Wallet, sellos, recompensas, miembros y tarjetas de regalo queda oculta hasta activar Umi Cash."
+msgstr "Wallet pass, stamps, rewards, members, and gift card settings stay hidden until Umi Cash is active."
+
+#: src/screens/settings.jsx
+msgid "Apariencia de la tarjeta"
+msgstr "Card appearance"
+
+#: src/screens/settings.jsx
+msgid "Cómo se ve la tarjeta del cliente en Apple Wallet y Google Wallet."
+msgstr "How the customer's card looks in Apple Wallet and Google Wallet."
+
+#. placeholder {0}: c.toFixed(1)
+#: src/screens/settings.jsx
+msgid "El texto blanco de la tarjeta queda en {0}:1 sobre este color."
+msgstr "The card's white text sits at {0}:1 on this color."
+
+#: src/screens/settings.jsx
+msgid "Tu cliente casi no podrá leer su saldo."
+msgstr "Your customer will barely be able to read their balance."
+
+#: src/screens/settings.jsx
+msgid "Un color más oscuro se lee mejor en la mano."
+msgstr "A darker color reads better in the hand."
+
+#: src/screens/settings.jsx
+msgid "Color secundario · acentos y detalles"
+msgstr "Secondary color · accents and details"
+
+#: src/screens/settings.jsx
+msgid "Recompensas por sellos"
+msgstr "Stamp rewards"
+
+#: src/screens/settings.jsx
+msgid "Premios por sellos"
+msgstr "Prizes for stamps"
+
+#: src/screens/settings.jsx
+msgid "Nombre del premio · lo ve el cliente"
+msgstr "Prize name · the customer sees it"
+
+#: src/screens/settings.jsx
+msgid "Visitas necesarias"
+msgstr "Visits required"
+
+#: src/screens/settings.jsx
+msgid "Costo del premio · MXN"
+msgstr "Prize cost · MXN"
+
+#: src/screens/settings.jsx
+msgid "Vista previa"
+msgstr "Preview"
+
+#: src/screens/settings.jsx
+msgid "Pase de Apple Wallet"
+msgstr "Apple Wallet pass"
+
+#: src/screens/settings.jsx
+msgid "Sellos máximos"
+msgstr "Maximum stamps"
+
+#: src/screens/settings.jsx
+msgid "Sellos máximos en la tarjeta"
+msgstr "Maximum stamps on the card"
+
+#: src/screens/settings.jsx
+msgid "Boost de cumpleaños"
+msgstr "Birthday boost"
+
+#: src/screens/settings.jsx
+msgid "Un premio que se emite solo el día del cumpleaños del cliente."
+msgstr "A prize issued only on the customer's birthday."
+
+#: src/screens/settings.jsx
+msgid "Nombre del premio · se emite solo en el cumpleaños"
+msgstr "Prize name · issued only on the birthday"
+
+#: src/screens/settings.jsx
+msgid "Se envía solo a las 09:00 (hora local) y vale 7 días. El cliente recibe un aviso por WhatsApp."
+msgstr "It is sent automatically at 09:00 (local time) and is valid for 7 days. The customer gets a WhatsApp notice."
+
+#: src/screens/settings.jsx
+msgid "Promoción del momento"
+msgstr "Current promotion"
+
+#: src/screens/settings.jsx
+msgid "Mensaje · se envía por WhatsApp · máx. 200 caracteres"
+msgstr "Message · sent over WhatsApp · max. 200 characters"
+
+#: src/screens/settings.jsx
+msgid "Vigencia · desde / hasta"
+msgstr "Validity · from / to"
+
+#: src/screens/settings.jsx
+msgid "Inicio de la vigencia"
+msgstr "Validity start"
+
+#: src/screens/settings.jsx
+msgid "Fin de la vigencia"
+msgstr "Validity end"
+
+#: src/screens/settings.jsx
+msgid "Días de la semana"
+msgstr "Days of the week"
+
+#: src/screens/settings.jsx
+msgid "Alta de clientes"
+msgstr "Customer sign-up"
+
+#: src/screens/settings.jsx
+msgid "Autorregistro"
+msgstr "Self-registration"
+
+#: src/screens/settings.jsx
+msgid "El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda del personal."
+msgstr "The customer joins the loyalty program by scanning a QR code at the table, without staff help."
+
+#: src/screens/settings.jsx
+msgid "Vista previa del pase de Wallet"
+msgstr "Wallet pass preview"
+
+#: src/screens/settings.jsx
+msgid "SALDO"
+msgstr "BALANCE"
+
+#: src/screens/settings.jsx
+msgid "VISITAS FALTANTES"
+msgstr "VISITS REMAINING"
+
+#: src/screens/settings.jsx
+msgid "{remaining, plural, one {# visita} other {# visitas}}"
+msgstr "{remaining, plural, one {# visit} other {# visits}}"
+
+#: src/screens/settings.jsx
+msgid "TIPO DE RECOMPENSA"
+msgstr "REWARD TYPE"
+
+#: src/screens/settings.jsx
+msgid "REGALO DE CUMPLEAÑOS"
+msgstr "BIRTHDAY GIFT"
+
+#: src/screens/settings.jsx
+msgid "Sucursales"
+msgstr "Locations"
+
+#: src/screens/settings.jsx
+msgid "Los locales de este café. Cada uno tiene su propio horario."
+msgstr "This café's locations. Each one has its own hours."
+
+#: src/screens/settings.jsx
+msgid "Agregar sucursal"
+msgstr "Add location"
+
+#: src/screens/settings.jsx
+msgid "No se pudo agregar la sucursal."
+msgstr "The location could not be added."
+
+#: src/screens/settings.jsx
+msgid "Agregar una sucursal"
+msgstr "Add a location"
+
+#: src/screens/settings.jsx
+msgid "Chapultepec"
+msgstr "Chapultepec"
+
+#: src/screens/settings.jsx
+msgid "Agregando…"
+msgstr "Adding…"
+
+#: src/screens/settings.jsx
+msgid "Av. Chapultepec 1, Guadalajara"
+msgstr "Av. Chapultepec 1, Guadalajara"
+
+#: src/screens/settings.jsx
+msgid "Buscando…"
+msgstr "Searching…"
+
+#: src/screens/settings.jsx
+msgid "Buscar"
+msgstr "Search"
+
+#: src/screens/settings.jsx
+msgid "Pin"
+msgstr "Pin"
+
+#: src/screens/settings.jsx
+msgid "Latitud"
+msgstr "Latitude"
+
+#: src/screens/settings.jsx
+msgid "Longitud"
+msgstr "Longitude"
+
+#: src/screens/settings.jsx
+msgid "No encontramos esa dirección. Puedes escribir el pin a mano."
+msgstr "We could not find that address. You can type the pin by hand."
+
+#: src/screens/settings.jsx
+msgid "No se pudo buscar ahora. Puedes escribir el pin a mano."
+msgstr "The search is unavailable right now. You can type the pin by hand."
+
+#: src/screens/settings.jsx
+msgid "No se pudo guardar. Reintenta."
+msgstr "It could not be saved. Retry."
+
+#: src/screens/settings.jsx
+msgid "Nombre de la sucursal"
+msgstr "Location name"
+
+#: src/screens/settings.jsx
+msgid "Abierta"
+msgstr "Open"
+
+#: src/screens/settings.jsx
+msgid "Cerrada"
+msgstr "Closed"
+
+#: src/screens/settings.jsx
+msgid "Sin dirección"
+msgstr "No address"
+
+#: src/screens/settings.jsx
+msgid "Sin guardar"
+msgstr "Unsaved"
+
+#: src/screens/settings.jsx
+msgid "✓ Guardado"
+msgstr "✓ Saved"
+
+#: src/screens/settings.jsx
+msgid "Reintentar"
+msgstr "Retry"
+
+#: src/screens/settings.jsx
+msgid "Apodos (cómo la llaman los clientes)"
+msgstr "Nicknames (what customers call it)"
+
+#: src/screens/settings.jsx
+msgid "Quitar {a}"
+msgstr "Remove {a}"
+
+#: src/screens/settings.jsx
+msgid "+ apodo"
+msgstr "+ nickname"
+
+#: src/screens/settings.jsx
+msgid "Descripción (zona / referencia)"
+msgstr "Description (area / landmark)"
+
+#: src/screens/settings.jsx
+msgid "p. ej. la del centro, junto al parque"
+msgstr "e.g. the downtown one, next to the park"
+
+#: src/screens/staff.jsx
+#: src/shell.jsx
+msgid "Admin"
+msgstr "Admin"
+
+#: src/screens/staff.jsx
+msgid "Barista"
+msgstr "Barista"
+
+#: src/screens/staff.jsx
+msgid "Secciones de equipo y acceso"
+msgstr "Team and access sections"
+
+#: src/screens/staff.jsx
+msgid "Personas"
+msgstr "People"
+
+#: src/screens/staff.jsx
+msgid "Roles y permisos"
+msgstr "Roles and permissions"
+
+#: src/screens/staff.jsx
+msgid "Equipo y acceso al POS"
+msgstr "Team and POS access"
+
+#. placeholder {0}: activeStaff.filter((person) => person.role === 'ADMIN').length
+#: src/screens/staff.jsx
+msgid "{0} con rol Admin."
+msgstr "{0} with the Admin role."
+
+#: src/screens/staff.jsx
+msgid "Define lo que cada rol puede hacer en el POS y el Dashboard."
+msgstr "Define what each role can do in the POS and the Dashboard."
+
+#: src/screens/staff.jsx
+msgid "personas"
+msgstr "people"
+
+#: src/screens/staff.jsx
+msgid "roles"
+msgstr "roles"
+
+#: src/screens/staff.jsx
+msgid "Filtrar el equipo por rol"
+msgstr "Filter the team by role"
+
+#: src/screens/staff.jsx
+msgid "Añadir persona"
+msgstr "Add person"
+
+#: src/screens/staff.jsx
+msgid "No hay personas activas en el equipo."
+msgstr "There are no active people on the team."
+
+#. placeholder {0}: roles.find((role) => role.id === filter)?.name || ''
+#: src/screens/staff.jsx
+msgid "No hay personas con el rol {0}."
+msgstr "There are no people with the role {0}."
+
+#: src/screens/staff.jsx
+msgid "Persona"
+msgstr "Person"
+
+#: src/screens/staff.jsx
+msgid "Acceso al POS"
+msgstr "POS access"
+
+#: src/screens/staff.jsx
+msgid "Desde"
+msgstr "Since"
+
+#: src/screens/staff.jsx
+msgid "Sin correo"
+msgstr "No email"
+
+#: src/screens/staff.jsx
+msgid "PIN configurado"
+msgstr "PIN set"
+
+#: src/screens/staff.jsx
+msgid "Sin PIN"
+msgstr "No PIN"
+
+#. placeholder {0}: person.name
+#: src/screens/staff.jsx
+msgid "Administrar acceso de {0}"
+msgstr "Manage access for {0}"
+
+#: src/screens/staff.jsx
+msgid "Solo el propietario puede administrar un acceso Admin."
+msgstr "Only the owner can manage an Admin access."
+
+#: src/screens/staff.jsx
+msgid "Administrar rol y PIN"
+msgstr "Manage role and PIN"
+
+#. placeholder {0}: person.name
+#: src/screens/staff.jsx
+msgid "Desactivar a {0}"
+msgstr "Deactivate {0}"
+
+#: src/screens/staff.jsx
+msgid "Desactivar acceso"
+msgstr "Deactivate access"
+
+#: src/screens/staff.jsx
+msgid "No se pudo desactivar el acceso."
+msgstr "The access could not be deactivated."
+
+#: src/screens/staff.jsx
+msgid "Nuevo rol"
+msgstr "New role"
+
+#: src/screens/staff.jsx
+msgid "Configura los permisos de este rol."
+msgstr "Configure this role's permissions."
+
+#: src/screens/staff.jsx
+msgid "No se pudo crear el rol."
+msgstr "The role could not be created."
+
+#: src/screens/staff.jsx
+msgid "Roles del comercio"
+msgstr "Business roles"
+
+#: src/screens/staff.jsx
+msgid "Crear un rol"
+msgstr "Create a role"
+
+#: src/screens/staff.jsx
+msgid "Solo el propietario puede crear roles."
+msgstr "Only the owner can create roles."
+
+#. placeholder {0}: role.assignedCount
+#: src/screens/staff.jsx
+msgid "{0, plural, one {# persona} other {# personas}}"
+msgstr "{0, plural, one {# person} other {# people}}"
+
+#. placeholder {0}: role.permissionKeys.length
+#: src/screens/staff.jsx
+msgid "{0, plural, one {# permiso} other {# permisos}}"
+msgstr "{0, plural, one {# permission} other {# permissions}}"
+
+#: src/screens/staff.jsx
+msgid "No hay roles disponibles."
+msgstr "There are no roles available."
+
+#: src/screens/staff.jsx
+msgid "No se pudo guardar el rol."
+msgstr "The role could not be saved."
+
+#: src/screens/staff.jsx
+msgid "No se pudo archivar el rol."
+msgstr "The role could not be archived."
+
+#: src/screens/staff.jsx
+msgid "Nombre del rol"
+msgstr "Role name"
+
+#: src/screens/staff.jsx
+msgid "Descripción del rol"
+msgstr "Role description"
+
+#. placeholder {0}: role.assignedCount
+#: src/screens/staff.jsx
+msgid "{0, plural, one {# persona afectada} other {# personas afectadas}}"
+msgstr "{0, plural, one {# person affected} other {# people affected}}"
+
+#. placeholder {0}: role.revision
+#: src/screens/staff.jsx
+msgid "Revisión {0}"
+msgstr "Revision {0}"
+
+#. placeholder {0}: role.sourceTemplateKey
+#: src/screens/staff.jsx
+msgid "Plantilla {0}"
+msgstr "Template {0}"
+
+#: src/screens/staff.jsx
+msgid "El rol Owner está protegido."
+msgstr "The Owner role is protected."
+
+#: src/screens/staff.jsx
+msgid "Filtrar permisos por producto"
+msgstr "Filter permissions by product"
+
+#: src/screens/staff.jsx
+msgid "Reasigna al equipo antes de archivar."
+msgstr "Reassign the team before archiving."
+
+#: src/screens/staff.jsx
+msgid "Guardar rol"
+msgstr "Save role"
+
+#: src/screens/staff.jsx
+msgid "Seleccionar el rol"
+msgstr "Select the role"
+
+#: src/screens/staff.jsx
+msgid "Solo el propietario puede asignar este rol."
+msgstr "Only the owner can assign this role."
+
+#: src/screens/staff.jsx
+msgid "Los permisos del rol se administran en Roles y permisos."
+msgstr "Role permissions are managed under Roles and permissions."
+
+#: src/screens/staff.jsx
+msgid "PIN del POS (opcional)"
+msgstr "POS PIN (optional)"
+
+#: src/screens/staff.jsx
+msgid "PIN activo"
+msgstr "PIN active"
+
+#: src/screens/staff.jsx
+msgid "4 a 8 dígitos"
+msgstr "4 to 8 digits"
+
+#: src/screens/staff.jsx
+msgid "Confirmar el PIN"
+msgstr "Confirm the PIN"
+
+#: src/screens/staff.jsx
+msgid "El Dashboard nunca muestra un PIN guardado."
+msgstr "The Dashboard never shows a saved PIN."
+
+#: src/screens/staff.jsx
+msgid "No se pudo añadir a la persona."
+msgstr "The person could not be added."
+
+#: src/screens/staff.jsx
+msgid "Añadir una persona"
+msgstr "Add a person"
+
+#: src/screens/staff.jsx
+msgid "Nombre completo"
+msgstr "Full name"
+
+#: src/screens/staff.jsx
+msgid "María García"
+msgstr "María García"
+
+#: src/screens/staff.jsx
+msgid "El PIN debe tener de 4 a 8 dígitos y debe coincidir."
+msgstr "The PIN must have 4 to 8 digits and must match."
+
+#: src/screens/staff.jsx
+msgid "No se pudo guardar el acceso."
+msgstr "The access could not be saved."
+
+#: src/screens/staff.jsx
+msgid "No se pudo quitar el PIN."
+msgstr "The PIN could not be removed."
+
+#: src/screens/staff.jsx
+msgid "Nombre de la persona"
+msgstr "Person's name"
+
+#: src/screens/staff.jsx
+msgid "Administrar acceso al POS"
+msgstr "Manage POS access"
+
+#: src/screens/staff.jsx
+msgid "Quitar el PIN actual"
+msgstr "Remove the current PIN"
+
+#: src/screens/staff.jsx
+msgid "Escribe el nombre de la persona."
+msgstr "Enter the person's name."
+
+#: src/screens/staff.jsx
+msgid "Guardar acceso"
+msgstr "Save access"
+
+#. placeholder {0}: THEME_NAME[resolveTheme('system')]
+#: src/shell.jsx
+#~ msgid "Sistema ({0})"
+#~ msgstr "System ({0})"
+
+#: src/shell.jsx
+msgid "Tema: {current}. Cambiar a {nextLabel}."
+msgstr "Theme: {current}. Switch to {nextLabel}."
+
+#: src/shell.jsx
+msgid "Tema actual: {current}. Cambiar a {nextLabel}."
+msgstr "Current theme: {current}. Switch to {nextLabel}."
+
+#: src/shell.jsx
+msgid "Tu perfil"
+msgstr "Your profile"
+
+#: src/shell.jsx
+msgid "HOY"
+msgstr "TODAY"
+
+#: src/shell.jsx
+msgid "OPERACIÓN"
+msgstr "OPERATIONS"
+
+#: src/shell.jsx
+msgid "CLIENTES"
+msgstr "CUSTOMERS"
+
+#: src/shell.jsx
+msgid "NEGOCIO"
+msgstr "BUSINESS"
+
+#: src/shell.jsx
+msgid "CONFIGURACIÓN"
+msgstr "CONFIGURATION"
+
+#: src/shell.jsx
+msgid "PLATAFORMA"
+msgstr "PLATFORM"
+
+#: src/shell.jsx
+msgid "Panorama"
+msgstr "Overview"
+
+#: src/shell.jsx
+msgid "Equipo y permisos"
+msgstr "Team and permissions"
+
+#: src/shell.jsx
+msgid "Horario y disponibilidad"
+msgstr "Hours and availability"
+
+#: src/shell.jsx
+msgid "Idioma"
+msgstr "Language"
+
+#: src/shell.jsx
+msgid "Mostrar u ocultar el menú"
+msgstr "Show or hide the menu"
+
+#: src/shell.jsx
+msgid "Consola del dueño"
+msgstr "Owner console"
+
+#: src/shell.jsx
+msgid "Negocio"
+msgstr "Business"
+
+#: src/shell.jsx
+msgid "Buenos días"
+msgstr "Good morning"
+
+#: src/shell.jsx
+msgid "Buenas tardes"
+msgstr "Good afternoon"
+
+#: src/shell.jsx
+msgid "Buenas noches"
+msgstr "Good evening"
+
+#: src/shell.jsx
+msgid "En línea"
+msgstr "Online"
+
+#: src/shell.jsx
+msgid "Conectando"
+msgstr "Connecting"
+
+#: src/shell.jsx
+msgid "Menú"
+msgstr "Menu"
+
+#: src/shell.jsx
+msgid "Reintentar la conexión"
+msgstr "Retry the connection"
+
+#: src/shell.jsx
+msgid "reintentar"
+msgstr "retry"
+
+#: src/shell.jsx
+msgid "Secciones"
+msgstr "Sections"

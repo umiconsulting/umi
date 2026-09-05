@@ -52,6 +52,10 @@ export const DashboardOperationItem = z
       .nullable(),
     version: z.number().int().nonnegative().nullable(),
     correlationId: z.string().min(1).max(160).nullable(),
+    // Per-domain observability payload (the seam): opaque here, typed by each
+    // domain's view. cash_shifts carries {operator, register, openingFloatMinorUnits,
+    // expectedCashMinorUnits, countedCashMinorUnits, status}. Null when a domain has none.
+    facts: z.record(z.unknown()).nullish(),
   })
   .strict();
 

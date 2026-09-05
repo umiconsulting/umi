@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { RegionHead } from '@/shell.jsx';
 import { useCafes, provisionCafe } from '@/data.jsx';
@@ -15,9 +17,9 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 // The 44px page title belongs to Topbar, so nothing here repeats it.
 
 const PLANS = [
-  { key: 'starter', label: 'Starter · loyalty only' },
-  { key: 'growth', label: 'Growth · loyalty + dashboard' },
-  { key: 'pro', label: 'Pro · everything' },
+  { key: 'starter', label: msg`Starter · solo lealtad` },
+  { key: 'growth', label: msg`Growth · lealtad + dashboard` },
+  { key: 'pro', label: msg`Pro · todo` },
 ];
 
 // The same swatches the Settings screen offers, so a café opened here and one
@@ -64,6 +66,7 @@ function Band({ children }) {
 }
 
 function NewCafeSheet({ onClose, onCreated }) {
+  const { t, i18n } = useLingui();
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -106,7 +109,7 @@ function NewCafeSheet({ onClose, onCreated }) {
     } catch (err) {
       // Every refusal from this route carries a sentence; `err.code` is there
       // when a caller wants to branch, and the sentence is what a person reads.
-      setError(err.message || 'No se pudo abrir el café.');
+      setError(err.message || t`No se pudo abrir el café.`);
       setSaving(false);
     }
   };
@@ -125,14 +128,14 @@ function NewCafeSheet({ onClose, onCreated }) {
           <div className="titles">
             {' '}
             <h2 id="new-cafe-title" style={{ margin: '6px 0 0' }}>
-              Abrir café
+              <Trans>Abrir café</Trans>
             </h2>
           </div>
           <button
             type="button"
             className="btn-icon focusable"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t`Cerrar`}
             disabled={saving}
           >
             <I.X size={18} />
@@ -140,9 +143,13 @@ function NewCafeSheet({ onClose, onCreated }) {
         </div>
 
         <div className="sheet-body">
-          <Band>El café</Band>
+          <Band>
+            <Trans>El café</Trans>
+          </Band>
           <div className="field">
-            <label htmlFor="cafe-name">Café name</label>
+            <label htmlFor="cafe-name">
+              <Trans>Nombre del café</Trans>
+            </label>
             <input
               id="cafe-name"
               ref={firstField}
@@ -157,7 +164,9 @@ function NewCafeSheet({ onClose, onCreated }) {
 
           <div className="grid grid-2">
             <div className="field">
-              <label htmlFor="cafe-city">Ciudad · opcional</label>
+              <label htmlFor="cafe-city">
+                <Trans>Ciudad · opcional</Trans>
+              </label>
               <input
                 id="cafe-city"
                 className="input"
@@ -167,7 +176,9 @@ function NewCafeSheet({ onClose, onCreated }) {
               />
             </div>
             <div className="field">
-              <label htmlFor="cafe-tz">Timezone</label>
+              <label htmlFor="cafe-tz">
+                <Trans>Zona horaria</Trans>
+              </label>
               <input
                 id="cafe-tz"
                 className="input"
@@ -179,7 +190,9 @@ function NewCafeSheet({ onClose, onCreated }) {
           </div>
 
           <div className="field">
-            <label htmlFor="cafe-location">First location · optional</label>
+            <label htmlFor="cafe-location">
+              <Trans>Primera sucursal · opcional</Trans>
+            </label>
             <input
               id="cafe-location"
               className="input"
@@ -189,20 +202,26 @@ function NewCafeSheet({ onClose, onCreated }) {
             />
           </div>
 
-          <Band>Plan y marca</Band>
+          <Band>
+            <Trans>Plan y marca</Trans>
+          </Band>
           <div className="field">
-            <label htmlFor="cafe-plan">Plan · decides which products the café owns</label>
+            <label htmlFor="cafe-plan">
+              <Trans>Plan · decide qué productos tiene el café</Trans>
+            </label>
             <select id="cafe-plan" className="select" value={form.plan} onChange={set('plan')}>
               {PLANS.map((p) => (
                 <option key={p.key} value={p.key}>
-                  {p.label}
+                  {i18n._(p.label)}
                 </option>
               ))}
             </select>
           </div>
 
           <div className="field">
-            <label htmlFor="cafe-prefix">Prefijo de tarjeta · solo letras</label>
+            <label htmlFor="cafe-prefix">
+              <Trans>Prefijo de tarjeta · solo letras</Trans>
+            </label>
             <input
               id="cafe-prefix"
               className="input"
@@ -217,14 +236,16 @@ function NewCafeSheet({ onClose, onCreated }) {
           </div>
 
           <div className="field">
-            <span className="field-label">Color principal · fondo de la tarjeta</span>
+            <span className="field-label">
+              <Trans>Color principal · fondo de la tarjeta</Trans>
+            </span>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {PRESET_COLORS.map((c) => (
                 <button
                   type="button"
                   key={c}
                   className="focusable"
-                  aria-label={'Color principal ' + c}
+                  aria-label={t`Color principal ${c}`}
                   aria-pressed={form.primaryColor === c}
                   onClick={() => setForm((f) => ({ ...f, primaryColor: c }))}
                   style={{
@@ -242,9 +263,13 @@ function NewCafeSheet({ onClose, onCreated }) {
             </div>
           </div>
 
-          <Band>Quién lo administra</Band>
+          <Band>
+            <Trans>Quién lo administra</Trans>
+          </Band>
           <div className="field">
-            <label htmlFor="cafe-admin-name">Owner name · optional</label>
+            <label htmlFor="cafe-admin-name">
+              <Trans>Nombre del dueño · opcional</Trans>
+            </label>
             <input
               id="cafe-admin-name"
               className="input"
@@ -256,7 +281,9 @@ function NewCafeSheet({ onClose, onCreated }) {
 
           <div className="grid grid-2">
             <div className="field">
-              <label htmlFor="cafe-admin-email">Owner email · her login</label>
+              <label htmlFor="cafe-admin-email">
+                <Trans>Correo del dueño · su acceso</Trans>
+              </label>
               <input
                 id="cafe-admin-email"
                 className="input"
@@ -268,7 +295,9 @@ function NewCafeSheet({ onClose, onCreated }) {
               />
             </div>
             <div className="field">
-              <label htmlFor="cafe-admin-pw">Password · 8 characters or more</label>
+              <label htmlFor="cafe-admin-pw">
+                <Trans>Contraseña · 8 caracteres o más</Trans>
+              </label>
               <input
                 id="cafe-admin-pw"
                 className="input"
@@ -301,10 +330,10 @@ function NewCafeSheet({ onClose, onCreated }) {
             </span>
           ) : null}
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
-            Cancelar
+            <Trans>Cancelar</Trans>
           </button>
           <button type="submit" className="btn btn-primary focusable" disabled={saving}>
-            {saving ? 'Abriendo…' : 'Abrir café'}
+            {saving ? <Trans>Abriendo…</Trans> : <Trans>Abrir café</Trans>}
           </button>
         </div>
       </form>
@@ -313,6 +342,7 @@ function NewCafeSheet({ onClose, onCreated }) {
 }
 
 const CafesScreen = () => {
+  const { t } = useLingui();
   const merchantState = useMerchant();
   const [refresh, setRefresh] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -327,8 +357,12 @@ const CafesScreen = () => {
         <span className="strip" />
         <I.AlertTriangle className="ico" size={18} />
         <div className="body">
-          <div className="ttl">Acceso de plataforma requerido</div>
-          <div className="sub">Esta pantalla es para operadores de Umi.</div>
+          <div className="ttl">
+            <Trans>Acceso de plataforma requerido</Trans>
+          </div>
+          <div className="sub">
+            <Trans>Esta pantalla es para operadores de Umi.</Trans>
+          </div>
         </div>
       </div>
     );
@@ -337,12 +371,12 @@ const CafesScreen = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
-        title="Cafés en la plataforma"
-        note={loading ? 'Cargando…' : 'Todos los cafés que opera Umi.'}
-        count={{ value: cafes.length, label: 'cafés' }}
+        title={t`Cafés en la plataforma`}
+        note={loading ? t`Cargando…` : t`Todos los cafés que opera Umi.`}
+        count={{ value: cafes.length, label: t`cafés` }}
         actions={
           <button className="btn btn-primary focusable" onClick={() => setSheetOpen(true)}>
-            <I.Plus size={16} /> Abrir café
+            <I.Plus size={16} /> <Trans>Abrir café</Trans>
           </button>
         }
       />
@@ -352,7 +386,9 @@ const CafesScreen = () => {
           <span className="strip" />
           <I.AlertTriangle className="ico" size={18} />
           <div className="body">
-            <div className="ttl">No se pudieron cargar los cafés</div>
+            <div className="ttl">
+              <Trans>No se pudieron cargar los cafés</Trans>
+            </div>
             <div className="sub">{error}</div>
           </div>
         </div>
@@ -362,9 +398,11 @@ const CafesScreen = () => {
         {!cafes.length && !loading ? (
           // An empty state with one clear next action, not a shrug.
           <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
-            <div style={{ marginBottom: 14 }}>Todavía no hay cafés.</div>
+            <div style={{ marginBottom: 14 }}>
+              <Trans>Todavía no hay cafés.</Trans>
+            </div>
             <button className="btn btn-primary focusable" onClick={() => setSheetOpen(true)}>
-              <I.Plus size={16} /> Abrir el primero
+              <I.Plus size={16} /> <Trans>Abrir el primero</Trans>
             </button>
           </div>
         ) : (
@@ -377,9 +415,15 @@ const CafesScreen = () => {
                 unreachable. The sibling roster fits at 360; this now does too. */}
             <thead>
               <tr>
-                <th style={{ width: '45%' }}>Café</th>
-                <th>Dirección pública</th>
-                <th>Zona horaria</th>
+                <th style={{ width: '45%' }}>
+                  <Trans>Café</Trans>
+                </th>
+                <th>
+                  <Trans>Dirección pública</Trans>
+                </th>
+                <th>
+                  <Trans>Zona horaria</Trans>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -389,7 +433,7 @@ const CafesScreen = () => {
                   <td style={{ color: c.handle ? 'var(--ink-2)' : 'var(--ink-3)' }}>
                     {/* A café opened after the cutover has no handle and is reached
                         by id. Saying so beats an em dash that explains nothing. */}
-                    {c.handle ? '/' + c.handle : 'por id'}
+                    {c.handle ? '/' + c.handle : <Trans>por id</Trans>}
                   </td>
                   {/* `America/Mexico_City` carries no space, so it cannot wrap on
                       its own and held the table 7px wider than the card that

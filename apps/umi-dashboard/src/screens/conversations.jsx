@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatNumber, formatTime } from '@/lib/format.js';
 import { RegionHead, XSep } from '@/shell.jsx';
 import { useConversationsData } from '@/data.jsx';
 
 const ConversationsScreen = () => {
+  const { t } = useLingui();
   const [page, setPage] = useState(1);
   const { data, loading } = useConversationsData({ page });
   const conversations = data?.conversations || [];
@@ -14,13 +17,19 @@ const ConversationsScreen = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
-        title="Conversaciones WhatsApp"
+        title={t`Conversaciones WhatsApp`}
         note={
-          loading
-            ? 'Cargando…'
-            : `${active} conversación${active === 1 ? '' : 'es'} activa${active === 1 ? '' : 's'} ahora mismo.`
+          loading ? (
+            <Trans>Cargando…</Trans>
+          ) : (
+            <Plural
+              value={active}
+              one="# conversación activa ahora mismo."
+              other="# conversaciones activas ahora mismo."
+            />
+          )
         }
-        count={{ value: total.toLocaleString('es-MX'), label: 'en total' }}
+        count={{ value: formatNumber(total), label: t`en total` }}
       />
 
       <div className="log-list">
@@ -30,18 +39,15 @@ const ConversationsScreen = () => {
             style={{ padding: '42px 28px', textAlign: 'center', color: 'var(--ink-3)' }}
           >
             <I.WhatsApp size={30} style={{ opacity: 0.35, marginBottom: 10 }} />
-            <div style={{ fontWeight: 600 }}>No conversations found.</div>
+            <div style={{ fontWeight: 600 }}>
+              <Trans>No hay conversaciones.</Trans>
+            </div>
           </div>
         )}
         {conversations.map((conversation) => (
           <div className="log-row" key={conversation.id}>
             <span className="t">
-              {conversation.lastMessageAt
-                ? new Date(conversation.lastMessageAt).toLocaleTimeString('es-MX', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '—'}
+              {conversation.lastMessageAt ? formatTime(conversation.lastMessageAt) : '—'}
             </span>
             <span
               className={'marker ' + (conversation.status === 'active' ? 'info' : 'warn')}
@@ -60,7 +66,7 @@ const ConversationsScreen = () => {
             </span>
             <div className="body">
               <div>
-                <b>{conversation.customerName || 'Cliente WhatsApp'}</b>
+                <b>{conversation.customerName || t`Cliente WhatsApp`}</b>
                 <span
                   style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', marginLeft: 10 }}
                 >
@@ -68,8 +74,9 @@ const ConversationsScreen = () => {
                 </span>
               </div>
               <div className="meta">
-                {conversation.summary || conversation.currentState || 'Sin resumen'}
-                <XSep /> {conversation.messageCount || 0} mensajes
+                {conversation.summary || conversation.currentState || t`Sin resumen`}
+                <XSep />{' '}
+                <Plural value={conversation.messageCount || 0} one="# mensaje" other="# mensajes" />
               </div>
             </div>
             <span
@@ -77,7 +84,7 @@ const ConversationsScreen = () => {
                 'badge ' + (conversation.status === 'active' ? 'badge-admin' : 'badge-staff')
               }
             >
-              {conversation.status || 'unknown'}
+              {conversation.status || t`desconocido`}
             </span>
           </div>
         ))}
@@ -90,7 +97,7 @@ const ConversationsScreen = () => {
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            <I.ChevronLeft size={14} /> Anterior
+            <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
           </button>
           <span
             style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', alignSelf: 'center' }}
@@ -102,7 +109,7 @@ const ConversationsScreen = () => {
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Siguiente <I.ChevronRight size={14} />
+            <Trans>Siguiente</Trans> <I.ChevronRight size={14} />
           </button>
         </div>
       )}

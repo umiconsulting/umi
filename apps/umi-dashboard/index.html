@@ -3,7 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Let native controls (scrollbars, selects, date pickers) match the theme. -->
+    <meta name="color-scheme" content="light dark" />
     <title>Umi · Dash — Owner Console</title>
+    <!-- Set the theme BEFORE first paint so the first frame is never the wrong
+         color. A stored value is a theme name (e.g. 'umi', 'midnight'); 'system'
+         stores nothing, so the OS preference governs through @media
+         (prefers-color-scheme) in @umi/tokens/dashboard.css. Kept inline and tiny
+         on purpose — it must run before the stylesheet applies. The name pattern
+         keeps it forward-compatible with new themes without editing this script.
+         Mirrors the storage key in src/lib/theme.js. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('umi-theme');
+          if (t && /^[a-z][a-z0-9-]*$/.test(t))
+            document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Fraunces is variable on optical size: `opsz` lets a 44px title and a 28px

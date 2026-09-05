@@ -63,4 +63,25 @@ describe('Gate 5A administrative command migration', () => {
     expect(rlsSql).toContain("ac.operation in ('refund.preview', 'refund.commit')");
     expect(rlsSql).toContain("current_setting('app.administrative_command_id', true)");
   });
+
+  it('scopes cash_shift device RLS to WRITES only, so owners can read shifts', () => {
+    // The owner/admin Dashboard authenticates a user, not a terminal, so it never
+    // sets app.current_device. If device_scoping gated SELECT on cash_shift, the
+    // owner would see zero shifts — the "Caja y turnos → Turnos de caja" blank —
+    // while the shift's own child facts (already not device-scoped) stayed visible.
+    // Reads must fall through to merchant_isolation + location_narrowing + the
+    // app-layer cash.shift.read permission; only writes stay pinned to the device
+    // (or a pending refund administrative command).
+    expect(rlsSql).toContain('device scoping on WRITES ONLY');
+    // USING is open for cash_shift → SELECT is not device-gated.
+    expect(rlsSql).toMatch(
+      /create policy device_scoping on merchant\.cash_shift as restrictive\s+using \(true\)/,
+    );
+    // WITH CHECK still pins every INSERT/UPDATE to the acting device …
+    expect(rlsSql).toContain('cash_shift.device_id = umi.current_device()');
+    // … or an authorised pending refund administrative command.
+    expect(rlsSql).toMatch(
+      /with check \([\s\S]*ac\.operation in \('refund\.preview', 'refund\.commit'\)/,
+    );
+  });
 });

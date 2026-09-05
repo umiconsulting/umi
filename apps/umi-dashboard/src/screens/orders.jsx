@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import { msg } from '@lingui/core/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { formatMoneyUnits } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
 import { transitionOrder, useOrdersData } from '@/data.jsx';
 
@@ -12,12 +15,31 @@ import { transitionOrder, useOrdersData } from '@/data.jsx';
 //   placed | preparing | ready | completed | canceled
 
 const ORDER_STATUS_META = {
-  placed: { label: 'Nuevo', color: 'var(--umi-blue)', bg: 'rgba(118,146,203,0.12)' },
-  preparing: { label: 'Preparando', color: 'var(--warning)', bg: 'var(--warning-soft)' },
-  ready: { label: 'Listo', color: 'var(--success)', bg: 'var(--success-soft)' },
-  completed: { label: 'Completado', color: 'var(--ink-3)', bg: 'var(--canvas-2)' },
-  canceled: { label: 'Cancelado', color: 'var(--danger)', bg: 'var(--danger-soft)' },
+  placed: { label: msg`Nuevo`, color: 'var(--umi-blue)', bg: 'rgba(118,146,203,0.12)' },
+  preparing: { label: msg`Preparando`, color: 'var(--warning)', bg: 'var(--warning-soft)' },
+  ready: {
+    label: msg({ message: 'Listo', context: 'order status' }),
+    color: 'var(--success)',
+    bg: 'var(--success-soft)',
+  },
+  completed: { label: msg`Completado`, color: 'var(--ink-3)', bg: 'var(--canvas-2)' },
+  canceled: { label: msg`Cancelado`, color: 'var(--danger)', bg: 'var(--danger-soft)' },
 };
+
+const STATUS_RAIL = [
+  { status: 'placed', label: msg`Nuevos` },
+  { status: 'preparing', label: msg`En preparación` },
+  { status: 'ready', label: msg`Listos` },
+  { status: 'completed', label: msg`Completados` },
+  { status: 'canceled', label: msg`Cancelados` },
+];
+
+const LIST_FILTERS = [
+  { id: 'active', label: msg`Activos` },
+  { id: 'completed', label: msg`Completados` },
+  { id: 'cancelled', label: msg`Cancelados` },
+  { id: 'all', label: msg`Todos` },
+];
 
 const ACTIVE_STATUSES = ['placed', 'preparing', 'ready'];
 
@@ -27,16 +49,20 @@ const CHANNEL_META = {
   pos: { label: 'POS', color: '#6B8F4A', bg: 'rgba(107,143,74,0.12)' },
   whatsapp: { label: 'WhatsApp', color: '#25D366', bg: 'rgba(37,211,102,0.12)' },
   web: { label: 'Web', color: 'var(--info)', bg: 'rgba(118,146,203,0.12)' },
-  dashboard: { label: 'Consola', color: 'var(--ink-3)', bg: 'var(--canvas-2)' },
+  dashboard: { label: msg`Consola`, color: 'var(--ink-3)', bg: 'var(--canvas-2)' },
 };
 
 const CHANNEL_FILTERS = [
-  { id: '', label: 'Todos' },
+  { id: '', label: msg`Todos` },
   { id: 'pos', label: 'POS' },
   { id: 'whatsapp', label: 'WhatsApp' },
 ];
 
+/** Brand names stay as strings; everything else is a message descriptor. */
+const text = (i18n, value) => (typeof value === 'string' ? value : i18n._(value));
+
 const OrdersScreen = () => {
+  const { t, i18n } = useLingui();
   const [filter, setFilter] = useState('active');
   const [channel, setChannel] = useState('');
   const [refresh, setRefresh] = useState(0);
@@ -66,28 +92,22 @@ const OrdersScreen = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
-        title="Pedidos"
-        note={`${displayed.length} de ${totalToday} mostrados.`}
-        count={{ value: totalToday, label: 'hoy' }}
+        title={t`Pedidos`}
+        note={t`${displayed.length} de ${totalToday} mostrados.`}
+        count={{ value: totalToday, label: t`hoy` }}
         actions={
           <button
             className="btn btn-ghost btn-sm focusable"
             onClick={() => setRefresh((r) => r + 1)}
           >
-            <I.Refresh size={14} /> Actualizar
+            <I.Refresh size={14} /> <Trans>Actualizar</Trans>
           </button>
         }
       />
 
       {/* Status summary rail */}
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {[
-          { status: 'placed', label: 'Nuevos' },
-          { status: 'preparing', label: 'En preparación' },
-          { status: 'ready', label: 'Listos' },
-          { status: 'completed', label: 'Completados' },
-          { status: 'canceled', label: 'Cancelados' },
-        ].map(function (item) {
+        {STATUS_RAIL.map(function (item) {
           var meta = ORDER_STATUS_META[item.status];
           var cnt = counts[item.status] || 0;
           return (
@@ -132,7 +152,7 @@ const OrdersScreen = () => {
                   textTransform: 'uppercase',
                 }}
               >
-                {item.label}
+                {i18n._(item.label)}
               </span>
             </div>
           );
@@ -148,13 +168,13 @@ const OrdersScreen = () => {
           }}
         >
           <span>
-            Ticket promedio{' '}
+            <Trans>Ticket promedio</Trans>{' '}
             <b style={{ color: 'var(--ink-1)', fontFamily: 'var(--font-mono)' }}>
               ${totalToday > 0 ? Math.round(totalRevenue / Math.max(totalToday, 1)) : '–'}
             </b>
           </span>
           <span>
-            Cancelaciones{' '}
+            <Trans>Cancelaciones</Trans>{' '}
             <b style={{ color: cancelledToday > 0 ? 'var(--danger)' : 'var(--ink-1)' }}>
               {cancelledToday}
             </b>
@@ -173,24 +193,19 @@ const OrdersScreen = () => {
         }}
       >
         <div className="seg" role="tablist">
-          {[
-            { id: 'active', label: 'Activos' },
-            { id: 'completed', label: 'Completados' },
-            { id: 'cancelled', label: 'Cancelados' },
-            { id: 'all', label: 'Todos' },
-          ].map(function (f) {
+          {LIST_FILTERS.map(function (f) {
             return (
               <button
                 key={f.id}
                 className={filter === f.id ? 'on' : ''}
                 onClick={() => setFilter(f.id)}
               >
-                {f.label}
+                {i18n._(f.label)}
               </button>
             );
           })}
         </div>
-        <div className="seg" role="tablist" aria-label="Origen">
+        <div className="seg" role="tablist" aria-label={t`Origen`}>
           {CHANNEL_FILTERS.map(function (f) {
             return (
               <button
@@ -198,7 +213,7 @@ const OrdersScreen = () => {
                 className={channel === f.id ? 'on' : ''}
                 onClick={() => setChannel(f.id)}
               >
-                {f.label}
+                {text(i18n, f.label)}
               </button>
             );
           })}
@@ -223,7 +238,7 @@ const OrdersScreen = () => {
                 background: 'var(--umi-blue)',
               }}
             />
-            Cargando…
+            <Trans>Cargando…</Trans>
           </span>
         )}
       </div>
@@ -235,8 +250,12 @@ const OrdersScreen = () => {
           style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}
         >
           <I.Receipt size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>Sin pedidos</div>
-          <div style={{ fontSize: 13 }}>No hay pedidos en este filtro.</div>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+            <Trans>Sin pedidos</Trans>
+          </div>
+          <div style={{ fontSize: 13 }}>
+            <Trans>No hay pedidos en este filtro.</Trans>
+          </div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -272,6 +291,7 @@ const OrdersScreen = () => {
 };
 
 const OrderRow = ({ order, onSelect, onTransition }) => {
+  const { t, i18n } = useLingui();
   const meta = ORDER_STATUS_META[order.status] || ORDER_STATUS_META.placed;
   const channel = CHANNEL_META[order.source] || CHANNEL_META.web;
   const isActive = ACTIVE_STATUSES.indexOf(order.status) !== -1;
@@ -323,7 +343,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
               textTransform: 'uppercase',
             }}
           >
-            {meta.label}
+            {i18n._(meta.label)}
           </span>
         </div>
 
@@ -347,13 +367,15 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
               letterSpacing: '0.05em',
             }}
           >
-            {channel.label}
+            {text(i18n, channel.label)}
           </span>
         </div>
 
         {/* Customer */}
         <div style={{ minWidth: 160 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{order.customer_name || 'Sin nombre'}</div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>
+            {order.customer_name || t`Sin nombre`}
+          </div>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
             {order.customer_phone || '—'}
           </div>
@@ -362,7 +384,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
         {/* Reference */}
         <div style={{ minWidth: 90 }}>
           <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>
-            Ref.
+            <Trans>Ref.</Trans>
           </div>
           <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
             {String(order.public_reference || '').slice(0, 8)}
@@ -372,7 +394,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
         {/* Items */}
         <div style={{ minWidth: 60, textAlign: 'center' }}>
           <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>
-            Items
+            <Trans>Artículos</Trans>
           </div>
           <div style={{ fontWeight: 600, fontSize: 15 }}>
             {order.items_count ?? itemsCount(order)}
@@ -382,7 +404,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
         {/* Amount */}
         <div style={{ minWidth: 90, textAlign: 'right', marginLeft: 'auto' }}>
           <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>
-            Total
+            <Trans>Total</Trans>
           </div>
           <div
             style={{
@@ -392,7 +414,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
               letterSpacing: '-0.01em',
             }}
           >
-            {'$ ' + (order.total_amount ?? 0).toLocaleString('es-MX')}
+            {formatMoneyUnits(order.total_amount ?? 0)}
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>MXN</div>
         </div>
@@ -400,7 +422,7 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
         {/* Time */}
         <div style={{ minWidth: 52, textAlign: 'right', flexShrink: 0 }}>
           <div className="eyebrow" style={{ fontSize: 10, marginBottom: 2 }}>
-            Hace
+            <Trans>Hace</Trans>
           </div>
           <div
             style={{
@@ -417,20 +439,20 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {order.status === 'placed' && (
             <button className="btn btn-secondary btn-sm" onClick={() => onTransition('preparing')}>
-              Cocina
+              <Trans>Cocina</Trans>
             </button>
           )}
           {order.status === 'preparing' && (
             <button className="btn btn-primary btn-sm" onClick={() => onTransition('ready')}>
-              Listo
+              <Trans context="order status">Listo</Trans>
             </button>
           )}
           {order.status === 'ready' && (
             <button className="btn btn-primary btn-sm" onClick={() => onTransition('completed')}>
-              Cerrar
+              <Trans>Cerrar</Trans>
             </button>
           )}
-          <button className="btn-icon" onClick={onSelect} aria-label="Order detail">
+          <button className="btn-icon" onClick={onSelect} aria-label={t`Detalle del pedido`}>
             <I.ChevronRight size={15} />
           </button>
         </div>
@@ -440,29 +462,33 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
 };
 
 const OrderDetail = ({ order, onClose, onTransition }) => {
+  const { t, i18n } = useLingui();
   const items = order.items || [];
   const channel = CHANNEL_META[order.source] || CHANNEL_META.web;
+  const channelLabel = text(i18n, channel.label);
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose}></div>
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">Pedido · {channel.label}</div>
+            <div className="eyebrow">
+              <Trans>Pedido · {channelLabel}</Trans>
+            </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              {order.customer_name || 'Sin nombre'}
+              {order.customer_name || t`Sin nombre`}
             </h2>
           </div>
-          <button className="btn-icon" onClick={onClose} aria-label="Close">
+          <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
           </button>
         </div>
         <div className="sheet-body">
           <div className="card" style={{ padding: 16 }}>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              Cliente
+              <Trans>Cliente</Trans>
             </div>
-            <div style={{ fontWeight: 600 }}>{order.customer_name || 'Sin nombre'}</div>
+            <div style={{ fontWeight: 600 }}>{order.customer_name || t`Sin nombre`}</div>
             <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', marginTop: 4 }}>
               {order.customer_phone || '—'}
             </div>
@@ -471,14 +497,14 @@ const OrderDetail = ({ order, onClose, onTransition }) => {
             )}
             {order.pickup_person && (
               <div style={{ marginTop: 10, color: 'var(--ink-2)' }}>
-                Recoge: {order.pickup_person}
+                <Trans>Recoge: {order.pickup_person}</Trans>
               </div>
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {items.length === 0 ? (
               <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                No hay items disponibles para este pedido.
+                <Trans>No hay artículos disponibles para este pedido.</Trans>
               </div>
             ) : (
               items.map((item) => (
@@ -489,7 +515,7 @@ const OrderDetail = ({ order, onClose, onTransition }) => {
                         {item.quantity}× {item.name}
                       </b>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
-                        {'$ ' + (item.unit_price ?? 0).toLocaleString('es-MX')}
+                        {formatMoneyUnits(item.unit_price ?? 0)}
                       </span>
                     </div>
                     {item.variant_name && (
@@ -515,7 +541,9 @@ const OrderDetail = ({ order, onClose, onTransition }) => {
               alignItems: 'center',
             }}
           >
-            <div className="eyebrow">Total</div>
+            <div className="eyebrow">
+              <Trans>Total</Trans>
+            </div>
             <div
               style={{
                 fontWeight: 700,
@@ -523,20 +551,20 @@ const OrderDetail = ({ order, onClose, onTransition }) => {
                 fontFamily: 'var(--font-display)',
               }}
             >
-              {'$ ' + (order.total_amount ?? 0).toLocaleString('es-MX')}
+              {formatMoneyUnits(order.total_amount ?? 0)}
             </div>
           </div>
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cerrar
+            <Trans>Cerrar</Trans>
           </button>
           {order.status !== 'completed' && order.status !== 'canceled' && (
             <button
               className="btn btn-primary"
               onClick={() => onTransition(nextStatus(order.status))}
             >
-              Avanzar estado
+              <Trans>Avanzar estado</Trans>
             </button>
           )}
         </div>

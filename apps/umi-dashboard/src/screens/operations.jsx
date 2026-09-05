@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { useOperationsData } from '@/data.jsx';
 import { DomainWorkspace } from './operations-workspace.jsx';
 
@@ -10,6 +11,7 @@ import { DomainWorkspace } from './operations-workspace.jsx';
  * `DomainWorkspace` the hubs render, so the two never drift.
  */
 export default function OperationsScreen() {
+  const { t } = useLingui();
   const [domain, setDomain] = useState('organization');
   const state = useOperationsData(domain, 0, 0, false);
   const domains = state.data?.domains || [];
@@ -17,17 +19,21 @@ export default function OperationsScreen() {
   return (
     <div className="fade-up" style={{ display: 'grid', gap: 18 }}>
       <section className="card" style={{ padding: 22 }}>
-        <h2 style={{ margin: '0 0 6px' }}>Centro operativo</h2>
+        <h2 style={{ margin: '0 0 6px' }}>
+          <Trans>Centro operativo</Trans>
+        </h2>
         <p style={{ margin: 0, color: 'var(--ink-3)', maxWidth: 760 }}>
-          Vista puente. Cada dominio se está moviendo a su propia sección. La API mantiene la
-          autoridad; el Dashboard muestra datos seguros y acciones autorizadas.
+          <Trans>
+            Vista puente. Cada dominio se está moviendo a su propia sección. La API mantiene la
+            autoridad; el Dashboard muestra datos seguros y acciones autorizadas.
+          </Trans>
         </p>
       </section>
 
       <div className="operations-layout">
         <nav
           className="card"
-          aria-label="Dominios operativos"
+          aria-label={t`Dominios operativos`}
           style={{ padding: 10, alignSelf: 'start' }}
         >
           {domains.map((item) => (
@@ -39,7 +45,7 @@ export default function OperationsScreen() {
               disabled={!item.available}
               aria-current={domain === item.domain ? 'page' : undefined}
               title={
-                item.available ? item.label : `Requiere ${item.requiredPermissions.join(' o ')}`
+                item.available ? item.label : t`Requiere ${item.requiredPermissions.join(t` o `)}`
               }
               style={{
                 width: '100%',

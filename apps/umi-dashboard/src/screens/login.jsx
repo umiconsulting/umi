@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { msg } from '@lingui/core/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import { signIn, isMfaChallenge, verifyMfaCode } from '@/lib/auth.jsx';
+import { LocaleSelect } from '@/shell.jsx';
 import '@/styles.css';
 
 const REMEMBER_KEY = 'umi.login.rememberedEmail';
@@ -17,10 +20,10 @@ const REMEMBER_KEY = 'umi.login.rememberedEmail';
  * An unknown method gets neutral words rather than a guess.
  */
 function mfaInstruction(method) {
-  if (method === 'email_otp') return 'Te enviamos un código de seis dígitos a tu correo.';
+  if (method === 'email_otp') return msg`Te enviamos un código de seis dígitos a tu correo.`;
   if (method === 'totp')
-    return 'Escribe el código de seis dígitos de tu aplicación de autenticación.';
-  return 'Escribe tu código de seis dígitos.';
+    return msg`Escribe el código de seis dígitos de tu aplicación de autenticación.`;
+  return msg`Escribe tu código de seis dígitos.`;
 }
 
 /* ---- icons (match login-elegant.html) ---- */
@@ -135,6 +138,7 @@ const MailIcon = () => (
 );
 
 export default function LoginScreen() {
+  const { t, i18n } = useLingui();
   const navigate = useNavigate();
   const [view, setView] = useState('login'); // 'login' | 'mfa' | 'forgot' | 'sent'
   const [email, setEmail] = useState('');
@@ -176,10 +180,10 @@ export default function LoginScreen() {
       setCode('');
       setPassword('');
       setView('login');
-      setError('Tu código venció. Inicia sesión otra vez.');
+      setError(t`Tu código venció. Inicia sesión otra vez.`);
     }, ms);
     return () => clearTimeout(timer);
-  }, [view, challenge]);
+  }, [view, challenge, t]);
 
   const persistRemember = (addr) => {
     try {
@@ -208,7 +212,7 @@ export default function LoginScreen() {
       }
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err.message || 'Correo o contraseña incorrectos. Revísalos e inténtalo otra vez.');
+      setError(err.message || t`Correo o contraseña incorrectos. Revísalos e inténtalo otra vez.`);
     } finally {
       setLoading(false);
     }
@@ -222,7 +226,7 @@ export default function LoginScreen() {
       await verifyMfaCode(challenge.challengeToken, code.trim(), remember);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err.message || 'Código incorrecto o vencido.');
+      setError(err.message || t`Código incorrecto o vencido.`);
       setCode('');
     } finally {
       setLoading(false);
@@ -244,7 +248,7 @@ export default function LoginScreen() {
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(errMessage(data, 'Error al enviar el correo'));
+        throw new Error(errMessage(data, t`Error al enviar el correo`));
       }
       setView('sent');
     } catch (err) {
@@ -286,11 +290,15 @@ export default function LoginScreen() {
         </div>
         <div className="login-hero">
           <h1>
-            Tu operación,
-            <br />
-            en tiempo real.
+            <Trans>
+              Tu operación,
+              <br />
+              en tiempo real.
+            </Trans>
           </h1>
-          <p>Supervisa la operación de tu negocio al momento, desde un solo panel.</p>
+          <p>
+            <Trans>Supervisa la operación de tu negocio al momento, desde un solo panel.</Trans>
+          </p>
         </div>
         <svg
           className="login-waves"
@@ -312,13 +320,24 @@ export default function LoginScreen() {
       {/* Right — form */}
       <main className="login-form-pane">
         <div className="login-form">
+          {/* The language control sits above the form: a person who cannot read the
+              screen yet must be able to change it before anything else. */}
+          <div className="login-locale">
+            <LocaleSelect />
+          </div>
           {view === 'login' && (
             <section className="login-view" key="login">
-              <h2>Hola de nuevo</h2>
-              <p className="sub">Inicia sesión para entrar a tu panel.</p>
+              <h2>
+                <Trans>Hola de nuevo</Trans>
+              </h2>
+              <p className="sub">
+                <Trans>Inicia sesión para entrar a tu panel.</Trans>
+              </p>
               <form onSubmit={handleSubmit} noValidate>
                 <div className="field">
-                  <label htmlFor="login-email">Correo</label>
+                  <label htmlFor="login-email">
+                    <Trans>Correo</Trans>
+                  </label>
                   <input
                     id="login-email"
                     className="input tall"
@@ -332,14 +351,16 @@ export default function LoginScreen() {
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="login-pw">Contraseña</label>
+                  <label htmlFor="login-pw">
+                    <Trans>Contraseña</Trans>
+                  </label>
                   <div className="login-pw">
                     <input
                       id="login-pw"
                       className="input tall"
                       type={showPw ? 'text' : 'password'}
                       autoComplete="current-password"
-                      placeholder="Tu contraseña"
+                      placeholder={t`Tu contraseña`}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -348,7 +369,7 @@ export default function LoginScreen() {
                       type="button"
                       className="login-reveal"
                       onClick={() => setShowPw((s) => !s)}
-                      aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      aria-label={showPw ? t`Ocultar contraseña` : t`Mostrar contraseña`}
                     >
                       <EyeIcon off={showPw} />
                     </button>
@@ -364,25 +385,29 @@ export default function LoginScreen() {
                     <span className="box">
                       <CheckIcon />
                     </span>
-                    Recordarme
+                    <Trans>Recordarme</Trans>
                   </label>
                   <button type="button" className="login-link" onClick={() => go('forgot')}>
-                    ¿Olvidaste tu contraseña?
+                    <Trans>¿Olvidaste tu contraseña?</Trans>
                   </button>
                 </div>
                 {alertBox}
-                {submitBtn('Entrar', 'Entrando…')}
+                {submitBtn(t`Entrar`, t`Entrando…`)}
               </form>
             </section>
           )}
 
           {view === 'mfa' && (
             <section className="login-view" key="mfa">
-              <h2>Verifica que eres tú</h2>
-              <p className="sub">{mfaInstruction(challenge && challenge.method)}</p>
+              <h2>
+                <Trans>Verifica que eres tú</Trans>
+              </h2>
+              <p className="sub">{i18n._(mfaInstruction(challenge && challenge.method))}</p>
               <form onSubmit={handleMfa} noValidate>
                 <div className="field">
-                  <label htmlFor="login-mfa">Código</label>
+                  <label htmlFor="login-mfa">
+                    <Trans>Código</Trans>
+                  </label>
                   <input
                     id="login-mfa"
                     className="input tall"
@@ -399,7 +424,7 @@ export default function LoginScreen() {
                   />
                 </div>
                 {alertBox}
-                {submitBtn('Verificar', 'Verificando…')}
+                {submitBtn(t`Verificar`, t`Verificando…`)}
               </form>
               <button
                 type="button"
@@ -412,18 +437,24 @@ export default function LoginScreen() {
                   go('login');
                 }}
               >
-                <BackIcon /> Volver a iniciar sesión
+                <BackIcon /> <Trans>Volver a iniciar sesión</Trans>
               </button>
             </section>
           )}
 
           {view === 'forgot' && (
             <section className="login-view" key="forgot">
-              <h2>¿Olvidaste tu contraseña?</h2>
-              <p className="sub">Escríbenos tu correo y te mandamos un enlace para recuperarla.</p>
+              <h2>
+                <Trans>¿Olvidaste tu contraseña?</Trans>
+              </h2>
+              <p className="sub">
+                <Trans>Escríbenos tu correo y te mandamos un enlace para recuperarla.</Trans>
+              </p>
               <form onSubmit={handleForgot} noValidate>
                 <div className="field">
-                  <label htmlFor="forgot-email">Correo</label>
+                  <label htmlFor="forgot-email">
+                    <Trans>Correo</Trans>
+                  </label>
                   <input
                     id="forgot-email"
                     className="input tall"
@@ -437,14 +468,14 @@ export default function LoginScreen() {
                   />
                 </div>
                 {alertBox}
-                {submitBtn('Enviar enlace', 'Enviando…')}
+                {submitBtn(t`Enviar enlace`, t`Enviando…`)}
               </form>
               <button
                 type="button"
                 className="btn btn-ghost login-back"
                 onClick={() => go('login')}
               >
-                <BackIcon /> Volver a iniciar sesión
+                <BackIcon /> <Trans>Volver a iniciar sesión</Trans>
               </button>
             </section>
           )}
@@ -454,10 +485,14 @@ export default function LoginScreen() {
               <div className="login-success-ico">
                 <MailIcon />
               </div>
-              <h2>Revisa tu correo</h2>
+              <h2>
+                <Trans>Revisa tu correo</Trans>
+              </h2>
               <p className="sub">
-                Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu
-                contraseña. Caduca en 15&nbsp;minutos.
+                <Trans>
+                  Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer tu
+                  contraseña. Caduca en 15&nbsp;minutos.
+                </Trans>
               </p>
               <button
                 type="button"
@@ -465,7 +500,7 @@ export default function LoginScreen() {
                 style={{ marginTop: 0 }}
                 onClick={() => go('login')}
               >
-                <BackIcon /> Volver a iniciar sesión
+                <BackIcon /> <Trans>Volver a iniciar sesión</Trans>
               </button>
             </section>
           )}

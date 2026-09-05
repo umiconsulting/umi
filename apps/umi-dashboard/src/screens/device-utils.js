@@ -13,13 +13,15 @@
  * the owner with nothing to act on. `credential_ready` and `credential_delivered` stay
  * too: those are approved but not yet connected, and the enrolment can still fail.
  */
+import { t } from '@lingui/core/macro';
+
 export function visiblePosEnrollmentRequests(requests) {
   return (requests || []).filter((request) => request.state !== 'completed');
 }
 
 export function locationName(locations, locationId) {
-  if (!locationId) return 'Sin sucursal';
-  return (locations || []).find((location) => location.id === locationId)?.name || 'Sucursal';
+  if (!locationId) return t`Sin sucursal`;
+  return (locations || []).find((location) => location.id === locationId)?.name || t`Sucursal`;
 }
 
 const PLATFORM_LABELS = {
@@ -32,12 +34,12 @@ const PLATFORM_LABELS = {
 };
 
 export function platformLabel(platform) {
-  return PLATFORM_LABELS[platform] || platform || 'Sin plataforma';
+  return PLATFORM_LABELS[platform] || platform || t`Sin plataforma`;
 }
 
 /** The floor-use label. Two values, because the register is either fixed or carried. */
 export function mobilityLabel(mobility) {
-  return mobility === 'mobile' ? 'Móvil' : 'Estático';
+  return mobility === 'mobile' ? t`Móvil` : t`Estático`;
 }
 
 /**
@@ -57,13 +59,13 @@ const LAST_SEEN_HOUR = 3_600_000;
 const LAST_SEEN_DAY = 86_400_000;
 
 export function fmtLastSeenEs(isoTimestamp, now = Date.now()) {
-  if (!isoTimestamp) return 'nunca';
+  if (!isoTimestamp) return t`nunca`;
   const ms = now - new Date(isoTimestamp).getTime();
-  if (!Number.isFinite(ms)) return 'nunca';
-  if (ms < LAST_SEEN_MINUTE) return 'hace un momento';
-  if (ms < LAST_SEEN_HOUR) return `hace ${Math.floor(ms / LAST_SEEN_MINUTE)} min`;
-  if (ms < LAST_SEEN_DAY) return `hace ${Math.floor(ms / LAST_SEEN_HOUR)} h`;
-  return `hace ${Math.floor(ms / LAST_SEEN_DAY)} d`;
+  if (!Number.isFinite(ms)) return t`nunca`;
+  if (ms < LAST_SEEN_MINUTE) return t`hace un momento`;
+  if (ms < LAST_SEEN_HOUR) return t`hace ${Math.floor(ms / LAST_SEEN_MINUTE)} min`;
+  if (ms < LAST_SEEN_DAY) return t`hace ${Math.floor(ms / LAST_SEEN_HOUR)} h`;
+  return t`hace ${Math.floor(ms / LAST_SEEN_DAY)} d`;
 }
 
 /**

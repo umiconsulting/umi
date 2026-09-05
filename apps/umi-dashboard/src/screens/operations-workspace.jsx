@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { useOperationsData } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatOperationDate, formatOperationMoney } from './operations-format.js';
@@ -18,17 +20,47 @@ const ACTION_ROUTES = {
 };
 
 const ERROR_COPY = {
-  PERMISSION_DENIED: 'No tienes el permiso requerido para esta operación.',
-  LOCATION_SCOPE_VIOLATION: 'La ubicación no pertenece a tu alcance.',
-  OPTIMISTIC_VERSION_CONFLICT: 'Los datos cambiaron. Actualiza la vista antes de continuar.',
-  HARDWARE_OUTCOME_UNKNOWN:
-    'El resultado físico es desconocido. Verifica el equipo antes de repetir.',
-  RECOVERY_REQUIRED: 'Consulta el comando original en el Centro de recuperación.',
-  SERVICE_UNAVAILABLE: 'El servicio no está disponible. Intenta de nuevo después.',
+  PERMISSION_DENIED: msg`No tienes el permiso requerido para esta operación.`,
+  LOCATION_SCOPE_VIOLATION: msg`La ubicación no pertenece a tu alcance.`,
+  OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Actualiza la vista antes de continuar.`,
+  HARDWARE_OUTCOME_UNKNOWN: msg`El resultado físico es desconocido. Verifica el equipo antes de repetir.`,
+  RECOVERY_REQUIRED: msg`Consulta el comando original en el Centro de recuperación.`,
+  SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
 };
 
+/** The owner-facing sentence for an API error code, or the raw message when none maps. */
+function errorCopy(i18n, error) {
+  if (!error) return null;
+  const known = ERROR_COPY[error.code];
+  return known ? i18n._(known) : error.message;
+}
+
+function CommandError({ command }) {
+  const { i18n } = useLingui();
+  if (!command.error) return null;
+  return <p style={{ color: 'var(--danger)' }}>{errorCopy(i18n, command.error)}</p>;
+}
+
 function Status({ value }) {
-  return <span className="sub-pill">{String(value || 'unknown').replaceAll('_', ' ')}</span>;
+  const { t } = useLingui();
+  return (
+    <span className="sub-pill">{value ? String(value).replaceAll('_', ' ') : t`desconocido`}</span>
+  );
+}
+
+/** The "PIN del aprobador" field, shared by every dialog that may need a manager. */
+function ManagerPinField({ value, onChange }) {
+  return (
+    <label>
+      <Trans>PIN del aprobador</Trans>
+      <input
+        type="password"
+        inputMode="numeric"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
 }
 
 const HARDWARE_TERMINAL = new Set(['succeeded', 'failed', 'retryable', 'cancelled', 'unknown']);
@@ -43,6 +75,7 @@ async function waitForHardwareResult(command, commandId) {
 }
 
 function RefundDialog({ sale, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [eligibility, setEligibility] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -119,13 +152,22 @@ function RefundDialog({ sale, onClose, onComplete }) {
   const requiresApproval = preview?.approvalRequired === true;
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Refund">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Reembolso`}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>Refund de {sale.publicReference}</h3>
-            <p style={{ color: 'var(--ink-3)' }}>La API calcula todos los importes.</p>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Reembolso de {sale.publicReference}</Trans>
+            </h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              <Trans>La API calcula todos los importes.</Trans>
+            </p>
           </div>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
@@ -136,12 +178,12 @@ function RefundDialog({ sale, onClose, onComplete }) {
             disabled={command.pending}
             onClick={loadEligibility}
           >
-            {command.pending ? 'Consultando…' : 'Consultar elegibilidad'}
+            {command.pending ? <Trans>Consultando…</Trans> : <Trans>Consultar elegibilidad</Trans>}
           </button>
         ) : !preview ? (
           <div style={{ display: 'grid', gap: 12 }}>
             <label>
-              Tipo
+              <Trans>Tipo</Trans>
               <select
                 value={exceptionType}
                 onChange={(event) => setExceptionType(event.target.value)}
@@ -154,11 +196,11 @@ function RefundDialog({ sale, onClose, onComplete }) {
               </select>
             </label>
             <label>
-              Motivo
+              <Trans>Motivo</Trans>
               <select value={reason} onChange={(event) => setReason(event.target.value)}>
-                <option value="customer_changed_mind">Cambio de decisión</option>
-                <option value="incorrect_item">Artículo incorrecto</option>
-                <option value="product_defect">Defecto del producto</option>
+                <option value="customer_changed_mind">{t`Cambio de decisión`}</option>
+                <option value="incorrect_item">{t`Artículo incorrecto`}</option>
+                <option value="product_defect">{t`Defecto del producto`}</option>
               </select>
             </label>
             {exceptionType === 'partial_refund' &&
@@ -179,7 +221,7 @@ function RefundDialog({ sale, onClose, onComplete }) {
                   />
                   <span>{line.displayName}</span>
                   <input
-                    aria-label={`Cantidad para ${line.displayName}`}
+                    aria-label={t`Cantidad para ${line.displayName}`}
                     type="number"
                     min="0"
                     max={line.quantity.remaining}
@@ -200,36 +242,30 @@ function RefundDialog({ sale, onClose, onComplete }) {
               disabled={command.pending}
               onClick={createPreview}
             >
-              {command.pending ? 'Calculando…' : 'Crear preview'}
+              {command.pending ? <Trans>Calculando…</Trans> : <Trans>Crear vista previa</Trans>}
             </button>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             <strong>
-              Total:{' '}
-              {formatOperationMoney(
-                preview.allocation.total.minorUnits,
-                preview.allocation.total.currency,
-              )}
+              <Trans>
+                Total:{' '}
+                {formatOperationMoney(
+                  preview.allocation.total.minorUnits,
+                  preview.allocation.total.currency,
+                )}
+              </Trans>
             </strong>
             {requiresApproval && !approvalId && (
               <>
-                <label>
-                  PIN del aprobador
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    value={managerPin}
-                    onChange={(event) => setManagerPin(event.target.value)}
-                  />
-                </label>
+                <ManagerPinField value={managerPin} onChange={setManagerPin} />
                 <button
                   className="btn"
                   type="button"
                   disabled={command.pending || managerPin.length < 4}
                   onClick={approve}
                 >
-                  Obtener aprobación
+                  <Trans>Obtener aprobación</Trans>
                 </button>
               </>
             )}
@@ -239,21 +275,18 @@ function RefundDialog({ sale, onClose, onComplete }) {
               disabled={command.pending || (requiresApproval && !approvalId)}
               onClick={commit}
             >
-              {command.pending ? 'Ejecutando…' : 'Confirmar refund'}
+              {command.pending ? <Trans>Ejecutando…</Trans> : <Trans>Confirmar reembolso</Trans>}
             </button>
           </div>
         )}
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function InventoryDialog({ row, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [overview, setOverview] = useState(null);
   const [operation, setOperation] = useState('inventory.adjustment');
@@ -354,7 +387,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
       managerPin,
       targetAggregateId: inventoryItemId,
     });
-    setMessage('Operación de inventario comprometida.');
+    setMessage(t`Operación de inventario confirmada.`);
     onComplete();
   }
 
@@ -444,16 +477,23 @@ function InventoryDialog({ row, onClose, onComplete }) {
       managerPin,
       targetAggregateId: count.id,
     });
-    setMessage('Conteo reconciliado.');
+    setMessage(t`Conteo reconciliado.`);
     onComplete();
   }
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Inventario">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Inventario`}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Inventario: {row.title}</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Inventario: {row.title}</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
@@ -464,12 +504,12 @@ function InventoryDialog({ row, onClose, onComplete }) {
             disabled={command.pending}
             onClick={load}
           >
-            Cargar autoridad
+            <Trans>Cargar datos autorizados</Trans>
           </button>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
             <label>
-              Operación
+              <Trans>Operación</Trans>
               <select
                 value={operation}
                 onChange={(event) => {
@@ -477,23 +517,23 @@ function InventoryDialog({ row, onClose, onComplete }) {
                   setPlanned(null);
                 }}
               >
-                <option value="inventory.adjustment">Ajuste</option>
-                <option value="inventory.waste">Merma</option>
-                <option value="inventory.damage">Daño</option>
-                <option value="inventory.quarantine">Cuarentena</option>
+                <option value="inventory.adjustment">{t`Ajuste`}</option>
+                <option value="inventory.waste">{t`Merma`}</option>
+                <option value="inventory.damage">{t`Daño`}</option>
+                <option value="inventory.quarantine">{t`Cuarentena`}</option>
               </select>
             </label>
             {operation === 'inventory.adjustment' && (
               <label>
-                Dirección
+                <Trans>Dirección</Trans>
                 <select value={direction} onChange={(event) => setDirection(event.target.value)}>
-                  <option value="increase">Aumentar</option>
-                  <option value="decrease">Reducir</option>
+                  <option value="increase">{t`Aumentar`}</option>
+                  <option value="decrease">{t`Reducir`}</option>
                 </select>
               </label>
             )}
             <label>
-              Cantidad
+              <Trans>Cantidad</Trans>
               <input
                 type="number"
                 min="1"
@@ -503,20 +543,12 @@ function InventoryDialog({ row, onClose, onComplete }) {
             </label>
             {!planned ? (
               <button className="btn" type="button" onClick={previewMutation}>
-                Revisar operación
+                <Trans>Revisar operación</Trans>
               </button>
             ) : (
               <>
                 {planned.approval.approvalRequired && (
-                  <label>
-                    PIN del aprobador
-                    <input
-                      type="password"
-                      inputMode="numeric"
-                      value={managerPin}
-                      onChange={(event) => setManagerPin(event.target.value)}
-                    />
-                  </label>
+                  <ManagerPinField value={managerPin} onChange={setManagerPin} />
                 )}
                 <button
                   className="btn btn-primary"
@@ -526,14 +558,14 @@ function InventoryDialog({ row, onClose, onComplete }) {
                   }
                   onClick={executeMutation}
                 >
-                  Confirmar operación
+                  <Trans>Confirmar operación</Trans>
                 </button>
               </>
             )}
             <hr />
             {!count ? (
               <button className="btn" type="button" onClick={createCount}>
-                Crear conteo del artículo
+                <Trans>Crear conteo del artículo</Trans>
               </button>
             ) : !submitted ? (
               <>
@@ -551,37 +583,30 @@ function InventoryDialog({ row, onClose, onComplete }) {
                   </label>
                 ))}
                 <button className="btn" type="button" onClick={submitCount}>
-                  Enviar conteo
+                  <Trans>Enviar conteo</Trans>
                 </button>
               </>
             ) : (
               <>
                 {submitted.variances.some((value) => value.approvalRequired) && (
-                  <label>
-                    PIN del aprobador
-                    <input
-                      type="password"
-                      inputMode="numeric"
-                      value={managerPin}
-                      onChange={(event) => setManagerPin(event.target.value)}
-                    />
-                  </label>
+                  <ManagerPinField value={managerPin} onChange={setManagerPin} />
                 )}
                 <button className="btn btn-primary" type="button" onClick={reconcileCount}>
-                  Reconciliar conteo
+                  <Trans>Reconciliar conteo</Trans>
                 </button>
               </>
             )}
           </div>
         )}
         {message && <p>{message}</p>}
-        {command.error && <p style={{ color: 'var(--danger)' }}>{command.error.message}</p>}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function ReceiptReprintDialog({ row, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState('');
@@ -593,16 +618,25 @@ function ReceiptReprintDialog({ row, onClose, onComplete }) {
     const result = HARDWARE_TERMINAL.has(response.result.command.status)
       ? response.result
       : await waitForHardwareResult(command, response.result.command.commandId);
-    setMessage(`COPY en estado ${result.command.status}. Referencia ${result.command.commandId}.`);
+    setMessage(
+      t`COPIA en estado ${result.command.status}. Referencia ${result.command.commandId}.`,
+    );
     onComplete();
   }
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Reimpresión">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Reimpresión`}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Reimprimir {row.publicReference}</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Reimprimir {row.publicReference}</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
@@ -612,7 +646,7 @@ function ReceiptReprintDialog({ row, onClose, onComplete }) {
             checked={confirmed}
             onChange={(event) => setConfirmed(event.target.checked)}
           />{' '}
-          Confirmo una copia controlada.
+          <Trans>Confirmo una copia controlada.</Trans>
         </label>
         <button
           className="btn btn-primary"
@@ -620,20 +654,17 @@ function ReceiptReprintDialog({ row, onClose, onComplete }) {
           disabled={!confirmed || command.pending}
           onClick={reprint}
         >
-          Crear COPY
+          <Trans>Crear COPIA</Trans>
         </button>
         {message && <p>{message}</p>}
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function LoyaltyDialog({ row, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [direction, setDirection] = useState('increase');
   const [points, setPoints] = useState(10);
@@ -692,23 +723,25 @@ function LoyaltyDialog({ row, onClose, onComplete }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Ajuste de puntos"
+        aria-label={t`Ajuste de puntos`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Ajuste de puntos</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Ajuste de puntos</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         <label>
-          Dirección
+          <Trans>Dirección</Trans>
           <select value={direction} onChange={(event) => setDirection(event.target.value)}>
-            <option value="increase">Aumentar</option>
-            <option value="decrease">Reducir</option>
+            <option value="increase">{t`Aumentar`}</option>
+            <option value="decrease">{t`Reducir`}</option>
           </select>
         </label>
         <label>
-          Puntos
+          <Trans>Puntos</Trans>
           <input
             type="number"
             min="1"
@@ -719,21 +752,15 @@ function LoyaltyDialog({ row, onClose, onComplete }) {
         </label>
         {!planned ? (
           <button className="btn" type="button" onClick={preview}>
-            Revisar ajuste
+            <Trans>Revisar ajuste</Trans>
           </button>
         ) : (
           <>
-            <p>Saldo proyectado: {planned.preview.projectedAvailable}</p>
+            <p>
+              <Trans>Saldo proyectado: {planned.preview.projectedAvailable}</Trans>
+            </p>
             {planned.preview.approvalPermission && (
-              <label>
-                PIN del aprobador
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  value={managerPin}
-                  onChange={(event) => setManagerPin(event.target.value)}
-                />
-              </label>
+              <ManagerPinField value={managerPin} onChange={setManagerPin} />
             )}
             <button
               className="btn btn-primary"
@@ -743,21 +770,18 @@ function LoyaltyDialog({ row, onClose, onComplete }) {
               }
               onClick={commit}
             >
-              Confirmar ajuste
+              <Trans>Confirmar ajuste</Trans>
             </button>
           </>
         )}
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function GiftCardIssueDialog({ row, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [amount, setAmount] = useState(10000);
   const [managerPin, setManagerPin] = useState('');
@@ -819,26 +843,30 @@ function GiftCardIssueDialog({ row, onClose, onComplete }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Emitir tarjeta de regalo"
+        aria-label={t`Emitir tarjeta de regalo`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Emisión promocional</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Emisión promocional</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         {secret ? (
           <>
-            <p>Código de entrega única:</p>
+            <p>
+              <Trans>Código de entrega única:</Trans>
+            </p>
             <code>{secret.code}</code>
             <button className="btn btn-primary" type="button" onClick={onComplete}>
-              Terminar
+              <Trans>Terminar</Trans>
             </button>
           </>
         ) : (
           <>
             <label>
-              Importe menor
+              <Trans>Importe en centavos</Trans>
               <input
                 type="number"
                 min="1"
@@ -849,21 +877,15 @@ function GiftCardIssueDialog({ row, onClose, onComplete }) {
             </label>
             {!planned ? (
               <button className="btn" type="button" onClick={preview}>
-                Revisar emisión
+                <Trans>Revisar emisión</Trans>
               </button>
             ) : (
               <>
-                <p>Límite: {planned.preview.maximumValueMinorUnits}</p>
+                <p>
+                  <Trans>Límite: {planned.preview.maximumValueMinorUnits}</Trans>
+                </p>
                 {planned.preview.approvalPermission && (
-                  <label>
-                    PIN del aprobador
-                    <input
-                      type="password"
-                      inputMode="numeric"
-                      value={managerPin}
-                      onChange={(event) => setManagerPin(event.target.value)}
-                    />
-                  </label>
+                  <ManagerPinField value={managerPin} onChange={setManagerPin} />
                 )}
                 <button
                   className="btn btn-primary"
@@ -873,23 +895,20 @@ function GiftCardIssueDialog({ row, onClose, onComplete }) {
                   }
                   onClick={issue}
                 >
-                  Emitir y revelar
+                  <Trans>Emitir y revelar</Trans>
                 </button>
               </>
             )}
           </>
         )}
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function CatalogDialog({ row, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [name, setName] = useState(row?.title || '');
   const [price, setPrice] = useState(row?.amountMinorUnits ?? 0);
@@ -947,10 +966,12 @@ function CatalogDialog({ row, onClose, onComplete }) {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Producto">
+      <section className="card modal-card" role="dialog" aria-modal="true" aria-label={t`Producto`}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>{row ? 'Editar producto' : 'Crear producto'}</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            {row ? <Trans>Editar producto</Trans> : <Trans>Crear producto</Trans>}
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
@@ -961,12 +982,12 @@ function CatalogDialog({ row, onClose, onComplete }) {
             disabled={command.pending}
             onClick={loadDetail}
           >
-            Cargar datos actuales
+            <Trans>Cargar datos actuales</Trans>
           </button>
         ) : (
           <>
             <label>
-              Nombre
+              <Trans>Nombre</Trans>
               <input
                 value={name}
                 maxLength={240}
@@ -974,7 +995,7 @@ function CatalogDialog({ row, onClose, onComplete }) {
               />
             </label>
             <label>
-              Precio en unidades menores
+              <Trans>Precio en centavos</Trans>
               <input
                 type="number"
                 min="0"
@@ -988,7 +1009,7 @@ function CatalogDialog({ row, onClose, onComplete }) {
               <input value={sku} maxLength={120} onChange={(event) => setSku(event.target.value)} />
             </label>
             <label>
-              Código de barras
+              <Trans>Código de barras</Trans>
               <input
                 value={barcode}
                 maxLength={160}
@@ -996,11 +1017,11 @@ function CatalogDialog({ row, onClose, onComplete }) {
               />
             </label>
             <label>
-              Categoría
+              <Trans>Categoría</Trans>
               <input
                 value={categoryId}
                 onChange={(event) => setCategoryId(event.target.value)}
-                placeholder="UUID opcional"
+                placeholder={t`UUID opcional`}
               />
             </label>
             <label>
@@ -1009,14 +1030,14 @@ function CatalogDialog({ row, onClose, onComplete }) {
                 checked={requiresPreparation}
                 onChange={(event) => setRequiresPreparation(event.target.checked)}
               />{' '}
-              Requiere preparación
+              <Trans>Requiere preparación</Trans>
             </label>
             <label>
-              Artículo de inventario
+              <Trans>Artículo de inventario</Trans>
               <input
                 value={inventoryItemId}
                 onChange={(event) => setInventoryItemId(event.target.value)}
-                placeholder="UUID opcional"
+                placeholder={t`UUID opcional`}
               />
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -1026,27 +1047,24 @@ function CatalogDialog({ row, onClose, onComplete }) {
                 disabled={command.pending || !name.trim()}
                 onClick={save}
               >
-                Guardar
+                <Trans>Guardar</Trans>
               </button>
               {row && row.status !== 'archived' && (
                 <button className="btn" type="button" disabled={command.pending} onClick={archive}>
-                  Archivar
+                  <Trans>Archivar</Trans>
                 </button>
               )}
             </div>
           </>
         )}
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function RegisterDialog({ row, onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [displayName, setDisplayName] = useState(row.title);
   const [assignmentPolicy, setAssignmentPolicy] = useState('device_required');
@@ -1068,15 +1086,17 @@ function RegisterDialog({ row, onClose, onComplete }) {
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label="Registro">
+      <section className="card modal-card" role="dialog" aria-modal="true" aria-label={t`Registro`}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Configurar registro</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Configurar registro</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         <label>
-          Nombre
+          <Trans>Nombre</Trans>
           <input
             value={displayName}
             maxLength={80}
@@ -1084,20 +1104,20 @@ function RegisterDialog({ row, onClose, onComplete }) {
           />
         </label>
         <label>
-          Política
+          <Trans>Política</Trans>
           <select
             value={assignmentPolicy}
             onChange={(event) => setAssignmentPolicy(event.target.value)}
           >
-            <option value="device_required">Dispositivo requerido</option>
-            <option value="operator_selects">Selección del operador</option>
+            <option value="device_required">{t`Dispositivo requerido`}</option>
+            <option value="operator_selects">{t`Selección del operador`}</option>
           </select>
         </label>
         <label>
-          Dispositivo POS asignado
+          <Trans>Dispositivo POS asignado</Trans>
           <input
             value={assignedDeviceId}
-            placeholder="UUID opcional"
+            placeholder={t`UUID opcional`}
             onChange={(event) => setAssignedDeviceId(event.target.value)}
           />
         </label>
@@ -1107,7 +1127,7 @@ function RegisterDialog({ row, onClose, onComplete }) {
             checked={enabled}
             onChange={(event) => setEnabled(event.target.checked)}
           />{' '}
-          Habilitado
+          <Trans>Habilitado</Trans>
         </label>
         <button
           className="btn btn-primary"
@@ -1115,19 +1135,16 @@ function RegisterDialog({ row, onClose, onComplete }) {
           disabled={command.pending || !displayName.trim()}
           onClick={save}
         >
-          Guardar
+          <Trans>Guardar</Trans>
         </button>
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function KitchenRouteDialog({ onClose, onComplete }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [stationId, setStationId] = useState('');
   const [routeType, setRouteType] = useState('default');
@@ -1154,42 +1171,44 @@ function KitchenRouteDialog({ onClose, onComplete }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Ruta de cocina"
+        aria-label={t`Ruta de cocina`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Configurar ruta de cocina</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Configurar ruta de cocina</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
         <label>
-          Estación
+          <Trans>Estación</Trans>
           <input
             value={stationId}
             onChange={(event) => setStationId(event.target.value)}
-            placeholder="UUID de estación"
+            placeholder={t`UUID de estación`}
           />
         </label>
         <label>
-          Tipo
+          <Trans>Tipo</Trans>
           <select value={routeType} onChange={(event) => setRouteType(event.target.value)}>
-            <option value="default">Predeterminada</option>
-            <option value="product">Producto</option>
-            <option value="category">Categoría</option>
+            <option value="default">{t`Predeterminada`}</option>
+            <option value="product">{t`Producto`}</option>
+            <option value="category">{t`Categoría`}</option>
           </select>
         </label>
         {targetRequired && (
           <label>
-            Objetivo
+            <Trans>Objetivo</Trans>
             <input
               value={routeTargetId}
               onChange={(event) => setRouteTargetId(event.target.value)}
-              placeholder="UUID del objetivo"
+              placeholder={t`UUID del objetivo`}
             />
           </label>
         )}
         <label>
-          Prioridad
+          <Trans>Prioridad</Trans>
           <input
             type="number"
             min="0"
@@ -1204,19 +1223,16 @@ function KitchenRouteDialog({ onClose, onComplete }) {
           disabled={command.pending || !stationId || (targetRequired && !routeTargetId)}
           onClick={save}
         >
-          Guardar ruta
+          <Trans>Guardar ruta</Trans>
         </button>
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
 }
 
 function RecoveryDialog({ row, onClose }) {
+  const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [result, setResult] = useState(null);
   async function query() {
@@ -1257,11 +1273,13 @@ function RecoveryDialog({ row, onClose }) {
         className="card modal-card"
         role="dialog"
         aria-modal="true"
-        aria-label="Recuperación"
+        aria-label={t`Recuperación`}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0 }}>Comando original</h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label="Cerrar">
+          <h3 style={{ margin: 0 }}>
+            <Trans>Comando original</Trans>
+          </h3>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
           </button>
         </div>
@@ -1271,7 +1289,7 @@ function RecoveryDialog({ row, onClose }) {
           disabled={command.pending}
           onClick={query}
         >
-          Consultar autoridad
+          <Trans>Consultar el registro</Trans>
         </button>
         {canRecover && (
           <button
@@ -1280,30 +1298,38 @@ function RecoveryDialog({ row, onClose }) {
             disabled={command.pending}
             onClick={executeDomainRecovery}
           >
-            Ejecutar recuperación del dominio
+            <Trans>Ejecutar recuperación del dominio</Trans>
           </button>
         )}
         {result && (
           <dl>
-            <dt>Tipo</dt>
+            <dt>
+              <Trans>Tipo</Trans>
+            </dt>
             <dd>{result.commandType}</dd>
-            <dt>Estado</dt>
+            <dt>
+              <Trans>Estado</Trans>
+            </dt>
             <dd>{result.status}</dd>
-            <dt>Correlación</dt>
+            <dt>
+              <Trans>Correlación</Trans>
+            </dt>
             <dd>
               <code>{result.correlationId}</code>
             </dd>
-            <dt>Acción</dt>
+            <dt>
+              <Trans>Acción</Trans>
+            </dt>
             <dd>
-              {result.retryable ? 'Usa la acción del dominio.' : 'Consulta antes de repetir.'}
+              {result.retryable ? (
+                <Trans>Usa la acción del dominio.</Trans>
+              ) : (
+                <Trans>Consulta antes de repetir.</Trans>
+              )}
             </dd>
           </dl>
         )}
-        {command.error && (
-          <p style={{ color: 'var(--danger)' }}>
-            {ERROR_COPY[command.error.code] || command.error.message}
-          </p>
-        )}
+        <CommandError command={command} />
       </section>
     </div>
   );
@@ -1315,7 +1341,81 @@ function RecoveryDialog({ row, onClose }) {
  * every dialog. Both the bridge `operations` screen and the new hubs render it.
  * Give it a `key={domain}` so a domain switch resets the cursor and dialog state.
  */
+// Per-domain observability views (the seam): the generic table is the fallback for
+// every domain; a domain with a registered summary gets a rich strip above it. Adding
+// a rich domain is one component + one branch in DomainSummary — the table is untouched.
+function CashShiftsSummary({ items }) {
+  const shifts = items.filter((it) => it.facts);
+  if (!shifts.length) return null;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
+        padding: '16px 20px',
+        borderBottom: '1px solid var(--line)',
+      }}
+    >
+      {shifts.map((it) => {
+        const f = it.facts;
+        const expected = f.expectedCashMinorUnits ?? null;
+        const counted = f.countedCashMinorUnits ?? null;
+        const variance = counted != null && expected != null ? counted - expected : null;
+        const varianceOff = variance != null && variance !== 0;
+        const accent = varianceOff
+          ? 'var(--danger)'
+          : it.status === 'open'
+            ? 'var(--success)'
+            : 'var(--ink-2)';
+        return (
+          <div
+            key={it.id}
+            style={{
+              minWidth: 200,
+              borderLeft: `3px solid ${accent}`,
+              padding: '10px 14px',
+              borderRadius: 6,
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>{f.operator || '—'}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+              {f.register} · {it.status}
+            </div>
+            <div style={{ fontSize: 12, marginTop: 6 }}>
+              <Trans>Fondo {formatOperationMoney(f.openingFloatMinorUnits, it.currency)}</Trans>
+            </div>
+            <div style={{ fontSize: 12 }}>
+              <Trans>
+                Esperado <strong>{formatOperationMoney(expected, it.currency)}</strong>
+              </Trans>
+            </div>
+            {counted != null && (
+              <div style={{ fontSize: 12 }}>
+                <Trans>Contado {formatOperationMoney(counted, it.currency)}</Trans>
+              </div>
+            )}
+            {variance != null && (
+              <div
+                style={{ fontSize: 12, color: varianceOff ? 'var(--danger)' : 'var(--success)' }}
+              >
+                <Trans>Diferencia {formatOperationMoney(variance, it.currency)}</Trans>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DomainSummary({ domain, items }) {
+  if (domain === 'cash_shifts') return <CashShiftsSummary items={items} />;
+  return null;
+}
+
 export function DomainWorkspace({ domain }) {
+  const { t, i18n } = useLingui();
   const navigate = useNavigate();
   const merchant = useMerchant();
   const [cursor, setCursor] = useState(0);
@@ -1360,15 +1460,15 @@ export function DomainWorkspace({ domain }) {
             }}
           >
             <div>
-              <h3 style={{ margin: 0 }}>{selected?.label || 'Operación'}</h3>
+              <h3 style={{ margin: 0 }}>{selected?.label || t`Operación`}</h3>
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>
-                Permiso: {selected?.requiredPermissions?.join(' o ') || '—'}
+                <Trans>Permiso: {selected?.requiredPermissions?.join(t` o `) || '—'}</Trans>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {domain === 'catalog' && (
                 <button className="btn" type="button" onClick={() => setCatalogRow(null)}>
-                  Crear producto
+                  <Trans>Crear producto</Trans>
                 </button>
               )}
               {domain === 'gift_cards' && (
@@ -1377,12 +1477,12 @@ export function DomainWorkspace({ domain }) {
                   type="button"
                   onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
                 >
-                  Emitir tarjeta
+                  <Trans>Emitir tarjeta</Trans>
                 </button>
               )}
               {domain === 'kitchen' && (
                 <button className="btn" type="button" onClick={() => setKitchenRouteOpen(true)}>
-                  Configurar ruta
+                  <Trans>Configurar ruta</Trans>
                 </button>
               )}
               {ACTION_ROUTES[domain] && (
@@ -1391,7 +1491,7 @@ export function DomainWorkspace({ domain }) {
                   type="button"
                   onClick={() => navigate(ACTION_ROUTES[domain])}
                 >
-                  Administrar
+                  <Trans>Administrar</Trans>
                 </button>
               )}
               {canUseMerchantScope && (
@@ -1404,7 +1504,7 @@ export function DomainWorkspace({ domain }) {
                     setCursor(0);
                   }}
                 >
-                  {merchantWide ? 'Ubicación' : 'Todo el negocio'}
+                  {merchantWide ? <Trans>Ubicación</Trans> : <Trans>Todo el negocio</Trans>}
                 </button>
               )}
               <button
@@ -1413,7 +1513,7 @@ export function DomainWorkspace({ domain }) {
                 disabled={state.loading}
                 onClick={() => setRefresh((value) => value + 1)}
               >
-                {state.loading ? 'Actualizando…' : 'Actualizar'}
+                {state.loading ? <Trans>Actualizando…</Trans> : <Trans>Actualizar</Trans>}
               </button>
             </div>
           </div>
@@ -1428,29 +1528,48 @@ export function DomainWorkspace({ domain }) {
           ) : null}
         </div>
 
+        {state.data?.items?.length ? (
+          <DomainSummary domain={domain} items={state.data.items} />
+        ) : null}
         {selected && !selected.available ? (
           <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-            Requiere permiso: {selected.requiredPermissions?.join(' o ') || '—'}
+            <Trans>Requiere permiso: {selected.requiredPermissions?.join(t` o `) || '—'}</Trans>
           </div>
         ) : state.error ? (
           <div style={{ padding: 28, color: 'var(--danger)' }}>
-            {ERROR_COPY[state.errorCode] || 'No fue posible cargar esta operación.'}
+            {ERROR_COPY[state.errorCode]
+              ? i18n._(ERROR_COPY[state.errorCode])
+              : t`No fue posible cargar esta operación.`}
           </div>
         ) : state.loading && !state.data?.items?.length ? (
-          <div style={{ padding: 28, color: 'var(--ink-3)' }}>Cargando datos autorizados…</div>
+          <div style={{ padding: 28, color: 'var(--ink-3)' }}>
+            <Trans>Cargando datos autorizados…</Trans>
+          </div>
         ) : !state.data?.items?.length ? (
-          <div style={{ padding: 28, color: 'var(--ink-3)' }}>No hay datos para este alcance.</div>
+          <div style={{ padding: 28, color: 'var(--ink-3)' }}>
+            <Trans>No hay datos para este alcance.</Trans>
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: 'var(--ink-3)' }}>
-                  <th style={{ padding: '12px 16px' }}>Referencia</th>
-                  <th>Detalle</th>
-                  <th>Estado</th>
-                  <th>Importe</th>
-                  <th>Fecha</th>
-                  <th aria-label="Acciones" />
+                  <th style={{ padding: '12px 16px' }}>
+                    <Trans>Referencia</Trans>
+                  </th>
+                  <th>
+                    <Trans>Detalle</Trans>
+                  </th>
+                  <th>
+                    <Trans>Estado</Trans>
+                  </th>
+                  <th>
+                    <Trans>Importe</Trans>
+                  </th>
+                  <th>
+                    <Trans>Fecha</Trans>
+                  </th>
+                  <th aria-label={t`Acciones`} />
                 </tr>
               </thead>
               <tbody>
@@ -1478,49 +1597,49 @@ export function DomainWorkspace({ domain }) {
                     <td style={{ paddingRight: 14 }}>
                       {domain === 'sales' && (
                         <button className="btn" type="button" onClick={() => setRefundSale(item)}>
-                          Refund
+                          <Trans>Reembolsar</Trans>
                         </button>
                       )}
                       {domain === 'inventory' && (
                         <button className="btn" type="button" onClick={() => setInventoryRow(item)}>
-                          Operar
+                          <Trans>Operar</Trans>
                         </button>
                       )}
                       {domain === 'receipts' && item.status !== 'not_printed' && (
                         <button className="btn" type="button" onClick={() => setReceiptRow(item)}>
-                          Reimprimir
+                          <Trans>Reimprimir</Trans>
                         </button>
                       )}
                       {domain === 'loyalty' && (
                         <button className="btn" type="button" onClick={() => setLoyaltyRow(item)}>
-                          Ajustar
+                          <Trans>Ajustar</Trans>
                         </button>
                       )}
                       {domain === 'gift_cards' && (
                         <button className="btn" type="button" onClick={() => setGiftCardRow(item)}>
-                          Emitir
+                          <Trans>Emitir</Trans>
                         </button>
                       )}
                       {domain === 'catalog' && (
                         <button className="btn" type="button" onClick={() => setCatalogRow(item)}>
-                          Editar
+                          <Trans>Editar</Trans>
                         </button>
                       )}
                       {domain === 'registers' && (
                         <button className="btn" type="button" onClick={() => setRegisterRow(item)}>
-                          Configurar
+                          <Trans>Configurar</Trans>
                         </button>
                       )}
                       {domain === 'recovery' && (
                         <button className="btn" type="button" onClick={() => setRecoveryRow(item)}>
-                          Recuperar
+                          <Trans>Recuperar</Trans>
                         </button>
                       )}
                       <button
                         className="btn-icon"
                         type="button"
                         onClick={() => copy(item.correlationId || item.publicReference)}
-                        aria-label={`Copiar referencia ${item.publicReference}`}
+                        aria-label={t`Copiar referencia ${item.publicReference}`}
                       >
                         {copied === (item.correlationId || item.publicReference) ? '✓' : '⧉'}
                       </button>
@@ -1546,10 +1665,15 @@ export function DomainWorkspace({ domain }) {
             disabled={cursor === 0 || state.loading}
             onClick={() => setCursor(Math.max(0, cursor - 20))}
           >
-            Anterior
+            <Trans>Anterior</Trans>
           </button>
           <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-            Página {Math.floor(cursor / 20) + 1} · {permissions.length} permisos efectivos
+            <Trans>Página {Math.floor(cursor / 20) + 1}</Trans> ·{' '}
+            <Plural
+              value={permissions.length}
+              one="# permiso efectivo"
+              other="# permisos efectivos"
+            />
           </span>
           <button
             className="btn"
@@ -1557,7 +1681,7 @@ export function DomainWorkspace({ domain }) {
             disabled={!state.data?.page?.hasMore || state.loading}
             onClick={() => setCursor(Number(state.data.page.nextCursor))}
           >
-            Siguiente
+            <Trans>Siguiente</Trans>
           </button>
         </div>
       </section>
