@@ -3,7 +3,7 @@
 Use this hierarchy when files disagree.
 
 1. Runtime code, migrations, schemas, and tests/evals.
-2. Root `AGENTS.md` and local repo `AGENTS.md`.
+2. Root `AGENTS.md` and local app `AGENTS.md`.
 3. Active architecture decisions and current operating-system docs.
 4. `WORKSPACE.md`, `REPO_CONTEXT.md`, retrieval maps, runbooks, and current report indexes.
 5. Current reports and signoff reviews.
@@ -21,6 +21,6 @@ Use this hierarchy when files disagree.
 
 - Workspace-wide rules: root `AGENTS.md`.
 - Workspace orientation: `WORKSPACE.md`.
-- Repo-local rules: local `AGENTS.md`.
-- Repo-local entry context: local `REPO_CONTEXT.md`.
+- App-local rules: local `AGENTS.md`.
+- App-local entry context: local `REPO_CONTEXT.md`.
 - Adapter behavior: adapter files, generated or maintained from neutral contracts.

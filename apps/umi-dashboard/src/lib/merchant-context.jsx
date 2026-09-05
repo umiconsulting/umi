@@ -105,6 +105,13 @@ export function MerchantProvider({ children }) {
   };
 
   const setSelectedLocationId = (locationId) => {
+    if (
+      locationId &&
+      locationId !== selectedLocationId &&
+      capabilities?.canSwitchLocations !== true
+    ) {
+      return;
+    }
     setSelectedLocationIdState(locationId || '');
     if (locationId) window.localStorage.setItem(SELECTED_LOCATION_KEY, locationId);
     else window.localStorage.removeItem(SELECTED_LOCATION_KEY);

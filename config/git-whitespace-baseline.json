@@ -2,6 +2,21 @@
   "version": 1,
   "allowedFindings": [
     {
+      "path": "docs/migration/audit-output/2026-09-01-merchant-role-rehearsal.md",
+      "line": 3,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/migration/audit-output/2026-09-01-merchant-role-rehearsal.md",
+      "line": 4,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/migration/audit-output/2026-09-01-merchant-role-rehearsal.md",
+      "line": 5,
+      "message": "trailing whitespace."
+    },
+    {
       "path": "docs/product/UMIPOS_DEVICE_ENROLLMENT_SPEC.md",
       "line": 3,
       "message": "trailing whitespace."
@@ -10,7 +25,32 @@
       "path": "docs/product/UMIPOS_DEVICE_ENROLLMENT_SPEC.md",
       "line": 4,
       "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/product/UMIPOS_REALTIME_PAIRING_SPEC.md",
+      "line": 3,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/product/UMIPOS_REALTIME_PAIRING_SPEC.md",
+      "line": 4,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/reports/2026-08-31-playwright-agent-testing.md",
+      "line": 3,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/reports/2026-08-31-playwright-agent-testing.md",
+      "line": 4,
+      "message": "trailing whitespace."
+    },
+    {
+      "path": "docs/reports/2026-08-31-super-admin-dashboard-research.md",
+      "line": 3,
+      "message": "trailing whitespace."
     }
   ],
-  "reason": "These two Markdown lines use a deliberate hard line break and predate this PR check."
+  "reason": "Markdown metadata headers that use a deliberate hard line break (two trailing spaces). Same pattern as the original UMIPOS_DEVICE_ENROLLMENT_SPEC entries."
 }

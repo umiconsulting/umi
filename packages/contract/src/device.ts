@@ -13,6 +13,14 @@ export const DeviceLifecycleState = z.enum([
 export type DeviceLifecycleState = z.infer<typeof DeviceLifecycleState>;
 export const DeviceType = z.enum(['pos_terminal', 'kds']);
 export const DevicePlatform = z.enum(['android', 'ios', 'linux', 'macos', 'windows', 'web']);
+/**
+ * How a terminal is used on the floor, as the owner declares it. It is deliberately
+ * NOT derived from `platform`: the same Android tablet is a fixed register on one
+ * counter and a hand-held on the next, and the label exists for the person who has to
+ * find the device, not for the runtime.
+ */
+export const DeviceMobility = z.enum(['static', 'mobile']);
+export type DeviceMobility = z.infer<typeof DeviceMobility>;
 
 export const DeviceSummary = z
   .object({
@@ -23,6 +31,7 @@ export const DeviceSummary = z
     displayName: z.string().min(1).max(120),
     type: DeviceType,
     platform: DevicePlatform,
+    mobility: DeviceMobility,
     state: DeviceLifecycleState,
     credentialVersion: z.number().int().positive(),
     lastSeenAt: IsoTimestamp.nullable(),
@@ -39,6 +48,7 @@ export const BeginDeviceEnrollmentRequest = z
     displayName: z.string().trim().min(1).max(120),
     type: DeviceType,
     platform: DevicePlatform,
+    mobility: DeviceMobility.default('static'),
     idempotencyKey: Uuid,
   })
   .strict();
@@ -112,6 +122,7 @@ export const DeviceEnrollmentRequestView = z
     type: DeviceType,
     platform: DevicePlatform,
     requestedPlatform: DevicePlatform.nullable(),
+    mobility: DeviceMobility,
     state: DeviceEnrollmentRequestState,
     expiresAt: IsoTimestamp,
     claimedAt: IsoTimestamp.nullable(),
@@ -128,6 +139,23 @@ export const DeviceEnrollmentRequestList = z
   .object({ requests: z.array(DeviceEnrollmentRequestView).max(200) })
   .strict();
 export type DeviceEnrollmentRequestList = z.infer<typeof DeviceEnrollmentRequestList>;
+
+/**
+ * The devices an owner may see for one merchant: the enrolled terminals themselves,
+ * not the requests that produced them. A revoked or replaced device is excluded — it
+ * is history, and the screen that reads this lists what is in service.
+ */
+export const DeviceList = z.object({ devices: z.array(DeviceSummary).max(200) }).strict();
+export type DeviceList = z.infer<typeof DeviceList>;
+
+/** The two fields an owner may change on an enrolled device after the fact. */
+export const UpdateDeviceRequest = z
+  .object({
+    displayName: z.string().trim().min(1).max(120),
+    mobility: DeviceMobility,
+  })
+  .strict();
+export type UpdateDeviceRequest = z.infer<typeof UpdateDeviceRequest>;
 
 export const DecideDeviceEnrollmentRequest = z.object({ idempotencyKey: Uuid }).strict();
 export type DecideDeviceEnrollmentRequest = z.infer<typeof DecideDeviceEnrollmentRequest>;
@@ -310,7 +338,19 @@ export type VerifyOperatorPinRequest = z.infer<typeof VerifyOperatorPinRequest>;
 export const ManagerApprovalRequest = z
   .object({
     operatorSessionId: Uuid,
-    managerPin: z.string().regex(/^\d{4,8}$/),
+    /**
+     * Exactly one of `managerPin` or `managerCard` must be sent. It is not
+     * expressed as a zod refinement because a top-level refinement turns this
+     * model into a `ZodEffects`, which the Dart emitter cannot describe; the
+     * API rejects a request carrying both or neither.
+     */
+    managerPin: z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .nullable()
+      .default(null),
+    /** Opaque token read from a manager card or fob. */
+    managerCard: z.string().min(8).max(256).nullable().default(null),
     permission: z.string().min(1).max(100),
     merchantId: Uuid,
     locationId: Uuid,
@@ -328,7 +368,7 @@ export const ElevationGrantView = z
     permission: z.string().min(1).max(100),
     merchantId: Uuid,
     locationId: Uuid,
-    method: z.enum(['manager_approval', 'operator_pin']),
+    method: z.enum(['manager_approval', 'manager_card', 'operator_pin']),
     expiresAt: IsoTimestamp,
     commandFingerprint: z
       .string()
@@ -342,7 +382,10 @@ export const deviceModels = {
   DeviceLifecycleState,
   DeviceType,
   DevicePlatform,
+  DeviceMobility,
   DeviceSummary,
+  DeviceList,
+  UpdateDeviceRequest,
   BeginDeviceEnrollmentRequest,
   EnrollmentChallenge,
   DeviceEnrollmentRequestState,

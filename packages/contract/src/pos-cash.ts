@@ -90,6 +90,7 @@ export const CashRecoveryState = z.enum([
   'reconciliation_required',
   'register_blocked',
   'operator_mismatch',
+  'device_adoption_required',
   'credential_rotated',
   'policy_expired',
   'posting_pending',
@@ -198,6 +199,13 @@ export const CashShift = z
     registerId: Uuid,
     deviceId: Uuid,
     deviceCredentialVersion: z.number().int().positive(),
+    /**
+     * The terminal holding the drawer right now. Equal to `deviceId` until custody
+     * moves — a replaced tablet, a rotated credential, or a web POS that lost its
+     * browser storage and came back as a new device.
+     */
+    holdingDeviceId: Uuid,
+    holdingDeviceCredentialVersion: z.number().int().positive(),
     openingOperatorId: Uuid,
     responsibleOperatorId: Uuid,
     operatorSessionId: Uuid,
@@ -546,6 +554,90 @@ export const ShiftCloseResult = z
   })
   .strict();
 
+export const CashShiftCustodyEventType = z.enum(['device_adoption', 'manager_recovery']);
+
+/**
+ * One rebinding of a cash shift onto a different terminal, or onto a manager who is
+ * closing it out. Read it as the chain of custody for the drawer: both sides of the
+ * swap are named, so a reader can always say which terminal held the money when.
+ */
+export const CashShiftCustodyEvent = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    registerId: Uuid,
+    eventType: CashShiftCustodyEventType,
+    previousHoldingDeviceId: Uuid,
+    newHoldingDeviceId: Uuid.nullable(),
+    actingOperatorId: Uuid,
+    responsibleOperatorId: Uuid,
+    shiftStatusBefore: CashShiftStatus,
+    shiftStatusAfter: CashShiftStatus,
+    expectedCash: Money.nullable(),
+    countedCash: Money.nullable(),
+    variance: Money.nullable(),
+    reasonCode: z.string().min(1).max(80),
+    note: SafeNote,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+
+/**
+ * The same operator takes their own open shift back onto the terminal in front of
+ * them. No approval and no count: nothing about the drawer changes, only which device
+ * is allowed to speak for it. This is the ordinary path after a browser loses its
+ * stored identity, which on web is one clearing of site data away.
+ */
+export const AdoptCashShiftRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    expectedShiftVersion: z.number().int().positive(),
+    reasonCode: z.string().min(1).max(80),
+  })
+  .strict();
+
+export const AdoptCashShiftResult = z
+  .object({
+    shift: CashShift,
+    register: PhysicalRegister,
+    custody: CashShiftCustodyEvent,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+/**
+ * A manager closes out a shift whose operator cannot come back to close it — the
+ * terminal is gone, or the person is. The manager counts the drawer under their own
+ * name and the shift lands on `recovered`, never `closed`, so a report can always
+ * tell a counted-out shift from one its own cashier reconciled.
+ */
+export const RecoverCashShiftRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    countedCash: NonNegativeMoney,
+    denominations: z.array(DenominationCount).max(64),
+    approvalId: Uuid,
+    approvalFingerprint: Fingerprint,
+    expectedShiftVersion: z.number().int().positive(),
+    reasonCode: z.string().min(1).max(80),
+    note: SafeNote,
+  })
+  .strict()
+  .superRefine((value, context) =>
+    validateDenominations(value.countedCash, value.denominations, context),
+  );
+
+export const RecoverCashShiftResult = z
+  .object({
+    summary: CashShiftSummary,
+    custody: CashShiftCustodyEvent,
+    recoveredAt: IsoTimestamp,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
 export const CashCenterQuery = z
   .object({
     locationId: Uuid,
@@ -576,6 +668,13 @@ export const CashCenterSnapshot = z
     policy: CashShiftPolicy,
     registers: z.array(PhysicalRegister).max(100),
     currentShift: CashShift.nullable(),
+    /**
+     * The operator's own open shift, sitting on a terminal that is not this one. It
+     * appears when this device cannot find a shift of its own but the operator still
+     * has one somewhere — the ordinary shape of a web POS that lost its stored
+     * identity. `adopt_shift` moves it here.
+     */
+    adoptableShift: CashShift.nullable(),
     expectedCash: ExpectedCash.nullable(),
     latestCount: CashCountSummary.nullable(),
     varianceResolution: CashVarianceResolution.nullable(),
@@ -639,6 +738,12 @@ export type RecountRequest = z.infer<typeof RecountRequest>;
 export type NoSaleDrawerRequest = z.infer<typeof NoSaleDrawerRequest>;
 export type NoSaleDrawerEvent = z.infer<typeof NoSaleDrawerEvent>;
 export type ShiftHandoff = z.infer<typeof ShiftHandoff>;
+export type CashShiftCustodyEventType = z.infer<typeof CashShiftCustodyEventType>;
+export type CashShiftCustodyEvent = z.infer<typeof CashShiftCustodyEvent>;
+export type AdoptCashShiftRequest = z.infer<typeof AdoptCashShiftRequest>;
+export type AdoptCashShiftResult = z.infer<typeof AdoptCashShiftResult>;
+export type RecoverCashShiftRequest = z.infer<typeof RecoverCashShiftRequest>;
+export type RecoverCashShiftResult = z.infer<typeof RecoverCashShiftResult>;
 
 export const posCashModels = {
   RegisterStatus,
@@ -680,6 +785,12 @@ export const posCashModels = {
   CashShiftSummary,
   ShiftCloseRequest,
   ShiftCloseResult,
+  CashShiftCustodyEventType,
+  CashShiftCustodyEvent,
+  AdoptCashShiftRequest,
+  AdoptCashShiftResult,
+  RecoverCashShiftRequest,
+  RecoverCashShiftResult,
   CashRecoveryState,
   CashCenterQuery,
   CashCommandRecoveryQuery,

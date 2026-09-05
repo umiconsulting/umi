@@ -18,6 +18,7 @@ const {
   OkResponse,
   PosPinLoginRequest,
   CreateStaffRequest,
+  UpdateStaffRequest,
 } = require('../dist/index.cjs');
 
 test('ScanRequest', () => {
@@ -184,23 +185,25 @@ test('POS PIN login requires scoped device input and four to eight digits', () =
 test('staff creation accepts a personal operator PIN without exposing it in responses', () => {
   assert.ok(
     CreateStaffRequest.safeParse({
-      name: 'Cashier',
-      email: 'cashier@example.test',
-      role: 'cashier',
-      locationId: null,
+      name: 'Barista',
+      phone: '+526671234567',
+      role: 'STAFF',
       operatorPin: '2468',
     }).success,
   );
   assert.equal(
     CreateStaffRequest.safeParse({
-      name: 'Cashier',
-      email: 'cashier@example.test',
-      role: 'cashier',
-      locationId: null,
+      name: 'Barista',
+      phone: '+526671234567',
+      role: 'STAFF',
       operatorPin: '12ab',
     }).success,
     false,
   );
+  assert.equal(CreateStaffRequest.safeParse({ name: 'Barista', role: 'STAFF' }).success, false);
+  assert.ok(UpdateStaffRequest.safeParse({ role: 'ADMIN', operatorPin: null }).success);
+  assert.ok(UpdateStaffRequest.safeParse({ status: 'disabled' }).success);
+  assert.equal(UpdateStaffRequest.safeParse({ status: 'inactive' }).success, false);
 });
 
 test('RegisterMemberRequest — national digit count, not string length', () => {

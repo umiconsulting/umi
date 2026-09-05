@@ -3,10 +3,17 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/security/credential_vault.dart';
+import '../../core/security/device_key.dart';
+import 'pairing_socket_client.dart';
 
 abstract interface class EntryGateway {
   Future<DevicePairingSession> claimPairing(String code);
   Future<DevicePairingPollResponse> pollPairing(PairingIdentity pairing);
+
+  /// Emits once per pairing state change, so the caller can poll immediately
+  /// instead of waiting out the poll interval. An empty stream means the
+  /// realtime path is unavailable; the poll loop covers that case unchanged.
+  Stream<void> watchPairing(PairingIdentity pairing);
   Future<void> acknowledgePairing(
     PairingIdentity pairing,
     String deviceCredential,
@@ -45,14 +52,30 @@ abstract interface class EntryGateway {
 }
 
 final class ApiEntryGateway implements EntryGateway {
-  ApiEntryGateway(this._api, this._vault);
+  ApiEntryGateway(
+    this._api,
+    this._vault, {
+    PairingSocketClient? socketClient,
+    DeviceKey? deviceKey,
+  }) : _socketClient = socketClient,
+       _deviceKey = deviceKey;
   final ApiClient _api;
   final CredentialVault _vault;
+
+  /// Signs proofs of device possession. Null on a build that has not wired one
+  /// yet; the device then pairs without registering a public key.
+  final DeviceKey? _deviceKey;
+
+  /// Null when the realtime path is switched off, or on a build that never
+  /// wires one. `watchPairing` then yields nothing and the poll loop carries
+  /// the enrollment on its own.
+  final PairingSocketClient? _socketClient;
 
   @override
   Future<DevicePairingSession> claimPairing(String code) async {
     final identity = await _vault.deviceIdentity();
     final setupCode = code.replaceAll(RegExp('[^A-Za-z0-9]'), '').toUpperCase();
+    final publicKey = await _deviceKey?.ensurePublicKey();
     return DevicePairingSession.fromJson(
       await _api.request(
         method: ApiMethod.post,
@@ -62,6 +85,7 @@ final class ApiEntryGateway implements EntryGateway {
           installationId: identity.installationId,
           platform: kIsWeb ? 'web' : defaultTargetPlatform.name,
           deviceType: 'pos_terminal',
+          ephemeralPublicKey: publicKey,
         ).toJson(),
       ),
     );
@@ -80,6 +104,17 @@ final class ApiEntryGateway implements EntryGateway {
         ).toJson(),
         idempotent: true,
       ),
+    );
+  }
+
+  @override
+  Stream<void> watchPairing(PairingIdentity pairing) async* {
+    final client = _socketClient;
+    if (client == null) return;
+    final identity = await _vault.deviceIdentity();
+    yield* client.watch(
+      pairing: pairing,
+      installationId: identity.installationId,
     );
   }
 
@@ -153,6 +188,8 @@ final class ApiEntryGateway implements EntryGateway {
       await _api.request(
         method: ApiMethod.post,
         path: UmiRoutes.posRefresh,
+        // The renewal must never trigger another renewal on its own 401.
+        authRefresh: false,
         body: PosRefreshRequest(
           refreshToken: refresh,
           installationId: identity.installationId,

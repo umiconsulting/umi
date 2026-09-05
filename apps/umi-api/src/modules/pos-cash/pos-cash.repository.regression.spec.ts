@@ -21,4 +21,14 @@ describe('POS cash center SQL regression', () => {
     expect(query).not.toContain('device_id=$4::uuid');
     expect(query).toContain('[merchantId, locationId, deviceId, operatorId]');
   });
+
+  it('sends ledgerSequence as a number, never as a bigint string', () => {
+    const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
+    // `ledger_sequence` is bigint and node-postgres returns bigint as a STRING to
+    // protect precision. The contract types it as a number and the Dart client
+    // casts it to one, so an unqualified projection crashed every suspend, resume
+    // and recount on the terminal — with the shift already changed on the server.
+    expect(source).not.toContain('ledger_sequence AS "ledgerSequence"');
+    expect(source).toContain('ledger_sequence::int AS "ledgerSequence"');
+  });
 });

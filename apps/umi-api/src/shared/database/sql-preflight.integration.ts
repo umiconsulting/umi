@@ -194,6 +194,14 @@ const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: stri
     // chosen per authorization at run time. Same integration.
     why: 'true run-time clause; accepted 2026-08-22',
   },
+  {
+    file: 'modules/orders/orders.repository.ts',
+    count: 1,
+    // ACCEPTED. The orders feed builds its WHERE from optional status / channel /
+    // location filters (`${statusSql} ${channelSql} ${locSql}`) chosen per query,
+    // so no static rebuild produces the statement the database will see.
+    why: 'true run-time clause; accepted 2026-09-05',
+  },
 ];
 
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {

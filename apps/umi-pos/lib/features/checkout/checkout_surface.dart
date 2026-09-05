@@ -6,11 +6,13 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
+import '../cash/money_input.dart';
 import '../customer_value/customer_value_controller.dart';
 import '../entry/entry_controller.dart';
 import '../offline/offline_policy.dart';
 import '../sale/sale_lifecycle_controller.dart';
 import 'checkout_controller.dart';
+import 'tender_identity.dart';
 
 Future<void> showCheckoutSheet(
   BuildContext context, {
@@ -63,6 +65,13 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   int tipBasisPoints = 0;
   String discountType = 'order_percentage';
   bool dirty = false;
+
+  /// The cashier has set the tender split by hand.
+  ///
+  /// Distinct from [dirty], which the customer-value preview raises on its own
+  /// before anyone touches the sheet — so `dirty` cannot tell an edited amount
+  /// from an untouched one, and a stale draft stayed on screen because of it.
+  bool tenderEdited = false;
   bool recoveredDraftLoaded = false;
   final cashApplied = TextEditingController();
   final cashReceived = TextEditingController();
@@ -225,10 +234,26 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         : TotalsPreview.fromJson(
             confirmation['totals']! as Map<String, Object?>,
           );
-    if (cashReceived.text.isEmpty) {
-      final minor = (totals.grandTotal['minorUnits']! as num).toInt();
-      cashReceived.text = (minor / 100).toStringAsFixed(2);
-      cashApplied.text = cashReceived.text;
+    // SEED THE TENDER FROM THE TOTAL THAT IS ON SCREEN NOW.
+    //
+    // `_restoreDraft` refills these fields from the saved tender, which was
+    // written against whatever the cart cost at the time. Add a line and reopen
+    // the sheet and the cashier was shown MXN 55.00 to collect on a MXN 110.00
+    // bill — the checkout then refused to complete and said only that it could
+    // not be done safely. A draft that no longer covers the total is stale, so
+    // it is replaced. `dirty` means the cashier typed the split themselves, and
+    // their numbers are never overwritten.
+    final grandTotal = (totals.grandTotal['minorUnits']! as num).toInt();
+    final tendered =
+        (cashEnabled ? _minorUnits(cashApplied.text) : 0) +
+        (terminalEnabled ? _minorUnits(terminalAmount.text) : 0);
+    if (tenderNeedsReseed(
+      receivedEmpty: cashReceived.text.isEmpty,
+      tenderEdited: tenderEdited,
+      tenderedMinorUnits: tendered,
+      grandTotalMinorUnits: grandTotal,
+    )) {
+      _balanceTenderFields(totals);
     }
     final policy = state.result?.policy == null
         ? null
@@ -333,10 +358,17 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
+                          inputFormatters: cashAmountFormatters,
                           decoration: InputDecoration(
                             labelText: l.tenderAmountLabel,
+                            errorText: parseMinorUnits(cashApplied.text) == null
+                                ? l.invalidAmountMessage
+                                : null,
                           ),
-                          onChanged: (_) => setState(() => dirty = true),
+                          onChanged: (_) => setState(() {
+                            dirty = true;
+                            tenderEdited = true;
+                          }),
                         ),
                       ),
                       const SizedBox(width: UmiSpacing.md),
@@ -346,10 +378,18 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
+                          inputFormatters: cashAmountFormatters,
                           decoration: InputDecoration(
                             labelText: l.cashReceivedLabel,
+                            errorText:
+                                parseMinorUnits(cashReceived.text) == null
+                                ? l.invalidAmountMessage
+                                : null,
                           ),
-                          onChanged: (_) => setState(() => dirty = true),
+                          onChanged: (_) => setState(() {
+                            dirty = true;
+                            tenderEdited = true;
+                          }),
                         ),
                       ),
                     ],
@@ -390,8 +430,17 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    decoration: InputDecoration(labelText: l.tenderAmountLabel),
-                    onChanged: (_) => setState(() => dirty = true),
+                    inputFormatters: cashAmountFormatters,
+                    decoration: InputDecoration(
+                      labelText: l.tenderAmountLabel,
+                      errorText: parseMinorUnits(terminalAmount.text) == null
+                          ? l.invalidAmountMessage
+                          : null,
+                    ),
+                    onChanged: (_) => setState(() {
+                      dirty = true;
+                      tenderEdited = true;
+                    }),
                   ),
                   const SizedBox(height: UmiSpacing.sm),
                   Wrap(
@@ -583,7 +632,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 ],
                 const SizedBox(height: UmiSpacing.lg),
                 FilledButton(
-                  onPressed: state.phase == CheckoutPhase.awaitingApproval
+                  // An unreadable amount never leaves the terminal. Sending it
+                  // meant tendering a number the cashier did not type.
+                  onPressed: !_amountsReadable
+                      ? null
+                      : state.phase == CheckoutPhase.awaitingApproval
                       ? () => _requestApproval(context)
                       : state.phase == CheckoutPhase.confirmationRequired &&
                             !dirty
@@ -1210,13 +1263,25 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     );
   }
 
-  int _minorUnits(String raw) {
-    final parts = raw.trim().split('.');
-    final whole = int.tryParse(parts.first) ?? 0;
-    final fraction = parts.length > 1
-        ? parts[1].padRight(2, '0').substring(0, 2)
-        : '00';
-    return whole * 100 + (int.tryParse(fraction) ?? 0);
+  /// The amount a person typed, or zero when it is not an amount.
+  ///
+  /// The reading itself lives in `parseMinorUnits`, which refuses rather than
+  /// invents: this copy used to answer `1,500.00` with zero and `0.999` with
+  /// 0.99, on the tender that settles the sale. `_amountsReadable` is what stops
+  /// an unreadable field from reaching the server; this getter only has to be
+  /// safe for the running totals shown while the cashier is still typing.
+  int _minorUnits(String raw) => parseMinorUnits(raw) ?? 0;
+
+  /// Every money field on the sheet is a well-formed amount.
+  bool get _amountsReadable {
+    for (final field in [
+      if (cashEnabled) cashApplied,
+      if (cashEnabled) cashReceived,
+      if (terminalEnabled) terminalAmount,
+    ]) {
+      if (parseMinorUnits(field.text) == null) return false;
+    }
+    return true;
   }
 
   void _setCash(bool selected, TotalsPreview totals) {
@@ -1263,6 +1328,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   void _setCashReceived(int minorUnits) => setState(() {
     cashReceived.text = (minorUnits / 100).toStringAsFixed(2);
     dirty = true;
+    tenderEdited = true;
   });
 
   void _terminalOutcome(String value) => setState(() {
@@ -1380,14 +1446,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     ];
   }
 
-  String _stableId(String kind) {
-    final suffix = switch (kind) {
-      'cash' => '000000000301',
-      'terminal' => '000000000302',
-      _ => '000000000303',
-    };
-    return '00000000-0000-4000-8000-$suffix';
-  }
+  String _stableId(String kind) => tenderId(widget.cart.state.cart!.id, kind);
 
   Future<void> _review(TotalsPreview totals) async {
     final cart = widget.cart.state.cart!;

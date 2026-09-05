@@ -5,6 +5,7 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import 'cash_controller.dart';
+import 'money_input.dart';
 
 Future<void> showCashCenter(
   BuildContext context, {
@@ -123,7 +124,12 @@ final class _CashCenterState extends State<CashCenter> {
                               _ClosedSummaryCard(summary: snapshot.summary!),
                               const SizedBox(height: UmiSpacing.lg),
                             ],
-                            if (snapshot.currentShift == null)
+                            if (snapshot.adoptableShift != null)
+                              _AdoptShiftSection(
+                                controller: widget.controller,
+                                permissions: widget.permissions,
+                              )
+                            else if (snapshot.currentShift == null)
                               _OpenShiftSection(
                                 controller: widget.controller,
                                 permissions: widget.permissions,
@@ -243,6 +249,51 @@ final class _StatusCard extends StatelessWidget {
   );
 }
 
+/// The shift is open, the drawer is full, and the terminal that was speaking for
+/// it is gone. Nothing here asks for a count or an approval: the operator in
+/// front of us already owns this shift, and only the address changes.
+final class _AdoptShiftSection extends StatelessWidget {
+  const _AdoptShiftSection({
+    required this.controller,
+    required this.permissions,
+  });
+
+  final CashController controller;
+  final OperatorPermissions permissions;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final state = controller.state;
+    final canAdopt =
+        permissions.allows('cash.shift.resume') &&
+        (state.snapshot?.allowedActions.contains('adopt_shift') ?? false);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(UmiSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l.adoptShiftTitle,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Text(l.adoptShiftMessage),
+            const SizedBox(height: UmiSpacing.lg),
+            FilledButton(
+              onPressed: state.busy || !canAdopt
+                  ? null
+                  : () => controller.adoptShift(),
+              child: Text(l.adoptShiftAction),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 final class _OpenShiftSection extends StatefulWidget {
   const _OpenShiftSection({
     required this.controller,
@@ -260,6 +311,7 @@ final class _OpenShiftSection extends StatefulWidget {
 
 final class _OpenShiftSectionState extends State<_OpenShiftSection> {
   final amount = TextEditingController(text: '0.00');
+  final amountFocus = FocusNode();
   String? selectedRegister;
 
   @override
@@ -268,17 +320,31 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
     if (widget.registers.isNotEmpty) {
       selectedRegister = widget.registers.first['id'] as String?;
     }
+    // The field opens holding `0.00`. Without this the caret lands after it and
+    // typing 50000 produces `0.0050000` — which used to parse as zero and open
+    // the shift on an empty drawer.
+    amountFocus.addListener(() {
+      if (amountFocus.hasFocus) {
+        amount.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: amount.text.length,
+        );
+      }
+    });
+    amount.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     amount.dispose();
+    amountFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final parsedFloat = parseMinorUnits(amount.text);
     final canOpen =
         widget.permissions.allows('cash.shift.open') &&
         (widget.controller.state.snapshot?.allowedActions.contains(
@@ -312,13 +378,16 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
             const SizedBox(height: UmiSpacing.md),
             TextField(
               controller: amount,
+              focusNode: amountFocus,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              inputFormatters: cashAmountFormatters,
               textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: l.openingFloatLabel,
                 prefixText: 'MXN ',
+                errorText: parsedFloat == null ? l.invalidAmountMessage : null,
               ),
             ),
             const SizedBox(height: UmiSpacing.lg),
@@ -326,11 +395,12 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
               onPressed:
                   selectedRegister == null ||
                       widget.controller.state.busy ||
-                      !canOpen
+                      !canOpen ||
+                      parsedFloat == null
                   ? null
                   : () => widget.controller.openShift(
                       registerId: selectedRegister!,
-                      amountMinorUnits: _minorUnits(amount.text),
+                      amountMinorUnits: parsedFloat,
                     ),
               icon: const Icon(Icons.lock_open),
               label: Text(l.openShiftAction),
@@ -665,8 +735,11 @@ Future<void> _movement(
     reason.dispose();
     return;
   }
-  if ((accepted ?? false) && reason.text.trim().isNotEmpty) {
-    final amountMinorUnits = _minorUnits(amount.text);
+  final parsedAmount = parseMinorUnits(amount.text);
+  if ((accepted ?? false) &&
+      reason.text.trim().isNotEmpty &&
+      parsedAmount != null) {
+    final amountMinorUnits = parsedAmount;
     final reasonCode = reason.text
         .trim()
         .replaceAll(RegExp(r'\s+'), '_')
@@ -790,6 +863,7 @@ Future<void> _count(BuildContext context, CashController controller) async {
         controller: amount,
         autofocus: true,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: cashAmountFormatters,
         decoration: InputDecoration(labelText: l.countedCashLabel),
       ),
       actions: [
@@ -804,8 +878,9 @@ Future<void> _count(BuildContext context, CashController controller) async {
       ],
     ),
   );
-  if (accepted ?? false) {
-    await controller.submitCount(amountMinorUnits: _minorUnits(amount.text));
+  final counted = parseMinorUnits(amount.text);
+  if ((accepted ?? false) && counted != null) {
+    await controller.submitCount(amountMinorUnits: counted);
   }
   amount.dispose();
 }
@@ -933,16 +1008,6 @@ Future<void> _close(BuildContext context, CashController controller) async {
   } finally {
     managerPin.dispose();
   }
-}
-
-int _minorUnits(String value) {
-  final normalized = value.trim().replaceAll(',', '.');
-  final parts = normalized.split('.');
-  final whole = int.tryParse(parts.first) ?? 0;
-  final fraction = parts.length > 1
-      ? int.tryParse(parts[1].padRight(2, '0').substring(0, 2)) ?? 0
-      : 0;
-  return whole * 100 + fraction;
 }
 
 String _money(Map<String, Object?> value) {

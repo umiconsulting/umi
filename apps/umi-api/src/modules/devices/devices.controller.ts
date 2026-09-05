@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   AcknowledgeDeviceCredentialRequest,
   BeginDeviceEnrollmentRequest,
@@ -8,6 +20,7 @@ import {
   RevokeDeviceRequest,
   ReplaceDeviceRequest,
   RotateDeviceCredentialRequest,
+  UpdateDeviceRequest,
 } from '@umi/contract';
 import type { FastifyRequest } from 'fastify';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
@@ -20,6 +33,7 @@ import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
+import { canSwitchLocations, resolveLocationAuthority } from '../auth/location-authority';
 import { DevicesService } from './devices.service';
 
 @UseGuards(AuthGuard)
@@ -36,7 +50,9 @@ export class DevicesController {
     @CurrentUser() user: AuthUser,
     @Body(new ZodValidationPipe(BeginDeviceEnrollmentRequest)) dto: BeginDeviceEnrollmentRequest,
   ) {
-    return this.devices.begin(merchant.merchantId, user.id, dto);
+    const locationId = resolveLocationAuthority(merchant, dto.locationId);
+    if (!locationId) throw new BadRequestException({ error: 'location_required' });
+    return this.devices.begin(merchant.merchantId, user.id, { ...dto, locationId });
   }
 
   @Public()
@@ -49,12 +65,43 @@ export class DevicesController {
     return this.devices.claim(dto, request.ip);
   }
 
+  /**
+   * The enrolled POS terminals. It is a separate route from the KDS device list on
+   * purpose: a KDS iPad is read through its live session, a POS terminal through its
+   * registry row, and one query cannot answer both without lying about one of them.
+   */
+  @Get('merchants/:merchantId/devices')
+  @UseGuards(MerchantAccessGuard, EntitlementGuard, RolesGuard)
+  @RequireProduct('pos')
+  @RequirePermission('device.enroll')
+  listDevices(@Merchant() merchant: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.devices.listDevices(merchant.merchantId, deviceLocationScope(merchant, locationId));
+  }
+
+  @Patch('merchants/:merchantId/devices/:deviceId')
+  @UseGuards(MerchantAccessGuard, EntitlementGuard, RolesGuard)
+  @RequireProduct('pos')
+  @RequirePermission('device.enroll')
+  update(
+    @Merchant() merchant: MerchantAccess,
+    @Param('deviceId') deviceId: string,
+    @Query('locationId') locationId: string | undefined,
+    @Body(new ZodValidationPipe(UpdateDeviceRequest)) dto: UpdateDeviceRequest,
+  ) {
+    return this.devices.update(
+      merchant.merchantId,
+      deviceId,
+      dto,
+      deviceLocationScope(merchant, locationId),
+    );
+  }
+
   @Get('merchants/:merchantId/devices/enrollment-requests')
   @UseGuards(MerchantAccessGuard, EntitlementGuard, RolesGuard)
   @RequireProduct('pos')
   @RequirePermission('device.enroll')
-  list(@Merchant() merchant: MerchantAccess) {
-    return this.devices.list(merchant.merchantId, null);
+  list(@Merchant() merchant: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.devices.list(merchant.merchantId, deviceLocationScope(merchant, locationId));
   }
 
   @Post('merchants/:merchantId/devices/enrollment-requests/:requestId/approve')
@@ -65,10 +112,17 @@ export class DevicesController {
     @Merchant() merchant: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('requestId') requestId: string,
+    @Query('locationId') locationId: string | undefined,
     @Body(new ZodValidationPipe(DecideDeviceEnrollmentRequest))
     dto: DecideDeviceEnrollmentRequest,
   ) {
-    return this.devices.approve(merchant.merchantId, user.id, requestId, dto.idempotencyKey, null);
+    return this.devices.approve(
+      merchant.merchantId,
+      user.id,
+      requestId,
+      dto.idempotencyKey,
+      deviceLocationScope(merchant, locationId),
+    );
   }
 
   @Post('merchants/:merchantId/devices/enrollment-requests/:requestId/deny')
@@ -79,10 +133,17 @@ export class DevicesController {
     @Merchant() merchant: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('requestId') requestId: string,
+    @Query('locationId') locationId: string | undefined,
     @Body(new ZodValidationPipe(DecideDeviceEnrollmentRequest))
     dto: DecideDeviceEnrollmentRequest,
   ) {
-    return this.devices.deny(merchant.merchantId, user.id, requestId, dto.idempotencyKey, null);
+    return this.devices.deny(
+      merchant.merchantId,
+      user.id,
+      requestId,
+      dto.idempotencyKey,
+      deviceLocationScope(merchant, locationId),
+    );
   }
 
   @Public()
@@ -164,4 +225,13 @@ export class DevicesController {
       dto.replacedDeviceId,
     );
   }
+}
+
+export function deviceLocationScope(
+  merchant: MerchantAccess,
+  requestedLocationId?: string,
+): string[] | null {
+  const locationId = resolveLocationAuthority(merchant, requestedLocationId);
+  if (locationId) return [locationId];
+  return canSwitchLocations(merchant) ? null : [];
 }

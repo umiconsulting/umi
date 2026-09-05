@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
+import '../../core/errors/app_error.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/security/operator_permissions.dart';
@@ -75,7 +76,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   final _scroll = ScrollController();
   final _searchFocus = FocusNode();
   bool _initialLoadStarted = false;
-  bool _cashPromptShown = false;
+  bool _leaving = false;
   String? _lastSaleErrorCode;
   StreamSubscription<CanonicalScanEvent>? _scanSubscription;
   Future<void> _scanQueue = Future<void>.value();
@@ -124,22 +125,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           locationId: entry.selectedBranch!.id,
           operatorSessionId: entry.operator!.id,
         );
+        // Load the shift state so the Cash Center button badge is accurate, but
+        // do NOT force the operator into the Cash Center. After the PIN the home
+        // screen is always the menu; opening a shift, a cash withdrawal, or a
+        // turn change is done on purpose from the Cash Center button in the app
+        // bar (badged when there is no open shift), not by a modal that blocks
+        // the menu on every sign-in.
         await widget.cash.load();
-        if (widget.cash.activeShiftId == null && !_cashPromptShown && mounted) {
-          _cashPromptShown = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              showCashCenter(
-                context,
-                controller: widget.cash,
-                permissions: OperatorPermissions(
-                  entry.operator?.permissions ?? const [],
-                ),
-                onHandoffCompleted: widget.entry.lock,
-              );
-            }
-          });
-        }
         await widget.sales.open(
           entry.selectedTenant!.id,
           entry.selectedBranch!.id,
@@ -210,7 +202,46 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }
 
   void _changed() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    // Browsing (catalog detail/search) and cart mutations both surface a lost
+    // operator session here; the `_leaving` guard makes this fire once.
+    _reauthIfSessionLost(widget.cart.state.errorCode);
+    _reauthIfSessionLost(widget.catalog.state.errorCode);
+  }
+
+  /// A cart/sale action the operator SHOULD be allowed to do (they hold
+  /// `sale.lifecycle`) was refused for lost authority — their operator session
+  /// was ended server-side (e.g. their role or a role's permissions changed in
+  /// the dashboard, which ends active sessions). Return them to the PIN to
+  /// re-authenticate rather than stranding them on a dead session with silent
+  /// failures. A genuine permission gap is left alone: the operator would not
+  /// hold `sale.lifecycle`, so re-entering the PIN would not change anything.
+  /// Returns true when it takes over the exit. `_leaving` makes it fire once
+  /// and stand down during an intentional lock/logout.
+  bool _reauthIfSessionLost(String? errorCode) {
+    if (_leaving || errorCode == null) return false;
+    final lost =
+        errorCode == 'PERMISSION_DENIED' ||
+        errorCode == 'OPERATOR_SESSION_ENDED' ||
+        errorCode == 'UNAUTHORIZED';
+    if (!lost) return false;
+    final permissions = OperatorPermissions(
+      widget.entry.state.operator?.permissions ?? const [],
+    );
+    if (!permissions.allows('sale.lifecycle')) return false;
+    _leaving = true;
+    // Use a microtask, not addPostFrameCallback: dropping to the PIN must run
+    // even if no further frame is pumped, and it also keeps `lock()` (which
+    // mutates state) out of the current build/listener turn.
+    scheduleMicrotask(() async {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).sessionEndedReauth)),
+      );
+      await widget.entry.lock();
+    });
+    return true;
   }
 
   void _saleChanged() {
@@ -219,15 +250,17 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final errorCode = widget.sales.state.errorCode;
     if (errorCode != null && errorCode != _lastSaleErrorCode) {
       _lastSaleErrorCode = errorCode;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context).saleLifecycleError),
-            ),
-          );
-        }
-      });
+      if (!_reauthIfSessionLost(errorCode)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(AppLocalizations.of(context).saleLifecycleError),
+              ),
+            );
+          }
+        });
+      }
     } else if (errorCode == null) {
       _lastSaleErrorCode = null;
     }
@@ -497,6 +530,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               onPressed: () => _showAuthorizationDiagnostics(permissions),
               icon: const Icon(Icons.policy_outlined),
             ),
+          if (widget.entry.operatorName != null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
+                child: Text(
+                  l.operatorShift(widget.entry.operatorName!),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ),
           Center(child: Text(widget.entry.state.selectedBranch?.name ?? '—')),
           IconButton(
             tooltip: l.lockAction,
@@ -634,16 +677,32 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }
 
   Future<void> _leaveOperator({required bool lock}) async {
+    // Mark the exit as intentional so the sale listener does not also fire its
+    // own auto-return-to-PIN when parking the open sale fails.
+    _leaving = true;
     final safe = await widget.sales.prepareForOperatorExit();
-    if (!safe || !mounted) {
-      if (mounted) {
+    if (!mounted) return;
+    if (!safe) {
+      // The open sale could not be parked. Locking is meant to preserve it, so
+      // for a possibly-recoverable failure keep the operator here and let them
+      // retry. But never trap them: logging out ALWAYS proceeds, and even a
+      // lock falls through when the operator has lost authority over the sale
+      // (their session was ended server-side, e.g. after a role change) —
+      // there is nothing left to preserve and nothing they can do here.
+      final code = widget.sales.state.errorCode;
+      final authorityLost =
+          code == 'PERMISSION_DENIED' ||
+          code == 'OPERATOR_SESSION_ENDED' ||
+          code == 'UNAUTHORIZED';
+      if (lock && !authorityLost) {
+        _leaving = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context).saleLifecycleError),
           ),
         );
+        return;
       }
-      return;
     }
     if (lock) {
       await widget.entry.lock();
@@ -855,6 +914,17 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               OperatorPermissions(
                 widget.entry.state.operator?.permissions ?? const [],
               ).allows('cart.write'),
+        ),
+      );
+    } on AppException catch (error) {
+      if (!mounted) return;
+      // The detail fetch is authorized against the operator session, so a lost
+      // session shows up here too — bounce to the PIN instead of a dead-end
+      // "catalog unavailable" toast.
+      if (_reauthIfSessionLost(error.code)) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).catalogUnexpectedError),
         ),
       );
     } catch (_) {

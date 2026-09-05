@@ -145,6 +145,15 @@ const I = {
       <line x1="12" y1="18" x2="12.01" y2="18" />
     </Icon>
   ),
+  // The POS register. It sits beside `Tablet` on the Devices screen, so the two must
+  // read apart at 18px: a screen on a stand against a hand-held slab.
+  Monitor: (p) => (
+    <Icon {...p}>
+      <rect x="2" y="4" width="20" height="12" rx="2" />
+      <line x1="8" y1="20" x2="16" y2="20" />
+      <line x1="12" y1="16" x2="12" y2="20" />
+    </Icon>
+  ),
   WhatsApp: (p) => (
     <Icon {...p}>
       <path d="M21 12a9 9 0 1 1-3.55-7.16L21 4l-1.16 3.54A9 9 0 0 1 21 12z" />

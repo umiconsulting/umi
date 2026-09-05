@@ -783,7 +783,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open a cash shift before you accept cash.';
 
   @override
+  String get adoptShiftTitle => 'Your shift is still open on another terminal';
+
+  @override
+  String get adoptShiftMessage =>
+      'This terminal lost its stored identity. The shift and the cash are still there; bring them to this screen to continue.';
+
+  @override
+  String get adoptShiftAction => 'Bring the shift to this terminal';
+
+  @override
   String get openShiftAction => 'Open cash shift';
+
+  @override
+  String get invalidAmountMessage =>
+      'Enter a valid amount, for example 1,500.00.';
 
   @override
   String get openingFloatLabel => 'Opening float';
@@ -1115,4 +1129,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get restockInventoryReviewLabel => 'Inventory review required';
+
+  @override
+  String get sessionEndedReauth =>
+      'Your session ended. Please re-enter your PIN.';
+
+  @override
+  String operatorShift(String name) {
+    return 'Shift: $name';
+  }
 }

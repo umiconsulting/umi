@@ -29,6 +29,7 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 | Shifts and cash operations                 | opening and closing checklists and manager quickstart               | Current authoritative               | Complete |
 | Customers, loyalty, wallet, and gift cards | `UMIPOS_CUSTOMERS_LOYALTY_STORED_VALUE.md`                          | Current authoritative               | Complete |
 | Devices and registers                      | enrollment specification, hardware runtime, and quickstarts         | Current authoritative               | Complete |
+| Realtime pairing push                      | `UMIPOS_REALTIME_PAIRING_SPEC.md`                                   | Current authoritative               | Planned  |
 | Workers and observability                  | product completion, deployment, and support runbook                 | Current authoritative               | Complete |
 | Deployment and backup                      | RC deployment and backup documents                                  | Current authoritative               | Complete |
 | Troubleshooting and security               | support runbook, RBAC, and security certification                   | Current authoritative               | Complete |
@@ -65,6 +66,7 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 | Design system                | `docs/design/UMIPOS_DESIGN_LANGUAGE_V1.md`                        |
 | RBAC                         | `docs/product/UMIPOS_PILOT_RBAC.md`                               |
 | Device enrollment            | `docs/product/UMIPOS_DEVICE_ENROLLMENT_SPEC.md`                   |
+| Realtime pairing push        | `docs/product/UMIPOS_REALTIME_PAIRING_SPEC.md`                    |
 | Dashboard operations         | `docs/product/UMIPOS_DASHBOARD_OPERATIONS.md`                     |
 | KDS operation                | `docs/product/UMIPOS_KDS_OPERATIONAL_MODEL.md`                    |
 | Catalog decisions            | `docs/product/CATALOG_UI_DECISIONS.md`                            |

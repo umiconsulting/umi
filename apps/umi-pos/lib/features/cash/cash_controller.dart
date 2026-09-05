@@ -294,6 +294,32 @@ final class CashController extends ChangeNotifier {
     });
   }
 
+  /// Take back a shift this operator already owns, from a terminal that can no
+  /// longer speak for it. On web that terminal is usually this same browser before
+  /// its stored identity was cleared, which mints a new device out of one register.
+  Future<void> adoptShift() async {
+    final shift = _requireSnapshot().adoptableShift;
+    if (shift == null) return;
+    await _perform(() async {
+      final ids = await _commandIds('adopt_shift');
+      await _repository.adopt(
+        _merchantId!,
+        shift['id']! as String,
+        AdoptCashShiftRequest(
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+          commandId: ids.commandId,
+          idempotencyKey: ids.idempotencyKey,
+          shiftId: shift['id']! as String,
+          expectedShiftVersion: shift['version']! as int,
+          reasonCode: 'terminal_identity_changed',
+        ),
+      );
+      await _completeCommand(ids);
+      await _reload();
+    });
+  }
+
   Future<void> handoff(String incomingPin) async {
     final shift = _requireShift();
     await _perform(() async {
@@ -674,6 +700,23 @@ final class CashController extends ChangeNotifier {
           resolution: before.resolution,
           reconciliation: before.reconciliation,
           errorCode: error.code,
+        ),
+      );
+    } catch (_) {
+      // ANYTHING ELSE STILL HAS TO RELEASE THE SCREEN.
+      //
+      // Only `AppException` was caught here, so a decoding slip — a bigint the
+      // API sent as a string, a field that arrived null — escaped `_perform`
+      // with `busy` still true. The cash screen then sat behind a progress bar
+      // for ever, on a shift the server had already changed, and the only way
+      // out was reloading the page. A cashier cannot be left there.
+      _set(
+        CashState(
+          snapshot: before.snapshot,
+          count: before.count,
+          resolution: before.resolution,
+          reconciliation: before.reconciliation,
+          errorCode: 'CASH_OPERATION_FAILED',
         ),
       );
     }

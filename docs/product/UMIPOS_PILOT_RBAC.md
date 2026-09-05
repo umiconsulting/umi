@@ -34,8 +34,8 @@ Una denegación explícita prevalece sobre un grant. Un permiso de otro merchant
 
 | Perfil      | Scope principal | Grants POS | Aprobación | Uso principal                                      |
 | ----------- | --------------- | ---------: | ---------- | -------------------------------------------------- |
-| Owner       | Merchant        |        130 | Sí         | Autoridad de negocio para un merchant.             |
-| Admin       | Merchant        |        129 | Sí         | Administración del negocio y operación autorizada. |
+| Owner       | Merchant        |        131 | Sí         | Autoridad de negocio para un merchant.             |
+| Admin       | Merchant        |        130 | Sí         | Administración del negocio y operación autorizada. |
 | Manager     | Location        |        120 | Sí         | Gestión de caja, recovery y excepciones.           |
 | Supervisor  | Location        |         85 | Sí         | Supervisión de checkout en una location.           |
 | Cashier     | Location        |         48 | No         | Jornada normal de venta y caja propia.             |
@@ -44,6 +44,8 @@ Una denegación explícita prevalece sobre un grant. Un permiso de otro merchant
 | super_admin | Platform        |          0 | N/A        | Administración de plataforma fuera del café.       |
 
 No existe un rol de negocio `Auditor`. Owner y Admin pueden leer auditoría. El perfil técnico `developer` conserva lectura limitada.
+
+`location.switch` permite seleccionar otra sucursal. La API valida este permiso y la asignación del usuario.
 
 ### Normalización de permisos
 
@@ -182,7 +184,10 @@ El seed también crea:
 - una política de excepciones;
 - productos de prueba.
 
-El Dashboard todavía no asigna los perfiles del piloto. Use el seed canónico en datos desechables.
+El Dashboard permite administrar los perfiles Admin y Barista desde `/staff`.
+Barista usa el perfil canónico `staff`, que conserva compatibilidad con Cashier.
+El Dashboard permite crear, reemplazar y quitar el PIN personal del POS.
+La API devuelve solamente `hasOperatorPin`. La API no devuelve el PIN.
 
 La matriz permite estas asignaciones:
 
@@ -212,6 +217,20 @@ El trigger de RBAC termina las sesiones activas después de un cambio importante
 - El Owner debe decidir si Staff seguirá como alias de Cashier después del piloto.
 - El Owner debe decidir si necesita un rol Auditor de negocio.
 - El Dashboard no ofrece un editor libre de permisos en este Gate.
+
+## 10.1. Base de la decisión
+
+- Hecho documentado: NIST clasifica un PIN como un secreto memorizado.
+- Hecho documentado: NIST recomienda un mínimo de seis caracteres para un secreto de activación.
+- Tradeoff: Umi conserva de cuatro a ocho dígitos por compatibilidad con el piloto actual.
+- Hecho documentado: OWASP requiere mínimo privilegio y validación en cada solicitud.
+- Inferencia de Umi: el Dashboard muestra un resumen y la API aplica la matriz canónica.
+
+Fuentes:
+
+- [NIST SP 800-63B](https://pages.nist.gov/800-63-4/sp800-63b.html)
+- [OWASP Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
 
 ## 11. Permisos de inventario de Gate 3E
 

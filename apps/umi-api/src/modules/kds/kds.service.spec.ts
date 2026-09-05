@@ -41,12 +41,14 @@ function make() {
     }),
     loadOrderForScope: vi.fn(),
     heartbeatTouch: vi.fn().mockResolvedValue(true),
+    sessionLastUsedAt: vi.fn().mockResolvedValue(null),
   };
   const rateLimit = {
     hit: vi.fn().mockReturnValue({ allowed: true, remaining: 9, resetAt: 0 }),
   };
-  const svc = new KdsService(repo as never, rateLimit as never);
-  return { svc, repo, rateLimit };
+  const realtime = { emitDevicesChanged: vi.fn() };
+  const svc = new KdsService(repo as never, rateLimit as never, realtime as never);
+  return { svc, repo, rateLimit, realtime };
 }
 
 const SESSION: KdsDeviceSession = {
@@ -625,5 +627,21 @@ describe('pure helpers', () => {
     expect(deviceStatus(new Date().toISOString())).toBe('live');
     expect(deviceStatus(new Date(Date.now() - 15_000).toISOString())).toBe('slow');
     expect(deviceStatus(new Date(Date.now() - 60_000).toISOString())).toBe('offline');
+  });
+});
+
+describe('KdsService.heartbeat realtime wake-up', () => {
+  it('emits a devices-changed wake-up when a device comes back online', async () => {
+    const { svc, repo, realtime } = make();
+    repo.sessionLastUsedAt.mockResolvedValue(new Date(Date.now() - 30_000).toISOString());
+    await svc.heartbeat(SESSION, null);
+    expect(realtime.emitDevicesChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays silent on a steady-state live heartbeat', async () => {
+    const { svc, repo, realtime } = make();
+    repo.sessionLastUsedAt.mockResolvedValue(new Date(Date.now() - 2_000).toISOString());
+    await svc.heartbeat(SESSION, null);
+    expect(realtime.emitDevicesChanged).not.toHaveBeenCalled();
   });
 });

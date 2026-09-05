@@ -1,6 +1,6 @@
 # UMI × UmiPOS — Canonical Project State
 
-Updated: 2026-08-05
+Updated: 2026-08-30
 
 ## Product authority
 
@@ -95,7 +95,8 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - UmiPOS uses a personal merchant-unique PIN after device trust. The API resolves the staff identity
   and current role without an email or client role selector.
 - `runtime.operator_session` separates operator presence from PIN authentication.
-- UmiPOS consumes contract version `2.9.0`. The generated checksum is the content-hash authority.
+- UmiPOS consumes contract version `2.13.0`. Its current content hash is
+  `f4ca66cde5633f4deb0f9676263f42f48a6ef56e5a992eda4dd4d83b9b905e63`.
 - Original sale, payment, receipt, and cash facts remain immutable after an exception.
 - `merchant.pos_sale_exception` and related tables own append-only compensation history.
 - Refund amounts use original receipt, discount, tax, tip, and tender snapshots.
@@ -162,7 +163,10 @@ Future clients use `packages/contract` and controlled UMI APIs.
 - Do not claim DDoS immunity; production requires provider mitigation, CDN/WAF controls, and a
   distributed limiter before horizontal scaling.
 
-## Current local baseline
+## Gate certification history
+
+This section records earlier gate evidence. It is not the current branch or contract baseline.
+Use `CURRENT_PLATFORM_STATE.json` and the gated cutover plan for current status.
 
 - Branch: `architectureUMIposIntegration`
 - Build-v3 certification source commit: `a1e794d8fe0e9883f5677147ab81c4342f1a3980`

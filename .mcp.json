@@ -50,8 +50,11 @@
     },
     "deepseek": {
       "type": "stdio",
-      "command": "deepseek-mcp-server",
-      "args": [],
+      "command": "npx",
+      "args": [
+        "-y",
+        "deepseek-mcp-server@0.6.0"
+      ],
       "env": {
         "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}",
         "DEEPSEEK_DEFAULT_MODEL": "deepseek-v4-pro"
@@ -67,6 +70,14 @@
       "env": {
         "GEMINI_API_KEY": "${GEMINI_API_KEY}"
       }
+    },
+    "dart": {
+      "type": "stdio",
+      "command": "dart",
+      "args": [
+        "mcp-server"
+      ],
+      "env": {}
     }
   }
 }

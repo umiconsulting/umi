@@ -163,30 +163,37 @@ export type GlobalLogoutRequest = z.infer<typeof GlobalLogoutRequest>;
 export const CreateStaffRequest = z
   .object({
     name: z.string().trim().min(1).max(160),
-    email: z.string().trim().email(),
-    role: z.string().min(1).max(100),
-    locationId: z.string().uuid().nullable().optional(),
-    position: z.string().trim().max(160).nullable().optional(),
+    phone: z.string().trim().min(1).max(40).optional(),
+    email: z.string().trim().email().optional(),
+    role: z.enum(['ADMIN', 'STAFF']).optional(),
+    roleId: z.string().uuid().optional(),
+    status: z.enum(['active', 'disabled']).optional(),
     operatorPin: z
       .string()
       .regex(/^\d{4,8}$/)
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => value.phone || value.email, {
+    message: 'phone or email is required',
+    path: ['phone'],
+  });
 export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
 
 /** PATCH /api/:merchantRef/admin/staff/:staffId — mirrors umi-api UpdateStaffDto. */
 export const UpdateStaffRequest = z
   .object({
-    role: z.string().min(1).max(100).optional(),
-    locationId: z.string().uuid().nullable().optional(),
-    position: z.string().trim().max(160).nullable().optional(),
+    name: z.string().trim().min(1).max(160).optional(),
+    phone: z.string().trim().max(40).nullable().optional(),
+    email: z.string().trim().email().nullable().optional(),
+    role: z.enum(['ADMIN', 'STAFF']).optional(),
+    roleId: z.string().uuid().optional(),
     operatorPin: z
       .string()
       .regex(/^\d{4,8}$/)
       .nullable()
       .optional(),
-    status: z.enum(['active', 'inactive']).optional(),
+    status: z.enum(['active', 'disabled']).optional(),
   })
   .strict();
 export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;

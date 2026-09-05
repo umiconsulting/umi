@@ -2,41 +2,48 @@
 
 This map summarizes execution chains. Code and migrations remain the source of truth.
 
-## ConversaFlow WhatsApp and job pipeline
+## API request and job pipeline
 
-1. `supabase/functions/whatsapp-handler/` receives Twilio ingress.
-2. The handler validates request/security, records inbound/message state, and inserts workflow jobs.
-3. `supabase/functions/job-worker/` claims jobs and dispatches processors.
-4. `turn.integrity` coalesces trailing user messages into durable turns.
-5. `turn.process` builds working memory, prompts the model, runs tools, writes assistant messages, writes outbox rows, records traces, and schedules background memory work.
-6. The worker drains outbox rows and delivers external side effects with retry/dead-letter behavior.
+1. `apps/umi-api` validates each request and resolves its authenticated scope.
+2. API modules execute canonical business commands against PostgreSQL.
+3. Durable jobs and outbox records control asynchronous side effects.
+4. The worker processes bounded jobs and records safe telemetry.
+5. API contracts expose normalized results to product clients.
 
-## ConversaFlow memory and prompts
+## Conversations and prompts
 
-- Runtime prompts live with code under `supabase/functions/whatsapp-handler/`.
-- Memory shaping lives in shared and processor modules.
+- Runtime prompts and conversation logic live in `apps/umi-api`.
+- The API normalizes channel data before a product client consumes it.
 - Memory is context, not operational truth.
+
+## UmiPOS execution
+
+1. UmiPOS authenticates through an enrolled device and an operator PIN.
+2. UmiPOS consumes generated Dart contracts from `packages/contract`.
+3. The API owns sales, payments, inventory, customer value, and shift facts.
+4. Native clients can journal approved offline cash work for controlled replay.
+5. Hardware access stays behind the UmiPOS hardware runtime.
 
 ## KDS execution
 
-1. KDS reads backend-owned projections from schema `kds`.
-2. KDS mutations go through backend command functions.
-3. ConversaFlow remains the source of order truth.
+1. KDS reads API-owned kitchen projections.
+2. KDS mutations use backend commands.
+3. The API remains the source of commercial order truth.
 4. KDS renders and optimistically updates local UI state while respecting backend transitions.
 
 ## Cash execution
 
-1. Cash web/API behavior uses its Next.js/Vercel runtime.
-2. Prisma defines Cash-owned data models.
-3. Vercel cron routes run scheduled Cash workflows.
-4. Wallet/pass behavior stays local to Cash unless a cross-product contract is explicitly introduced.
-
-## Logs execution
-
-1. Logs reads ConversaFlow trace/log tables through configured Supabase credentials.
-2. Parser code assembles trace trees for UI display.
-3. Logs does not own the underlying operational truth or trace schema.
+1. Cash uses its separate Next.js and npm workflow.
+2. Cash retains Prisma compatibility behavior.
+3. The frozen wallet-pass route forwards generation to the API.
+4. New wallet, loyalty, and pass authority belongs in the API.
 
 ## Dashboard execution
 
-The dashboard reads live data through its server/API layer while leaving product data ownership in ConversaFlow, KDS, and Cash. Its visible functions, screens, and flows are the behavior contract for future production hardening.
+The Dashboard reads normalized API data.
+Its visible functions, screens, and flows remain the behavior contract for production hardening.
+
+## Landing execution
+
+The landing app serves public content and captures leads.
+Canonical lead writes belong in the API.

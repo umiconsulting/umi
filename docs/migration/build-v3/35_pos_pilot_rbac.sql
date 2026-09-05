@@ -82,6 +82,7 @@ values
   ('kitchen.recall','UmiPOS permission kitchen.recall'),
   ('kitchen.station.manage','UmiPOS permission kitchen.station.manage'),
   ('kitchen.station.read','UmiPOS permission kitchen.station.read'),
+  ('location.switch','Select another merchant location for dashboard work'),
   ('loyalty.adjust','UmiPOS Gate 3F permission loyalty.adjust'),
   ('loyalty.adjust.approve','UmiPOS Gate 3F permission loyalty.adjust.approve'),
   ('loyalty.policy.manage','UmiPOS Gate 3F permission loyalty.policy.manage'),
@@ -120,7 +121,7 @@ using umi.role r, umi.permission p
 where rp.role_id=r.id
   and rp.permission_id=p.id
   and r.key in ('admin','cashier','manager','owner','staff','supervisor','viewer')
-  and p.key in ('audit.read','cart.write','cash.count.recount','cash.count.submit','cash.drawer.no_sale','cash.drawer.no_sale.approve','cash.movement.paid_in','cash.movement.paid_in.approve','cash.movement.paid_out','cash.movement.paid_out.approve','cash.movement.safe_drop','cash.movement.safe_drop.approve','cash.reconcile','cash.register.use','cash.shift.close','cash.shift.close.approve','cash.shift.handoff','cash.shift.open','cash.shift.read','cash.shift.resume','cash.shift.suspend','cash.variance.approve','catalog.read','checkout.commit','checkout.discount.apply','checkout.discount.approve','checkout.recover.any','checkout.terminal.approve','checkout.terminal.confirm','customer.attach','customer.contact.read','customer.create','customer.detach','customer.history.admin','customer.history.global','customer.history.read','customer.merge','customer.merge.approve','customer.read','customer.search','device.enroll','gift_card.activate','gift_card.activate.approve','gift_card.authorize','gift_card.issue','gift_card.issue.approve','gift_card.lookup','gift_card.read','gift_card.redeem','gift_card.refund','gift_card.release','hardware.assign','hardware.command.execute','hardware.customer_display.test','hardware.customer_display.use','hardware.diagnostics','hardware.drawer.open','hardware.drawer.test','hardware.manage','hardware.printer.print','hardware.printer.reprint','hardware.printer.test','hardware.read','hardware.scanner.test','hardware.scanner.use','insights.read','inventory.adjust.approve','inventory.adjust.decrease','inventory.adjust.increase','inventory.count.approve','inventory.count.create','inventory.count.reconcile','inventory.count.submit','inventory.damage.approve','inventory.damage.create','inventory.history.read','inventory.negative_stock.override','inventory.policy.manage','inventory.policy.read','inventory.quarantine.approve','inventory.quarantine.enter','inventory.quarantine.release','inventory.read','inventory.restock.approve','inventory.restock.resolve','inventory.waste.approve','inventory.waste.create','kitchen.cancel_ack','kitchen.complete','kitchen.diagnostics','kitchen.merchant.read','kitchen.prepare','kitchen.priority','kitchen.read','kitchen.ready','kitchen.recall','kitchen.station.manage','kitchen.station.read','loyalty.adjust','loyalty.adjust.approve','loyalty.policy.manage','loyalty.read','loyalty.reward.approve','loyalty.reward.authorize','loyalty.reward.redeem','loyalty.reward.release','merchant.manage','offline.cash.checkout','offline.recovery.review','offline.replay','sale.exception.history','sale.exception.read','sale.lifecycle','sale.refund.approve','sale.refund.cash','sale.refund.full','sale.refund.manual_terminal','sale.refund.other_location','sale.refund.other_operator','sale.refund.partial','sale.refund.reconcile','sale.resume.any','sale.void.create','stored_value.approve','stored_value.reconcile','wallet.authorize','wallet.read','wallet.redeem','wallet.refund','wallet.release');
+  and p.key in ('audit.read','cart.write','cash.count.recount','cash.count.submit','cash.drawer.no_sale','cash.drawer.no_sale.approve','cash.movement.paid_in','cash.movement.paid_in.approve','cash.movement.paid_out','cash.movement.paid_out.approve','cash.movement.safe_drop','cash.movement.safe_drop.approve','cash.reconcile','cash.register.use','cash.shift.close','cash.shift.close.approve','cash.shift.handoff','cash.shift.open','cash.shift.read','cash.shift.resume','cash.shift.suspend','cash.variance.approve','catalog.read','checkout.commit','checkout.discount.apply','checkout.discount.approve','checkout.recover.any','checkout.terminal.approve','checkout.terminal.confirm','customer.attach','customer.contact.read','customer.create','customer.detach','customer.history.admin','customer.history.global','customer.history.read','customer.merge','customer.merge.approve','customer.read','customer.search','device.enroll','gift_card.activate','gift_card.activate.approve','gift_card.authorize','gift_card.issue','gift_card.issue.approve','gift_card.lookup','gift_card.read','gift_card.redeem','gift_card.refund','gift_card.release','hardware.assign','hardware.command.execute','hardware.customer_display.test','hardware.customer_display.use','hardware.diagnostics','hardware.drawer.open','hardware.drawer.test','hardware.manage','hardware.printer.print','hardware.printer.reprint','hardware.printer.test','hardware.read','hardware.scanner.test','hardware.scanner.use','insights.read','inventory.adjust.approve','inventory.adjust.decrease','inventory.adjust.increase','inventory.count.approve','inventory.count.create','inventory.count.reconcile','inventory.count.submit','inventory.damage.approve','inventory.damage.create','inventory.history.read','inventory.negative_stock.override','inventory.policy.manage','inventory.policy.read','inventory.quarantine.approve','inventory.quarantine.enter','inventory.quarantine.release','inventory.read','inventory.restock.approve','inventory.restock.resolve','inventory.waste.approve','inventory.waste.create','kitchen.cancel_ack','kitchen.complete','kitchen.diagnostics','kitchen.merchant.read','kitchen.prepare','kitchen.priority','kitchen.read','kitchen.ready','kitchen.recall','kitchen.station.manage','kitchen.station.read','location.switch','loyalty.adjust','loyalty.adjust.approve','loyalty.policy.manage','loyalty.read','loyalty.reward.approve','loyalty.reward.authorize','loyalty.reward.redeem','loyalty.reward.release','merchant.manage','offline.cash.checkout','offline.recovery.review','offline.replay','sale.exception.history','sale.exception.read','sale.lifecycle','sale.refund.approve','sale.refund.cash','sale.refund.full','sale.refund.manual_terminal','sale.refund.other_location','sale.refund.other_operator','sale.refund.partial','sale.refund.reconcile','sale.resume.any','sale.void.create','stored_value.approve','stored_value.reconcile','wallet.authorize','wallet.read','wallet.redeem','wallet.refund','wallet.release');
 
 with grants(role_key,permission_key) as (
   values
@@ -222,6 +223,7 @@ with grants(role_key,permission_key) as (
   ('admin','kitchen.recall'),
   ('admin','kitchen.station.manage'),
   ('admin','kitchen.station.read'),
+  ('admin','location.switch'),
   ('admin','loyalty.adjust'),
   ('admin','loyalty.adjust.approve'),
   ('admin','loyalty.policy.manage'),
@@ -519,6 +521,7 @@ with grants(role_key,permission_key) as (
   ('owner','kitchen.recall'),
   ('owner','kitchen.station.manage'),
   ('owner','kitchen.station.read'),
+  ('owner','location.switch'),
   ('owner','loyalty.adjust'),
   ('owner','loyalty.adjust.approve'),
   ('owner','loyalty.policy.manage'),
@@ -775,12 +778,14 @@ for each row execute function runtime.invalidate_operator_sessions_for_rbac();
 
 drop trigger if exists staff_authority_operator_session_invalidation on merchant.staff;
 create trigger staff_authority_operator_session_invalidation
-after update of role_id,location_id,status on merchant.staff
+after update of role_id,location_id,status,operator_pin_hash,operator_pin_lookup on merchant.staff
 for each row
 when (
   old.role_id is distinct from new.role_id
   or old.location_id is distinct from new.location_id
   or old.status is distinct from new.status
+  or old.operator_pin_hash is distinct from new.operator_pin_hash
+  or old.operator_pin_lookup is distinct from new.operator_pin_lookup
 )
 execute function runtime.invalidate_operator_sessions_for_rbac();
 
@@ -895,6 +900,7 @@ begin
   ('admin','kitchen.recall'),
   ('admin','kitchen.station.manage'),
   ('admin','kitchen.station.read'),
+  ('admin','location.switch'),
   ('admin','loyalty.adjust'),
   ('admin','loyalty.adjust.approve'),
   ('admin','loyalty.policy.manage'),
@@ -1192,6 +1198,7 @@ begin
   ('owner','kitchen.recall'),
   ('owner','kitchen.station.manage'),
   ('owner','kitchen.station.read'),
+  ('owner','location.switch'),
   ('owner','loyalty.adjust'),
   ('owner','loyalty.adjust.approve'),
   ('owner','loyalty.policy.manage'),

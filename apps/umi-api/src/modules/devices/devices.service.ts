@@ -3,12 +3,15 @@ import {
   ConflictException,
   HttpException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import type {
   BeginDeviceEnrollmentRequest,
+  DeviceList,
+  UpdateDeviceRequest,
   ClaimDevicePairingRequest,
   DeviceEnrollmentDecision,
   DeviceEnrollmentRequestList,
@@ -23,6 +26,7 @@ import type {
 import type { AppConfig } from '../../shared/config/config.schema';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { IntegrityService } from '../integrity/integrity.service';
+import { DevicePairingEvents } from '../realtime/device-pairing.events';
 import { DevicesRepository } from './devices.repository';
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -34,6 +38,7 @@ export class DevicesService {
     private readonly config: ConfigService<AppConfig, true>,
     private readonly integrity: IntegrityService,
     private readonly rateLimit: RateLimitService,
+    private readonly pairingEvents: DevicePairingEvents,
   ) {}
 
   async begin(
@@ -62,6 +67,7 @@ export class DevicesService {
       displayName: dto.displayName,
       type: dto.type,
       platform: dto.platform,
+      mobility: dto.mobility,
       codeHash: this.pairingCodeHash(code),
       idempotencyKey: dto.idempotencyKey,
       expiresAt,
@@ -113,6 +119,27 @@ export class DevicesService {
     return { requests: await this.repo.listPairingRequests(merchantId, locationIds) };
   }
 
+  async listDevices(merchantId: string, locationIds: string[] | null): Promise<DeviceList> {
+    return { devices: await this.repo.listDevices(merchantId, locationIds) };
+  }
+
+  async update(
+    merchantId: string,
+    deviceId: string,
+    dto: UpdateDeviceRequest,
+    locationIds: string[] | null,
+  ): Promise<DeviceSummary> {
+    const device = await this.repo.updateDevice({
+      merchantId,
+      deviceId,
+      displayName: dto.displayName,
+      mobility: dto.mobility,
+      allowedBranchIds: locationIds,
+    });
+    if (!device) throw new NotFoundException({ code: 'DEVICE_NOT_ALLOWED' });
+    return device;
+  }
+
   async approve(
     merchantId: string,
     actorUserId: string,
@@ -132,6 +159,7 @@ export class DevicesService {
       allowedBranchIds: locationIds,
     });
     if (!result) throw new ConflictException({ code: 'ENROLLMENT_REJECTED' });
+    this.announcePairingDecision(result);
     return result;
   }
 
@@ -153,7 +181,44 @@ export class DevicesService {
       allowedBranchIds: locationIds,
     });
     if (!result) throw new ConflictException({ code: 'ENROLLMENT_REJECTED' });
+    this.announcePairingDecision(result);
     return result;
+  }
+
+  /**
+   * Nudges the waiting device that the pairing state moved. The repository has
+   * already committed by the time it returns, so the device cannot poll ahead of
+   * its own decision. The payload carries no credential and no device: the poll
+   * route stays the single credential-delivery gate.
+   */
+  private announcePairingDecision(
+    decision: DeviceEnrollmentDecision & { pairingSessionId: string },
+  ): void {
+    this.pairingEvents.emitPairingChanged({
+      pairingSessionId: decision.pairingSessionId,
+      state: decision.state,
+      occurredAt: decision.decidedAt,
+    });
+  }
+
+  /**
+   * Validates a realtime handshake for a device that waits for approval. It is
+   * read-only on purpose: it counts no poll attempt and moves no state, so a
+   * reconnecting socket cannot consume the budget that protects the poll route.
+   * Returns the pairing session id to join, or null for every failure — the
+   * caller must not tell the device which value was wrong.
+   */
+  async authorizePairingSocket(input: {
+    pairingSessionId: string;
+    pollingCredential: string;
+    installationId: string;
+  }): Promise<{ pairingSessionId: string } | null> {
+    const session = await this.repo.findPairingSessionForRealtime({
+      pairingSessionId: input.pairingSessionId,
+      pollingCredentialHash: hash(input.pollingCredential),
+      installationHash: hash(input.installationId),
+    });
+    return session ? { pairingSessionId: session.pairingSessionId } : null;
   }
 
   async poll(

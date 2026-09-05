@@ -13,6 +13,9 @@ const pilotMatrix = JSON.parse(
 const cashierPermissions = pilotMatrix.profiles.find(
   (profile) => profile.role === 'cashier',
 )!.permissions;
+const managerPermissions = pilotMatrix.profiles.find(
+  (profile) => profile.role === 'manager',
+)!.permissions;
 
 const authorization = {
   operatorSessionId: id(4),
@@ -382,5 +385,139 @@ describe('Gate 3C cash application boundary', () => {
     });
     expect(result.status).toBe('succeeded');
     expect(repo.commandRecovery).toHaveBeenCalledWith(user.id, id(5), id(6), id(7), id(10));
+  });
+
+  it('adopts a shift onto this terminal without asking for an approval', async () => {
+    const audits: Array<{ eventType: string; publicData: unknown }> = [];
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      adopt: vi.fn().mockResolvedValue({
+        shift: { id: id(9), holdingDeviceId: id(3) },
+        register: { publicReference: 'REG-01' },
+        custody: { previousHoldingDeviceId: id(20), newHoldingDeviceId: id(3) },
+        correlationId: 'adopt',
+      }),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          commandId: id(7),
+          correlationId: 'adopt',
+          appendAudit: vi.fn(async (entry) => {
+            audits.push({ eventType: entry.eventType, publicData: entry.publicData });
+          }),
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const service = new PosCashService(repo as never, integrity as never);
+    const result = await service.adopt(user, id(5), id(9), {
+      locationId: id(6),
+      shiftId: id(9),
+      operatorSessionId: id(4),
+      expectedShiftVersion: 3,
+      reasonCode: 'browser_storage_cleared',
+      commandId: id(7),
+      idempotencyKey: id(10),
+    });
+
+    expect(repo.adopt).toHaveBeenCalledOnce();
+    expect(result.shift.holdingDeviceId).toBe(id(3));
+    // The move is auditable from both ends or it is not a chain of custody.
+    expect(audits).toEqual([
+      {
+        eventType: 'cash.shift_adopted',
+        publicData: { previousHoldingDeviceId: id(20), newHoldingDeviceId: id(3) },
+      },
+    ]);
+    // A cashier can take back their own shift: it is theirs already.
+    expect(cashierPermissions).toContain('cash.shift.resume');
+  });
+
+  it('refuses to adopt when the operator cannot even resume a shift', async () => {
+    const repo = {
+      authorize: vi.fn().mockResolvedValue({ ...authorization, permissions: ['cash.shift.read'] }),
+      adopt: vi.fn(),
+    };
+    const service = new PosCashService(repo as never, { execute: vi.fn() } as never);
+    await expect(
+      service.adopt(user, id(5), id(9), {
+        locationId: id(6),
+        shiftId: id(9),
+        operatorSessionId: id(4),
+        expectedShiftVersion: 3,
+        reasonCode: 'browser_storage_cleared',
+        commandId: id(7),
+        idempotencyKey: id(10),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(repo.adopt).not.toHaveBeenCalled();
+  });
+
+  const recoverRequest = {
+    locationId: id(6),
+    shiftId: id(9),
+    operatorSessionId: id(4),
+    countedCash: money(1_850),
+    denominations: [],
+    approvalId: id(13),
+    approvalFingerprint: 'a'.repeat(64),
+    expectedShiftVersion: 3,
+    reasonCode: 'terminal_lost',
+    note: null,
+    commandId: id(7),
+    idempotencyKey: id(10),
+  };
+
+  it('recovers an orphaned shift under the variance authority and books the difference', async () => {
+    const audits: Array<{ eventType: string; publicData: unknown }> = [];
+    const repo = {
+      authorize: vi.fn().mockResolvedValue({ ...authorization, permissions: managerPermissions }),
+      recover: vi.fn().mockResolvedValue({
+        summary: { shift: { id: id(9), status: 'recovered' } },
+        custody: { responsibleOperatorId: id(21), variance: money(-150) },
+        recoveredAt: '2026-09-02T18:00:00.000Z',
+        correlationId: 'recover',
+      }),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          commandId: id(7),
+          correlationId: 'recover',
+          appendAudit: vi.fn(async (entry) => {
+            audits.push({ eventType: entry.eventType, publicData: entry.publicData });
+          }),
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const service = new PosCashService(repo as never, integrity as never);
+    const result = await service.recover(user, id(5), id(9), recoverRequest);
+
+    // `recovered`, never `closed`: a report has to be able to tell a shift the cashier
+    // reconciled from one somebody else counted out afterwards.
+    expect(result.summary.shift.status).toBe('recovered');
+    expect(audits).toEqual([
+      {
+        eventType: 'cash.shift_recovered',
+        publicData: { responsibleOperatorId: id(21), variance: -150 },
+      },
+    ]);
+  });
+
+  it('keeps recovery away from the cashier who cannot approve a variance', async () => {
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      recover: vi.fn(),
+    };
+    const service = new PosCashService(repo as never, { execute: vi.fn() } as never);
+    await expect(service.recover(user, id(5), id(9), recoverRequest)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    expect(repo.recover).not.toHaveBeenCalled();
+    expect(cashierPermissions).not.toContain('cash.variance.approve');
   });
 });

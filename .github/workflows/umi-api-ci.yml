@@ -117,6 +117,18 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      # Redis for the realtime family (pairing handshake + nudge). The schema
+      # family below does NOT touch it; only the "Realtime instruments" step does.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       PGHOST: localhost
       PGPORT: '5432'
@@ -208,6 +220,22 @@ jobs:
         # absent: it needs a backfilled clone of production, which CI has not
         # got and must never have. It belongs to the P7 rehearsal.
         run: pnpm run test:integration:schema
+
+      # The REALTIME family runs against the same from-scratch schema but needs
+      # Redis (device-pairing nudges go over pub/sub), so it is its own step with
+      # the `redis` service wired in — kept out of the schema family above, which
+      # is deliberately Redis-free.
+      - name: Realtime instruments (pairing handshake · nudge)
+        working-directory: apps/umi-api
+        env:
+          DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
+          DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
+          REDIS_URL: redis://localhost:6379
+        # Device pairing HMACs its secret with JWT_SECRET (config requires >=16
+        # chars). Generate an ephemeral one per run instead of committing a
+        # secret-shaped literal — it only has to be self-consistent within this
+        # job's throwaway database.
+        run: JWT_SECRET="$(openssl rand -hex 24)" pnpm run test:integration:realtime
 
       # THE RE-RUNNABLE RULE, proven rather than written down.
       #

@@ -63,16 +63,6 @@ export const DASHBOARD_DOMAIN_POLICY: readonly DashboardDomainPolicy[] = [
     recovery: true,
   },
   {
-    domain: 'hardware',
-    label: 'Hardware',
-    priority: 'P0',
-    administrative: true,
-    boundary: 'dashboard',
-    permissions: ['hardware.read'],
-    actions: ['review'],
-    recovery: true,
-  },
-  {
     domain: 'catalog',
     label: 'Catálogo',
     priority: 'P0',

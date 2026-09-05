@@ -96,7 +96,9 @@ for f in 30_device_pairing 31_pos_sale 32_pos_checkout 33_pos_cash 34_pos_except
 done
 
 echo "== cross-schema FKs + RLS (data now present) =="
-for f in 50_cross_schema_fk 90_rls 47_checkout_kitchen_projection 48_customer_value_worker_scope; do
+for f in 50_cross_schema_fk 90_rls 47_checkout_kitchen_projection 48_customer_value_worker_scope \
+         49_merchant_roles 51_manager_card_credential 52_platform_elevation \
+         53_location_switch_grants; do
   psql -v ON_ERROR_STOP=1 -q -d "$DB" -f "$DDL/$f.sql"
 done
 

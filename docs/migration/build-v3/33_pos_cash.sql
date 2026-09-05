@@ -106,8 +106,20 @@ create table merchant.cash_shift (
   merchant_id uuid not null references merchant.merchant(id) on delete restrict,
   location_id uuid not null references merchant.location(id) on delete restrict,
   register_id uuid not null references merchant.physical_register(id) on delete restrict,
+  -- The terminal that OPENED the shift. Identity, and `tg_closed_cash_shift_immutable`
+  -- keeps it that way: it names the device that took responsibility for the drawer.
   device_id uuid not null references merchant.device(id) on delete restrict,
   device_credential_version integer not null check (device_credential_version > 0),
+  -- The terminal that HOLDS the shift right now, which is a different question and a
+  -- moving one. Equal to the opening device until something takes the identity away —
+  -- a rotated credential, a replaced tablet, or a web POS whose browser storage was
+  -- cleared, which mints a brand new device out of the same physical register. Every
+  -- cash operation matches against these two, so the shift follows the drawer instead
+  -- of dying with a browser profile. Each move is written to
+  -- `merchant.cash_shift_custody_event`.
+  holding_device_id uuid not null references merchant.device(id) on delete restrict,
+  holding_device_credential_version integer not null
+    check (holding_device_credential_version > 0),
   opening_operator_id uuid not null references umi.user(id) on delete restrict,
   responsible_operator_id uuid not null references umi.user(id) on delete restrict,
   operator_session_id uuid not null references runtime.operator_session(id) on delete restrict,
@@ -130,13 +142,18 @@ create table merchant.cash_shift (
   unique(merchant_id,opening_command_id)
 );
 
+-- `recovered` sits with `closed` and `blocked` on purpose. A shift a manager has
+-- recovered is finished: the drawer was counted and the register handed back. Leaving
+-- it out of these two predicates was what made recovery impossible to express — the
+-- register stayed held by a shift nobody could close, and the operator could never
+-- open another one.
 create unique index cash_shift_one_unresolved_register
   on merchant.cash_shift(merchant_id,register_id)
-  where status not in ('closed','blocked');
+  where status not in ('closed','blocked','recovered');
 create unique index cash_shift_one_active_operator
   on merchant.cash_shift(merchant_id,responsible_operator_id)
   where status in ('opening','open','suspended','handoff_pending','counting',
-                   'reconciliation_required','closing','recovered');
+                   'reconciliation_required','closing');
 
 alter table merchant.physical_register
   add constraint physical_register_current_shift_fk
@@ -383,6 +400,10 @@ begin
      or device_location<>new.location_id
      or device_version<>new.device_credential_version
      or device_state<>'active'
+     -- A shift always opens on the terminal that opened it. Custody moves later,
+     -- through an audited update, never through the opening row.
+     or new.holding_device_id<>new.device_id
+     or new.holding_device_credential_version<>new.device_credential_version
      or session_business<>new.merchant_id
      or session_location<>new.location_id
      or session_device<>new.device_id
@@ -518,6 +539,69 @@ end $$;
 create trigger cash_reconciliation_guard before insert on merchant.cash_reconciliation
   for each row execute function merchant.tg_cash_reconciliation_guard();
 
+-- WHO IS HOLDING THE DRAWER, and every time that changed.
+--
+-- `cash_shift` names one device and one operator session, and every cash operation
+-- matches against them. That is the right lock while a terminal keeps its identity,
+-- and the wrong one the moment it loses it: a web POS is one browser profile on one
+-- origin, so clearing site data mints a new device and strands the open shift on an
+-- identity that can never authenticate again. The register stays `in_use` for ever
+-- and the money in it can never be counted out.
+--
+-- So the device is rebindable, and every rebinding lands here. Two ways in:
+--   `device_adoption`  the same operator returns on another terminal and takes back
+--                      their own shift. No elevation: they already own it.
+--   `manager_recovery` the operator cannot return at all. A manager counts the drawer
+--                      and closes the shift to `recovered` under their own name.
+-- The row keeps both sides of the swap, so the chain of custody reads end to end.
+create table merchant.cash_shift_custody_event (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid not null references merchant.merchant(id) on delete restrict,
+  location_id uuid not null references merchant.location(id) on delete restrict,
+  register_id uuid not null references merchant.physical_register(id) on delete restrict,
+  shift_id uuid not null references merchant.cash_shift(id) on delete restrict,
+  event_type text not null check (event_type in ('device_adoption','manager_recovery')),
+  previous_holding_device_id uuid not null references merchant.device(id) on delete restrict,
+  previous_holding_credential_version integer not null
+    check (previous_holding_credential_version > 0),
+  previous_operator_session_id uuid not null
+    references runtime.operator_session(id) on delete restrict,
+  new_holding_device_id uuid references merchant.device(id) on delete restrict,
+  new_holding_credential_version integer check (new_holding_credential_version > 0),
+  new_operator_session_id uuid references runtime.operator_session(id) on delete restrict,
+  acting_operator_id uuid not null references umi."user"(id) on delete restrict,
+  responsible_operator_id uuid not null references umi."user"(id) on delete restrict,
+  shift_status_before text not null check (length(shift_status_before) between 1 and 40),
+  shift_status_after text not null check (length(shift_status_after) between 1 and 40),
+  expected_cash_minor_units bigint
+    check (expected_cash_minor_units between 0 and 9007199254740991),
+  counted_cash_minor_units bigint
+    check (counted_cash_minor_units between 0 and 9007199254740991),
+  currency text not null check (currency ~ '^[A-Z]{3}$'),
+  reason_code text not null check (reason_code ~ '^[a-z0-9_.-]{1,80}$'),
+  note text check (length(note) <= 160 and note !~ '[<>]'),
+  approval_id uuid references runtime.elevation_grant(id) on delete restrict,
+  command_id uuid not null,
+  ledger_sequence bigint not null check (ledger_sequence >= 0),
+  occurred_at timestamptz not null default now(),
+  unique(merchant_id,command_id),
+  constraint cash_custody_shape check (
+    case event_type
+      when 'device_adoption' then
+        new_holding_device_id is not null
+        and new_holding_credential_version is not null
+        and new_operator_session_id is not null
+        and counted_cash_minor_units is null
+      when 'manager_recovery' then
+        counted_cash_minor_units is not null
+        and expected_cash_minor_units is not null
+      else false
+    end
+  )
+);
+create index cash_shift_custody_shift_idx
+  on merchant.cash_shift_custody_event(merchant_id,shift_id,occurred_at);
+
 create function merchant.tg_cash_close_guard()
 returns trigger language plpgsql as $$
 declare
@@ -547,7 +631,7 @@ begin
     'physical_register','cash_shift_policy','cash_shift','cash_ledger_entry',
     'cash_movement','cash_shift_handoff','cash_count_attempt',
     'cash_variance_resolution','cash_reconciliation','cash_shift_close',
-    'no_sale_drawer_event'
+    'no_sale_drawer_event','cash_shift_custody_event'
   ] loop
     execute format('alter table merchant.%I enable row level security',table_name);
     execute format('alter table merchant.%I force row level security',table_name);
@@ -564,11 +648,13 @@ end $$;
 grant select on merchant.physical_register,merchant.cash_shift_policy,merchant.cash_shift,
   merchant.cash_ledger_entry,merchant.cash_movement,merchant.cash_shift_handoff,
   merchant.cash_count_attempt,merchant.cash_variance_resolution,merchant.cash_reconciliation,
-  merchant.cash_shift_close,merchant.no_sale_drawer_event to api,worker;
+  merchant.cash_shift_close,merchant.no_sale_drawer_event,
+  merchant.cash_shift_custody_event to api,worker;
 grant insert,update on merchant.physical_register,merchant.cash_shift to api,worker;
 grant insert on merchant.cash_ledger_entry,merchant.cash_movement,merchant.cash_shift_handoff,
   merchant.cash_count_attempt,merchant.cash_variance_resolution,merchant.cash_reconciliation,
-  merchant.cash_shift_close,merchant.no_sale_drawer_event to api,worker;
+  merchant.cash_shift_close,merchant.no_sale_drawer_event,
+  merchant.cash_shift_custody_event to api,worker;
 
 comment on table merchant.cash_ledger_entry is
   'Append-only physical cash authority. Expected cash is reproduced from these ordered facts.';
@@ -576,3 +662,5 @@ comment on table merchant.cash_count_attempt is
   'Immutable blind-count observations. Counted cash never replaces expected cash.';
 comment on table merchant.cash_shift_close is
   'One immutable close result for one fully reconciled cash shift.';
+comment on table merchant.cash_shift_custody_event is
+  'Every rebinding of a cash shift to a different terminal or a recovering manager.';

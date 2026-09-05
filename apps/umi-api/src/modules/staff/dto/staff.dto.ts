@@ -21,6 +21,10 @@ export class CreateStaffDto {
 
   @IsOptional()
   @IsString()
+  roleId?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()
@@ -29,7 +33,7 @@ export class CreateStaffDto {
 
   @IsOptional()
   @IsString()
-  operatorPin?: string;
+  operatorPin?: string | null;
 }
 
 export class UpdateStaffDto extends CreateStaffDto {}

@@ -37,6 +37,13 @@ final class NoAccessTokenProvider implements AccessTokenProvider {
   Future<String?> accessToken() async => null;
 }
 
+/// Renews the access token after a request is rejected with
+/// `AUTHENTICATION_REQUIRED`. Returns true when a fresh token is stored and the
+/// request may be retried. The composition root wires this to the durable POS
+/// refresh; it must itself call [ApiClient.request] with `authRefresh: false`
+/// so a failing refresh cannot recurse.
+typedef SessionRefresh = Future<bool> Function();
+
 abstract interface class ApiClient {
   Future<Map<String, Object?>> request({
     required ApiMethod method,
@@ -44,6 +51,7 @@ abstract interface class ApiClient {
     Map<String, Object?>? body,
     CancellationToken? cancellation,
     bool idempotent = false,
+    bool authRefresh = true,
   });
   void dispose();
 }
@@ -55,6 +63,7 @@ final class BoundedApiClient implements ApiClient {
     AccessTokenProvider tokenProvider = const NoAccessTokenProvider(),
     DeviceCredentialProvider deviceCredentialProvider =
         const NoDeviceCredentialProvider(),
+    this.sessionRefresh,
     http.Client? client,
   }) : // ignore: prefer_initializing_formals
        _config = config,
@@ -64,6 +73,15 @@ final class BoundedApiClient implements ApiClient {
        _tokenProvider = tokenProvider,
        _deviceCredentialProvider = deviceCredentialProvider,
        _client = client ?? http.Client();
+
+  /// Renews an expired access token on demand. Set by the composition root
+  /// after the entry gateway exists (the gateway and this client are mutually
+  /// dependent), or injected directly in tests. Null disables auto-refresh.
+  SessionRefresh? sessionRefresh;
+
+  /// Holds the one in-progress refresh so a burst of concurrent 401s triggers
+  /// a single renewal that they all await.
+  Future<bool>? _refreshInFlight;
 
   static const requestTimeout = Duration(seconds: 15);
   static const maxResponseBytes = 2 * 1024 * 1024;
@@ -82,6 +100,7 @@ final class BoundedApiClient implements ApiClient {
     Map<String, Object?>? body,
     CancellationToken? cancellation,
     bool idempotent = false,
+    bool authRefresh = true,
   }) async {
     if (!path.startsWith('/')) {
       throw const AppException(
@@ -98,6 +117,48 @@ final class BoundedApiClient implements ApiClient {
         recoverable: false,
       );
     }
+    // The auth guard rejects an expired access token before the handler runs,
+    // so no side effect has occurred and one retry after a token renewal is
+    // safe even for a POST. A single renewal per request, shared across a
+    // burst of concurrent 401s, guards against loops.
+    var didRefresh = false;
+    while (true) {
+      try {
+        return await _send(
+          method: method,
+          path: path,
+          body: body,
+          cancellation: cancellation,
+          idempotent: idempotent,
+          base: base,
+        );
+      } on AppException catch (error) {
+        if (!didRefresh &&
+            authRefresh &&
+            sessionRefresh != null &&
+            error.code == 'AUTHENTICATION_REQUIRED' &&
+            await _refreshOnce()) {
+          didRefresh = true;
+          continue;
+        }
+        rethrow;
+      }
+    }
+  }
+
+  Future<bool> _refreshOnce() =>
+      _refreshInFlight ??= sessionRefresh!().whenComplete(() {
+        _refreshInFlight = null;
+      });
+
+  Future<Map<String, Object?>> _send({
+    required ApiMethod method,
+    required String path,
+    Map<String, Object?>? body,
+    CancellationToken? cancellation,
+    required bool idempotent,
+    required Uri base,
+  }) async {
     final safeRetry =
         method == ApiMethod.get || method == ApiMethod.head || idempotent;
     final attempts = safeRetry ? maxSafeReadAttempts : 1;

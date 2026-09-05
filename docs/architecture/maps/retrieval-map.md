@@ -9,17 +9,19 @@ This file defines how agents should load Umi context without turning the workspa
 3. `docs/architecture/agent-operating-system.md`.
 4. `docs/architecture/maps/workspace-map.md`.
 5. This file.
-6. The owning repo's `AGENTS.md`.
-7. The owning repo's `REPO_CONTEXT.md`.
+6. The owning app's `AGENTS.md`, if present.
+7. The owning app's `REPO_CONTEXT.md`, if present.
 8. Task-specific code, schema, tests, evals, diagnostics, or reports.
 
 ## Route by task
 
-- Backend, Supabase, jobs, prompts, memory, traces, WhatsApp, outbox, KDS projection SQL: `apps/umi-conversaflow`.
+- Backend, jobs, prompts, traces, WhatsApp, outbox, passes, projections, and business writes: `apps/umi-api`.
+- UmiPOS client, checkout, device hardware, offline replay, and shifts: `apps/umi-pos`.
 - Native iPad KDS UI, Swift client behavior, KDS board interactions: `apps/umi-kds`.
-- Loyalty, wallet passes, Prisma, Cash web behavior, Cash Vercel cron jobs: `apps/umi-cash`.
-- Logs dashboard, trace rendering, observability UI: `apps/umi-logs`.
+- Cash compatibility site, Prisma behavior, and Cash Vercel jobs: `apps/umi-cash`.
 - Owner dashboard live-data UI behavior: `apps/umi-dashboard`.
+- Public marketing pages and lead capture: `apps/umi-landing-page`.
+- Shared API and UmiPOS contract changes: `packages/contract` and both consumers.
 - Cross-product ownership, retrieval policy, governance, report/eval indexing: root docs.
 
 ## Authority classes

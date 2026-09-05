@@ -1,19 +1,27 @@
 # Workspace Map
 
-This map routes work to the narrowest current owner. It is a retrieval aid, not a replacement for code, migrations, tests, or local contracts.
+This map routes work to the narrowest current owner.
+It does not replace code, migrations, tests, or local contracts.
 
 ## Root
 
-- Purpose: workspace governance, architecture, migration planning, retrieval policy, report indexes, eval indexes, memory policy, and agent operating-system design.
+- Purpose: governance, architecture, migration planning, retrieval policy, reports, evaluations, memory policy, and agent operating-system design.
 - High-authority entrypoints: `AGENTS.md`, `WORKSPACE.md`, `docs/README.md`, `docs/architecture/agent-operating-system.md`, `docs/governance/authority.md`.
 - Do not put product runtime logic here.
 
-## `apps/umi-conversaflow`
+## `apps/umi-api`
 
-- Purpose: shared Supabase edge/backend logic, workflow jobs, queue/outbox, prompts, memory, traces, KDS backend contracts, schema migrations, and cross-channel normalization.
-- Runtime surfaces: `supabase/functions/`, `supabase/migrations/`, `sql/`, `scripts/diagnostics/`, runtime prompt files.
-- Schemas: owns operational `conversaflow`; owns schema-qualified migrations that create/update `kds` projections when the backend write model is the source.
-- Load first: `AGENTS.md`, `REPO_CONTEXT.md`, `supabase/functions/job-worker/processors/index.ts`, relevant migrations.
+- Purpose: canonical backend, workflows, normalization, authentication, business writes, projections, and pass generation.
+- Runtime surfaces: `src/`, `db/`, `passes/`, `deploy/`, and `test/`.
+- Schemas: owns application access to `umi`, `merchant`, and `runtime`.
+- Load first: `package.json`, relevant `src/` modules, database definitions, and tests.
+
+## `apps/umi-pos`
+
+- Purpose: Flutter UmiPOS client and native device workflows.
+- Runtime surfaces: `lib/`, platform directories, `test/`, and `integration_test/`.
+- Schemas: consumes API contracts. It does not own business truth.
+- Load first: `README.md`, `pubspec.yaml`, relevant `lib/` code, and tests.
 
 ## `apps/umi-kds`
 
@@ -24,21 +32,21 @@ This map routes work to the narrowest current owner. It is a retrieval aid, not 
 
 ## `apps/umi-cash`
 
-- Purpose: loyalty, wallet, passes, tenant/user/session behavior, Vercel cron behavior, and Cash-specific Prisma schema.
+- Purpose: Cash compatibility client, tenant sessions, Vercel jobs, and Cash-specific Prisma behavior.
 - Runtime surfaces: `src/`, `prisma/`, `passes/`, `vercel.json`.
-- Schemas: owns Cash Prisma schema and loyalty/wallet tables.
+- Schemas: retains its compatibility Prisma schema. New business truth belongs in `umi-api`.
 - Load first: `AGENTS.md`, `REPO_CONTEXT.md`, `package.json`, `prisma/schema.prisma`.
-
-## `apps/umi-logs`
-
-- Purpose: operational logs, trace browsing, and observability UI for ConversaFlow.
-- Runtime surfaces: Next.js app, Supabase trace client, trace parsers, trace types.
-- Schemas: consumes ConversaFlow logs/traces using configured service credentials; does not own the underlying trace tables.
-- Load first: `AGENTS.md`, `REPO_CONTEXT.md`, `lib/supabase.ts`, `lib/parsers/traceAssembler.ts`, `types/trace.ts`.
 
 ## `apps/umi-dashboard`
 
 - Purpose: Umi owner dashboard app shell with live product data.
 - Runtime surfaces: dashboard server/API, `src/` screens, shell, styles, icons, and legacy `Umi Dash.html` reference shell.
 - Behavior contract: preserve the visible functions and flows when hardening the production app.
-- Load first: `AGENTS.md`, `REPO_CONTEXT.md`, `Umi Dash.html`, `src/app.jsx`, `src/shell.jsx`, relevant screen file.
+- Load first: `AGENTS.md`, `REPO_CONTEXT.md`, `package.json`, and the relevant `src/` files.
+
+## `apps/umi-landing-page`
+
+- Purpose: public marketing site and lead capture.
+- Runtime surfaces: `src/`, `data/`, and `scripts/`.
+- Schemas: owns local lead-capture compatibility data. Canonical lead writes belong in `umi-api`.
+- Load first: `README.md`, `package.json`, relevant `src/` code, and tests.

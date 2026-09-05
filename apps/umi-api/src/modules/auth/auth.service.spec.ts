@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { createHash, generateKeyPairSync, sign as edSign } from 'node:crypto';
+
+function deviceProofFor(installationId: string, timestampIso: string) {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const message = Buffer.from(`${installationId}|${timestampIso}`, 'utf8');
+  const signature = edSign(null, message, privateKey).toString('base64url');
+  const jwk = publicKey.export({ format: 'jwk' }) as { x: string };
+  return { publicKey: jwk.x, signature };
+}
 import { AuthService, isMfaChallenge, type LoginOutcome } from './auth.service';
 
 function make() {
@@ -18,6 +26,9 @@ function make() {
     findResetToken: vi.fn(),
     updatePassword: vi.fn().mockResolvedValue(undefined),
     markResetTokenUsed: vi.fn().mockResolvedValue(undefined),
+    validatePosDevice: vi.fn(),
+    findPosPinStaff: vi.fn(),
+    recordPosPinFailure: vi.fn().mockResolvedValue(undefined),
     validatePosSession: vi.fn(),
     rotatePosSessionToken: vi.fn().mockResolvedValue(true),
     revokePosSession: vi.fn().mockResolvedValue(undefined),
@@ -185,11 +196,17 @@ describe('AuthService POS session lifecycle', () => {
   });
 
   it('rotates a device-bound POS session', async () => {
-    h.repo.validatePosSession.mockResolvedValue({ deviceId: 'device-1' });
+    h.repo.validatePosSession.mockResolvedValue({
+      deviceId: 'device-1',
+      ephemeralPublicKey: null,
+    });
     const result = await h.svc.posRefresh({
       refreshToken: 'old-refresh',
       installationId: 'installation-1',
       deviceCredential: 'credential-1',
+      deviceProof: null,
+      deviceProofTimestamp: null,
+      deviceProofAlgorithm: null,
     });
     expect(result.deviceId).toBe('device-1');
     expect(h.repo.rotatePosSessionToken).toHaveBeenCalledWith('session-1', expect.any(String));
@@ -202,6 +219,9 @@ describe('AuthService POS session lifecycle', () => {
         refreshToken: 'old-refresh',
         installationId: 'installation-1',
         deviceCredential: 'credential-1',
+        deviceProof: null,
+        deviceProofTimestamp: null,
+        deviceProofAlgorithm: null,
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
@@ -209,6 +229,84 @@ describe('AuthService POS session lifecycle', () => {
   it('revokes the original session on logout', async () => {
     await h.svc.posLogout('refresh-token');
     expect(h.repo.revokePosSession).toHaveBeenCalledWith('session-1', 'u1', expect.any(String));
+  });
+});
+
+describe('AuthService.pinLogin — device possession proof', () => {
+  const installationId = 'installation-1';
+
+  function pinLoginInput(overrides: Record<string, unknown>) {
+    return {
+      pin: '2468',
+      merchantId: 'm1',
+      locationId: 'l1',
+      installationId,
+      deviceId: 'device-1',
+      deviceCredential: 'credential-1',
+      deviceProof: null,
+      deviceProofTimestamp: null,
+      deviceProofAlgorithm: null,
+      ip: null,
+      ...overrides,
+    } as Parameters<AuthService['pinLogin']>[0];
+  }
+
+  it('rejects a keyed device that sends no proof', async () => {
+    const h = make();
+    const { publicKey } = deviceProofFor(installationId, new Date().toISOString());
+    h.repo.validatePosDevice.mockResolvedValue({
+      allowed: true,
+      ephemeralPublicKey: publicKey,
+    });
+    await expect(h.svc.pinLogin(pinLoginInput({}))).rejects.toMatchObject({
+      response: { code: 'DEVICE_PROOF_REQUIRED' },
+    });
+    expect(h.repo.findPosPinStaff).not.toHaveBeenCalled();
+  });
+
+  it('rejects a keyed device that sends a bad signature', async () => {
+    const h = make();
+    const timestamp = new Date().toISOString();
+    const { publicKey } = deviceProofFor(installationId, timestamp);
+    h.repo.validatePosDevice.mockResolvedValue({
+      allowed: true,
+      ephemeralPublicKey: publicKey,
+    });
+    await expect(
+      h.svc.pinLogin(pinLoginInput({ deviceProof: 'AAAA', deviceProofTimestamp: timestamp })),
+    ).rejects.toMatchObject({ response: { code: 'DEVICE_PROOF_INVALID' } });
+    expect(h.repo.findPosPinStaff).not.toHaveBeenCalled();
+  });
+
+  it('passes a valid proof through to the PIN check', async () => {
+    const h = make();
+    const timestamp = new Date().toISOString();
+    const proof = deviceProofFor(installationId, timestamp);
+    h.repo.validatePosDevice.mockResolvedValue({
+      allowed: true,
+      ephemeralPublicKey: proof.publicKey,
+    });
+    h.repo.findPosPinStaff.mockResolvedValue(undefined);
+    await expect(
+      h.svc.pinLogin(
+        pinLoginInput({
+          deviceProof: proof.signature,
+          deviceProofTimestamp: timestamp,
+        }),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(h.repo.findPosPinStaff).toHaveBeenCalled();
+  });
+
+  it('allows a legacy device that never registered a key', async () => {
+    const h = make();
+    h.repo.validatePosDevice.mockResolvedValue({
+      allowed: true,
+      ephemeralPublicKey: null,
+    });
+    h.repo.findPosPinStaff.mockResolvedValue(undefined);
+    await expect(h.svc.pinLogin(pinLoginInput({}))).rejects.toBeInstanceOf(ForbiddenException);
+    expect(h.repo.findPosPinStaff).toHaveBeenCalled();
   });
 });
 

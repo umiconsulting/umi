@@ -21,6 +21,8 @@
     "umi-pos:android": "cd apps/umi-pos && flutter run -d android",
     "umi-pos:ios": "cd apps/umi-pos && flutter run -d ios",
     "umi-pos:web": "cd apps/umi-pos && flutter run -d chrome",
+    "umi-pos:firefox": "bash scripts/umi-pos-firefox.sh",
+    "umi-pos:firefox:test": "node --test scripts/umi-pos-firefox-launch.spec.mjs",
     "umi-pos:offline-tests": "cd apps/umi-pos && flutter test test/offline_journal_test.dart test/offline_policy_test.dart test/checkout_test.dart",
     "umi-pos:replay-api-tests": "pnpm --filter @umi/api exec vitest run src/modules/pos-offline/pos-offline.service.spec.ts",
     "umi-pos:pairing-db-check": "bash scripts/umi-pos-device-pairing-db-check.sh",
@@ -72,6 +74,9 @@
     "pilot:bootstrap": "bash scripts/umipos-pilot-bootstrap.sh"
   },
   "devDependencies": {
+    "@playwright/cli": "0.1.18",
+    "@playwright/mcp": "0.0.80",
+    "@playwright/test": "1.62.1",
     "prettier": "3.9.4",
     "turbo": "^2.8.8"
   }

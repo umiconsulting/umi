@@ -41,3 +41,15 @@ description = "Test fixtures that are hashes, not credentials"
 regexes = [
   '''75da00f6378d098bbe2e19dd7ce73a633c0f0f56aa876e9741e37974f1e68ed9''',
 ]
+
+[[allowlists]]
+description = "Test idempotency keys (UUIDs) in dashboard device specs"
+# Fixed `idempotencyKey` UUIDs asserted in
+# apps/umi-dashboard/src/data.devices.spec.jsx. The `key` in `idempotencyKey`
+# plus the high-entropy UUID trips `generic-api-key`, but these are request
+# de-duplication ids in a unit test, not credentials. Allowlisted by exact
+# value (not by path) so a real secret pasted into that same spec is still caught.
+regexes = [
+  '''38f9cfe6-4777-4e3c-b7bc-fe16522b3024''',
+  '''b0f8e0a2-9a1e-4c3e-9c1a-0d7d7a5f7f11''',
+]

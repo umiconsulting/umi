@@ -168,7 +168,7 @@ export class DiagnosticTrigger {
     await this.upsertLead(newLead);
 
     const daysElapsed = await this.getDaysElapsed(leadId);
-    const allEmails = this.calculateEmailsToSend(newLead);
+    const allEmails = await this.calculateEmailsToSend(newLead);
 
     // Fresh submissions send only the immediate welcome email. Short backfills
     // can catch up on delayed follow-ups; very old imports restart at welcome.
@@ -232,7 +232,7 @@ export class DiagnosticTrigger {
 
     await this.upsertLead(updatedLead);
 
-    const emailsToSend = this.calculateEmailsToSend(updatedLead);
+    const emailsToSend = await this.calculateEmailsToSend(updatedLead);
 
     return {
       isNewLead: false,
@@ -245,15 +245,14 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   // calculateEmailsToSend
   // -----------------------------------------------------------------------
-  private calculateEmailsToSend(lead: LeadData): Array<{
-    template: string;
-    day: number;
-    subject: string;
-  }> {
-    // Use sync method for calculation (both adapters support it)
-    const daysElapsed = this.isPostgres
-      ? 0
-      : (this.database as LeadDatabase).getDaysElapsed(lead.id);
+  private async calculateEmailsToSend(lead: LeadData): Promise<
+    Array<{
+      template: string;
+      day: number;
+      subject: string;
+    }>
+  > {
+    const daysElapsed = await this.getDaysElapsed(lead.id);
     const emailsToSend: Array<{ template: string; day: number; subject: string }> = [];
 
     const emailSequence = [
@@ -264,8 +263,7 @@ export class DiagnosticTrigger {
     ];
 
     for (const emailConfig of emailSequence) {
-      // For postgres we can't check synchronously — handled at send time
-      if (daysElapsed >= emailConfig.day || this.isPostgres) {
+      if (daysElapsed >= emailConfig.day && !(await this.wasEmailSent(lead.id, emailConfig.day))) {
         emailsToSend.push(emailConfig);
       }
     }
@@ -276,14 +274,14 @@ export class DiagnosticTrigger {
   // -----------------------------------------------------------------------
   // calculatePendingEmails
   // -----------------------------------------------------------------------
-  private calculatePendingEmails(lead: LeadData): Array<{
-    template: string;
-    day: number;
-    subject: string;
-  }> {
-    const daysElapsed = this.isPostgres
-      ? 999
-      : (this.database as LeadDatabase).getDaysElapsed(lead.id);
+  private async calculatePendingEmails(lead: LeadData): Promise<
+    Array<{
+      template: string;
+      day: number;
+      subject: string;
+    }>
+  > {
+    const daysElapsed = await this.getDaysElapsed(lead.id);
     const emailsToSend: Array<{ template: string; day: number; subject: string }> = [];
 
     const emailSequence = [
@@ -294,7 +292,7 @@ export class DiagnosticTrigger {
     ];
 
     for (const emailConfig of emailSequence) {
-      if (daysElapsed >= emailConfig.day || this.isPostgres) {
+      if (daysElapsed >= emailConfig.day && !(await this.wasEmailSent(lead.id, emailConfig.day))) {
         emailsToSend.push(emailConfig);
       }
     }
@@ -347,7 +345,7 @@ export class DiagnosticTrigger {
       console.log(`🔍 Procesando ${pendingLeads.length} leads pendientes`);
 
       for (const lead of pendingLeads) {
-        const emailsToSend = this.calculatePendingEmails(lead);
+        const emailsToSend = await this.calculatePendingEmails(lead);
 
         if (emailsToSend.length > 0) {
           processed++;

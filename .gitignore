@@ -73,3 +73,7 @@ deploy/pilot/pilot.env
 # allowlists that have historically included credentials in command strings.
 # The repo-shared config is .mcp.json (secrets via ${VAR} expansion only).
 .claude/settings.local.json
+
+# Playwright CLI runtime artifacts (snapshots, console logs)
+.playwright-cli/
+.playwright/

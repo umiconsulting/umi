@@ -264,6 +264,9 @@ export class PosAuthController {
       installationId: dto.installationId,
       deviceId,
       deviceCredential,
+      deviceProof: header(req, 'x-umi-device-proof'),
+      deviceProofTimestamp: header(req, 'x-umi-device-proof-ts'),
+      deviceProofAlgorithm: header(req, 'x-umi-device-proof-alg'),
       ip: req.ip ?? null,
     });
     return {
@@ -286,6 +289,9 @@ export class PosAuthController {
       refreshToken: dto.refreshToken,
       installationId: dto.installationId,
       deviceCredential: header(req, 'x-umi-device-credential'),
+      deviceProof: header(req, 'x-umi-device-proof'),
+      deviceProofTimestamp: header(req, 'x-umi-device-proof-ts'),
+      deviceProofAlgorithm: header(req, 'x-umi-device-proof-alg'),
     });
     return {
       session: {

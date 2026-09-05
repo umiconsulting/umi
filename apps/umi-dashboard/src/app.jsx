@@ -23,14 +23,17 @@ import OverviewScreen from '@/screens/overview.jsx';
 import OrdersScreen from '@/screens/orders.jsx';
 import DevicesScreen from '@/screens/devices.jsx';
 import StaffScreen from '@/screens/staff.jsx';
-import MembersScreen from '@/screens/members.jsx';
-import GiftCardsScreen from '@/screens/gift-cards.jsx';
+import LoyaltyValueScreen from '@/screens/loyalty-value.jsx';
 import CustomersScreen from '@/screens/customers.jsx';
 import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
 import CafesScreen from '@/screens/cafes.jsx';
 import OperationsScreen from '@/screens/operations.jsx';
+import CashShiftsScreen from '@/screens/cash-shifts.jsx';
+import CatalogInventoryScreen from '@/screens/catalog-inventory.jsx';
+import DiagnosticsScreen from '@/screens/diagnostics.jsx';
+import CocinaScreen from '@/screens/cocina.jsx';
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy', lang: 'es' };
 
@@ -187,6 +190,7 @@ function DashboardLayout() {
           screen={screen}
           merchantName={merchantName}
           locations={merchantState?.capabilities?.locations || []}
+          canSwitchLocations={merchantState?.capabilities?.canSwitchLocations === true}
           selectedLocationId={merchantState?.selectedLocationId}
           onLocationChange={merchantState?.setSelectedLocationId}
           connection={connection}
@@ -222,10 +226,42 @@ function DashboardLayout() {
               }
             />
             <Route
+              path="cash-shifts"
+              element={
+                <GuardedScreen moduleKey="cash-shifts">
+                  <CashShiftsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="catalog-inventory"
+              element={
+                <GuardedScreen moduleKey="catalog-inventory">
+                  <CatalogInventoryScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="diagnostics"
+              element={
+                <GuardedScreen moduleKey="diagnostics">
+                  <DiagnosticsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
               path="orders"
               element={
                 <GuardedScreen moduleKey="orders">
                   <OrdersScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="kitchen"
+              element={
+                <GuardedScreen moduleKey="kitchen">
+                  <CocinaScreen />
                 </GuardedScreen>
               }
             />
@@ -254,21 +290,17 @@ function DashboardLayout() {
               }
             />
             <Route
-              path="members"
+              path="loyalty-value"
               element={
-                <GuardedScreen moduleKey="members">
-                  <MembersScreen />
+                <GuardedScreen moduleKey="loyalty-value">
+                  <LoyaltyValueScreen />
                 </GuardedScreen>
               }
             />
-            <Route
-              path="gift-cards"
-              element={
-                <GuardedScreen moduleKey="gift-cards">
-                  <GiftCardsScreen />
-                </GuardedScreen>
-              }
-            />
+            {/* Old single-domain routes fold into the Lealtad y valor hub. Keep the
+                paths as redirects so no bookmark 404s. */}
+            <Route path="members" element={<Navigate to="/loyalty-value" replace />} />
+            <Route path="gift-cards" element={<Navigate to="/loyalty-value" replace />} />
             <Route path="insights" element={<Navigate to="/customers" replace />} />
             <Route
               path="conversations/*"

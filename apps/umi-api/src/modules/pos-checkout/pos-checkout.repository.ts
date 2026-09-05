@@ -385,10 +385,21 @@ export class PosCheckoutRepository {
          discount_drafts=excluded.discount_drafts,receipt_delivery=excluded.receipt_delivery,
          payment_summary=excluded.payment_summary,recovery_state=excluded.recovery_state,
          cash_shift_id=excluded.cash_shift_id,
+         -- THE DRAFT FOLLOWS THE CART, it does not outlive a session on its own.
+         --
+         -- These two were in the WHERE below, compared against the acting session
+         -- and device. A cashier who signed in again — or a web terminal that came
+         -- back as a new device — no longer matched, so the upsert touched nothing
+         -- and the checkout threw. The cart could be handed over -- resume moves it
+         -- and marks it recovered -- but its draft could not, which left the cart
+         -- permanently unpayable. $4 is the cart's CURRENT session, already proven
+         -- to own the cart before we get here, so it is the right owner to record.
+         operator_session_id=excluded.operator_session_id,
+         device_id=excluded.device_id,
          updated_at=now()
+       -- What actually has to be protected: a settled draft is immutable, and a
+       -- confirmed terminal payment can never be dropped from the tenders.
        WHERE merchant.pos_checkout_draft.state NOT IN ('completed','receipt_available','payment_unknown')
-         AND merchant.pos_checkout_draft.operator_session_id=$4::uuid
-         AND merchant.pos_checkout_draft.device_id=$5::uuid
          AND NOT EXISTS (
            SELECT 1
            FROM jsonb_array_elements(merchant.pos_checkout_draft.tender_drafts) prior
@@ -1054,9 +1065,19 @@ export class PosCheckoutRepository {
     if (cashTenders.length > 1) {
       throw new Error('MULTIPLE_CASH_TENDERS_NOT_ALLOWED');
     }
+    // THE DAY THE SALE BELONGS TO.
+    //
+    // `pos_cart.business_date` is stamped when the cart is first created and never
+    // moves. A cart resumed the next morning still carries yesterday, and
+    // `tg_cash_ledger_open_shift` compares that date against the open shift's —
+    // so every cash sale on a cart that outlived midnight failed with a 500 and no
+    // explanation. The drawer decides: a sale paid out of a shift belongs to that
+    // shift's business day, whatever day the cart was born on. Without a shift
+    // there is nothing to disagree with and the cart's own date stands.
+    let businessDate = cart.businessDate;
     if (cashShiftId) {
-      const eligible = await client.query(
-        `SELECT 1
+      const eligible = await client.query<{ businessDate: string }>(
+        `SELECT s.business_date::text AS "businessDate"
          FROM merchant.cash_shift s
          JOIN merchant.pos_checkout_draft d ON d.id=$6::uuid AND d.cash_shift_id=s.id
          WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid
@@ -1072,6 +1093,7 @@ export class PosCheckoutRepository {
         ],
       );
       if (!eligible.rows[0]) throw new Error('CASH_SHIFT_NOT_ELIGIBLE');
+      businessDate = eligible.rows[0].businessDate;
     }
     const writtenOrder = await writeOrder(client, {
       merchantId: cart.merchantId,
@@ -1127,10 +1149,13 @@ export class PosCheckoutRepository {
         orderId,
         payments[0].attempt.id,
         receipt.receiptRef,
-        receipt.businessDate,
+        // The customer's copy has to name the same day the ledger booked. The
+        // receipt is built from the cart, so on a cart that outlived its business
+        // date it printed yesterday while the drawer counted it today.
+        businessDate,
         receipt.currency,
         receipt.grandTotal.minorUnits,
-        receipt,
+        { ...receipt, businessDate },
         receipt.receiptDestination ?? 'display',
         receipt.receiptDestination === 'digital'
           ? JSON.stringify({ destination: 'digital', deliveryStatus: 'not_sent' })
@@ -1186,7 +1211,7 @@ export class PosCheckoutRepository {
           commandId,
           sale.rows[0].id,
           cash.tenderId,
-          cart.businessDate,
+          businessDate,
           checkoutId,
         ],
       );
@@ -1206,7 +1231,7 @@ export class PosCheckoutRepository {
         authorization.operatorId,
         authorization.deviceId,
         authorization.credentialVersion,
-        cart.businessDate,
+        businessDate,
         correlationId,
       ],
     );
@@ -1226,7 +1251,7 @@ export class PosCheckoutRepository {
         customerValue?.previewFingerprint ?? confirmation.fingerprint,
         cart.version,
         customerValueBasisFingerprint,
-        cart.businessDate,
+        businessDate,
         authorization.operatorId,
         authorization.deviceId,
         customerValue?.storedValueFingerprint ?? null,

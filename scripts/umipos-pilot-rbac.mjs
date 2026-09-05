@@ -131,6 +131,12 @@ function generatedSql() {
         permission.source.includes('39_pos_customer_value_final_closeout.sql') ||
         permission.source.includes('40_pos_hardware_runtime.sql') ||
         permission.source.includes('42_pos_kitchen.sql') ||
+        // A permission introduced by a forward migration still has to exist in a
+        // PRISTINE build: `00_run.sh` applies the numbered DDL only, and CI builds
+        // that way every round. `location.switch` was granted and reconciled here
+        // while it was seeded solely by migrations/003, so the pristine build
+        // failed on its own reconciliation block.
+        permission.source.includes('/migrations/') ||
         permission.key.startsWith('inventory.'),
     )
     .map(
@@ -255,12 +261,14 @@ for each row execute function runtime.invalidate_operator_sessions_for_rbac();
 
 drop trigger if exists staff_authority_operator_session_invalidation on merchant.staff;
 create trigger staff_authority_operator_session_invalidation
-after update of role_id,location_id,status on merchant.staff
+after update of role_id,location_id,status,operator_pin_hash,operator_pin_lookup on merchant.staff
 for each row
 when (
   old.role_id is distinct from new.role_id
   or old.location_id is distinct from new.location_id
   or old.status is distinct from new.status
+  or old.operator_pin_hash is distinct from new.operator_pin_hash
+  or old.operator_pin_lookup is distinct from new.operator_pin_lookup
 )
 execute function runtime.invalidate_operator_sessions_for_rbac();
 

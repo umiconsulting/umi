@@ -788,7 +788,21 @@ class AppLocalizationsEs extends AppLocalizations {
       'Abre un turno de caja antes de aceptar efectivo.';
 
   @override
+  String get adoptShiftTitle => 'Tu turno sigue abierto en otra terminal';
+
+  @override
+  String get adoptShiftMessage =>
+      'Esta terminal perdió su identidad guardada. El turno y el dinero siguen ahí; tráelos a esta pantalla para continuar.';
+
+  @override
+  String get adoptShiftAction => 'Traer el turno a esta terminal';
+
+  @override
   String get openShiftAction => 'Abrir turno de caja';
+
+  @override
+  String get invalidAmountMessage =>
+      'Escribe un monto válido, por ejemplo 1,500.00.';
 
   @override
   String get openingFloatLabel => 'Fondo inicial';
@@ -1125,4 +1139,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get restockInventoryReviewLabel =>
       'Se requiere una revisión de inventario';
+
+  @override
+  String get sessionEndedReauth =>
+      'Tu sesión terminó. Vuelve a ingresar tu PIN.';
+
+  @override
+  String operatorShift(String name) {
+    return 'Turno de $name';
+  }
 }

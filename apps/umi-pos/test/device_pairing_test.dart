@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +88,91 @@ void main() {
     expect(controller.state.phase, EntryPhase.pinRequired);
     expect((await vault.deviceIdentity()).publicId, _publicId);
     expect(gateway.polls, 1);
+  });
+
+  group('realtime pairing nudge', () {
+    Future<(_PairingGateway, CredentialVault, EntryController)> waiting() async {
+      final storage = MemorySecureStorage();
+      storage.values['device.installation_id'] = _installationId;
+      final vault = CredentialVault(storage);
+      final gateway = _PairingGateway()..pollState = 'awaiting_approval';
+      addTearDown(gateway.dispose);
+      final controller = _controller(gateway, vault);
+      addTearDown(controller.dispose);
+
+      await controller.enroll('ABCDEFGH');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // One poll happened, it reported awaiting_approval, and the loop is now
+      // asleep for 30 s. Anything that follows can only come from the nudge.
+      expect(controller.state.phase, EntryPhase.enrollmentPending);
+      expect(gateway.polls, 1);
+      return (gateway, vault, controller);
+    }
+
+    test('a nudge collects the credential without waiting for the poll', () async {
+      final (gateway, vault, controller) = await waiting();
+
+      gateway.pollState = 'credential_delivered';
+      gateway.nudges.add(null);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(controller.state.phase, EntryPhase.pinRequired);
+      expect(gateway.polls, 2, reason: 'one from the loop, one from the nudge');
+      expect(gateway.acknowledgements, 1, reason: 'the credential is stored once');
+      expect((await vault.deviceIdentity()).credential, _secret);
+      expect(await vault.pairingIdentity(), isNull);
+    });
+
+    test('a burst of nudges still stores the credential once', () async {
+      final (gateway, _, controller) = await waiting();
+
+      gateway.pollState = 'credential_delivered';
+      gateway.nudges..add(null)..add(null)..add(null);
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+
+      expect(controller.state.phase, EntryPhase.pinRequired);
+      expect(gateway.acknowledgements, 1);
+    });
+
+    test('a nudge after cancel does nothing', () async {
+      final (gateway, _, controller) = await waiting();
+
+      await controller.cancelPairing();
+      final pollsAtCancel = gateway.polls;
+      gateway.pollState = 'credential_delivered';
+      gateway.nudges.add(null);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(controller.state.phase, EntryPhase.enrollmentRequired);
+      expect(gateway.polls, pollsAtCancel);
+      expect(gateway.acknowledgements, 0);
+    });
+
+    test('a failing nudge channel leaves the poll loop in charge', () async {
+      final storage = MemorySecureStorage();
+      storage.values['device.installation_id'] = _installationId;
+      final vault = CredentialVault(storage);
+      final gateway = _PairingGateway();
+      addTearDown(gateway.dispose);
+      final controller = _controller(gateway, vault);
+      addTearDown(controller.dispose);
+
+      await controller.enroll('ABCDEFGH');
+      gateway.nudges.addError(
+        const AppException(
+          category: AppErrorCategory.transport,
+          code: 'TRANSPORT_FAILURE',
+          recoverable: true,
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // Identical to the baseline with no realtime channel at all.
+      expect(controller.state.phase, EntryPhase.pinRequired);
+      expect(gateway.polls, 1);
+      expect(gateway.acknowledgements, 1);
+    });
   });
 
   testWidgets('enrollment asks for one setup code and no challenge id', (
@@ -278,7 +366,7 @@ void main() {
   });
 
   test(
-    'restart revokes the previous local session and requires the PIN',
+    'restart within the grace window restores the operator without a PIN',
     () async {
       final storage = MemorySecureStorage();
       storage.values['device.installation_id'] = _installationId;
@@ -292,17 +380,72 @@ void main() {
         merchantId: _merchantId,
         locationId: _locationId,
       );
+      // saveTokens stamps the last-proven time to now, inside the window.
       await vault.saveTokens('old-access', 'old-refresh');
       final gateway = _PairingGateway();
       final controller = _controller(gateway, vault);
 
       await controller.initialize();
 
-      expect(controller.state.phase, EntryPhase.pinRequired);
-      expect(gateway.logouts, 1);
-      expect(await vault.refreshToken(), isNull);
+      expect(gateway.refreshes, 1);
+      expect(gateway.logouts, 0);
+      expect(controller.state.phase, EntryPhase.ready);
+      expect(await vault.refreshToken(), 'refresh2');
     },
   );
+
+  test('restart with a failed refresh falls back to the PIN', () async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    await vault.saveDevice(
+      id: _deviceId,
+      publicId: _publicId,
+      credential: _secret,
+      credentialVersion: 1,
+      state: 'active',
+      merchantId: _merchantId,
+      locationId: _locationId,
+    );
+    await vault.saveTokens('old-access', 'old-refresh');
+    final gateway = _PairingGateway()..failRefresh = true;
+    final controller = _controller(gateway, vault);
+
+    await controller.initialize();
+
+    expect(gateway.refreshes, 1);
+    expect(controller.state.phase, EntryPhase.pinRequired);
+    expect(await vault.refreshToken(), isNull);
+  });
+
+  test('restart after the grace window requires the PIN', () async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    await vault.saveDevice(
+      id: _deviceId,
+      publicId: _publicId,
+      credential: _secret,
+      credentialVersion: 1,
+      state: 'active',
+      merchantId: _merchantId,
+      locationId: _locationId,
+    );
+    await vault.saveTokens('old-access', 'old-refresh');
+    // Move the last-proven time outside the restore window.
+    storage.values['session.activity_at'] = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(minutes: 10))
+        .toIso8601String();
+    final gateway = _PairingGateway();
+    final controller = _controller(gateway, vault);
+
+    await controller.initialize();
+
+    expect(gateway.refreshes, 0);
+    expect(controller.state.phase, EntryPhase.pinRequired);
+    expect(await vault.refreshToken(), isNull);
+  });
 
   test('operator lock preserves the device branch for the next PIN', () async {
     final storage = MemorySecureStorage();
@@ -363,6 +506,58 @@ void main() {
       expect(controller.state.errorCode, isNull);
     },
   );
+
+  test('an idle ready session locks itself and asks for the PIN', () {
+    fakeAsync((async) {
+      final storage = MemorySecureStorage();
+      storage.values['device.installation_id'] = _installationId;
+      final vault = CredentialVault(storage);
+      unawaited(
+        vault.saveDevice(
+          id: _deviceId,
+          publicId: _publicId,
+          credential: _secret,
+          credentialVersion: 1,
+          state: 'active',
+          merchantId: _merchantId,
+          locationId: _locationId,
+        ),
+      );
+      async.flushMicrotasks();
+      final gateway = _PairingGateway();
+      final controller = EntryController(
+        gateway: gateway,
+        vault: vault,
+        telemetry: SafeTelemetry(
+          enabled: false,
+          context: TelemetryContext.current(testConfig),
+          exporter: RecordingExporter(),
+        ),
+        idleTimeout: const Duration(minutes: 30),
+      );
+
+      // No saved tokens, so the cold start lands on the PIN, not a restore.
+      unawaited(controller.initialize());
+      async.flushMicrotasks();
+      expect(controller.state.phase, EntryPhase.pinRequired);
+
+      unawaited(controller.loginWithPin('2468'));
+      async.flushMicrotasks();
+      expect(controller.state.phase, EntryPhase.ready);
+
+      // A short interaction keeps it open; a long silence locks it.
+      controller.noteActivity();
+      async.elapse(const Duration(minutes: 20));
+      async.flushMicrotasks();
+      expect(controller.state.phase, EntryPhase.ready);
+
+      async.elapse(const Duration(minutes: 31));
+      async.flushMicrotasks();
+      expect(controller.state.phase, EntryPhase.pinRequired);
+
+      controller.dispose();
+    });
+  });
 }
 
 EntryController _controller(EntryGateway gateway, CredentialVault vault) {
@@ -382,10 +577,26 @@ final class _PairingGateway implements EntryGateway {
   int polls = 0;
   int acknowledgements = 0;
   int logouts = 0;
+  int refreshes = 0;
+  bool failRefresh = false;
   String? authenticatedPin;
   bool failLock = false;
   bool failClaim = false;
   String? claimFailureCode;
+
+  /// Drives the realtime nudge channel. A test adds to it to imitate the API
+  /// announcing that the pairing state moved.
+  final StreamController<void> nudges = StreamController<void>.broadcast();
+
+  /// What the next poll reports. Tests flip it to 'credential_delivered' to
+  /// imitate an administrator approving the request.
+  String pollState = 'credential_delivered';
+
+  @override
+  Stream<void> watchPairing(PairingIdentity pairing) => nudges.stream;
+
+  /// Closes the nudge channel. Tests register this with `addTearDown`.
+  Future<void> dispose() => nudges.close();
 
   @override
   Future<DevicePairingSession> claimPairing(String code) async {
@@ -411,6 +622,16 @@ final class _PairingGateway implements EntryGateway {
   @override
   Future<DevicePairingPollResponse> pollPairing(PairingIdentity pairing) async {
     polls++;
+    if (pollState != 'credential_delivered') {
+      return DevicePairingPollResponse(
+        pairingSessionId: pairing.sessionId,
+        state: pollState,
+        expiresAt: pairing.expiresAt.toIso8601String(),
+        pollAfterSeconds: 30,
+        device: null,
+        credential: null,
+      );
+    }
     return DevicePairingPollResponse(
       pairingSessionId: pairing.sessionId,
       state: 'credential_delivered',
@@ -424,6 +645,7 @@ final class _PairingGateway implements EntryGateway {
         'displayName': 'Front register',
         'type': 'pos_terminal',
         'platform': 'web',
+        'mobility': 'static',
         'state': 'active',
         'credentialVersion': 1,
         'lastSeenAt': null,
@@ -452,6 +674,7 @@ final class _PairingGateway implements EntryGateway {
     displayName: 'Front register',
     type: 'pos_terminal',
     platform: 'web',
+    mobility: 'static',
     state: 'active',
     credentialVersion: 1,
     lastSeenAt: null,
@@ -476,7 +699,20 @@ final class _PairingGateway implements EntryGateway {
   }
 
   @override
-  Future<PosSessionResponse> refresh() => throw UnimplementedError();
+  Future<PosSessionResponse> refresh() async {
+    refreshes++;
+    if (failRefresh) {
+      throw AppException(
+        category: AppErrorCategory.authentication,
+        code: 'SESSION_EXPIRED',
+        recoverable: false,
+      );
+    }
+    return const PosSessionResponse(
+      session: {'id': 'session'},
+      tokens: {'accessToken': 'access2', 'refreshToken': 'refresh2'},
+    );
+  }
   @override
   Future<void> logout() async {
     logouts++;

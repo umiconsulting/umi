@@ -200,6 +200,8 @@ export interface DeviceListRow {
   device_id: string;
   device_registry_id: string | null;
   device_type: string | null;
+  location_id: string | null;
+  location_name: string | null;
   station_id: string | null;
   station_name: string | null;
   device_name: string | null;
@@ -219,6 +221,16 @@ export class KdsRepository {
           AND status='active'
         LIMIT 1`,
       [userId, merchantId, locationId],
+    );
+    return (rowCount ?? 0) === 1;
+  }
+
+  async merchantLocationExists(merchantId: string, locationId: string): Promise<boolean> {
+    const { rowCount } = await this.pg.query(
+      `SELECT 1 FROM merchant.location
+        WHERE merchant_id=$1::uuid AND id=$2::uuid AND status='active'
+        LIMIT 1`,
+      [merchantId, locationId],
     );
     return (rowCount ?? 0) === 1;
   }
@@ -904,6 +916,17 @@ export class KdsRepository {
     ]);
   }
 
+  /** Last heartbeat timestamp for a session, or null. Reads BEFORE the touch so a
+   * caller can detect a status transition. */
+  async sessionLastUsedAt(sessionId: string, merchantId: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ last_used_at: string | null }>(
+      `SELECT last_used_at FROM runtime.session
+        WHERE id = $1::uuid AND merchant_id = $2::uuid AND is_active = true`,
+      [sessionId, merchantId],
+    );
+    return rows[0]?.last_used_at ?? null;
+  }
+
   /** Heartbeat endpoint: touch + record source ip in metadata. */
   async heartbeatTouch(sessionId: string, merchantId: string, ip: string | null): Promise<boolean> {
     const { rowCount } = await this.pg.query(
@@ -917,19 +940,32 @@ export class KdsRepository {
   }
 
   async listDevices(merchantId: string, locationId: string | null): Promise<DeviceListRow[]> {
-    const locClause = locationId ? `AND s.metadata->>'location_id' = $2` : '';
+    const locClause = locationId
+      ? `AND COALESCE(dv.location_id::text, s.metadata->>'location_id') = $2`
+      : '';
     const params = locationId ? [merchantId, locationId] : [merchantId];
     const { rows } = await this.pg.query<DeviceListRow>(
       `SELECT s.id AS device_id, s.principal_id AS device_registry_id,
-              dv.kind AS device_type, s.station_id, st.name AS station_name,
+              dv.kind AS device_type,
+              COALESCE(dv.location_id::text, s.metadata->>'location_id') AS location_id,
+              loc.name AS location_name, s.station_id, st.name AS station_name,
               s.device_name, s.last_used_at, s.is_active, s.metadata
          FROM runtime.session s
          LEFT JOIN merchant.device dv
            ON dv.merchant_id = s.merchant_id AND dv.id = s.principal_id
          LEFT JOIN merchant.station st
            ON st.merchant_id = s.merchant_id AND st.id = s.station_id
+         LEFT JOIN merchant.location loc
+           ON loc.merchant_id = s.merchant_id AND loc.id = dv.location_id
         WHERE s.merchant_id = $1 AND s.is_active = true
           AND s.principal_type = 'device' ${locClause}
+          -- POS terminals also hold a principal_type='device' session, and they used to
+          -- surface here as nameless cards with no station and no order count: this view
+          -- reads a KDS session, and a POS session has none of what it renders. The POS
+          -- registry has its own route. Two guards, because a session can outlive the
+          -- device row the join reaches for.
+          AND COALESCE(dv.kind, 'kds') <> 'pos_terminal'
+          AND COALESCE(s.metadata->>'app', 'kds') <> 'pos'
         ORDER BY s.last_used_at DESC NULLS LAST, s.created_at DESC`,
       params,
     );

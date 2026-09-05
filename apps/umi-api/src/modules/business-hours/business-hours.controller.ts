@@ -3,6 +3,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
+import { resolveLocationAuthority } from '../auth/location-authority';
 import { MerchantsRepository } from '../merchants/merchants.repository';
 import { BusinessHoursService } from './business-hours.service';
 import { UpdateHoursDto } from './dto/update-hours.dto';
@@ -24,7 +25,7 @@ export class BusinessHoursController {
   async get(@Merchant() merchant: MerchantAccess, @Query('locationId') locationId?: string) {
     const resolved = await this.merchants.resolveLocationId(
       merchant.merchantId,
-      locationId ?? null,
+      resolveLocationAuthority(merchant, locationId),
     );
     return this.hours.getHours(merchant.merchantId, resolved, merchant.timezone);
   }
@@ -37,7 +38,7 @@ export class BusinessHoursController {
   ) {
     const resolved = await this.merchants.resolveLocationId(
       merchant.merchantId,
-      locationId ?? null,
+      resolveLocationAuthority(merchant, locationId),
     );
     await this.hours.updateAll(merchant.merchantId, resolved, {
       hours: dto.hours,

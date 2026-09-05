@@ -10,6 +10,10 @@ import '../core/observability/telemetry.dart';
 import '../core/platform/platform_adapters.dart';
 import '../core/release/release_compatibility.dart';
 import '../core/security/credential_vault.dart';
+import '../core/security/device_key.dart';
+import '../core/security/keystore_device_key.dart';
+import '../core/security/tpm_backend.dart';
+import '../core/security/tpm_device_key.dart';
 import '../core/storage/storage.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_repository.dart';
@@ -24,6 +28,7 @@ import '../features/customer_value/customer_value_controller.dart';
 import '../features/customer_value/customer_value_repository.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
+import '../features/entry/pairing_socket_client.dart';
 import '../features/exception/exception_controller.dart';
 import '../features/exception/exception_recovery_store.dart';
 import '../features/exception/exception_repository.dart';
@@ -90,6 +95,18 @@ final class AppCompositionRoot {
     );
     const secureStorage = FlutterSecureKeyValueStorage();
     final credentials = CredentialVault(secureStorage);
+    // One device key for the whole app. Default is the software Ed25519 key that
+    // runs everywhere. Opt-in hardware builds: UMIPOS_DEVICE_KEY=tpm (desktop
+    // TPM, backend selected web-safely by `tpm_backend.dart`) or =keystore
+    // (mobile Android Keystore / iOS Secure Enclave over a MethodChannel).
+    final DeviceKey deviceKey;
+    if (config.useTpmDeviceKey) {
+      deviceKey = TpmDeviceKey(createTpmBackend());
+    } else if (config.useKeystoreDeviceKey) {
+      deviceKey = KeystoreDeviceKey(MethodChannelKeystore());
+    } else {
+      deviceKey = SoftwareDeviceKey(secureStorage);
+    }
     const preferences = SharedPreferencesStore();
     const localDatabase = UnsupportedLocalDatabase();
     const platform = PlatformAdapters.unsupported();
@@ -97,7 +114,10 @@ final class AppCompositionRoot {
       config: config,
       telemetry: telemetry,
       tokenProvider: credentials,
-      deviceCredentialProvider: credentials,
+      deviceCredentialProvider: ProvingDeviceCredentials(
+        credentials,
+        deviceKey,
+      ),
     );
     final connectivity = ConnectivityController();
     final hardwareLab = PilotHardwareLab(
@@ -133,11 +153,28 @@ final class AppCompositionRoot {
       secureStorage: secureStorage,
       telemetry: telemetry,
     );
+    // Null unless the build asks for the realtime nudge and knows where the API
+    // is. `EntryController.dispose` cancels the watch, and cancelling the stream
+    // closes the socket, so this needs no separate teardown here.
+    final apiBaseUri = config.apiBaseUri;
+    final pairingSocket = config.realtimeEnrollmentEnabled && apiBaseUri != null
+        ? SocketIoPairingClient(baseUri: apiBaseUri)
+        : null;
     final entry = EntryController(
-      gateway: ApiEntryGateway(apiClient, credentials),
+      gateway: ApiEntryGateway(
+        apiClient,
+        credentials,
+        socketClient: pairingSocket,
+        deviceKey: deviceKey,
+      ),
       vault: credentials,
       telemetry: telemetry,
+      idleTimeout: const Duration(minutes: 30),
     );
+    // Let any request renew an expired access token once and retry, so a long
+    // shift is not interrupted by the 30-minute access-token lifetime. The
+    // renewal itself opts out of this path, so a dead session fails cleanly.
+    apiClient.sessionRefresh = entry.renewAccessToken;
     final cash = CashController(
       repository: ApiCashRepository(apiClient),
       recoveryStore: SecureCashRecoveryStore(secureStorage),

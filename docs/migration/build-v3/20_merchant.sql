@@ -1551,7 +1551,17 @@ create table merchant.device (
   installation_hash    text,      -- sha256 of the app installation id; survives credential rotation
   credential_hash      text,      -- sha256 of the device credential
   credential_version   integer not null default 1 check (credential_version > 0),
+  -- Device-bound Ed25519 public key (base64url), registered at pairing. When it
+  -- is present, POS PIN login and refresh require a fresh signature over
+  -- `installationId|timestamp`, so a stolen bearer credential is not enough.
+  -- See apps/umi-api/src/modules/devices/device-proof.ts.
+  ephemeral_public_key text,
   platform      text check (platform in ('android','ios','linux','macos','windows','web')),
+  -- How the terminal is used on the floor. The owner declares it; it is not derivable
+  -- from `platform`, because the same Android tablet is a fixed register on one counter
+  -- and a hand-held on the next. Two values only: the column labels the device for the
+  -- person who has to find it, and a third value would invite a taxonomy nobody reads.
+  mobility      text not null default 'static' check (mobility in ('static','mobile')),
   last_seen_at  timestamptz,
   -- Operator PIN throttle. It sits on the DEVICE, not on merchant.staff, and the PIN
   -- model forces that: a wrong PIN matches NO staff row, so there is no employee to

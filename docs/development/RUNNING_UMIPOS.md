@@ -24,16 +24,40 @@ This command uses the protected platform bootstrap context. Normal Dashboard aut
 
 Pass compile-time values with `--dart-define`:
 
-- `UMI_ENVIRONMENT=development|staging|production`
-- `UMI_API_BASE_URL=https://...`
-- `UMI_TELEMETRY_ENABLED=true|false`
-- `UMI_DEVELOPMENT_DIAGNOSTICS=true|false`
-- `UMI_FEATURE_BOOTSTRAP_MODE=localSafeDefaults|disabled`
+- `UMIPOS_ENVIRONMENT=development|staging|pilot|production`
+- `UMIPOS_API_BASE_URL=https://...`
+- `UMIPOS_TELEMETRY_ENABLED=true|false`
+- `UMIPOS_DEVELOPMENT_DIAGNOSTICS=true|false`
+- `UMIPOS_FEATURE_BOOTSTRAP=localSafeDefaults|disabled`
+- `UMIPOS_HARDWARE_SIMULATOR_ENABLED=true|false`
+- `UMIPOS_RELEASE_VERSION=0.1.0`
+- `UMIPOS_CONTRACT_VERSION=2.13.0`
+- `UMIPOS_CONFIG_SCHEMA_VERSION=1`
 
 Production configuration fails closed. Use a local API URL for development, an approved staging
 endpoint for staging, and the approved TLS production endpoint for production.
 
 Start the backend with its documented UMI API command before running authenticated flows.
+
+Use this command for a local Firefox tab:
+
+```sh
+flutter run --release -d web-server --web-hostname 127.0.0.1 --web-port 4002 \
+  --dart-define=UMIPOS_ENVIRONMENT=development \
+  --dart-define=UMIPOS_API_BASE_URL=http://127.0.0.1:4001 \
+  --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
+  --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
+  --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true \
+  --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
+  --dart-define=UMIPOS_CONTRACT_VERSION=2.13.0 \
+  --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
+```
+
+Add `http://127.0.0.1:4002` to the local API value of `CORS_ORIGINS`.
+
+Run `pnpm umi-pos:firefox` to use this configuration without manual flags.
+Do not use the DDC debug server for Firefox.
+It can stop before `main.dart` after it loads the development modules.
 
 ## Device enrollment
 
@@ -749,7 +773,13 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
 ```
 
 Inicia la UMI API real en `http://127.0.0.1:4001`.
-Inicia el Dashboard real en `http://127.0.0.1:4000`.
+Inicia el Dashboard real con este comando:
+
+```bash
+pnpm --filter @umi/dashboard dev
+```
+
+Abre el Dashboard en `http://127.0.0.1:4000`.
 Define `GATE5A_PG_DATABASE` con el nombre de la base desechable.
 
 Ejecuta el recorrido continuo:

@@ -9,7 +9,7 @@ export const MODULES = {
     id: 'overview',
     label: 'Resumen',
     icon: 'Home',
-    section: 'OPERATIONS',
+    section: 'HOME',
     product: 'dashboard',
   },
   operations: {
@@ -21,8 +21,6 @@ export const MODULES = {
     permissions: [
       'merchant.manage',
       'audit.read',
-      'hardware.read',
-      'hardware.diagnostics',
       'inventory.read',
       'sale.lifecycle',
       'sale.exception.read',
@@ -42,7 +40,7 @@ export const MODULES = {
     label: 'Pedidos',
     icon: 'Receipt',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
     permissions: ['kitchen.read'],
     locationScoped: true,
   },
@@ -50,7 +48,7 @@ export const MODULES = {
     id: 'devices',
     label: 'Dispositivos',
     icon: 'Tablet',
-    section: 'OPERATIONS',
+    section: 'BUSINESS',
     product: 'dashboard',
     permissions: ['device.enroll'],
     locationScoped: true,
@@ -59,7 +57,7 @@ export const MODULES = {
     id: 'staff',
     label: 'Equipo y accesos',
     icon: 'Users',
-    section: 'OPERATIONS',
+    section: 'BUSINESS',
     product: 'dashboard',
     permissions: ['merchant.manage'],
   },
@@ -67,26 +65,12 @@ export const MODULES = {
     id: 'customers',
     label: 'Clientes',
     icon: 'Users2',
-    section: 'OPERATIONS',
+    section: 'CUSTOMERS',
     product: 'dashboard',
     permissions: ['customer.read'],
   },
-  members: {
-    id: 'members',
-    label: 'Lealtad',
-    icon: 'CreditCard',
-    section: 'GROWTH',
-    product: 'cash',
-    permissions: ['loyalty.read'],
-  },
-  'gift-cards': {
-    id: 'gift-cards',
-    label: 'Tarjetas de regalo',
-    icon: 'Gift',
-    section: 'GROWTH',
-    product: 'cash',
-    permissions: ['gift_card.read'],
-  },
+  // `members` and `gift-cards` are folded into the `loyalty-value` hub. Their routes
+  // redirect there, so they no longer need their own module entries.
   hours: {
     id: 'hours',
     label: 'Horarios',
@@ -138,21 +122,81 @@ export const MODULES = {
     // different axis from `role`, which reads the CAFÉ membership.
     platform: 'super_admin',
   },
+  'cash-shifts': {
+    id: 'cash-shifts',
+    label: 'Caja y turnos',
+    icon: 'DollarSign',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: ['sale.lifecycle', 'sale.exception.read', 'cash.shift.read'],
+    locationScoped: true,
+  },
+  'catalog-inventory': {
+    id: 'catalog-inventory',
+    label: 'Catálogo e inventario',
+    icon: 'Package',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    permissions: ['catalog.read', 'inventory.read'],
+    locationScoped: true,
+  },
+  diagnostics: {
+    id: 'diagnostics',
+    label: 'Diagnóstico',
+    icon: 'Activity',
+    section: 'CONFIGURATION',
+    product: 'dashboard',
+    // Admin surface: recovery, audit, and diagnostics. Technical codes live here only.
+    permissions: ['audit.read', 'hardware.diagnostics'],
+  },
+  'loyalty-value': {
+    id: 'loyalty-value',
+    label: 'Lealtad y valor',
+    icon: 'CreditCard',
+    section: 'CUSTOMERS',
+    product: 'cash',
+    // Absorbs Lealtad and Tarjetas de regalo as tabs; adds rewards and wallet.
+    permissions: ['loyalty.read', 'gift_card.read', 'wallet.read'],
+  },
+  kitchen: {
+    id: 'kitchen',
+    label: 'Cocina',
+    icon: 'Monitor',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: ['kitchen.read'],
+    locationScoped: true,
+  },
 };
 
+// Order and grouping mirror the operator's day, not the data model. The sidebar
+// renders one section header per run of items that share a `section`, so the order
+// below must keep each section's items together. Sections in order:
+//   HOME · OPERATIONS · CUSTOMERS · BUSINESS · CONFIGURATION · PLATFORM.
+// `operations` (Centro operativo) stays as a bridge until each domain has a hub.
 export const MODULE_ORDER = [
+  // HOME — the daily cockpit.
   'overview',
-  'operations',
+  // OPERATIONS — run the shop today. Centro operativo is dissolved from the nav; its
+  // /operations URL stays as a bridge for organization/locations/memberships until
+  // those get dedicated coverage.
   'orders',
+  'cash-shifts',
+  'kitchen',
+  // CUSTOMERS — the customer through-line. Loyalty, gift cards, rewards, and wallet
+  // are tabs of one "Lealtad y valor" hub now, not separate rows or a "Crecimiento" theme.
+  'customers',
+  'loyalty-value',
+  // BUSINESS — the assets and people behind the shop.
+  'catalog-inventory',
   'devices',
   'staff',
-  'customers',
-  'members',
-  'gift-cards',
+  // CONFIGURATION — set up the business.
   'hours',
   'settings',
   'products-billing',
-  // Last, and in its own section: the platform sits outside the café hierarchy.
+  'diagnostics',
+  // PLATFORM — outside the café hierarchy.
   'cafes',
 ];
 

@@ -26,6 +26,9 @@ import { GeocodeAdapter } from '../../shared/adapters/geocode.adapter';
 import { ProvisionMerchantDto } from './dto/provision-merchant.dto';
 import { PlatformAdminGuard } from '../auth/platform-admin.guard';
 import { MissingRoleCatalogError, UnknownPlanError } from './merchants.repository';
+import { RolesGuard } from '../auth/roles.guard';
+import { RequirePermission } from '../auth/roles.decorator';
+import { resolveLocationAuthority } from '../auth/location-authority';
 
 /**
  * Merchant shell routes. All require a valid session (AuthGuard); the
@@ -116,8 +119,9 @@ export class MerchantsController {
   }
 
   @Patch('merchants/:merchantId/settings')
-  @UseGuards(MerchantAccessGuard, EntitlementGuard)
+  @UseGuards(MerchantAccessGuard, EntitlementGuard, RolesGuard)
   @RequireProduct('dashboard')
+  @RequirePermission('merchant.manage')
   async updateSettings(@Merchant() merchant: MerchantAccess, @Body() dto: UpdateSettingsDto) {
     await this.merchants.updateSettings(merchant.merchantId, dto);
     return { ok: true };
@@ -147,8 +151,9 @@ export class MerchantsController {
    * and the screen that edits it is the café's own settings screen.
    */
   @Post('merchants/:merchantId/locations')
-  @UseGuards(MerchantAccessGuard, EntitlementGuard)
+  @UseGuards(MerchantAccessGuard, EntitlementGuard, RolesGuard)
   @RequireProduct('dashboard')
+  @RequirePermission('merchant.manage')
   async createLocation(@Merchant() merchant: MerchantAccess, @Body() dto: CreateLocationDto) {
     const location = await this.merchants.createLocation(merchant.merchantId, dto);
     return { location };
@@ -179,14 +184,23 @@ export class MerchantsController {
   }
 
   @Patch('merchants/:merchantId/locations/:locationId')
-  @UseGuards(MerchantAccessGuard, EntitlementGuard)
+  @UseGuards(MerchantAccessGuard, EntitlementGuard, RolesGuard)
   @RequireProduct('dashboard')
+  @RequirePermission('merchant.manage')
   async updateLocation(
     @Merchant() merchant: MerchantAccess,
     @Param('locationId') locationId: string,
     @Body() dto: UpdateLocationDto,
   ) {
-    const location = await this.merchants.updateLocation(merchant.merchantId, locationId, dto);
+    const authorizedLocationId = resolveLocationAuthority(merchant, locationId);
+    if (!authorizedLocationId) {
+      throw new BadRequestException({ error: 'location_required' });
+    }
+    const location = await this.merchants.updateLocation(
+      merchant.merchantId,
+      authorizedLocationId,
+      dto,
+    );
     return { location };
   }
 }

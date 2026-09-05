@@ -40,11 +40,6 @@
       "count": 1
     }
   },
-  "src/screens/devices.jsx": {
-    "react-hooks/set-state-in-effect": {
-      "count": 3
-    }
-  },
   "src/screens/gift-cards.jsx": {
     "no-unused-vars": {
       "count": 1
@@ -70,7 +65,7 @@
   },
   "src/screens/orders.jsx": {
     "no-unused-vars": {
-      "count": 3
+      "count": 1
     },
     "react-hooks/purity": {
       "count": 1

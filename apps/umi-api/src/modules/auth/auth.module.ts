@@ -7,6 +7,9 @@ import { MerchantAccessGuard } from './merchant-access.guard';
 import { PublicMerchantGuard } from './public-merchant.guard';
 import { CustomerAuthGuard } from './customer-auth.guard';
 import { PlatformAdminGuard } from './platform-admin.guard';
+import { PlatformElevationController } from './platform-elevation.controller';
+import { PlatformElevationGuard } from './platform-elevation.guard';
+import { PlatformElevationService } from './platform-elevation.service';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { MfaService } from './mfa.service';
@@ -19,7 +22,7 @@ import { CsrfGuard } from './csrf.guard';
  * PasswordService/JwtService come from the global SharedAuthModule.
  */
 @Module({
-  controllers: [AuthController, PosAuthController],
+  controllers: [AuthController, PosAuthController, PlatformElevationController],
   providers: [
     AuthService,
     AuthRepository,
@@ -29,12 +32,16 @@ import { CsrfGuard } from './csrf.guard';
     PublicMerchantGuard,
     CustomerAuthGuard,
     PlatformAdminGuard,
+    PlatformElevationService,
+    PlatformElevationGuard,
     EntitlementGuard,
     RolesGuard,
     CsrfGuard,
   ],
   exports: [
     AuthRepository,
+    PlatformElevationService,
+    PlatformElevationGuard,
     AuthGuard,
     MerchantAccessGuard,
     PublicMerchantGuard,

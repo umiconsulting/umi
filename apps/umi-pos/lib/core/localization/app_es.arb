@@ -240,7 +240,11 @@
   ,"registerAvailableLabel": "Caja disponible"
   ,"registerAssignedLabel": "Caja asignada"
   ,"shiftRequiredMessage": "Abre un turno de caja antes de aceptar efectivo."
+  ,"adoptShiftTitle": "Tu turno sigue abierto en otra terminal"
+  ,"adoptShiftMessage": "Esta terminal perdió su identidad guardada. El turno y el dinero siguen ahí; tráelos a esta pantalla para continuar."
+  ,"adoptShiftAction": "Traer el turno a esta terminal"
   ,"openShiftAction": "Abrir turno de caja"
+  ,"invalidAmountMessage": "Escribe un monto válido, por ejemplo 1,500.00."
   ,"openingFloatLabel": "Fondo inicial"
   ,"denominationCountLabel": "Conteo por denominación"
   ,"paidInAction": "Entrada de efectivo"
@@ -349,4 +353,14 @@
   ,"restockIntentLabel": "Decisión de reposición"
   ,"restockNotApplicableLabel": "No aplica la reposición"
   ,"restockInventoryReviewLabel": "Se requiere una revisión de inventario"
+  ,"sessionEndedReauth": "Tu sesión terminó. Vuelve a ingresar tu PIN."
+  ,"operatorShift": "Turno de {name}"
+  ,"@operatorShift": {
+    "description": "Label in the POS app bar naming the operator who holds the current turn.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

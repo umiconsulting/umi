@@ -10,6 +10,9 @@ class MainFlutterWindow: NSWindow {
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
+    // Register the hardware device-key channel (Secure Enclave).
+    DeviceKeySigner.register(with: flutterViewController.engine.binaryMessenger)
+
     super.awakeFromNib()
   }
 }

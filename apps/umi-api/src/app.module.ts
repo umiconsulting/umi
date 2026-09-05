@@ -29,6 +29,8 @@ import { OperationsModule } from './shared/operations/operations.module';
 import { OperationalInterceptor } from './shared/operations/operational.interceptor';
 import { IpRateLimitGuard } from './shared/operations/ip-rate-limit.guard';
 import { DevicesModule } from './modules/devices/devices.module';
+import { RealtimeEventsModule } from './modules/realtime/realtime-events.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PosEntryModule } from './modules/pos-entry/pos-entry.module';
 import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
 import { PosCartModule } from './modules/pos-cart/pos-cart.module';
@@ -45,6 +47,7 @@ import { CsrfGuard } from './modules/auth/csrf.guard';
 import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
 import { ReleaseModule } from './shared/release/release.module';
 import { PlatformBootstrapModule } from './modules/platform-bootstrap/platform-bootstrap.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -78,6 +81,8 @@ import { PlatformBootstrapModule } from './modules/platform-bootstrap/platform-b
     IntegrityModule,
     OperationsModule,
     DevicesModule,
+    RealtimeEventsModule,
+    RealtimeModule,
     PosEntryModule,
     PosCatalogModule,
     PosCartModule,
@@ -92,6 +97,7 @@ import { PlatformBootstrapModule } from './modules/platform-bootstrap/platform-b
     DashboardOperationsModule,
     AdministrativeCommandModule,
     PlatformBootstrapModule,
+    OrdersModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

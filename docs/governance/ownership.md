@@ -1,6 +1,6 @@
 # Ownership Model
 
-Umi uses federated ownership. The root coordinates cognition; repos own runtime behavior.
+Umi uses explicit ownership. The root coordinates context; apps own runtime behavior.
 
 ## Root owns
 
@@ -10,38 +10,48 @@ Umi uses federated ownership. The root coordinates cognition; repos own runtime 
 - Report, eval, trace, and memory indexes.
 - Agent operating-system structure.
 
-## ConversaFlow owns
+## API owns
 
-- Shared Supabase backend behavior.
-- Operational workflow jobs, queues, outbox, and durable side effects.
-- Runtime prompts and tool orchestration for ConversaFlow.
-- ConversaFlow memory implementation and trace writes.
-- Schema-qualified migrations for backend-owned contracts and KDS projections.
+- Canonical business writes and backend behavior.
+- Authentication, authorization, jobs, queues, outbox, and durable side effects.
+- Conversations, leads, customer value, passes, sales, inventory, and kitchen projections.
+- Runtime prompts, tool orchestration, telemetry, and trace writes.
+- Access to the `umi`, `merchant`, and `runtime` schemas.
+
+## Contract owns
+
+- Shared API types for TypeScript and Dart consumers.
+- Generated artifacts for the API, Dashboard, and UmiPOS.
+
+## UmiPOS owns
+
+- The Flutter POS client.
+- Operator journeys, device workflows, hardware access, and offline replay.
+- Consumption of API contracts. It does not own business truth.
 
 ## KDS owns
 
 - Native iPad KDS client.
 - KDS board presentation, client state, interactions, and app UX.
-- Consumption of `kds` projections and backend command contracts.
+- Consumption of API-owned projections and command contracts.
 
 ## Cash owns
 
-- Loyalty and wallet behavior.
-- Cash Next.js/Vercel runtime.
-- Cash Prisma schema and pass/cert integration surfaces.
-- Cash scheduled jobs.
-
-## Logs owns
-
-- ConversaFlow logs and trace UI.
-- Trace assembly for human operations views.
-- Read-only consumption of operational observability data.
+- The Cash compatibility site and Next.js runtime.
+- Cash-specific Prisma compatibility behavior.
+- Frozen wallet-pass URL forwarding and scheduled compatibility jobs.
 
 ## Dashboard owns
 
 - Umi owner dashboard app shell and live-data UI.
 - Screen inventory, visible functions, and interaction flows that should carry forward into future production hardening.
 
+## Landing page owns
+
+- Public marketing pages.
+- Lead capture and local delivery compatibility behavior.
+
 ## Boundary rule
 
-Place changes where the current write model, runtime, or consumer already lives. Add a new shared boundary only when the existing owner fails on ownership, latency, deploy isolation, or operational simplicity.
+Place changes where the current write model, runtime, or consumer lives.
+Add a boundary only when measured constraints show that the current owner fails.
