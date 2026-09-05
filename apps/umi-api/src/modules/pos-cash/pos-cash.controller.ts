@@ -1,11 +1,13 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
+  AdoptCashShiftRequest,
   CashCenterQuery,
   CashCommandRecoveryQuery,
   CashMovementRequest,
   OpenCashShiftRequest,
   ReconcileCashShiftRequest,
   RecountRequest,
+  RecoverCashShiftRequest,
   NoSaleDrawerRequest,
   ResolveCashVarianceRequest,
   ShiftCloseRequest,
@@ -144,6 +146,26 @@ export class PosCashController {
     @Body(new ZodValidationPipe(ShiftHandoffRequest)) dto: ShiftHandoffRequest,
   ) {
     return this.cash.handoff(user, merchantId, shiftId, dto);
+  }
+
+  @Post('shifts/:shiftId/adopt')
+  adopt(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('shiftId') shiftId: string,
+    @Body(new ZodValidationPipe(AdoptCashShiftRequest)) dto: AdoptCashShiftRequest,
+  ) {
+    return this.cash.adopt(user, merchantId, shiftId, dto);
+  }
+
+  @Post('shifts/:shiftId/recover')
+  recover(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('shiftId') shiftId: string,
+    @Body(new ZodValidationPipe(RecoverCashShiftRequest)) dto: RecoverCashShiftRequest,
+  ) {
+    return this.cash.recover(user, merchantId, shiftId, dto);
   }
 
   @Post('shifts/:shiftId/no-sale')

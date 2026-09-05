@@ -6,6 +6,7 @@ function harness() {
   const send = vi.fn();
   const status = vi.fn(() => ({ send }));
   const host = {
+    getType: () => 'http',
     switchToHttp: () => ({
       getResponse: () => ({ status }),
     }),

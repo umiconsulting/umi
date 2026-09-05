@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { PasswordService } from '../../shared/auth/password.service';
 import { posPinLookupHash } from '../../shared/auth/pos-pin';
+import { verifyDeviceProof } from '../devices/device-proof';
 import { JwtService } from '../../shared/auth/jwt.service';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import type { AppConfig } from '../../shared/config/config.schema';
@@ -211,6 +212,38 @@ export class AuthService {
     await this.repo.revokeDashboardSession(hashToken(refreshToken));
   }
 
+  /**
+   * Enforces the device-possession proof. Once a device has registered a public
+   * key at pairing, every PIN login and refresh must carry a fresh Ed25519
+   * signature over `installationId|timestamp`. A device with no registered key
+   * (a legacy enrolment) passes through unchanged, so the keys roll out one
+   * pairing at a time without locking anyone out.
+   */
+  private enforceDeviceProof(
+    publicKey: string | null,
+    proof: {
+      installationId: string;
+      signature: string | null;
+      timestamp: string | null;
+      algorithm: string | null;
+    },
+  ): void {
+    if (!publicKey) return;
+    if (!proof.signature || !proof.timestamp) {
+      throw new UnauthorizedException({ code: 'DEVICE_PROOF_REQUIRED' });
+    }
+    const verified = verifyDeviceProof({
+      publicKeyB64Url: publicKey,
+      installationId: proof.installationId,
+      timestampIso: proof.timestamp,
+      signatureB64Url: proof.signature,
+      algorithm: proof.algorithm === 'es256' ? 'es256' : 'ed25519',
+    });
+    if (!verified) {
+      throw new UnauthorizedException({ code: 'DEVICE_PROOF_INVALID' });
+    }
+  }
+
   async pinLogin(input: {
     pin: string;
     merchantId: string;
@@ -218,6 +251,9 @@ export class AuthService {
     installationId: string;
     deviceId: string | null;
     deviceCredential: string | null;
+    deviceProof: string | null;
+    deviceProofTimestamp: string | null;
+    deviceProofAlgorithm: string | null;
     ip: string | null;
   }): Promise<LoginResult> {
     if (!input.deviceId || !input.deviceCredential) {
@@ -228,16 +264,22 @@ export class AuthService {
 
     const installationHash = sha256(input.installationId);
     const credentialHash = sha256(input.deviceCredential);
-    const deviceAllowed = await this.repo.validatePosDevice({
+    const device = await this.repo.validatePosDevice({
       deviceId: input.deviceId,
       merchantId: input.merchantId,
       locationId: input.locationId,
       installationHash,
       credentialHash,
     });
-    if (!deviceAllowed) {
+    if (!device.allowed) {
       throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
     }
+    this.enforceDeviceProof(device.ephemeralPublicKey, {
+      installationId: input.installationId,
+      signature: input.deviceProof,
+      timestamp: input.deviceProofTimestamp,
+      algorithm: input.deviceProofAlgorithm,
+    });
 
     const secret = this.config.get('JWT_SECRET', { infer: true });
     if (!secret) throw new Error('JWT_SECRET is required for POS PIN authentication');
@@ -289,6 +331,9 @@ export class AuthService {
     refreshToken: string;
     installationId: string;
     deviceCredential: string | null;
+    deviceProof: string | null;
+    deviceProofTimestamp: string | null;
+    deviceProofAlgorithm: string | null;
   }): Promise<LoginResult> {
     if (!input.deviceCredential) {
       throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
@@ -301,6 +346,12 @@ export class AuthService {
       credentialHash: sha256(input.deviceCredential),
     });
     if (!session) throw new UnauthorizedException({ code: 'DEVICE_NOT_ALLOWED' });
+    this.enforceDeviceProof(session.ephemeralPublicKey, {
+      installationId: input.installationId,
+      signature: input.deviceProof,
+      timestamp: input.deviceProofTimestamp,
+      algorithm: input.deviceProofAlgorithm,
+    });
 
     const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');

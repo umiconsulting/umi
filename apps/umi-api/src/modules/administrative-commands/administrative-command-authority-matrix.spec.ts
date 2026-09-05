@@ -61,6 +61,7 @@ const service = (overrides: Record<string, unknown> = {}) =>
 
 const csrfContext = (request: Record<string, unknown>) =>
   ({
+    getType: () => 'http',
     getHandler: () => 'handler',
     getClass: () => 'class',
     switchToHttp: () => ({ getRequest: () => request }),

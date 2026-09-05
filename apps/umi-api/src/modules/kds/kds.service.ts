@@ -9,6 +9,7 @@ import {
 import type { PosKitchenOrderQuery } from '@umi/contract';
 import type { AuthUser } from '../auth/auth.types';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
+import { DashboardRealtimeEvents } from '../realtime/dashboard-realtime.events';
 import {
   KdsRepository,
   type OrderScopeRow,
@@ -48,6 +49,7 @@ export class KdsService {
   constructor(
     private readonly repo: KdsRepository,
     private readonly rateLimit: RateLimitService,
+    private readonly realtime: DashboardRealtimeEvents,
   ) {}
 
   // ════════════════════════════ Device auth ════════════════════════════════
@@ -459,8 +461,25 @@ export class KdsService {
   // ════════════════════════════ Heartbeat ══════════════════════════════════
 
   async heartbeat(session: KdsDeviceSession, ip: string | null): Promise<KdsResult> {
-    await this.repo.heartbeatTouch(session.deviceId, session.merchantId, ip);
+    // Read the previous heartbeat BEFORE the touch so a wake-up can be detected:
+    // a heartbeat only ever turns a device live, and steady-state live heartbeats
+    // must stay silent so the dashboard does not refetch every poll cycle.
+    const prevLastUsedAt = await this.repo.sessionLastUsedAt(session.deviceId, session.merchantId);
+    const prevStatus = deviceStatus(prevLastUsedAt);
+    const touched = await this.repo.heartbeatTouch(session.deviceId, session.merchantId, ip);
+    if (touched && prevStatus !== 'live') {
+      this.emitDevicesChanged(session.merchantId);
+    }
     return { status: 200, body: { ok: true, ts: new Date().toISOString() } };
+  }
+
+  /** Wake the dashboard sockets for a merchant so it re-reads the device list. */
+  private emitDevicesChanged(merchantId: string): void {
+    this.realtime.emitDevicesChanged({
+      merchantId,
+      locationId: null,
+      occurredAt: new Date().toISOString(),
+    });
   }
 
   // ═══════════════════════════ Dashboard surface ════════════════════════════
@@ -730,6 +749,7 @@ export class KdsService {
     if (!id) throw new BadRequestException({ error: 'invalid_pairing_id' });
     const updated = await this.repo.dispositionPairing(id, merchantId, 'approve', adminUserId);
     if (!updated) throw new BadRequestException({ error: 'pairing_not_pending' });
+    this.emitDevicesChanged(merchantId);
     return { ok: true, pairing: updated };
   }
 
@@ -759,6 +779,7 @@ export class KdsService {
     if ('station_id' in body) patch.stationId = asUuid(body.station_id);
     const ok = await this.repo.updateSession(merchantId, id, patch);
     if (!ok) throw new NotFoundException({ error: 'device_not_found' });
+    this.emitDevicesChanged(merchantId);
     return { ok: true };
   }
 
@@ -767,6 +788,7 @@ export class KdsService {
     if (!id) throw new BadRequestException({ error: 'invalid_device_id' });
     const ok = await this.repo.revokeSession(merchantId, id);
     if (!ok) throw new NotFoundException({ error: 'device_not_found' });
+    this.emitDevicesChanged(merchantId);
     return { ok: true };
   }
 
@@ -1021,6 +1043,8 @@ function toDeviceRow(d: DeviceListRow) {
     device_id: d.device_id,
     device_registry_id: d.device_registry_id,
     device_type: d.device_type ?? 'kds',
+    location_id: d.location_id,
+    location_name: d.location_name,
     device_name: d.device_name,
     station_id: d.station_id,
     station_name: d.station_name,

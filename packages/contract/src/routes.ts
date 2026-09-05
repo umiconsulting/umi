@@ -95,9 +95,28 @@ export const routes = {
         buildPath('staff.byRef.update', { merchantRef: ref, staffId }),
     },
   },
+  roles: {
+    list: (merchantId: string): string => buildPath('roles.list', { merchantId }),
+    create: (merchantId: string): string => buildPath('roles.create', { merchantId }),
+    update: (merchantId: string, roleId: string): string =>
+      buildPath('roles.update', { merchantId, roleId }),
+    archive: (merchantId: string, roleId: string, expectedRevision: number): string =>
+      `${buildPath('roles.archive', { merchantId, roleId })}?expectedRevision=${expectedRevision}`,
+  },
   devices: {
+    list: (merchantId: string): string => buildPath('devices.list', { merchantId }),
+    update: (merchantId: string, deviceId: string): string =>
+      buildPath('devices.update', { merchantId, deviceId }),
+    revoke: (merchantId: string, deviceId: string): string =>
+      buildPath('devices.revoke', { merchantId, deviceId }),
     beginEnrollment: (merchantId: string): string =>
       buildPath('devices.beginEnrollment', { merchantId }),
+    enrollmentRequests: (merchantId: string): string =>
+      buildPath('devices.enrollmentRequests', { merchantId }),
+    approveEnrollment: (merchantId: string, requestId: string): string =>
+      buildPath('devices.approveEnrollment', { merchantId, requestId }),
+    denyEnrollment: (merchantId: string, requestId: string): string =>
+      buildPath('devices.denyEnrollment', { merchantId, requestId }),
     completeEnrollment: routePath('devices.completeEnrollment'),
     status: routePath('devices.status'),
   },
@@ -146,6 +165,10 @@ export const routes = {
         buildPath('pos.cashResume', { merchantId, shiftId }),
       handoff: (merchantId: string, shiftId: string): string =>
         buildPath('pos.cashHandoff', { merchantId, shiftId }),
+      adopt: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashAdopt', { merchantId, shiftId }),
+      recover: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashRecover', { merchantId, shiftId }),
       count: (merchantId: string, shiftId: string): string =>
         buildPath('pos.cashCount', { merchantId, shiftId }),
       recount: (merchantId: string, shiftId: string): string =>

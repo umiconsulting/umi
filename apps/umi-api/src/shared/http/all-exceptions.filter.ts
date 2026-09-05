@@ -21,6 +21,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
+    // A websocket handler shares this global filter. `getResponse()` returns a
+    // socket there, and writing an HTTP status to it crashes a second time on
+    // top of the original error. Let the ws layer handle its own failures.
+    if (host.getType() !== 'http') throw exception;
+
     const reply = host.switchToHttp().getResponse<FastifyReply>();
 
     const status =
@@ -32,8 +37,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (status >= SERVER_ERROR_MIN) {
       const correlationId = getRequestContext()?.correlationId ?? 'unavailable';
       const errorType = exception instanceof Error ? exception.constructor.name : 'UnknownError';
+      // The message and stack stay OUT of the response — `publicError` below is the
+      // only thing the caller sees — but they have to reach the log. A 500 that
+      // records nothing but a constructor name cannot be diagnosed from the outside,
+      // and the correlation id it hands back leads to a line that says no more than
+      // the caller already knew.
+      const detail = exception instanceof Error ? exception.message : String(exception);
       this.logger.error(
-        `${status} request_failed correlationId=${correlationId} type=${errorType}`,
+        `${status} request_failed correlationId=${correlationId} type=${errorType} detail=${detail}`,
+        exception instanceof Error ? exception.stack : undefined,
       );
     }
 

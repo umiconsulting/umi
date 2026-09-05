@@ -6,12 +6,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
+  AdoptCashShiftRequest,
   CashMovementRequest,
   CashCommandRecoveryQuery,
   NoSaleDrawerRequest,
   OpenCashShiftRequest,
   ReconcileCashShiftRequest,
   RecountRequest,
+  RecoverCashShiftRequest,
   ResolveCashVarianceRequest,
   ShiftCloseRequest,
   ShiftHandoffRequest,
@@ -491,6 +493,84 @@ export class PosCashService {
           return { ok: true, value: result };
         },
       ),
+    );
+  }
+
+  async adopt(user: AuthUser, merchantId: string, shiftId: string, dto: AdoptCashShiftRequest) {
+    this.assertPathShift(shiftId, dto.shiftId);
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'cash.shift.resume',
+    );
+    return this.command(
+      merchantId,
+      dto.locationId,
+      dto.commandId,
+      dto.idempotencyKey,
+      'pos.cash.shift.adopt',
+      dto,
+      async (context) => {
+        const result = await this.repo.adopt(
+          context.client,
+          merchantId,
+          authorization,
+          dto,
+          context.correlationId,
+        );
+        await context.appendAudit({
+          eventType: 'cash.shift_adopted',
+          entityType: 'cash_shift',
+          entityId: dto.shiftId,
+          outcome: 'success',
+          publicData: {
+            previousHoldingDeviceId: result.custody.previousHoldingDeviceId,
+            newHoldingDeviceId: result.custody.newHoldingDeviceId,
+          },
+        });
+        return result;
+      },
+    );
+  }
+
+  async recover(user: AuthUser, merchantId: string, shiftId: string, dto: RecoverCashShiftRequest) {
+    this.assertPathShift(shiftId, dto.shiftId);
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'cash.variance.approve',
+    );
+    return this.command(
+      merchantId,
+      dto.locationId,
+      dto.commandId,
+      dto.idempotencyKey,
+      'pos.cash.shift.recover',
+      dto,
+      async (context) => {
+        const result = await this.repo.recover(
+          context.client,
+          merchantId,
+          authorization,
+          dto,
+          context.correlationId,
+        );
+        await context.appendAudit({
+          eventType: 'cash.shift_recovered',
+          entityType: 'cash_shift',
+          entityId: dto.shiftId,
+          outcome: 'success',
+          publicData: {
+            responsibleOperatorId: result.custody.responsibleOperatorId,
+            variance: result.custody.variance?.minorUnits ?? null,
+          },
+        });
+        return result;
+      },
     );
   }
 

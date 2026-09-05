@@ -5,8 +5,8 @@
 # packages/contract. Its image is now built from the repo root with pnpm (multi-stage
 # `pnpm deploy`); the VPS still only pulls the prebuilt image (never builds).
 #
-# Excluded on purpose (keeps its own npm lockfile — do NOT pull into the workspace):
-#   - umi-cash: FROZEN until the dashboard cutover.
+# Excluded on purpose because it keeps its own npm lockfile:
+#   - umi-cash: compatibility app with frozen public URLs and a separate npm workflow.
 packages:
   - 'apps/*'
   - '!apps/umi-cash'

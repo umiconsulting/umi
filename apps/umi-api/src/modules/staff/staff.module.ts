@@ -5,6 +5,9 @@ import { StaffController } from './staff.controller';
 import { StaffMerchantController } from './staff-merchant.controller';
 import { StaffService } from './staff.service';
 import { StaffRepository } from './staff.repository';
+import { MerchantRolesController } from './roles.controller';
+import { RolesRepository } from './roles.repository';
+import { RolesService } from './roles.service';
 
 /**
  * Staff & access domain. Imports AuthModule (guards) and MerchantsModule
@@ -12,7 +15,7 @@ import { StaffRepository } from './staff.repository';
  */
 @Module({
   imports: [AuthModule, MerchantsModule],
-  controllers: [StaffController, StaffMerchantController],
-  providers: [StaffService, StaffRepository],
+  controllers: [StaffController, StaffMerchantController, MerchantRolesController],
+  providers: [StaffService, StaffRepository, RolesService, RolesRepository],
 })
 export class StaffModule {}

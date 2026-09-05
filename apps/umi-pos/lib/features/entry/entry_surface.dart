@@ -13,7 +13,8 @@ final class EntrySurface extends StatelessWidget {
   Widget build(BuildContext context) => switch (controller.state.phase) {
     EntryPhase.checkingDevice ||
     EntryPhase.authenticating ||
-    EntryPhase.pinAuthenticating => const Center(
+    EntryPhase.pinAuthenticating ||
+    EntryPhase.startingOperator => const Center(
       child: CircularProgressIndicator(),
     ),
     EntryPhase.enrollmentRequired => _Enrollment(controller: controller),

@@ -12,6 +12,7 @@ import {
 import { buildModuleAvailability, type ModuleAvailability } from './module-registry';
 import { PasswordService } from '../../shared/auth/password.service';
 import type { ProvisionMerchantDto } from './dto/provision-merchant.dto';
+import { canSwitchLocations } from '../auth/location-authority';
 
 export interface Capabilities {
   merchant: {
@@ -25,6 +26,7 @@ export interface Capabilities {
   };
   selectedLocation: LocationRow | null;
   locations: LocationRow[];
+  canSwitchLocations: boolean;
   membership: {
     // null for a synthesized global-super_admin access (no explicit edge here).
     id: string | null;
@@ -92,9 +94,12 @@ export class MerchantsService {
       this.repo.loadBranding(access.merchantId),
     ]);
 
-    const locations = access.locationId
-      ? allLocations.filter((location) => location.id === access.locationId)
-      : allLocations;
+    const switchAllowed = canSwitchLocations(access);
+    const locations = switchAllowed
+      ? allLocations
+      : access.locationId
+        ? allLocations.filter((location) => location.id === access.locationId)
+        : [];
     const selectedLocation =
       (selectedLocationId
         ? locations.find((location) => location.id === selectedLocationId)
@@ -121,6 +126,7 @@ export class MerchantsService {
       },
       selectedLocation,
       locations,
+      canSwitchLocations: switchAllowed,
       membership,
       products,
     };

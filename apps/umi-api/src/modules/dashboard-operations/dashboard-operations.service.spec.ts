@@ -16,17 +16,17 @@ const access = {
   membershipId: '00000000-0000-4000-8000-000000000004',
   role: 'owner',
   roles: ['owner'],
-  permissions: ['merchant.manage', 'audit.read', 'hardware.read'],
+  permissions: ['merchant.manage', 'audit.read'],
   locationId: null,
 };
 const query = { domain: 'organization' as const, cursor: 0, limit: 20 };
 
 describe('DashboardOperationsService', () => {
-  it('returns exactly 21 permission-filtered domains', async () => {
+  it('returns exactly 20 permission-filtered domains', async () => {
     const repository = { list: vi.fn().mockResolvedValue([]) };
     const service = new DashboardOperationsService(repository as never);
     const result = await service.snapshot(user, access, query);
-    expect(result.domains).toHaveLength(21);
+    expect(result.domains).toHaveLength(20);
     expect(result.domains.find((item) => item.domain === 'organization')?.available).toBe(true);
     expect(result.domains.find((item) => item.domain === 'inventory')?.available).toBe(false);
   });

@@ -41,8 +41,6 @@ export const MODULES: Record<string, ModuleConfig> = {
     permissions: [
       'merchant.manage',
       'audit.read',
-      'hardware.read',
-      'hardware.diagnostics',
       'inventory.read',
       'sale.lifecycle',
       'sale.exception.read',
@@ -62,7 +60,7 @@ export const MODULES: Record<string, ModuleConfig> = {
     label: 'Pedidos',
     icon: 'Receipt',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
     permissions: ['kitchen.read'],
     locationScoped: true,
   },

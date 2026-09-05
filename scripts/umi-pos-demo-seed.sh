@@ -651,11 +651,10 @@ values(:'merchant_id','71000000-0000-4000-8000-000000000104',50000,50000,'loaded
 on conflict(merchant_id,idempotency_key) do nothing;
 
 insert into merchant.loyalty_gift_card(
-  id,merchant_id,code,code_hash,masked_code,status,public_reference,currency,amount_cents,activated_at
+  id,merchant_id,code_hash,masked_code,status,public_reference,currency,amount_cents,activated_at
 )
 values('71000000-0000-4000-8000-000000000106',:'merchant_id',
-  encode(extensions.digest(:'merchant_id'::text||':gate3f-demo','sha256'),'hex'),
-  extensions.digest(:'merchant_id'::text||':gate3f-demo','sha256'),'••••-demo',
+  extensions.digest(:'merchant_id'::text||':gate3f-demo','sha256'),'••••-DEMO',
   'active','GFT-PILOT-01','MXN',25000,now())
 on conflict(id) do update set status='active',activated_at=coalesce(merchant.loyalty_gift_card.activated_at,now());
 

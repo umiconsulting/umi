@@ -31,6 +31,7 @@ type PairingRequestRow = {
   deviceKind: 'kds' | 'pos_terminal';
   platform: ChallengeRow['platform'];
   requestedPlatform: ChallengeRow['platform'] | null;
+  mobility: 'static' | 'mobile';
   state: string;
   attempts: number;
   installationHash: string | null;
@@ -38,6 +39,7 @@ type PairingRequestRow = {
   pairingSessionId: string | null;
   deviceId: string | null;
   replacesDeviceId: string | null;
+  ephemeralPublicKey: string | null;
 };
 
 const DEVICE_PROJECTION = `
@@ -48,6 +50,7 @@ const DEVICE_PROJECTION = `
   d.name AS "displayName",
   d.kind AS type,
   d.platform,
+  d.mobility,
   d.status AS state,
   d.credential_version AS "credentialVersion",
   d.last_seen_at AS "lastSeenAt",
@@ -109,6 +112,7 @@ export class DevicesRepository {
     displayName: string;
     type: 'kds' | 'pos_terminal';
     platform: ChallengeRow['platform'];
+    mobility: 'static' | 'mobile';
     codeHash: string;
     idempotencyKey: string;
     expiresAt: Date;
@@ -118,8 +122,10 @@ export class DevicesRepository {
     const { rows } = await this.pg.worker.query<{ id: string; expiresAt: Date }>(
       `INSERT INTO runtime.device_enrollment_request
          (id, merchant_id, location_id, display_name, device_kind, platform,
-          setup_code_hash, idempotency_key, expires_at, created_by, replaces_device_id)
-       SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8::uuid, $9, $10::uuid, $11::uuid
+          setup_code_hash, idempotency_key, expires_at, created_by, replaces_device_id,
+          mobility)
+       SELECT $1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7, $8::uuid, $9, $10::uuid, $11::uuid,
+              $12
        WHERE $3::uuid IS NULL OR EXISTS (
          SELECT 1 FROM merchant.location
          WHERE id = $3::uuid AND merchant_id = $2::uuid AND status = 'active'
@@ -139,6 +145,7 @@ export class DevicesRepository {
         input.expiresAt,
         input.actorUserId,
         input.replacesDeviceId ?? null,
+        input.mobility,
       ],
     );
     if (!rows[0]) throw new Error('branch_not_allowed');
@@ -173,7 +180,7 @@ export class DevicesRepository {
         `SELECT r.id::text, r.merchant_id::text AS "businessId",
                 r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
-                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.mobility, r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
                 r.device_id::text AS "deviceId",
                 r.replaces_device_id::text AS "replacesDeviceId"
@@ -254,6 +261,54 @@ export class DevicesRepository {
     }
   }
 
+  /**
+   * The enrolled POS terminals for one merchant — the devices themselves, not the
+   * requests that produced them.
+   *
+   * A device whose `location_id` is NULL is included in EVERY branch view rather than
+   * none. Such a row is a defect from an enrolment that ran before the API required a
+   * branch, and hiding it would leave it active with no screen able to revoke it.
+   */
+  async listDevices(merchantId: string, locationIds: string[] | null): Promise<DeviceSummary[]> {
+    const { rows } = await this.pg.worker.query<DeviceSummary>(
+      `SELECT ${DEVICE_PROJECTION}
+         FROM merchant.device d
+        WHERE d.merchant_id = $1::uuid
+          AND d.kind = 'pos_terminal'
+          AND d.status NOT IN ('revoked', 'replaced', 'retired')
+          AND ($2::uuid[] IS NULL OR d.location_id = any($2::uuid[]) OR d.location_id IS NULL)
+        ORDER BY d.registered_at DESC
+        LIMIT 200`,
+      [merchantId, locationIds],
+    );
+    return rows;
+  }
+
+  /**
+   * Rename a terminal and restate how it is used on the floor. Neither field is
+   * security material, so this does not touch the credential columns and cannot move
+   * the device to another branch — a branch change means enrolling again.
+   */
+  async updateDevice(input: {
+    merchantId: string;
+    deviceId: string;
+    displayName: string;
+    mobility: 'static' | 'mobile';
+    allowedBranchIds: string[] | null;
+  }): Promise<DeviceSummary | null> {
+    const { rows } = await this.pg.worker.query<DeviceSummary>(
+      `UPDATE merchant.device AS d
+          SET name = $3, mobility = $4, updated_at = now()
+        WHERE d.id = $2::uuid AND d.merchant_id = $1::uuid
+          AND d.kind = 'pos_terminal'
+          AND d.status NOT IN ('revoked', 'replaced')
+          AND ($5::uuid[] IS NULL OR d.location_id = any($5::uuid[]) OR d.location_id IS NULL)
+        RETURNING ${DEVICE_PROJECTION}`,
+      [input.merchantId, input.deviceId, input.displayName, input.mobility, input.allowedBranchIds],
+    );
+    return rows[0] ?? null;
+  }
+
   async listPairingRequests(
     merchantId: string,
     locationIds: string[] | null,
@@ -261,7 +316,7 @@ export class DevicesRepository {
     const { rows } = await this.pg.worker.query<DeviceEnrollmentRequestView>(
       `SELECT id::text, merchant_id::text AS "merchantId", location_id::text AS "locationId",
               display_name AS "displayName", device_kind AS type, platform,
-              requested_platform AS "requestedPlatform", state,
+              requested_platform AS "requestedPlatform", mobility, state,
               expires_at AS "expiresAt", claimed_at AS "claimedAt",
               installation_reference AS "installationReference", created_at AS "createdAt"
        FROM runtime.device_enrollment_request
@@ -282,7 +337,9 @@ export class DevicesRepository {
     approve: boolean;
     credentialHash: string | null;
     allowedBranchIds: string[] | null;
-  }): Promise<DeviceEnrollmentDecision | null> {
+    // `pairingSessionId` rides along for the realtime nudge. It is internal: the
+    // HTTP response model stays `DeviceEnrollmentDecision`.
+  }): Promise<(DeviceEnrollmentDecision & { pairingSessionId: string }) | null> {
     const client = await this.pg.worker.connect();
     try {
       await client.query('BEGIN');
@@ -290,10 +347,11 @@ export class DevicesRepository {
         `SELECT r.id::text, r.merchant_id::text AS "businessId",
                 r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
-                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.mobility, r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
                 r.device_id::text AS "deviceId",
-                r.replaces_device_id::text AS "replacesDeviceId"
+                r.replaces_device_id::text AS "replacesDeviceId",
+                r.ephemeral_public_key AS "ephemeralPublicKey"
          FROM runtime.device_enrollment_request r
          LEFT JOIN runtime.device_pairing_session s ON s.enrollment_request_id = r.id
          WHERE r.id = $1::uuid AND r.merchant_id = $2::uuid
@@ -326,6 +384,7 @@ export class DevicesRepository {
           enrollmentRequestId: request.id,
           state: input.approve ? 'credential_ready' : 'denied',
           decidedAt: decided.rows[0].decidedAt.toISOString(),
+          pairingSessionId: request.pairingSessionId,
         };
       }
       if (request.state !== 'awaiting_approval' || request.expiresAt.getTime() <= Date.now()) {
@@ -345,8 +404,9 @@ export class DevicesRepository {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO merchant.device
              (merchant_id, location_id, name, kind, status, platform,
-              installation_hash, credential_hash, credential_version)
-           VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, $6, $7, 1)
+              installation_hash, credential_hash, credential_version, mobility,
+              ephemeral_public_key)
+           VALUES ($1::uuid, $2::uuid, $3, $4, 'active', $5, $6, $7, 1, $8, $9)
            RETURNING id::text`,
           [
             request.businessId,
@@ -356,6 +416,8 @@ export class DevicesRepository {
             request.requestedPlatform ?? request.platform,
             request.installationHash,
             input.credentialHash,
+            request.mobility,
+            request.ephemeralPublicKey ?? null,
           ],
         );
         deviceId = inserted.rows[0].id;
@@ -392,6 +454,7 @@ export class DevicesRepository {
         enrollmentRequestId: request.id,
         state: nextState,
         decidedAt: updated.rows[0].decidedAt.toISOString(),
+        pairingSessionId: request.pairingSessionId,
       };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -399,6 +462,46 @@ export class DevicesRepository {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Read-only twin of the `pollPairing` lookup, for the realtime handshake. It
+   * takes no row lock, counts no attempt, and writes no state: a socket that
+   * reconnects must not consume the 240-attempt budget that guards the poll
+   * route, and must not move a request toward `expired` or `credential_delivered`.
+   */
+  async findPairingSessionForRealtime(input: {
+    pairingSessionId: string;
+    pollingCredentialHash: string;
+    installationHash: string;
+  }): Promise<{ pairingSessionId: string; requestId: string; expiresAt: Date } | null> {
+    const result = await this.pg.worker.query<{
+      requestId: string;
+      installationHash: string;
+      expiresAt: Date;
+      pollingAttempts: number;
+    }>(
+      `SELECT r.id::text AS "requestId", r.installation_hash AS "installationHash",
+              r.expires_at AS "expiresAt", s.polling_attempts AS "pollingAttempts"
+       FROM runtime.device_pairing_session s
+       JOIN runtime.device_enrollment_request r ON r.id = s.enrollment_request_id
+       WHERE s.id = $1::uuid AND s.polling_credential_hash = $2`,
+      [input.pairingSessionId, input.pollingCredentialHash],
+    );
+    const row = result.rows[0];
+    if (
+      !row ||
+      row.installationHash !== input.installationHash ||
+      row.pollingAttempts >= 240 ||
+      row.expiresAt.getTime() <= Date.now()
+    ) {
+      return null;
+    }
+    return {
+      pairingSessionId: input.pairingSessionId,
+      requestId: row.requestId,
+      expiresAt: row.expiresAt,
+    };
   }
 
   async pollPairing(input: {
@@ -418,7 +521,7 @@ export class DevicesRepository {
         `SELECT r.id::text, r.merchant_id::text AS "businessId",
                 r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
-                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.mobility, r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
                 r.device_id::text AS "deviceId",
                 r.replaces_device_id::text AS "replacesDeviceId",
@@ -506,7 +609,7 @@ export class DevicesRepository {
         `SELECT r.id::text, r.merchant_id::text AS "businessId",
                 r.location_id::text AS "locationId", r.display_name AS "displayName",
                 r.device_kind AS "deviceKind", r.platform, r.requested_platform AS "requestedPlatform",
-                r.state, r.attempts, r.installation_hash AS "installationHash",
+                r.mobility, r.state, r.attempts, r.installation_hash AS "installationHash",
                 r.expires_at AS "expiresAt", s.id::text AS "pairingSessionId",
                 r.device_id::text AS "deviceId",
                 r.replaces_device_id::text AS "replacesDeviceId"

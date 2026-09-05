@@ -55,12 +55,13 @@ describe('the server module map and the platform axis', () => {
   });
 
   it('still hides a module whose product the café does not own', () => {
-    // The axis this map DOES own, unchanged.
+    // The axis this map DOES own, unchanged. `members` owns `cash` here; the café only
+    // holds `dashboard`, so the cash module hides even though it has the admin role.
     const cap = { products: { dashboard: { status: 'active' } }, membership: { role: 'admin' } };
-    expect(getModuleAvailability('orders', cap)).toMatchObject({
+    expect(getModuleAvailability('members', cap)).toMatchObject({
       available: false,
       reason: 'product_missing',
-      product: 'kds',
+      product: 'cash',
     });
   });
 

@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "f4ca66cde5633f4deb0f9676263f42f48a6ef56e5a992eda4dd4d83b9b905e63",
-  "contractVersion": "2.13.0",
+  "contentHash": "86620a7c79bb358b2ebe97242f763e70f09526b70532d5b0eb600a3d6dfdae5e",
+  "contractVersion": "2.17.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -38,6 +38,538 @@
       },
       "required": [
         "reconciliationId"
+      ],
+      "type": "object"
+    },
+    "AdoptCashShiftRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedShiftVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "shiftId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "shiftId",
+        "expectedShiftVersion",
+        "reasonCode"
+      ],
+      "type": "object"
+    },
+    "AdoptCashShiftResult": {
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "custody": {
+          "additionalProperties": false,
+          "properties": {
+            "actingOperatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "countedCash": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "eventType": {
+              "enum": [
+                "device_adoption",
+                "manager_recovery"
+              ],
+              "type": "string"
+            },
+            "expectedCash": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "newHoldingDeviceId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "note": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "pattern": "^[^<>]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "previousHoldingDeviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "reasonCode": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "registerId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "responsibleOperatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "shiftId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "shiftStatusAfter": {
+              "enum": [
+                "opening",
+                "open",
+                "suspended",
+                "handoff_pending",
+                "counting",
+                "reconciliation_required",
+                "closing",
+                "closed",
+                "blocked",
+                "recovered"
+              ],
+              "type": "string"
+            },
+            "shiftStatusBefore": {
+              "enum": [
+                "opening",
+                "open",
+                "suspended",
+                "handoff_pending",
+                "counting",
+                "reconciliation_required",
+                "closing",
+                "closed",
+                "blocked",
+                "recovered"
+              ],
+              "type": "string"
+            },
+            "variance": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "shiftId",
+            "registerId",
+            "eventType",
+            "previousHoldingDeviceId",
+            "newHoldingDeviceId",
+            "actingOperatorId",
+            "responsibleOperatorId",
+            "shiftStatusBefore",
+            "shiftStatusAfter",
+            "expectedCash",
+            "countedCash",
+            "variance",
+            "reasonCode",
+            "note",
+            "occurredAt"
+          ],
+          "type": "object"
+        },
+        "register": {
+          "additionalProperties": false,
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "archivedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "assignment": {
+              "additionalProperties": false,
+              "properties": {
+                "allowedDeviceClasses": {
+                  "items": {
+                    "maxLength": 40,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 16,
+                  "type": "array"
+                },
+                "assignedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "deviceId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "deviceId",
+                "allowedDeviceClasses",
+                "assignedAt"
+              ],
+              "type": "object"
+            },
+            "assignmentPolicy": {
+              "enum": [
+                "device_required",
+                "operator_selects"
+              ],
+              "type": "string"
+            },
+            "createdAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "currentShiftId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "displayName": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "publicReference": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "available",
+                "assigned",
+                "in_use",
+                "suspended",
+                "counting",
+                "reconciliation_required",
+                "blocked",
+                "archived"
+              ],
+              "type": "string"
+            },
+            "version": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "merchantId",
+            "locationId",
+            "displayName",
+            "publicReference",
+            "currency",
+            "active",
+            "assignmentPolicy",
+            "assignment",
+            "currentShiftId",
+            "status",
+            "version",
+            "createdAt",
+            "archivedAt"
+          ],
+          "type": "object"
+        },
+        "shift": {
+          "additionalProperties": false,
+          "properties": {
+            "businessDate": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            "closedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "deviceCredentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "deviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "holdingDeviceCredentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "holdingDeviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "ledgerSequence": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "locationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "merchantId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "openedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "openingCommandId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "openingOperatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "operatorSessionId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "registerId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "responsibleOperatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "opening",
+                "open",
+                "suspended",
+                "handoff_pending",
+                "counting",
+                "reconciliation_required",
+                "closing",
+                "closed",
+                "blocked",
+                "recovered"
+              ],
+              "type": "string"
+            },
+            "suspendedAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "version": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "merchantId",
+            "locationId",
+            "registerId",
+            "deviceId",
+            "deviceCredentialVersion",
+            "holdingDeviceId",
+            "holdingDeviceCredentialVersion",
+            "openingOperatorId",
+            "responsibleOperatorId",
+            "operatorSessionId",
+            "currency",
+            "businessDate",
+            "status",
+            "openingCommandId",
+            "openedAt",
+            "suspendedAt",
+            "closedAt",
+            "ledgerSequence",
+            "version"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "shift",
+        "register",
+        "custody",
+        "correlationId"
       ],
       "type": "object"
     },
@@ -1362,6 +1894,14 @@
               "type": "null"
             }
           ]
+        },
+        "mobility": {
+          "default": "static",
+          "enum": [
+            "static",
+            "mobile"
+          ],
+          "type": "string"
         },
         "platform": {
           "enum": [
@@ -2852,20 +3392,7 @@
     "CashCenterSnapshot": {
       "additionalProperties": false,
       "properties": {
-        "allowedActions": {
-          "items": {
-            "maxLength": 80,
-            "minLength": 1,
-            "type": "string"
-          },
-          "maxItems": 24,
-          "type": "array"
-        },
-        "businessDate": {
-          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-          "type": "string"
-        },
-        "currentShift": {
+        "adoptableShift": {
           "anyOf": [
             {
               "additionalProperties": false,
@@ -2894,6 +3421,14 @@
                   "type": "integer"
                 },
                 "deviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "holdingDeviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "holdingDeviceId": {
                   "format": "uuid",
                   "type": "string"
                 },
@@ -2975,6 +3510,161 @@
                 "registerId",
                 "deviceId",
                 "deviceCredentialVersion",
+                "holdingDeviceId",
+                "holdingDeviceCredentialVersion",
+                "openingOperatorId",
+                "responsibleOperatorId",
+                "operatorSessionId",
+                "currency",
+                "businessDate",
+                "status",
+                "openingCommandId",
+                "openedAt",
+                "suspendedAt",
+                "closedAt",
+                "ledgerSequence",
+                "version"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "allowedActions": {
+          "items": {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 24,
+          "type": "array"
+        },
+        "businessDate": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "type": "string"
+        },
+        "currentShift": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "businessDate": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "closedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "deviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "deviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "holdingDeviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "holdingDeviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "ledgerSequence": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "openedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "openingCommandId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "openingOperatorId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "operatorSessionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "registerId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "responsibleOperatorId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "opening",
+                    "open",
+                    "suspended",
+                    "handoff_pending",
+                    "counting",
+                    "reconciliation_required",
+                    "closing",
+                    "closed",
+                    "blocked",
+                    "recovered"
+                  ],
+                  "type": "string"
+                },
+                "suspendedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "version": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "merchantId",
+                "locationId",
+                "registerId",
+                "deviceId",
+                "deviceCredentialVersion",
+                "holdingDeviceId",
+                "holdingDeviceCredentialVersion",
                 "openingOperatorId",
                 "responsibleOperatorId",
                 "operatorSessionId",
@@ -4359,6 +5049,7 @@
             "reconciliation_required",
             "register_blocked",
             "operator_mismatch",
+            "device_adoption_required",
             "credential_rotated",
             "policy_expired",
             "posting_pending",
@@ -4976,6 +5667,14 @@
                       "format": "uuid",
                       "type": "string"
                     },
+                    "holdingDeviceCredentialVersion": {
+                      "exclusiveMinimum": 0,
+                      "type": "integer"
+                    },
+                    "holdingDeviceId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
                     "id": {
                       "format": "uuid",
                       "type": "string"
@@ -5054,6 +5753,8 @@
                     "registerId",
                     "deviceId",
                     "deviceCredentialVersion",
+                    "holdingDeviceId",
+                    "holdingDeviceCredentialVersion",
                     "openingOperatorId",
                     "responsibleOperatorId",
                     "operatorSessionId",
@@ -5235,6 +5936,7 @@
         "policy",
         "registers",
         "currentShift",
+        "adoptableShift",
         "expectedCash",
         "latestCount",
         "varianceResolution",
@@ -5367,6 +6069,7 @@
             "reconciliation_required",
             "register_blocked",
             "operator_mismatch",
+            "device_adoption_required",
             "credential_rotated",
             "policy_expired",
             "posting_pending",
@@ -6618,6 +7321,7 @@
         "reconciliation_required",
         "register_blocked",
         "operator_mismatch",
+        "device_adoption_required",
         "credential_rotated",
         "policy_expired",
         "posting_pending",
@@ -6727,6 +7431,14 @@
           "format": "uuid",
           "type": "string"
         },
+        "holdingDeviceCredentialVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "holdingDeviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
         "id": {
           "format": "uuid",
           "type": "string"
@@ -6805,6 +7517,8 @@
         "registerId",
         "deviceId",
         "deviceCredentialVersion",
+        "holdingDeviceId",
+        "holdingDeviceCredentialVersion",
         "openingOperatorId",
         "responsibleOperatorId",
         "operatorSessionId",
@@ -6819,6 +7533,209 @@
         "version"
       ],
       "type": "object"
+    },
+    "CashShiftCustodyEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "actingOperatorId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "countedCash": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "eventType": {
+          "enum": [
+            "device_adoption",
+            "manager_recovery"
+          ],
+          "type": "string"
+        },
+        "expectedCash": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "newHoldingDeviceId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[^<>]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "previousHoldingDeviceId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "registerId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "responsibleOperatorId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "shiftId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "shiftStatusAfter": {
+          "enum": [
+            "opening",
+            "open",
+            "suspended",
+            "handoff_pending",
+            "counting",
+            "reconciliation_required",
+            "closing",
+            "closed",
+            "blocked",
+            "recovered"
+          ],
+          "type": "string"
+        },
+        "shiftStatusBefore": {
+          "enum": [
+            "opening",
+            "open",
+            "suspended",
+            "handoff_pending",
+            "counting",
+            "reconciliation_required",
+            "closing",
+            "closed",
+            "blocked",
+            "recovered"
+          ],
+          "type": "string"
+        },
+        "variance": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "shiftId",
+        "registerId",
+        "eventType",
+        "previousHoldingDeviceId",
+        "newHoldingDeviceId",
+        "actingOperatorId",
+        "responsibleOperatorId",
+        "shiftStatusBefore",
+        "shiftStatusAfter",
+        "expectedCash",
+        "countedCash",
+        "variance",
+        "reasonCode",
+        "note",
+        "occurredAt"
+      ],
+      "type": "object"
+    },
+    "CashShiftCustodyEventType": {
+      "enum": [
+        "device_adoption",
+        "manager_recovery"
+      ],
+      "type": "string"
     },
     "CashShiftPolicy": {
       "additionalProperties": false,
@@ -7488,6 +8405,14 @@
               "format": "uuid",
               "type": "string"
             },
+            "holdingDeviceCredentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "holdingDeviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "id": {
               "format": "uuid",
               "type": "string"
@@ -7566,6 +8491,8 @@
             "registerId",
             "deviceId",
             "deviceCredentialVersion",
+            "holdingDeviceId",
+            "holdingDeviceCredentialVersion",
             "openingOperatorId",
             "responsibleOperatorId",
             "operatorSessionId",
@@ -19609,17 +20536,6 @@
           "format": "email",
           "type": "string"
         },
-        "locationId": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "name": {
           "maxLength": 160,
           "minLength": 1,
@@ -19629,27 +20545,32 @@
           "pattern": "^\\d{4,8}$",
           "type": "string"
         },
-        "position": {
-          "anyOf": [
-            {
-              "maxLength": 160,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "phone": {
+          "maxLength": 40,
+          "minLength": 1,
+          "type": "string"
         },
         "role": {
-          "maxLength": 100,
-          "minLength": 1,
+          "enum": [
+            "ADMIN",
+            "STAFF"
+          ],
+          "type": "string"
+        },
+        "roleId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "disabled"
+          ],
           "type": "string"
         }
       },
       "required": [
-        "name",
-        "email",
-        "role"
+        "name"
       ],
       "type": "object"
     },
@@ -26642,6 +27563,13 @@
               "format": "uuid",
               "type": "string"
             },
+            "mobility": {
+              "enum": [
+                "static",
+                "mobile"
+              ],
+              "type": "string"
+            },
             "platform": {
               "enum": [
                 "android",
@@ -26709,6 +27637,7 @@
             "displayName",
             "type",
             "platform",
+            "mobility",
             "state",
             "credentialVersion",
             "lastSeenAt",
@@ -26852,6 +27781,13 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "mobility": {
+                "enum": [
+                  "static",
+                  "mobile"
+                ],
+                "type": "string"
+              },
               "platform": {
                 "enum": [
                   "android",
@@ -26911,6 +27847,7 @@
               "type",
               "platform",
               "requestedPlatform",
+              "mobility",
               "state",
               "expiresAt",
               "claimedAt",
@@ -26999,6 +27936,13 @@
           "format": "uuid",
           "type": "string"
         },
+        "mobility": {
+          "enum": [
+            "static",
+            "mobile"
+          ],
+          "type": "string"
+        },
         "platform": {
           "enum": [
             "android",
@@ -27058,6 +28002,7 @@
         "type",
         "platform",
         "requestedPlatform",
+        "mobility",
         "state",
         "expiresAt",
         "claimedAt",
@@ -27074,6 +28019,152 @@
         "rotated",
         "revoked",
         "replaced"
+      ],
+      "type": "string"
+    },
+    "DeviceList": {
+      "additionalProperties": false,
+      "properties": {
+        "devices": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "credentialVersion": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "displayName": {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lastSeenAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "locationId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "merchantId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "mobility": {
+                "enum": [
+                  "static",
+                  "mobile"
+                ],
+                "type": "string"
+              },
+              "platform": {
+                "enum": [
+                  "android",
+                  "ios",
+                  "linux",
+                  "macos",
+                  "windows",
+                  "web"
+                ],
+                "type": "string"
+              },
+              "publicId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "replacementDeviceId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "revokedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "rotationRequired": {
+                "type": "boolean"
+              },
+              "state": {
+                "enum": [
+                  "enrollment_pending",
+                  "active",
+                  "rotation_required",
+                  "rotated",
+                  "revoked",
+                  "replaced"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "pos_terminal",
+                  "kds"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "publicId",
+              "merchantId",
+              "locationId",
+              "displayName",
+              "type",
+              "platform",
+              "mobility",
+              "state",
+              "credentialVersion",
+              "lastSeenAt",
+              "rotationRequired",
+              "revokedAt",
+              "replacementDeviceId"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        }
+      },
+      "required": [
+        "devices"
+      ],
+      "type": "object"
+    },
+    "DeviceMobility": {
+      "enum": [
+        "static",
+        "mobile"
       ],
       "type": "string"
     },
@@ -27159,6 +28250,13 @@
                   "format": "uuid",
                   "type": "string"
                 },
+                "mobility": {
+                  "enum": [
+                    "static",
+                    "mobile"
+                  ],
+                  "type": "string"
+                },
                 "platform": {
                   "enum": [
                     "android",
@@ -27226,6 +28324,7 @@
                 "displayName",
                 "type",
                 "platform",
+                "mobility",
                 "state",
                 "credentialVersion",
                 "lastSeenAt",
@@ -27273,6 +28372,37 @@
         "pollAfterSeconds",
         "device",
         "credential"
+      ],
+      "type": "object"
+    },
+    "DevicePairingRealtimeEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "pairingSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "awaiting_approval",
+            "credential_ready",
+            "credential_delivered",
+            "completed",
+            "denied",
+            "expired",
+            "cancelled"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "pairingSessionId",
+        "state",
+        "occurredAt"
       ],
       "type": "object"
     },
@@ -27364,6 +28494,13 @@
           "format": "uuid",
           "type": "string"
         },
+        "mobility": {
+          "enum": [
+            "static",
+            "mobile"
+          ],
+          "type": "string"
+        },
         "platform": {
           "enum": [
             "android",
@@ -27431,6 +28568,7 @@
         "displayName",
         "type",
         "platform",
+        "mobility",
         "state",
         "credentialVersion",
         "lastSeenAt",
@@ -27959,6 +29097,7 @@
         "method": {
           "enum": [
             "manager_approval",
+            "manager_card",
             "operator_pin"
           ],
           "type": "string"
@@ -42939,9 +44078,30 @@
           "format": "uuid",
           "type": "string"
         },
+        "managerCard": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 8,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "managerPin": {
-          "pattern": "^\\d{4,8}$",
-          "type": "string"
+          "anyOf": [
+            {
+              "pattern": "^\\d{4,8}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "merchantId": {
           "format": "uuid",
@@ -42959,7 +44119,6 @@
       },
       "required": [
         "operatorSessionId",
-        "managerPin",
         "permission",
         "merchantId",
         "locationId"
@@ -47479,6 +48638,14 @@
               "format": "uuid",
               "type": "string"
             },
+            "holdingDeviceCredentialVersion": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "holdingDeviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
             "id": {
               "format": "uuid",
               "type": "string"
@@ -47557,6 +48724,8 @@
             "registerId",
             "deviceId",
             "deviceCredentialVersion",
+            "holdingDeviceId",
+            "holdingDeviceCredentialVersion",
             "openingOperatorId",
             "responsibleOperatorId",
             "operatorSessionId",
@@ -56017,6 +57186,992 @@
       ],
       "type": "object"
     },
+    "RecoverCashShiftRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "approvalFingerprint": {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "approvalId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "countedCash": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "denominations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "denomination": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "lineTotal": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "quantity": {
+                "maximum": 100000,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "denomination",
+              "quantity",
+              "lineTotal"
+            ],
+            "type": "object"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
+        "expectedShiftVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[^<>]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "maxLength": 80,
+          "minLength": 1,
+          "type": "string"
+        },
+        "shiftId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "shiftId",
+        "countedCash",
+        "denominations",
+        "approvalId",
+        "approvalFingerprint",
+        "expectedShiftVersion",
+        "reasonCode",
+        "note"
+      ],
+      "type": "object"
+    },
+    "RecoverCashShiftResult": {
+      "additionalProperties": false,
+      "properties": {
+        "correlationId": {
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$",
+          "type": "string"
+        },
+        "custody": {
+          "additionalProperties": false,
+          "properties": {
+            "actingOperatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "countedCash": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "eventType": {
+              "enum": [
+                "device_adoption",
+                "manager_recovery"
+              ],
+              "type": "string"
+            },
+            "expectedCash": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "newHoldingDeviceId": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "note": {
+              "anyOf": [
+                {
+                  "maxLength": 160,
+                  "minLength": 1,
+                  "pattern": "^[^<>]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "occurredAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "previousHoldingDeviceId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "reasonCode": {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            "registerId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "responsibleOperatorId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "shiftId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "shiftStatusAfter": {
+              "enum": [
+                "opening",
+                "open",
+                "suspended",
+                "handoff_pending",
+                "counting",
+                "reconciliation_required",
+                "closing",
+                "closed",
+                "blocked",
+                "recovered"
+              ],
+              "type": "string"
+            },
+            "shiftStatusBefore": {
+              "enum": [
+                "opening",
+                "open",
+                "suspended",
+                "handoff_pending",
+                "counting",
+                "reconciliation_required",
+                "closing",
+                "closed",
+                "blocked",
+                "recovered"
+              ],
+              "type": "string"
+            },
+            "variance": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "shiftId",
+            "registerId",
+            "eventType",
+            "previousHoldingDeviceId",
+            "newHoldingDeviceId",
+            "actingOperatorId",
+            "responsibleOperatorId",
+            "shiftStatusBefore",
+            "shiftStatusAfter",
+            "expectedCash",
+            "countedCash",
+            "variance",
+            "reasonCode",
+            "note",
+            "occurredAt"
+          ],
+          "type": "object"
+        },
+        "recoveredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "summary": {
+          "additionalProperties": false,
+          "properties": {
+            "countAttempts": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "countedCash": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "expectedCash": {
+              "additionalProperties": false,
+              "properties": {
+                "adjustments": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "calculatedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "changeGiven": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "expectedDrawerCash": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "grossCashReceived": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "ledgerSequence": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "netCashSales": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "openingFloat": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "paidIn": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "paidOut": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "safeDrops": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                "shiftVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "openingFloat",
+                "grossCashReceived",
+                "changeGiven",
+                "netCashSales",
+                "paidIn",
+                "paidOut",
+                "safeDrops",
+                "adjustments",
+                "expectedDrawerCash",
+                "currency",
+                "ledgerSequence",
+                "calculatedAt",
+                "shiftVersion"
+              ],
+              "type": "object"
+            },
+            "handoffCount": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "openingFloat": {
+              "additionalProperties": false,
+              "properties": {
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "minorUnits": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "minorUnits",
+                "currency"
+              ],
+              "type": "object"
+            },
+            "reconciliationOutcome": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "balanced",
+                    "within_tolerance",
+                    "approved_variance",
+                    "recount_required",
+                    "approval_required",
+                    "posting_pending",
+                    "ambiguous_cash_effect",
+                    "blocked",
+                    "support_required"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "register": {
+              "additionalProperties": false,
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "archivedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "assignment": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "allowedDeviceClasses": {
+                      "items": {
+                        "maxLength": 40,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "maxItems": 16,
+                      "type": "array"
+                    },
+                    "assignedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "deviceId": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "deviceId",
+                    "allowedDeviceClasses",
+                    "assignedAt"
+                  ],
+                  "type": "object"
+                },
+                "assignmentPolicy": {
+                  "enum": [
+                    "device_required",
+                    "operator_selects"
+                  ],
+                  "type": "string"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "currentShiftId": {
+                  "anyOf": [
+                    {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "displayName": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "publicReference": {
+                  "maxLength": 80,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "available",
+                    "assigned",
+                    "in_use",
+                    "suspended",
+                    "counting",
+                    "reconciliation_required",
+                    "blocked",
+                    "archived"
+                  ],
+                  "type": "string"
+                },
+                "version": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "merchantId",
+                "locationId",
+                "displayName",
+                "publicReference",
+                "currency",
+                "active",
+                "assignmentPolicy",
+                "assignment",
+                "currentShiftId",
+                "status",
+                "version",
+                "createdAt",
+                "archivedAt"
+              ],
+              "type": "object"
+            },
+            "shift": {
+              "additionalProperties": false,
+              "properties": {
+                "businessDate": {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                "closedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "currency": {
+                  "pattern": "^[A-Z]{3}$",
+                  "type": "string"
+                },
+                "deviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "deviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "holdingDeviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "holdingDeviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "ledgerSequence": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "locationId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "merchantId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "openedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "openingCommandId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "openingOperatorId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "operatorSessionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "registerId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "responsibleOperatorId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "opening",
+                    "open",
+                    "suspended",
+                    "handoff_pending",
+                    "counting",
+                    "reconciliation_required",
+                    "closing",
+                    "closed",
+                    "blocked",
+                    "recovered"
+                  ],
+                  "type": "string"
+                },
+                "suspendedAt": {
+                  "anyOf": [
+                    {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "version": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "merchantId",
+                "locationId",
+                "registerId",
+                "deviceId",
+                "deviceCredentialVersion",
+                "holdingDeviceId",
+                "holdingDeviceCredentialVersion",
+                "openingOperatorId",
+                "responsibleOperatorId",
+                "operatorSessionId",
+                "currency",
+                "businessDate",
+                "status",
+                "openingCommandId",
+                "openedAt",
+                "suspendedAt",
+                "closedAt",
+                "ledgerSequence",
+                "version"
+              ],
+              "type": "object"
+            },
+            "variance": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "currency": {
+                      "pattern": "^[A-Z]{3}$",
+                      "type": "string"
+                    },
+                    "minorUnits": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "minorUnits",
+                    "currency"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "varianceReason": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "no_variance",
+                    "counting_error",
+                    "change_error",
+                    "unrecorded_paid_in",
+                    "unrecorded_paid_out",
+                    "missing_safe_drop",
+                    "cash_handling_error",
+                    "unknown_operational_difference",
+                    "other_approved_reason"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "shift",
+            "register",
+            "openingFloat",
+            "expectedCash",
+            "countedCash",
+            "variance",
+            "varianceReason",
+            "reconciliationOutcome",
+            "countAttempts",
+            "handoffCount"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "summary",
+        "custody",
+        "recoveredAt",
+        "correlationId"
+      ],
+      "type": "object"
+    },
     "RecoveryAction": {
       "additionalProperties": false,
       "properties": {
@@ -58739,6 +60894,14 @@
               "type": "null"
             }
           ]
+        },
+        "mobility": {
+          "default": "static",
+          "enum": [
+            "static",
+            "mobile"
+          ],
+          "type": "string"
         },
         "platform": {
           "enum": [
@@ -61649,6 +63812,7 @@
             "reconciliation_required",
             "register_blocked",
             "operator_mismatch",
+            "device_adoption_required",
             "credential_rotated",
             "policy_expired",
             "posting_pending",
@@ -67388,6 +69552,14 @@
                   "format": "uuid",
                   "type": "string"
                 },
+                "holdingDeviceCredentialVersion": {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                "holdingDeviceId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "id": {
                   "format": "uuid",
                   "type": "string"
@@ -67466,6 +69638,8 @@
                 "registerId",
                 "deviceId",
                 "deviceCredentialVersion",
+                "holdingDeviceId",
+                "holdingDeviceCredentialVersion",
                 "openingOperatorId",
                 "responsibleOperatorId",
                 "operatorSessionId",
@@ -72180,6 +74354,28 @@
       ],
       "type": "string"
     },
+    "UpdateDeviceRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "maxLength": 120,
+          "minLength": 1,
+          "type": "string"
+        },
+        "mobility": {
+          "enum": [
+            "static",
+            "mobile"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "displayName",
+        "mobility"
+      ],
+      "type": "object"
+    },
     "UpdateHardwarePolicyRequest": {
       "additionalProperties": false,
       "properties": {
@@ -72409,16 +74605,21 @@
     "UpdateStaffRequest": {
       "additionalProperties": false,
       "properties": {
-        "locationId": {
+        "email": {
           "anyOf": [
             {
-              "format": "uuid",
+              "format": "email",
               "type": "string"
             },
             {
               "type": "null"
             }
           ]
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
         },
         "operatorPin": {
           "anyOf": [
@@ -72431,10 +74632,10 @@
             }
           ]
         },
-        "position": {
+        "phone": {
           "anyOf": [
             {
-              "maxLength": 160,
+              "maxLength": 40,
               "type": "string"
             },
             {
@@ -72443,14 +74644,20 @@
           ]
         },
         "role": {
-          "maxLength": 100,
-          "minLength": 1,
+          "enum": [
+            "ADMIN",
+            "STAFF"
+          ],
+          "type": "string"
+        },
+        "roleId": {
+          "format": "uuid",
           "type": "string"
         },
         "status": {
           "enum": [
             "active",
-            "inactive"
+            "disabled"
           ],
           "type": "string"
         }
@@ -73527,6 +75734,38 @@
       "request": null,
       "response": "DeviceSummary"
     },
+    "GET /api/v1/merchants/:merchantId/devices": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": null,
+      "response": "DeviceList"
+    },
+    "GET /api/v1/merchants/:merchantId/devices/enrollment-requests": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": false,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": null,
+      "response": "DeviceEnrollmentRequestList"
+    },
     "GET /api/v1/pos/entry-context": {
       "approval": false,
       "auth": "device",
@@ -74104,6 +76343,24 @@
       "request": "UpdateStaffRequest",
       "response": null
     },
+    "PATCH /api/v1/merchants/:merchantId/devices/:deviceId": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED",
+        "RESOURCE_NOT_FOUND",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": "UpdateDeviceRequest",
+      "response": "DeviceSummary"
+    },
     "PATCH /api/v1/pos/merchants/:merchantId/cart/lines/:lineId": {
       "approval": false,
       "auth": "operator-session",
@@ -74599,6 +76856,23 @@
       "request": "ClaimDevicePairingRequest",
       "response": "DevicePairingSession"
     },
+    "POST /api/v1/merchants/:merchantId/devices/:deviceId/revoke": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED",
+        "DEVICE_NOT_ALLOWED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": "RevokeDeviceRequest",
+      "response": null
+    },
     "POST /api/v1/merchants/:merchantId/devices/enrollment": {
       "approval": false,
       "auth": "session",
@@ -74614,7 +76888,41 @@
       "permission": "device.enroll",
       "pin": false,
       "request": "BeginDeviceEnrollmentRequest",
-      "response": "EnrollmentChallenge"
+      "response": "DeviceEnrollmentRequestCreated"
+    },
+    "POST /api/v1/merchants/:merchantId/devices/enrollment-requests/:requestId/approve": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": "DecideDeviceEnrollmentRequest",
+      "response": "DeviceEnrollmentDecision"
+    },
+    "POST /api/v1/merchants/:merchantId/devices/enrollment-requests/:requestId/deny": {
+      "approval": false,
+      "auth": "session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "VALIDATION_FAILED",
+        "ENTITLEMENT_DISABLED"
+      ],
+      "idempotent": true,
+      "locationContext": false,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "device.enroll",
+      "pin": false,
+      "request": "DecideDeviceEnrollmentRequest",
+      "response": "DeviceEnrollmentDecision"
     },
     "POST /api/v1/pos/elevation/manager-approval": {
       "approval": true,
@@ -74734,6 +77042,23 @@
       "request": "OpenCashShiftRequest",
       "response": "OpenCashShiftResult"
     },
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/adopt": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cash.shift.resume",
+      "pin": false,
+      "request": "AdoptCashShiftRequest",
+      "response": "AdoptCashShiftResult"
+    },
     "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/close": {
       "approval": true,
       "auth": "operator-session",
@@ -74849,6 +77174,23 @@
       "pin": false,
       "request": "ReconcileCashShiftRequest",
       "response": "ShiftReconciliation"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/recover": {
+      "approval": true,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cash.variance.approve",
+      "pin": false,
+      "request": "RecoverCashShiftRequest",
+      "response": "RecoverCashShiftResult"
     },
     "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/resume": {
       "approval": false,

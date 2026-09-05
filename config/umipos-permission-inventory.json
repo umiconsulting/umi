@@ -1597,6 +1597,23 @@
       "profiles": ["admin", "manager", "owner", "supervisor", "viewer"]
     },
     {
+      "key": "location.switch",
+      "description": "Select another merchant location for dashboard work",
+      "source": "docs/migration/build-v3/migrations/003_location_switch_permission.sql",
+      "control": "resolveLocationAuthority",
+      "merchantScope": true,
+      "locationScope": false,
+      "deviceRequired": false,
+      "operatorSessionRequired": false,
+      "approvalRequired": false,
+      "entitlement": "dashboard",
+      "classification": "administrative",
+      "tested": true,
+      "seedGap": false,
+      "status": "active",
+      "profiles": ["admin", "owner"]
+    },
+    {
       "key": "loyalty.adjust",
       "description": "UmiPOS Gate 3F permission loyalty.adjust",
       "source": "docs/migration/build-v3/37_pos_customer_value.sql",

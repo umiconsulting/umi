@@ -79,9 +79,20 @@ describe('MerchantsService.buildCapabilities', () => {
 
   it('limits a location-bound membership to its assigned location', async () => {
     h.repo.loadProducts.mockResolvedValue({ dashboard: { status: 'active' } });
-    const caps = await h.svc.buildCapabilities({ ...ACCESS, locationId: 'l2' }, 'l1');
+    const caps = await h.svc.buildCapabilities(
+      { ...ACCESS, permissions: [], locationId: 'l2' },
+      'l1',
+    );
     expect(caps.locations.map((location) => location.id)).toEqual(['l2']);
     expect(caps.selectedLocation?.id).toBe('l2');
+    expect(caps.canSwitchLocations).toBe(false);
+  });
+
+  it('does not expose merchant locations without location.switch or an assignment', async () => {
+    h.repo.loadProducts.mockResolvedValue({ dashboard: { status: 'active' } });
+    const caps = await h.svc.buildCapabilities({ ...ACCESS, permissions: [] }, 'l1');
+    expect(caps.locations).toEqual([]);
+    expect(caps.selectedLocation).toBeNull();
   });
 });
 

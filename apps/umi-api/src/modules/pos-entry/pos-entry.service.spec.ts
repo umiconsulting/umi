@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PosEntryService } from './pos-entry.service';
+import { posCardLookupHash } from '../../shared/auth/pos-pin';
 
 const user = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -18,7 +19,10 @@ describe('PosEntryService', () => {
 
   it('starts an operator only from repository-authorized scope intersection', async () => {
     const operator = { id: 'operator-session' };
-    const repo = { startOperator: vi.fn().mockResolvedValue(operator) };
+    const repo = {
+      startOperator: vi.fn().mockResolvedValue(operator),
+      deviceLocation: vi.fn().mockResolvedValue(null),
+    };
     const service = new PosEntryService(repo as never, {} as never, {} as never);
     await expect(service.start(user, 'tenant', 'branch')).resolves.toBe(operator);
     expect(repo.startOperator).toHaveBeenCalledWith(
@@ -32,6 +36,7 @@ describe('PosEntryService', () => {
 
   it('rate-lock boundary rejects a locked PIN before verification', async () => {
     const repo = {
+      deviceLocation: vi.fn().mockResolvedValue(null),
       pinRecord: vi.fn().mockResolvedValue({
         staffId: 'staff',
         salt: 'salt',
@@ -51,6 +56,160 @@ describe('PosEntryService', () => {
       }),
     ).rejects.toMatchObject({ response: { code: 'PIN_LOCKED' } });
     expect(passwords.verify).not.toHaveBeenCalled();
+  });
+
+  it('anchors the operator branch to a pinned device, not to the request', async () => {
+    const operator = { id: 'operator-session' };
+    const repo = {
+      startOperator: vi.fn().mockResolvedValue(operator),
+      deviceLocation: vi.fn().mockResolvedValue('branch-the-device-stands-in'),
+    };
+    const service = new PosEntryService(repo as never, {} as never, {} as never);
+
+    await service.start(user, 'tenant', 'branch-the-operator-asked-for');
+
+    // The till decides. An operator who also administers another branch cannot
+    // move this drawer's takings by switching branch in the UI.
+    expect(repo.startOperator).toHaveBeenCalledWith(
+      expect.objectContaining({ locationId: 'branch-the-device-stands-in' }),
+    );
+  });
+
+  it('lets a floating device take the requested branch', async () => {
+    const operator = { id: 'operator-session' };
+    const repo = {
+      startOperator: vi.fn().mockResolvedValue(operator),
+      deviceLocation: vi.fn().mockResolvedValue(null),
+    };
+    const service = new PosEntryService(repo as never, {} as never, {} as never);
+
+    await service.start(user, 'tenant', 'branch-the-operator-asked-for');
+
+    expect(repo.startOperator).toHaveBeenCalledWith(
+      expect.objectContaining({ locationId: 'branch-the-operator-asked-for' }),
+    );
+  });
+
+  it('refuses when the device is not a registered active device', async () => {
+    const repo = {
+      startOperator: vi.fn(),
+      deviceLocation: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new PosEntryService(repo as never, {} as never, {} as never);
+
+    await expect(service.start(user, 'tenant', 'branch')).rejects.toMatchObject({
+      response: { code: 'DEVICE_NOT_REGISTERED' },
+    });
+    expect(repo.startOperator).not.toHaveBeenCalled();
+  });
+
+  it('verifies a PIN against the branch the device stands in', async () => {
+    const repo = {
+      deviceLocation: vi.fn().mockResolvedValue('branch-the-device-stands-in'),
+      pinRecord: vi.fn().mockResolvedValue(null),
+    };
+    const service = new PosEntryService(repo as never, { verify: vi.fn() } as never, {} as never);
+
+    await expect(
+      service.verifyPin(user, {
+        pin: '1234',
+        merchantId: 'tenant',
+        locationId: 'branch-the-operator-asked-for',
+        permission: 'future.action',
+      }),
+    ).rejects.toBeDefined();
+
+    // Without this, a device pinned elsewhere disappears under the device RLS
+    // narrowing and a correct PIN reads as wrong.
+    expect(repo.pinRecord).toHaveBeenCalledWith(
+      user.id,
+      'tenant',
+      'branch-the-device-stands-in',
+      user.deviceId,
+    );
+  });
+
+  it('accepts a manager card as an alternative to the typed PIN', async () => {
+    const repo = {
+      managerPinRecord: vi.fn().mockResolvedValue({
+        staffId: '00000000-0000-4000-8000-000000000010',
+        userId: '00000000-0000-4000-8000-000000000011',
+        salt: 'salt',
+        hash: 'hash',
+        credential: 'manager_card',
+        lockedUntil: null,
+      }),
+      grantManagerElevation: vi.fn().mockResolvedValue({
+        id: 'elevation',
+        expiresAt: new Date(Date.now() + 60_000),
+      }),
+    };
+    const passwords = { verify: vi.fn().mockReturnValue(true) };
+    const config = { get: vi.fn().mockReturnValue('secret') };
+    const service = new PosEntryService(repo as never, passwords as never, config as never);
+
+    const grant = await service.approveByManager(user, {
+      operatorSessionId: '00000000-0000-4000-8000-000000000020',
+      managerCard: 'card-token-from-the-magnetic-stripe',
+      permission: 'sale.void',
+      merchantId: 'tenant',
+      locationId: 'branch',
+      commandFingerprint: null,
+    });
+
+    // The card token is what gets verified, and the grant says how it was approved.
+    expect(passwords.verify).toHaveBeenCalledWith(
+      'card-token-from-the-magnetic-stripe',
+      'salt',
+      'hash',
+    );
+    expect(grant.method).toBe('manager_card');
+    // The lookup must not be the PIN-domain hash, or a card could be replayed as a PIN.
+    expect(repo.managerPinRecord.mock.calls[0][0]).toBe(
+      posCardLookupHash('secret', 'tenant', 'card-token-from-the-magnetic-stripe'),
+    );
+  });
+
+  it('refuses a request that carries both a PIN and a card', async () => {
+    const repo = { managerPinRecord: vi.fn() };
+    const service = new PosEntryService(
+      repo as never,
+      {} as never,
+      { get: vi.fn().mockReturnValue('secret') } as never,
+    );
+
+    await expect(
+      service.approveByManager(user, {
+        operatorSessionId: '00000000-0000-4000-8000-000000000020',
+        managerPin: '1234',
+        managerCard: 'card-token-from-the-magnetic-stripe',
+        permission: 'sale.void',
+        merchantId: 'tenant',
+        locationId: 'branch',
+        commandFingerprint: null,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED' } });
+    expect(repo.managerPinRecord).not.toHaveBeenCalled();
+  });
+
+  it('refuses a request that carries neither a PIN nor a card', async () => {
+    const repo = { managerPinRecord: vi.fn() };
+    const service = new PosEntryService(
+      repo as never,
+      {} as never,
+      { get: vi.fn().mockReturnValue('secret') } as never,
+    );
+
+    await expect(
+      service.approveByManager(user, {
+        operatorSessionId: '00000000-0000-4000-8000-000000000020',
+        permission: 'sale.void',
+        merchantId: 'tenant',
+        locationId: 'branch',
+        commandFingerprint: null,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'VALIDATION_FAILED' } });
+    expect(repo.managerPinRecord).not.toHaveBeenCalled();
   });
 
   it('binds a different manager PIN approval to one checkout fingerprint', async () => {

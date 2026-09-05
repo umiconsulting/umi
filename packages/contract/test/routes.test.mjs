@@ -26,9 +26,38 @@ test('me + merchant-scoped route builders', () => {
   assert.equal(routes.cash.stats('abc'), '/api/merchants/abc/cash/stats');
 });
 
+test('merchant role routes are byte-exact', () => {
+  assert.equal(routes.roles.list('abc'), '/api/merchants/abc/roles');
+  assert.equal(routes.roles.create('abc'), '/api/merchants/abc/roles');
+  assert.equal(routes.roles.update('abc', 'role-1'), '/api/merchants/abc/roles/role-1');
+  assert.equal(
+    routes.roles.archive('abc', 'role-1', 4),
+    '/api/merchants/abc/roles/role-1?expectedRevision=4',
+  );
+});
+
 test('merchant id is URL-encoded (matches data.jsx _merchantPath)', () => {
   assert.equal(routes.merchants.base('a b'), '/api/merchants/a%20b');
   assert.equal(routes.cash.stats('a/b'), `/api/merchants/${encodeURIComponent('a/b')}/cash/stats`);
+});
+
+test('dashboard device enrollment routes match the versioned controller', () => {
+  assert.equal(
+    routes.devices.beginEnrollment('abc'),
+    '/api/v1/merchants/abc/devices/enrollment',
+  );
+  assert.equal(
+    routes.devices.enrollmentRequests('abc'),
+    '/api/v1/merchants/abc/devices/enrollment-requests',
+  );
+  assert.equal(
+    routes.devices.approveEnrollment('abc', 'request-1'),
+    '/api/v1/merchants/abc/devices/enrollment-requests/request-1/approve',
+  );
+  assert.equal(
+    routes.devices.denyEnrollment('abc', 'request-1'),
+    '/api/v1/merchants/abc/devices/enrollment-requests/request-1/deny',
+  );
 });
 
 test('cash merchant-scoped routes (dashboard surface)', () => {

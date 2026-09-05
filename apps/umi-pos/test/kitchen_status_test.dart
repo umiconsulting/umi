@@ -17,6 +17,7 @@ final class _KitchenApi implements ApiClient {
     Map<String, Object?>? body,
     CancellationToken? cancellation,
     bool idempotent = false,
+    bool authRefresh = true,
   }) async {
     this.method = method;
     this.path = path;

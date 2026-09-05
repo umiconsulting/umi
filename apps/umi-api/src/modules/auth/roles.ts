@@ -1,7 +1,7 @@
 /**
- * Role model. A role is a `umi.role` catalog row, granted through the EMPLOYMENT
- * (`merchant.staff.role_id`) inside a café, or through `umi.user_role` at the
- * platform — never a column on a person. One human may hold MANY roles across cafés,
+ * Role model. A merchant role is a `merchant.role` row, granted through the EMPLOYMENT
+ * (`merchant.staff.merchant_role_id`) inside a café. A platform role stays in
+ * `umi.role` and `umi.user_role`. One human may hold MANY roles across cafés,
  * so callers reduce the set with `normalizeRoleKey`; precedence is highest-first.
  * A `umi.user_role` grant is platform-wide by definition, which is how `super_admin`
  * and `developer` reach every merchant.

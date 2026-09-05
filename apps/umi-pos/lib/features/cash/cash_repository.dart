@@ -28,6 +28,11 @@ abstract interface class CashRepository {
     String shiftId,
     ShiftHandoffRequest request,
   );
+  Future<AdoptCashShiftResult> adopt(
+    String merchantId,
+    String shiftId,
+    AdoptCashShiftRequest request,
+  );
   Future<CashCountSummary> count(
     String merchantId,
     String shiftId,
@@ -140,6 +145,20 @@ final class ApiCashRepository implements CashRepository {
       path: suspend
           ? UmiRoutes.posCashSuspend(merchantId, shiftId)
           : UmiRoutes.posCashResume(merchantId, shiftId),
+      body: request.toJson(),
+      idempotent: true,
+    ),
+  );
+
+  @override
+  Future<AdoptCashShiftResult> adopt(
+    String merchantId,
+    String shiftId,
+    AdoptCashShiftRequest request,
+  ) async => AdoptCashShiftResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posCashAdopt(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),

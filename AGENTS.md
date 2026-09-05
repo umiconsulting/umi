@@ -1,40 +1,35 @@
 # Umi Workspace
 
-Umi is a multi-product organization workspace, not a single-app repository.
-This file is the workspace-wide contract — product boundaries, ownership,
-architecture rules, and the research standard. Hermes provides the generic
-agent operating model; the `codex-claude-pipeline` skill handles worker
-routing. What lives here is what no agent can infer.
+Umi is a multi-product monorepo and organization workspace.
+This file defines product boundaries, ownership, architecture rules, and the research standard.
 
 ## Start here
 
 - `WORKSPACE.md` — workspace map and cognitive layers
 - `docs/architecture/agent-operating-system.md` — neutral agent OS
 - `docs/architecture/maps/retrieval-map.md` — bounded progressive disclosure
-- `docs/migration/2026-06-09-workspace-integration-implementation-plan.md` — active program driver
+- `docs/migration/build-v3/GATED_CUTOVER_PLAN.md` — active cutover program
 
 ## Product boundaries
 
-| Path                    | Owns                                                                                                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/umi-api`          | The canonical backend. Auth, cash, KDS, conversations, leads, the wallet-pass layer for Apple and Google, and UmiPOS sale/inventory/stored-value authority |
-| `apps/umi-pos`          | Flutter UmiPOS client: enrolled-device + PIN operator login, sale, cart, checkout, cash shift, hardware, offline replay                                    |
-| `apps/umi-kds`          | Native iPad Kitchen Display System client                                                                                                                  |
-| `apps/umi-cash`         | Cash customer site and Cash-specific Prisma. It answers the frozen wallet-pass URL and forwards it to `umi-api`; it no longer builds passes                |
-| `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization                                                                       |
-| `apps/umi-logs`         | ConversaFlow operational logs and trace UI                                                                                                                 |
-| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                                                                                 |
-| `apps/umi-landing-page` | Public landing and lead capture                                                                                                                            |
-| root `docs/`            | Architecture, migration, governance, cross-product planning                                                                                                |
+| Path                    | Owns                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `apps/umi-api`          | Canonical backend for auth, cash, KDS, conversations, leads, passes, sales, inventory, and stored value |
+| `apps/umi-pos`          | Flutter UmiPOS client for operator access, sales, checkout, shifts, hardware, and offline replay        |
+| `apps/umi-kds`          | Native iPad Kitchen Display System client                                                               |
+| `apps/umi-cash`         | Cash compatibility client and Cash-specific Prisma. It forwards the frozen wallet-pass URL to `umi-api` |
+| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                              |
+| `apps/umi-landing-page` | Public landing and lead capture                                                                         |
+| root `docs/`            | Architecture, migration, governance, and cross-product planning                                         |
 
 ## Database ownership
 
-- `conversaflow` — operational runtime: conversations, orders, workflow jobs, outbox
-- `kds` — kitchen read models and projections only
-- `umi_cash` — Cash consumer loyalty, wallet, and pass tables
-- build-v3 `merchant` — UmiPOS merchant loyalty and stored-value transaction facts
-- `platform` — shared organization data (contacts, users, tenants, leads)
-- `public` — temporary compatibility surface; do not add new product logic
+- `umi` owns the sealed SaaS, identity, and entitlement model.
+- `merchant` owns café business facts and row-level security policies.
+- `runtime` owns sealed operational machinery.
+- `docs/migration/build-v3` owns pre-cutover database definitions.
+- `supabase/migrations` accepts approved post-cutover migrations only.
+- Build-v2 and legacy schemas are historical inputs. Do not add new logic to them.
 
 ## Architecture rules
 
@@ -123,13 +118,15 @@ summary, a recommendation, or a message to a person.
 
 ## Agent layer
 
-Hermes is the local orchestrator. DeepSeek v4 Pro is the reasoning engine. The
-`codex-claude-pipeline` skill (loaded by Hermes) governs when to delegate to Codex
-or Claude Code. Agent procedures live under `.agents/skills/` (canonical per the
-2026-06-10 S1.5 decision). Each tool reads its own path, so `.claude/skills/` is a **symlink**
-into it (`.claude/skills -> ../.agents/skills`) — one source of truth, nothing to regenerate.
-Write to `.agents/skills/`; the link reflects it instantly. `adapter-sync-check` guards the link.
-Symlinks assume macOS/Linux (Windows needs `git config core.symlinks true`).
+Agent procedures live under `.agents/skills/`.
+This path is the canonical procedure layer from the 2026-06-10 S1.5 decision.
+The `.claude/skills` path is a symlink to `../.agents/skills`.
+Write to `.agents/skills/`; the link reflects the change immediately.
+The `adapter-sync-check` skill guards the link.
+Symlinks assume macOS or Linux. Windows requires `git config core.symlinks true`.
+
+Hermes, Claude Code, and `codex-claude-pipeline` are external components.
+This repository does not install these components. Use them only after approved provisioning.
 
 For workspace-wide work, inspect root instructions first. For project-specific work,
 descend into the owning repo and follow its `AGENTS.md` / `REPO_CONTEXT.md` if present.
@@ -150,19 +147,20 @@ See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ## Current stance
 
-- KDS reads a backend-owned kitchen projection in schema `kds`. The normalization
-  layer lives in `apps/umi-conversaflow` plus schema-qualified SQL under `kds`.
-- Dashboard has cut over to the single platform schema path (S4.1, 2026-06-10).
-- All app remotes use `git@github.com-umi:umiconsulting/<repo>.git`. The push matrix
-  is documented in `docs/governance/github-push-matrix.md`.
-- Root pnpm workspaces + Turborepo are additive and inert for app npm workflows
-  until the Phase 5 monorepo cutover (gated by ST-1…ST-5 in the implementation plan).
-- The active program driver is the 2026-06-09 implementation plan. Sequencing
-  invariant: database consolidation → backend consolidation → monorepo.
+- `apps/umi-api` owns authoritative business writes for build-v3.
+- Build-v3 uses `umi`, `merchant`, and `runtime` as its canonical schemas.
+- KDS reads the API-owned kitchen projection. KDS does not own commercial order truth.
+- UmiPOS consumes contract version 2.13.0 from `packages/contract`.
+- The workspace uses one Git repository at `git@github.com:umiconsulting/umi.git`.
+- App directories are not separate Git repositories.
+- Root pnpm workspaces and Turborepo own the active JavaScript workspace workflow.
+- Umi Cash stays outside pnpm and uses its separate npm lockfile.
+- The active program driver is the build-v3 gated cutover plan.
+- P7 production cutover remains active. Gate 13 waits for real hardware and environment validation.
 
 ## Commands
 
-Root monorepo (pnpm + Turborepo, additive at this phase):
+Root monorepo (pnpm + Turborepo):
 
 - Install: `pnpm install`
 - Build: `pnpm run build` (or `turbo run build`)
@@ -170,8 +168,8 @@ Root monorepo (pnpm + Turborepo, additive at this phase):
 - Test: `pnpm run test` (or `turbo run test`)
 - Dev: `pnpm run dev` (or `turbo run dev`)
 
-Per-app (current npm workflows):
+Umi Cash uses its separate npm workflow:
 
 ```sh
-cd apps/<app> && npm install && npm run dev
+cd apps/umi-cash && npm ci && npm run dev
 ```

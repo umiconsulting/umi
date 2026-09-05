@@ -76,6 +76,10 @@ export class PosCartRepository {
          ('building_cart','ready_for_checkout','recovered')
        DO UPDATE SET operator_session_id=excluded.operator_session_id,
                      lifecycle_state='recovered',
+                     -- A cart picked up the next morning is today's cart. Leaving
+                     -- yesterday's stamp here is what sent stale dates downstream,
+                     -- where the cash ledger refuses them outright.
+                     business_date=excluded.business_date,
                      updated_at=now()
        RETURNING id::text`,
       [merchantId, locationId, operatorSessionId],

@@ -25,6 +25,7 @@ const EMPTY_CUSTOMER_DETAIL = {
 };
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null };
 const EMPTY_STAFF = { staff: [] };
+const EMPTY_ROLES = { roles: [], permissions: [] };
 const EMPTY_HOURS = {
   hours: {},
   timezone: null,
@@ -134,7 +135,13 @@ function _merchantPath(ctx, suffix) {
 }
 
 function _useAsync(asyncFn, deps, seed) {
-  const [state, setState] = useStateD({ data: seed, loading: true, error: null, errorCode: null });
+  const [state, setState] = useStateD({
+    data: seed,
+    loading: true,
+    error: null,
+    errorCode: null,
+    loaded: false,
+  });
   useEffectD(function () {
     var active = true;
     setState(function (s) {
@@ -145,7 +152,7 @@ function _useAsync(asyncFn, deps, seed) {
         return asyncFn();
       })
       .then(function (data) {
-        if (active) setState({ data: data, loading: false, error: null, errorCode: null });
+        if (active) setState({ data: data, loading: false, error: null, errorCode: null, loaded: true });
       })
       .catch(function (err) {
         if (active)
@@ -382,12 +389,14 @@ async function _loadMerchant(ctx) {
   };
 }
 
-async function _loadOrders(ctx, filter) {
-  if (!_active(ctx, 'kds')) return EMPTY_ORDERS;
+async function _loadOrders(ctx, filter, channel) {
+  if (!_active(ctx, 'dashboard')) return EMPTY_ORDERS;
+  const query = new URLSearchParams({ filter: filter || 'all' });
+  if (channel) query.set('channel', channel);
   const result = await _apiFetch(
     _withLocation(
       ctx,
-      _merchantPath(ctx, '/kds/orders?filter=' + encodeURIComponent(filter || 'all')),
+      _merchantPath(ctx, '/orders?' + query.toString()),
     ),
   );
   return (result.orders || []).map(function (t) {
@@ -431,6 +440,12 @@ async function _loadStaff(ctx) {
   const merchantId = _merchantId(ctx);
   if (!merchantId) throw new Error('No active merchant selected');
   return _apiFetch(routes.staff.list(merchantId));
+}
+
+async function _loadRoles(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.roles.list(merchantId));
 }
 
 async function _loadGiftCards(ctx, opts) {
@@ -566,6 +581,30 @@ async function deleteStaffMember(id) {
   return _apiFetch(routes.staff.remove(merchantId, id), { method: 'DELETE' });
 }
 
+async function createMerchantRole(role) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.roles.create(merchantId), {
+    method: 'POST',
+    body: JSON.stringify(role),
+  });
+}
+
+async function updateMerchantRole(id, role) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.roles.update(merchantId, id), {
+    method: 'PATCH',
+    body: JSON.stringify(role),
+  });
+}
+
+async function archiveMerchantRole(id, expectedRevision) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.roles.archive(merchantId, id, expectedRevision), { method: 'DELETE' });
+}
+
 // Credit several loyalty stamps to one card at once — the catch-up an operator does
 // for a customer migrated from another loyalty program (the recurring "Agregar sellos"
 // case). Writes merchant.loyalty_visit through the SAME endpoint the register uses;
@@ -645,36 +684,74 @@ async function generateDevicePairingPin(device) {
 }
 
 async function createPosEnrollmentRequest(device) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(routes.devices.beginEnrollment(tenantId), {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.devices.beginEnrollment(merchantId), {
     method: 'POST',
     body: JSON.stringify(device),
   });
 }
 
-async function getPosEnrollmentRequests() {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(routes.devices.enrollmentRequests(tenantId));
+function deviceEnrollmentPath(path, locationId) {
+  if (!locationId) return path;
+  return `${path}?locationId=${encodeURIComponent(locationId)}`;
 }
 
-async function approvePosEnrollmentRequest(requestId) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(routes.devices.approveEnrollment(tenantId, requestId), {
-    method: 'POST',
-    body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+async function getPosEnrollmentRequests(locationId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(deviceEnrollmentPath(routes.devices.enrollmentRequests(merchantId), locationId));
+}
+
+// The enrolled POS terminals, which are NOT the enrolment requests above: a request is
+// a code waiting to be used, a device is a register in service. The Devices screen shows
+// a request until it completes and the terminal itself from then on.
+async function getPosDevices(locationId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(deviceEnrollmentPath(routes.devices.list(merchantId), locationId));
+}
+
+async function updatePosDevice(deviceId, patch, locationId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(deviceEnrollmentPath(routes.devices.update(merchantId, deviceId), locationId), {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
   });
 }
 
-async function denyPosEnrollmentRequest(requestId) {
-  const tenantId = window.localStorage.getItem('umi-dashboard-selected-tenant');
-  if (!tenantId) throw new Error('No active tenant selected');
-  return _apiFetch(routes.devices.denyEnrollment(tenantId, requestId), {
+async function revokePosDevice(deviceId, reason) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(routes.devices.revoke(merchantId, deviceId), {
     method: 'POST',
-    body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    body: JSON.stringify({ idempotencyKey: crypto.randomUUID(), reason }),
   });
+}
+
+async function approvePosEnrollmentRequest(requestId, locationId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(
+    deviceEnrollmentPath(routes.devices.approveEnrollment(merchantId, requestId), locationId),
+    {
+      method: 'POST',
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    },
+  );
+}
+
+async function denyPosEnrollmentRequest(requestId, locationId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error('No active merchant selected');
+  return _apiFetch(
+    deviceEnrollmentPath(routes.devices.denyEnrollment(merchantId, requestId), locationId),
+    {
+      method: 'POST',
+      body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
+    },
+  );
 }
 
 async function createKdsStation(station) {
@@ -728,11 +805,11 @@ async function revokeDevice(deviceId, reason) {
   });
 }
 
-async function transitionOrder(ticketId, targetStatus, extra) {
+async function transitionOrder(orderId, targetStatus, extra) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   const locationId = window.localStorage.getItem('umi-dashboard-selected-location');
   if (!merchantId) throw new Error('No active merchant selected');
-  const path = `/api/merchants/${encodeURIComponent(merchantId)}/kds/orders/${encodeURIComponent(ticketId)}/transition${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
+  const path = `/api/merchants/${encodeURIComponent(merchantId)}/orders/${encodeURIComponent(orderId)}/transition${locationId ? `?locationId=${encodeURIComponent(locationId)}` : ''}`;
   return _apiFetch(path, {
     method: 'POST',
     body: JSON.stringify(Object.assign({ target_status: targetStatus }, extra || {})),
@@ -794,13 +871,13 @@ function useMerchantData() {
   );
 }
 
-function useOrdersData(filter, refresh) {
+function useOrdersData(filter, refresh, channel) {
   const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadOrders(ctx, filter);
+      return _loadOrders(ctx, filter, channel);
     },
-    _deps(ctx, [filter, refresh]),
+    _deps(ctx, [filter, refresh, channel || '']),
     EMPTY_ORDERS,
   );
 }
@@ -813,6 +890,17 @@ function useStaffData(refresh) {
     },
     _deps(ctx, [refresh || 0]),
     EMPTY_STAFF,
+  );
+}
+
+function useRolesData(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadRoles(ctx);
+    },
+    _deps(ctx, [refresh || 0]),
+    EMPTY_ROLES,
   );
 }
 
@@ -1126,6 +1214,7 @@ export {
   useCustomerDetail,
   useCustomerInsights,
   useStaffData,
+  useRolesData,
   useBusinessHours,
   useVoiceConfig,
   useGiftCardsData,
@@ -1146,6 +1235,9 @@ export {
   createStaffMember,
   updateStaffMember,
   deleteStaffMember,
+  createMerchantRole,
+  updateMerchantRole,
+  archiveMerchantRole,
   // Data-module function, not a component. Keeps the react-refresh baseline flat.
   // eslint-disable-next-line react-refresh/only-export-components
   creditLoyaltySeals,
@@ -1163,6 +1255,9 @@ export {
   generateDevicePairingPin,
   createPosEnrollmentRequest,
   getPosEnrollmentRequests,
+  getPosDevices,
+  updatePosDevice,
+  revokePosDevice,
   approvePosEnrollmentRequest,
   denyPosEnrollmentRequest,
   approveDevicePairing,

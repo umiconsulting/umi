@@ -29,6 +29,7 @@ final class _FakeCashRepository implements CashRepository {
         'status': 'assigned',
       },
     ],
+    adoptableShift: null,
     currentShift: null,
     expectedCash: null,
     latestCount: null,
@@ -87,6 +88,7 @@ final class _FakeCashRepository implements CashRepository {
       businessDate: snapshot.businessDate,
       policy: snapshot.policy,
       registers: snapshot.registers,
+      adoptableShift: null,
       currentShift: {
         'id': '00000000-0000-4000-8000-000000000009',
         'status': 'open',
@@ -172,6 +174,7 @@ final class _FakeCashRepository implements CashRepository {
       businessDate: snapshot.businessDate,
       policy: snapshot.policy,
       registers: snapshot.registers,
+      adoptableShift: null,
       currentShift: {
         ...snapshot.currentShift!,
         'status': 'reconciliation_required',
@@ -189,6 +192,45 @@ final class _FakeCashRepository implements CashRepository {
       summary: null,
     );
     return result;
+  }
+
+  AdoptCashShiftRequest? adoptedWith;
+
+  @override
+  Future<AdoptCashShiftResult> adopt(
+    String merchantId,
+    String shiftId,
+    AdoptCashShiftRequest request,
+  ) async {
+    adoptedWith = request;
+    final adopted = {
+      ...?snapshot.adoptableShift,
+      'holdingDeviceId': '00000000-0000-4000-8000-000000000099',
+      'version': 4,
+    };
+    snapshot = CashCenterSnapshot(
+      businessDate: snapshot.businessDate,
+      policy: snapshot.policy,
+      registers: snapshot.registers,
+      adoptableShift: null,
+      currentShift: adopted,
+      expectedCash: null,
+      latestCount: null,
+      varianceResolution: null,
+      reconciliation: null,
+      recoveryState: 'none',
+      allowedActions: const ['movement', 'suspend', 'count'],
+      summary: null,
+    );
+    return AdoptCashShiftResult(
+      shift: adopted,
+      register: snapshot.registers.first,
+      custody: const {
+        'previousHoldingDeviceId': '00000000-0000-4000-8000-000000000098',
+        'newHoldingDeviceId': '00000000-0000-4000-8000-000000000099',
+      },
+      correlationId: 'adopt',
+    );
   }
 
   @override
@@ -503,4 +545,154 @@ void main() {
       expect(controller.activeShiftId, isNull);
     },
   );
+
+  const orphanShift = {
+    'id': '00000000-0000-4000-8000-000000000031',
+    'registerId': '00000000-0000-4000-8000-000000000001',
+    'status': 'open',
+    'version': 3,
+    'holdingDeviceId': '00000000-0000-4000-8000-000000000098',
+    'operatorSessionId': '00000000-0000-4000-8000-000000000013',
+  };
+
+  CashCenterSnapshot orphanedSnapshot(CashCenterSnapshot base) =>
+      CashCenterSnapshot(
+        businessDate: base.businessDate,
+        policy: base.policy,
+        registers: base.registers,
+        adoptableShift: orphanShift,
+        currentShift: null,
+        expectedCash: null,
+        latestCount: null,
+        varianceResolution: null,
+        reconciliation: null,
+        recoveryState: 'device_adoption_required',
+        allowedActions: const ['adopt_shift'],
+        summary: null,
+      );
+
+  test(
+    'adopts the shift left open on a terminal that lost its identity',
+    () async {
+      final repository = _FakeCashRepository();
+      repository.snapshot = orphanedSnapshot(repository.snapshot);
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: '00000000-0000-4000-8000-000000000012',
+      );
+      await controller.load();
+      expect(controller.state.snapshot?.adoptableShift, isNotNull);
+
+      await controller.adoptShift();
+
+      // The shift it takes over is the orphan, at the version the snapshot reported.
+      expect(repository.adoptedWith?.shiftId, orphanShift['id']);
+      expect(repository.adoptedWith?.expectedShiftVersion, 3);
+      // And it is now this terminal's own shift, not an adoptable one.
+      expect(controller.state.snapshot?.adoptableShift, isNull);
+      expect(controller.state.snapshot?.currentShift?['status'], 'open');
+    },
+  );
+
+  testWidgets(
+    'offers to bring the shift over instead of a dead open-shift form',
+    (tester) async {
+      final repository = _FakeCashRepository();
+      repository.snapshot = orphanedSnapshot(repository.snapshot);
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: '00000000-0000-4000-8000-000000000012',
+      );
+      await controller.load();
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('es'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: Scaffold(
+            body: CashCenter(
+              controller: controller,
+              permissions: OperatorPermissions(const [
+                'cash.shift.open',
+                'cash.shift.resume',
+              ]),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.text('Tu turno sigue abierto en otra terminal'),
+        findsOneWidget,
+      );
+      // The open-shift form would be a trap here: the register is held, so opening
+      // another shift on it can only fail.
+      expect(find.text('Abrir turno de caja'), findsNothing);
+
+      await tester.tap(find.text('Traer el turno a esta terminal'));
+      await tester.pumpAndSettle();
+      expect(repository.adoptedWith, isNotNull);
+    },
+  );
+
+  testWidgets('refuses to open a shift on an amount it cannot read', (
+    tester,
+  ) async {
+    final repository = _FakeCashRepository();
+    final controller = CashController(repository: repository);
+    controller.setContext(
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
+      operatorSessionId: '00000000-0000-4000-8000-000000000012',
+    );
+    await controller.load();
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(
+          body: CashCenter(
+            controller: controller,
+            permissions: OperatorPermissions(const ['cash.shift.open']),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final field = find.byType(TextField).first;
+    final button = find.widgetWithText(FilledButton, 'Abrir turno de caja');
+
+    // Exactly what typing 50000 into a field holding "0.00" used to produce.
+    // It parsed as zero and opened the shift on an empty drawer.
+    await tester.enterText(field, '0.0050000');
+    await tester.pump();
+    expect(find.text('Escribe un monto válido, por ejemplo 1,500.00.'), findsOneWidget);
+    expect(tester.widget<FilledButton>(button).onPressed, isNull);
+
+    await tester.enterText(field, '1,500.00');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    // One thousand five hundred pesos, not one peso fifty.
+    expect(repository.openedWith?.openingFloat['minorUnits'], 150000);
+  });
 }

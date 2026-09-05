@@ -250,6 +250,9 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
     expect(sql).toContain('GENERATED FROM config/umipos-pilot-role-grants.json');
     expect(sql).not.toContain('cross join umi.permission');
     expect(sql).toContain("'cash.movement.paid_out.approve'");
+    expect(sql).toContain(
+      'after update of role_id,location_id,status,operator_pin_hash,operator_pin_lookup',
+    );
     for (const value of matrix.profiles.filter((item) => !item.platformOnly)) {
       expect(sql).toContain(`('${value.role}',`);
       for (const permission of value.permissions) {

@@ -54,6 +54,7 @@ final class CredentialVault
   static const _deviceState = 'device.state';
   static const _access = 'session.access_token';
   static const _refresh = 'session.refresh_token';
+  static const _sessionActivity = 'session.activity_at';
   static const _operator = 'operator.session_id';
   static const _pairingSession = 'device.pairing_session_id';
   static const _pollingCredential = 'device.polling_credential';
@@ -117,7 +118,18 @@ final class CredentialVault
   Future<void> saveTokens(String accessToken, String refreshToken) async {
     await _storage.write(_access, accessToken);
     await _storage.write(_refresh, refreshToken);
+    await markSessionActive();
   }
+
+  /// Stamps the moment the session was last proven, on login or on refresh.
+  /// A cold start reads this to decide whether it may restore the operator
+  /// silently or must fall back to the personal PIN.
+  Future<void> markSessionActive() =>
+      _storage.write(_sessionActivity, DateTime.now().toUtc().toIso8601String());
+
+  /// When the session was last proven, or null if none is recorded.
+  Future<DateTime?> sessionActivityAt() async =>
+      DateTime.tryParse(await _storage.read(_sessionActivity) ?? '');
 
   Future<PairingIdentity?> pairingIdentity() async {
     final sessionId = await _storage.read(_pairingSession);
@@ -166,7 +178,14 @@ final class CredentialVault
   }
 
   Future<void> clearSession() async {
-    for (final key in [_access, _refresh, _tenant, _branch, _operator]) {
+    for (final key in [
+      _access,
+      _refresh,
+      _sessionActivity,
+      _tenant,
+      _branch,
+      _operator,
+    ]) {
       await _storage.delete(key);
     }
   }

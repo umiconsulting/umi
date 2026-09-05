@@ -43,6 +43,7 @@ final class _ReleaseApi implements ApiClient {
     Map<String, Object?>? body,
     CancellationToken? cancellation,
     bool idempotent = false,
+    bool authRefresh = true,
   }) async => {
     'environment': environment,
     'contractVersion': '2.12.0',

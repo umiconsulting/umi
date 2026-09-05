@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import '../errors/app_error.dart';
 
 enum AppEnvironment { invalid, development, test, staging, pilot, production }
@@ -12,7 +14,10 @@ final class AppConfig {
     required this.developmentDiagnostics,
     required this.featureBootstrapMode,
     required this.hardwareSimulatorEnabled,
+    required this.realtimeEnrollmentEnabled,
     required this.release,
+    this.runningOnWeb = false,
+    this.deviceKeyKind = '',
   });
 
   factory AppConfig.fromEnvironment() {
@@ -34,6 +39,20 @@ final class AppConfig {
       'UMIPOS_HARDWARE_SIMULATOR_ENABLED',
       defaultValue: false,
     );
+    // Off by default. The poll loop is the baseline everywhere; this only adds
+    // the realtime nudge on top of it, so it is safe in every environment
+    // including pilot and production.
+    const realtimeEnrollment = bool.fromEnvironment(
+      'UMIPOS_REALTIME_ENROLLMENT_ENABLED',
+      defaultValue: false,
+    );
+    // Which device key the build uses: '' (default) keeps the software Ed25519
+    // key that runs everywhere; 'tpm' selects the hardware TPM key on a desktop
+    // build that has one. Opt-in, so no platform changes behavior by default.
+    const deviceKey = String.fromEnvironment(
+      'UMIPOS_DEVICE_KEY',
+      defaultValue: '',
+    );
     return AppConfig(
       environment: AppEnvironment.values.firstWhere(
         (value) => value.name == environmentValue,
@@ -46,7 +65,10 @@ final class AppConfig {
           ? FeatureBootstrapMode.localSafeDefaults
           : FeatureBootstrapMode.disabled,
       hardwareSimulatorEnabled: simulator,
+      realtimeEnrollmentEnabled: realtimeEnrollment,
       release: ReleaseIdentity.fromEnvironment(),
+      runningOnWeb: kIsWeb,
+      deviceKeyKind: deviceKey,
     );
   }
 
@@ -56,6 +78,26 @@ final class AppConfig {
   final bool developmentDiagnostics;
   final FeatureBootstrapMode featureBootstrapMode;
   final bool hardwareSimulatorEnabled;
+
+  /// True when the app runs in a web browser. A browser cannot hold a
+  /// hardware-backed device key, so the web build is a development preview
+  /// only and is refused as a production POS (see [validate]).
+  final bool runningOnWeb;
+
+  /// The device-key backend the build asked for: '' (software, default), 'tpm'
+  /// (desktop TPM), or 'keystore' (mobile Android Keystore / iOS Secure
+  /// Enclave).
+  final String deviceKeyKind;
+
+  /// True when the build opted into the hardware TPM device key (desktop).
+  bool get useTpmDeviceKey => deviceKeyKind == 'tpm';
+
+  /// True when the build opted into the mobile platform-keystore device key.
+  bool get useKeystoreDeviceKey => deviceKeyKind == 'keystore';
+
+  /// Adds the realtime pairing nudge beside the poll loop. It never replaces
+  /// the poll loop, so switching it off restores the previous behaviour exactly.
+  final bool realtimeEnrollmentEnabled;
   final ReleaseIdentity release;
 
   AppException? validate() {
@@ -63,6 +105,20 @@ final class AppConfig {
       return const AppException(
         category: AppErrorCategory.configuration,
         code: 'ENVIRONMENT_INVALID',
+        recoverable: false,
+      );
+    }
+    // A browser cannot protect a device key in hardware. The web build is a
+    // development preview; it must never run a real till. Allowed only in
+    // development and test, refused everywhere else.
+    if (runningOnWeb &&
+        !{
+          AppEnvironment.development,
+          AppEnvironment.test,
+        }.contains(environment)) {
+      return const AppException(
+        category: AppErrorCategory.configuration,
+        code: 'WEB_POS_UNSUPPORTED',
         recoverable: false,
       );
     }
@@ -121,6 +177,7 @@ final class AppConfig {
     'developmentDiagnostics': developmentDiagnostics,
     'featureBootstrapMode': featureBootstrapMode.name,
     'hardwareSimulatorEnabled': hardwareSimulatorEnabled,
+    'runningOnWeb': runningOnWeb,
     'release': release.safeSummary(),
   };
 }

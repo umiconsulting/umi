@@ -20,6 +20,7 @@ import { posCustomerValueModels } from './pos-customer-value';
 import { posHardwareModels } from './pos-hardware';
 import { posKitchenModels } from './pos-kitchen';
 import { dashboardOperationsModels } from './dashboard-operations';
+import { realtimeModels } from './realtime';
 import { ROUTE_TABLE, type RouteContract } from './route-table';
 import type { ZodTypeAny } from 'zod';
 
@@ -33,7 +34,7 @@ import type { ZodTypeAny } from 'zod';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.13.0';
+export const CONTRACT_VERSION = '2.17.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -80,6 +81,7 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...posHardwareModels,
   ...posKitchenModels,
   ...dashboardOperationsModels,
+  ...realtimeModels,
 };
 
 export const invariantCatalog = {

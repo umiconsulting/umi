@@ -4,6 +4,7 @@ import { CsrfGuard } from './csrf.guard';
 
 const context = (request: Record<string, unknown>, isPublic = false) =>
   ({
+    getType: () => 'http',
     getHandler: () => 'handler',
     getClass: () => 'class',
     switchToHttp: () => ({ getRequest: () => request }),

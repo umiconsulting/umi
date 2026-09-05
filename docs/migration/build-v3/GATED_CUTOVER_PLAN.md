@@ -1,6 +1,6 @@
 # build-v3 Gated Cutover — Roadmap & Status
 
-**Status:** ACTIVE (living) · **Owner:** platform · **Last updated:** 2026-08-22 · **Scope:** internal-only
+**Status:** ACTIVE (living) · **Owner:** platform · **Last updated:** 2026-08-30 · **Scope:** internal-only
 **Companion docs:** [`SECURITY_GATE.md`](./SECURITY_GATE.md) (the gate) · [`ORDER_MODEL.md`](./ORDER_MODEL.md) · [`backend-convergence-map.md`](./backend-convergence-map.md)
 
 > **What this is.** The tracked roadmap for converging `apps/umi-api` **and** the data-migration
@@ -605,6 +605,11 @@ still has no Flutter job; physical-iOS signing stays a Gate 13 item. The deploy 
 bakes `RELEASE_*`/`CONTRACT_VERSION` into the image (`deploy-backend.yml`), while
 `UMI_ENVIRONMENT` and `EXPECTED_SCHEMA_VERSION` are VPS `.env` state — see
 `apps/umi-api/docs/deploy-pipeline.md`.
+
+**Current contract reconciliation (2026-08-30).** PR #135 advanced the generated contract to
+2.13.0. The UmiPOS lock and canonical assertion now use 2.13.0. Flutter analysis, 178 tests, and
+the Web debug build pass with content hash
+`f4ca66cde5633f4deb0f9676263f42f48a6ef56e5a992eda4dd4d83b9b905e63`.
 
 AB#118 is largely delivered by the merge for the POS (`POST /api/v1/auth/pos/pin-login`, device
 enrolment, `merchant.staff.operator_pin_*` issued from the staff screen); the register's own PIN

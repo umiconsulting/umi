@@ -10,6 +10,7 @@ void main() {
       developmentDiagnostics: false,
       featureBootstrapMode: FeatureBootstrapMode.disabled,
       hardwareSimulatorEnabled: false,
+      realtimeEnrollmentEnabled: false,
       release: testReleaseIdentity,
     );
     expect(config.validate()?.code, 'TLS_REQUIRED');
@@ -23,6 +24,7 @@ void main() {
       developmentDiagnostics: true,
       featureBootstrapMode: FeatureBootstrapMode.localSafeDefaults,
       hardwareSimulatorEnabled: true,
+      realtimeEnrollmentEnabled: false,
       release: testReleaseIdentity,
     );
     expect(config.validate()?.code, 'PILOT_CONFIGURATION_UNSAFE');
@@ -36,9 +38,55 @@ void main() {
       developmentDiagnostics: true,
       featureBootstrapMode: FeatureBootstrapMode.disabled,
       hardwareSimulatorEnabled: true,
+      realtimeEnrollmentEnabled: false,
       release: testReleaseIdentity,
     );
     expect(config.validate()?.code, 'PILOT_CONFIGURATION_UNSAFE');
+  });
+
+  test('a web build is refused as a production POS', () {
+    final config = AppConfig(
+      environment: AppEnvironment.production,
+      apiBaseUri: Uri.parse('https://api.example.test'),
+      telemetryEnabled: true,
+      developmentDiagnostics: false,
+      featureBootstrapMode: FeatureBootstrapMode.disabled,
+      hardwareSimulatorEnabled: false,
+      realtimeEnrollmentEnabled: false,
+      release: testReleaseIdentity,
+      runningOnWeb: true,
+    );
+    expect(config.validate()?.code, 'WEB_POS_UNSUPPORTED');
+  });
+
+  test('a web build is refused as a pilot POS', () {
+    final config = AppConfig(
+      environment: AppEnvironment.pilot,
+      apiBaseUri: Uri.parse('https://pilot.example.com'),
+      telemetryEnabled: true,
+      developmentDiagnostics: false,
+      featureBootstrapMode: FeatureBootstrapMode.disabled,
+      hardwareSimulatorEnabled: false,
+      realtimeEnrollmentEnabled: false,
+      release: testReleaseIdentity,
+      runningOnWeb: true,
+    );
+    expect(config.validate()?.code, 'WEB_POS_UNSUPPORTED');
+  });
+
+  test('a web build is allowed as a development preview', () {
+    final config = AppConfig(
+      environment: AppEnvironment.development,
+      apiBaseUri: Uri.parse('http://127.0.0.1:4001'),
+      telemetryEnabled: false,
+      developmentDiagnostics: true,
+      featureBootstrapMode: FeatureBootstrapMode.disabled,
+      hardwareSimulatorEnabled: true,
+      realtimeEnrollmentEnabled: false,
+      release: testReleaseIdentity,
+      runningOnWeb: true,
+    );
+    expect(config.validate(), isNull);
   });
 
   test('invalid environment fails closed', () {
@@ -49,6 +97,7 @@ void main() {
       developmentDiagnostics: false,
       featureBootstrapMode: FeatureBootstrapMode.disabled,
       hardwareSimulatorEnabled: false,
+      realtimeEnrollmentEnabled: false,
       release: testReleaseIdentity,
     );
     expect(config.validate()?.code, 'ENVIRONMENT_INVALID');

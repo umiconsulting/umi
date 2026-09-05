@@ -11,6 +11,11 @@ export class CsrfGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    // CSRF is a browser-form threat and has no meaning off the HTTP transport.
+    // Without this check a websocket context falls through `getRequest()` to a
+    // socket, whose missing `.method` only accidentally reads as a safe verb.
+    if (context.getType() !== 'http') return true;
+
     const request = context.switchToHttp().getRequest<AuthedRequest & { method?: string }>();
     if (SAFE_METHODS.has((request.method ?? 'GET').toUpperCase())) return true;
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [

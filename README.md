@@ -7,13 +7,14 @@ secrets; everything else is a thin client. This is a pnpm + Turborepo monorepo.
 
 ### `apps/` — independently deployed units
 
-| Directory               | Package          | What it is                                                                                                                                                         | Deploys to                              |
-| ----------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
-| `apps/umi-api`          | `@umi/api`       | The backend. NestJS + Fastify, one image / two processes (web + BullMQ worker). **The only thing that touches the database or secrets.**                           | VPS (Docker, via GitHub Actions → GHCR) |
-| `apps/umi-dashboard`    | `@umi/dashboard` | Operator / owner console (Vite + React SPA).                                                                                                                       | Vercel                                  |
-| `apps/umi-landing-page` | `@umi/landing`   | Marketing site (Next.js).                                                                                                                                          | Vercel                                  |
-| `apps/umi-cash`         | `umi-cash`       | Customer wallet / loyalty. **FROZEN** — being absorbed into the dashboard; excluded from the workspace, keeps its own npm lockfile. Don't touch until the cutover. | Vercel                                  |
-| `apps/umi-kds`          | —                | Kitchen Display System — a native iPad app (Swift). Not a JS workspace member.                                                                                     | App Store                               |
+| Directory               | Package          | What it is                                                                                                                               | Deploys to                              |
+| ----------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `apps/umi-api`          | `@umi/api`       | The backend. NestJS + Fastify, one image / two processes (web + BullMQ worker). **The only thing that touches the database or secrets.** | VPS (Docker, via GitHub Actions → GHCR) |
+| `apps/umi-dashboard`    | `@umi/dashboard` | Operator / owner console (Vite + React SPA).                                                                                             | Vercel                                  |
+| `apps/umi-landing-page` | `@umi/landing`   | Marketing site (Next.js).                                                                                                                | Vercel                                  |
+| `apps/umi-cash`         | `umi-cash`       | Cash compatibility client. Its public wallet URLs stay frozen. It uses a separate npm lockfile.                                          | Vercel                                  |
+| `apps/umi-pos`          | —                | Flutter UmiPOS client for sales, cash, inventory, customer value, hardware, and recovery.                                                | Pilot device bundle                     |
+| `apps/umi-kds`          | —                | Kitchen Display System — a native iPad app (Swift). Not a JS workspace member.                                                           | App Store                               |
 
 ### `packages/` — shared code
 
@@ -24,58 +25,41 @@ secrets; everything else is a thin client. This is a pnpm + Turborepo monorepo.
 
 ## Quick start
 
+Use Node 22 and pnpm 10.29.3. UmiPOS also requires Flutter 3.44.6 and Dart 3.12.2.
+
 ```bash
-pnpm install                          # install the whole workspace
+pnpm install --frozen-lockfile        # install the whole workspace
 pnpm --filter @umi/dashboard dev      # run the console locally
 pnpm --filter @umi/api dev            # run the backend (needs apps/umi-api/.env)
 pnpm --filter @umi/api test           # backend tests
 pnpm turbo run build                  # build everything, in dependency order
 ```
 
+Copy each required `.env.example` file to its ignored local equivalent. Keep all secret values outside Git.
+
+Run Umi Cash through its separate npm workflow:
+
+```bash
+cd apps/umi-cash
+npm ci
+npm run dev
+```
+
+See [RUNNING_UMIPOS.md](./docs/development/RUNNING_UMIPOS.md) for Flutter setup and UmiPOS commands.
+See [NEW_MACHINE_SETUP.md](./docs/development/NEW_MACHINE_SETUP.md) for a complete workstation checklist.
+
 Filter by the **package name** (`@umi/dashboard`), not the directory — see
 [CONVENTIONS.md](./CONVENTIONS.md).
 
-## Project tracking (Plane)
+## Project tracking
 
-Work items and PRDs live in self-hosted **Plane** at
-**https://plane.umiconsulting.co** — workspace `umi`, project **`UMI`**, so
-identifiers read `UMI-42`. Trello is retired.
+Work items and specifications live in Azure Boards. Use organization `umiconsulting` and project `Umi Consulting`.
 
-One project holds the whole monorepo, with **modules** for the area (`umi-api`,
-`dashboard`, `landing`, `kds`, `infra`). Plane scopes a cycle to one project, so
-splitting the repo across projects would force parallel sprints that five people
-cannot plan across, and cross-cutting work would have no home. A separate repo
-gets its own project. See
-[docs/agents/issue-tracker.md](./docs/agents/issue-tracker.md) for the triage
-states, the PR↔item link, and how the agent skills use it.
+GitHub pull requests are the review surface. Use `AB#<id>` in a commit or pull request to create the link.
 
-`.mcp.json` wires Plane into Claude Code, so agents raise work items as issues
-surface instead of waiting for someone to file them. The token is **per-person**,
-so each dev supplies their own:
+Plane and Trello are retired as trackers. Plane remains available only for data export.
 
-1. In Plane: avatar → **Settings → Personal Access Tokens → Add**. Copy it once;
-   it is not shown again. Name it something you can revoke in isolation.
-2. Export it where your shell will pick it up (`~/.zshrc`, direnv, 1Password CLI —
-   wherever the other `.mcp.json` secrets already come from):
-
-   ```bash
-   export PLANE_API_KEY=plane_api_...
-   ```
-
-3. Verify before wiring anything up — a 200 means the token and the base URL are
-   both right:
-
-   ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' -H "X-API-Key: $PLANE_API_KEY" \
-     https://plane.umiconsulting.co/api/v1/workspaces/umi/projects/
-   ```
-
-Never put the token in `.mcp.json`. Every server in that file reads its secrets
-through `${VAR}` expansion for this reason.
-
-The instance runs on the same VPS as `@umi/api`, behind the same Caddy — see
-[apps/umi-api/docs/vps-setup.md](./apps/umi-api/docs/vps-setup.md) for how it is
-wired and what to check after a Plane upgrade.
+See [issue-tracker.md](./docs/agents/issue-tracker.md) for states, links, evidence, and tool requirements.
 
 ## How it deploys
 

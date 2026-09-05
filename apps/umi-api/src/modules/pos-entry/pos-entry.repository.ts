@@ -31,6 +31,34 @@ export class PosEntryRepository {
     );
   }
 
+  /**
+   * The branch this device physically belongs to: a location id when the device
+   * is pinned, `null` when it floats, `undefined` when there is no such active
+   * device in the merchant.
+   *
+   * It runs with the location scope deliberately CLEARED. `merchant.device`
+   * carries a `location_narrowing` RLS policy, so a device pinned to another
+   * branch is invisible while `app.current_location` names a branch — which is
+   * exactly the row this lookup has to be able to see in order to correct the
+   * caller. `umi.current_location()` maps the empty setting to NULL, and the
+   * policy short-circuits on NULL.
+   */
+  async deviceLocation(merchantId: string, deviceId: string): Promise<string | null | undefined> {
+    const { rows } = await this.pg.runWithMerchant(
+      merchantId,
+      getRequestContext()?.userId ?? null,
+      (client) =>
+        client.query<{ locationId: string | null }>(
+          `SELECT d.location_id::text AS "locationId"
+             FROM merchant.device d
+            WHERE d.id = $1::uuid AND d.merchant_id = $2::uuid AND d.status = 'active'`,
+          [deviceId, merchantId],
+        ),
+      null,
+    );
+    return rows[0] ? rows[0].locationId : undefined;
+  }
+
   async entryContext(userId: string, deviceId: string): Promise<EntryMerchant[]> {
     // This cross-merchant discovery read runs before the operator selects a merchant.
     // It uses exact user and device predicates. All selected-merchant work uses RLS.
@@ -234,12 +262,22 @@ export class PosEntryRepository {
       userId: string;
       salt: string | null;
       hash: string | null;
+      credential: 'operator_pin' | 'manager_card';
       lockedUntil: Date | null;
     }>(
       merchantId,
       locationId,
+      // One lookup value, two possible credentials. The caller derives the hash
+      // from whichever the manager presented, and the row answers with the salt
+      // and hash belonging to THAT credential, so the verify step never compares
+      // a card against a PIN hash.
       `SELECT s.id::text AS "staffId",s.user_id::text AS "userId",
-              s.operator_pin_salt AS salt,s.operator_pin_hash AS hash,
+              CASE WHEN s.operator_pin_lookup=$1 THEN s.operator_pin_salt
+                   ELSE s.manager_card_salt END AS salt,
+              CASE WHEN s.operator_pin_lookup=$1 THEN s.operator_pin_hash
+                   ELSE s.manager_card_hash END AS hash,
+              CASE WHEN s.operator_pin_lookup=$1 THEN 'operator_pin'
+                   ELSE 'manager_card' END AS credential,
               d.pin_locked_until AS "lockedUntil"
        FROM merchant.staff s
        JOIN runtime.operator_session acting ON acting.id=$5::uuid
@@ -249,7 +287,8 @@ export class PosEntryRepository {
        JOIN merchant.device d ON d.id=$8::uuid AND d.id=acting.device_id
          AND d.status='active'
        WHERE s.merchant_id=$2::uuid AND (s.location_id IS NULL OR s.location_id=$3::uuid)
-         AND s.operator_pin_lookup=$1 AND s.status='active'
+         AND (s.operator_pin_lookup=$1 OR s.manager_card_lookup=$1)
+         AND s.status='active'
          AND acting.state='active' AND acting.expires_at>now()
          AND acting.user_id<>s.user_id
          AND $4=ANY(umi.resolve_staff_permissions(s.id))
@@ -403,6 +442,8 @@ export class PosEntryRepository {
     locationId: string;
     permission: string;
     commandFingerprint: string | null;
+    /** Which credential the manager presented. Recorded on the grant and its audit event. */
+    method: 'manager_approval' | 'manager_card';
   }) {
     const { rows } = await this.scopedQuery<{ id: string; expiresAt: Date }>(
       input.merchantId,
@@ -432,7 +473,7 @@ export class PosEntryRepository {
          (session_id, merchant_id, location_id, permission_key, method, approved_by,
           expires_at,command_fingerprint)
        SELECT target.durable_session_id, $3::uuid, $4::uuid, $5,
-              'manager_approval', $1::uuid, now() + interval '5 minutes',$7
+              $8, $1::uuid, now() + interval '5 minutes',$7
        FROM target, manager_allowed
        WHERE target.user_id <> $1::uuid
        RETURNING id::text, expires_at AS "expiresAt"`,
@@ -444,6 +485,7 @@ export class PosEntryRepository {
         input.permission,
         input.managerStaffId,
         input.commandFingerprint,
+        input.method,
       ],
     );
     if (rows[0]) {
@@ -455,8 +497,15 @@ export class PosEntryRepository {
             entity_id, outcome, metadata)
          VALUES ($1::uuid, $2::uuid, $3::uuid, 'elevation.manager_granted',
                  'elevation_grant', $4::uuid, 'success',
-                 jsonb_build_object('method','manager_approval','permission',$5::text))`,
-        [input.managerUserId, input.merchantId, input.locationId, rows[0].id, input.permission],
+                 jsonb_build_object('method',$6::text,'permission',$5::text))`,
+        [
+          input.managerUserId,
+          input.merchantId,
+          input.locationId,
+          rows[0].id,
+          input.permission,
+          input.method,
+        ],
       );
     }
     return rows[0] ?? null;

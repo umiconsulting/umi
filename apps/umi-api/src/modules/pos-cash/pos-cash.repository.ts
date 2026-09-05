@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type {
+  AdoptCashShiftRequest,
+  AdoptCashShiftResult,
   CashCenterSnapshot,
   CashCommandRecoveryResult,
   CashCountState,
@@ -9,6 +11,7 @@ import type {
   CashMovementRequest,
   CashReconciliationOutcome,
   CashShift,
+  CashShiftCustodyEvent,
   CashShiftPolicy,
   CashShiftSummary,
   ExpectedCash,
@@ -16,8 +19,11 @@ import type {
   NoSaleDrawerRequest,
   OpenCashShiftRequest,
   OpenCashShiftResult,
+  PhysicalRegister,
   ReconcileCashShiftRequest,
   RecountRequest,
+  RecoverCashShiftRequest,
+  RecoverCashShiftResult,
   RegisterStatus,
   ResolveCashVarianceRequest,
   ShiftCloseRequest,
@@ -299,10 +305,11 @@ export class PosCashRepository {
     }>(
       `INSERT INTO merchant.cash_shift
          (merchant_id,location_id,register_id,device_id,device_credential_version,
+          holding_device_id,holding_device_credential_version,
           opening_operator_id,responsible_operator_id,operator_session_id,currency,
           business_date,status,opening_command_id,opening_float_minor_units,
           opening_denominations,opening_note)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::uuid,$6::uuid,$7::uuid,
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$4::uuid,$5,$6::uuid,$6::uuid,$7::uuid,
                $8,$9::date,'open',$10::uuid,$11,$12,$13)
        RETURNING id::text,opened_at::text AS "openedAt",version`,
       [
@@ -378,6 +385,8 @@ export class PosCashRepository {
         registerId: dto.registerId,
         deviceId: authorization.deviceId,
         deviceCredentialVersion: authorization.credentialVersion,
+        holdingDeviceId: authorization.deviceId,
+        holdingDeviceCredentialVersion: authorization.credentialVersion,
         openingOperatorId: authorization.operatorId,
         responsibleOperatorId: authorization.operatorId,
         operatorSessionId: authorization.operatorSessionId,
@@ -451,7 +460,7 @@ export class PosCashRepository {
               version,ledger_sequence::text AS sequence
        FROM merchant.cash_shift
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
          AND status='open' AND version=$6
        FOR UPDATE`,
       [
@@ -601,7 +610,7 @@ export class PosCashRepository {
       `SELECT register_id::text AS "registerId",currency,ledger_sequence::text AS sequence,version
        FROM merchant.cash_shift
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
          AND status IN ('open','suspended','counting','reconciliation_required')
          AND version=$6 AND ledger_sequence=$7
        FOR UPDATE`,
@@ -722,7 +731,7 @@ export class PosCashRepository {
       `UPDATE merchant.cash_shift
        SET status='counting',version=version+1
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
          AND version=$6 AND status='reconciliation_required'
          AND (
            SELECT count(*) FROM merchant.cash_count_attempt
@@ -732,13 +741,15 @@ export class PosCashRepository {
                  location_id::text AS "locationId",register_id::text AS "registerId",
                  device_id::text AS "deviceId",
                  device_credential_version AS "deviceCredentialVersion",
+                 holding_device_id::text AS "holdingDeviceId",
+                 holding_device_credential_version AS "holdingDeviceCredentialVersion",
                  opening_operator_id::text AS "openingOperatorId",
                  responsible_operator_id::text AS "responsibleOperatorId",
                  operator_session_id::text AS "operatorSessionId",currency,
                  business_date::text AS "businessDate",status,
                  opening_command_id::text AS "openingCommandId",
                  opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
-                 closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version`,
+                 closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version`,
       [
         dto.shiftId,
         merchantId,
@@ -776,7 +787,7 @@ export class PosCashRepository {
        JOIN merchant.cash_shift s ON s.id=c.shift_id
        WHERE c.id=$1::uuid AND c.shift_id=$2::uuid AND c.merchant_id=$3::uuid
          AND c.location_id=$4::uuid AND s.version=$5
-         AND s.responsible_operator_id=$6::uuid AND s.device_id=$7::uuid
+         AND s.responsible_operator_id=$6::uuid AND s.holding_device_id=$7::uuid
          AND s.operator_session_id=$8::uuid
        FOR UPDATE OF s`,
       [
@@ -883,7 +894,7 @@ export class PosCashRepository {
        WHERE c.id=$1::uuid AND c.shift_id=$2::uuid AND c.merchant_id=$3::uuid
          AND c.location_id=$4::uuid AND s.version=$5
          AND s.status='reconciliation_required' AND s.ledger_sequence=c.ledger_sequence
-         AND s.responsible_operator_id=$6::uuid AND s.device_id=$7::uuid
+         AND s.responsible_operator_id=$6::uuid AND s.holding_device_id=$7::uuid
          AND s.operator_session_id=$8::uuid
        FOR UPDATE OF s`,
       [
@@ -1016,6 +1027,8 @@ export class PosCashRepository {
       registerId: string;
       deviceId: string;
       deviceCredentialVersion: number;
+      holdingDeviceId: string;
+      holdingDeviceCredentialVersion: number;
       openingOperatorId: string;
       responsibleOperatorId: string;
       operatorSessionId: string;
@@ -1029,6 +1042,8 @@ export class PosCashRepository {
     }>(
       `SELECT id::text,location_id::text AS "locationId",register_id::text AS "registerId",
               device_id::text AS "deviceId",device_credential_version AS "deviceCredentialVersion",
+              holding_device_id::text AS "holdingDeviceId",
+              holding_device_credential_version AS "holdingDeviceCredentialVersion",
               opening_operator_id::text AS "openingOperatorId",
               responsible_operator_id::text AS "responsibleOperatorId",
               operator_session_id::text AS "operatorSessionId",currency,
@@ -1038,7 +1053,7 @@ export class PosCashRepository {
        FROM merchant.cash_shift
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
          AND status='closing' AND version=$4
-         AND responsible_operator_id=$5::uuid AND device_id=$6::uuid
+         AND responsible_operator_id=$5::uuid AND holding_device_id=$6::uuid
          AND operator_session_id=$7::uuid
        FOR UPDATE`,
       [
@@ -1151,6 +1166,8 @@ export class PosCashRepository {
         registerId: current.registerId,
         deviceId: current.deviceId,
         deviceCredentialVersion: current.deviceCredentialVersion,
+        holdingDeviceId: current.holdingDeviceId,
+        holdingDeviceCredentialVersion: current.holdingDeviceCredentialVersion,
         openingOperatorId: current.openingOperatorId,
         responsibleOperatorId: current.responsibleOperatorId,
         operatorSessionId: current.operatorSessionId,
@@ -1278,20 +1295,54 @@ export class PosCashRepository {
           `SELECT id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                   register_id::text AS "registerId",device_id::text AS "deviceId",
                   device_credential_version AS "deviceCredentialVersion",
+                  holding_device_id::text AS "holdingDeviceId",
+                  holding_device_credential_version AS "holdingDeviceCredentialVersion",
                   opening_operator_id::text AS "openingOperatorId",
                   responsible_operator_id::text AS "responsibleOperatorId",
                   operator_session_id::text AS "operatorSessionId",currency,
                   business_date::text AS "businessDate",status,
                   opening_command_id::text AS "openingCommandId",
                   opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
-                  closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version
+                  closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version
            FROM merchant.cash_shift
            WHERE merchant_id=$1::uuid AND location_id=$2::uuid
-             AND device_id=$3::uuid AND status<>'closed'
+             AND holding_device_id=$3::uuid AND status<>'closed'
              AND responsible_operator_id=$4::uuid
            ORDER BY opened_at DESC LIMIT 1`,
           [merchantId, locationId, deviceId, operatorId],
         );
+        // NOTHING OF THIS OPERATOR'S ON THIS TERMINAL — but maybe on another one.
+        // A shift belongs to the operator and the register; the holding device is only
+        // whichever screen last spoke for it. When that device is gone (a browser that
+        // was cleared, a tablet that was replaced) the shift is still open and the
+        // drawer is still full, and the operator in front of us is the person who owns
+        // it. Offer to move it rather than leaving them staring at a register they
+        // cannot open and cannot close.
+        const adoptable = current.rows[0]
+          ? null
+          : await client.query<CashShift>(
+              `SELECT id::text,merchant_id::text AS "merchantId",
+                      location_id::text AS "locationId",
+                      register_id::text AS "registerId",device_id::text AS "deviceId",
+                      device_credential_version AS "deviceCredentialVersion",
+                      holding_device_id::text AS "holdingDeviceId",
+                      holding_device_credential_version AS "holdingDeviceCredentialVersion",
+                      opening_operator_id::text AS "openingOperatorId",
+                      responsible_operator_id::text AS "responsibleOperatorId",
+                      operator_session_id::text AS "operatorSessionId",currency,
+                      business_date::text AS "businessDate",status,
+                      opening_command_id::text AS "openingCommandId",
+                      opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
+                      closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version
+               FROM merchant.cash_shift
+               WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+                 AND responsible_operator_id=$3::uuid
+                 AND holding_device_id<>$4::uuid
+                 AND status NOT IN ('closed','blocked','recovered')
+               ORDER BY opened_at DESC LIMIT 1`,
+              [merchantId, locationId, operatorId, deviceId],
+            );
+        const adoptableShift = adoptable?.rows[0] ?? null;
         const mappedRegisters = registers.rows.map((row) => ({
           ...row,
           assignment: {
@@ -1308,7 +1359,7 @@ export class PosCashRepository {
                FROM merchant.cash_shift_close c
                JOIN merchant.cash_shift s ON s.id=c.shift_id
                WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
-                 AND s.device_id=$3::uuid AND s.responsible_operator_id=$4::uuid
+                 AND s.holding_device_id=$3::uuid AND s.responsible_operator_id=$4::uuid
                ORDER BY c.closed_at DESC LIMIT 1`,
               [merchantId, locationId, deviceId, operatorId],
             )
@@ -1404,7 +1455,7 @@ export class PosCashRepository {
           ? await client.query<StoredReconciliationHeader>(
               `SELECT id::text,shift_id::text AS "shiftId",
                       count_attempt_id::text AS "countAttemptId",outcome,
-                      ledger_sequence AS "ledgerSequence",
+                      ledger_sequence::int AS "ledgerSequence",
                       reconciled_at::text AS "reconciledAt"
                FROM merchant.cash_reconciliation
                WHERE shift_id=$1::uuid
@@ -1489,34 +1540,39 @@ export class PosCashRepository {
           latestCount,
           varianceResolution,
           reconciliation,
+          adoptableShift,
           recoveryState: !policyUsable
             ? 'policy_expired'
-            : shift
-              ? !sessionMatches
-                ? 'operator_mismatch'
-                : shift.status === 'open'
-                  ? 'none'
-                  : shift.status === 'suspended' || shift.status === 'handoff_pending'
-                    ? 'shift_suspended'
-                    : 'reconciliation_required'
-              : 'shift_required',
+            : adoptableShift
+              ? 'device_adoption_required'
+              : shift
+                ? !sessionMatches
+                  ? 'operator_mismatch'
+                  : shift.status === 'open'
+                    ? 'none'
+                    : shift.status === 'suspended' || shift.status === 'handoff_pending'
+                      ? 'shift_suspended'
+                      : 'reconciliation_required'
+                : 'shift_required',
           allowedActions: !policyUsable
             ? []
-            : shift
-              ? !sessionMatches
-                ? ['resume']
-                : shift.status === 'open'
-                  ? ['movement', 'suspend', 'handoff', 'count', 'no_sale']
-                  : shift.status === 'suspended' || shift.status === 'handoff_pending'
-                    ? ['resume', 'count']
-                    : handoffReady
-                      ? ['handoff', 'reconcile', 'count']
-                      : reconciliation
-                        ? ['close']
-                        : ['resolve_variance', 'reconcile', 'count']
-              : mappedRegisters.length
-                ? ['open_shift']
-                : [],
+            : adoptableShift
+              ? ['adopt_shift']
+              : shift
+                ? !sessionMatches
+                  ? ['resume']
+                  : shift.status === 'open'
+                    ? ['movement', 'suspend', 'handoff', 'count', 'no_sale']
+                    : shift.status === 'suspended' || shift.status === 'handoff_pending'
+                      ? ['resume', 'count']
+                      : handoffReady
+                        ? ['handoff', 'reconcile', 'count']
+                        : reconciliation
+                          ? ['close']
+                          : ['resolve_variance', 'reconcile', 'count']
+                : mappedRegisters.length
+                  ? ['open_shift']
+                  : [],
           summary: closeSummary,
         };
       },
@@ -1553,18 +1609,20 @@ export class PosCashRepository {
            operator_session_id=CASE WHEN $7='open' THEN $9::uuid ELSE operator_session_id END,
            suspended_at=CASE WHEN $7='suspended' THEN now() ELSE NULL END
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
          AND version=$6 AND status=ANY($8::text[])
        RETURNING id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                  register_id::text AS "registerId",device_id::text AS "deviceId",
                  device_credential_version AS "deviceCredentialVersion",
+                 holding_device_id::text AS "holdingDeviceId",
+                 holding_device_credential_version AS "holdingDeviceCredentialVersion",
                  opening_operator_id::text AS "openingOperatorId",
                  responsible_operator_id::text AS "responsibleOperatorId",
                  operator_session_id::text AS "operatorSessionId",currency,
                  business_date::text AS "businessDate",status,
                  opening_command_id::text AS "openingCommandId",
                  opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
-                 closed_at::text AS "closedAt",ledger_sequence AS "ledgerSequence",version`,
+                 closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version`,
       [
         dto.shiftId,
         merchantId,
@@ -1620,10 +1678,9 @@ export class PosCashRepository {
        JOIN runtime.operator_session acting ON acting.id=$4::uuid
          AND acting.merchant_id=s.merchant_id AND acting.location_id=$3::uuid
        JOIN merchant.device d ON d.id=acting.device_id AND d.status='active'
-       JOIN umi.role_permission rp ON rp.role_id=s.role_id
-       JOIN umi.permission p ON p.id=rp.permission_id AND p.key='cash.register.use'
        WHERE s.operator_pin_lookup=$1 AND s.merchant_id=$2::uuid
          AND (s.location_id IS NULL OR s.location_id=$3::uuid) AND s.status='active'
+         AND 'cash.register.use'=ANY(umi.resolve_staff_permissions(s.id))
          AND acting.user_id<>s.user_id AND acting.state='active'
        LIMIT 1`,
           [lookupHash, merchantId, locationId, actingOperatorSessionId],
@@ -1673,7 +1730,7 @@ export class PosCashRepository {
               ledger_sequence::text AS sequence,status
        FROM merchant.cash_shift
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND device_id=$5::uuid
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
          AND version=$6 AND status IN ('open','suspended','reconciliation_required')
        FOR UPDATE`,
       [
@@ -1774,7 +1831,7 @@ export class PosCashRepository {
       `SELECT register_id::text AS "registerId",currency
        FROM merchant.cash_shift
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND device_id=$5::uuid AND status='open'
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid AND status='open'
        FOR UPDATE`,
       [dto.shiftId, merchantId, dto.locationId, authorization.operatorId, authorization.deviceId],
     );
@@ -1835,6 +1892,439 @@ export class PosCashRepository {
       verifiedHardwareResult: false,
       requestedAt: rows[0].requestedAt,
       correlationId,
+    };
+  }
+
+  /**
+   * Move an open shift onto the terminal in front of the operator who owns it.
+   *
+   * Only the holder changes. The opening device, the float, the ledger and the
+   * responsible operator are all untouched, which is why this needs no approval and no
+   * count: the drawer has not been opened, only re-addressed. `cash_shift.device_id`
+   * stays put as well — it records who took responsibility at the start and
+   * `tg_closed_cash_shift_immutable` enforces that.
+   */
+  async adopt(
+    client: PoolClient,
+    merchantId: string,
+    authorization: CashAuthorization,
+    dto: AdoptCashShiftRequest,
+    correlationId: string,
+  ): Promise<AdoptCashShiftResult> {
+    const held = await client.query<{
+      registerId: string;
+      holdingDeviceId: string;
+      holdingDeviceCredentialVersion: number;
+      operatorSessionId: string;
+      responsibleOperatorId: string;
+      status: string;
+      currency: string;
+      ledgerSequence: string;
+    }>(
+      `SELECT register_id::text AS "registerId",
+              holding_device_id::text AS "holdingDeviceId",
+              holding_device_credential_version AS "holdingDeviceCredentialVersion",
+              operator_session_id::text AS "operatorSessionId",
+              responsible_operator_id::text AS "responsibleOperatorId",
+              status,currency,ledger_sequence::text AS "ledgerSequence"
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+         AND responsible_operator_id=$4::uuid AND version=$5
+         AND status NOT IN ('closed','blocked','recovered')
+       FOR UPDATE`,
+      [dto.shiftId, merchantId, dto.locationId, authorization.operatorId, dto.expectedShiftVersion],
+    );
+    const current = held.rows[0];
+    if (!current) throw new Error('SHIFT_NOT_ADOPTABLE');
+    if (
+      current.holdingDeviceId === authorization.deviceId &&
+      current.holdingDeviceCredentialVersion === authorization.credentialVersion
+    ) {
+      throw new Error('SHIFT_ALREADY_HELD');
+    }
+    const expected = await this.expectedCash(client, dto.shiftId);
+    const { rows } = await client.query<CashShift>(
+      `UPDATE merchant.cash_shift
+       SET holding_device_id=$6::uuid,holding_device_credential_version=$7,
+           operator_session_id=$8::uuid,version=version+1
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+         AND responsible_operator_id=$4::uuid AND version=$5
+       RETURNING id::text,merchant_id::text AS "merchantId",
+                 location_id::text AS "locationId",register_id::text AS "registerId",
+                 device_id::text AS "deviceId",
+                 device_credential_version AS "deviceCredentialVersion",
+                 holding_device_id::text AS "holdingDeviceId",
+                 holding_device_credential_version AS "holdingDeviceCredentialVersion",
+                 opening_operator_id::text AS "openingOperatorId",
+                 responsible_operator_id::text AS "responsibleOperatorId",
+                 operator_session_id::text AS "operatorSessionId",currency,
+                 business_date::text AS "businessDate",status,
+                 opening_command_id::text AS "openingCommandId",
+                 opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
+                 closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version`,
+      [
+        dto.shiftId,
+        merchantId,
+        dto.locationId,
+        authorization.operatorId,
+        dto.expectedShiftVersion,
+        authorization.deviceId,
+        authorization.credentialVersion,
+        authorization.operatorSessionId,
+      ],
+    );
+    const shift = rows[0];
+    if (!shift) throw new Error('SHIFT_NOT_ADOPTABLE');
+    const custody = await this.recordCustody(client, merchantId, {
+      locationId: dto.locationId,
+      registerId: current.registerId,
+      shiftId: dto.shiftId,
+      eventType: 'device_adoption',
+      previousHoldingDeviceId: current.holdingDeviceId,
+      previousHoldingCredentialVersion: current.holdingDeviceCredentialVersion,
+      previousOperatorSessionId: current.operatorSessionId,
+      newHoldingDeviceId: authorization.deviceId,
+      newHoldingCredentialVersion: authorization.credentialVersion,
+      newOperatorSessionId: authorization.operatorSessionId,
+      actingOperatorId: authorization.operatorId,
+      responsibleOperatorId: current.responsibleOperatorId,
+      shiftStatusBefore: current.status,
+      shiftStatusAfter: shift.status,
+      expectedCashMinorUnits: expected.expectedDrawerCash.minorUnits,
+      countedCashMinorUnits: null,
+      currency: current.currency,
+      reasonCode: dto.reasonCode,
+      note: null,
+      approvalId: null,
+      commandId: dto.commandId,
+      ledgerSequence: Number(current.ledgerSequence),
+    });
+    return {
+      shift,
+      register: await this.readRegister(client, merchantId, current.registerId),
+      custody,
+      correlationId,
+    };
+  }
+
+  /**
+   * Close out a shift whose operator is not coming back to close it themselves.
+   *
+   * The manager counts the drawer under their own name and the shift lands on
+   * `recovered`, never `closed`. That distinction is the whole point: a closed shift
+   * was reconciled by the cashier who was responsible for it, and a recovered one was
+   * counted by somebody else after the fact. A report that cannot tell those apart is
+   * not an audit trail.
+   *
+   * The ledger is left alone. Expected cash is reproduced from it and stays whatever
+   * the shift actually did; the difference against the manager's count is recorded on
+   * the custody row, where it reads as what it is — an unexplained variance somebody
+   * has to answer for — instead of being papered over with an invented movement.
+   */
+  async recover(
+    client: PoolClient,
+    merchantId: string,
+    authorization: CashAuthorization,
+    dto: RecoverCashShiftRequest,
+    correlationId: string,
+  ): Promise<RecoverCashShiftResult> {
+    const held = await client.query<{
+      registerId: string;
+      deviceId: string;
+      deviceCredentialVersion: number;
+      holdingDeviceId: string;
+      holdingDeviceCredentialVersion: number;
+      operatorSessionId: string;
+      openingOperatorId: string;
+      responsibleOperatorId: string;
+      status: string;
+      currency: string;
+      businessDate: string;
+      openingCommandId: string;
+      openingFloat: string;
+      openedAt: string;
+      ledgerSequence: string;
+      version: number;
+    }>(
+      `SELECT register_id::text AS "registerId",device_id::text AS "deviceId",
+              device_credential_version AS "deviceCredentialVersion",
+              holding_device_id::text AS "holdingDeviceId",
+              holding_device_credential_version AS "holdingDeviceCredentialVersion",
+              operator_session_id::text AS "operatorSessionId",
+              opening_operator_id::text AS "openingOperatorId",
+              responsible_operator_id::text AS "responsibleOperatorId",
+              status,currency,business_date::text AS "businessDate",
+              opening_command_id::text AS "openingCommandId",
+              opening_float_minor_units::text AS "openingFloat",
+              opened_at::text AS "openedAt",
+              ledger_sequence::text AS "ledgerSequence",version
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+         AND version=$4 AND status NOT IN ('closed','blocked','recovered')
+       FOR UPDATE`,
+      [dto.shiftId, merchantId, dto.locationId, dto.expectedShiftVersion],
+    );
+    const current = held.rows[0];
+    if (!current) throw new Error('SHIFT_NOT_RECOVERABLE');
+    if (current.currency !== dto.countedCash.currency) throw new Error('CURRENCY_MISMATCH');
+    // Recovery is for a shift its own operator cannot close. If that operator is the
+    // one asking, the ordinary count-and-close path is open to them and carries the
+    // reconciliation this one deliberately skips.
+    if (current.responsibleOperatorId === authorization.operatorId) {
+      throw new Error('SHIFT_NOT_ORPHANED');
+    }
+    const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
+    if (policy.version === 'default-deny') throw new Error('CASH_POLICY_DENIED');
+    const expected = await this.expectedCash(client, dto.shiftId);
+    const expectedFingerprint = createHash('sha256')
+      .update(
+        [
+          merchantId,
+          dto.locationId,
+          dto.shiftId,
+          dto.countedCash.minorUnits,
+          expected.expectedDrawerCash.minorUnits,
+          current.ledgerSequence,
+          'cash.shift.recover',
+        ].join(':'),
+      )
+      .digest('hex');
+    if (dto.approvalFingerprint !== expectedFingerprint) {
+      throw new Error('APPROVAL_FINGERPRINT_MISMATCH');
+    }
+    await this.consumeApproval(client, dto.approvalId, {
+      merchantId,
+      locationId: dto.locationId,
+      permission: 'cash.variance.approve',
+      fingerprint: dto.approvalFingerprint,
+      commandId: dto.commandId,
+    });
+    const { rows } = await client.query<CashShift>(
+      `UPDATE merchant.cash_shift
+       SET status='recovered',closed_at=now(),version=version+1
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid AND version=$4
+       RETURNING id::text,merchant_id::text AS "merchantId",
+                 location_id::text AS "locationId",register_id::text AS "registerId",
+                 device_id::text AS "deviceId",
+                 device_credential_version AS "deviceCredentialVersion",
+                 holding_device_id::text AS "holdingDeviceId",
+                 holding_device_credential_version AS "holdingDeviceCredentialVersion",
+                 opening_operator_id::text AS "openingOperatorId",
+                 responsible_operator_id::text AS "responsibleOperatorId",
+                 operator_session_id::text AS "operatorSessionId",currency,
+                 business_date::text AS "businessDate",status,
+                 opening_command_id::text AS "openingCommandId",
+                 opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
+                 closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version`,
+      [dto.shiftId, merchantId, dto.locationId, dto.expectedShiftVersion],
+    );
+    const shift = rows[0];
+    if (!shift) throw new Error('SHIFT_NOT_RECOVERABLE');
+    const custody = await this.recordCustody(client, merchantId, {
+      locationId: dto.locationId,
+      registerId: current.registerId,
+      shiftId: dto.shiftId,
+      eventType: 'manager_recovery',
+      previousHoldingDeviceId: current.holdingDeviceId,
+      previousHoldingCredentialVersion: current.holdingDeviceCredentialVersion,
+      previousOperatorSessionId: current.operatorSessionId,
+      newHoldingDeviceId: null,
+      newHoldingCredentialVersion: null,
+      newOperatorSessionId: null,
+      actingOperatorId: authorization.operatorId,
+      responsibleOperatorId: current.responsibleOperatorId,
+      shiftStatusBefore: current.status,
+      shiftStatusAfter: shift.status,
+      expectedCashMinorUnits: expected.expectedDrawerCash.minorUnits,
+      countedCashMinorUnits: dto.countedCash.minorUnits,
+      currency: current.currency,
+      reasonCode: dto.reasonCode,
+      note: dto.note,
+      approvalId: dto.approvalId,
+      commandId: dto.commandId,
+      ledgerSequence: Number(current.ledgerSequence),
+    });
+    // Hand the register back. Without this the drawer stays `in_use` for ever, which
+    // was the original trap.
+    const register = await client.query<{
+      displayName: string;
+      publicReference: string;
+      active: boolean;
+      assignmentPolicy: 'device_required' | 'operator_selects';
+      assignedDeviceId: string | null;
+      allowedDeviceClasses: string[];
+      createdAt: string;
+      version: number;
+    }>(
+      `UPDATE merchant.physical_register
+       SET status=CASE WHEN assigned_device_id IS NULL THEN 'available' ELSE 'assigned' END,
+           current_shift_id=NULL,version=version+1
+       WHERE id=$1::uuid
+       RETURNING display_name AS "displayName",public_reference AS "publicReference",active,
+                 assignment_policy AS "assignmentPolicy",
+                 assigned_device_id::text AS "assignedDeviceId",
+                 allowed_device_classes AS "allowedDeviceClasses",
+                 created_at::text AS "createdAt",version`,
+      [current.registerId],
+    );
+    const registerRow = register.rows[0];
+    const counted = { minorUnits: dto.countedCash.minorUnits, currency: current.currency };
+    return {
+      summary: {
+        shift,
+        register: {
+          id: current.registerId,
+          merchantId,
+          locationId: dto.locationId,
+          displayName: registerRow.displayName,
+          publicReference: registerRow.publicReference,
+          currency: current.currency,
+          active: registerRow.active,
+          assignmentPolicy: registerRow.assignmentPolicy,
+          assignment: {
+            deviceId: registerRow.assignedDeviceId,
+            allowedDeviceClasses: registerRow.allowedDeviceClasses,
+            assignedAt: null,
+          },
+          currentShiftId: null,
+          status: registerRow.assignedDeviceId ? 'assigned' : 'available',
+          version: registerRow.version,
+          createdAt: registerRow.createdAt,
+          archivedAt: null,
+        },
+        openingFloat: { minorUnits: Number(current.openingFloat), currency: current.currency },
+        expectedCash: expected,
+        countedCash: counted,
+        variance: {
+          minorUnits: counted.minorUnits - expected.expectedDrawerCash.minorUnits,
+          currency: current.currency,
+        },
+        varianceReason: null,
+        reconciliationOutcome: null,
+        countAttempts: 0,
+        handoffCount: 0,
+      },
+      custody,
+      recoveredAt: shift.closedAt ?? new Date().toISOString(),
+      correlationId,
+    };
+  }
+
+  private async readRegister(
+    client: PoolClient,
+    merchantId: string,
+    registerId: string,
+  ): Promise<PhysicalRegister> {
+    const { rows } = await client.query<PhysicalRegisterRow>(
+      `SELECT id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
+              display_name AS "displayName",public_reference AS "publicReference",
+              currency,active,assignment_policy AS "assignmentPolicy",
+              assigned_device_id::text AS "assignedDeviceId",
+              allowed_device_classes AS "allowedDeviceClasses",
+              current_shift_id::text AS "currentShiftId",status,version,
+              created_at::text AS "createdAt",archived_at::text AS "archivedAt"
+       FROM merchant.physical_register WHERE id=$1::uuid AND merchant_id=$2::uuid`,
+      [registerId, merchantId],
+    );
+    const row = rows[0];
+    if (!row) throw new Error('REGISTER_NOT_FOUND');
+    const { assignedDeviceId, allowedDeviceClasses, ...rest } = row;
+    return {
+      ...rest,
+      assignment: { deviceId: assignedDeviceId, allowedDeviceClasses, assignedAt: null },
+    };
+  }
+
+  private async recordCustody(
+    client: PoolClient,
+    merchantId: string,
+    input: {
+      locationId: string;
+      registerId: string;
+      shiftId: string;
+      eventType: CashShiftCustodyEvent['eventType'];
+      previousHoldingDeviceId: string;
+      previousHoldingCredentialVersion: number;
+      previousOperatorSessionId: string;
+      newHoldingDeviceId: string | null;
+      newHoldingCredentialVersion: number | null;
+      newOperatorSessionId: string | null;
+      actingOperatorId: string;
+      responsibleOperatorId: string;
+      shiftStatusBefore: string;
+      shiftStatusAfter: string;
+      expectedCashMinorUnits: number | null;
+      countedCashMinorUnits: number | null;
+      currency: string;
+      reasonCode: string;
+      note: string | null;
+      approvalId: string | null;
+      commandId: string;
+      ledgerSequence: number;
+    },
+  ): Promise<CashShiftCustodyEvent> {
+    const { rows } = await client.query<{ id: string; occurredAt: string }>(
+      `INSERT INTO merchant.cash_shift_custody_event
+         (merchant_id,location_id,register_id,shift_id,event_type,
+          previous_holding_device_id,previous_holding_credential_version,
+          previous_operator_session_id,new_holding_device_id,new_holding_credential_version,
+          new_operator_session_id,acting_operator_id,responsible_operator_id,
+          shift_status_before,shift_status_after,expected_cash_minor_units,
+          counted_cash_minor_units,currency,reason_code,note,approval_id,command_id,
+          ledger_sequence)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::uuid,$7,$8::uuid,$9::uuid,$10,
+               $11::uuid,$12::uuid,$13::uuid,$14,$15,$16,$17,$18,$19,$20,$21::uuid,$22::uuid,$23)
+       RETURNING id::text,occurred_at::text AS "occurredAt"`,
+      [
+        merchantId,
+        input.locationId,
+        input.registerId,
+        input.shiftId,
+        input.eventType,
+        input.previousHoldingDeviceId,
+        input.previousHoldingCredentialVersion,
+        input.previousOperatorSessionId,
+        input.newHoldingDeviceId,
+        input.newHoldingCredentialVersion,
+        input.newOperatorSessionId,
+        input.actingOperatorId,
+        input.responsibleOperatorId,
+        input.shiftStatusBefore,
+        input.shiftStatusAfter,
+        input.expectedCashMinorUnits,
+        input.countedCashMinorUnits,
+        input.currency,
+        input.reasonCode,
+        input.note,
+        input.approvalId,
+        input.commandId,
+        input.ledgerSequence,
+      ],
+    );
+    const money = (minorUnits: number | null) =>
+      minorUnits === null ? null : { minorUnits, currency: input.currency };
+    const expected = money(input.expectedCashMinorUnits);
+    const counted = money(input.countedCashMinorUnits);
+    return {
+      id: rows[0].id,
+      shiftId: input.shiftId,
+      registerId: input.registerId,
+      eventType: input.eventType,
+      previousHoldingDeviceId: input.previousHoldingDeviceId,
+      newHoldingDeviceId: input.newHoldingDeviceId,
+      actingOperatorId: input.actingOperatorId,
+      responsibleOperatorId: input.responsibleOperatorId,
+      shiftStatusBefore: input.shiftStatusBefore as CashShiftCustodyEvent['shiftStatusBefore'],
+      shiftStatusAfter: input.shiftStatusAfter as CashShiftCustodyEvent['shiftStatusAfter'],
+      expectedCash: expected,
+      countedCash: counted,
+      variance:
+        expected && counted
+          ? { minorUnits: counted.minorUnits - expected.minorUnits, currency: input.currency }
+          : null,
+      reasonCode: input.reasonCode,
+      note: input.note,
+      occurredAt: rows[0].occurredAt,
     };
   }
 

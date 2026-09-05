@@ -1,6 +1,15 @@
-import React, { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { I } from '@/icons.jsx';
 import { RegionHead, XSep } from '@/shell.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
+import { REALTIME_STATE, useDevicesRealtime } from '@/lib/device-realtime.js';
+import {
+  locationName,
+  mobilityLabel,
+  platformLabel,
+  posDeviceCard,
+  visiblePosEnrollmentRequests,
+} from './device-utils.js';
 import {
   approvePosEnrollmentRequest,
   approveDevicePairing,
@@ -10,8 +19,11 @@ import {
   denyDevicePairing,
   denyPosEnrollmentRequest,
   generateDevicePairingPin,
+  getPosDevices,
   getPosEnrollmentRequests,
   revokeDevice,
+  revokePosDevice,
+  updatePosDevice,
   updateDevice,
   updateKdsStation,
   useDevicePairings,
@@ -44,33 +56,43 @@ function deriveStatus(lastUsedAt) {
   return 'offline';
 }
 
-const POLL_INTERVAL = 8; // seconds — heartbeat is every 5 s, catch a miss quickly
+const POLL_INTERVAL = 10; // seconds — REST fallback and offline detection. The socket
+// wakes the screen for live transitions so this poll is the safety net, not the
+// primary freshness source.
 
 const DevicesScreen = () => {
   const [refresh, setRefresh] = useState(0);
   const [stationOpen, setStationOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [posAddOpen, setPosAddOpen] = useState(false);
   const [editDevice, setEditDevice] = useState(null);
-  const [countdown, setCountdown] = useState(POLL_INTERVAL);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [editPosDevice, setEditPosDevice] = useState(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [posRequests, setPosRequests] = useState([]);
   const [posRequestError, setPosRequestError] = useState(null);
+  const [posDevices, setPosDevices] = useState([]);
+  const { capabilities, isProductActive, selectedMerchantId, selectedLocationId, setSelectedLocationId } =
+    useMerchant();
+  const locations = (capabilities?.locations || []).filter(
+    (location) => location.status === 'active',
+  );
+  const effectiveLocationId =
+    selectedLocationId || capabilities?.selectedLocation?.id || locations[0]?.id || '';
+  const kdsProductEnabled = isProductActive('kds');
+  const posProductEnabled = isProductActive('pos');
+  const deviceProducts = {
+    kds: kdsProductEnabled,
+    pos: posProductEnabled,
+  };
 
   // Auto-poll local heartbeat data so offline/online transitions are picked up.
   useEffect(function () {
-    setCountdown(POLL_INTERVAL);
     const pollId = setInterval(function () {
       setRefresh(function (r) {
         return r + 1;
       });
-      setCountdown(POLL_INTERVAL);
     }, POLL_INTERVAL * 1000);
     const tickId = setInterval(function () {
       setCurrentTime(Date.now());
-      setCountdown(function (c) {
-        return c <= 1 ? POLL_INTERVAL : c - 1;
-      });
     }, 1000);
     return function () {
       clearInterval(pollId);
@@ -78,18 +100,46 @@ const DevicesScreen = () => {
     };
   }, []);
 
-  const { data: rawDevices, loading } = useDevicesData(refresh);
+  const { data: rawDevices, loaded } = useDevicesData(refresh);
+  // `loading` is true on EVERY background poll (8-s), not only on the first load, so the
+  // header note and per-card labels would flash "Actualizando… / Reconectando…" each poll.
+  // `_useAsync` exposes `loaded` — true only after the first successful load — so those
+  // transient labels stay stable on a background refresh instead of re-flipping.
   const { data: stations } = useKdsStations(refresh);
   const { data: pairings } = useDevicePairings(refresh);
+  // Live channel for connection-status transitions. The socket only wakes the
+  // screen (the payload re-reads over REST); when it is down the screen falls
+  // back to the 10 s poll below, and the failure is logged loudly in the hook.
+  const realtimeState = useDevicesRealtime({
+    merchantId: selectedMerchantId,
+    enabled: kdsProductEnabled,
+    onChanged: () => setRefresh((r) => r + 1),
+  });
+  const realtimeChip =
+    realtimeState === REALTIME_STATE.LIVE
+      ? { text: 'En vivo', cls: 'live' }
+      : realtimeState === REALTIME_STATE.CONNECTING
+        ? { text: 'Conectando…', cls: 'connecting' }
+        : { text: 'Sondeo 10 s', cls: 'polling' };
   useEffect(
     function () {
+      if (!posProductEnabled) {
+        return undefined;
+      }
       let active = true;
-      getPosEnrollmentRequests()
-        .then(function (result) {
-          if (active) {
-            setPosRequests(result.requests || []);
-            setPosRequestError(null);
-          }
+      // The requests and the devices are one picture — a request disappears exactly as
+      // its device appears — so they are read together and fail together. Two effects
+      // would let the grid show a terminal while the card above still offered to
+      // approve it.
+      Promise.all([
+        getPosEnrollmentRequests(effectiveLocationId),
+        getPosDevices(effectiveLocationId),
+      ])
+        .then(function ([requestResult, deviceResult]) {
+          if (!active) return;
+          setPosRequests(requestResult.requests || []);
+          setPosDevices(deviceResult.devices || []);
+          setPosRequestError(null);
         })
         .catch(function (error) {
           if (active) setPosRequestError(error.message);
@@ -98,7 +148,7 @@ const DevicesScreen = () => {
         active = false;
       };
     },
-    [refresh],
+    [effectiveLocationId, refresh, posProductEnabled],
   );
   const devices = (rawDevices || []).map(function (d) {
     // Heartbeat (local, 5-s cadence) is the authoritative connection signal.
@@ -111,6 +161,8 @@ const DevicesScreen = () => {
       name: d.device_name,
       station: d.station_name || d.station_id,
       stationId: d.station_id,
+      locationId: d.location_id || null,
+      locationName: d.location_name || locationName(locations, d.location_id),
       status: connectionStatus,
       hasHeartbeat: !!hbStatus,
       open: d.open || 0,
@@ -122,23 +174,41 @@ const DevicesScreen = () => {
     };
   });
 
+  const posCards = (posDevices || []).map(function (device) {
+    return posDeviceCard(device, locations, currentTime);
+  });
+
   const liveCount = devices.filter(function (d) {
     return d.status === 'live';
   }).length;
+  const totalDevices = devices.length + posCards.length;
+  const headNote = posCards.length
+    ? `${liveCount} KDS en vivo · ${posCards.length} ${posCards.length === 1 ? 'caja' : 'cajas'} UmiPOS`
+    : `${liveCount} en vivo ahora mismo.`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
         title="Dispositivos pareados"
-        note={loading ? 'Actualizando…' : `${liveCount} en vivo ahora mismo.`}
-        count={{ value: devices.length, label: 'dispositivos' }}
+        note={loaded ? headNote : 'Actualizando…'}
+        count={{ value: totalDevices, label: 'dispositivos' }}
         actions={
           <>
+            <span
+              className={'chip ' + realtimeChip.cls}
+              style={{ fontSize: 10.5, height: 22, alignSelf: 'center' }}
+              title={
+                realtimeState === REALTIME_STATE.LIVE
+                  ? 'Actualización en vivo por el canal en tiempo real.'
+                  : 'El canal en tiempo real no responde; la lista se actualiza cada 10 s.'
+              }
+            >
+              {realtimeChip.text}
+            </span>
             <button
               className="btn btn-ghost btn-sm focusable"
               onClick={() => {
                 setRefresh((r) => r + 1);
-                setCountdown(POLL_INTERVAL);
               }}
             >
               <I.Refresh size={14} /> Actualizar
@@ -148,9 +218,6 @@ const DevicesScreen = () => {
             </button>
             <button className="btn btn-primary focusable" onClick={() => setAddOpen(true)}>
               <I.Plus size={16} /> Añadir dispositivo
-            </button>
-            <button className="btn btn-primary focusable" onClick={() => setPosAddOpen(true)}>
-              <I.Tablet size={16} /> Registrar UmiPOS
             </button>
           </>
         }
@@ -208,7 +275,7 @@ const DevicesScreen = () => {
                       alignItems: 'center',
                       gap: 8,
                       marginBottom: 3,
-                      flexWrap: 'nowrap',
+                      flexWrap: 'wrap',
                     }}
                   >
                     <span
@@ -235,6 +302,9 @@ const DevicesScreen = () => {
                     >
                       {d.station || 'SIN ASIGNAR'}
                     </span>
+                    <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
+                      {d.locationName}
+                    </span>
                   </div>
                   <div
                     style={{
@@ -255,7 +325,7 @@ const DevicesScreen = () => {
                       }}
                     >
                       <span className={'s-dot ' + d.status} />
-                      {loading && d.status !== 'live' ? (
+                      {!loaded && d.status !== 'live' ? (
                         <span style={{ color: 'var(--warning)', fontStyle: 'italic' }}>
                           Reconectando…
                         </span>
@@ -271,9 +341,6 @@ const DevicesScreen = () => {
                       ·
                     </span>
                     <span style={{ whiteSpace: 'nowrap' }}>Visto {d.last}</span>
-                    {d.status === 'offline' && !loading && (
-                      <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>· en {countdown}s</span>
-                    )}
                   </div>
                 </div>
 
@@ -308,46 +375,31 @@ const DevicesScreen = () => {
             </div>
           );
         })}
+        {posCards.map(function (d) {
+          return <PosDeviceCard key={d.id} device={d} onEdit={() => setEditPosDevice(d)} />;
+        })}
       </div>
 
       {(pairings || []).length > 0 && (
         <PairingRequestsCard
           pairings={pairings}
-          stations={stations || []}
+          stations={(stations || []).filter(
+            (station) => station.location_id === effectiveLocationId,
+          )}
           currentTime={currentTime}
           onChanged={() => setRefresh((r) => r + 1)}
         />
       )}
 
-      <PosEnrollmentRequestsCard
-        requests={posRequests}
-        error={posRequestError}
-        currentTime={currentTime}
-        onChanged={() => setRefresh((r) => r + 1)}
-      />
-
-      {/* Connection legend */}
-      <div
-        className="card"
-        style={{
-          padding: '18px 22px',
-          display: 'flex',
-          gap: 24,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div className="eyebrow">Estados</div>
-        <span className="legend">
-          <span className="s-dot live" /> En vivo · responde en menos de 10 s
-        </span>
-        <span className="legend">
-          <span className="s-dot slow" /> Lento · responde entre 10 y 20 s
-        </span>
-        <span className="legend">
-          <span className="s-dot offline" /> Sin conexión · sin señal por más de 20 s
-        </span>
-      </div>
+      {posProductEnabled && (
+        <PosEnrollmentRequestsCard
+          requests={posRequests}
+          error={posRequestError}
+          locations={locations}
+          branchId={effectiveLocationId}
+          onChanged={() => setRefresh((r) => r + 1)}
+        />
+      )}
 
       {stationOpen && (
         <StationPanel
@@ -360,21 +412,34 @@ const DevicesScreen = () => {
       {addOpen && (
         <AddDevicePanel
           onClose={() => setAddOpen(false)}
-          stations={stations || []}
+          stations={(stations || []).filter(
+            (station) => station.location_id === effectiveLocationId,
+          )}
           pairings={pairings || []}
+          products={deviceProducts}
+          locations={locations}
+          branchId={effectiveLocationId}
+          onBranchChange={setSelectedLocationId}
           onProvisioned={() => setRefresh((r) => r + 1)}
         />
       )}
-      {posAddOpen && (
-        <AddPosDevicePanel
-          onClose={() => setPosAddOpen(false)}
-          onCreated={() => setRefresh((r) => r + 1)}
+      {editPosDevice && (
+        <EditPosDevicePanel
+          device={editPosDevice}
+          branchId={effectiveLocationId}
+          onClose={() => setEditPosDevice(null)}
+          onSaved={() => {
+            setEditPosDevice(null);
+            setRefresh((r) => r + 1);
+          }}
         />
       )}
       {editDevice && (
         <EditDevicePanel
           device={editDevice}
-          stations={stations || []}
+          stations={(stations || []).filter(
+            (station) => !editDevice.locationId || station.location_id === editDevice.locationId,
+          )}
           onClose={() => setEditDevice(null)}
           onSaved={() => {
             setEditDevice(null);
@@ -383,6 +448,416 @@ const DevicesScreen = () => {
         />
       )}
     </div>
+  );
+};
+
+const POS_STATUS_LABELS = {
+  registered: 'Registrado',
+  rotation: 'Rotación pendiente',
+};
+
+/**
+ * The POS half of the device grid. It shares the KDS card's frame on purpose — one grid,
+ * one shape — and differs only where the two devices differ: a register carries a
+ * platform and a floor-use label where an iPad carries a station, and it reports no
+ * order count because it never had one to report.
+ */
+export const PosDeviceCard = ({ device, onEdit }) => (
+  <div
+    className={'list-card ' + device.status}
+    style={{ padding: 0, paddingRight: 16, cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+    onClick={onEdit}
+    onMouseEnter={(e) => (e.currentTarget.style.boxShadow = 'var(--shadow-pop)')}
+    onMouseLeave={(e) => (e.currentTarget.style.boxShadow = '')}
+  >
+    <div className="l-strip" />
+    <div
+      style={{
+        paddingTop: 14,
+        paddingBottom: 14,
+        flex: 1,
+        display: 'flex',
+        gap: 14,
+        alignItems: 'center',
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          background: 'var(--canvas-2)',
+          color: 'var(--umi-navy)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <I.Monitor size={18} />
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 3,
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              color: 'var(--ink-1)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {device.name}
+          </span>
+          <span
+            className="chip"
+            style={{
+              fontSize: 10,
+              height: 20,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              flexShrink: 0,
+            }}
+          >
+            {device.platformLabel.toUpperCase()}
+          </span>
+          <span
+            className="chip"
+            style={{
+              fontSize: 10,
+              height: 20,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              flexShrink: 0,
+            }}
+          >
+            {device.mobilityLabel.toUpperCase()}
+          </span>
+          <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
+            {device.locationName}
+          </span>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: 'var(--ink-3)',
+            flexWrap: 'nowrap',
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <span className={'s-dot ' + device.status} />
+            {POS_STATUS_LABELS[device.status] || device.status}
+          </span>
+          <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
+            ·
+          </span>
+          <span style={{ whiteSpace: 'nowrap' }}>Visto {device.last}</span>
+        </div>
+      </div>
+
+      <button
+        className="btn-icon focusable"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+        aria-label="Editar caja"
+      >
+        <I.Edit size={15} />
+      </button>
+    </div>
+  </div>
+);
+
+/**
+ * The POS detail sheet. It is a sibling of `EditDevicePanel`, not a branch inside it:
+ * that panel edits a station assignment and reads an open-order count, and a register
+ * has neither. Sharing it was what made the edit button open a blank sheet.
+ */
+export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
+  const uid = useId();
+  const [name, setName] = useState(device.name);
+  const [mobility, setMobility] = useState(device.mobility || 'static');
+  const [reveal, setReveal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await updatePosDevice(device.id, { displayName: name.trim(), mobility }, branchId);
+      onSaved && onSaved();
+    } catch (failure) {
+      console.error('[umipos] device update failed', failure);
+      setError('No se pudieron guardar los cambios. Intenta de nuevo.');
+      setSaving(false);
+    }
+  }
+
+  async function remove() {
+    setRemoving(true);
+    setError(null);
+    try {
+      await revokePosDevice(device.id, 'removed_from_dashboard');
+      onSaved && onSaved();
+    } catch (failure) {
+      console.error('[umipos] device revoke failed', failure);
+      setError('No se pudo revocar la caja. Intenta de nuevo.');
+      setRemoving(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="sheet-backdrop" onClick={onClose} />
+      <aside className="sheet">
+        <div className="sheet-head">
+          <div>
+            <div className="eyebrow">UmiPOS · Dispositivo</div>
+            <h2 className="h-section" style={{ marginTop: 4 }}>
+              Gestionar caja
+            </h2>
+          </div>
+          <button className="btn-icon" onClick={onClose} aria-label="Cerrar">
+            <I.X size={16} />
+          </button>
+        </div>
+        <div className="sheet-body">
+          <div
+            className="card"
+            style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: 'var(--canvas-2)',
+                color: 'var(--umi-navy)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <I.Monitor size={18} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span className={'s-dot ' + device.status} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {POS_STATUS_LABELS[device.status] || device.status}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Visto {device.last}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="eyebrow" style={{ fontSize: 9, marginBottom: 3 }}>
+                CREDENCIAL
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 22,
+                  fontWeight: 600,
+                  lineHeight: 1,
+                  color: 'var(--ink-1)',
+                }}
+              >
+                v{device.credentialVersion}
+              </div>
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor={`${uid}-pos-device-name`}>Nombre del dispositivo</label>
+            <input
+              id={`${uid}-pos-device-name`}
+              className="input tall"
+              maxLength={120}
+              placeholder="Caja principal"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor={`${uid}-pos-device-mobility`}>Modalidad</label>
+            <select
+              id={`${uid}-pos-device-mobility`}
+              className="select"
+              style={{ height: 52, borderRadius: 14 }}
+              value={mobility}
+              onChange={(e) => setMobility(e.target.value)}
+            >
+              <option value="static">{mobilityLabel('static')}</option>
+              <option value="mobile">{mobilityLabel('mobile')}</option>
+            </select>
+            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva a la
+              mesa.
+            </span>
+          </div>
+
+          <div className="field">
+            <span className="field-label">Plataforma</span>
+            <div className="input tall" style={{ display: 'flex', alignItems: 'center' }}>
+              {platformLabel(device.platform)}
+            </div>
+          </div>
+
+          <div className="field">
+            <span className="field-label">Sucursal</span>
+            <div className="input tall" style={{ display: 'flex', alignItems: 'center' }}>
+              {device.locationName}
+            </div>
+            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              Para cambiar la sucursal, registra el dispositivo otra vez.
+            </span>
+          </div>
+
+          <div className="field">
+            <span className="field-label">ID público</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span
+                className="pin-box"
+                style={{
+                  flex: 1,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10.5,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {reveal ? device.publicId : '••••••••-••••-••••-••••-••••••••••••'}
+              </span>
+              <button
+                className="pin-reveal focusable"
+                onClick={() => setReveal((r) => !r)}
+                aria-label={reveal ? 'Ocultar' : 'Mostrar'}
+              >
+                {reveal ? <I.EyeOff size={15} /> : <I.Eye size={15} />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div
+              style={{
+                fontSize: 12.5,
+                color: 'var(--danger)',
+                background: 'var(--danger-soft)',
+                borderRadius: 10,
+                padding: '9px 12px',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 16, marginTop: 4 }}>
+            <button
+              className="btn btn-ghost btn-sm focusable"
+              style={{ color: 'var(--danger)' }}
+              disabled={removing}
+              onClick={() => setConfirmingRevoke(true)}
+            >
+              <I.Trash size={14} /> {removing ? 'Revocando…' : 'Revocar caja'}
+            </button>
+          </div>
+        </div>
+        <div className="sheet-foot">
+          <button className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            className="btn btn-primary focusable"
+            disabled={!name.trim() || saving}
+            style={{ opacity: name.trim() && !saving ? 1 : 0.5 }}
+            onClick={save}
+          >
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
+      </aside>
+      {confirmingRevoke && (
+        <div className="modal-backdrop" onClick={() => !removing && setConfirmingRevoke(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
+              <div>
+                <div className="eyebrow">UmiPOS · Acceso</div>
+                <h2 className="h-section" style={{ marginTop: 4 }}>
+                  Revocar caja
+                </h2>
+              </div>
+              <button
+                className="btn-icon"
+                disabled={removing}
+                onClick={() => setConfirmingRevoke(false)}
+                aria-label="Cerrar"
+              >
+                <I.X size={16} />
+              </button>
+            </div>
+            <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
+              Esta caja pierde su credencial de inmediato. Para volver a usarla, crea un código de
+              registro nuevo y regístrala otra vez.
+            </p>
+            {error && (
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--danger)',
+                  background: 'var(--danger-soft)',
+                  borderRadius: 10,
+                  padding: '9px 12px',
+                  marginTop: 14,
+                }}
+              >
+                {error}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
+              <button
+                className="btn btn-ghost"
+                disabled={removing}
+                onClick={() => setConfirmingRevoke(false)}
+              >
+                Cancelar
+              </button>
+              <button className="btn btn-primary focusable" disabled={removing} onClick={remove}>
+                {removing ? 'Revocando…' : 'Revocar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -680,6 +1155,16 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
           </div>
 
           <div className="field">
+            <span className="field-label">Sucursal</span>
+            <div className="input tall" style={{ display: 'flex', alignItems: 'center' }}>
+              {device.locationName}
+            </div>
+            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              Para cambiar la sucursal, registra el dispositivo otra vez.
+            </span>
+          </div>
+
+          <div className="field">
             <span className="field-label">ID de sesión</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
@@ -745,10 +1230,16 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
         </div>
       </aside>
       {confirmingRevoke && (
-        <>
-          <div className="sheet-backdrop" onClick={() => !removing && setConfirmingRevoke(false)} />
-          <aside className="sheet" style={{ maxWidth: 420 }}>
-            <div className="sheet-head">
+        <div className="modal-backdrop" onClick={() => !removing && setConfirmingRevoke(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
               <div>
                 <div className="eyebrow">KDS · Acceso</div>
                 <h2 className="h-section" style={{ marginTop: 4 }}>
@@ -764,25 +1255,24 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
                 <I.X size={16} />
               </button>
             </div>
-            <div className="sheet-body">
-              <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
-                Este iPad se cerrará y tendrá que parearse de nuevo con un PIN.
-              </p>
-              {error && (
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    color: 'var(--danger)',
-                    background: 'var(--danger-soft)',
-                    borderRadius: 10,
-                    padding: '9px 12px',
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-            </div>
-            <div className="sheet-foot">
+            <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
+              Este iPad se cerrará y tendrá que parearse de nuevo con un PIN.
+            </p>
+            {error && (
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--danger)',
+                  background: 'var(--danger-soft)',
+                  borderRadius: 10,
+                  padding: '9px 12px',
+                  marginTop: 14,
+                }}
+              >
+                {error}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
               <button
                 className="btn btn-ghost"
                 disabled={removing}
@@ -794,8 +1284,8 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
                 {removing ? 'Revocando…' : 'Revocar'}
               </button>
             </div>
-          </aside>
-        </>
+          </div>
+        </div>
       )}
     </>
   );
@@ -831,6 +1321,8 @@ const StationRow = ({ station, count, onChanged, onError }) => {
 
   useEffect(
     function () {
+      // The row can receive a newer station name while its edit panel stays open.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(station.name);
     },
     [station.name],
@@ -1038,13 +1530,42 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
   );
 };
 
-const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
+const AddDevicePanel = ({
+  onClose,
+  stations,
+  pairings,
+  products,
+  locations,
+  branchId,
+  onBranchChange,
+  onProvisioned,
+}) => {
   const uid = useId();
+  const purchaseMessageId = `${uid}-purchase-message`;
+  const kdsEnabled = products?.kds === true;
+  const posEnabled = products?.pos === true;
+  const [deviceProduct, setDeviceProduct] = useState(kdsEnabled ? 'kds' : posEnabled ? 'pos' : '');
   const [name, setName] = useState('');
   const [station, setStation] = useState('');
   const [pairing, setPairing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [posName, setPosName] = useState('');
+  const [posPlatform, setPosPlatform] = useState('web');
+  const [posMobility, setPosMobility] = useState('static');
+  const [posCreated, setPosCreated] = useState(null);
+  const [posSaving, setPosSaving] = useState(false);
+  const [posError, setPosError] = useState(null);
+  const activeDeviceProduct =
+    deviceProduct === 'kds' && kdsEnabled
+      ? 'kds'
+      : deviceProduct === 'pos' && posEnabled
+        ? 'pos'
+        : kdsEnabled
+          ? 'kds'
+          : posEnabled
+            ? 'pos'
+            : '';
 
   const hasStations = (stations || []).length > 0;
   const {
@@ -1057,12 +1578,7 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
     onProvisioned && onProvisioned();
   });
 
-  React.useEffect(
-    function () {
-      if (!station && stations && stations[0]) setStation(stations[0].id);
-    },
-    [stations, station],
-  );
+  const selectedStationId = station || stations?.[0]?.id || '';
 
   function addStation() {
     return createStationInline(setError);
@@ -1072,7 +1588,10 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
     setSaving(true);
     setError(null);
     try {
-      const result = await generateDevicePairingPin({ device_name: name, station_id: station });
+      const result = await generateDevicePairingPin({
+        device_name: name,
+        station_id: selectedStationId,
+      });
       setPairing(result.pairing);
       onProvisioned && onProvisioned();
     } catch (err) {
@@ -1082,8 +1601,30 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
     }
   }
 
+  async function createPosRequest() {
+    setPosSaving(true);
+    setPosError(null);
+    try {
+      const result = await createPosEnrollmentRequest({
+        locationId: branchId || null,
+        displayName: posName.trim(),
+        type: 'pos_terminal',
+        platform: posPlatform,
+        mobility: posMobility,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      setPosCreated(result);
+      onProvisioned && onProvisioned();
+    } catch (failure) {
+      console.error('[umipos] enrollment request failed', failure);
+      setPosError('No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.');
+    } finally {
+      setPosSaving(false);
+    }
+  }
+
   const selectedStation = (stations || []).find(function (s) {
-    return s.id === station;
+    return s.id === selectedStationId;
   });
   const activePairings = (pairings || []).filter(function (p) {
     return p.status === 'pending' || p.status === 'approved';
@@ -1095,9 +1636,9 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
       <aside className="sheet">
         <div className="sheet-head">
           <div>
-            <div className="eyebrow">KDS</div>
+            <div className="eyebrow">Dispositivos</div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              Vincular un iPad nuevo
+              Añadir dispositivo
             </h2>
           </div>
           <button className="btn-icon" onClick={onClose} aria-label="Close">
@@ -1106,164 +1647,341 @@ const AddDevicePanel = ({ onClose, stations, pairings, onProvisioned }) => {
         </div>
         <div className="sheet-body">
           <div className="field">
-            <label htmlFor={`${uid}-device-name`}>Nombre del dispositivo</label>
-            <input
-              id={`${uid}-device-name`}
-              className="input tall"
-              placeholder="e.g. Cocina Caliente 2"
-              value={name}
-              onChange={function (e) {
-                setName(e.target.value);
-              }}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={`${uid}-assign-to-station`}>Estación asignada</label>
-            {hasStations ? (
-              <select
-                id={`${uid}-assign-to-station`}
-                className="select"
-                style={{ height: 52, borderRadius: 14 }}
-                value={station}
-                onChange={function (e) {
-                  setStation(e.target.value);
-                }}
-              >
-                {(stations || []).map(function (s) {
-                  return (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  );
-                })}
-              </select>
-            ) : (
-              <>
-                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
-                  No hay estaciones todavía. Crea una para asignar este dispositivo.
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    className="input"
-                    placeholder="Nombre de la estación"
-                    value={newStationName}
-                    onChange={function (e) {
-                      setNewStationName(e.target.value);
-                    }}
-                    onKeyDown={function (e) {
-                      if (e.key === 'Enter') addStation();
-                    }}
-                  />
-                  <button
-                    className="btn btn-secondary focusable"
-                    onClick={addStation}
-                    disabled={creatingStation || !newStationName.trim()}
-                    style={{ whiteSpace: 'nowrap' }}
-                  >
-                    <I.Plus size={16} /> {creatingStation ? 'Creando…' : 'Crear estación'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          {error && (
-            <div
-              style={{
-                fontSize: 12.5,
-                color: 'var(--danger)',
-                background: 'var(--danger-soft)',
-                borderRadius: 10,
-                padding: '10px 12px',
+            <label htmlFor={`${uid}-device-location`}>Sucursal</label>
+            <select
+              id={`${uid}-device-location`}
+              className="select"
+              style={{ height: 52, borderRadius: 14 }}
+              value={branchId || ''}
+              disabled={Boolean(pairing || posCreated)}
+              onChange={(event) => {
+                setStation('');
+                setPairing(null);
+                setPosCreated(null);
+                setError(null);
+                setPosError(null);
+                onBranchChange?.(event.target.value);
               }}
             >
-              {error}
-            </div>
-          )}
-          {pairing && (
-            <div className="field">
-              <span className="field-label">PIN de primer pareo</span>
-              <div
-                className="card-warm"
-                style={{
-                  padding: '20px 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 18,
-                }}
+              <option value="">Selecciona una sucursal</option>
+              {(locations || []).map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              El dispositivo y sus estaciones quedarán vinculados a esta sucursal.
+            </span>
+          </div>
+
+          <div className="field">
+            <label htmlFor={`${uid}-device-product`}>Producto del dispositivo</label>
+            <select
+              id={`${uid}-device-product`}
+              className="select"
+              style={{ height: 52, borderRadius: 14 }}
+              value={activeDeviceProduct}
+              aria-describedby={!kdsEnabled || !posEnabled ? purchaseMessageId : undefined}
+              onChange={(event) => {
+                setDeviceProduct(event.target.value);
+                setError(null);
+                setPosError(null);
+              }}
+            >
+              {!activeDeviceProduct && <option value="">Selecciona un producto</option>}
+              <option
+                value="kds"
+                disabled={!kdsEnabled}
+                title={!kdsEnabled ? 'Necesitas comprar este producto primero.' : undefined}
               >
-                <div>
-                  <div
-                    className="display"
-                    style={{
-                      fontSize: 42,
-                      fontFamily: 'var(--font-mono)',
-                      letterSpacing: '0.12em',
-                      color: 'var(--ink-warm)',
-                      lineHeight: 1,
+                UmiKDS{!kdsEnabled ? ' — producto no activo' : ''}
+              </option>
+              <option
+                value="pos"
+                disabled={!posEnabled}
+                title={!posEnabled ? 'Necesitas comprar este producto primero.' : undefined}
+              >
+                UmiPOS{!posEnabled ? ' — producto no activo' : ''}
+              </option>
+            </select>
+            {(!kdsEnabled || !posEnabled) && (
+              <div id={purchaseMessageId} className="device-product-help" role="note">
+                <span aria-hidden="true">
+                  <I.Lock size={14} />
+                </span>
+                <span>Las opciones en gris requieren un producto activo.</span>
+                <button
+                  type="button"
+                  className="device-product-tooltip"
+                  aria-label="Información sobre productos no activos"
+                >
+                  ¿Por qué?
+                  <span role="tooltip">Necesitas comprar este producto primero.</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {activeDeviceProduct === 'kds' && (
+            <>
+              <div className="field">
+                <label htmlFor={`${uid}-device-name`}>Nombre del dispositivo</label>
+                <input
+                  id={`${uid}-device-name`}
+                  className="input tall"
+                  placeholder="e.g. Cocina Caliente 2"
+                  value={name}
+                  onChange={function (e) {
+                    setName(e.target.value);
+                  }}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`${uid}-assign-to-station`}>Estación asignada</label>
+                {hasStations ? (
+                  <select
+                    id={`${uid}-assign-to-station`}
+                    className="select"
+                    style={{ height: 52, borderRadius: 14 }}
+                    value={selectedStationId}
+                    onChange={function (e) {
+                      setStation(e.target.value);
                     }}
                   >
-                    {pairing.pin.slice(0, 3)} {pairing.pin.slice(3)}
-                  </div>
-                  <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-warm-soft)' }}>
-                    Esperando solicitud del iPad
-                  </div>
+                    {(stations || []).map(function (s) {
+                      return (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
+                      No hay estaciones todavía. Crea una para asignar este dispositivo.
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        className="input"
+                        placeholder="Nombre de la estación"
+                        value={newStationName}
+                        onChange={function (e) {
+                          setNewStationName(e.target.value);
+                        }}
+                        onKeyDown={function (e) {
+                          if (e.key === 'Enter') addStation();
+                        }}
+                      />
+                      <button
+                        className="btn btn-secondary focusable"
+                        onClick={addStation}
+                        disabled={creatingStation || !newStationName.trim()}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <I.Plus size={16} /> {creatingStation ? 'Creando…' : 'Crear estación'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              {error && (
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    color: 'var(--danger)',
+                    background: 'var(--danger-soft)',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                  }}
+                >
+                  {error}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="eyebrow on-warm" style={{ marginBottom: 4 }}>
-                    station
+              )}
+              {pairing && (
+                <div className="field">
+                  <span className="field-label">PIN de primer pareo</span>
+                  <div
+                    className="card-warm"
+                    style={{
+                      padding: '20px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 18,
+                    }}
+                  >
+                    <div>
+                      <div
+                        className="display"
+                        style={{
+                          fontSize: 42,
+                          fontFamily: 'var(--font-mono)',
+                          letterSpacing: '0.12em',
+                          color: 'var(--ink-warm)',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {pairing.pin.slice(0, 3)} {pairing.pin.slice(3)}
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-warm-soft)' }}>
+                        Esperando solicitud del iPad
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div className="eyebrow on-warm" style={{ marginBottom: 4 }}>
+                        station
+                      </div>
+                      <div style={{ fontWeight: 600, color: 'var(--ink-warm)' }}>
+                        {selectedStation?.name || pairing.station_id}
+                      </div>
+                      <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-warm-soft)' }}>
+                        Expira{' '}
+                        {new Date(pairing.expires_at).toLocaleTimeString('es-MX', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ fontWeight: 600, color: 'var(--ink-warm)' }}>
-                    {selectedStation?.name || pairing.station_id}
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-warm-soft)' }}>
-                    Expira{' '}
-                    {new Date(pairing.expires_at).toLocaleTimeString('es-MX', {
-                      hour: '2-digit',
-                      minute: '2-digit',
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-3)' }}>
+                    Enter this PIN on the KDS iPad. When it appears in pending requests, approve it
+                    from this screen.
+                  </p>
+                </div>
+              )}
+              {activePairings.length > 0 && (
+                <div className="field">
+                  <span className="field-label">Solicitudes activas</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {activePairings.map(function (p) {
+                      return (
+                        <div key={p.id} className="list-card" style={{ padding: 12 }}>
+                          <div style={{ paddingLeft: 12, flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.device_name}</div>
+                            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                              {p.requested_name || 'Esperando iPad'} <XSep /> {p.status}
+                            </div>
+                          </div>
+                        </div>
+                      );
                     })}
                   </div>
                 </div>
-              </div>
-              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-3)' }}>
-                Enter this PIN on the KDS iPad. When it appears in pending requests, approve it from
-                this screen.
-              </p>
-            </div>
+              )}
+            </>
           )}
-          {activePairings.length > 0 && (
-            <div className="field">
-              <span className="field-label">Solicitudes activas</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {activePairings.map(function (p) {
-                  return (
-                    <div key={p.id} className="list-card" style={{ padding: 12 }}>
-                      <div style={{ paddingLeft: 12, flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.device_name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                          {p.requested_name || 'Esperando iPad'} <XSep /> {p.status}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+
+          {activeDeviceProduct === 'pos' && (
+            <>
+              {!posCreated ? (
+                <>
+                  <div className="field">
+                    <label htmlFor={`${uid}-pos-name`}>Nombre del dispositivo</label>
+                    <input
+                      id={`${uid}-pos-name`}
+                      className="input tall"
+                      value={posName}
+                      maxLength={120}
+                      onChange={(event) => setPosName(event.target.value)}
+                      placeholder="Caja principal"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-pos-platform`}>Plataforma</label>
+                    <select
+                      id={`${uid}-pos-platform`}
+                      className="select"
+                      value={posPlatform}
+                      onChange={(event) => setPosPlatform(event.target.value)}
+                    >
+                      <option value="web">Web</option>
+                      <option value="linux">Linux</option>
+                      <option value="macos">macOS</option>
+                      <option value="windows">Windows</option>
+                      <option value="android">Android</option>
+                      <option value="ios">iOS</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-pos-mobility`}>Modalidad</label>
+                    <select
+                      id={`${uid}-pos-mobility`}
+                      className="select"
+                      value={posMobility}
+                      onChange={(event) => setPosMobility(event.target.value)}
+                    >
+                      <option value="static">{mobilityLabel('static')}</option>
+                      <option value="mobile">{mobilityLabel('mobile')}</option>
+                    </select>
+                    <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+                      Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva
+                      a la mesa.
+                    </span>
+                  </div>
+                  <p style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+                    La solicitud queda vinculada al negocio y a la sucursal seleccionada.
+                  </p>
+                </>
+              ) : (
+                <div className="card-warm" style={{ padding: 24, textAlign: 'center' }}>
+                  <div className="eyebrow on-warm">Código de configuración</div>
+                  <div
+                    aria-label={`Código ${posCreated.setupCode}`}
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 38,
+                      letterSpacing: '0.12em',
+                      marginTop: 12,
+                      color: 'var(--ink-warm)',
+                    }}
+                  >
+                    {posCreated.setupCode.slice(0, 4)} {posCreated.setupCode.slice(4)}
+                  </div>
+                  <p style={{ color: 'var(--ink-warm-soft)', marginBottom: 0 }}>
+                    Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla.
+                  </p>
+                  <p style={{ color: 'var(--ink-warm-soft)', fontSize: 12 }}>
+                    Expira a las {new Date(posCreated.expiresAt).toLocaleTimeString('es-MX')}.
+                  </p>
+                </div>
+              )}
+              {posError && (
+                <div role="alert" style={{ color: 'var(--danger)' }}>
+                  {posError}
+                </div>
+              )}
+            </>
           )}
         </div>
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
-            Cancel
+            Cerrar
           </button>
-          <button
-            className="btn btn-primary"
-            disabled={!name.trim() || !station || saving || pairing}
-            style={{ opacity: name.trim() && station && !saving && !pairing ? 1 : 0.5 }}
-            onClick={createDevice}
-          >
-            <I.Refresh size={15} />{' '}
-            {saving ? 'Generando…' : pairing ? 'PIN generado' : 'Generar PIN'}
-          </button>
+          {activeDeviceProduct === 'kds' && (
+            <button
+              className="btn btn-primary"
+              disabled={!branchId || !name.trim() || !selectedStationId || saving || pairing}
+              style={{
+                opacity:
+                  branchId && name.trim() && selectedStationId && !saving && !pairing ? 1 : 0.5,
+              }}
+              onClick={createDevice}
+            >
+              <I.Refresh size={15} />{' '}
+              {saving ? 'Generando…' : pairing ? 'PIN generado' : 'Generar PIN'}
+            </button>
+          )}
+          {activeDeviceProduct === 'pos' && !posCreated && (
+            <button
+              className="btn btn-primary focusable"
+              disabled={!branchId || !posName.trim() || posSaving}
+              onClick={createPosRequest}
+            >
+              {posSaving ? 'Creando…' : 'Crear código'}
+            </button>
+          )}
         </div>
       </aside>
     </>
@@ -1281,21 +1999,17 @@ const POS_STATE_LABELS = {
   cancelled: 'Cancelado',
 };
 
-const PosEnrollmentRequestsCard = ({ requests, error, currentTime, onChanged }) => {
+const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onChanged }) => {
   const [busy, setBusy] = useState(null);
   const [actionError, setActionError] = useState(null);
-  const visible = (requests || []).filter(function (request) {
-    return (
-      request.state !== 'completed' || currentTime - new Date(request.createdAt).getTime() < 3600000
-    );
-  });
+  const visible = visiblePosEnrollmentRequests(requests);
 
   async function decide(request, approved) {
     setBusy(request.id);
     setActionError(null);
     try {
-      if (approved) await approvePosEnrollmentRequest(request.id);
-      else await denyPosEnrollmentRequest(request.id);
+      if (approved) await approvePosEnrollmentRequest(request.id, branchId);
+      else await denyPosEnrollmentRequest(request.id, branchId);
     } catch (failure) {
       console.error('[umipos] enrollment decision failed', failure);
       setActionError('No se pudo guardar la decisión. Actualiza y vuelve a intentarlo.');
@@ -1346,9 +2060,11 @@ const PosEnrollmentRequestsCard = ({ requests, error, currentTime, onChanged }) 
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <b>{request.displayName}</b>
                     <span className="chip">{POS_STATE_LABELS[request.state] || request.state}</span>
+                    <span className="chip">{locationName(locations, request.locationId)}</span>
                   </div>
                   <div style={{ color: 'var(--ink-3)', fontSize: 12, marginTop: 4 }}>
-                    {request.type} · {request.requestedPlatform || request.platform}
+                    {platformLabel(request.requestedPlatform || request.platform)} ·{' '}
+                    {mobilityLabel(request.mobility)}
                     {request.installationReference
                       ? ` · Instalación ${request.installationReference}`
                       : ''}
@@ -1378,145 +2094,6 @@ const PosEnrollmentRequestsCard = ({ requests, error, currentTime, onChanged }) 
         </div>
       )}
     </section>
-  );
-};
-
-const AddPosDevicePanel = ({ onClose, onCreated }) => {
-  const [name, setName] = useState('');
-  const [platform, setPlatform] = useState('web');
-  const [deviceType, setDeviceType] = useState('pos_terminal');
-  const [created, setCreated] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const branchId = window.localStorage.getItem('umi-dashboard-selected-location');
-
-  async function createRequest() {
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await createPosEnrollmentRequest({
-        branchId: branchId || null,
-        displayName: name.trim(),
-        type: deviceType,
-        platform,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      setCreated(result);
-      onCreated && onCreated();
-    } catch (failure) {
-      console.error('[umipos] enrollment request failed', failure);
-      setError('No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <>
-      <div className="sheet-backdrop" onClick={onClose} />
-      <aside className="sheet" aria-labelledby="pos-enrollment-title">
-        <div className="sheet-head">
-          <div>
-            <div className="eyebrow">UmiPOS</div>
-            <h2 id="pos-enrollment-title" className="h-section" style={{ marginTop: 4 }}>
-              Registrar dispositivo
-            </h2>
-          </div>
-          <button className="btn-icon focusable" onClick={onClose} aria-label="Cerrar">
-            <I.X size={16} />
-          </button>
-        </div>
-        <div className="sheet-body">
-          {!created ? (
-            <>
-              <div className="field">
-                <label htmlFor="pos-device-name">Nombre del dispositivo</label>
-                <input
-                  id="pos-device-name"
-                  className="input tall"
-                  value={name}
-                  maxLength={120}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Caja principal"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="pos-device-type">Tipo</label>
-                <select
-                  id="pos-device-type"
-                  className="select"
-                  value={deviceType}
-                  onChange={(event) => setDeviceType(event.target.value)}
-                >
-                  <option value="pos_terminal">Terminal UmiPOS</option>
-                  <option value="kds">Pantalla KDS</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="pos-device-platform">Plataforma</label>
-                <select
-                  id="pos-device-platform"
-                  className="select"
-                  value={platform}
-                  onChange={(event) => setPlatform(event.target.value)}
-                >
-                  <option value="web">Web</option>
-                  <option value="linux">Linux</option>
-                  <option value="macos">macOS</option>
-                  <option value="windows">Windows</option>
-                  <option value="android">Android</option>
-                  <option value="ios">iOS</option>
-                </select>
-              </div>
-              <p style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-                La solicitud queda vinculada al negocio y a la sucursal seleccionada.
-              </p>
-            </>
-          ) : (
-            <div className="card-warm" style={{ padding: 24, textAlign: 'center' }}>
-              <div className="eyebrow on-warm">Código de configuración</div>
-              <div
-                aria-label={`Código ${created.setupCode}`}
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 38,
-                  letterSpacing: '0.12em',
-                  marginTop: 12,
-                  color: 'var(--ink-warm)',
-                }}
-              >
-                {created.setupCode.slice(0, 4)} {created.setupCode.slice(4)}
-              </div>
-              <p style={{ color: 'var(--ink-warm-soft)', marginBottom: 0 }}>
-                Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla.
-              </p>
-              <p style={{ color: 'var(--ink-warm-soft)', fontSize: 12 }}>
-                Expira a las {new Date(created.expiresAt).toLocaleTimeString('es-MX')}.
-              </p>
-            </div>
-          )}
-          {error && (
-            <div role="alert" style={{ color: 'var(--danger)' }}>
-              {error}
-            </div>
-          )}
-        </div>
-        <div className="sheet-foot">
-          <button className="btn btn-ghost focusable" onClick={onClose}>
-            Cerrar
-          </button>
-          {!created && (
-            <button
-              className="btn btn-primary focusable"
-              disabled={!name.trim() || saving}
-              onClick={createRequest}
-            >
-              {saving ? 'Creando…' : 'Crear código'}
-            </button>
-          )}
-        </div>
-      </aside>
-    </>
   );
 };
 

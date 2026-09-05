@@ -34,6 +34,7 @@ final testConfig = AppConfig(
   developmentDiagnostics: true,
   featureBootstrapMode: FeatureBootstrapMode.localSafeDefaults,
   hardwareSimulatorEnabled: true,
+  realtimeEnrollmentEnabled: false,
   release: const ReleaseIdentity(
     application: 'umi-pos',
     version: '0.1.0-test',
@@ -51,6 +52,7 @@ final pilotTestConfig = AppConfig(
   developmentDiagnostics: false,
   featureBootstrapMode: FeatureBootstrapMode.disabled,
   hardwareSimulatorEnabled: false,
+  realtimeEnrollmentEnabled: false,
   release: testConfig.release,
 );
 
@@ -119,6 +121,7 @@ final class TestApiClient implements ApiClient {
     Map<String, Object?>? body,
     CancellationToken? cancellation,
     bool idempotent = false,
+    bool authRefresh = true,
   }) async => {};
 }
 

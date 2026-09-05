@@ -20,7 +20,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:integration:schema": "vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts src/shared/database/check-values.integration.ts src/shared/database/schema-parity.integration.ts src/modules/wallet/wallet-carry.integration.ts src/shared/loyalty/loyalty-stamps.integration.ts src/modules/cash/cash-seals.integration.ts src/modules/cash/cash-gift-card.integration.ts src/modules/cash/cash-logout.integration.ts src/modules/cash/cash-login.integration.ts src/modules/auth/credential-upgrade.integration.ts src/modules/auth/dashboard-session.integration.ts src/modules/cash/register-flip.integration.ts src/modules/merchants/provision.integration.ts src/modules/merchants/locations.integration.ts",
+    "test:integration:schema": "vitest run --config vitest.integration.config.ts src/shared/database/sql-preflight.integration.ts src/shared/database/check-values.integration.ts src/shared/database/schema-parity.integration.ts src/modules/wallet/wallet-carry.integration.ts src/shared/loyalty/loyalty-stamps.integration.ts src/modules/cash/cash-seals.integration.ts src/modules/cash/cash-gift-card.integration.ts src/modules/cash/cash-logout.integration.ts src/modules/cash/cash-login.integration.ts src/modules/auth/credential-upgrade.integration.ts src/modules/auth/dashboard-session.integration.ts src/modules/cash/register-flip.integration.ts src/modules/merchants/provision.integration.ts src/modules/merchants/locations.integration.ts src/modules/devices/pairing-realtime-handshake.integration.ts src/modules/realtime/pairing-nudge.integration.ts",
     "test:integration:migration": "vitest run --config vitest.integration.config.ts src/shared/database/rls.integration.ts src/shared/database/pooler-isolation.integration.ts src/shared/database/identity-normalization.integration.ts src/smoke.integration.ts"
   },
   "dependencies": {
@@ -31,6 +31,8 @@
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-fastify": "^11.0.0",
+    "@nestjs/platform-socket.io": "^11.2.3",
+    "@nestjs/websockets": "^11.2.3",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.79.0",
     "@umi/contract": "workspace:*",
@@ -47,6 +49,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "sharp": "^0.34.5",
+    "socket.io": "^4.8.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -61,6 +64,7 @@
     "@types/qrcode": "^1.5.6",
     "eslint": "^10.7.0",
     "globals": "^17.7.0",
+    "socket.io-client": "^4.8.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.65.0",
     "unplugin-swc": "^1.5.11",

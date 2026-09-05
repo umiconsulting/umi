@@ -75,6 +75,10 @@ export interface PosPinStaffRecord {
   staffId: string;
   userId: string;
   email: string;
+  /** The POS operator's name: the per-merchant staff name (`merchant.staff.name`,
+   * editable from /staff), falling back to the auth account's full name only when
+   * the staff row has no name. The POS identity follows the PIN → staff record,
+   * not the dashboard/account identity. */
   displayName: string | null;
   pinSalt: string;
   pinHash: string;
@@ -170,7 +174,10 @@ export class AuthRepository {
     const { rows } = await this.pg.query<PosPinStaffRecord>(
       `SELECT s.id::text AS "staffId", s.user_id::text AS "userId",
               COALESCE(u.email, s.email) AS email,
-              COALESCE(u.full_name, s.name) AS "displayName",
+              -- Prefer the per-merchant staff name (what the dashboard staff
+              -- editor sets) over the auth user's full name, so the POS "turn"
+              -- label reflects the operator's staff record for THIS merchant.
+              COALESCE(NULLIF(s.name, ''), u.full_name) AS "displayName",
               s.operator_pin_salt AS "pinSalt",
               s.operator_pin_hash AS "pinHash"
          FROM merchant.staff AS s
@@ -195,10 +202,9 @@ export class AuthRepository {
     locationId: string;
     installationHash: string;
     credentialHash: string;
-  }): Promise<boolean> {
-    const { rows } = await this.pg.query<{ allowed: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1
+  }): Promise<{ allowed: boolean; ephemeralPublicKey: string | null }> {
+    const { rows } = await this.pg.query<{ ephemeralPublicKey: string | null }>(
+      `SELECT d.ephemeral_public_key AS "ephemeralPublicKey"
            FROM merchant.device AS d
           WHERE d.id = $1::uuid
             AND d.merchant_id = $2::uuid
@@ -207,7 +213,7 @@ export class AuthRepository {
             AND d.status = 'active'
             AND d.installation_hash = $4
             AND d.credential_hash = $5
-       ) AS allowed`,
+          LIMIT 1`,
       [
         input.deviceId,
         input.merchantId,
@@ -216,7 +222,11 @@ export class AuthRepository {
         input.credentialHash,
       ],
     );
-    return rows[0]?.allowed === true;
+    const row = rows[0];
+    return {
+      allowed: row !== undefined,
+      ephemeralPublicKey: row?.ephemeralPublicKey ?? null,
+    };
   }
 
   async recordPosPinFailure(deviceId: string): Promise<void> {
@@ -273,9 +283,13 @@ export class AuthRepository {
     userId: string;
     installationHash: string;
     credentialHash: string;
-  }): Promise<{ deviceId: string } | null> {
-    const { rows } = await this.pg.worker.query<{ deviceId: string }>(
-      `SELECT d.id::text AS "deviceId"
+  }): Promise<{ deviceId: string; ephemeralPublicKey: string | null } | null> {
+    const { rows } = await this.pg.worker.query<{
+      deviceId: string;
+      ephemeralPublicKey: string | null;
+    }>(
+      `SELECT d.id::text AS "deviceId",
+              d.ephemeral_public_key AS "ephemeralPublicKey"
        FROM runtime.session s
        JOIN merchant.device d
          ON s.principal_type='device' AND d.id=s.principal_id
@@ -736,11 +750,14 @@ export class AuthRepository {
          t.id::text AS "id",
          t.handle   AS "handle",
          t.name     AS "name",
-         COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
+         COALESCE(array_agg(COALESCE(mr.key,r.key))
+                    FILTER (WHERE COALESCE(mr.key,r.key) IS NOT NULL),
                   ARRAY[(SELECT platform_role FROM sa)]) AS "roles"
        FROM merchant.merchant AS t
        LEFT JOIN merchant.staff AS s
          ON s.merchant_id = t.id AND s.user_id = $1::uuid AND s.status = 'active'
+       LEFT JOIN merchant.role AS mr
+         ON mr.id=s.merchant_role_id AND mr.merchant_id=s.merchant_id
        LEFT JOIN umi.role AS r ON r.id = s.role_id
        WHERE t.status = 'active'
          AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
@@ -785,8 +802,10 @@ export class AuthRepository {
          -- The café grant, and only that. The platform role is added separately below,
          -- because it is not an employment and has no merchant.staff row to come from.
          -- A disabled employment grants nothing, so status is part of the predicate.
-         SELECT s.id, r.key AS role_key
+         SELECT s.id,COALESCE(mr.key,r.key) AS role_key
          FROM merchant.staff AS s
+         LEFT JOIN merchant.role AS mr
+           ON mr.id=s.merchant_role_id AND mr.merchant_id=s.merchant_id
          JOIN umi.role AS r ON r.id = s.role_id
          WHERE s.user_id = $1::uuid
            AND s.merchant_id = $2::uuid

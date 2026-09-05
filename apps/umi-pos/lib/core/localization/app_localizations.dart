@@ -1532,11 +1532,35 @@ abstract class AppLocalizations {
   /// **'Abre un turno de caja antes de aceptar efectivo.'**
   String get shiftRequiredMessage;
 
+  /// No description provided for @adoptShiftTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu turno sigue abierto en otra terminal'**
+  String get adoptShiftTitle;
+
+  /// No description provided for @adoptShiftMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta terminal perdió su identidad guardada. El turno y el dinero siguen ahí; tráelos a esta pantalla para continuar.'**
+  String get adoptShiftMessage;
+
+  /// No description provided for @adoptShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Traer el turno a esta terminal'**
+  String get adoptShiftAction;
+
   /// No description provided for @openShiftAction.
   ///
   /// In es, this message translates to:
   /// **'Abrir turno de caja'**
   String get openShiftAction;
+
+  /// No description provided for @invalidAmountMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Escribe un monto válido, por ejemplo 1,500.00.'**
+  String get invalidAmountMessage;
 
   /// No description provided for @openingFloatLabel.
   ///
@@ -2173,6 +2197,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Se requiere una revisión de inventario'**
   String get restockInventoryReviewLabel;
+
+  /// No description provided for @sessionEndedReauth.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu sesión terminó. Vuelve a ingresar tu PIN.'**
+  String get sessionEndedReauth;
+
+  /// Label in the POS app bar naming the operator who holds the current turn.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno de {name}'**
+  String operatorShift(String name);
 }
 
 class _AppLocalizationsDelegate

@@ -111,6 +111,7 @@
         "kitchen.recall",
         "kitchen.station.manage",
         "kitchen.station.read",
+        "location.switch",
         "loyalty.adjust",
         "loyalty.adjust.approve",
         "loyalty.policy.manage",
@@ -170,7 +171,7 @@
         "sale.refund.other_operator",
         "sale.resume.any"
       ],
-      "crossLocationPermissions": [],
+      "crossLocationPermissions": ["location.switch"],
       "policyDependencies": [
         "cash",
         "checkout",
@@ -524,6 +525,7 @@
         "kitchen.recall",
         "kitchen.station.manage",
         "kitchen.station.read",
+        "location.switch",
         "loyalty.adjust",
         "loyalty.adjust.approve",
         "loyalty.policy.manage",
@@ -584,7 +586,7 @@
         "sale.refund.other_operator",
         "sale.resume.any"
       ],
-      "crossLocationPermissions": ["sale.refund.other_location"],
+      "crossLocationPermissions": ["location.switch", "sale.refund.other_location"],
       "policyDependencies": [
         "cash",
         "checkout",

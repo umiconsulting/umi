@@ -21,6 +21,173 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-09-01 - Device branch assignment and enrollment list stabilization
+- task type: dashboard and API bug fix for device registration
+- request summary: assign devices to a branch and stop the UmiPOS request count from decreasing after page load
+- filesystem slice inspected: `apps/umi-dashboard/src/screens/devices.jsx`, dashboard merchant context, KDS API service, and KDS repository
+- chosen owner: `apps/umi-api` owns device scope; `apps/umi-dashboard` owns the branch selection interface
+- chosen path: direct implementation; the existing database already stores `merchant.device.location_id`
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `ui-ux-pro-max`, and `diagnosing-bugs`; no subagent
+- files touched: dashboard device screen and utility tests; KDS repository projection and query regression test
+- tools used: CodeGraph sync, `rg`, Vitest, TypeScript, ESLint, Vite, and Playwright with Firefox
+- outcome: the first render now hides old completed requests; registration requires a branch; device rows expose their branch
+- reusable pattern observed: use the merchant context for branch state; do not read branch state directly from `localStorage`
+- promotion follow-up: none; the existing boundary skills cover this pattern
+
+- 2026-09-01 — Merchant roles and POS permissions. Owner: `apps/umi-api`, `apps/umi-dashboard`, and build-v3 migration definitions. Used `workspace-boundary-check`, `repository-cartographer`, CodeGraph, and the staging rehearsal. Added merchant role storage, API contracts, Dashboard management, POS permission resolution, and rehearsal evidence.
+
+### 2026-09-01 - POS roles and staff PIN management
+- task type: Cross-product implementation
+- request summary: Show the POS permission matrix and manage staff PIN access from Dashboard `/staff`.
+- filesystem slice inspected: `apps/umi-api`, `apps/umi-dashboard`, `packages/contract`, `config`, and build-v3 docs.
+- chosen owner: `apps/umi-api`
+- chosen path: Keep grants and PIN writes in the API. Keep the Dashboard as a contract client.
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `scientific-research-check`, and `playwright-cli`
+- files touched: Staff API, Dashboard staff screen, shared contract, RBAC generator, generated SQL, and RBAC docs.
+- tools used: Repository search, API tests, contract tests, Dashboard tests, build checks, lint, and Firefox automation.
+- outcome: Added Admin and Barista matrix views. Added role and PIN management with server authorization.
+- reusable pattern observed: Present canonical grants as a summary. Do not add a client-side permission editor.
+- promotion follow-up: None.
+
+### 2026-08-31 - Diagnose the Dashboard super-admin session failure
+- task type: cross-product runtime diagnosis
+- request summary: Find the saved intent for super-admin café access and explain the Dashboard logout.
+- filesystem slice inspected: root documentation, apps/umi-dashboard, apps/umi-api, packages/contract
+- chosen owner: apps/umi-dashboard
+- chosen path: diagnose the browser session boundary and verify the build-v3 rehearsal data
+- skill or subagent used: task-router, diagnosing-bugs, research, super_admin_history
+- files touched: apps/umi-dashboard/package.json; docs/development/RUNNING_UMIPOS.md; docs/reports/2026-08-31-super-admin-dashboard-research.md; .agents/skills/task-router/routing-ledger.md
+- tools used: ripgrep, Git history, PostgreSQL-backed API requests, process inspection, runtime restart
+- outcome: Confirmed a localhost and 127.0.0.1 cookie mismatch; made 127.0.0.1 the default Dashboard host.
+- reusable pattern observed: local cookie-auth clients must use one hostname across the browser and API.
+- promotion follow-up: Add a browser test and an explicit Vite host in a separate fix.
+
+### 2026-08-31 - Connect local Dashboard and POS to the build-v3 rehearsal
+- task type: cross-product local runtime configuration
+- request summary: Route Dashboard and POS through umi-api to the rehearsal database, then prepare Kalala for POS testing.
+- filesystem slice inspected: `apps/umi-api`, `apps/umi-dashboard`, `apps/umi-pos`, and the build-v3 rehearsal database.
+- chosen owner: `apps/umi-api` owns the database connection; Dashboard and POS remain API clients.
+- chosen path: Switch the API process to the rehearsal database and keep both client API URLs unchanged.
+- skill or subagent used: `task-router`, `diagnosing-bugs`, and `webapp-testing`; no subagent.
+- files touched: `.agents/skills/task-router/routing-ledger.md`; runtime changes affected only the rehearsal database and local processes.
+- tools used: PostgreSQL, Docker, curl, Firefox, Flutter, Vite, X11, and local process inspection.
+- outcome: API uses `umi_transition_rehearsal_20260901`; Dashboard login works; POS shows device registration; Kalala has an active rehearsal POS entitlement and its 136-product catalog remains unchanged.
+- reusable pattern observed: A restored merchant can need a rehearsal-only entitlement override before a new product client can use migrated source data.
+- promotion follow-up: none; wait for the manual POS registration and the next debug result.
+
+### 2026-08-31 - Rehearse build-v3 against the current production snapshot
+
+- task type: cross-workspace database transition validation
+- request summary: Restore the new production dump and run the full build-v3 transition SQL against it.
+- filesystem slice inspected: build-v3 DDL and backfill, migration gates, API integration tests, and audit evidence
+- chosen owner: root `docs/migration/build-v3` for the transition; `apps/umi-api` for the data-pinned integration test
+- chosen path: Restore nine source schemas into PostgreSQL 17. Rebuild a separate target through the canonical backfill runner.
+- skill or subagent used: `staging-validation-runner`, `diagnosing-bugs`, and `task-router`; no subagent
+- files touched: `apps/umi-api/src/shared/database/identity-normalization.integration.ts`, `docs/migration/audit-output/2026-08-31-build-v3-production-snapshot-rehearsal.md`, and this ledger
+- tools used: Docker, PostgreSQL 17, pg_restore, psql, pnpm, and Vitest
+- outcome: Reconcile and the security gate passed. The migration integration suite passed 24/24 with 100 routes and zero unexpected results.
+- reusable pattern observed: Repin named production snapshot counts only after invariant queries prove that new rows preserve the rule.
+- promotion follow-up: no new procedure is required
+
+### 2026-08-31 - Seed local build-v3 data and restore cross-merchant access
+
+- task type: local cross-product data and runtime repair
+- request summary: Seed merchant data, enable the documented cross-merchant administrator, and repair UmiPOS startup.
+- filesystem slice inspected: build-v3 RBAC, demo seed, API release configuration, Dashboard merchant context, and UmiPOS bootstrap
+- chosen owner: `scripts/umi-pos-demo-seed.sh` for demo data; `umi-api` for auth and release data; `umi-pos` for the client
+- chosen path: Repair the stale gift-card insert. Run the canonical seed. Grant `super_admin` to the existing local owner.
+- skill or subagent used: `task-router`, `staging-validation-runner`, `diagnosing-bugs`, and `webapp-testing`; no subagent
+- files touched: `scripts/umi-pos-demo-seed.sh`, ignored `apps/umi-api/.env`, and `.agents/skills/task-router/routing-ledger.md`
+- tools used: PostgreSQL, Docker, curl, Flutter tests, Firefox, pnpm, and memory checks
+- outcome: The seed completed. The owner can select two merchants. The API and POS release contracts now match at `2.13.0`.
+- reusable pattern observed: Keep the demo gift-card insert aligned with the sealed clear-code storage rule.
+- promotion follow-up: Add a pristine demo-seed check to CI if this drift recurs.
+
+### 2026-08-31 - Fix UmiPOS CORS and create a local Dashboard owner
+
+- task type: local cross-product runtime repair
+- request summary: Fix the UmiPOS CORS failure and provide a local Dashboard administrator login.
+- filesystem slice inspected: API CORS configuration, UmiPOS release check, Dashboard authentication, and platform bootstrap
+- chosen owner: `apps/umi-api` for CORS and authentication; `apps/umi-pos` as the client
+- chosen path: Add the UmiPOS origins to local CORS. Create the first local owner through the guarded bootstrap endpoint.
+- skill or subagent used: `task-router` and `diagnosing-bugs`; no subagent
+- files touched: ignored `apps/umi-api/.env` and `.agents/skills/task-router/routing-ledger.md`
+- tools used: curl, pnpm, PostgreSQL, Firefox, and socket checks
+- outcome: UmiPOS CORS passed. The Dashboard owner login returned HTTP 201. The temporary bootstrap authority was removed.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Relaunch Dashboard and UmiPOS
+
+- task type: local cross-product app launch
+- request summary: Restart the Dashboard and UmiPOS after the host sign-in.
+- filesystem slice inspected: Dashboard and UmiPOS runtime commands
+- chosen owner: `apps/umi-dashboard` and `apps/umi-pos`
+- chosen path: Run the Dashboard with Vite. Run the UmiPOS web target against the local API.
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: pnpm, Vite, Flutter, curl, Firefox, and memory checks
+- outcome: Both apps respond and load in separate Firefox tabs. The local API remains healthy.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Start the local API and database
+
+- task type: local cross-product runtime launch
+- request summary: Start `umi-api`, PostgreSQL, and Redis after Docker installation.
+- filesystem slice inspected: API configuration, build-v3 schema files, role files, and local runtime state
+- chosen owner: `apps/umi-api` for the API; build-v3 database files for PostgreSQL
+- chosen path: Run PostgreSQL and Redis in limited containers. Run the API through the local Node watch process.
+- skill or subagent used: `task-router` and `diagnosing-bugs`; no subagent
+- files touched: ignored `apps/umi-api/.env` and `.agents/skills/task-router/routing-ledger.md`
+- tools used: Docker, PostgreSQL, Redis, pnpm, curl, free, and socket checks
+- outcome: The build-v3 schema passed. API health passed twice. The missing expected schema value caused the initial 503 response.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Assess the local API and database launch
+
+- task type: local cross-product runtime assessment
+- request summary: Start `umi-api` and its database after a RAM check for Docker containers.
+- filesystem slice inspected: API runtime files, pilot Compose files, local database guides, and host service state
+- chosen owner: `apps/umi-api` for the API; `deploy/pilot` for the PostgreSQL and Redis services
+- chosen path: Use only PostgreSQL, Redis, and the local Node API for development.
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: free, ps, systemctl, apt-cache, socket checks, and repository inspection
+- outcome: The smaller service set fits available RAM. Docker, PostgreSQL, Redis, and their client tools are absent.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Launch Dashboard and UmiPOS
+
+- task type: local cross-product app launch
+- request summary: Start the Dashboard and UmiPOS, then open both apps in separate Firefox tabs.
+- filesystem slice inspected: root run commands, Dashboard runtime files, and the UmiPOS run guide
+- chosen owner: `apps/umi-dashboard` and `apps/umi-pos`
+- chosen path: Run the Dashboard with Vite and run the UmiPOS web compatibility target with Flutter.
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: pnpm, Vite, Flutter, curl, and Firefox
+- outcome: Dashboard runs at `http://localhost:4000/`; UmiPOS runs at `http://127.0.0.1:8080/`; Firefox opened both URLs.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-30 - Bootstrap a new build-v3 workstation
+
+- task type: workspace setup and current-state reconciliation
+- request summary: Prepare a blank machine for current Umi development. Resolve stale guidance from b2 through build-v3.
+- filesystem slice inspected: root governance, build-v3 state, current cutover plan, app setup files, environment templates, Git history, and GitHub pull requests
+- chosen owner: root workspace for setup; each app keeps its dependency lock and local environment
+- chosen path: track `origin/build-v3`, install exact tools, repair dependency drift, run all available gates, and record external blockers
+- skill or subagent used: `task-router`, `adapter-sync-check`, and `diagnosing-bugs`; no subagents
+- files touched: root setup and governance files, current state records, Cash lockfile, UmiPOS lock and contract test, Dashboard environment template, and Landing tests
+- tools used: Git, GitHub CLI, pnpm, npm, Flutter, Dart, Java, uv, Prettier, ESLint, Vitest, Jest, and official tool archives
+- outcome: root build, root tests, lint, Cash tests and build, UmiPOS analysis, 178 tests, and Web build pass
+- remaining blockers: privileged host packages, Android license acceptance, shared secrets, Azure login, and current dependency advisories
+- reusable pattern observed: compare generated contract output with every lock, assertion, environment template, and current-state record after a branch integration
+- promotion follow-up: the new machine guide now records the setup sequence; no new skill is required
+
 ### 2026-08-22 - Merge the UmiPOS integration branch into build-v3
 - task type: cross-product branch merge with architectural reconciliation
 - request summary: Complete the merge of `architectureUMIposIntegration-v2` into `build-v3`; umi-api keeps the newer build-v3 architecture, the POS client follows the branch verbatim.
@@ -720,3 +887,16 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 - 2026-07-29: Routed UmiPOS device pairing to `packages/contract`, `umi-api`, `umi-dashboard`, `umi-pos`, and platform migrations. Used `workspace-boundary-check`. Implemented administrator-approved pairing.
 - 2026-08-13: Gate 12 se enrutó a la raíz para certificación transversal. `apps/umi-api` recibió la corrección del healthcheck. `docs/` recibió el cierre y RC3. No se creó un servicio ni una autoridad nueva.
+
+### 2026-09-01 - Autoridad del cambio de sucursal
+- tipo de tarea: autorización y alcance de sucursal
+- resumen: añadir `location.switch` y evitar que un `locationId` del cliente conceda autoridad
+- área revisada: `apps/umi-api`, `apps/umi-dashboard`, configuración RBAC y migraciones de build-v3
+- propietario: `umi-api` resuelve la autoridad; el Dashboard solo presenta las sucursales permitidas
+- ruta elegida: implementación directa en los propietarios existentes
+- skills usados: `task-router`, `workspace-boundary-check`, `domain-modeling`, `scientific-research-check`
+- archivos principales: autoridad de ubicación, controladores de dispositivos, guard de KDS, servicio de comercios, selector del Dashboard y migración `003`
+- herramientas usadas: `rg`, Vitest, ESLint, PostgreSQL y Playwright
+- resultado: el rol define el cambio de sucursal; la API valida cada selección con el usuario autenticado y sus permisos efectivos
+- patrón reutilizable: un identificador de alcance enviado por el cliente expresa intención; el servidor calcula y valida la autoridad
+- seguimiento de promoción: ninguno

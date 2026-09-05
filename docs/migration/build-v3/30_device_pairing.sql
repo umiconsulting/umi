@@ -12,6 +12,11 @@ create table runtime.device_enrollment_request (
     check (platform in ('android', 'ios', 'linux', 'macos', 'windows', 'web')),
   requested_platform    text
     check (requested_platform in ('android', 'ios', 'linux', 'macos', 'windows', 'web')),
+  -- The owner's floor-use declaration, made when the code is issued and copied onto
+  -- merchant.device at approval. It rides the request rather than being set afterwards
+  -- so an approved device is never briefly labelled wrong.
+  mobility              text not null default 'static'
+    check (mobility in ('static', 'mobile')),
   setup_code_hash       text not null unique check (setup_code_hash ~ '^[a-f0-9]{64}$'),
   idempotency_key       uuid not null,
   state                 text not null default 'created'

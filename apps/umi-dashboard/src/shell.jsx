@@ -3,8 +3,10 @@ import { I, UmiX } from './icons.jsx';
 
 /** Section keys as an operator reads them. The key itself is the storage form. */
 const SECTION_LABELS = {
+  HOME: 'HOY',
   OPERATIONS: 'OPERACIÓN',
-  GROWTH: 'CRECIMIENTO',
+  CUSTOMERS: 'CLIENTES',
+  BUSINESS: 'NEGOCIO',
   CONFIGURATION: 'CONFIGURACIÓN',
   PLATFORM: 'PLATAFORMA',
 };
@@ -195,6 +197,7 @@ const Topbar = ({
   screen,
   merchantName,
   locations = [],
+  canSwitchLocations = false,
   selectedLocationId,
   onLocationChange,
   connection = {},
@@ -208,8 +211,12 @@ const Topbar = ({
   const titles = {
     overview: 'Panorama',
     operations: 'Centro operativo',
-    orders: 'Pedidos WhatsApp',
-    devices: 'Dispositivos KDS',
+    'cash-shifts': 'Caja y turnos',
+    'catalog-inventory': 'Catálogo e inventario',
+    'loyalty-value': 'Lealtad y valor',
+    kitchen: 'Cocina',
+    orders: 'Pedidos',
+    devices: 'Dispositivos',
     staff: 'Equipo y permisos',
     customers: 'Clientes',
     members: 'Lealtad',
@@ -217,6 +224,7 @@ const Topbar = ({
     hours: 'Horario y disponibilidad',
     settings: 'Ajustes',
     'products-billing': 'Productos y facturación',
+    diagnostics: 'Diagnóstico',
     cafes: 'Cafés',
   };
 
@@ -226,9 +234,17 @@ const Topbar = ({
   // a white page is not.
   const title = titles[screen] || screen;
 
-  const locationScoped = ['orders', 'devices', 'hours'].includes(screen);
+  const locationScoped = [
+    'orders',
+    'devices',
+    'hours',
+    'cash-shifts',
+    'catalog-inventory',
+    'kitchen',
+  ].includes(screen);
   const activeLocations = locations.filter((l) => l.status === 'active');
-  const showLocationSelect = locationScoped && activeLocations.length > 1;
+  const showLocationSelect =
+    locationScoped && canSwitchLocations && activeLocations.length > 1;
   const branchName =
     activeLocations.find((l) => l.id === selectedLocationId)?.name ||
     (activeLocations.length === 1 ? activeLocations[0].name : null);
@@ -434,4 +450,26 @@ const MiniBars = ({ data, accent = 'var(--info)' }) => {
   );
 };
 
-export { Sidebar, Topbar, RegionHead, Spark, MiniBars, XSep };
+/**
+ * HubTabs — the second level of the two-tier IA. A hub screen groups several
+ * operational domains and shows one at a time. The tabs are the in-page navigation
+ * that keeps the sidebar flat: a new feature becomes a tab here, not a sidebar row.
+ */
+const HubTabs = ({ tabs, active, onChange, ariaLabel = 'Secciones' }) => (
+  <div className="hub-tabs" role="tablist" aria-label={ariaLabel}>
+    {tabs.map((tab) => (
+      <button
+        key={tab.id}
+        type="button"
+        role="tab"
+        aria-selected={active === tab.id}
+        className={'hub-tab focusable' + (active === tab.id ? ' active' : '')}
+        onClick={() => onChange(tab.id)}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+);
+
+export { Sidebar, Topbar, RegionHead, Spark, MiniBars, XSep, HubTabs };

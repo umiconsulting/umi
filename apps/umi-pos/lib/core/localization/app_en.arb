@@ -240,7 +240,11 @@
   ,"registerAvailableLabel": "Register available"
   ,"registerAssignedLabel": "Assigned register"
   ,"shiftRequiredMessage": "Open a cash shift before you accept cash."
+  ,"adoptShiftTitle": "Your shift is still open on another terminal"
+  ,"adoptShiftMessage": "This terminal lost its stored identity. The shift and the cash are still there; bring them to this screen to continue."
+  ,"adoptShiftAction": "Bring the shift to this terminal"
   ,"openShiftAction": "Open cash shift"
+  ,"invalidAmountMessage": "Enter a valid amount, for example 1,500.00."
   ,"openingFloatLabel": "Opening float"
   ,"denominationCountLabel": "Denomination count"
   ,"paidInAction": "Paid In"
@@ -349,4 +353,6 @@
   ,"restockIntentLabel": "Restock intent"
   ,"restockNotApplicableLabel": "Restock does not apply"
   ,"restockInventoryReviewLabel": "Inventory review required"
+  ,"sessionEndedReauth": "Your session ended. Please re-enter your PIN."
+  ,"operatorShift": "Shift: {name}"
 }

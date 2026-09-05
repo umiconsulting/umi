@@ -17,3 +17,14 @@
 - Un ledger contiene hechos inmutables. Una proyección se puede reconstruir desde esos hechos.
 - El checkout compromete la venta, el inventario, los puntos y el valor en una transacción.
 - Un refund agrega hechos de reversión. No modifica el hecho original.
+
+## Roles y permisos
+
+- Un `Permiso canónico` es una autoridad de acción que Umi define y mantiene. Un merchant no crea permisos nuevos.
+- Una `Plantilla de rol` es un perfil global que Umi mantiene con un nombre, una descripción y permisos predeterminados.
+- Un `Rol del merchant` es un perfil propio de un merchant. Puede partir de una plantilla y conserva su configuración independiente.
+- Una `Asignación de rol` vincula a una persona del equipo con un rol del merchant y con su alcance autorizado.
+- Los `Permisos efectivos` son las autoridades que la API calcula para una asignación, su alcance y sus restricciones vigentes.
+- `location.switch` permite seleccionar otra sucursal del mismo merchant.
+- El `Alcance de sucursal` es la sucursal que la API obtiene de la asignación y de los permisos efectivos.
+- Una `Sucursal seleccionada` es una intención de navegación. No concede autoridad por sí misma.

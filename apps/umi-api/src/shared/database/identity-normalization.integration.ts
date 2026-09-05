@@ -31,21 +31,14 @@ const DSN =
 /**
  * WHAT THE PRODUCTION SNAPSHOT HOLDS, and the date it was measured.
  *
- * Re-pinned on 2026-08-18 against `umi_prod_snapshot_20260818`. The previous pin
- * was taken against the 2026-07-09 dump, and every number moved for a reason
+ * Re-pinned on 2026-09-01 against `umi_prod_snapshot_20260901`. The previous pin
+ * was taken against the 2026-08-18 dump, and every number moved for a reason
  * worth writing down rather than editing away:
  *
- *   phoneContacts 458 → 794  Forty days of new customers. The count tracks the
- *                            café's growth and carries no judgement.
- *   repaired        4 → 7    Five DISTINCT NANP numbers across seven rows (two
- *                            are held by two customers each). Every one keeps
- *                            its declared '+1'.
- *   nulled          1 → 2    Paloma R Mendia joined Mayela. Both are a declared
- *                            '+52' carrying only EIGHT national digits, so
- *                            neither string is a number anyone can dial. The
- *                            owner ruled on 2026-08-18 that these stay NULL:
- *                            `raw_phone_number` still holds what the customer
- *                            typed, so the café can correct it on a visit.
+ *   phoneContacts 794 → 864  Seventy new contact rows. The count tracks café
+ *                            growth and carries no judgement.
+ *   repaired          7 → 8  One new NANP row keeps its declared '+1'.
+ *   nulled            2 → 2  No new un-dialable row entered the snapshot.
  *
  * ⚠️ Rising `nulled` is the number to be suspicious of. It moved from 1 to 2
  * because a SECOND customer was entered with the same eight-digit defect, not
@@ -55,9 +48,9 @@ const DSN =
  */
 const SNAPSHOT = {
   /** Rows in `merchant.contact` that came from `core.contact_methods`. */
-  phoneContacts: 794,
+  phoneContacts: 864,
   /** Rows whose declared country code the old function had overwritten. */
-  repaired: 7,
+  repaired: 8,
   /** Rows that are not dialable at all, so NULL is the truthful answer. */
   nulled: 2,
 } as const;

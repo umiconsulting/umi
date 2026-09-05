@@ -36,6 +36,14 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
         },
+        // Socket.IO realtime. The dashboard connects to `/rt/dashboard`, but the
+        // engine.io transport lands on `/socket.io` (the default path); the
+        // namespace rides in the handshake payload.
+        '/socket.io': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
     build: {

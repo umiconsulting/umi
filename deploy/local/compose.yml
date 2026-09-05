@@ -1,0 +1,69 @@
+# Local infrastructure only: Postgres + Redis.
+#
+# The apps stay on the host with hot reload:
+#   4000  umi-dashboard   pnpm --filter @umi/dashboard dev
+#   4001  umi-api         pnpm --filter @umi/api dev
+#   4002  umi-pos (web)   flutter run -d web-server --web-port 4002
+#   4003  postgres        this stack
+#   4004  redis           this stack
+#
+# Postgres serves ONE database, umi_transition_rehearsal_20260901. On the first
+# start it is restored from ./seed (roles.sql + the pg_dump archive). Later
+# starts reuse the volume and skip the seed. To reseed: docker compose down -v.
+#
+#   docker compose -f deploy/local/compose.yml up -d
+#   docker compose -f deploy/local/compose.yml down        # keep data
+#   docker compose -f deploy/local/compose.yml down -v     # drop data, reseed on next up
+
+name: umi-local
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.5-pg17-bookworm
+    environment:
+      POSTGRES_DB: umi_transition_rehearsal_20260901
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/local/.env}
+      POSTGRES_INITDB_ARGS: --data-checksums
+    command:
+      - postgres
+      - -c
+      - timezone=UTC
+      - -c
+      - max_connections=60
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+    ports:
+      - '127.0.0.1:4003:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./seed:/seed:ro
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/00-umi-local.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d umi_transition_rehearsal_20260901']
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    mem_limit: 768m
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4.10-alpine3.21
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory', '128mb', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '127.0.0.1:4004:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    mem_limit: 192m
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

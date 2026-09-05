@@ -12,6 +12,7 @@ import '../features/catalog/catalog_surface.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_surface.dart';
 import '../shared/widgets/status_card.dart';
+import 'activity_listener.dart';
 
 final class HardwareKeyboardWedgeRouter {
   KeyEventResult route({
@@ -130,6 +131,12 @@ final class _UmiPosAppState extends State<UmiPosApp> {
       ],
       localeResolutionCallback: (locale, supported) =>
           supported.contains(locale) ? locale : const Locale('es'),
+      // Wrap the whole navigator, so a press on any route or dialog counts as
+      // activity and pushes back the idle auto-lock.
+      builder: (context, child) => ActivityListener(
+        onActivity: widget.root.entry.noteActivity,
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: _GuardedSurface(root: widget.root),
       onUnknownRoute: (_) => MaterialPageRoute<void>(
         builder: (_) => _UnknownRoute(root: widget.root),

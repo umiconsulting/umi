@@ -12,8 +12,11 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { RequirePermission } from '../auth/roles.decorator';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
+import { resolveLocationAuthority } from '../auth/location-authority';
 import { StaffService } from './staff.service';
 import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
 
@@ -28,7 +31,8 @@ import { CreateStaffDto, UpdateStaffDto } from './dto/staff.dto';
  * cafés too (AB#118). Employment is a dashboard capability; the product gate
  * belongs on the POS routes, where it is.
  */
-@UseGuards(AuthGuard, MerchantAccessGuard)
+@UseGuards(AuthGuard, MerchantAccessGuard, RolesGuard)
+@RequirePermission('merchant.manage')
 @Controller('api/:merchantRef/admin/staff')
 export class StaffController {
   constructor(private readonly staff: StaffService) {}
@@ -46,7 +50,12 @@ export class StaffController {
     @Query('locationId') locationId?: string,
   ) {
     return {
-      staff: await this.staff.create(merchant.merchantId, locationId ?? null, dto),
+      staff: await this.staff.create(
+        merchant.merchantId,
+        resolveLocationAuthority(merchant, locationId),
+        dto,
+        merchant,
+      ),
     };
   }
 
@@ -56,7 +65,7 @@ export class StaffController {
     @Param('staffId') staffId: string,
     @Body() dto: UpdateStaffDto,
   ) {
-    return { staff: await this.staff.update(merchant.merchantId, staffId, dto) };
+    return { staff: await this.staff.update(merchant.merchantId, staffId, dto, merchant) };
   }
 
   @Delete(':staffId')

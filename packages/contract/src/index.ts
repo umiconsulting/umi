@@ -29,6 +29,8 @@ export * from './pos-customer-value';
 export * from './pos-hardware';
 export * from './pos-kitchen';
 export * from './dashboard-operations';
+// Realtime transport vocabulary: the socket namespace, event names, and payloads.
+export * from './realtime';
 // The generated-artifact manifest: versions, error/route/model/invariant catalogues.
 export * from './catalog';
 // Zero-dep entitlement vocabulary. Also published as '@umi/contract/entitlements'
