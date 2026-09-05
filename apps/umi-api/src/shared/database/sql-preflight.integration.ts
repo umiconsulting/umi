@@ -202,15 +202,6 @@ const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: stri
     // so no static rebuild produces the statement the database will see.
     why: 'true run-time clause; accepted 2026-09-05',
   },
-  {
-    file: 'modules/conversations/products.repository.ts',
-    count: 2,
-    // ACCEPTED. The conversational product search composes its statement from
-    // run-time fragments (`SELECT ${SELECT} ${FROM}` plus the per-request search /
-    // ranking clause), so the exact statement the database sees is chosen at run
-    // time. Arrived with the orders / conversations work on build-v3.
-    why: 'true run-time clause; accepted 2026-09-05',
-  },
 ];
 
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {
