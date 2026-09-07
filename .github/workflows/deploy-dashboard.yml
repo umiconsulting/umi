@@ -1,0 +1,114 @@
+# Builds and ships apps/umi-dashboard to Cloudflare Pages with wrangler.
+#
+# This REPLACES Vercel's Git integration for the dashboard. Vercel may still
+# build in parallel until its project is disconnected, but nothing serves from
+# Cloudflare on the real domain until the `dashboard` CNAME is cut over in
+# Squarespace DNS — so this workflow is safe to land before the cutover.
+#
+#   push to main   -> production deployment  (umi-dashboard.pages.dev, then the
+#                     custom domain once the CNAME points here)
+#   pull_request   -> preview deployment     (<branch>.umi-dashboard.pages.dev)
+#
+# The dashboard is a static Vite SPA. Every config value is a VITE_* variable
+# baked in AT BUILD TIME — there are no runtime server secrets. The only secret
+# this workflow needs is CLOUDFLARE_API_TOKEN (Account > Cloudflare Pages > Edit).
+#
+# ⚠️ WHY WE WRITE .env.production.local. vite.config.js reads config through
+# `loadEnv()`, which reads .env FILES, and then a validator throws if the
+# deployed-env keys are missing. In CI there is no .env.local (it is gitignored),
+# so we materialise the production values into .env.production.local first. The
+# VITE_RELEASE_* values come from the commit, the way Vercel derived them from
+# its VERCEL_GIT_* injections. Non-secret build config is inlined below on
+# purpose: it is public (an API origin and a version string), and keeping it in
+# the workflow makes the deployed configuration reviewable in git.
+name: deploy dashboard (cloudflare pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/umi-dashboard/**'
+      - 'packages/tokens/**'
+      - 'packages/contract/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'turbo.json'
+      - '.github/workflows/deploy-dashboard.yml'
+  pull_request:
+    paths:
+      - 'apps/umi-dashboard/**'
+      - 'packages/tokens/**'
+      - 'packages/contract/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'turbo.json'
+      - '.github/workflows/deploy-dashboard.yml'
+
+# One deploy per ref at a time; a newer push supersedes an in-flight preview.
+concurrency:
+  group: deploy-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      # Only the dashboard subtree — avoids installing sibling apps (e.g. umi-cash
+      # runs `prisma generate` on install, which this build does not need).
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter @umi/dashboard...
+
+      - name: Write build env
+        run: |
+          cat > apps/umi-dashboard/.env.production.local <<EOF
+          VITE_UMI_ENVIRONMENT=production
+          VITE_AUTH_MODE=cookie
+          VITE_API_BASE=https://api.umiconsulting.co
+          VITE_PUBLIC_URL=https://dashboard.umiconsulting.co
+          VITE_BUSINESS_SLUG=elgranribera
+          VITE_CONTRACT_VERSION=2.13.0
+          VITE_CONFIG_SCHEMA_VERSION=1
+          VITE_RELEASE_VERSION=${{ github.ref_name }}
+          VITE_RELEASE_GIT_COMMIT=${{ github.sha }}
+          VITE_RELEASE_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+
+      - name: Build
+        run: pnpm --filter @umi/dashboard build
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 8aef562d6d0c51b70f1b83fa1d2912a4
+        run: |
+          # main -> production branch "main"; PR -> preview branch = head ref.
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          echo "Deploying to Cloudflare Pages (branch: $BRANCH)"
+          OUT=$(pnpm dlx wrangler@4.129.0 pages deploy apps/umi-dashboard/dist \
+            --project-name=umi-dashboard --branch="$BRANCH" --commit-dirty=true 2>&1)
+          echo "$OUT"
+          URL=$(echo "$OUT" | grep -oE 'https://[a-z0-9.-]+\.pages\.dev' | tail -1)
+          {
+            echo "### Cloudflare Pages — umi-dashboard"
+            echo ""
+            echo "- branch: \`$BRANCH\`"
+            echo "- deployment: $URL"
+          } >> "$GITHUB_STEP_SUMMARY"
