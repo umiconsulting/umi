@@ -24,6 +24,8 @@
 name: deploy dashboard (cloudflare pages)
 
 on:
+  # Manual redeploy of current main (e.g. an env/variable change, no code change).
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -84,6 +86,14 @@ jobs:
           VITE_API_BASE=https://api.umiconsulting.co
           VITE_PUBLIC_URL=https://dashboard.umiconsulting.co
           VITE_BUSINESS_SLUG=elgranribera
+          # main still uses @supabase/supabase-js for auth + password reset
+          # (lib/auth.jsx, screens/reset-password.jsx), so the client needs these
+          # or createClient() throws "supabaseUrl is required" at load and the app
+          # white-screens. The anon key is a public client key, but it is a JWT, so
+          # it lives in an Actions variable to keep gitleaks quiet — not inlined.
+          # build-v3 removes Supabase from the dashboard; drop these when it ships.
+          VITE_SUPABASE_URL=https://xbudknbimkgjjgohnjgp.supabase.co
+          VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_CONTRACT_VERSION=2.13.0
           VITE_CONFIG_SCHEMA_VERSION=1
           VITE_RELEASE_VERSION=${{ github.ref_name }}
