@@ -148,16 +148,34 @@ export function staffVisitMessage(profile: RewardProfile, visitsThisCycle: numbe
   return `${visitas(next.remaining)} para ${next.rewardName}.`;
 }
 
-export type AppleFrontFields = { remaining: string; reward: string; ready: string | null };
+export type AppleFrontField = { key: string; label: string; value: string };
 
-/** Apple front: VISITAS FALTANTES / RECOMPENSA values, plus the cashed-out-able tier when reached. */
-export function appleFrontFields(profile: RewardProfile, visitsThisCycle: number): AppleFrontFields {
+/**
+ * Apple front row, in order. A store card has ONE row under the strip (secondary and
+ * auxiliary fields share it), so this stays at three columns on a ladder — Apple
+ * shrinks the text with every extra column. The upper tier is labelled "SEGUNDO
+ * NIVEL", never "2da recompensa": the customer gets one drink or the other, not both.
+ */
+export function appleFrontFields(profile: RewardProfile, visitsThisCycle: number): AppleFrontField[] {
+  const base = profile.baseTier;
   const next = nextTier(profile, visitsThisCycle);
-  return {
-    remaining: visitas(next.remaining),
-    reward: next.rewardName,
-    ready: isBaseReady(profile, visitsThisCycle) ? profile.baseTier!.rewardName : null,
-  };
+  const remaining: AppleFrontField = { key: 'remaining', label: 'VISITAS FALTANTES', value: visitas(next.remaining) };
+  if (!base) {
+    return [remaining, { key: 'rewards', label: 'RECOMPENSA', value: profile.rewardName }];
+  }
+  if (isBaseReady(profile, visitsThisCycle)) {
+    return [
+      { key: 'baseReady', label: 'LISTO PARA CANJEAR', value: base.rewardName },
+      remaining,
+      { key: 'upgrade', label: 'SEGUNDO NIVEL', value: profile.rewardName },
+    ];
+  }
+  const toTop = Math.max(1, profile.visitsRequired - visitsThisCycle);
+  return [
+    remaining,
+    { key: 'rewards', label: 'RECOMPENSA', value: base.rewardName },
+    { key: 'upgrade', label: 'SEGUNDO NIVEL', value: `${profile.rewardName} · ${toTop} más` },
+  ];
 }
 
 export type VisitMoment = {

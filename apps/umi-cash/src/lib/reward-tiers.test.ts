@@ -108,10 +108,26 @@ describe('pass copy', () => {
     expect(staffVisitMessage(ladder, 8)).toBe('¡Capuccino listo! 1 visita más para Bebida rocas.');
   });
 
-  it('apple front fields', () => {
-    expect(appleFrontFields(single, 4)).toEqual({ remaining: '6 visitas', reward: 'Bebida gratis', ready: null });
-    expect(appleFrontFields(ladder, 5)).toEqual({ remaining: '2 visitas', reward: 'Capuccino', ready: null });
-    expect(appleFrontFields(ladder, 7)).toEqual({ remaining: '2 visitas', reward: 'Bebida rocas', ready: 'Capuccino' });
+  it('apple front row: two columns for a single reward, three on a ladder', () => {
+    expect(appleFrontFields(single, 4)).toEqual([
+      { key: 'remaining', label: 'VISITAS FALTANTES', value: '6 visitas' },
+      { key: 'rewards', label: 'RECOMPENSA', value: 'Bebida gratis' },
+    ]);
+    // The upper tier is on the front from the first stamp, labelled as a LEVEL — the
+    // customer gets one drink or the other, never "2da recompensa".
+    expect(appleFrontFields(ladder, 5)).toEqual([
+      { key: 'remaining', label: 'VISITAS FALTANTES', value: '2 visitas' },
+      { key: 'rewards', label: 'RECOMPENSA', value: 'Capuccino' },
+      { key: 'upgrade', label: 'SEGUNDO NIVEL', value: 'Bebida rocas · 4 más' },
+    ]);
+    expect(appleFrontFields(ladder, 7)).toEqual([
+      { key: 'baseReady', label: 'LISTO PARA CANJEAR', value: 'Capuccino' },
+      { key: 'remaining', label: 'VISITAS FALTANTES', value: '2 visitas' },
+      { key: 'upgrade', label: 'SEGUNDO NIVEL', value: 'Bebida rocas' },
+    ]);
+    expect(appleFrontFields(ladder, 8)[1].value).toBe('1 visita');
+    // Never more than three columns — Apple shrinks the row with every extra one.
+    for (const v of [0, 3, 6, 7, 8]) expect(appleFrontFields(ladder, v).length).toBeLessThanOrEqual(3);
   });
 
   it('ladder summary for the pass back / details', () => {

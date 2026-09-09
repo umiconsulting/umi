@@ -258,25 +258,12 @@ export async function generateApplePass(data: PassData): Promise<{
     // generic "Store Card changed" notification. The lifecycle back field (below)
     // is the single notification channel — the scan writes a moment there on
     // EVERY visit, so its changeMessage carries the real copy alone.
-    // On a ladder both count toward the NEXT tier (the lower one until it's reached),
-    // and the reached lower tier gets its own "listo para canjear" field below.
-    const front = appleFrontFields(profile, data.visitsThisCycle);
-    pass.secondaryFields.push({
-      key: 'remaining',
-      label: 'VISITAS FALTANTES',
-      value: front.remaining,
-    });
-    pass.secondaryFields.push({
-      key: 'rewards',
-      label: 'RECOMPENSA',
-      value: front.reward,
-    });
-    if (front.ready) {
-      pass.auxiliaryFields.push({
-        key: 'baseReady',
-        label: 'LISTO PARA CANJEAR',
-        value: front.ready,
-      });
+    // Two columns for a single reward; three on a ladder (reward-tiers.ts decides the
+    // order: the upper tier is always on the front as "SEGUNDO NIVEL", and once the
+    // lower tier is reached "LISTO PARA CANJEAR" leads the row). All secondary so the
+    // order is deterministic — Apple merges secondary + auxiliary into this one row.
+    for (const field of appleFrontFields(profile, data.visitsThisCycle)) {
+      pass.secondaryFields.push(field);
     }
     // Néctar Café shows the member name on the front of the stamps pass.
     if (data.tenantSlug === 'nectarcafe') {
