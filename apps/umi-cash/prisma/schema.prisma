@@ -777,8 +777,10 @@ model reward_configs {
   activated_at       DateTime             @default(now()) @db.Timestamptz(6)
   created_at         DateTime             @default(now()) @db.Timestamptz(6)
   // 'standard' = a tenant default (current or retired); 'override' = a per-client
-  // custom reward. Keeps override rows out of the rewards settings "history" list
-  // and out of getActiveRewardConfig's candidate pool by construction.
+  // custom reward; 'upgrade' = the optional upper tier of a two-tier ladder (e.g.
+  // 7 visits = capuccino, 9 = bebida en las rocas), active alongside the standard
+  // row it sits above. Keeps override/upgrade rows out of the rewards settings
+  // "history" list and out of getActiveRewardConfig's candidate pool by construction.
   kind               String               @default("standard")
   tenants            tenants              @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   programs           programs?            @relation(fields: [tenant_id, program_id], references: [tenant_id, id], onDelete: SetNull, onUpdate: NoAction)

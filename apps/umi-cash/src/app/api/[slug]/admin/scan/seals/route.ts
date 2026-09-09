@@ -10,7 +10,8 @@ import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage, lifecycleMetadata } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
-import { resolveJourneyTemplate, renderTemplate, type LifecycleJourneyKey } from '@/lib/lifecycle-copy';
+import { resolveJourneyTemplate, renderTemplate } from '@/lib/lifecycle-copy';
+import { momentVars, visitMoment } from '@/lib/reward-tiers';
 
 // waitUntil work shares this budget — see the scan route; the backgrounded wallet push
 // is cancelled if the invocation ends first.
@@ -80,7 +81,9 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ error: 'Tu usuario no está registrado como personal' }, { status: 403 });
     }
     const rewardProfile = await getRewardProfileForCard(tenant.id, card);
-    const { visitsRequired, rewardName } = rewardProfile;
+    // Cycle length is the TOP tier on a two-tier ladder; a bulk credit that crosses the
+    // lower tier just leaves the card there (the customer chooses on their next scan).
+    const { visitsRequired } = rewardProfile;
     const required = Math.max(1, visitsRequired); // guard divide-by-zero on a mis-set config
 
     // Keep the pass's birthday reward visible if one is still active (this action
@@ -117,27 +120,22 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const rewardsEarned = Math.floor(total / required);
       const newCycle = total % required;
 
-      // Same moment system as the scan route: a credit that crosses the threshold
-      // announces the reward; lesser milestones fill in behind it. Written on every
-      // applied credit (moment or null), so a moment cached by an earlier visit can
-      // never linger — or re-notify — on the wallet push this credit triggers.
-      // No first_visit here: a bulk import isn't the customer's first stamp story.
-      let momentJourney: LifecycleJourneyKey | null = null;
-      if (rewardsEarned > 0) momentJourney = 'reward_earned';
-      else if (newCycle === required - 1) momentJourney = 'milestone_one_left';
-      else if (required >= 4 && newCycle === Math.floor(required / 2)) momentJourney = 'milestone_halfway';
-      // Same rule as the scan route: every credit changes the lifecycle field —
-      // the single Apple notification channel — with real copy.
-      else momentJourney = 'visit_recorded';
-      const momentMessage = momentJourney
-        ? renderTemplate(resolveJourneyTemplate(tenant.lifecycleCopy, momentJourney), {
-            name: card.person?.display_name || DEFAULT_CUSTOMER_NAME,
-            tenant: tenant.name,
-            rewardName,
-            visitsThisCycle: rewardsEarned > 0 ? required : newCycle,
-            visitsRequired: required,
-          })
-        : null;
+      // Same moment system as the scan route (reward-tiers.ts): a credit that crosses
+      // the threshold announces the reward; lesser milestones fill in behind it.
+      // Written on every applied credit (moment or null), so a moment cached by an
+      // earlier visit can never linger — or re-notify — on the wallet push this credit
+      // triggers. No first_visit here: a bulk import isn't the customer's first stamp
+      // story. Every credit changes the lifecycle field — the single Apple
+      // notification channel — with real copy.
+      const moment = visitMoment(rewardProfile, {
+        newVisitsThisCycle: rewardsEarned > 0 ? required : newCycle,
+        earnedReward: rewardsEarned > 0,
+        isFirstVisitEver: false,
+      });
+      const momentMessage = renderTemplate(
+        resolveJourneyTemplate(tenant.lifecycleCopy, moment.journey),
+        momentVars(rewardProfile, moment, { name: card.person?.display_name || DEFAULT_CUSTOMER_NAME, tenant: tenant.name }),
+      );
 
       await tx.visit_events.create({
         data: {
@@ -175,8 +173,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           card.card_number,
           result.card,
           customerName,
-          visitsRequired,
-          rewardName,
+          rewardProfile,
           card.created_at,
           tenant.name,
           params.slug,
@@ -201,7 +198,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       seals,
       rewardsEarned: earned,
       message,
-      card: buildCardSummary(result.card, visitsRequired),
+      card: buildCardSummary(result.card, rewardProfile),
     });
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });

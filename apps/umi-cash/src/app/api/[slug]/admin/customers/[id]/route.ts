@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatMXN } from '@/lib/currency';
 import { getActiveRewardConfig, rewardConfigDefaults, getRewardProfileForCard } from '@/lib/prisma-helpers';
-import { triggerWalletUpdates, readLifecycleMessage } from '@/lib/scan-helpers';
+import { triggerWalletUpdates, readLifecycleMessage, cardRewardFields } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 
@@ -45,7 +45,6 @@ export async function GET(
   }
 
   const rewardProfile = await getRewardProfileForCard(tenant.id, card);
-  const { visitsRequired, rewardName } = rewardProfile;
   const overrideConfig = card.reward_config_id
     ? await prisma.reward_configs.findFirst({ where: { tenant_id: tenant.id, id: card.reward_config_id } })
     : null;
@@ -102,8 +101,9 @@ export async function GET(
     cardNumber: card.card_number, cardId: card.id,
     balanceMXN: formatMXN(card.balance_cents), balanceCentavos: card.balance_cents,
     totalVisits: card.total_visits, visitsThisCycle: card.visits_this_cycle,
-    visitsRequired, pendingRewards: card.pending_rewards, rewardsRedeemed,
-    rewardName,
+    pendingRewards: card.pending_rewards, rewardsRedeemed,
+    // visitsRequired / rewardName (cycle values) + baseReward / pendingRewardName (ladder)
+    ...cardRewardFields(card, rewardProfile),
     customReward: overrideConfig
       ? { name: overrideConfig.reward_name, description: overrideConfig.reward_description }
       : null,
@@ -224,7 +224,7 @@ export async function PATCH(
       'wallet:reward-override',
       triggerWalletUpdates(
         card.id, card.card_number, updatedCard, person.display_name,
-        rewardProfile.visitsRequired, rewardProfile.rewardName, card.created_at,
+        rewardProfile, card.created_at,
         tenant.name, params.slug, tenant.primaryColor,
         activeBirthdayReward ? tenant.birthdayRewardName : null,
         readLifecycleMessage(updatedCard.metadata),

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { formatMXN } from '@/lib/currency';
 import { getTenant } from '@/lib/tenant';
 import { getRewardProfileForCard } from '@/lib/prisma-helpers';
+import { walletRewardFields } from '@/lib/reward-tiers';
 import { applyWalletDelta } from '@/lib/wallet';
 import { findPersonByPhone, findPersonByEmail } from '@/lib/identity';
 import { sendApplePushUpdate } from '@/lib/push-apple';
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     });
 
     // Update wallet passes
-    const { visitsRequired, rewardName } = await getRewardProfileForCard(tenant.id, card);
+    const rewardProfile = await getRewardProfileForCard(tenant.id, card);
     // Await push inline — waitUntil + http2 is unreliable on Vercel
     await Promise.all([
       sendApplePushUpdate(card.id),
@@ -140,9 +141,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         customerName: person.display_name || DEFAULT_CUSTOMER_NAME,
         balanceCentavos: balanceCents,
         visitsThisCycle: card.visits_this_cycle,
-        visitsRequired,
         pendingRewards: card.pending_rewards,
-        rewardName,
+        ...walletRewardFields(rewardProfile, card.metadata),
         totalVisits: card.total_visits,
         memberSince: card.created_at.toISOString(),
         tenantName: tenant.name,

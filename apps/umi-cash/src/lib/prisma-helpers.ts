@@ -9,6 +9,26 @@ export async function getActiveRewardConfig(tenantId: string) {
   });
 }
 
+/**
+ * The optional upper tier of a two-tier ladder (kind 'upgrade'). Null for every
+ * tenant that runs a single reward — the common case.
+ */
+export async function getActiveUpgradeConfig(tenantId: string) {
+  return prisma.reward_configs.findFirst({
+    where: { tenant_id: tenantId, is_active: true, kind: 'upgrade' },
+    orderBy: { activated_at: 'desc' },
+  });
+}
+
+/** Tenant-wide profile (no card override) — landing page, cron sends, analytics. */
+export async function getTenantRewardProfile(tenantId: string): Promise<RewardProfile> {
+  const [defaultConfig, upgradeConfig] = await Promise.all([
+    getActiveRewardConfig(tenantId),
+    getActiveUpgradeConfig(tenantId),
+  ]);
+  return resolveRewardProfile(defaultConfig, null, upgradeConfig);
+}
+
 export function rewardConfigDefaults(config: Awaited<ReturnType<typeof getActiveRewardConfig>>) {
   return {
     visitsRequired: config?.visits_required ?? DEFAULT_VISITS_REQUIRED,
@@ -26,13 +46,14 @@ export async function getRewardProfileForCard(
   tenantId: string,
   card: { reward_config_id: string | null },
 ): Promise<RewardProfile> {
-  const [defaultConfig, overrideConfig] = await Promise.all([
+  const [defaultConfig, overrideConfig, upgradeConfig] = await Promise.all([
     getActiveRewardConfig(tenantId),
     card.reward_config_id
       ? prisma.reward_configs.findFirst({ where: { tenant_id: tenantId, id: card.reward_config_id } })
       : Promise.resolve(null),
+    getActiveUpgradeConfig(tenantId),
   ]);
-  return resolveRewardProfile(defaultConfig, overrideConfig);
+  return resolveRewardProfile(defaultConfig, overrideConfig, upgradeConfig);
 }
 
 /**

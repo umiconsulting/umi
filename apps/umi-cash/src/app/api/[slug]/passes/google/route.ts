@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateGoogleWalletURL, isGoogleWalletConfigured } from '@/lib/pass-google';
 import { getRewardProfileForCard } from '@/lib/prisma-helpers';
+import { walletRewardFields } from '@/lib/reward-tiers';
 import { logError } from '@/lib/log';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant } from '@/lib/tenant';
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   });
   if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
 
-  const [{ visitsRequired, rewardName }, activeBirthdayReward, existingPass] = await Promise.all([
+  const [rewardProfile, activeBirthdayReward, existingPass] = await Promise.all([
     getRewardProfileForCard(tenant.id, card),
     prisma.birthday_rewards.findFirst({
       where: { loyalty_card_id: card.id, status: 'active', expires_at: { gte: new Date() } },
@@ -50,9 +51,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       customerName,
       balanceCentavos: card.balance_cents,
       visitsThisCycle: card.visits_this_cycle,
-      visitsRequired,
       pendingRewards: card.pending_rewards,
-      rewardName,
+      ...walletRewardFields(rewardProfile, card.metadata),
       totalVisits: card.total_visits,
       memberSince: card.created_at.toISOString(),
       tenantName: tenant.name,

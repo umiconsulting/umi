@@ -7,6 +7,7 @@ import { lockCard } from '@/lib/wallet';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { triggerWalletUpdates, readLifecycleMessage, lifecycleMetadata } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
+import { readPendingTier1 } from '@/lib/reward-tiers';
 
 // waitUntil work shares this budget — see the scan route; the backgrounded wallet push
 // is cancelled if the invocation ends first.
@@ -61,7 +62,13 @@ export async function POST(
       where: { id: redemption.loyalty_card_id },
       select: { reward_config_id: true },
     });
-    const { visitsRequired, rewardName } = await getRewardProfileForCard(tenant.id, cardForReward ?? { reward_config_id: null });
+    const rewardProfile = await getRewardProfileForCard(tenant.id, cardForReward ?? { reward_config_id: null });
+    // On a two-tier ladder a reverted LOWER-tier canje comes back as a banked lower-tier
+    // reward (pending_tier1 tag) — the early cash-out consumed the cycle, and the visits
+    // it took are gone, so a banked capuccino is the honest restoration. Anything else
+    // comes back as the top tier, which is what the cycle banks.
+    const revertsBaseTier = !!rewardProfile.baseTier?.configId && redemption.reward_config_id === rewardProfile.baseTier.configId;
+    const rewardName = revertsBaseTier ? rewardProfile.baseTier!.rewardName : rewardProfile.rewardName;
 
     const card = await prisma.$transaction(async (tx) => {
       // Serialize against concurrent scans/redeems on this card and re-check the
@@ -76,13 +83,16 @@ export async function POST(
       });
 
       const freshCard = await tx.cards.findUniqueOrThrow({ where: { id: redemption.loyalty_card_id } });
+      const restoredMeta = revertsBaseTier
+        ? { ...((freshCard.metadata ?? {}) as Record<string, unknown>), pending_tier1: readPendingTier1(freshCard.metadata) + 1 }
+        : freshCard.metadata;
       return tx.cards.update({
         where: { id: redemption.loyalty_card_id },
         data: {
           pending_rewards: { increment: 1 },
           // The customer should see (and be notified) that the reward is back.
           metadata: lifecycleMetadata(
-            freshCard.metadata,
+            restoredMeta,
             `Te devolvimos tu ${rewardName} — está lista para canjear de nuevo 🎁`,
           ),
         },
@@ -109,8 +119,7 @@ export async function POST(
         card.card_number,
         card,
         card.accounts?.people?.display_name ?? null,
-        visitsRequired,
-        rewardName,
+        rewardProfile,
         card.created_at,
         tenant.name,
         params.slug,

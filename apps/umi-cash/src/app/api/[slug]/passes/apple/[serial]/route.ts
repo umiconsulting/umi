@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateApplePass, isAppleWalletConfigured } from '@/lib/pass-apple';
 import { getRewardProfileForCard } from '@/lib/prisma-helpers';
+import { walletRewardFields } from '@/lib/reward-tiers';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant, getActivePromo } from '@/lib/tenant';
 
@@ -34,7 +35,7 @@ export async function GET(
     return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
   }
 
-  const [{ visitsRequired, rewardName }, locations, activeBirthdayReward] = await Promise.all([
+  const [rewardProfile, locations, activeBirthdayReward] = await Promise.all([
     getRewardProfileForCard(card.tenant_id, card),
     prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),
     prisma.birthday_rewards.findFirst({
@@ -52,9 +53,8 @@ export async function GET(
       customerName,
       balanceCentavos: card.balance_cents,
       visitsThisCycle: card.visits_this_cycle,
-      visitsRequired,
       pendingRewards: card.pending_rewards,
-      rewardName,
+      ...walletRewardFields(rewardProfile, card.metadata),
       totalVisits: card.total_visits,
       serial: pass.serial_number ?? undefined,
       authToken: pass.auth_token ?? undefined,
