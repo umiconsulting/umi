@@ -91,7 +91,8 @@ void main() {
   });
 
   group('realtime pairing nudge', () {
-    Future<(_PairingGateway, CredentialVault, EntryController)> waiting() async {
+    Future<(_PairingGateway, CredentialVault, EntryController)>
+    waiting() async {
       final storage = MemorySecureStorage();
       storage.values['device.installation_id'] = _installationId;
       final vault = CredentialVault(storage);
@@ -110,25 +111,39 @@ void main() {
       return (gateway, vault, controller);
     }
 
-    test('a nudge collects the credential without waiting for the poll', () async {
-      final (gateway, vault, controller) = await waiting();
+    test(
+      'a nudge collects the credential without waiting for the poll',
+      () async {
+        final (gateway, vault, controller) = await waiting();
 
-      gateway.pollState = 'credential_delivered';
-      gateway.nudges.add(null);
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+        gateway.pollState = 'credential_delivered';
+        gateway.nudges.add(null);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(controller.state.phase, EntryPhase.pinRequired);
-      expect(gateway.polls, 2, reason: 'one from the loop, one from the nudge');
-      expect(gateway.acknowledgements, 1, reason: 'the credential is stored once');
-      expect((await vault.deviceIdentity()).credential, _secret);
-      expect(await vault.pairingIdentity(), isNull);
-    });
+        expect(controller.state.phase, EntryPhase.pinRequired);
+        expect(
+          gateway.polls,
+          2,
+          reason: 'one from the loop, one from the nudge',
+        );
+        expect(
+          gateway.acknowledgements,
+          1,
+          reason: 'the credential is stored once',
+        );
+        expect((await vault.deviceIdentity()).credential, _secret);
+        expect(await vault.pairingIdentity(), isNull);
+      },
+    );
 
     test('a burst of nudges still stores the credential once', () async {
       final (gateway, _, controller) = await waiting();
 
       gateway.pollState = 'credential_delivered';
-      gateway.nudges..add(null)..add(null)..add(null);
+      gateway.nudges
+        ..add(null)
+        ..add(null)
+        ..add(null);
       await Future<void>.delayed(const Duration(milliseconds: 40));
 
       expect(controller.state.phase, EntryPhase.pinRequired);
@@ -355,8 +370,13 @@ void main() {
     expect(find.text('Email'), findsNothing);
     expect(find.text('Use 4 to 8 digits.'), findsOneWidget);
     expect(find.text('0/8'), findsNothing);
-    await tester.enterText(find.byType(TextField), '2468');
-    await tester.pump();
+    // The operator PIN is entered on an on-screen keypad now (audit F14), not a
+    // text field: tap the digit keys.
+    for (final digit in const ['2', '4', '6', '8']) {
+      await tester.tap(find.text(digit));
+      await tester.pump();
+    }
+    await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
@@ -713,6 +733,7 @@ final class _PairingGateway implements EntryGateway {
       tokens: {'accessToken': 'access2', 'refreshToken': 'refresh2'},
     );
   }
+
   @override
   Future<void> logout() async {
     logouts++;

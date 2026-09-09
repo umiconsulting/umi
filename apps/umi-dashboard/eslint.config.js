@@ -98,7 +98,7 @@ export default [
             '^T\\d{2}:\\d{2}', // ISO time suffixes
             '^\\(prefers-color-scheme',
             '^America / ', // IANA zone names shown as-is
-            '^\\s*(umi|· dash|Umi|Midnight)\\s*$', // brand and theme names
+            '^\\s*(umi|· dash|Umi|Midnight|Oscuro)\\s*$', // brand and theme names
           ],
           ignoreNames: [
             { regex: { pattern: 'className', flags: 'i' } },

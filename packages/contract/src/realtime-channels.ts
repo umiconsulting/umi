@@ -37,6 +37,13 @@ export const DASHBOARD_REALTIME_NAMESPACE = '/rt/dashboard';
  */
 export const DASHBOARD_EVENT_DEVICES_CHANGED = 'dashboard.devices.changed';
 
+/**
+ * A conversation gained a message. It carries only which conversation moved; the
+ * dashboard re-reads the thread tail over REST. Like the device nudge, the socket
+ * is a wake-up, not a delivery gate — the message body never rides it.
+ */
+export const DASHBOARD_EVENT_CONVERSATION_MESSAGE = 'dashboard.conversation.message';
+
 /** Room name that scopes a dashboard nudge to one merchant. */
 export function dashboardRoom(merchantId: string): string {
   return `dashboard:${merchantId}`;

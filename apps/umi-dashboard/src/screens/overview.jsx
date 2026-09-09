@@ -69,14 +69,14 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
   ].filter(Boolean);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="overview-screen" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* An empty ticker rendered as a full-width bar with a lone EN VIVO tag and
           nothing running past it — a container advertising that it has nothing to
           say. It appears when there is something to report, and not before. */}
       {ticker?.length ? <LiveTicker events={ticker} /> : null}
 
       {/* Hero metric + supporting strip */}
-      <section className="split">
+      <section className="split even overview-hero-split">
         {/* Hero — Active Members */}
         <div className="hero-metric">
           <div className="h-head">

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Select } from '@/components/select.jsx';
 import { useNavigate } from 'react-router-dom';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
-import { useOperationsData } from '@/data.jsx';
+import { loadSaleReceipt, useOperationsData } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatOperationDate, formatOperationMoney } from './operations-format.js';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
@@ -26,6 +27,32 @@ const ERROR_COPY = {
   HARDWARE_OUTCOME_UNKNOWN: msg`El resultado físico es desconocido. Verifica el equipo antes de repetir.`,
   RECOVERY_REQUIRED: msg`Consulta el comando original en el Centro de recuperación.`,
   SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
+};
+
+// Domain heading labels, localized on the client. The API's domain registry sends a
+// Spanish `label`; here the owner reads the heading in the active language. Any domain
+// not mapped falls back to the server label, so nothing regresses.
+const DOMAIN_LABELS = {
+  organization: msg`Organización`,
+  locations: msg`Ubicaciones`,
+  memberships: msg`Usuarios y membresías`,
+  devices: msg`Dispositivos POS`,
+  registers: msg`Registros`,
+  catalog: msg`Catálogo`,
+  inventory: msg`Inventario`,
+  sales: msg`Ventas`,
+  receipts: msg`Recibos`,
+  refunds_voids: msg`Reembolsos y anulaciones`,
+  cash_shifts: msg`Turnos de caja`,
+  customers: msg`Clientes`,
+  loyalty: msg`Lealtad`,
+  rewards: msg`Recompensas`,
+  wallet: msg`Wallet`,
+  gift_cards: msg`Gift cards`,
+  kitchen: msg`Cocina y KDS`,
+  recovery: msg`Centro de recuperación`,
+  audit: msg`Auditoría`,
+  diagnostics: msg`Diagnóstico`,
 };
 
 /** The owner-facing sentence for an API error code, or the raw message when none maps. */
@@ -184,7 +211,7 @@ function RefundDialog({ sale, onClose, onComplete }) {
           <div style={{ display: 'grid', gap: 12 }}>
             <label>
               <Trans>Tipo</Trans>
-              <select
+              <Select
                 value={exceptionType}
                 onChange={(event) => setExceptionType(event.target.value)}
               >
@@ -193,15 +220,15 @@ function RefundDialog({ sale, onClose, onComplete }) {
                     {type.replaceAll('_', ' ')}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               <Trans>Motivo</Trans>
-              <select value={reason} onChange={(event) => setReason(event.target.value)}>
+              <Select value={reason} onChange={(event) => setReason(event.target.value)}>
                 <option value="customer_changed_mind">{t`Cambio de decisión`}</option>
                 <option value="incorrect_item">{t`Artículo incorrecto`}</option>
                 <option value="product_defect">{t`Defecto del producto`}</option>
-              </select>
+              </Select>
             </label>
             {exceptionType === 'partial_refund' &&
               eligibility.refund.lines.map((line) => (
@@ -260,7 +287,7 @@ function RefundDialog({ sale, onClose, onComplete }) {
               <>
                 <ManagerPinField value={managerPin} onChange={setManagerPin} />
                 <button
-                  className="btn"
+                  className="btn btn-secondary"
                   type="button"
                   disabled={command.pending || managerPin.length < 4}
                   onClick={approve}
@@ -510,7 +537,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
           <div style={{ display: 'grid', gap: 12 }}>
             <label>
               <Trans>Operación</Trans>
-              <select
+              <Select
                 value={operation}
                 onChange={(event) => {
                   setOperation(event.target.value);
@@ -521,15 +548,15 @@ function InventoryDialog({ row, onClose, onComplete }) {
                 <option value="inventory.waste">{t`Merma`}</option>
                 <option value="inventory.damage">{t`Daño`}</option>
                 <option value="inventory.quarantine">{t`Cuarentena`}</option>
-              </select>
+              </Select>
             </label>
             {operation === 'inventory.adjustment' && (
               <label>
                 <Trans>Dirección</Trans>
-                <select value={direction} onChange={(event) => setDirection(event.target.value)}>
+                <Select value={direction} onChange={(event) => setDirection(event.target.value)}>
                   <option value="increase">{t`Aumentar`}</option>
                   <option value="decrease">{t`Reducir`}</option>
-                </select>
+                </Select>
               </label>
             )}
             <label>
@@ -542,7 +569,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
               />
             </label>
             {!planned ? (
-              <button className="btn" type="button" onClick={previewMutation}>
+              <button className="btn btn-secondary" type="button" onClick={previewMutation}>
                 <Trans>Revisar operación</Trans>
               </button>
             ) : (
@@ -564,7 +591,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
             )}
             <hr />
             {!count ? (
-              <button className="btn" type="button" onClick={createCount}>
+              <button className="btn btn-secondary" type="button" onClick={createCount}>
                 <Trans>Crear conteo del artículo</Trans>
               </button>
             ) : !submitted ? (
@@ -582,7 +609,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
                     />
                   </label>
                 ))}
-                <button className="btn" type="button" onClick={submitCount}>
+                <button className="btn btn-secondary" type="button" onClick={submitCount}>
                   <Trans>Enviar conteo</Trans>
                 </button>
               </>
@@ -605,7 +632,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
   );
 }
 
-function ReceiptReprintDialog({ row, onClose, onComplete }) {
+export function ReceiptReprintDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
   const [confirmed, setConfirmed] = useState(false);
@@ -735,10 +762,10 @@ function LoyaltyDialog({ row, onClose, onComplete }) {
         </div>
         <label>
           <Trans>Dirección</Trans>
-          <select value={direction} onChange={(event) => setDirection(event.target.value)}>
+          <Select value={direction} onChange={(event) => setDirection(event.target.value)}>
             <option value="increase">{t`Aumentar`}</option>
             <option value="decrease">{t`Reducir`}</option>
-          </select>
+          </Select>
         </label>
         <label>
           <Trans>Puntos</Trans>
@@ -751,7 +778,7 @@ function LoyaltyDialog({ row, onClose, onComplete }) {
           />
         </label>
         {!planned ? (
-          <button className="btn" type="button" onClick={preview}>
+          <button className="btn btn-secondary" type="button" onClick={preview}>
             <Trans>Revisar ajuste</Trans>
           </button>
         ) : (
@@ -876,7 +903,7 @@ function GiftCardIssueDialog({ row, onClose, onComplete }) {
               />
             </label>
             {!planned ? (
-              <button className="btn" type="button" onClick={preview}>
+              <button className="btn btn-secondary" type="button" onClick={preview}>
                 <Trans>Revisar emisión</Trans>
               </button>
             ) : (
@@ -1050,7 +1077,12 @@ function CatalogDialog({ row, onClose, onComplete }) {
                 <Trans>Guardar</Trans>
               </button>
               {row && row.status !== 'archived' && (
-                <button className="btn" type="button" disabled={command.pending} onClick={archive}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={command.pending}
+                  onClick={archive}
+                >
                   <Trans>Archivar</Trans>
                 </button>
               )}
@@ -1105,13 +1137,13 @@ function RegisterDialog({ row, onClose, onComplete }) {
         </label>
         <label>
           <Trans>Política</Trans>
-          <select
+          <Select
             value={assignmentPolicy}
             onChange={(event) => setAssignmentPolicy(event.target.value)}
           >
             <option value="device_required">{t`Dispositivo requerido`}</option>
             <option value="operator_selects">{t`Selección del operador`}</option>
-          </select>
+          </Select>
         </label>
         <label>
           <Trans>Dispositivo POS asignado</Trans>
@@ -1191,11 +1223,11 @@ function KitchenRouteDialog({ onClose, onComplete }) {
         </label>
         <label>
           <Trans>Tipo</Trans>
-          <select value={routeType} onChange={(event) => setRouteType(event.target.value)}>
+          <Select value={routeType} onChange={(event) => setRouteType(event.target.value)}>
             <option value="default">{t`Predeterminada`}</option>
             <option value="product">{t`Producto`}</option>
             <option value="category">{t`Categoría`}</option>
-          </select>
+          </Select>
         </label>
         {targetRequired && (
           <label>
@@ -1293,7 +1325,7 @@ function RecoveryDialog({ row, onClose }) {
         </button>
         {canRecover && (
           <button
-            className="btn"
+            className="btn btn-secondary"
             type="button"
             disabled={command.pending}
             onClick={executeDomainRecovery}
@@ -1341,78 +1373,952 @@ function RecoveryDialog({ row, onClose }) {
  * every dialog. Both the bridge `operations` screen and the new hubs render it.
  * Give it a `key={domain}` so a domain switch resets the cursor and dialog state.
  */
-// Per-domain observability views (the seam): the generic table is the fallback for
-// every domain; a domain with a registered summary gets a rich strip above it. Adding
-// a rich domain is one component + one branch in DomainSummary — the table is untouched.
-function CashShiftsSummary({ items }) {
-  const shifts = items.filter((it) => it.facts);
-  if (!shifts.length) return null;
+// Per-domain views (the seam): the generic table is the fallback for every domain;
+// a domain in DOMAIN_VIEWS replaces the table with a purpose-built view.
+//
+// The money hub is written as a CALM EDITORIAL BRIEFING, not a data cockpit: each tab
+// opens with one honest sentence (the lede), then a few quiet figures, then the items as
+// narrative rows — jobs, not tables ("think outside the database"). Refunds are OBSERVED
+// here, never issued: a cash refund happens at the register, with the customer present
+// (Toast Web cannot open a drawer either), so the owner reviews and governs, not executes.
+
+const CASH_SHIFT_CLOSED = 'closed';
+const CASH_SHIFT_OPEN = new Set(['open', 'opening']);
+// Statuses that demand the owner's attention: an in-progress or blocked close.
+const CASH_SHIFT_ATTENTION = new Set(['reconciliation_required', 'counting', 'closing']);
+
+/** counted − expected, in centavos. Null until a count exists. */
+function shiftVariance(facts) {
+  const expected = facts?.expectedCashMinorUnits ?? null;
+  const counted = facts?.countedCashMinorUnits ?? null;
+  if (expected == null || counted == null) return null;
+  return counted - expected;
+}
+
+/** Text colour + label key for a variance. Null when there is nothing to show. */
+function varianceTone(variance) {
+  if (variance == null) return null;
+  if (variance === 0) return { color: 'var(--success)', key: 'ok' };
+  if (variance > 0) return { color: 'var(--warning)', key: 'over' };
+  return { color: 'var(--danger)', key: 'short' };
+}
+
+/** Short elapsed time ("2h 15m", "3d 4h", "45m"). Symbols only, so no translation. */
+function formatShiftDuration(fromIso, toIso) {
+  if (!fromIso) return null;
+  const start = new Date(fromIso).getTime();
+  const end = toIso ? new Date(toIso).getTime() : Date.now();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  const minutes = Math.floor((end - start) / 60000);
+  if (minutes < 1) return '<1m';
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  if (days > 0) return [`${days}d`, `${hours}h`].join(' ');
+  if (hours > 0) return [`${hours}h`, `${mins}m`].join(' ');
+  return `${mins}m`;
+}
+
+/** The signed word for a variance: balanced / over / short. */
+function VarianceLabel({ toneKey }) {
+  if (toneKey === 'ok') return <Trans>Cuadrado</Trans>;
+  if (toneKey === 'over') return <Trans>Sobrante</Trans>;
+  return <Trans>Faltante</Trans>;
+}
+
+/** The owner-facing word for an exception type. */
+function ExceptionTypeLabel({ type }) {
+  if (type === 'void') return <Trans>Anulación</Trans>;
+  if (type === 'partial_refund') return <Trans>Reembolso parcial</Trans>;
+  return <Trans>Reembolso total</Trans>;
+}
+
+/** The owner-facing word for a print-job status. */
+export function ReceiptStatusLabel({ status }) {
+  if (status === 'printed') return <Trans>Impreso</Trans>;
+  if (status === 'failed') return <Trans>Falló</Trans>;
+  if (status === 'not_printed') return <Trans>Sin imprimir</Trans>;
+  if (status === 'queued') return <Trans>En cola</Trans>;
+  if (status === 'printing') return <Trans>Imprimiendo</Trans>;
+  return <>{String(status || '').replaceAll('_', ' ')}</>;
+}
+
+/** The owner-facing word for a physical-register status. */
+export function RegisterStatusLabel({ status }) {
+  if (status === 'available') return <Trans>Disponible</Trans>;
+  if (status === 'in_use') return <Trans>En uso</Trans>;
+  if (status === 'reconciliation_required') return <Trans>Conciliación</Trans>;
+  if (status === 'blocked') return <Trans>Bloqueado</Trans>;
+  if (status === 'archived') return <Trans>Archivado</Trans>;
+  return <>{String(status || '').replaceAll('_', ' ')}</>;
+}
+
+// ── Editorial primitives — a calm briefing, not tiles ────────────────────────
+const TONE_COLOR = { ok: 'var(--success)', warn: 'var(--warning)', danger: 'var(--danger)' };
+
+/** A quiet state dot. */
+function StateDot({ tone }) {
   return (
-    <div
+    <span
+      aria-hidden="true"
       style={{
-        display: 'flex',
-        gap: 12,
-        flexWrap: 'wrap',
-        padding: '16px 20px',
-        borderBottom: '1px solid var(--line)',
+        width: 9,
+        height: 9,
+        borderRadius: '50%',
+        flexShrink: 0,
+        background: TONE_COLOR[tone] || 'var(--ink-3)',
       }}
-    >
-      {shifts.map((it) => {
-        const f = it.facts;
-        const expected = f.expectedCashMinorUnits ?? null;
-        const counted = f.countedCashMinorUnits ?? null;
-        const variance = counted != null && expected != null ? counted - expected : null;
-        const varianceOff = variance != null && variance !== 0;
-        const accent = varianceOff
-          ? 'var(--danger)'
-          : it.status === 'open'
-            ? 'var(--success)'
-            : 'var(--ink-2)';
-        return (
-          <div
-            key={it.id}
-            style={{
-              minWidth: 200,
-              borderLeft: `3px solid ${accent}`,
-              padding: '10px 14px',
-              borderRadius: 6,
-            }}
-          >
-            <div style={{ fontWeight: 600 }}>{f.operator || '—'}</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-              {f.register} · {it.status}
-            </div>
-            <div style={{ fontSize: 12, marginTop: 6 }}>
-              <Trans>Fondo {formatOperationMoney(f.openingFloatMinorUnits, it.currency)}</Trans>
-            </div>
-            <div style={{ fontSize: 12 }}>
-              <Trans>
-                Esperado <strong>{formatOperationMoney(expected, it.currency)}</strong>
-              </Trans>
-            </div>
-            {counted != null && (
-              <div style={{ fontSize: 12 }}>
-                <Trans>Contado {formatOperationMoney(counted, it.currency)}</Trans>
-              </div>
-            )}
-            {variance != null && (
-              <div
-                style={{ fontSize: 12, color: varianceOff ? 'var(--danger)' : 'var(--success)' }}
-              >
-                <Trans>Diferencia {formatOperationMoney(variance, it.currency)}</Trans>
-              </div>
-            )}
-          </div>
-        );
-      })}
+    />
+  );
+}
+
+/** The lede: the honest one-sentence read that opens a tab. */
+function Lede({ tone, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+      <span style={{ position: 'relative', top: -3, flexShrink: 0 }}>
+        <StateDot tone={tone} />
+      </span>
+      <p
+        style={{
+          margin: 0,
+          fontFamily: 'var(--font-display)',
+          fontWeight: 400,
+          fontSize: 23,
+          letterSpacing: '-0.012em',
+          color: 'var(--ink-1)',
+          lineHeight: 1.35,
+        }}
+      >
+        {children}
+      </p>
     </div>
   );
 }
 
-function DomainSummary({ domain, items }) {
-  if (domain === 'cash_shifts') return <CashShiftsSummary items={items} />;
-  return null;
+/** A quiet figure: a small label over a display-face value. No box. */
+function FigureStat({ label, value, tone }) {
+  return (
+    <div style={{ minWidth: 110 }}>
+      <div className="eyebrow">{label}</div>
+      <div
+        className="figures"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 400,
+          fontSize: 34,
+          letterSpacing: '-0.02em',
+          lineHeight: 1.05,
+          marginTop: 6,
+          color: TONE_COLOR[tone] || 'var(--ink-1)',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
+
+/** A row of figures separated by whitespace, a hairline beneath. */
+function FigureRow({ children }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '18px 52px',
+        paddingBottom: 22,
+        borderBottom: '1px solid var(--line)',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A narrative line item: a state dot, a subject sentence, and an optional right slot. */
+function NarrativeRow({ tone, subject, meta, right, onClick }) {
+  const clickable = typeof onClick === 'function';
+  return (
+    <div
+      onClick={onClick}
+      onKeyDown={
+        clickable
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      className={clickable ? 'narrative-row-click' : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: clickable ? '15px 10px' : '15px 2px',
+        margin: clickable ? '0 -10px' : undefined,
+        borderRadius: clickable ? 10 : undefined,
+        borderBottom: '1px solid var(--line-soft)',
+        cursor: clickable ? 'pointer' : undefined,
+      }}
+    >
+      {tone ? <StateDot tone={tone} /> : null}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14.5, color: 'var(--ink-1)' }}>{subject}</div>
+        {meta ? (
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3 }}>{meta}</div>
+        ) : null}
+      </div>
+      {right ? (
+        <div
+          style={{
+            textAlign: 'right',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            justifyContent: 'flex-end',
+          }}
+        >
+          {right}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A section in the editorial voice: a broadsheet header, then rows. */
+function BriefSection({ title, children }) {
+  return (
+    <section>
+      <div className="ed-head">
+        <div className="titles">
+          <h2>{title}</h2>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** The display-face amount on the right of a narrative row. */
+function RowAmount({ children, tone }) {
+  return (
+    <span
+      className="figures"
+      style={{
+        fontFamily: 'var(--font-display)',
+        fontSize: 19,
+        letterSpacing: '-0.01em',
+        color: TONE_COLOR[tone] || 'var(--ink-1)',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ── cash_shifts — "is my money safe, and who did what" ───────────────────────
+function CashShiftsView({ items }) {
+  const shifts = items.filter((it) => it.facts);
+  if (!shifts.length) return null;
+  const currency = shifts.find((s) => s.currency)?.currency ?? null;
+  const active = shifts.filter((s) => s.status !== CASH_SHIFT_CLOSED);
+  const closed = shifts.filter((s) => s.status === CASH_SHIFT_CLOSED);
+  const openCount = shifts.filter((s) => CASH_SHIFT_OPEN.has(s.status)).length;
+  const expectedInDrawers = active.reduce(
+    (sum, s) => sum + (s.facts?.expectedCashMinorUnits ?? 0),
+    0,
+  );
+  const blocked = active.filter((s) => CASH_SHIFT_ATTENTION.has(s.status)).length;
+  const reviewCount = shifts.filter(
+    (s) =>
+      CASH_SHIFT_ATTENTION.has(s.status) ||
+      (s.status === CASH_SHIFT_CLOSED && (shiftVariance(s.facts) ?? 0) !== 0),
+  ).length;
+  const netClosedVariance = closed.reduce((sum, s) => sum + (shiftVariance(s.facts) ?? 0), 0);
+  const netToneKey = netClosedVariance < 0 ? 'danger' : netClosedVariance > 0 ? 'warn' : undefined;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <Lede tone={reviewCount ? (blocked ? 'danger' : 'warn') : 'ok'}>
+        {reviewCount > 0 ? (
+          <Plural
+            value={reviewCount}
+            one="# turno necesita tu revisión."
+            other="# turnos necesitan tu revisión."
+          />
+        ) : (
+          <Trans>Todo cuadrado. Nada requiere tu atención.</Trans>
+        )}
+      </Lede>
+
+      <FigureRow>
+        <FigureStat
+          label={<Trans>En caja ahora</Trans>}
+          value={formatOperationMoney(expectedInDrawers, currency)}
+        />
+        <FigureStat
+          label={<Trans>Diferencia del día</Trans>}
+          value={closed.length ? formatOperationMoney(netClosedVariance, currency) : '—'}
+          tone={netToneKey}
+        />
+        <FigureStat label={<Trans>Turnos abiertos</Trans>} value={openCount} />
+      </FigureRow>
+
+      <BriefSection title={<Trans>Turnos abiertos</Trans>}>
+        {active.length ? (
+          active.map((s) => {
+            const f = s.facts;
+            const dur = formatShiftDuration(f.openedAt, null);
+            return (
+              <NarrativeRow
+                key={s.id}
+                tone={
+                  s.status === 'reconciliation_required'
+                    ? 'danger'
+                    : CASH_SHIFT_OPEN.has(s.status)
+                      ? 'ok'
+                      : 'warn'
+                }
+                subject={
+                  <>
+                    <strong style={{ fontWeight: 600 }}>{f.operator || '—'}</strong>
+                    <span style={{ color: 'var(--ink-3)' }}> · {f.register}</span>
+                  </>
+                }
+                meta={
+                  dur ? (
+                    <Trans>
+                      Abrió {formatOperationMoney(f.openingFloatMinorUnits, s.currency)} · lleva{' '}
+                      {dur}
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      Abrió {formatOperationMoney(f.openingFloatMinorUnits, s.currency)}
+                    </Trans>
+                  )
+                }
+                right={
+                  <RowAmount>
+                    {formatOperationMoney(f.expectedCashMinorUnits, s.currency)}
+                  </RowAmount>
+                }
+              />
+            );
+          })
+        ) : (
+          <p style={{ color: 'var(--ink-3)', fontSize: 14 }}>
+            <Trans>No hay turnos abiertos ahora.</Trans>
+          </p>
+        )}
+      </BriefSection>
+
+      {closed.length > 0 && (
+        <BriefSection title={<Trans>Historial de turnos</Trans>}>
+          {closed.map((s) => {
+            const f = s.facts;
+            const variance = shiftVariance(f);
+            const t = varianceTone(variance);
+            const toneKey =
+              variance == null
+                ? undefined
+                : variance === 0
+                  ? 'ok'
+                  : variance > 0
+                    ? 'warn'
+                    : 'danger';
+            return (
+              <NarrativeRow
+                key={s.id}
+                tone={toneKey}
+                subject={
+                  <>
+                    <strong style={{ fontWeight: 600 }}>{f.operator || '—'}</strong>
+                    <span style={{ color: 'var(--ink-3)' }}> · {f.register}</span>
+                  </>
+                }
+                meta={
+                  <Trans>
+                    Esperaba {formatOperationMoney(f.expectedCashMinorUnits, s.currency)}, contó{' '}
+                    {formatOperationMoney(f.countedCashMinorUnits, s.currency)} · cerró{' '}
+                    {formatOperationDate(s.occurredAt)}
+                  </Trans>
+                }
+                right={
+                  variance == null ? null : (
+                    <RowAmount tone={toneKey}>
+                      <VarianceLabel toneKey={t.key} />{' '}
+                      {formatOperationMoney(Math.abs(variance), s.currency)}
+                    </RowAmount>
+                  )
+                }
+              />
+            );
+          })}
+        </BriefSection>
+      )}
+    </div>
+  );
+}
+
+/** The owner-facing word for a payment method. */
+function PaymentMethodLabel({ method }) {
+  if (method === 'cash') return <Trans>Efectivo</Trans>;
+  if (method === 'card') return <Trans>Tarjeta</Trans>;
+  return <>{String(method || '').replaceAll('_', ' ')}</>;
+}
+
+/** A totals line in the sale detail (subtotal / discount / tax / total). */
+function SaleTotalRow({ label, value, strong, tone }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: strong ? 15 : 13,
+        fontWeight: strong ? 600 : 400,
+        color: tone === 'warn' ? 'var(--warning)' : strong ? 'var(--ink-1)' : 'var(--ink-2)',
+      }}
+    >
+      <span>{label}</span>
+      <span className="figures">{value}</span>
+    </div>
+  );
+}
+
+// A sale's detail = its receipt, rendered in a slide-over. Read-only: the receipt IS
+// the sale (the transaction rendered as a document), so this is both the "detail" and
+// the "receipt" in one surface — no separate ticket button (see the placement research).
+// The snapshot is fetched on open from the immutable receipt_snapshot.
+function SaleReceiptSheet({ sale, onClose }) {
+  const { t } = useLingui();
+  const [state, setState] = useState({ loading: true, error: null, data: null });
+  // Keyed by sale.id at the call site, so each open mounts fresh at loading:true —
+  // no synchronous setState in the effect (react-hooks/set-state-in-effect).
+  useEffect(() => {
+    let live = true;
+    loadSaleReceipt(sale.id)
+      .then((data) => live && setState({ loading: false, error: null, data }))
+      .catch(
+        (err) =>
+          live && setState({ loading: false, error: err.message || String(err), data: null }),
+      );
+    return () => {
+      live = false;
+    };
+  }, [sale.id]);
+
+  const snap = state.data?.snapshot || null;
+  const money = (m) => (m ? formatOperationMoney(m.minorUnits, m.currency) : '—');
+  const lines = snap?.lines || [];
+  const payment = (snap?.payments && snap.payments[0]) || snap?.payment || null;
+  const discountTotal = lines.reduce((sum, l) => sum + (l.discount?.minorUnits || 0), 0);
+
+  return (
+    <>
+      <div className="sheet-backdrop" role="presentation" onClick={onClose} />
+      <section className="sheet" role="dialog" aria-modal="true" aria-label={t`Venta`}>
+        <div className="sheet-head">
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{sale.facts?.operator || '—'}</div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--ink-3)',
+                marginTop: 2,
+              }}
+            >
+              {sale.publicReference}
+            </div>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
+            ×
+          </button>
+        </div>
+        <div className="sheet-body">
+          {state.loading ? (
+            <p style={{ color: 'var(--ink-3)' }}>
+              <Trans>Cargando la venta…</Trans>
+            </p>
+          ) : state.error ? (
+            <p style={{ color: 'var(--danger)' }}>{state.error}</p>
+          ) : !snap ? (
+            <p style={{ color: 'var(--ink-3)' }}>
+              <Trans>No se encontró el recibo de esta venta.</Trans>
+            </p>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                {formatOperationDate(sale.occurredAt)}
+              </div>
+              <div>
+                {lines.map((line, i) => (
+                  <div
+                    key={line.lineRef || i}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '10px 0',
+                      borderBottom: '1px solid var(--line-soft)',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, color: 'var(--ink-1)' }}>
+                        {line.quantity}× {line.description}
+                        {line.variantName ? ` · ${line.variantName}` : ''}
+                      </div>
+                      {(line.modifiers || []).length > 0 && (
+                        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                          {line.modifiers
+                            .map((m) => m.description || m.name)
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                      )}
+                      {line.discount?.minorUnits > 0 && (
+                        <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 2 }}>
+                          <Trans>Descuento {money(line.discount)}</Trans>
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      className="figures"
+                      style={{ whiteSpace: 'nowrap', color: 'var(--ink-1)' }}
+                    >
+                      {money(line.lineTotal)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                <SaleTotalRow label={<Trans>Subtotal</Trans>} value={money(snap.subtotal)} />
+                {discountTotal > 0 && (
+                  <SaleTotalRow
+                    label={<Trans>Descuento</Trans>}
+                    value={money({ minorUnits: discountTotal, currency: snap.currency })}
+                    tone="warn"
+                  />
+                )}
+                {snap.taxTotal?.minorUnits > 0 && (
+                  <SaleTotalRow label={<Trans>Impuestos</Trans>} value={money(snap.taxTotal)} />
+                )}
+                <SaleTotalRow label={<Trans>Total</Trans>} value={money(snap.grandTotal)} strong />
+              </div>
+              {payment && (
+                <div style={{ marginTop: 8, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
+                  <div className="eyebrow">
+                    <Trans>Pago</Trans>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: 6,
+                      fontSize: 14,
+                    }}
+                  >
+                    <span>
+                      <PaymentMethodLabel method={payment.method} />
+                    </span>
+                    <span className="figures">{money(payment.amount)}</span>
+                  </div>
+                  {payment.received && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginTop: 4,
+                        fontSize: 13,
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      <span>
+                        <Trans>Recibido</Trans>
+                      </span>
+                      <span className="figures">{money(payment.received)}</span>
+                    </div>
+                  )}
+                  {payment.change && payment.change.minorUnits > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginTop: 4,
+                        fontSize: 13,
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      <span>
+                        <Trans>Cambio</Trans>
+                      </span>
+                      <span className="figures">{money(payment.change)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <div className="sheet-foot">
+          <button className="btn btn-secondary" type="button" onClick={onClose}>
+            <Trans>Cerrar</Trans>
+          </button>
+        </div>
+      </section>
+    </>
+  );
+}
+
+// ── sales — the day's take, and any margin given away ────────────────────────
+function SalesView({ items, ctx }) {
+  const currency = items.find((i) => i.currency)?.currency ?? null;
+  const total = items.reduce((sum, i) => sum + (i.amountMinorUnits ?? 0), 0);
+  const discounted = items.filter((i) => (i.facts?.discountMinorUnits ?? 0) > 0).length;
+  const average = items.length ? Math.round(total / items.length) : 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <Lede tone="ok">
+        {items.length > 0 ? (
+          <Trans>
+            Ventas: {items.length} · {formatOperationMoney(total, currency)} vendido.
+          </Trans>
+        ) : (
+          <Trans>Aún no hay ventas en esta vista.</Trans>
+        )}
+      </Lede>
+
+      <FigureRow>
+        <FigureStat label={<Trans>Vendido</Trans>} value={formatOperationMoney(total, currency)} />
+        <FigureStat
+          label={<Trans>Ticket promedio</Trans>}
+          value={formatOperationMoney(average, currency)}
+        />
+        <FigureStat
+          label={<Trans>Con descuento</Trans>}
+          value={discounted}
+          tone={discounted ? 'warn' : undefined}
+        />
+      </FigureRow>
+
+      {items.length > 0 && (
+        <BriefSection title={<Trans>Ventas</Trans>}>
+          {items.map((item) => {
+            const discount = item.facts?.discountMinorUnits ?? 0;
+            return (
+              <NarrativeRow
+                key={item.id}
+                subject={<strong style={{ fontWeight: 600 }}>{item.facts?.operator || '—'}</strong>}
+                meta={
+                  <>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      {item.publicReference}
+                    </span>
+                    {' · '}
+                    {formatOperationDate(item.occurredAt)}
+                    {discount > 0 ? (
+                      <span style={{ color: 'var(--warning)' }}>
+                        {' · '}
+                        <Trans>desc. {formatOperationMoney(discount, item.currency)}</Trans>
+                      </span>
+                    ) : null}
+                  </>
+                }
+                onClick={() => ctx.onSale(item)}
+                right={
+                  <>
+                    <RowAmount>
+                      {formatOperationMoney(item.amountMinorUnits, item.currency)}
+                    </RowAmount>
+                    <span
+                      aria-hidden="true"
+                      style={{ color: 'var(--ink-4)', fontSize: 18, lineHeight: 1 }}
+                    >
+                      ›
+                    </span>
+                  </>
+                }
+              />
+            );
+          })}
+        </BriefSection>
+      )}
+    </div>
+  );
+}
+
+// ── receipts — which receipts printed, and which failed ──────────────────────
+function ReceiptsView({ items, ctx }) {
+  const printed = items.filter((i) => i.status === 'printed').length;
+  const failed = items.filter((i) => i.status === 'failed').length;
+  const queued = items.filter((i) => i.status === 'queued' || i.status === 'printing').length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <Lede tone={failed ? 'danger' : queued ? 'warn' : 'ok'}>
+        {failed > 0 ? (
+          <Trans>
+            Recibos: {items.length} · {failed} no se imprimieron.
+          </Trans>
+        ) : queued > 0 ? (
+          <Trans>
+            Recibos: {items.length} · {queued} en cola.
+          </Trans>
+        ) : printed === items.length && items.length > 0 ? (
+          <Trans>Recibos: {items.length} · todos impresos.</Trans>
+        ) : (
+          <Trans>Recibos: {items.length}.</Trans>
+        )}
+      </Lede>
+
+      <FigureRow>
+        <FigureStat
+          label={<Trans>Impresos</Trans>}
+          value={printed}
+          tone={printed ? 'ok' : undefined}
+        />
+        <FigureStat
+          label={<Trans>En cola</Trans>}
+          value={queued}
+          tone={queued ? 'warn' : undefined}
+        />
+        <FigureStat
+          label={<Trans>Fallidos</Trans>}
+          value={failed}
+          tone={failed ? 'danger' : undefined}
+        />
+      </FigureRow>
+
+      <BriefSection title={<Trans>Recibos</Trans>}>
+        {items.map((item) => {
+          const st = item.status;
+          const dotTone =
+            st === 'printed'
+              ? 'ok'
+              : st === 'failed'
+                ? 'danger'
+                : st === 'not_printed'
+                  ? undefined
+                  : 'warn';
+          return (
+            <NarrativeRow
+              key={item.id}
+              tone={dotTone}
+              subject={
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                  {item.publicReference}
+                </span>
+              }
+              meta={
+                <>
+                  <ReceiptStatusLabel status={st} />
+                  {' · '}
+                  <Trans>emitido {formatOperationDate(item.occurredAt)}</Trans>
+                </>
+              }
+              right={
+                <>
+                  <RowAmount>
+                    {formatOperationMoney(item.amountMinorUnits, item.currency)}
+                  </RowAmount>
+                  {st !== 'not_printed' && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      onClick={() => ctx.onReprint(item)}
+                    >
+                      <Trans>Reimprimir</Trans>
+                    </button>
+                  )}
+                </>
+              }
+            />
+          );
+        })}
+      </BriefSection>
+    </div>
+  );
+}
+
+// ── refunds_voids — OBSERVE only: money back is a register act, with the customer.
+function RefundsView({ items }) {
+  const currency = items.find((i) => i.currency)?.currency ?? null;
+  const total = items.reduce((sum, i) => sum + (i.amountMinorUnits ?? 0), 0);
+  const voids = items.filter((i) => i.facts?.exceptionType === 'void').length;
+  const approved = items.filter((i) => i.facts?.approved).length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <Lede tone={total ? 'warn' : 'ok'}>
+        {items.length > 0 ? (
+          <Trans>
+            Excepciones: {items.length} · {formatOperationMoney(total, currency)} devuelto.
+          </Trans>
+        ) : (
+          <Trans>Sin reembolsos ni anulaciones en esta vista.</Trans>
+        )}
+      </Lede>
+
+      <FigureRow>
+        <FigureStat
+          label={<Trans>Devuelto</Trans>}
+          value={formatOperationMoney(total, currency)}
+          tone={total ? 'danger' : undefined}
+        />
+        <FigureStat label={<Trans>Anulaciones</Trans>} value={voids} />
+        <FigureStat label={<Trans>Con aprobación</Trans>} value={approved} />
+      </FigureRow>
+
+      {items.length > 0 && (
+        <BriefSection title={<Trans>Movimientos</Trans>}>
+          {items.map((item) => {
+            const f = item.facts || {};
+            const reason = f.reasonCode ? String(f.reasonCode).replaceAll('_', ' ') : null;
+            return (
+              <NarrativeRow
+                key={item.id}
+                tone="danger"
+                subject={
+                  <>
+                    <strong style={{ fontWeight: 600 }}>
+                      <ExceptionTypeLabel type={f.exceptionType} />
+                    </strong>
+                    {f.originalReceipt ? (
+                      <span
+                        style={{
+                          color: 'var(--ink-3)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 12,
+                        }}
+                      >
+                        {' · '}
+                        {f.originalReceipt}
+                      </span>
+                    ) : null}
+                  </>
+                }
+                meta={
+                  <>
+                    {f.operator || '—'}
+                    {reason ? ` · ${reason}` : null}
+                    {f.approved ? (
+                      <>
+                        {' · '}
+                        <Trans>aprobado por gerente</Trans>
+                      </>
+                    ) : null}
+                  </>
+                }
+                right={
+                  <RowAmount tone="danger">
+                    {formatOperationMoney(item.amountMinorUnits, item.currency)}
+                  </RowAmount>
+                }
+              />
+            );
+          })}
+        </BriefSection>
+      )}
+
+      <p
+        style={{
+          color: 'var(--ink-3)',
+          fontSize: 13,
+          paddingTop: 16,
+          borderTop: '1px solid var(--line-soft)',
+          margin: 0,
+          maxWidth: '64ch',
+        }}
+      >
+        <Trans>
+          Los reembolsos y las anulaciones se hacen en la caja, con el cliente presente. Aquí los
+          revisas: quién, por qué y quién autorizó.
+        </Trans>
+      </p>
+    </div>
+  );
+}
+
+// ── registers — the drawers, and the no-sale opens that signal shrinkage ──────
+function RegistersView({ items }) {
+  const inUse = items.filter((i) => i.status === 'in_use').length;
+  const movements = items.reduce((sum, i) => sum + (i.facts?.movements ?? 0), 0);
+  const noSale = items.reduce((sum, i) => sum + (i.facts?.noSaleOpens ?? 0), 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <Lede tone={noSale ? 'danger' : 'ok'}>
+        {noSale > 0 ? (
+          <Trans>{noSale} aperturas de cajón sin venta — conviene revisarlas.</Trans>
+        ) : (
+          <Trans>Cajas en orden. Ninguna apertura de cajón sin venta.</Trans>
+        )}
+      </Lede>
+
+      <FigureRow>
+        <FigureStat label={<Trans>En uso</Trans>} value={inUse} tone={inUse ? 'ok' : undefined} />
+        <FigureStat label={<Trans>Movimientos</Trans>} value={movements} />
+        <FigureStat
+          label={<Trans>Sin venta</Trans>}
+          value={noSale}
+          tone={noSale ? 'danger' : undefined}
+        />
+      </FigureRow>
+
+      <BriefSection title={<Trans>Cajas registradoras</Trans>}>
+        {items.map((item) => {
+          const noSaleOpens = item.facts?.noSaleOpens ?? 0;
+          const moves = item.facts?.movements ?? 0;
+          return (
+            <NarrativeRow
+              key={item.id}
+              tone={
+                item.status === 'reconciliation_required' || item.status === 'blocked'
+                  ? 'danger'
+                  : item.status === 'in_use'
+                    ? 'ok'
+                    : noSaleOpens
+                      ? 'warn'
+                      : undefined
+              }
+              subject={<strong style={{ fontWeight: 600 }}>{item.title}</strong>}
+              meta={
+                <>
+                  <RegisterStatusLabel status={item.status} />
+                  {' · '}
+                  <Trans>
+                    {moves} movimientos · {noSaleOpens} sin venta
+                  </Trans>
+                </>
+              }
+            />
+          );
+        })}
+      </BriefSection>
+    </div>
+  );
+}
+
+// The domain-view registry (the seam). A domain here replaces the generic table.
+const DOMAIN_VIEWS = {
+  cash_shifts: CashShiftsView,
+  sales: SalesView,
+  receipts: ReceiptsView,
+  refunds_voids: RefundsView,
+  registers: RegistersView,
+};
+
+// The money hub: these five domains render as the calm editorial briefing (on the
+// canvas), not the generic card+table. Every other domain keeps the generic table.
+const MONEY_HUB = new Set(['sales', 'receipts', 'refunds_voids', 'cash_shifts', 'registers']);
 
 export function DomainWorkspace({ domain }) {
   const { t, i18n } = useLingui();
@@ -1431,9 +2337,11 @@ export function DomainWorkspace({ domain }) {
   const [registerRow, setRegisterRow] = useState(null);
   const [kitchenRouteOpen, setKitchenRouteOpen] = useState(false);
   const [recoveryRow, setRecoveryRow] = useState(null);
+  const [saleDetail, setSaleDetail] = useState(null);
   const state = useOperationsData(domain, cursor, refresh, merchantWide);
   const domains = state.data?.domains || [];
   const selected = domains.find((item) => item.domain === domain);
+  const DomainView = DOMAIN_VIEWS[domain];
   const permissions = merchant?.capabilities?.membership?.permissions || [];
   const canUseMerchantScope =
     !merchant?.capabilities?.membership?.locationId &&
@@ -1447,244 +2355,372 @@ export function DomainWorkspace({ domain }) {
     window.setTimeout(() => setCopied(''), 1200);
   }
 
+  const scopeToggle = canUseMerchantScope ? (
+    <button
+      className="btn btn-secondary btn-sm"
+      type="button"
+      aria-pressed={merchantWide}
+      onClick={() => {
+        setMerchantWide((value) => !value);
+        setCursor(0);
+      }}
+    >
+      {merchantWide ? <Trans>Ubicación</Trans> : <Trans>Todo el negocio</Trans>}
+    </button>
+  ) : null;
   return (
     <>
-      <section className="card" style={{ minWidth: 0 }} aria-live="polite">
-        <div style={{ padding: 20, borderBottom: '1px solid var(--line)' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 12,
-              alignItems: 'center',
-            }}
-          >
-            <div>
-              <h3 style={{ margin: 0 }}>{selected?.label || t`Operación`}</h3>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>
-                <Trans>Permiso: {selected?.requiredPermissions?.join(t` o `) || '—'}</Trans>
-              </div>
+      {MONEY_HUB.has(domain) ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }} aria-live="polite">
+          {scopeToggle ? (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>{scopeToggle}</div>
+          ) : null}
+          {selected && !selected.available ? (
+            <div className="card" style={{ padding: 28, color: 'var(--ink-3)' }}>
+              <Trans>Requiere permiso: {selected.requiredPermissions?.join(t` o `) || '—'}</Trans>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {domain === 'catalog' && (
-                <button className="btn" type="button" onClick={() => setCatalogRow(null)}>
-                  <Trans>Crear producto</Trans>
-                </button>
-              )}
-              {domain === 'gift_cards' && (
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
-                >
-                  <Trans>Emitir tarjeta</Trans>
-                </button>
-              )}
-              {domain === 'kitchen' && (
-                <button className="btn" type="button" onClick={() => setKitchenRouteOpen(true)}>
-                  <Trans>Configurar ruta</Trans>
-                </button>
-              )}
-              {ACTION_ROUTES[domain] && (
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => navigate(ACTION_ROUTES[domain])}
-                >
-                  <Trans>Administrar</Trans>
-                </button>
-              )}
-              {canUseMerchantScope && (
-                <button
-                  className="btn"
-                  type="button"
-                  aria-pressed={merchantWide}
-                  onClick={() => {
-                    setMerchantWide((value) => !value);
-                    setCursor(0);
-                  }}
-                >
-                  {merchantWide ? <Trans>Ubicación</Trans> : <Trans>Todo el negocio</Trans>}
-                </button>
-              )}
+          ) : state.error ? (
+            <div className="card" style={{ padding: 28, color: 'var(--danger)' }}>
+              {ERROR_COPY[state.errorCode]
+                ? i18n._(ERROR_COPY[state.errorCode])
+                : t`No fue posible cargar esta operación.`}
+            </div>
+          ) : state.loading && !state.data?.items?.length ? (
+            <div className="card" style={{ padding: 28, color: 'var(--ink-3)' }}>
+              <Trans>Cargando datos autorizados…</Trans>
+            </div>
+          ) : !state.data?.items?.length ? (
+            <div className="card" style={{ padding: 28, color: 'var(--ink-3)' }}>
+              <Trans>No hay datos para este alcance.</Trans>
+            </div>
+          ) : (
+            <DomainView
+              items={state.data.items}
+              ctx={{
+                copy,
+                copied,
+                onRefund: setRefundSale,
+                onReprint: setReceiptRow,
+                onConfigure: setRegisterRow,
+                onSale: setSaleDetail,
+              }}
+            />
+          )}
+          {(cursor > 0 || state.data?.page?.hasMore) && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
-                className="btn"
+                className="btn btn-secondary"
                 type="button"
-                disabled={state.loading}
-                onClick={() => setRefresh((value) => value + 1)}
+                disabled={cursor === 0 || state.loading}
+                onClick={() => setCursor(Math.max(0, cursor - 20))}
               >
-                {state.loading ? <Trans>Actualizando…</Trans> : <Trans>Actualizar</Trans>}
+                <Trans>Anterior</Trans>
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                <Trans>Página {Math.floor(cursor / 20) + 1}</Trans>
+              </span>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                disabled={!state.data?.page?.hasMore || state.loading}
+                onClick={() => setCursor(Number(state.data.page.nextCursor))}
+              >
+                <Trans>Siguiente</Trans>
               </button>
             </div>
-          </div>
-          {selected?.allowedActions?.length ? (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
-              {selected.allowedActions.map((action) => (
-                <span className="sub-pill" key={action}>
-                  {action.replaceAll('_', ' ')}
-                </span>
-              ))}
+          )}
+        </div>
+      ) : (
+        <section className="card" style={{ minWidth: 0 }} aria-live="polite">
+          <div style={{ padding: 20, borderBottom: '1px solid var(--line)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0 }}>
+                  {DOMAIN_LABELS[domain]
+                    ? i18n._(DOMAIN_LABELS[domain])
+                    : selected?.label || t`Operación`}
+                </h3>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>
+                  <Trans>Permiso: {selected?.requiredPermissions?.join(t` o `) || '—'}</Trans>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {domain === 'catalog' && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setCatalogRow(null)}
+                  >
+                    <Trans>Crear producto</Trans>
+                  </button>
+                )}
+                {domain === 'gift_cards' && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
+                  >
+                    <Trans>Emitir tarjeta</Trans>
+                  </button>
+                )}
+                {domain === 'kitchen' && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => setKitchenRouteOpen(true)}
+                  >
+                    <Trans>Configurar ruta</Trans>
+                  </button>
+                )}
+                {ACTION_ROUTES[domain] && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={() => navigate(ACTION_ROUTES[domain])}
+                  >
+                    <Trans>Administrar</Trans>
+                  </button>
+                )}
+                {canUseMerchantScope && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    aria-pressed={merchantWide}
+                    onClick={() => {
+                      setMerchantWide((value) => !value);
+                      setCursor(0);
+                    }}
+                  >
+                    {merchantWide ? <Trans>Ubicación</Trans> : <Trans>Todo el negocio</Trans>}
+                  </button>
+                )}
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={state.loading}
+                  onClick={() => setRefresh((value) => value + 1)}
+                >
+                  {state.loading ? <Trans>Actualizando…</Trans> : <Trans>Actualizar</Trans>}
+                </button>
+              </div>
             </div>
-          ) : null}
-        </div>
-
-        {state.data?.items?.length ? (
-          <DomainSummary domain={domain} items={state.data.items} />
-        ) : null}
-        {selected && !selected.available ? (
-          <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-            <Trans>Requiere permiso: {selected.requiredPermissions?.join(t` o `) || '—'}</Trans>
-          </div>
-        ) : state.error ? (
-          <div style={{ padding: 28, color: 'var(--danger)' }}>
-            {ERROR_COPY[state.errorCode]
-              ? i18n._(ERROR_COPY[state.errorCode])
-              : t`No fue posible cargar esta operación.`}
-          </div>
-        ) : state.loading && !state.data?.items?.length ? (
-          <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-            <Trans>Cargando datos autorizados…</Trans>
-          </div>
-        ) : !state.data?.items?.length ? (
-          <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-            <Trans>No hay datos para este alcance.</Trans>
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--ink-3)' }}>
-                  <th style={{ padding: '12px 16px' }}>
-                    <Trans>Referencia</Trans>
-                  </th>
-                  <th>
-                    <Trans>Detalle</Trans>
-                  </th>
-                  <th>
-                    <Trans>Estado</Trans>
-                  </th>
-                  <th>
-                    <Trans>Importe</Trans>
-                  </th>
-                  <th>
-                    <Trans>Fecha</Trans>
-                  </th>
-                  <th aria-label={t`Acciones`} />
-                </tr>
-              </thead>
-              <tbody>
-                {state.data.items.map((item) => (
-                  <tr key={item.id} style={{ borderTop: '1px solid var(--line)' }}>
-                    <td style={{ padding: '14px 16px' }}>
-                      <strong>{item.title}</strong>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 10,
-                          color: 'var(--ink-3)',
-                          marginTop: 4,
-                        }}
-                      >
-                        {item.publicReference}
-                      </div>
-                    </td>
-                    <td>{item.detail || '—'}</td>
-                    <td>
-                      <Status value={item.status} />
-                    </td>
-                    <td>{formatOperationMoney(item.amountMinorUnits, item.currency)}</td>
-                    <td>{formatOperationDate(item.occurredAt)}</td>
-                    <td style={{ paddingRight: 14 }}>
-                      {domain === 'sales' && (
-                        <button className="btn" type="button" onClick={() => setRefundSale(item)}>
-                          <Trans>Reembolsar</Trans>
-                        </button>
-                      )}
-                      {domain === 'inventory' && (
-                        <button className="btn" type="button" onClick={() => setInventoryRow(item)}>
-                          <Trans>Operar</Trans>
-                        </button>
-                      )}
-                      {domain === 'receipts' && item.status !== 'not_printed' && (
-                        <button className="btn" type="button" onClick={() => setReceiptRow(item)}>
-                          <Trans>Reimprimir</Trans>
-                        </button>
-                      )}
-                      {domain === 'loyalty' && (
-                        <button className="btn" type="button" onClick={() => setLoyaltyRow(item)}>
-                          <Trans>Ajustar</Trans>
-                        </button>
-                      )}
-                      {domain === 'gift_cards' && (
-                        <button className="btn" type="button" onClick={() => setGiftCardRow(item)}>
-                          <Trans>Emitir</Trans>
-                        </button>
-                      )}
-                      {domain === 'catalog' && (
-                        <button className="btn" type="button" onClick={() => setCatalogRow(item)}>
-                          <Trans>Editar</Trans>
-                        </button>
-                      )}
-                      {domain === 'registers' && (
-                        <button className="btn" type="button" onClick={() => setRegisterRow(item)}>
-                          <Trans>Configurar</Trans>
-                        </button>
-                      )}
-                      {domain === 'recovery' && (
-                        <button className="btn" type="button" onClick={() => setRecoveryRow(item)}>
-                          <Trans>Recuperar</Trans>
-                        </button>
-                      )}
-                      <button
-                        className="btn-icon"
-                        type="button"
-                        onClick={() => copy(item.correlationId || item.publicReference)}
-                        aria-label={t`Copiar referencia ${item.publicReference}`}
-                      >
-                        {copied === (item.correlationId || item.publicReference) ? '✓' : '⧉'}
-                      </button>
-                    </td>
-                  </tr>
+            {selected?.allowedActions?.length ? (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
+                {selected.allowedActions.map((action) => (
+                  <span className="sub-pill" key={action}>
+                    {action.replaceAll('_', ' ')}
+                  </span>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            ) : null}
           </div>
-        )}
 
-        <div
-          style={{
-            padding: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            borderTop: '1px solid var(--line)',
-          }}
-        >
-          <button
-            className="btn"
-            type="button"
-            disabled={cursor === 0 || state.loading}
-            onClick={() => setCursor(Math.max(0, cursor - 20))}
-          >
-            <Trans>Anterior</Trans>
-          </button>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-            <Trans>Página {Math.floor(cursor / 20) + 1}</Trans> ·{' '}
-            <Plural
-              value={permissions.length}
-              one="# permiso efectivo"
-              other="# permisos efectivos"
+          {selected && !selected.available ? (
+            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
+              <Trans>Requiere permiso: {selected.requiredPermissions?.join(t` o `) || '—'}</Trans>
+            </div>
+          ) : state.error ? (
+            <div style={{ padding: 28, color: 'var(--danger)' }}>
+              {ERROR_COPY[state.errorCode]
+                ? i18n._(ERROR_COPY[state.errorCode])
+                : t`No fue posible cargar esta operación.`}
+            </div>
+          ) : state.loading && !state.data?.items?.length ? (
+            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
+              <Trans>Cargando datos autorizados…</Trans>
+            </div>
+          ) : !state.data?.items?.length ? (
+            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
+              <Trans>No hay datos para este alcance.</Trans>
+            </div>
+          ) : DomainView ? (
+            <DomainView
+              items={state.data.items}
+              ctx={{
+                copy,
+                copied,
+                onRefund: setRefundSale,
+                onReprint: setReceiptRow,
+                onConfigure: setRegisterRow,
+                onSale: setSaleDetail,
+              }}
             />
-          </span>
-          <button
-            className="btn"
-            type="button"
-            disabled={!state.data?.page?.hasMore || state.loading}
-            onClick={() => setCursor(Number(state.data.page.nextCursor))}
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', color: 'var(--ink-3)' }}>
+                    <th style={{ padding: '12px 16px' }}>
+                      <Trans>Referencia</Trans>
+                    </th>
+                    <th>
+                      {domain === 'catalog' ? <Trans>Categoría</Trans> : <Trans>Detalle</Trans>}
+                    </th>
+                    <th>
+                      <Trans>Estado</Trans>
+                    </th>
+                    <th>
+                      <Trans>Importe</Trans>
+                    </th>
+                    <th>
+                      <Trans>Fecha</Trans>
+                    </th>
+                    <th aria-label={t`Acciones`} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.data.items.map((item) => (
+                    <tr key={item.id} style={{ borderTop: '1px solid var(--line)' }}>
+                      <td style={{ padding: '14px 16px' }}>
+                        <strong>{item.title}</strong>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: 10,
+                            color: 'var(--ink-3)',
+                            marginTop: 4,
+                          }}
+                        >
+                          {item.publicReference}
+                        </div>
+                      </td>
+                      <td>{item.detail || '—'}</td>
+                      <td>
+                        <Status value={item.status} />
+                      </td>
+                      <td>{formatOperationMoney(item.amountMinorUnits, item.currency)}</td>
+                      <td>{formatOperationDate(item.occurredAt)}</td>
+                      <td style={{ paddingRight: 14 }}>
+                        {domain === 'sales' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setRefundSale(item)}
+                          >
+                            <Trans>Reembolsar</Trans>
+                          </button>
+                        )}
+                        {domain === 'inventory' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setInventoryRow(item)}
+                          >
+                            <Trans>Operar</Trans>
+                          </button>
+                        )}
+                        {domain === 'receipts' && item.status !== 'not_printed' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setReceiptRow(item)}
+                          >
+                            <Trans>Reimprimir</Trans>
+                          </button>
+                        )}
+                        {domain === 'loyalty' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setLoyaltyRow(item)}
+                          >
+                            <Trans>Ajustar</Trans>
+                          </button>
+                        )}
+                        {domain === 'gift_cards' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setGiftCardRow(item)}
+                          >
+                            <Trans>Emitir</Trans>
+                          </button>
+                        )}
+                        {domain === 'catalog' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setCatalogRow(item)}
+                          >
+                            <Trans>Editar</Trans>
+                          </button>
+                        )}
+                        {domain === 'registers' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setRegisterRow(item)}
+                          >
+                            <Trans>Configurar</Trans>
+                          </button>
+                        )}
+                        {domain === 'recovery' && (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            onClick={() => setRecoveryRow(item)}
+                          >
+                            <Trans>Recuperar</Trans>
+                          </button>
+                        )}
+                        <button
+                          className="btn-icon"
+                          type="button"
+                          onClick={() => copy(item.correlationId || item.publicReference)}
+                          aria-label={t`Copiar referencia ${item.publicReference}`}
+                        >
+                          {copied === (item.correlationId || item.publicReference) ? '✓' : '⧉'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div
+            style={{
+              padding: 14,
+              display: 'flex',
+              justifyContent: 'space-between',
+              borderTop: '1px solid var(--line)',
+            }}
           >
-            <Trans>Siguiente</Trans>
-          </button>
-        </div>
-      </section>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              disabled={cursor === 0 || state.loading}
+              onClick={() => setCursor(Math.max(0, cursor - 20))}
+            >
+              <Trans>Anterior</Trans>
+            </button>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              <Trans>Página {Math.floor(cursor / 20) + 1}</Trans> ·{' '}
+              <Plural
+                value={permissions.length}
+                one="# permiso efectivo"
+                other="# permisos efectivos"
+              />
+            </span>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              disabled={!state.data?.page?.hasMore || state.loading}
+              onClick={() => setCursor(Number(state.data.page.nextCursor))}
+            >
+              <Trans>Siguiente</Trans>
+            </button>
+          </div>
+        </section>
+      )}
       {refundSale && (
         <RefundDialog
           sale={refundSale}
@@ -1765,6 +2801,13 @@ export function DomainWorkspace({ domain }) {
         />
       )}
       {recoveryRow && <RecoveryDialog row={recoveryRow} onClose={() => setRecoveryRow(null)} />}
+      {saleDetail && (
+        <SaleReceiptSheet
+          key={saleDetail.id}
+          sale={saleDetail}
+          onClose={() => setSaleDetail(null)}
+        />
+      )}
     </>
   );
 }

@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DASHBOARD_EVENT_DEVICES_CHANGED } from '@umi/contract';
+import {
+  DASHBOARD_EVENT_CONVERSATION_MESSAGE,
+  DASHBOARD_EVENT_DEVICES_CHANGED,
+} from '@umi/contract';
 import { DashboardRealtimeGateway } from './dashboard-realtime.gateway';
 import { DashboardRealtimeEvents } from './dashboard-realtime.events';
 
 const MERCHANT_ID = '11111111-1111-4111-8111-111111111111';
+const CONVERSATION_ID = '22222222-2222-4222-8222-222222222222';
 const COOKIE = `umi_access=abc123; umi_refresh=def456`;
 
 const socketWith = (auth: Record<string, unknown>, cookie = COOKIE) => ({
@@ -138,5 +142,19 @@ describe('DashboardRealtimeGateway emit', () => {
 
     expect(to).toHaveBeenCalledWith(`dashboard:${MERCHANT_ID}`);
     expect(emit).toHaveBeenCalledWith(DASHBOARD_EVENT_DEVICES_CHANGED, event);
+  });
+
+  it('emits a conversation-message wake-up only to the merchant room', () => {
+    const { gateway, events } = make();
+    const emit = vi.fn();
+    const to = vi.fn().mockReturnValue({ emit });
+    Reflect.set(gateway, 'server', { to });
+    gateway.onModuleInit();
+
+    const event = { merchantId: MERCHANT_ID, conversationId: CONVERSATION_ID };
+    events.emitConversationMessage(event);
+
+    expect(to).toHaveBeenCalledWith(`dashboard:${MERCHANT_ID}`);
+    expect(emit).toHaveBeenCalledWith(DASHBOARD_EVENT_CONVERSATION_MESSAGE, event);
   });
 });

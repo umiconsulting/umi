@@ -908,16 +908,50 @@ export class PosExceptionRepository {
         preview.totalMinorUnits,
       ],
     );
-    if (preview.exceptionType === 'void') {
-      await this.applyVoidKitchenConsequence(
-        client,
-        merchantId,
-        dto.locationId,
-        saleId,
-        exceptionId,
-        correlationId,
-      );
-    }
+    // KDS state changes run through the WORKER role, never the RLS-bound `api` role: per
+    // 47_checkout_kitchen_projection.sql the api role may create the kitchen projection
+    // (insert) and move the order header, but "KDS state changes continue through the KDS
+    // repository and the worker role" — it has no UPDATE on merchant.kitchen_order_item.
+    // So the fulfilment consequence runs in its own worker transaction, separate from the
+    // append-only money ledger written above on the api `client`.
+    const refundLines =
+      preview.exceptionType === 'void'
+        ? null
+        : preview.lineAllocations.map((line) => ({
+            saleLineId: line.lineId,
+            quantity: line.quantity,
+          }));
+    await this.pg.workerTx(async (kitchenClient) => {
+      if (preview.exceptionType === 'void') {
+        // A void reverses the whole sale: cancel every pending kitchen item, preserve ready.
+        await this.applyVoidKitchenConsequence(
+          kitchenClient,
+          merchantId,
+          dto.locationId,
+          saleId,
+          exceptionId,
+          correlationId,
+        );
+      } else {
+        // full_refund | partial_refund: the refund itself is money-only (append-only
+        // ledger), but the kitchen must still be told to stop making work that has not
+        // started — a refunded-but-un-started item should not be cooked. Cancel the
+        // un-started (queued/preparing) kitchen items for the refunded lines, per line and
+        // capped at the refunded quantity; ready/completed work is already made, so it is
+        // preserved (its waste is governed by the line's restock decision). Prep state
+        // decides, not payment state. See
+        // docs/research/2026-09-06-void-refund-kitchen-propagation-research.md.
+        await this.applyRefundKitchenConsequence(
+          kitchenClient,
+          merchantId,
+          dto.locationId,
+          saleId,
+          exceptionId,
+          refundLines ?? [],
+          correlationId,
+        );
+      }
+    });
     return {
       exceptionId,
       saleId,
@@ -984,6 +1018,105 @@ export class PosExceptionRepository {
        VALUES (gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,NULL,'order_cancelled',$4,$5,
                jsonb_build_object('exceptionId',$6::text,'consequence','sale_voided'),$7)`,
       [merchantId, locationId, row.id, version, nextStatus, exceptionId, correlationId],
+    );
+  }
+
+  /**
+   * Refund fulfilment consequence (partial or full refund). Unlike a void — which reverses
+   * the whole sale and cancels every pending kitchen item — a refund is line-scoped: for
+   * each refunded line it cancels up to the refunded quantity of that product's UN-STARTED
+   * kitchen items (queued first, then preparing), so the kitchen stops making a refunded
+   * item that was never started. Ready/completed work is already made and is left in place
+   * (waste is governed by the line's restock decision). Lines map to kitchen items by
+   * product within the sale's kitchen_order (kitchen_order_item.product_id = pos_cart_line
+   * .product_id). If nothing un-started is cancelled (e.g. everything was already made) the
+   * kitchen order is left untouched — a refund never downgrades already-fulfilled work.
+   */
+  private async applyRefundKitchenConsequence(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    saleId: string,
+    exceptionId: string,
+    lines: ReadonlyArray<{ saleLineId: string; quantity: number }>,
+    correlationId: string,
+  ): Promise<void> {
+    const order = await client.query<{ id: string; version: string }>(
+      `SELECT ko.id::text,ko.version::text
+         FROM merchant.pos_committed_sale s
+         JOIN merchant.kitchen_order ko
+           ON ko.merchant_id=s.merchant_id AND ko.source_order_id=s.order_id
+        WHERE s.id=$1::uuid AND s.merchant_id=$2::uuid AND s.location_id=$3::uuid
+        FOR UPDATE OF ko`,
+      [saleId, merchantId, locationId],
+    );
+    const row = order.rows[0];
+    if (!row) return;
+    let cancelled = 0;
+    for (const line of lines) {
+      if (!(line.quantity > 0)) continue;
+      const result = await client.query(
+        `WITH targets AS (
+           SELECT koi.id
+             FROM merchant.kitchen_order_item koi
+            WHERE koi.merchant_id=$1::uuid AND koi.kitchen_order_id=$2::uuid
+              AND koi.status IN ('queued','preparing')
+              AND koi.product_id=(SELECT product_id FROM merchant.pos_cart_line WHERE id=$3::uuid)
+            ORDER BY CASE koi.status WHEN 'queued' THEN 0 ELSE 1 END, koi.created_at
+            LIMIT $4
+         )
+         UPDATE merchant.kitchen_order_item k
+            SET status='cancelled',version=version+1,cancelled_at=clock_timestamp(),
+                updated_at=clock_timestamp()
+           FROM targets WHERE k.id=targets.id
+         RETURNING k.id`,
+        [merchantId, row.id, line.saleLineId, line.quantity],
+      );
+      cancelled += result.rowCount ?? 0;
+    }
+    // Nothing un-started was cancelled — every refunded item was already made. Leave the
+    // kitchen order exactly as it is; the money refund and any waste live in the ledger.
+    if (cancelled === 0) return;
+    const status = await client.query<{ status: string }>(
+      `SELECT CASE
+          WHEN count(*) FILTER (WHERE status<>'cancelled')=0 THEN 'cancelled'
+          WHEN bool_or(status='exception') THEN 'exception'
+          WHEN bool_and(status='ready') FILTER (WHERE status<>'cancelled') THEN 'ready'
+          WHEN bool_or(status='ready') FILTER (WHERE status<>'cancelled') THEN 'partially_ready'
+          WHEN bool_or(status='preparing') FILTER (WHERE status<>'cancelled') THEN 'in_preparation'
+          ELSE 'queued' END AS status
+         FROM merchant.kitchen_order_item
+        WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid`,
+      [merchantId, row.id],
+    );
+    const nextStatus = status.rows[0]?.status ?? 'exception';
+    const version = Number(row.version) + 1;
+    await client.query(
+      `UPDATE merchant.kitchen_order
+          SET status=$3,version=$4,updated_at=clock_timestamp(),
+              cancelled_at=CASE WHEN $3='cancelled' THEN clock_timestamp() ELSE cancelled_at END,
+              cancellation_code=CASE WHEN $3='cancelled' THEN 'sale_refunded' ELSE cancellation_code END
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, row.id, nextStatus, version],
+    );
+    await client.query(
+      `INSERT INTO merchant.kitchen_event
+         (event_id,merchant_id,location_id,kitchen_order_id,station_id,kind,
+          aggregate_version,status,safe_payload,correlation_id)
+       VALUES (gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,NULL,$5,$4,$6,
+               jsonb_build_object('exceptionId',$7::text,'consequence','sale_refunded',
+                                  'cancelledItems',$8::int),$9)`,
+      [
+        merchantId,
+        locationId,
+        row.id,
+        version,
+        nextStatus === 'cancelled' ? 'order_cancelled' : 'order_updated',
+        nextStatus,
+        exceptionId,
+        cancelled,
+        correlationId,
+      ],
     );
   }
 

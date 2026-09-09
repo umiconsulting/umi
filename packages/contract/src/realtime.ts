@@ -10,6 +10,7 @@ export {
   pairingRoom,
   DASHBOARD_REALTIME_NAMESPACE,
   DASHBOARD_EVENT_DEVICES_CHANGED,
+  DASHBOARD_EVENT_CONVERSATION_MESSAGE,
   dashboardRoom,
 } from './realtime-channels';
 
@@ -32,7 +33,16 @@ export const DashboardDevicesChangedEvent = z
   .strict();
 export type DashboardDevicesChangedEvent = z.infer<typeof DashboardDevicesChangedEvent>;
 
+export const DashboardConversationMessageEvent = z
+  .object({
+    merchantId: Uuid,
+    conversationId: Uuid,
+  })
+  .strict();
+export type DashboardConversationMessageEvent = z.infer<typeof DashboardConversationMessageEvent>;
+
 export const realtimeModels = {
   DevicePairingRealtimeEvent,
   DashboardDevicesChangedEvent,
+  DashboardConversationMessageEvent,
 } as const;

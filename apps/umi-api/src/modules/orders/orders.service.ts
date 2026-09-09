@@ -70,20 +70,31 @@ export class OrdersService {
 
 function toOrderRow(r: Row): Row {
   const items = Array.isArray(r.items) ? r.items : [];
+  const events = Array.isArray(r.events) ? r.events : [];
+  const discounts = Array.isArray(r.discounts) ? r.discounts : [];
+  const liveItems = items.filter((i: Row) => !i.voidedAt);
   return {
     order_id: r.id,
     public_reference: r.publicReference ?? r.id,
     source: r.source,
     status: r.status,
     fulfillment_type: r.fulfillmentType ?? null,
+    cancel_reason: r.cancelReason ?? null,
     customer_name: r.customerName ?? null,
     customer_phone: r.customerPhone ?? null,
     customer_note: r.notes ?? null,
     pickup_person: r.pickupPerson ?? null,
+    // Money — three numbers, not one (ORDER_MODEL §4). gross − discount = total (owed).
+    gross_amount: Number(r.grossCents ?? 0) / 100,
+    discount_amount: Number(r.discountCents ?? 0) / 100,
     total_cents: Number(r.totalCents ?? 0),
     total_amount: Number(r.totalCents ?? 0) / 100,
+    // Net-of-refund: gross total minus committed refund/void exceptions. `total_amount`
+    // stays the original gross (append-only); `net_amount` is what the owner actually keeps.
+    refunded_amount: Number(r.refundedCents ?? 0) / 100,
+    net_amount: (Number(r.totalCents ?? 0) - Number(r.refundedCents ?? 0)) / 100,
     placed_at: r.placedAt ?? null,
-    created_at: r.placedAt ?? null,
+    created_at: r.createdAt ?? r.placedAt ?? null,
     updated_at: r.updatedAt ?? null,
     location_id: r.locationId ?? null,
     items: items.map((i: Row) => ({
@@ -93,7 +104,28 @@ function toOrderRow(r: Row): Row {
       quantity: Number(i.quantity ?? 0),
       unit_price: Number(i.unitPriceCents ?? 0) / 100,
       notes: i.notes ?? null,
+      voided: Boolean(i.voidedAt),
+      void_reason: i.voidReason ?? null,
+      modifiers: (Array.isArray(i.modifiers) ? i.modifiers : []).map((m: Row) => ({
+        name: m.name,
+        quantity: Number(m.quantity ?? 1),
+        price_delta: Number(m.priceDeltaCents ?? 0) / 100,
+      })),
     })),
-    items_count: items.length,
+    // The lifecycle spine: one entry per status transition, oldest first.
+    events: events.map((e: Row) => ({
+      status: e.status,
+      occurred_at: e.occurredAt ?? null,
+      operator: e.staffName ?? null,
+    })),
+    discounts: discounts.map((d: Row) => ({
+      kind: d.kind,
+      code: d.code,
+      label: d.label,
+      amount: Number(d.amountCents ?? 0) / 100,
+      reason: d.reason ?? null,
+    })),
+    // Article count stays the count of LIVE lines, so a void does not inflate it.
+    items_count: liveItems.length,
   };
 }

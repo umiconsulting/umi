@@ -175,6 +175,60 @@ export class KdsDashboardController {
   ) {
     return this.kds.transitionFromDashboard(t.merchantId, user?.id ?? null, ticketId, body);
   }
+
+  // Forward advance from a permission-guarded staff session (not the device-token path).
+  // One endpoint per action so each carries its own fine-grained permission; all three
+  // reuse the same executeKitchenCommand the device command uses.
+  @Post('orders/:ticketId/prepare')
+  @RequirePermission('kitchen.prepare')
+  prepare(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.advanceFromDashboard(
+      t.merchantId,
+      user?.id ?? null,
+      ticketId,
+      'start_preparation',
+      body,
+    );
+  }
+
+  @Post('orders/:ticketId/ready')
+  @RequirePermission('kitchen.ready')
+  ready(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.advanceFromDashboard(
+      t.merchantId,
+      user?.id ?? null,
+      ticketId,
+      'mark_order_ready',
+      body,
+    );
+  }
+
+  @Post('orders/:ticketId/complete')
+  @RequirePermission('kitchen.complete')
+  complete(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.advanceFromDashboard(
+      t.merchantId,
+      user?.id ?? null,
+      ticketId,
+      'complete',
+      body,
+    );
+  }
 }
 
 /** These aliases keep the current Dashboard routes operational. */

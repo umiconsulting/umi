@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Select } from '@/components/select.jsx';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
@@ -209,13 +210,13 @@ function NewCafeSheet({ onClose, onCreated }) {
             <label htmlFor="cafe-plan">
               <Trans>Plan · decide qué productos tiene el café</Trans>
             </label>
-            <select id="cafe-plan" className="select" value={form.plan} onChange={set('plan')}>
+            <Select id="cafe-plan" className="select" value={form.plan} onChange={set('plan')}>
               {PLANS.map((p) => (
                 <option key={p.key} value={p.key}>
                   {i18n._(p.label)}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="field">

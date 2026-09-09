@@ -1,4 +1,5 @@
 import React from 'react';
+import { Select } from '@/components/select.jsx';
 
 // tweaks-panel.jsx
 // Reusable Tweaks shell + form-control helpers.
@@ -405,7 +406,7 @@ function TweakRadio({ label, value, options, onChange }) {
   const maxLen = options.reduce((m, o) => Math.max(m, labelLen(o)), 0);
   const fitsAsSegments = maxLen <= ({ 2: 16, 3: 10 }[options.length] ?? 0);
   if (!fitsAsSegments) {
-    // <select> emits strings — map back to the original option value so the
+    // <Select> emits strings — map back to the original option value so the
     // fallback stays type-preserving (numbers, booleans) like the segment path.
     const resolve = (s) => {
       const m = options.find((o) => String(typeof o === 'object' ? o.value : o) === s);
@@ -480,7 +481,7 @@ function TweakRadio({ label, value, options, onChange }) {
 function TweakSelect({ label, value, options, onChange }) {
   return (
     <TweakRow label={label}>
-      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+      <Select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
         {options.map((o) => {
           const v = typeof o === 'object' ? o.value : o;
           const l = typeof o === 'object' ? o.label : o;
@@ -490,7 +491,7 @@ function TweakSelect({ label, value, options, onChange }) {
             </option>
           );
         })}
-      </select>
+      </Select>
     </TweakRow>
   );
 }

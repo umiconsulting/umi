@@ -28,6 +28,54 @@ function normalizeCustomerPhone(phone: string | null): string | null {
   return `+${digits}`;
 }
 
+/** Opaque keyset cursor for the message transcript: base64url of {occurredAt,id}. */
+function encodeMessageCursor(cursor: { occurredAt: string; id: string }): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+/** Decode a transcript cursor; a missing or malformed cursor means "start from newest". */
+function decodeMessageCursor(raw: string | undefined): { occurredAt: string; id: string } | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    if (
+      parsed &&
+      typeof parsed.occurredAt === 'string' &&
+      typeof parsed.id === 'string' &&
+      UUID_RE.test(parsed.id)
+    ) {
+      return { occurredAt: parsed.occurredAt, id: parsed.id };
+    }
+  } catch {
+    // fall through: treat a corrupt cursor as no cursor rather than 500ing
+  }
+  return null;
+}
+
+/** Opaque keyset cursor for the customer list: base64url of {ts,id}. */
+function encodeListCursor(cursor: { ts: string; id: string }): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+/** Decode a list cursor; a missing or malformed cursor means "start from the top". */
+function decodeListCursor(raw: string | undefined): { ts: string; id: string } | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
+    if (
+      parsed &&
+      typeof parsed.ts === 'string' &&
+      typeof parsed.id === 'string' &&
+      UUID_RE.test(parsed.id)
+    ) {
+      return { ts: parsed.ts, id: parsed.id };
+    }
+  } catch {
+    // corrupt cursor → start from the top
+  }
+  return null;
+}
+
 /**
  * Customer 360 read service. Maps repository rows into the exact dashboard DTOs
  * (server.js `platformCustomerDto` + the per-domain detail mappers). Product
@@ -120,14 +168,13 @@ export class CustomersService {
     merchantId: string,
     products: Products,
     options: {
-      page?: string;
       limit?: string;
       search?: string;
       filter?: string;
       contactId?: string;
+      cursor?: string;
     } = {},
   ) {
-    const page = Math.max(1, parseInt(options.page || '1') || 1);
     const limit = Math.max(1, Math.min(parseInt(options.limit || '20') || 20, 100));
     const search = String(options.search || '')
       .trim()
@@ -137,28 +184,33 @@ export class CustomersService {
       .slice(0, 24);
     const contactId = String(options.contactId || '').trim();
     const contactUuid = isUuid(contactId) ? contactId : merchantId;
+    const cursor = decodeListCursor(options.cursor);
 
-    const { rows, total } = await this.repo.listCustomers(merchantId, {
-      page,
+    const { rows, nextCursor } = await this.repo.listCustomers(merchantId, {
       limit,
       search,
       filter,
       contactId,
       contactUuid,
+      cursorTs: cursor?.ts ?? null,
+      cursorId: cursor?.id ?? null,
     });
     const customers = rows.map((r) => this.customerDto(r, products));
     return {
       customers,
-      total,
-      page,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
+      nextCursor: nextCursor ? encodeListCursor(nextCursor) : null,
       source: 'merchant.customer',
     };
   }
 
+  /** Cheap total for the insights header — a plain count, no laterals. */
+  async count(merchantId: string): Promise<number> {
+    return this.repo.countCustomers(merchantId);
+  }
+
   async detail(merchantId: string, products: Products, contactId: string) {
     if (!isUuid(contactId)) return null;
-    const list = await this.list(merchantId, products, { page: '1', limit: '1', contactId });
+    const list = await this.list(merchantId, products, { limit: '1', contactId });
     const customer = list.customers[0] || null;
     if (!customer) return null;
     const [timeline, conversations, orders, cash, identity] = await Promise.all([
@@ -188,6 +240,46 @@ export class CustomersService {
       messageCount: Number(row.messageCount || 0),
       summary: row.metadata?.summary || row.metadata?.current_state || '',
     }));
+  }
+
+  /**
+   * One conversation's transcript, returned oldest-first for display. The repo
+   * reads newest-first for keyset paging (fetch older with `?cursor=`); we reverse
+   * here so the caller renders top-to-bottom. `nextCursor` is non-null only while
+   * older messages remain.
+   */
+  async messages(
+    merchantId: string,
+    contactId: string,
+    conversationId: string,
+    options: { cursor?: string; limit?: string } = {},
+  ) {
+    if (!isUuid(contactId) || !isUuid(conversationId)) {
+      return { messages: [], nextCursor: null };
+    }
+    const limit = Math.max(1, Math.min(parseInt(options.limit || '30') || 30, 100));
+    const cursor = decodeMessageCursor(options.cursor);
+    // limit + 1 probes for a further page without a second COUNT query.
+    const rows = await this.repo.messages(merchantId, contactId, conversationId, cursor, limit + 1);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    const oldest = page[page.length - 1];
+    const nextCursor =
+      hasMore && oldest
+        ? encodeMessageCursor({ occurredAt: String(oldest.occurred_cursor), id: oldest.id })
+        : null;
+    const messages = page
+      .map((row) => ({
+        id: row.id,
+        direction: row.direction,
+        sender: row.sender,
+        body: row.body || '',
+        deliveryStatus: row.delivery_status || null,
+        occurredAt: iso(row.occurred_at),
+        createdAt: iso(row.created_at),
+      }))
+      .reverse();
+    return { messages, nextCursor };
   }
 
   async orders(merchantId: string, contactId: string) {
@@ -258,8 +350,32 @@ export class CustomersService {
     };
   }
 
+  /**
+   * The triage queue for the WhatsApp supervision surface: conversations where the
+   * customer is waiting on a reply, oldest-waiting first.
+   */
+  async triage(merchantId: string, options: { limit?: string } = {}) {
+    const limit = Math.max(1, Math.min(parseInt(options.limit || '50') || 50, 100));
+    const rows = await this.repo.triage(merchantId, limit);
+    return {
+      conversations: rows.map((row) => ({
+        id: row.id,
+        customerId: row.customer_id,
+        customerName: row.customer_name || null,
+        customerPhone: row.customer_phone || null,
+        status: row.status,
+        summary: row.summary || '',
+        lastSender: row.last_sender,
+        lastMessage: row.last_message || '',
+        waitingSince: iso(row.waiting_since),
+      })),
+      total: rows.length,
+    };
+  }
+
   async insights(merchantId: string, products: Products) {
-    const payload = await this.list(merchantId, products, { page: '1', limit: '100' });
+    const payload = await this.list(merchantId, products, { limit: '100' });
+    const total = await this.count(merchantId);
     const customers = payload.customers || [];
     const whatsappCustomers = customers.filter((c) => c.products?.whatsapp?.active).length;
     const cashCustomers = customers.filter((c) => c.products?.cash?.active).length;
@@ -273,7 +389,7 @@ export class CustomersService {
       source: payload.source,
       generatedAt: new Date().toISOString(),
       metrics: {
-        totalCustomers: payload.total,
+        totalCustomers: total,
         whatsappCustomers,
         cashCustomers,
         memoryReady,
@@ -284,10 +400,10 @@ export class CustomersService {
         {
           key: 'customer-growth',
           label: 'Customer base',
-          value: payload.total,
+          value: total,
           action: 'Open Customers',
           target: '/customers',
-          status: payload.total > 0 ? 'ready' : 'empty',
+          status: total > 0 ? 'ready' : 'empty',
         },
         {
           key: 'whatsapp-health',

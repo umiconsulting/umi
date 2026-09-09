@@ -23,6 +23,8 @@ export interface Capabilities {
     timezone: string | null;
     brandColor: string | null;
     secondaryColor: string | null;
+    /** Trading-day rollover hour, `HH:MM:SS` (merchant.business_day_start). */
+    businessDayStart: string | null;
   };
   selectedLocation: LocationRow | null;
   locations: LocationRow[];
@@ -123,6 +125,7 @@ export class MerchantsService {
         timezone: access.timezone,
         brandColor: branding.brandColor,
         secondaryColor: branding.secondaryColor,
+        businessDayStart: branding.businessDayStart,
       },
       selectedLocation,
       locations,
@@ -151,6 +154,8 @@ export class MerchantsService {
       subscriptionStatus: dashboard?.status?.toUpperCase?.() ?? 'ACTIVE',
       primaryColor: capabilities.merchant.brandColor ?? '#B5605A',
       secondaryColor: capabilities.merchant.secondaryColor ?? '#E8C9A3',
+      // The trading-day rollover hour as HH:MM for a time input; default local midnight.
+      businessDayStart: (capabilities.merchant.businessDayStart ?? '00:00:00').slice(0, 5),
       products: capabilities.products,
       locations: capabilities.locations,
     };
@@ -158,7 +163,7 @@ export class MerchantsService {
 
   async updateSettings(
     merchantId: string,
-    patch: { name?: string; timezone?: string },
+    patch: { name?: string; timezone?: string; businessDayStart?: string },
   ): Promise<void> {
     await this.repo.updateMerchantSettings(merchantId, patch);
   }

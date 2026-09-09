@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
-import type { DashboardDevicesChangedEvent } from '@umi/contract';
+import type {
+  DashboardConversationMessageEvent,
+  DashboardDevicesChangedEvent,
+} from '@umi/contract';
 
 /**
  * In-process bus between the KDS domain and the dashboard socket gateway. It is
@@ -20,5 +23,15 @@ export class DashboardRealtimeEvents {
 
   emitDevicesChanged(event: DashboardDevicesChangedEvent): void {
     this.subject.next(event);
+  }
+
+  // A second, independent stream for WhatsApp message nudges. Kept separate from
+  // the devices stream so the gateway can emit each under its own event name.
+  private readonly conversationSubject = new Subject<DashboardConversationMessageEvent>();
+
+  readonly conversationMessage$ = this.conversationSubject.asObservable();
+
+  emitConversationMessage(event: DashboardConversationMessageEvent): void {
+    this.conversationSubject.next(event);
   }
 }

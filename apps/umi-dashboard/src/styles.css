@@ -13,7 +13,8 @@
 :root {
   color-scheme: light;
 }
-[data-theme='midnight'] {
+[data-theme='midnight'],
+[data-theme='dark'] {
   color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -22,10 +23,12 @@
   }
 }
 
-/* Midnight neutralizes the sidebar's brand-blue glow so the rail reads as warm
-   graphite, not navy. The linear layer already tracks the themed --sidebar-bg
-   tokens; only the radial accent is hard-coded, so it is overridden here. */
-[data-theme='midnight'] .side {
+/* Both dark themes neutralize the sidebar's brand-blue glow so the rail reads as
+   the themed dark ground, not navy. The linear layer already tracks the themed
+   --sidebar-bg tokens; only the radial accent is hard-coded, so it is overridden
+   here. (Ocean 'dark' and all-black 'midnight' share this treatment.) */
+[data-theme='midnight'] .side,
+[data-theme='dark'] .side {
   background-image:
     radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
     linear-gradient(180deg, var(--sidebar-bg), var(--sidebar-bg-deep));
@@ -38,24 +41,30 @@
   }
 }
 
-/* Midnight is black with ONE accent. Surfaces are all #000 and cards are drawn
-   by their 1px line alone; the brand blue appears only on the primary action
-   and on accent text (eyebrow captions, links), never as a surface. The sidebar
-   shares the black canvas, so a 1px line marks where the rail ends. Shapes and
-   borders are the Umi defaults on purpose — only color changes. */
-[data-theme='midnight'] .btn-primary {
+/* The dark themes carry ONE accent. Surfaces are the themed dark ground and cards
+   are drawn by their 1px line alone; the brand blue appears only on the primary
+   action and on accent text (eyebrow captions, links), never as a surface. The
+   sidebar shares the canvas, so a 1px line marks where the rail ends. Shapes and
+   borders are the Umi defaults on purpose — only color changes. Ocean 'dark' and
+   all-black 'midnight' share this treatment. */
+[data-theme='midnight'] .btn-primary,
+[data-theme='dark'] .btn-primary {
   background: var(--umi-blue);
   color: var(--umi-navy-ink);
   box-shadow: none;
 }
-[data-theme='midnight'] .btn-primary:hover {
+[data-theme='midnight'] .btn-primary:hover,
+[data-theme='dark'] .btn-primary:hover {
   background: var(--umi-blue-soft);
 }
 [data-theme='midnight'] .eyebrow,
-[data-theme='midnight'] .as-text {
+[data-theme='midnight'] .as-text,
+[data-theme='dark'] .eyebrow,
+[data-theme='dark'] .as-text {
   color: var(--umi-blue);
 }
-[data-theme='midnight'] .side {
+[data-theme='midnight'] .side,
+[data-theme='dark'] .side {
   border-right-color: var(--line);
 }
 @media (prefers-color-scheme: dark) {
@@ -135,39 +144,31 @@ textarea:focus-visible,
 /* ============================================================
    TYPE — three voices, deployed by role, never by mood
    ------------------------------------------------------------
-   display (Fraunces)  page titles and figures ≥ 26px. Roman always;
-                       an italicised word in a heading is the most
-                       reliable tell there is.
-   body (Source Sans)  every other word on the screen.
-   mono (JetBrains)    codes, ids, clock times, and any COLUMN of
-                       figures — always with tabular-nums, so the
-                       digits stack on a shared axis.
+   display (Inter Tight)  page titles and figures ≥ 26px. Roman
+                          always, semibold: a sans title at 400
+                          reads as body text that grew.
+   body (Source Sans)     every other word on the screen.
+   mono (JetBrains)       codes, ids, clock times, and any COLUMN
+                          of figures — always with tabular-nums,
+                          so the digits stack on a shared axis.
 
-   `opsz` is what lets one family carry a 44px title and a 28px
-   figure: the face redraws for the size instead of being scaled.
+   Inter Tight is already spaced for large sizes; the negative
+   tracking below only closes the last hair at title scale.
    ============================================================ */
 .display {
   font-family: var(--font-display);
-  font-variation-settings:
-    'opsz' 96,
-    'SOFT' 0,
-    'WONK' 0;
   font-style: normal;
-  font-weight: 400;
-  letter-spacing: -0.014em;
+  font-weight: 600;
+  letter-spacing: -0.024em;
   line-height: 1;
   font-variant-numeric: tabular-nums lining-nums;
 }
 .h-page {
   font-family: var(--font-display);
-  font-variation-settings:
-    'opsz' 144,
-    'SOFT' 0,
-    'WONK' 0;
   font-style: normal;
-  font-weight: 400;
+  font-weight: 600;
   font-size: clamp(28px, 2.6vw, 38px);
-  letter-spacing: -0.018em;
+  letter-spacing: -0.028em;
   line-height: 1.06;
   margin: 0;
   text-wrap: balance;
@@ -176,14 +177,10 @@ textarea:focus-visible,
 }
 .h-section {
   font-family: var(--font-display);
-  font-variation-settings:
-    'opsz' 36,
-    'SOFT' 0,
-    'WONK' 0;
   font-style: normal;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 19px;
-  letter-spacing: -0.006em;
+  letter-spacing: -0.012em;
   line-height: 1.2;
   margin: 0;
 }
@@ -266,7 +263,6 @@ table th {
   font-style: normal;
   font-weight: 300;
   color: var(--side-text-2);
-  margin-left: 6px;
 }
 .side-brand-sub {
   font-size: 10px;
@@ -377,6 +373,19 @@ table th {
   color: var(--side-text-3);
   font-size: 11px;
 }
+/* Café switcher (super admin) — no outline, no focus highlight, blends into the
+   sidebar foot. */
+.side-foot .select,
+.side-foot .select:hover,
+.side-foot .select:focus,
+.side-foot .select:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+/* Note: the native <select> popup highlight cannot be recolored by CSS in this
+   Chromium, so the white-in-dark-mode highlight lives on the custom <Select>
+   listbox instead (see .ui-select-option rules). */
 
 .collapse-btn {
   position: absolute;
@@ -542,14 +551,32 @@ table th {
   background: var(--canvas-2);
   color: var(--ink-1);
 }
-/* The topbar profile control — an initials monogram beside the theme toggle. It
-   is round, so it reads as an account and not another square icon button. */
+/* The topbar profile control — the identity anchor of the action cluster. The
+   initials monogram and the operator's name read as ONE unit: a single rounded
+   pill, avatar tight on the left, name beside it. It is the only accented member
+   of the row (the blue monogram), so it leads; the theme, language and logout
+   controls that follow are muted ghosts. Height 32px keeps it level with them. */
 .profile-toggle {
-  width: 32px;
+  width: auto;
   height: 32px;
-  padding: 0;
-  justify-content: center;
+  padding: 0 12px 0 3px;
+  gap: 8px;
+  justify-content: flex-start;
   border-radius: var(--r-pill);
+  /* Identity sits at the right end, after the utilities. A touch more air before it
+     than the 8px between utilities splits the cluster into [theme · language] and
+     [identity] by proximity alone, without drawing a divider line. */
+  margin-left: 6px;
+}
+.profile-toggle:hover {
+  background: var(--canvas-2);
+}
+.profile-toggle-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-1);
+  white-space: nowrap;
+  letter-spacing: -0.005em;
 }
 .profile-toggle-avatar {
   width: 26px;
@@ -570,17 +597,37 @@ table th {
 .profile-toggle.active {
   box-shadow: 0 0 0 2px var(--canvas-2);
 }
-/* The language control in the topbar corner: compact, sized to sit level with
-   the theme toggle and profile button rather than the full-height form select. */
-.locale-select-topbar {
+/* The caret that marks the pill as a menu. It rotates when the menu is open, the
+   same tell the topbar selects and the custom Select use. */
+.profile-toggle-caret {
+  flex: 0 0 auto;
+  /* The pill is pinned 15% longer than its content (see ProfileMenu), so the caret
+     takes the slack and sits at the right edge — over the menu's right edge, since
+     the menu opens aligned to it. */
+  margin-left: auto;
+  opacity: 0.5;
+  transition: transform 0.16s var(--ease);
+}
+.profile-toggle[aria-expanded='true'] .profile-toggle-caret {
+  transform: rotate(180deg);
+}
+/* Topbar selects — language and branch. Both join the action cluster as ghost
+   controls: no resting border or fill, 32px tall like the theme and profile
+   buttons, hover reveals the same theme-aware tint. The `.select.` prefix raises
+   specificity over the base `.select` (height:44px, bordered), which otherwise
+   wins on source order and made these the odd, tall, boxed members of the row. */
+.select.topbar-select {
   height: 32px;
   width: auto;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 10px;
   font-size: 12.5px;
   color: var(--ink-2);
+  background: transparent;
+  border-color: transparent;
 }
-.locale-select-topbar:hover {
+.select.topbar-select:hover {
+  background: var(--canvas-2);
   color: var(--ink-1);
 }
 .btn-icon {
@@ -596,6 +643,20 @@ table th {
   justify-content: center;
 }
 .btn-icon:hover {
+  background: var(--canvas-2);
+  color: var(--ink-1);
+}
+/* Logout inside the action cluster — same 32px ghost treatment as the theme
+   toggle, so the row reads as one set of controls instead of a bordered box
+   trailing two borderless icons. */
+.top-actions .btn-icon {
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+}
+.top-actions .btn-icon:hover {
   background: var(--canvas-2);
   color: var(--ink-1);
 }
@@ -1167,6 +1228,156 @@ table th {
 .select option:disabled {
   color: var(--ink-4);
 }
+
+/* ============================================================
+   Custom <Select> (src/components/select.jsx)
+   A button trigger + a portaled listbox, so the option highlight is ours to
+   theme instead of the browser's fixed accent. The trigger wears the same
+   variant class the native select did (.select / .topbar-select / .twk-field),
+   which paints its box; the rules here only add the flex layout and the caret,
+   plus the popup and its options.
+   ============================================================ */
+.ui-select-trigger {
+  appearance: none;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  vertical-align: middle;
+  max-width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+.ui-select-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ui-select-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-select-caret {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  opacity: 0.55;
+}
+.ui-select-trigger[aria-expanded='true'] .ui-select-caret {
+  transform: rotate(180deg);
+}
+
+.ui-select-pop {
+  z-index: 200;
+  background: var(--surface);
+  color: var(--ink-1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 14px 34px -14px rgba(15, 20, 31, 0.45);
+  overflow-y: auto;
+  font-size: 13px;
+}
+.ui-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  color: var(--ink-1);
+  line-height: 1.2;
+  cursor: pointer;
+}
+.ui-select-check {
+  flex: 0 0 16px;
+  width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--umi-blue);
+}
+.ui-select-option-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-select-option.selected {
+  font-weight: 600;
+}
+/* Light mode: a soft tint marks the hovered/keyboard-active row. */
+.ui-select-option.active {
+  background: var(--canvas-2);
+}
+.ui-select-option.disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+/* Dark mode: the highlight is WHITE — the light-blue browser accent we could not
+   recolor on the native control is gone, because this list is ours to paint. */
+[data-theme='midnight'] .ui-select-option.active,
+[data-theme='dark'] .ui-select-option.active {
+  background: #fff;
+  color: var(--umi-navy-ink);
+}
+[data-theme='midnight'] .ui-select-option.active .ui-select-check,
+[data-theme='dark'] .ui-select-option.active .ui-select-check {
+  color: var(--umi-navy-ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .ui-select-option.active {
+    background: #fff;
+    color: var(--umi-navy-ink);
+  }
+  :root:not([data-theme]) .ui-select-option.active .ui-select-check {
+    color: var(--umi-navy-ink);
+  }
+}
+
+/* Menu — the action dropdown (components/menu.jsx) sits on the Select popup shell
+   (.ui-select-pop). Its rows are real <button>s, so they need the appearance reset
+   the <div> options never did, and they drop the checkmark column for a leading
+   icon column when one is given. The popup width comes from the trigger (see the
+   `widthFactor` prop), so it needs no min-width of its own. */
+.ui-menu-item {
+  appearance: none;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+}
+.ui-menu-item-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  opacity: 0.65;
+}
+/* Logout wears the danger tint, so the one irreversible action in the menu reads
+   as different from the one that only navigates. */
+.ui-menu-item.danger {
+  color: var(--danger);
+}
+.ui-menu-item.danger.active {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+[data-theme='midnight'] .ui-menu-item.danger.active,
+[data-theme='dark'] .ui-menu-item.danger.active {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .ui-menu-item.danger.active {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
 .device-product-help {
   min-height: 44px;
   display: flex;
@@ -2058,17 +2269,13 @@ time,
   letter-spacing: 0;
   line-height: 1.3;
 }
-/* The figure is the point of the row, so it takes the display face and the
-   whole optical-size range. `slashed-zero` because a café reads these as
-   amounts, and a zero must never be mistaken for an O. */
+/* The figure is the point of the row, so it takes the display face at title
+   weight. `slashed-zero` because a café reads these as amounts, and a zero
+   must never be mistaken for an O. */
 .strip-metric .val {
   font-family: var(--font-display);
-  font-variation-settings:
-    'opsz' 72,
-    'SOFT' 0,
-    'WONK' 0;
   font-style: normal;
-  font-weight: 400;
+  font-weight: 600;
   font-size: 32px;
   letter-spacing: -0.02em;
   line-height: 1;
@@ -2292,14 +2499,10 @@ time,
 }
 .ed-head h2 {
   font-family: var(--font-display);
-  font-variation-settings:
-    'opsz' 40,
-    'SOFT' 0,
-    'WONK' 0;
   font-style: normal;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 20px;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.012em;
   margin: 0;
   line-height: 1.15;
 }
@@ -2421,37 +2624,10 @@ time,
   color: var(--ink-3);
 }
 
-/* Sidebar — X-mark active instead of left bar */
+/* Sidebar — active module marked by the tint alone, no glyph and no left bar */
 .side-item.active.x-active {
   background: linear-gradient(90deg, rgba(118, 146, 203, 0.18), rgba(118, 146, 203, 0));
   box-shadow: none;
-}
-.side-item.active.x-active::before {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  background: var(--umi-blue);
-  clip-path: polygon(
-    14% 0%,
-    50% 28%,
-    86% 0%,
-    100% 14%,
-    72% 50%,
-    100% 86%,
-    86% 100%,
-    50% 72%,
-    14% 100%,
-    0% 86%,
-    28% 50%,
-    0% 14%
-  );
-}
-.side-item.active.x-active .ic {
-  margin-left: 4px;
 }
 
 /* Sidebar foot — show 1x grid as brand artifact */
@@ -3118,23 +3294,75 @@ time,
   }
 }
 
-/* ===== Login (redesign: split-navy, "elegant") ===== */
-.login-wrap {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1.08fr 1fr;
+/* ===== Reportes / Caja y turnos — the money-hub two-pane layouts.
+   Each screen lays the columns out inline; these classes are the responsive hooks, so the
+   collapse needs !important to win over the inline grid-template-columns. Below 1080px the
+   master-detail (shift list + reconciliation), the chart + payment mix, and the ledger +
+   trazabilidad each stack into one column. ===== */
+@media (max-width: 1080px) {
+  .caja-grid,
+  .ventas-grid,
+  .cash-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
-/* Left · brand panel — disciplined navy value-ramp on one hue (Munsell) */
+/* ===== Login (redesign: split-navy, "elegant") ===== */
+/* ============================================================
+   LOGIN — "ocean at night" (umi = the sea), told the way Apple's marketing
+   pages are: one solid, deep, near-black ground; no glass, no blur, no glow.
+   The work is done by type — large, tight, confident — generous negative space,
+   and a single precise blue. The palette lives here as local custom properties
+   so the shared .input / .select / checkbox pick up the dark ground without a
+   rule each. */
+.login-wrap {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  color: #f5f5f7;
+  /* A goldfish leaving the sea over deep navy — umi's ground made literal. The
+     photo sits under a scrim: darker on the right, where the form must stay
+     legible, and along the top-left, where the brand words sit. The solid navy
+     is the last layer, so the page still reads as deep sea if the image fails
+     to load. */
+  background:
+    linear-gradient(
+      90deg,
+      rgba(6, 10, 21, 0.62) 0%,
+      rgba(6, 10, 21, 0.34) 38%,
+      rgba(6, 10, 21, 0.58) 62%,
+      rgba(6, 10, 21, 0.82) 100%
+    ),
+    url('/login-bg.jpg') center / cover no-repeat,
+    linear-gradient(180deg, #0a1428 0%, #060a15 100%);
+  /* Dark-ground token override — scoped to the login only. */
+  --surface: #111a2e;
+  --canvas: transparent;
+  --canvas-2: #0c1424;
+  --ink-1: #f5f5f7;
+  --ink-2: #9aa3b6;
+  --ink-3: #7b8397;
+  --ink-4: #5b6376;
+  --line: rgba(255, 255, 255, 0.12);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.26);
+  --umi-navy: #0071e3;
+  --danger: #ff6b60;
+  --danger-soft: rgba(255, 90, 80, 0.12);
+  /* Apple's system blue on a dark ground — for links and focus. */
+  --lg-accent: #2997ff;
+}
+
+/* Left · brand panel — the marketing statement on the shared ground. */
 .login-brand {
   position: relative;
-  overflow: hidden;
-  padding: 44px 52px;
+  padding: 56px 64px;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  color: #eaf0ff;
-  background: linear-gradient(158deg, var(--umi-navy-deep) 0%, var(--umi-navy-ink) 100%);
+  color: #f5f5f7;
+  background: transparent;
 }
 .login-brand > * {
   position: relative;
@@ -3146,29 +3374,33 @@ time,
   gap: 12px;
 }
 .login-brandmark .word {
-  font-weight: 700;
-  font-size: 17px;
+  font-weight: 600;
+  font-size: 18px;
   letter-spacing: -0.02em;
-  color: #f4f7ff;
+  color: #f5f5f7;
 }
 .login-hero {
-  max-width: 400px;
+  max-width: 460px;
   margin: auto 0;
 }
 .login-hero h1 {
-  font-size: 34px;
-  line-height: 1.12;
-  letter-spacing: -0.025em;
-  margin: 0 0 16px;
-  font-weight: 700;
-  color: #f6f9ff;
+  font-size: 48px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 0 0 18px;
+  font-weight: 600;
+  color: #f5f5f7;
+}
+.login-hero h1 b,
+.login-hero h1 strong {
+  font-weight: 600;
 }
 .login-hero p {
-  font-size: 15px;
-  line-height: 1.6;
-  color: rgba(234, 240, 255, 0.62);
+  font-size: 19px;
+  line-height: 1.47;
+  color: var(--ink-2);
   margin: 0;
-  max-width: 23em;
+  max-width: 22em;
 }
 .login-side-foot {
   display: flex;
@@ -3183,27 +3415,20 @@ time,
   border-radius: 50%;
   background: var(--umi-blue-soft);
 }
-.login-waves {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 44%;
-  z-index: 0;
-  opacity: 0.6;
-}
-
-/* Right · form */
+/* Right · form — no card. The fields sit directly on the ground, defined by
+   their own hairlines and the blue key, the way an Apple sign-in reads. */
 .login-form-pane {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 44px 48px;
-  background: var(--surface);
+  padding: 44px 56px;
+  background: transparent;
 }
 .login-form {
+  position: relative;
   width: 100%;
-  max-width: 376px;
+  max-width: 360px;
 }
 .login-mark-mobile {
   display: none;
@@ -3221,17 +3446,27 @@ time,
   color: var(--ink-3);
 }
 .login-form h2 {
-  font-size: 25px;
-  font-weight: 700;
+  font-size: 28px;
+  font-weight: 600;
   letter-spacing: -0.02em;
   margin: 0 0 8px;
-  color: var(--ink-1);
+  color: #f5f5f7;
 }
 .login-form .sub {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--ink-2);
   margin: 0 0 32px;
+}
+/* Clean flat fields: a placeholder that recedes and a crisp Apple-blue focus ring. */
+.login-wrap .input::placeholder {
+  color: var(--ink-4);
+}
+.login-wrap .input:focus,
+.login-wrap .select:focus {
+  border-color: var(--lg-accent);
+  background: #121c33;
+  box-shadow: 0 0 0 4px rgba(41, 151, 255, 0.28);
 }
 .login-form form {
   display: flex;
@@ -3268,7 +3503,7 @@ time,
 }
 .login-reveal:hover {
   color: var(--ink-1);
-  background: rgba(34, 57, 121, 0.06);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 /* remember + forgot row */
@@ -3311,30 +3546,32 @@ time,
   color: #fff;
 }
 .login-remember input:checked + .box {
-  background: var(--umi-navy);
-  border-color: var(--umi-navy);
+  background: #0071e3;
+  border-color: #0071e3;
 }
 .login-remember input:checked + .box svg {
   opacity: 1;
   transform: scale(1);
 }
 .login-remember input:focus-visible + .box {
-  box-shadow: 0 0 0 3px rgba(118, 146, 203, 0.3);
+  box-shadow: 0 0 0 4px rgba(41, 151, 255, 0.28);
 }
 
 .login-link {
   background: none;
   border: none;
-  color: var(--ink-2);
+  color: var(--lg-accent);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 500;
   cursor: pointer;
   font-family: inherit;
   padding: 0;
+  text-underline-offset: 3px;
   transition: color 0.16s var(--ease);
 }
 .login-link:hover {
-  color: var(--umi-navy);
+  color: var(--lg-accent);
+  text-decoration: underline;
 }
 
 /* submit + spinner */
@@ -3342,6 +3579,27 @@ time,
   width: 100%;
   justify-content: center;
   position: relative;
+}
+/* The Apple key: one flat system blue, a pill, no gradient, no shadow, no glow.
+   The `.btn-primary.login-submit` pairing raises specificity to match (and, being
+   later, beat) the dark-scheme `.btn-primary` rule that would otherwise repaint
+   this the app's brand blue. */
+.login-wrap .btn-primary.login-submit {
+  height: 50px;
+  border-radius: 980px;
+  background: #0071e3;
+  border: none;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  box-shadow: none;
+}
+.login-wrap .btn-primary.login-submit:hover {
+  background: #0077ed;
+}
+.login-wrap .btn-primary.login-submit:active {
+  background: #006edb;
 }
 .login-spinner {
   width: 16px;
@@ -3388,11 +3646,12 @@ time,
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--success-soft);
+  background: rgba(41, 151, 255, 0.12);
+  border: 1px solid rgba(41, 151, 255, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--success);
+  color: var(--lg-accent);
   margin-bottom: 20px;
 }
 
@@ -3416,7 +3675,7 @@ time,
   color: var(--ink-3);
 }
 .login-back:hover {
-  color: var(--umi-navy);
+  color: var(--ink-1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3733,4 +3992,170 @@ time,
   border: 1px solid var(--umi-blue);
   border-radius: var(--r-pill);
   padding: 1px 7px;
+}
+
+/* Overview screen — square card corners (the owner asked for normal angles here).
+   Scoped to .overview-screen so the rest of the console keeps its rounded cards.
+   Only the card CONTAINERS square off; pills, badges and avatars inside keep theirs. */
+.overview-screen .card,
+.overview-screen .hero-metric,
+.overview-screen .strip-metric,
+.overview-screen .kpi,
+.overview-screen .list-card,
+.overview-screen .alert {
+  border-radius: 0;
+}
+
+/* Overview hero row — the hero (Miembros activos) and the stat stack to its right
+   share one height. The columns stretch to the taller one, and the stack's cards
+   grow equally to fill it, so both sides end on the same line. */
+.overview-hero-split {
+  align-items: stretch;
+}
+.overview-hero-split > div:last-child {
+  display: flex;
+  flex-direction: column;
+}
+.overview-hero-split > div:last-child > .strip-metric {
+  flex: 1 1 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Customers · WhatsApp transcript
+   The profile's WhatsApp tab: a clickable conversation list that drills into a
+   virtualized message thread. Bubbles reuse the app tokens — neutral surface for
+   the customer (inbound, left), brand blue for Umi/staff (outbound, right).
+--------------------------------------------------------------------------- */
+.conversation-row {
+  /* Reset the button chrome so it inherits the .profile-row grid look. */
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.conversation-row:hover {
+  background: var(--canvas);
+}
+
+.wa-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wa-back {
+  align-self: flex-start;
+}
+
+.transcript {
+  height: clamp(320px, 52vh, 560px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+.transcript-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 32px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.transcript-older {
+  padding: 10px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.msg-row {
+  display: flex;
+  padding: 3px 14px;
+}
+.msg-row.in {
+  justify-content: flex-start;
+}
+.msg-row.out {
+  justify-content: flex-end;
+}
+.msg-row.system {
+  justify-content: center;
+  padding: 8px 14px;
+}
+.msg-system {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-align: center;
+}
+.msg-bubble {
+  max-width: 78%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.msg-row.in .msg-bubble {
+  background: var(--surface);
+  color: var(--ink-1);
+  border: 1px solid var(--line-soft);
+  border-bottom-left-radius: 4px;
+}
+.msg-row.out .msg-bubble {
+  background: var(--umi-blue);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.msg-body {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.msg-empty {
+  opacity: 0.6;
+  font-style: italic;
+}
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  opacity: 0.75;
+}
+.msg-row.out .msg-meta {
+  justify-content: flex-end;
+}
+.msg-sender {
+  font-weight: 600;
+}
+.msg-status {
+  text-transform: capitalize;
+}
+
+.customer-load-more {
+  display: block;
+  margin: 12px auto 6px;
+}
+
+/* Triage queue rows reuse the .log-row grid but must click through as buttons. */
+.triage-row {
+  appearance: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.triage-row:hover {
+  background: var(--canvas);
 }

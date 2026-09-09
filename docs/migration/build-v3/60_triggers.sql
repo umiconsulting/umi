@@ -276,3 +276,29 @@ create trigger customer_order_business_date
 create trigger pos_cart_business_date
   before insert or update on merchant.pos_cart
   for each row execute function merchant.tg_business_date('created_at');
+
+-- Realtime nudge: every new WhatsApp message NOTIFYs the dashboard socket listener,
+-- which re-emits a wake-up to the merchant's room. The payload is ids only — the
+-- body is re-read over RLS REST. One trigger covers every insert path (inbound
+-- webhook, bot reply, staff reply). NOTIFY is transactional, so a rolled-back
+-- message never nudges. The merchant id is looked up from the parent conversation
+-- (merchant.message has no merchant_id of its own).
+create or replace function merchant.tg_notify_conversation_message() returns trigger
+  language plpgsql
+  set search_path = pg_catalog as $$
+declare
+  v_merchant uuid;
+begin
+  select merchant_id into v_merchant from merchant.conversation where id = new.conversation_id;
+  if v_merchant is not null then
+    perform pg_notify(
+      'umi_conversation_message',
+      json_build_object('merchant_id', v_merchant, 'conversation_id', new.conversation_id)::text
+    );
+  end if;
+  return new;
+end $$;
+
+create trigger message_notify_conversation
+  after insert on merchant.message
+  for each row execute function merchant.tg_notify_conversation_message();
