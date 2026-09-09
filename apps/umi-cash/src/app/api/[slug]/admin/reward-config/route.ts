@@ -5,6 +5,12 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getTenant } from '@/lib/tenant';
 import { sendApplePushUpdateForTenant } from '@/lib/push-apple';
+import { refreshGoogleWalletObjectsForTenant } from '@/lib/wallet-refresh';
+import { afterResponse } from '@/lib/after-response';
+
+// The post-save Google fleet refresh runs under waitUntil and needs the invocation
+// alive well past the response (a 100-pass tenant takes tens of seconds).
+export const maxDuration = 300;
 
 const TierSchema = z.object({
   visitsRequired: z.number().int().min(1).max(100),
@@ -160,6 +166,11 @@ export async function PUT(req: NextRequest, { params }: { params: { slug: string
     } catch (err) {
       console.error('[reward-config] Push update failed:', err instanceof Error ? err.message : String(err));
     }
+
+    // Google objects only change when we patch them: a customer whose card isn't
+    // scanned for weeks would otherwise keep the old reward (and, with a ladder, the
+    // old 7-slot strip) on their phone. Plain HTTPS, so waitUntil is fine here.
+    await afterResponse('wallet:reward-config-google', refreshGoogleWalletObjectsForTenant(tenant));
 
     return NextResponse.json({ newConfig });
   } catch (err) {

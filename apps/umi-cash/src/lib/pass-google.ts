@@ -61,6 +61,12 @@ export interface GooglePassData {
   topupEnabled?: boolean;
   birthdayRewardName?: string | null;
   lifecycleMessage?: string | null;
+  /**
+   * Re-render only: PATCH the object (lifecycle text module included) but skip the
+   * addMessage notification. For settings-driven refreshes of passes whose cached
+   * moment the customer has already been notified about.
+   */
+  silent?: boolean;
 }
 
 function getClassId(tenantSlug?: string): string {
@@ -283,8 +289,9 @@ async function getGoogleAuthToken(): Promise<string> {
   return token.token as string;
 }
 
-export async function updateGoogleWalletObject(data: GooglePassData): Promise<void> {
-  if (!isGoogleWalletConfigured()) return;
+/** Resolves true when the object PATCH was accepted; false on any failure (already logged). */
+export async function updateGoogleWalletObject(data: GooglePassData): Promise<boolean> {
+  if (!isGoogleWalletConfigured()) return false;
 
   try {
     const objectId = resolveObjectId(data);
@@ -306,12 +313,13 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
     // A rejected PATCH means the customer's pass silently keeps stale state — say so.
     if (!patched.ok) {
       console.warn('[Google Wallet] PATCH failed:', patched.status, await patched.text().catch(() => ''));
+      return false;
     }
 
     // Push a real device notification for the lifecycle message. PATCHing textModules
     // alone updates the card UI but does NOT generate a notification — Google requires
     // an explicit addMessage call (or messages[] entry) with messageType=TEXT_AND_NOTIFY.
-    if (data.lifecycleMessage) {
+    if (data.lifecycleMessage && !data.silent) {
       const res = await fetch(
         `https://walletobjects.googleapis.com/walletobjects/v1/loyaltyObject/${encodeURIComponent(objectId)}/addMessage`,
         {
@@ -335,7 +343,9 @@ export async function updateGoogleWalletObject(data: GooglePassData): Promise<vo
         console.warn('[Google Wallet] addMessage failed:', res.status, await res.text().catch(() => ''));
       }
     }
+    return true;
   } catch (err) {
     console.error('[Google Wallet] Update failed:', err instanceof Error ? err.message : String(err));
+    return false;
   }
 }
