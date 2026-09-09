@@ -1,8 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
 import { isProductStatusActive } from '@umi/contract';
+import { AnthropicAdapter } from '../../shared/adapters/anthropic.adapter';
 import { MerchantsRepository } from '../merchants/merchants.repository';
 import { CustomersRepository, type Row } from './customers.repository';
+import {
+  averageTicketCents,
+  classifyCustomerSegment,
+  daysBetween,
+  visitsPerMonth,
+} from './customer-kpis';
 
 type Products = Record<string, { status?: string } | undefined>;
 
@@ -76,6 +83,33 @@ function decodeListCursor(raw: string | undefined): { ts: string; id: string } |
   return null;
 }
 
+// The AI portrait is cheap-stale: a 6-hour, size-bounded in-memory cache keyed by a
+// fingerprint of the inputs means the Haiku call fires only when the customer's
+// facts, conversation summaries or KPIs actually move — not on every tab open.
+const DESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000;
+const DESCRIPTION_CACHE_MAX = 500;
+
+// Spanish, plain language (lenguaje claro) — the portrait is read by café owners.
+// The model gets facts + conversation summaries + KPIs and MUST NOT invent.
+const PORTRAIT_SYSTEM = `Eres el analista de clientes de un café. Escribes un retrato breve de UN cliente para el dueño del negocio.
+
+Reglas:
+- Escribe en español claro y sencillo (lenguaje llano). Usa frases cortas.
+- Máximo 3 frases y 50 palabras. Solo el párrafo: sin títulos, sin listas, sin emojis.
+- Usa solo los datos que te doy. No inventes nada. Si hay pocos datos, di solo lo que se sabe.
+- Interpreta los datos, no los repitas como tabla. Habla de sus hábitos, lo que pide, su valor y su ritmo de visita.
+- Si el segmento es "at_risk" (en riesgo) o "lapsed" (inactivo), dilo con claridad para que el dueño actúe.
+
+Segmentos: prospect=sin compras aún; new=cliente nuevo; regular=cliente frecuente; vip=frecuente y de alto gasto; at_risk=antes venía seguido y ya se tardó; lapsed=hace mucho que no viene.`;
+
+/** Cheap, stable fingerprint of the portrait inputs (djb2 over the JSON). */
+function fingerprintPortrait(value: unknown): string {
+  const json = JSON.stringify(value);
+  let h = 5381;
+  for (let i = 0; i < json.length; i += 1) h = ((h << 5) + h + json.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36) + ':' + json.length.toString(36);
+}
+
 /**
  * Customer 360 read service. Maps repository rows into the exact dashboard DTOs
  * (server.js `platformCustomerDto` + the per-domain detail mappers). Product
@@ -83,9 +117,13 @@ function decodeListCursor(raw: string | undefined): { ts: string; id: string } |
  */
 @Injectable()
 export class CustomersService {
+  /** contactId:fingerprint → the generated portrait, with an expiry. */
+  private readonly descriptionCache = new Map<string, { text: string; expires: number }>();
+
   constructor(
     private readonly repo: CustomersRepository,
     private readonly merchants: MerchantsRepository,
+    private readonly anthropic: AnthropicAdapter,
   ) {}
 
   /** Merchant product map (drives availability flags in the DTOs). */
@@ -213,14 +251,212 @@ export class CustomersService {
     const list = await this.list(merchantId, products, { limit: '1', contactId });
     const customer = list.customers[0] || null;
     if (!customer) return null;
-    const [timeline, conversations, orders, cash, identity] = await Promise.all([
+    const [kpis, timeline, conversations, orders, cash, identity] = await Promise.all([
+      this.kpis(merchantId, contactId),
       this.timeline(merchantId, contactId),
       this.conversations(merchantId, contactId),
       this.orders(merchantId, contactId),
       this.cash(merchantId, products, contactId),
       this.identity(merchantId, contactId),
     ]);
-    return { customer, timeline, conversations, orders, cash, identity };
+    return { customer, kpis, timeline, conversations, orders, cash, identity };
+  }
+
+  /**
+   * The Overview-tab KPI block for one customer: the restaurant guest-card metrics
+   * (spend · average ticket · visits · recency), the cadence/preference texture
+   * (frequency, tenure, favourites, channel mix, daypart), the margin signals
+   * (tip/refund/discount) and one RFM-style segment. Money is formatted es-MX;
+   * `segment`, `recencyDays`, `tenureDays` etc. stay raw for the UI to localise.
+   */
+  private kpisDto(raw: {
+    agg: Row;
+    favorites: Row[];
+    category: Row | null;
+    daypart: Row | null;
+  }) {
+    const agg = raw.agg || {};
+    const orders = Number(agg.orders_count || 0);
+    const visits = Number(agg.visit_days || 0);
+    const totalSpendCents = Number(agg.total_spend_cents || 0);
+    const grossCents = Number(agg.gross_cents || 0);
+    const discountCents = Number(agg.discount_cents || 0);
+    const firstOrderAt = iso(agg.first_order_at);
+    const lastOrderAt = iso(agg.last_order_at);
+    const nowIso = new Date().toISOString();
+    const recencyDays = daysBetween(lastOrderAt, nowIso);
+    const tenureDays = daysBetween(firstOrderAt, nowIso);
+    const avgTicketCents = averageTicketCents(totalSpendCents, orders);
+    const frequencyPerMonth = visitsPerMonth(visits, tenureDays);
+    const segment = classifyCustomerSegment({
+      orders,
+      visits,
+      totalSpendCents,
+      recencyDays,
+      tenureDays,
+    });
+
+    const dineIn = Number(agg.dine_in_orders || 0);
+    const pickup = Number(agg.pickup_orders || 0);
+    const delivery = Number(agg.delivery_orders || 0);
+    const unspecified = Number(agg.unspecified_orders || 0);
+    const channelTotal = dineIn + pickup + delivery + unspecified;
+    const dominantChannel =
+      [
+        { key: 'dine_in', orders: dineIn },
+        { key: 'pickup', orders: pickup },
+        { key: 'delivery', orders: delivery },
+      ]
+        .filter((x) => x.orders > 0)
+        .sort((a, b) => b.orders - a.orders)[0]?.key ?? null;
+
+    const tipTotalCents = Number(agg.tip_total_cents || 0);
+    const tippedReceipts = Number(agg.tipped_receipts || 0);
+    const avgTipWhenTippedCents = tippedReceipts > 0 ? Math.round(tipTotalCents / tippedReceipts) : 0;
+
+    const refundedOrders = Number(agg.refunded_orders || 0);
+    const refundRate = orders > 0 ? refundedOrders / orders : 0;
+    const discountRate = grossCents > 0 ? discountCents / grossCents : 0;
+
+    const daypartBucket =
+      raw.daypart && raw.daypart.daypart_bucket != null ? Number(raw.daypart.daypart_bucket) : null;
+    const daypartDow =
+      raw.daypart && raw.daypart.dow_local != null ? Number(raw.daypart.dow_local) : null;
+
+    return {
+      orders,
+      visits,
+      spend: {
+        totalCents: totalSpendCents,
+        total: formatMxn(totalSpendCents),
+        avgTicketCents,
+        avgTicket: formatMxn(avgTicketCents),
+      },
+      firstOrderAt,
+      lastOrderAt,
+      recencyDays,
+      tenureDays,
+      frequencyPerMonth,
+      segment,
+      favorites: (raw.favorites || []).map((f) => ({
+        name: f.name,
+        units: Number(f.units || 0),
+        timesOrdered: Number(f.times_ordered || 0),
+      })),
+      topCategory: raw.category
+        ? { name: raw.category.category, units: Number(raw.category.units || 0) }
+        : null,
+      channelMix: {
+        dineIn,
+        pickup,
+        delivery,
+        unspecified,
+        total: channelTotal,
+        dominant: dominantChannel,
+      },
+      daypart: { bucket: daypartBucket, dow: daypartDow },
+      // Tip is only present on POS receipts that had a customer attached, so it is
+      // "on attributed POS receipts", flagged by `attributed`, never "per visit".
+      tips: {
+        totalCents: tipTotalCents,
+        total: formatMxn(tipTotalCents),
+        tippedReceipts,
+        avgWhenTippedCents: avgTipWhenTippedCents,
+        avgWhenTipped: formatMxn(avgTipWhenTippedCents),
+        attributed: tippedReceipts > 0,
+      },
+      refunds: { refundedOrders, rate: refundRate },
+      discounts: { totalCents: discountCents, total: formatMxn(discountCents), rate: discountRate },
+    };
+  }
+
+  /** Compute the Overview KPI block for one customer. */
+  async kpis(merchantId: string, contactId: string) {
+    const raw = await this.repo.kpis(merchantId, contactId);
+    return this.kpisDto(raw);
+  }
+
+  /**
+   * The AI customer portrait: a short Spanish sentence set, synthesised by Haiku
+   * from the customer's extracted facts, recent conversation summaries and KPIs.
+   * The embeddings feed this indirectly — the facts were extracted from embedded
+   * messages — so no vector is read here. Fail-safe by design: a missing API key or
+   * a model error returns `{ description: null }`, and the tab simply hides the card.
+   */
+  async describe(
+    merchantId: string,
+    contactId: string,
+  ): Promise<{ description: string | null; generated: boolean; segment: string | null }> {
+    if (!isUuid(contactId)) return { description: null, generated: false, segment: null };
+
+    const [factRows, summaryRows, kpi] = await Promise.all([
+      this.repo.factsFor(merchantId, contactId),
+      this.repo.conversationSummaries(merchantId, contactId, 5),
+      this.kpis(merchantId, contactId),
+    ]);
+
+    const facts: Record<string, unknown> = {};
+    for (const r of factRows) facts[String(r.key)] = r.value;
+    const summaries = summaryRows
+      .map((r) => String(r.summary || '').trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
+    // Nothing to describe: no orders, no facts, no summaries.
+    if (kpi.orders === 0 && Object.keys(facts).length === 0 && summaries.length === 0) {
+      return { description: null, generated: false, segment: kpi.segment };
+    }
+
+    const input = {
+      stats: {
+        lifetimeSpend: kpi.spend.total,
+        averageTicket: kpi.spend.avgTicket,
+        visits: kpi.visits,
+        orders: kpi.orders,
+        visitsPerMonth: kpi.frequencyPerMonth,
+        daysSinceLastVisit: kpi.recencyDays,
+        tenureDays: kpi.tenureDays,
+        segment: kpi.segment,
+        favorites: kpi.favorites.map((f) => f.name),
+        topCategory: kpi.topCategory?.name ?? null,
+        channelMix: kpi.channelMix,
+        daypart: kpi.daypart,
+      },
+      facts,
+      conversationSummaries: summaries,
+    };
+
+    const key = `${contactId}:${fingerprintPortrait(input)}`;
+    const now = Date.now();
+    const cached = this.descriptionCache.get(key);
+    if (cached && cached.expires > now) {
+      return { description: cached.text, generated: false, segment: kpi.segment };
+    }
+
+    const completion = await this.anthropic.createCompletion({
+      maxTokens: 220,
+      system: PORTRAIT_SYSTEM,
+      userMessage: JSON.stringify(input),
+    });
+    const text = completion?.text?.trim() || null;
+    if (text) {
+      this.descriptionCache.set(key, { text, expires: now + DESCRIPTION_TTL_MS });
+      this.pruneDescriptionCache();
+    }
+    return { description: text, generated: Boolean(text), segment: kpi.segment };
+  }
+
+  /** Drop expired entries; if still over the cap, evict oldest-inserted first. */
+  private pruneDescriptionCache() {
+    const now = Date.now();
+    for (const [k, v] of this.descriptionCache) {
+      if (v.expires <= now) this.descriptionCache.delete(k);
+    }
+    while (this.descriptionCache.size > DESCRIPTION_CACHE_MAX) {
+      const oldest = this.descriptionCache.keys().next().value;
+      if (oldest === undefined) break;
+      this.descriptionCache.delete(oldest);
+    }
   }
 
   async timeline(merchantId: string, contactId: string) {

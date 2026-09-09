@@ -9,6 +9,7 @@ import {
   creditLoyaltySeals,
   loyaltyScan,
   topupWallet,
+  useCustomerDescription,
   useCustomerDetail,
   useCustomerInsights,
   useCustomersData,
@@ -252,6 +253,266 @@ function Metric({ label, value, note, icon }) {
         {note && <em>{note}</em>}
       </div>
     </div>
+  );
+}
+
+// ── KPI-tab labels (static → msg descriptors, resolved with text(i18n, …)) ──────
+const SEGMENT_LABEL = {
+  vip: msg`VIP`,
+  regular: msg`Frecuente`,
+  new: msg`Nuevo`,
+  at_risk: msg`En riesgo`,
+  lapsed: msg`Inactivo`,
+  prospect: msg`Prospecto`,
+};
+const SEGMENT_HINT = {
+  vip: msg`Viene seguido y gasta bien.`,
+  regular: msg`Cliente habitual y activo.`,
+  new: msg`Apenas empieza a comprar.`,
+  at_risk: msg`Antes venía seguido y ya se tardó.`,
+  lapsed: msg`Hace mucho que no viene.`,
+  prospect: msg`Aún no ha comprado.`,
+};
+const SEGMENT_TONE = {
+  vip: 'seg-vip',
+  regular: 'seg-regular',
+  new: 'seg-new',
+  at_risk: 'seg-risk',
+  lapsed: 'seg-lapsed',
+  prospect: 'seg-prospect',
+};
+const CHANNEL_LABEL = {
+  dine_in: msg`En mesa`,
+  pickup: msg`Para llevar`,
+  delivery: msg`A domicilio`,
+};
+const DAYPART_LABEL = {
+  0: msg`Madrugadas`,
+  1: msg`Mañanas`,
+  2: msg`Tardes`,
+  3: msg`Noches`,
+};
+const DOW_LABEL = {
+  0: msg`domingos`,
+  1: msg`lunes`,
+  2: msg`martes`,
+  3: msg`miércoles`,
+  4: msg`jueves`,
+  5: msg`viernes`,
+  6: msg`sábados`,
+};
+
+/** "70% en mesa · 30% para llevar" from the channel-mix counts. */
+function channelMixText(i18n, mix) {
+  if (!mix || !mix.total) return '';
+  const fields = [
+    ['dine_in', mix.dineIn],
+    ['pickup', mix.pickup],
+    ['delivery', mix.delivery],
+  ];
+  return fields
+    .filter(([, n]) => n > 0)
+    .map(([key, n]) => Math.round((n / mix.total) * 100) + '% ' + text(i18n, CHANNEL_LABEL[key]))
+    .join(' · ');
+}
+
+function SegmentBadge({ segment }) {
+  const { i18n } = useLingui();
+  const key = segment && SEGMENT_LABEL[segment] ? segment : 'prospect';
+  return (
+    <span className={'segment-badge ' + (SEGMENT_TONE[key] || 'seg-prospect')}>
+      {text(i18n, SEGMENT_LABEL[key])}
+    </span>
+  );
+}
+
+// The AI portrait: a short Spanish description synthesized from the customer's
+// memory (facts extracted from embedded messages), conversation summaries and KPIs.
+// Loaded lazily so the model call never blocks the KPI tiles; hidden when there is
+// nothing to say.
+function CustomerPortrait({ customerId, segment }) {
+  const { t, i18n } = useLingui();
+  const { data, loading } = useCustomerDescription(customerId);
+  const description = data?.description || null;
+  const seg = data?.segment || segment || null;
+
+  return (
+    <div className="customer-portrait">
+      <div className="portrait-head">
+        <span className="portrait-icon">
+          <I.Sparkles size={16} />
+        </span>
+        <div className="portrait-titles">
+          <strong>
+            <Trans>Resumen del cliente</Trans>
+          </strong>
+          <small>
+            <Trans>Escrito con IA a partir de su memoria y sus compras</Trans>
+          </small>
+        </div>
+        {seg && <SegmentBadge segment={seg} />}
+      </div>
+      {loading ? (
+        <div className="portrait-body loading" aria-hidden="true">
+          <span className="line" />
+          <span className="line" />
+          <span className="line short" />
+        </div>
+      ) : description ? (
+        <p className="portrait-body">{description}</p>
+      ) : (
+        <p className="portrait-body muted">
+          {seg && SEGMENT_HINT[seg]
+            ? text(i18n, SEGMENT_HINT[seg])
+            : t`Aún no hay datos para describir a este cliente.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function OverviewTab({ customerId, customer, kpis, timeline }) {
+  const { t, i18n } = useLingui();
+  const k = kpis || {};
+  const spend = k.spend || {};
+  const favorites = k.favorites || [];
+  const channel = k.channelMix || {};
+  const daypart = k.daypart || {};
+  const tips = k.tips || {};
+  const refunds = k.refunds || {};
+  const discounts = k.discounts || {};
+  const pct = (r) => Math.round((r || 0) * 100) + '%';
+
+  const recencyText =
+    k.recencyDays == null
+      ? t`Sin pedidos`
+      : k.recencyDays <= 0
+        ? t`Hoy`
+        : k.recencyDays === 1
+          ? t`Ayer`
+          : k.recencyDays < 30
+            ? t`Hace ${k.recencyDays} días`
+            : k.recencyDays < 365
+              ? t`Hace ${Math.round(k.recencyDays / 30)} meses`
+              : t`Hace ${Math.round(k.recencyDays / 365)} años`;
+
+  const tenureText =
+    k.tenureDays == null
+      ? ''
+      : k.tenureDays < 30
+        ? t`${k.tenureDays} días`
+        : k.tenureDays < 365
+          ? t`${Math.round(k.tenureDays / 30)} meses`
+          : t`${Math.round(k.tenureDays / 365)} años`;
+
+  const daypartText =
+    daypart.bucket != null && DAYPART_LABEL[daypart.bucket]
+      ? text(i18n, DAYPART_LABEL[daypart.bucket])
+      : '—';
+  const dowText =
+    daypart.dow != null && DOW_LABEL[daypart.dow] ? text(i18n, DOW_LABEL[daypart.dow]) : '';
+
+  return (
+    <>
+      <CustomerPortrait customerId={customerId} segment={k.segment || customer?.status} />
+
+      <div className="customer-metrics hero">
+        <Metric
+          label={t`Gastado`}
+          value={spend.total || '$0'}
+          note={t`en total`}
+          icon={<I.DollarSign size={18} />}
+        />
+        <Metric
+          label={t`Ticket promedio`}
+          value={spend.avgTicket || '$0'}
+          note={<Plural value={k.orders || 0} one="# pedido" other="# pedidos" />}
+          icon={<I.Receipt size={18} />}
+        />
+        <Metric
+          label={t`Visitas`}
+          value={formatNumber(k.visits || 0)}
+          note={t`días distintos`}
+          icon={<I.Activity size={18} />}
+        />
+        <Metric
+          label={t`Última visita`}
+          value={recencyText}
+          note={k.lastOrderAt ? fmtDate(k.lastOrderAt) : ''}
+          icon={<I.Clock size={18} />}
+        />
+      </div>
+
+      <div className="customer-metrics secondary">
+        <Metric
+          label={t`Visitas por mes`}
+          value={formatNumber(k.frequencyPerMonth || 0)}
+          note={t`en promedio`}
+          icon={<I.TrendUp size={18} />}
+        />
+        <Metric
+          label={t`Cliente desde`}
+          value={k.firstOrderAt ? fmtDate(k.firstOrderAt) : '—'}
+          note={tenureText}
+          icon={<I.Calendar size={18} />}
+        />
+        <Metric
+          label={t`Favoritos`}
+          value={favorites[0]?.name || '—'}
+          note={favorites
+            .slice(1, 3)
+            .map((f) => f.name)
+            .join(', ')}
+          icon={<I.Package size={18} />}
+        />
+        <Metric
+          label={t`Canal principal`}
+          value={
+            channel.dominant && CHANNEL_LABEL[channel.dominant]
+              ? text(i18n, CHANNEL_LABEL[channel.dominant])
+              : '—'
+          }
+          note={channelMixText(i18n, channel)}
+          icon={<I.Store size={18} />}
+        />
+        <Metric
+          label={t`Horario habitual`}
+          value={daypartText}
+          note={dowText ? t`sobre todo los ${dowText}` : ''}
+          icon={<I.Sun size={18} />}
+        />
+        <Metric
+          label={t`Propina`}
+          value={tips.attributed ? tips.avgWhenTipped : '—'}
+          note={
+            tips.attributed ? (
+              <Plural
+                value={tips.tippedReceipts || 0}
+                one="prom. en # recibo"
+                other="prom. en # recibos"
+              />
+            ) : (
+              t`sin datos de propina`
+            )
+          }
+          icon={<I.Wallet size={18} />}
+        />
+        <Metric
+          label={t`Reembolsos`}
+          value={pct(refunds.rate)}
+          note={t`${refunds.refundedOrders || 0} de ${k.orders || 0}`}
+          icon={<I.Refresh size={18} />}
+        />
+        <Metric
+          label={t`Descuentos`}
+          value={pct(discounts.rate)}
+          note={discounts.total || '$0'}
+          icon={<I.CreditCard size={18} />}
+        />
+      </div>
+
+      <Timeline items={timeline || []} />
+    </>
   );
 }
 
@@ -915,29 +1176,12 @@ function CustomerProfile({ customerId }) {
 
       <div className="profile-body">
         {activeTab === 'overview' && (
-          <>
-            <div className="customer-metrics">
-              <Metric
-                label={t`Pedidos`}
-                value={customer.value?.orders || 0}
-                note={customer.value?.totalSpend || '$0.00'}
-                icon={<I.Receipt size={18} />}
-              />
-              <Metric
-                label={t`Visitas`}
-                value={customer.value?.visits || 0}
-                note={customer.value?.walletBalance || t`$0.00 en monedero`}
-                icon={<I.Activity size={18} />}
-              />
-              <Metric
-                label={t`Datos de memoria`}
-                value={customer.memory?.factsCount || 0}
-                note={customer.memory?.embeddingHealth || t`sin indexar`}
-                icon={<I.Sparkles size={18} />}
-              />
-            </div>
-            <Timeline items={data?.timeline || []} />
-          </>
+          <OverviewTab
+            customerId={customerId}
+            customer={customer}
+            kpis={data?.kpis}
+            timeline={data?.timeline || []}
+          />
         )}
         {activeTab === 'whatsapp' && (
           <WhatsAppPanel customerId={customerId} conversations={data?.conversations || []} />

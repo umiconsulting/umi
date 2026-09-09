@@ -24,12 +24,14 @@ const EMPTY_ORDERS = [];
 const EMPTY_MEMBERS = { customers: [], total: 0, page: 1, totalPages: 1 };
 const EMPTY_CUSTOMER_DETAIL = {
   customer: null,
+  kpis: null,
   timeline: [],
   conversations: [],
   orders: [],
   cash: null,
   identity: null,
 };
+const EMPTY_CUSTOMER_DESCRIPTION = { description: null, generated: false, segment: null };
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null };
 const EMPTY_STAFF = { staff: [] };
 const EMPTY_ROLES = { roles: [], permissions: [] };
@@ -457,6 +459,15 @@ async function _loadConversationMessages(ctx, customerId, conversationId, cursor
 
 async function _loadCustomerInsights(ctx) {
   return _apiFetch(_merchantPath(ctx, '/insights/customer-platform'));
+}
+
+// The AI customer portrait for the Overview tab. Loaded separately from the detail
+// bundle so the (slow) model call never blocks the KPI tiles.
+async function _loadCustomerDescription(ctx, customerId) {
+  if (!customerId) return EMPTY_CUSTOMER_DESCRIPTION;
+  return _apiFetch(
+    _merchantPath(ctx, '/customers/' + encodeURIComponent(customerId) + '/description'),
+  );
 }
 
 async function _loadStaff(ctx) {
@@ -1180,6 +1191,17 @@ function useCustomerInsights(refresh) {
   );
 }
 
+function useCustomerDescription(customerId, refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadCustomerDescription(ctx, customerId);
+    },
+    _deps(ctx, [customerId || '', refresh || 0]),
+    EMPTY_CUSTOMER_DESCRIPTION,
+  );
+}
+
 function useGiftCardsData(opts) {
   const ctx = useMerchant();
   var page = opts && opts.page ? opts.page : 1;
@@ -1515,6 +1537,7 @@ export {
   useCustomerDetail,
   useConversationMessages,
   useCustomerInsights,
+  useCustomerDescription,
   useStaffData,
   useRolesData,
   useBusinessHours,

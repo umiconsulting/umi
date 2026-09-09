@@ -498,4 +498,178 @@ export class CustomersRepository {
       };
     });
   }
+
+  /**
+   * The Overview-tab KPI bundle for ONE customer. A single customer is a small
+   * scan, so this can afford richer aggregation than the list rollup: four reads on
+   * one pooled (RLS-scoped) connection — a scalar core, top-3 favourite items, the
+   * dominant category, and the preferred daypart in the merchant's local time.
+   *
+   * Restaurant-metric notes carried from the data model:
+   *   * money is the derived `merchant.order_total` view (net `total`, plus `gross`
+   *     and `discount`, both already void-corrected) — never a stored order total.
+   *   * a "visit" is a distinct trading day (`business_date`), not a raw order, so
+   *     split checks do not double-count; canceled orders are not a visit.
+   *   * TIP lives only in the POS receipt JSON (`receipt_snapshot.snapshot->'tip'`)
+   *     and is attributable only when the POS attached a customer — the anonymous
+   *     walk-in tail (customer_id NULL) is simply absent, so tip is "on attributed
+   *     POS receipts", not "per visit".
+   *   * REFUNDS run through two DISJOINT paths — `merchant.refund` (chat/web/dash,
+   *     via payment) and `merchant.pos_sale_exception` (POS, via committed sale).
+   *     No FK bridges them, so a UNION of refunded order ids counts each order once.
+   */
+  async kpis(
+    merchantId: string,
+    contactId: string,
+  ): Promise<{ agg: Row; favorites: Row[]; category: Row | null; daypart: Row | null }> {
+    return this.pg.withMerchant(async (c) => {
+      const agg = (
+        await c.query<Row>(
+          `SELECT
+             count(o.id)::int                                             AS orders_count,
+             count(DISTINCT o.business_date)
+               FILTER (WHERE o.status <> 'canceled')::int                 AS visit_days,
+             COALESCE(sum(ot.total), 0)::bigint                           AS total_spend_cents,
+             COALESCE(sum(ot.gross), 0)::bigint                           AS gross_cents,
+             COALESCE(sum(ot.discount), 0)::bigint                        AS discount_cents,
+             min(o.placed_at)                                            AS first_order_at,
+             max(o.placed_at)                                            AS last_order_at,
+             count(*) FILTER (WHERE o.fulfillment_type = 'dine_in')::int  AS dine_in_orders,
+             count(*) FILTER (WHERE o.fulfillment_type = 'pickup')::int   AS pickup_orders,
+             count(*) FILTER (WHERE o.fulfillment_type = 'delivery')::int AS delivery_orders,
+             count(*) FILTER (WHERE o.fulfillment_type IS NULL)::int      AS unspecified_orders,
+             -- Tip on attributed POS receipts (order_id → receipt_snapshot JSON).
+             COALESCE((
+               SELECT sum((rs.snapshot->'tip'->>'minorUnits')::bigint)
+                 FROM merchant.receipt_snapshot AS rs
+                 JOIN merchant.customer_order AS ro ON ro.id = rs.order_id
+                WHERE ro.merchant_id = $1::uuid AND ro.customer_id = $2::uuid
+             ), 0)::bigint                                                AS tip_total_cents,
+             (
+               SELECT count(*)
+                 FROM merchant.receipt_snapshot AS rs
+                 JOIN merchant.customer_order AS ro ON ro.id = rs.order_id
+                WHERE ro.merchant_id = $1::uuid AND ro.customer_id = $2::uuid
+                  AND (rs.snapshot->'tip'->>'minorUnits')::bigint > 0
+             )::int                                                       AS tipped_receipts,
+             -- Refunded orders across BOTH settlement paths, each order once.
+             (
+               SELECT count(*) FROM (
+                 SELECT p.order_id
+                   FROM merchant.refund AS r
+                   JOIN merchant.payment AS p ON p.id = r.payment_id
+                   JOIN merchant.customer_order AS ro ON ro.id = p.order_id
+                  WHERE ro.merchant_id = $1::uuid AND ro.customer_id = $2::uuid
+                 UNION
+                 SELECT cs.order_id
+                   FROM merchant.pos_sale_exception AS x
+                   JOIN merchant.pos_committed_sale AS cs ON cs.id = x.sale_id
+                   JOIN merchant.customer_order AS ro ON ro.id = cs.order_id
+                  WHERE ro.merchant_id = $1::uuid AND ro.customer_id = $2::uuid
+                    AND x.status = 'committed'
+               ) AS refunded
+             )::int                                                       AS refunded_orders
+           FROM merchant.customer_order AS o
+           LEFT JOIN merchant.order_total AS ot ON ot.order_id = o.id
+           WHERE o.merchant_id = $1::uuid AND o.customer_id = $2::uuid`,
+          [merchantId, contactId],
+        )
+      ).rows[0];
+
+      const favorites = (
+        await c.query<Row>(
+          `SELECT oi.name,
+                  sum(oi.quantity)::int AS units,
+                  count(*)::int        AS times_ordered
+             FROM merchant.order_item AS oi
+             JOIN merchant.customer_order AS o ON o.id = oi.order_id
+            WHERE o.merchant_id = $1::uuid AND o.customer_id = $2::uuid
+              AND oi.voided_at IS NULL
+            GROUP BY oi.name
+            ORDER BY units DESC, times_ordered DESC
+            LIMIT 3`,
+          [merchantId, contactId],
+        )
+      ).rows;
+
+      const category = (
+        await c.query<Row>(
+          `SELECT pc.name AS category, sum(oi.quantity)::int AS units
+             FROM merchant.order_item AS oi
+             JOIN merchant.customer_order AS o ON o.id = oi.order_id
+             LEFT JOIN merchant.product AS pr ON pr.id = oi.product_id
+             LEFT JOIN merchant.product_category AS pc ON pc.id = pr.category_id
+            WHERE o.merchant_id = $1::uuid AND o.customer_id = $2::uuid
+              AND oi.voided_at IS NULL AND pc.name IS NOT NULL
+            GROUP BY pc.name
+            ORDER BY units DESC
+            LIMIT 1`,
+          [merchantId, contactId],
+        )
+      ).rows[0];
+
+      const daypart = (
+        await c.query<Row>(
+          // Hour/dow are read in the merchant's (or the location's) local wall-clock,
+          // not UTC, so "mornings" means mornings for this café. Bucket: 0=00-05,
+          // 1=06-11, 2=12-17, 3=18-23. dow: 0=Sun … 6=Sat (Postgres EXTRACT).
+          `SELECT
+             mode() WITHIN GROUP (ORDER BY floor(extract(hour FROM loc) / 6)::int) AS daypart_bucket,
+             mode() WITHIN GROUP (ORDER BY extract(dow FROM loc)::int)             AS dow_local
+           FROM (
+             SELECT o.placed_at AT TIME ZONE COALESCE(l.timezone, m.timezone) AS loc
+               FROM merchant.customer_order AS o
+               JOIN merchant.merchant AS m ON m.id = o.merchant_id
+               LEFT JOIN merchant.location AS l ON l.id = o.location_id
+              WHERE o.merchant_id = $1::uuid AND o.customer_id = $2::uuid
+                AND o.status <> 'canceled'
+           ) AS t`,
+          [merchantId, contactId],
+        )
+      ).rows[0];
+
+      return { agg, favorites, category: category ?? null, daypart: daypart ?? null };
+    });
+  }
+
+  /**
+   * The customer's atomic facts (`merchant.customer_fact`), all sources, for the AI
+   * portrait. Returned raw (source/key/value) so the service can shape the prompt;
+   * the value is jsonb, rendered to text at the caller.
+   */
+  async factsFor(merchantId: string, contactId: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT source, key, value
+           FROM merchant.customer_fact
+          WHERE merchant_id = $2::uuid AND customer_id = $1::uuid
+          ORDER BY source, created_at`,
+        [contactId, merchantId],
+      ),
+    );
+    return rows;
+  }
+
+  /**
+   * Recent per-conversation rolling summaries (Haiku-written) for the AI portrait.
+   * Newest first; only conversations that actually have a summary.
+   */
+  async conversationSummaries(
+    merchantId: string,
+    contactId: string,
+    limit: number,
+  ): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT cv.summary, cv.last_message_at
+           FROM merchant.conversation AS cv
+          WHERE cv.merchant_id = $2::uuid AND cv.customer_id = $1::uuid
+            AND cv.summary IS NOT NULL AND length(trim(cv.summary)) > 0
+          ORDER BY cv.last_message_at DESC NULLS LAST
+          LIMIT $3`,
+        [contactId, merchantId, limit],
+      ),
+    );
+    return rows;
+  }
 }

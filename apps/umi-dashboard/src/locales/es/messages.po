@@ -174,6 +174,7 @@ msgstr "Clientes"
 
 #: src/lib/module-registry.js
 #: src/screens/conversations.jsx
+#: src/shell.jsx
 msgid "Atención"
 msgstr "Atención"
 
@@ -208,6 +209,7 @@ msgstr "Ventas"
 
 #: src/lib/module-registry.js
 #: src/screens/caja-turnos.jsx
+#: src/screens/customers.jsx
 #: src/screens/reembolsos.jsx
 msgid "Reembolsos"
 msgstr "Reembolsos"
@@ -709,10 +711,6 @@ msgstr "Aún no hay categorías. Crea la primera arriba."
 #~ msgstr "{active, plural, one {# conversación activa ahora mismo.} other {# conversaciones activas ahora mismo.}}"
 
 #: src/screens/conversations.jsx
-#~ msgid "en total"
-#~ msgstr "en total"
-
-#: src/screens/conversations.jsx
 #~ msgid "No hay conversaciones."
 #~ msgstr "No hay conversaciones."
 
@@ -743,6 +741,18 @@ msgstr "Espera"
 #: src/screens/customers.jsx
 #~ msgid "{total, plural, one {# cliente} other {# clientes}}"
 #~ msgstr "{total, plural, one {# cliente} other {# clientes}}"
+
+#: src/screens/customers.jsx
+#~ msgid "$0.00 en monedero"
+#~ msgstr "$0.00 en monedero"
+
+#: src/screens/customers.jsx
+#~ msgid "Datos de memoria"
+#~ msgstr "Datos de memoria"
+
+#: src/screens/customers.jsx
+#~ msgid "sin indexar"
+#~ msgstr "sin indexar"
 
 #: src/screens/customers.jsx
 #: src/screens/orders.jsx
@@ -812,6 +822,256 @@ msgstr "Prueba otra búsqueda u otro filtro."
 #: src/screens/customers.jsx
 msgid "Cargar más"
 msgstr "Cargar más"
+
+#: src/screens/customers.jsx
+msgid "VIP"
+msgstr "VIP"
+
+#: src/screens/customers.jsx
+msgid "Frecuente"
+msgstr "Frecuente"
+
+#: src/screens/customers.jsx
+#: src/screens/orders.jsx
+msgid "Nuevo"
+msgstr "Nuevo"
+
+#: src/screens/customers.jsx
+msgid "En riesgo"
+msgstr "En riesgo"
+
+#: src/screens/customers.jsx
+msgid "Inactivo"
+msgstr "Inactivo"
+
+#: src/screens/customers.jsx
+msgid "Prospecto"
+msgstr "Prospecto"
+
+#: src/screens/customers.jsx
+msgid "Viene seguido y gasta bien."
+msgstr "Viene seguido y gasta bien."
+
+#: src/screens/customers.jsx
+msgid "Cliente habitual y activo."
+msgstr "Cliente habitual y activo."
+
+#: src/screens/customers.jsx
+msgid "Apenas empieza a comprar."
+msgstr "Apenas empieza a comprar."
+
+#: src/screens/customers.jsx
+msgid "Antes venía seguido y ya se tardó."
+msgstr "Antes venía seguido y ya se tardó."
+
+#: src/screens/customers.jsx
+msgid "Hace mucho que no viene."
+msgstr "Hace mucho que no viene."
+
+#: src/screens/customers.jsx
+msgid "Aún no ha comprado."
+msgstr "Aún no ha comprado."
+
+#: src/screens/customers.jsx
+msgid "En mesa"
+msgstr "En mesa"
+
+#: src/screens/customers.jsx
+msgid "Para llevar"
+msgstr "Para llevar"
+
+#: src/screens/customers.jsx
+#: src/screens/orders.jsx
+msgid "A domicilio"
+msgstr "A domicilio"
+
+#: src/screens/customers.jsx
+msgid "Madrugadas"
+msgstr "Madrugadas"
+
+#: src/screens/customers.jsx
+msgid "Mañanas"
+msgstr "Mañanas"
+
+#: src/screens/customers.jsx
+msgid "Tardes"
+msgstr "Tardes"
+
+#: src/screens/customers.jsx
+msgid "Noches"
+msgstr "Noches"
+
+#: src/screens/customers.jsx
+msgid "domingos"
+msgstr "domingos"
+
+#: src/screens/customers.jsx
+msgid "lunes"
+msgstr "lunes"
+
+#: src/screens/customers.jsx
+msgid "martes"
+msgstr "martes"
+
+#: src/screens/customers.jsx
+msgid "miércoles"
+msgstr "miércoles"
+
+#: src/screens/customers.jsx
+msgid "jueves"
+msgstr "jueves"
+
+#: src/screens/customers.jsx
+msgid "viernes"
+msgstr "viernes"
+
+#: src/screens/customers.jsx
+msgid "sábados"
+msgstr "sábados"
+
+#: src/screens/customers.jsx
+msgid "Resumen del cliente"
+msgstr "Resumen del cliente"
+
+#: src/screens/customers.jsx
+msgid "Escrito con IA a partir de su memoria y sus compras"
+msgstr "Escrito con IA a partir de su memoria y sus compras"
+
+#: src/screens/customers.jsx
+msgid "Aún no hay datos para describir a este cliente."
+msgstr "Aún no hay datos para describir a este cliente."
+
+#: src/screens/customers.jsx
+#: src/screens/orders.jsx
+msgid "Sin pedidos"
+msgstr "Sin pedidos"
+
+#: src/screens/customers.jsx
+#: src/screens/ventas-report.jsx
+msgid "Hoy"
+msgstr "Hoy"
+
+#: src/screens/customers.jsx
+#: src/screens/ventas-report.jsx
+msgid "Ayer"
+msgstr "Ayer"
+
+#. placeholder {0}: k.recencyDays
+#: src/screens/customers.jsx
+msgid "Hace {0} días"
+msgstr "Hace {0} días"
+
+#. placeholder {0}: Math.round(k.recencyDays / 30)
+#: src/screens/customers.jsx
+msgid "Hace {0} meses"
+msgstr "Hace {0} meses"
+
+#. placeholder {0}: Math.round(k.recencyDays / 365)
+#: src/screens/customers.jsx
+msgid "Hace {0} años"
+msgstr "Hace {0} años"
+
+#. placeholder {0}: k.tenureDays
+#: src/screens/customers.jsx
+msgid "{0} días"
+msgstr "{0} días"
+
+#. placeholder {0}: Math.round(k.tenureDays / 30)
+#: src/screens/customers.jsx
+msgid "{0} meses"
+msgstr "{0} meses"
+
+#. placeholder {0}: Math.round(k.tenureDays / 365)
+#: src/screens/customers.jsx
+msgid "{0} años"
+msgstr "{0} años"
+
+#: src/screens/customers.jsx
+msgid "Gastado"
+msgstr "Gastado"
+
+#: src/screens/customers.jsx
+msgid "en total"
+msgstr "en total"
+
+#: src/screens/customers.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/ventas-report.jsx
+msgid "Ticket promedio"
+msgstr "Ticket promedio"
+
+#. placeholder {0}: k.orders || 0
+#: src/screens/customers.jsx
+msgid "{0, plural, one {# pedido} other {# pedidos}}"
+msgstr "{0, plural, one {# pedido} other {# pedidos}}"
+
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Visitas"
+msgstr "Visitas"
+
+#: src/screens/customers.jsx
+msgid "días distintos"
+msgstr "días distintos"
+
+#: src/screens/customers.jsx
+#: src/screens/members.jsx
+msgid "Última visita"
+msgstr "Última visita"
+
+#: src/screens/customers.jsx
+msgid "Visitas por mes"
+msgstr "Visitas por mes"
+
+#: src/screens/customers.jsx
+msgid "en promedio"
+msgstr "en promedio"
+
+#: src/screens/customers.jsx
+msgid "Cliente desde"
+msgstr "Cliente desde"
+
+#: src/screens/customers.jsx
+msgid "Favoritos"
+msgstr "Favoritos"
+
+#: src/screens/customers.jsx
+msgid "Canal principal"
+msgstr "Canal principal"
+
+#: src/screens/customers.jsx
+msgid "Horario habitual"
+msgstr "Horario habitual"
+
+#: src/screens/customers.jsx
+msgid "sobre todo los {dowText}"
+msgstr "sobre todo los {dowText}"
+
+#: src/screens/customers.jsx
+#: src/screens/recibos.jsx
+msgid "Propina"
+msgstr "Propina"
+
+#. placeholder {0}: tips.tippedReceipts || 0
+#: src/screens/customers.jsx
+msgid "{0, plural, one {prom. en # recibo} other {prom. en # recibos}}"
+msgstr "{0, plural, one {prom. en # recibo} other {prom. en # recibos}}"
+
+#: src/screens/customers.jsx
+msgid "sin datos de propina"
+msgstr "sin datos de propina"
+
+#. placeholder {0}: refunds.refundedOrders || 0
+#. placeholder {1}: k.orders || 0
+#: src/screens/customers.jsx
+msgid "{0} de {1}"
+msgstr "{0} de {1}"
+
+#: src/screens/customers.jsx
+#: src/screens/ventas-report.jsx
+msgid "Descuentos"
+msgstr "Descuentos"
 
 #: src/screens/customers.jsx
 msgid "Sin actividad reciente"
@@ -1095,23 +1355,6 @@ msgstr "Tarjetas de regalo"
 #: src/screens/customers.jsx
 msgid "Perfil del cliente"
 msgstr "Perfil del cliente"
-
-#: src/screens/customers.jsx
-#: src/screens/members.jsx
-msgid "Visitas"
-msgstr "Visitas"
-
-#: src/screens/customers.jsx
-msgid "$0.00 en monedero"
-msgstr "$0.00 en monedero"
-
-#: src/screens/customers.jsx
-msgid "Datos de memoria"
-msgstr "Datos de memoria"
-
-#: src/screens/customers.jsx
-msgid "sin indexar"
-msgstr "sin indexar"
 
 #: src/screens/customers.jsx
 msgid "Un perfil por cliente: WhatsApp, pedidos, lealtad, monedero y notas."
@@ -2285,10 +2528,6 @@ msgid "Pendientes"
 msgstr "Pendientes"
 
 #: src/screens/members.jsx
-msgid "Última visita"
-msgstr "Última visita"
-
-#: src/screens/members.jsx
 msgid "Gasto total"
 msgstr "Gasto total"
 
@@ -3123,12 +3362,6 @@ msgid "Vendido"
 msgstr "Vendido"
 
 #: src/screens/operations-workspace.jsx
-#: src/screens/orders.jsx
-#: src/screens/ventas-report.jsx
-msgid "Ticket promedio"
-msgstr "Ticket promedio"
-
-#: src/screens/operations-workspace.jsx
 msgid "Con descuento"
 msgstr "Con descuento"
 
@@ -3366,10 +3599,6 @@ msgstr "Requiere {0}"
 #~ msgstr "Avanzar estado"
 
 #: src/screens/orders.jsx
-msgid "Nuevo"
-msgstr "Nuevo"
-
-#: src/screens/orders.jsx
 msgid "Preparando"
 msgstr "Preparando"
 
@@ -3389,10 +3618,6 @@ msgstr "Para recoger"
 #: src/screens/orders.jsx
 msgid "Para comer aquí"
 msgstr "Para comer aquí"
-
-#: src/screens/orders.jsx
-msgid "A domicilio"
-msgstr "A domicilio"
 
 #: src/screens/orders.jsx
 msgid "Activos"
@@ -3435,10 +3660,6 @@ msgstr "Origen"
 #: src/screens/orders.jsx
 msgid "Cancelaciones"
 msgstr "Cancelaciones"
-
-#: src/screens/orders.jsx
-msgid "Sin pedidos"
-msgstr "Sin pedidos"
 
 #: src/screens/orders.jsx
 msgid "No hay pedidos en este filtro."
@@ -3888,10 +4109,6 @@ msgstr "Concepto"
 #: src/screens/recibos.jsx
 msgid "Cant."
 msgstr "Cant."
-
-#: src/screens/recibos.jsx
-msgid "Propina"
-msgstr "Propina"
 
 #: src/screens/recibos.jsx
 msgid "cambio"
@@ -4762,14 +4979,6 @@ msgstr "Guardar acceso"
 #~ msgstr "Aún no hay ventas en este periodo."
 
 #: src/screens/ventas-report.jsx
-msgid "Hoy"
-msgstr "Hoy"
-
-#: src/screens/ventas-report.jsx
-msgid "Ayer"
-msgstr "Ayer"
-
-#: src/screens/ventas-report.jsx
 msgid "7 días"
 msgstr "7 días"
 
@@ -4856,10 +5065,6 @@ msgstr "por orden"
 #: src/screens/ventas-report.jsx
 msgid "Ítems vendidos"
 msgstr "Ítems vendidos"
-
-#: src/screens/ventas-report.jsx
-msgid "Descuentos"
-msgstr "Descuentos"
 
 #: src/screens/ventas-report.jsx
 msgid "Propinas"
