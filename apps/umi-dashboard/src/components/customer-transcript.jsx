@@ -2,6 +2,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDateTime } from '@/lib/format.js';
+import { formatWhatsApp } from '@/lib/whatsapp-format.jsx';
 import { useConversationMessages } from '@/data.jsx';
 
 function senderLabel(sender, t) {
@@ -39,7 +40,7 @@ function MessageBubble({ message }) {
     <div className={'msg-row ' + (outbound ? 'out' : 'in')}>
       <div className={'msg-bubble sender-' + message.sender}>
         {message.body ? (
-          <span className="msg-body">{message.body}</span>
+          <span className="msg-body">{formatWhatsApp(message.body)}</span>
         ) : (
           <span className="msg-body msg-empty">{t`(sin texto)`}</span>
         )}
