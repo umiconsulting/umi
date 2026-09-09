@@ -73,6 +73,16 @@ export class CustomersController {
     return this.customers.identity(merchant.merchantId, contactId);
   }
 
+  /**
+   * The AI customer portrait (Overview tab). Loaded lazily and separately from the
+   * detail bundle so the Haiku call never slows the profile: the KPI tiles paint
+   * from `detail`, and this fills the description card in when it is ready.
+   */
+  @Get('customers/:contactId/description')
+  async description(@Merchant() merchant: MerchantAccess, @Param('contactId') contactId: string) {
+    return this.customers.describe(merchant.merchantId, contactId);
+  }
+
   @Get('insights/customer-platform')
   async insights(@Merchant() merchant: MerchantAccess) {
     const products = await this.customers.loadProducts(merchant.merchantId);
