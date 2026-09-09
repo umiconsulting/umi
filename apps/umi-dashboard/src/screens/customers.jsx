@@ -285,6 +285,7 @@ const CHANNEL_LABEL = {
   dine_in: msg`En mesa`,
   pickup: msg`Para llevar`,
   delivery: msg`A domicilio`,
+  unspecified: msg`Sin especificar`,
 };
 const DAYPART_LABEL = {
   0: msg`Madrugadas`,
@@ -371,7 +372,7 @@ function CustomerPortrait({ customerId, segment }) {
   );
 }
 
-function OverviewTab({ customerId, customer, kpis, timeline }) {
+function OverviewTab({ customerId, customer, kpis }) {
   const { t, i18n } = useLingui();
   const k = kpis || {};
   const spend = k.spend || {};
@@ -510,8 +511,6 @@ function OverviewTab({ customerId, customer, kpis, timeline }) {
           icon={<I.CreditCard size={18} />}
         />
       </div>
-
-      <Timeline items={timeline || []} />
     </>
   );
 }
@@ -1180,7 +1179,6 @@ function CustomerProfile({ customerId }) {
             customerId={customerId}
             customer={customer}
             kpis={data?.kpis}
-            timeline={data?.timeline || []}
           />
         )}
         {activeTab === 'whatsapp' && (

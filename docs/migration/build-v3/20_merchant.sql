@@ -196,6 +196,12 @@ create table merchant.merchant (
   -- merchant sets 04:00. EVERY business_date in this schema is derived from this column
   -- plus `timezone` by merchant.tg_business_date, so they cannot disagree with each other.
   business_day_start time not null default '00:00',
+  -- Owner-tunable customer-segment cutoffs (New/Regular/VIP/At-risk/Lapsed), edited in
+  -- Ajustes. A partial or empty object is fine: the API merges it over the code defaults
+  -- in customer-kpis.ts, so an unset merchant keeps the shipped thresholds. Keys mirror
+  -- SEGMENT_THRESHOLDS (lapsedDays, activeWindowDays, regularMinVisits, vipMinVisits,
+  -- vipMinSpendCents, ...). Not derived, so it lives here rather than being recomputed.
+  segment_thresholds jsonb not null default '{}'::jsonb,
   status            text not null default 'active'
                       check (status in ('active','suspended')),
   created_at        timestamptz not null default now(),

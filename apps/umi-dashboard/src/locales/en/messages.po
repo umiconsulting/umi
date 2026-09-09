@@ -886,6 +886,10 @@ msgid "A domicilio"
 msgstr "Delivery"
 
 #: src/screens/customers.jsx
+msgid "Sin especificar"
+msgstr "Not specified"
+
+#: src/screens/customers.jsx
 msgid "Madrugadas"
 msgstr "Early mornings"
 
@@ -4370,6 +4374,34 @@ msgstr "Business day start"
 #: src/screens/settings.jsx
 msgid "Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café nocturno usa p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche que la abrió. No cambia días ya cerrados."
 msgstr "Time the sales day starts. 00:00 = local midnight. A late-night café uses e.g. 04:00 so a 1 a.m. sale counts toward the night that opened it. It does not change days already closed."
+
+#: src/screens/settings.jsx
+msgid "Segmentos de clientes"
+msgstr "Customer segments"
+
+#: src/screens/settings.jsx
+msgid "Define cuándo un cliente es Frecuente, VIP, En riesgo o Inactivo. Se usa en el resumen del cliente. Deja los valores por defecto si no estás seguro."
+msgstr "Define when a customer is Regular, VIP, At risk or Lapsed. It is used in the customer summary. Leave the defaults if you are not sure."
+
+#: src/screens/settings.jsx
+msgid "VIP: gasto mínimo (MXN)"
+msgstr "VIP: minimum spend (MXN)"
+
+#: src/screens/settings.jsx
+msgid "VIP: visitas mínimas"
+msgstr "VIP: minimum visits"
+
+#: src/screens/settings.jsx
+msgid "Frecuente: visitas mínimas"
+msgstr "Regular: minimum visits"
+
+#: src/screens/settings.jsx
+msgid "Activo: dentro de (días)"
+msgstr "Active: within (days)"
+
+#: src/screens/settings.jsx
+msgid "Inactivo: después de (días)"
+msgstr "Lapsed: after (days)"
 
 #: src/screens/settings.jsx
 msgid "Estado de la cuenta"

@@ -15,7 +15,7 @@ function make() {
     factsFor: vi.fn(),
     conversationSummaries: vi.fn(),
   };
-  const merchants = { loadProducts: vi.fn() };
+  const merchants = { loadProducts: vi.fn(), loadSegmentThresholds: vi.fn().mockResolvedValue({}) };
   const anthropic = { createCompletion: vi.fn() };
   return {
     svc: new CustomersService(repo as never, merchants as never, anthropic as never),
@@ -233,6 +233,53 @@ describe('CustomersService.kpis → kpisDto', () => {
     expect(kpi.discounts.rate).toBe(0);
     expect(kpi.channelMix.dominant).toBeNull();
     expect(kpi.tips.attributed).toBe(false);
+  });
+
+  it('reports the dominant channel as unspecified when most orders lack a fulfillment type', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 33,
+        visit_days: 13,
+        total_spend_cents: 372_600,
+        gross_cents: 372_600,
+        first_order_at: new Date(Date.now() - 180 * 86_400_000),
+        last_order_at: new Date(Date.now() - 2 * 86_400_000),
+        dine_in_orders: 1,
+        pickup_orders: 0,
+        delivery_orders: 0,
+        unspecified_orders: 32,
+      },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.channelMix.dominant).toBe('unspecified'); // not "dine_in" at 3%
+  });
+
+  it('applies owner-configured thresholds (an override flips regular → VIP)', async () => {
+    const h = make();
+    // Lower the VIP floors below this customer's 6 visits / $600 lifetime.
+    h.merchants.loadSegmentThresholds.mockResolvedValue({
+      vipMinVisits: 5,
+      vipMinSpendCents: 50_000,
+    });
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 6,
+        visit_days: 6,
+        total_spend_cents: 60_000,
+        gross_cents: 66_000,
+        first_order_at: new Date(Date.now() - 120 * 86_400_000),
+        last_order_at: new Date(Date.now() - 5 * 86_400_000),
+      },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.segment).toBe('vip'); // would be 'regular' under the default $1k / 8-visit floors
   });
 });
 

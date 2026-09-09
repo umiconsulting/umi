@@ -373,6 +373,8 @@ async function _loadMerchant(ctx) {
     passStyle: cashSettings?.passStyle || s.passStyle || 'stamps',
     subscriptionStatus: s.subscriptionStatus || 'ACTIVE',
     businessDayStart: s.businessDayStart || '00:00',
+    // Effective segment cutoffs (code defaults merged with the owner's overrides).
+    segmentThresholds: s.segmentThresholds || {},
     topupEnabled: s.topupEnabled,
     selfRegistration: cashSettings?.selfRegistration ?? s.selfRegistration,
     birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? s.birthdayRewardEnabled,

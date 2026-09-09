@@ -118,6 +118,8 @@ const SettingsScreen = () => {
 
   // ── Local editing state ─────────────────────────────────────────────────────
   const [biz, setBiz] = useState(null);
+  // Customer-segment cutoffs, edited as display strings (spend shown in pesos, not centavos).
+  const [seg, setSeg] = useState(null);
   const [brand, setBrand] = useState(null);
   const [stamps, setStamps] = useState(4);
   const [loyalty, setLoyalty] = useState(null);
@@ -140,6 +142,15 @@ const SettingsScreen = () => {
       cardPrefix: merchant.cardPrefix,
       subscription: merchant.subscriptionStatus,
       businessDayStart: merchant.businessDayStart || '00:00',
+    });
+    // Effective cutoffs come merged from the API; show spend in pesos.
+    const st = merchant.segmentThresholds || {};
+    setSeg({
+      vipMinPesos: String(Math.round(Number(st.vipMinSpendCents ?? 100000) / 100)),
+      vipMinVisits: String(Number(st.vipMinVisits ?? 8)),
+      regularMinVisits: String(Number(st.regularMinVisits ?? 3)),
+      activeWindowDays: String(Number(st.activeWindowDays ?? 45)),
+      lapsedDays: String(Number(st.lapsedDays ?? 180)),
     });
     setBrand({
       primary: merchant.primaryColor || '#B5605A',
@@ -219,6 +230,17 @@ const SettingsScreen = () => {
         name: biz.name,
         city: biz.city,
         businessDayStart: biz.businessDayStart,
+        ...(seg
+          ? {
+              segmentThresholds: {
+                vipMinSpendCents: Math.max(0, Math.round(Number(seg.vipMinPesos || 0) * 100)),
+                vipMinVisits: Math.max(1, Math.round(Number(seg.vipMinVisits || 1))),
+                regularMinVisits: Math.max(1, Math.round(Number(seg.regularMinVisits || 1))),
+                activeWindowDays: Math.max(1, Math.round(Number(seg.activeWindowDays || 1))),
+                lapsedDays: Math.max(1, Math.round(Number(seg.lapsedDays || 1))),
+              },
+            }
+          : {}),
         primaryColor: brand.primary,
         secondaryColor: brand.secondary,
         passStyle: 'stamps',
@@ -386,6 +408,92 @@ const SettingsScreen = () => {
               </Trans>
             </div>
           </div>
+          {seg && (
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
+              <span className="field-label">
+                <Trans>Segmentos de clientes</Trans>
+              </span>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', margin: '2px 0 10px' }}>
+                <Trans>
+                  Define cuándo un cliente es Frecuente, VIP, En riesgo o Inactivo. Se usa en
+                  el resumen del cliente. Deja los valores por defecto si no estás seguro.
+                </Trans>
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                  gap: 12,
+                }}
+              >
+                <div className="field">
+                  <label htmlFor={`${uid}-seg-vip-spend`}>
+                    <Trans>VIP: gasto mínimo (MXN)</Trans>
+                  </label>
+                  <input
+                    id={`${uid}-seg-vip-spend`}
+                    type="number"
+                    min="0"
+                    className="input tall"
+                    value={seg.vipMinPesos}
+                    onChange={(e) => setSeg((s) => ({ ...s, vipMinPesos: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor={`${uid}-seg-vip-visits`}>
+                    <Trans>VIP: visitas mínimas</Trans>
+                  </label>
+                  <input
+                    id={`${uid}-seg-vip-visits`}
+                    type="number"
+                    min="1"
+                    className="input tall"
+                    value={seg.vipMinVisits}
+                    onChange={(e) => setSeg((s) => ({ ...s, vipMinVisits: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor={`${uid}-seg-regular-visits`}>
+                    <Trans>Frecuente: visitas mínimas</Trans>
+                  </label>
+                  <input
+                    id={`${uid}-seg-regular-visits`}
+                    type="number"
+                    min="1"
+                    className="input tall"
+                    value={seg.regularMinVisits}
+                    onChange={(e) => setSeg((s) => ({ ...s, regularMinVisits: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor={`${uid}-seg-active-days`}>
+                    <Trans>Activo: dentro de (días)</Trans>
+                  </label>
+                  <input
+                    id={`${uid}-seg-active-days`}
+                    type="number"
+                    min="1"
+                    className="input tall"
+                    value={seg.activeWindowDays}
+                    onChange={(e) => setSeg((s) => ({ ...s, activeWindowDays: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor={`${uid}-seg-lapsed-days`}>
+                    <Trans>Inactivo: después de (días)</Trans>
+                  </label>
+                  <input
+                    id={`${uid}-seg-lapsed-days`}
+                    type="number"
+                    min="1"
+                    className="input tall"
+                    value={seg.lapsedDays}
+                    onChange={(e) => setSeg((s) => ({ ...s, lapsedDays: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           <div className="field">
             <span className="field-label">
               <Trans>Estado de la cuenta</Trans>

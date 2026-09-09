@@ -9,6 +9,8 @@ import {
   classifyCustomerSegment,
   daysBetween,
   visitsPerMonth,
+  SEGMENT_THRESHOLDS,
+  type SegmentThresholds,
 } from './customer-kpis';
 
 type Products = Record<string, { status?: string } | undefined>;
@@ -269,12 +271,15 @@ export class CustomersService {
    * (tip/refund/discount) and one RFM-style segment. Money is formatted es-MX;
    * `segment`, `recencyDays`, `tenureDays` etc. stay raw for the UI to localise.
    */
-  private kpisDto(raw: {
-    agg: Row;
-    favorites: Row[];
-    category: Row | null;
-    daypart: Row | null;
-  }) {
+  private kpisDto(
+    raw: {
+      agg: Row;
+      favorites: Row[];
+      category: Row | null;
+      daypart: Row | null;
+    },
+    thresholds: SegmentThresholds,
+  ) {
     const agg = raw.agg || {};
     const orders = Number(agg.orders_count || 0);
     const visits = Number(agg.visit_days || 0);
@@ -288,24 +293,26 @@ export class CustomersService {
     const tenureDays = daysBetween(firstOrderAt, nowIso);
     const avgTicketCents = averageTicketCents(totalSpendCents, orders);
     const frequencyPerMonth = visitsPerMonth(visits, tenureDays);
-    const segment = classifyCustomerSegment({
-      orders,
-      visits,
-      totalSpendCents,
-      recencyDays,
-      tenureDays,
-    });
+    const segment = classifyCustomerSegment(
+      { orders, visits, totalSpendCents, recencyDays, tenureDays },
+      thresholds,
+    );
 
     const dineIn = Number(agg.dine_in_orders || 0);
     const pickup = Number(agg.pickup_orders || 0);
     const delivery = Number(agg.delivery_orders || 0);
     const unspecified = Number(agg.unspecified_orders || 0);
     const channelTotal = dineIn + pickup + delivery + unspecified;
+    // The dominant channel is the plurality across ALL orders — including those
+    // with no fulfillment_type set. So a customer whose orders are mostly
+    // unspecified reads "Sin especificar", not a channel that only 3% of orders
+    // used (WhatsApp/POS orders often carry no fulfillment_type).
     const dominantChannel =
       [
         { key: 'dine_in', orders: dineIn },
         { key: 'pickup', orders: pickup },
         { key: 'delivery', orders: delivery },
+        { key: 'unspecified', orders: unspecified },
       ]
         .filter((x) => x.orders > 0)
         .sort((a, b) => b.orders - a.orders)[0]?.key ?? null;
@@ -372,8 +379,13 @@ export class CustomersService {
 
   /** Compute the Overview KPI block for one customer. */
   async kpis(merchantId: string, contactId: string) {
-    const raw = await this.repo.kpis(merchantId, contactId);
-    return this.kpisDto(raw);
+    const [raw, overrides] = await Promise.all([
+      this.repo.kpis(merchantId, contactId),
+      this.merchants.loadSegmentThresholds(merchantId),
+    ]);
+    // Owner overrides win over the code defaults; missing keys keep the shipped value.
+    const thresholds = { ...SEGMENT_THRESHOLDS, ...overrides };
+    return this.kpisDto(raw, thresholds);
   }
 
   /**
