@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTenant } from '@/lib/tenant';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getTenantRewardProfile } from '@/lib/prisma-helpers';
+import { nextTier } from '@/lib/reward-tiers';
 import { notFound } from 'next/navigation';
 
 function QRCodeMock({ size = 96 }: { size?: number }) {
@@ -43,18 +44,24 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
   const tenant = await getTenant(params.slug);
   if (!tenant) notFound();
 
-  const rewardConfig = await getActiveRewardConfig(tenant.id);
-  const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+  const profile = await getTenantRewardProfile(tenant.id);
+  // The cycle (top tier on a ladder) drives the stamp grid; the headline sells the
+  // first reward the customer can reach.
+  const { visitsRequired, rewardName } = profile;
+  const headlineVisits = profile.baseTier?.visitsRequired ?? visitsRequired;
+  const headlineReward = profile.baseTier?.rewardName ?? rewardName;
+  const bonusFrom = profile.baseTier?.visitsRequired ?? null;
   const cardNumberExample = `${tenant.cardPrefix}-1234567890`;
   const exampleVisits = 4;
+  const exampleNext = nextTier(profile, exampleVisits);
 
   const safeHex = (c: string) => /^#[0-9A-Fa-f]{6}$/.test(c) ? c : '#333333';
   const primary = safeHex(tenant.primaryColor);
   const accent = safeHex(tenant.secondaryColor || tenant.primaryColor);
 
-  const isCoffee = /caf[eé]/i.test(rewardName);
-  const headlineLine1 = isCoffee ? `Tu ${ordinalEs(visitsRequired)} café` : rewardName;
-  const headlineLine2 = isCoffee ? 'va por la casa.' : `cada ${visitsRequired} visitas.`;
+  const isCoffee = /caf[eé]/i.test(headlineReward);
+  const headlineLine1 = isCoffee ? `Tu ${ordinalEs(headlineVisits)} café` : headlineReward;
+  const headlineLine2 = isCoffee ? 'va por la casa.' : `cada ${headlineVisits} visitas.`;
 
   return (
     <main
@@ -119,7 +126,9 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
               maxWidth: 340,
             }}
           >
-            Suma una visita cada vez que vengas. Al llegar a {visitsRequired}, disfruta tu recompensa. Se guarda en tu Wallet — sin apps, sin contraseñas.
+            Suma una visita cada vez que vengas. Al llegar a {headlineVisits}, disfruta tu recompensa.
+            {profile.baseTier && ` O sigue hasta ${visitsRequired} visitas y llévate ${rewardName}.`}
+            {' '}Se guarda en tu Wallet — sin apps, sin contraseñas.
           </p>
         </div>
 
@@ -163,8 +172,18 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
                           const src = isWelcome
                             ? `/logos/${params.slug}-stamp-welcome.png`
                             : `/logos/${params.slug}-stamp-${i < exampleVisits ? 'filled' : 'empty'}.png`;
+                          // Ladder: the extra slots toward the upper tier get their own color,
+                          // like the wallet strip (a ring + cool tint, no extra art needed here).
+                          const isBonus = bonusFrom != null && i >= bonusFrom;
                           return (
-                            <div key={i} className="aspect-square flex items-center justify-center rounded-full overflow-hidden" style={{ width: `${100 / cols - 2}%` }}>
+                            <div
+                              key={i}
+                              className="aspect-square flex items-center justify-center rounded-full overflow-hidden"
+                              style={{
+                                width: `${100 / cols - 2}%`,
+                                ...(isBonus ? { boxShadow: 'inset 0 0 0 3px #78AAD2', filter: 'hue-rotate(170deg) saturate(1.3)' } : {}),
+                              }}
+                            >
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={src}
@@ -188,11 +207,11 @@ export default async function TenantLandingPage({ params }: { params: { slug: st
               <div className="px-4 pt-1 pb-3 flex gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-white/50">Visitas faltantes</p>
-                  <p className="text-white text-lg font-semibold mt-0.5">{visitsRequired - exampleVisits} visitas</p>
+                  <p className="text-white text-lg font-semibold mt-0.5">{exampleNext.remaining} visitas</p>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-white/50">Recompensa</p>
-                  <p className="text-white text-lg font-semibold mt-0.5 truncate">{rewardName}</p>
+                  <p className="text-white text-lg font-semibold mt-0.5 truncate">{exampleNext.rewardName}</p>
                 </div>
               </div>
 

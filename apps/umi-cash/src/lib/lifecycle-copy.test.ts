@@ -61,3 +61,26 @@ describe('reward_redeemed journey', () => {
     expect(renderTemplate(template, { name: 'Ana' })).toBe('¡Gracias Ana!');
   });
 });
+
+describe('base_reward_ready journey (two-tier ladder)', () => {
+  it('is registered across the whole journey registry', () => {
+    expect(LIFECYCLE_JOURNEYS.map((j) => j.key)).toContain('base_reward_ready');
+    expect(DEFAULT_LIFECYCLE_COPY.base_reward_ready).toBeTruthy();
+    expect(LIFECYCLE_VARIABLES.base_reward_ready).toEqual(['{name}', '{tenant}', '{rewardName}', '{upgradeRewardName}', '{visitsToUpgrade}']);
+  });
+
+  it('renders the choice with every variable substituted', () => {
+    const body = renderTemplate(resolveJourneyTemplate(null, 'base_reward_ready'), {
+      name: 'Ana',
+      tenant: 'El Gran Ribera',
+      rewardName: 'Capuccino',
+      upgradeRewardName: 'Bebida rocas',
+      visitsToUpgrade: 2,
+    });
+    expect(body).toContain('Capuccino');
+    expect(body).toContain('2 visitas más');
+    expect(body).toContain('Bebida rocas');
+    expect(body).not.toMatch(/\{\w+\}/);
+    expect(body.length).toBeLessThanOrEqual(200);
+  });
+});

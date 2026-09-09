@@ -9,7 +9,7 @@ import { authedFetch } from '@/lib/authed-fetch';
 
 interface DashboardData {
   totalCustomers: number;
-  activeReward: { rewardName: string; visitsRequired: number } | null;
+  activeReward: { rewardName: string; visitsRequired: number; upgrade: { rewardName: string; visitsRequired: number } | null } | null;
   visitsToday: number;
   topupsTodayCount: number;
   topupsTodayMXN: string;
@@ -32,7 +32,13 @@ export default function AdminDashboard() {
         setData({
           totalCustomers: customers.total || 0,
           activeReward: rewards.active
-            ? { rewardName: rewards.active.rewardName, visitsRequired: rewards.active.visitsRequired }
+            ? {
+                rewardName: rewards.active.rewardName,
+                visitsRequired: rewards.active.visitsRequired,
+                upgrade: rewards.upgrade
+                  ? { rewardName: rewards.upgrade.rewardName, visitsRequired: rewards.upgrade.visitsRequired }
+                  : null,
+              }
             : null,
           visitsToday: stats.visitsToday ?? 0,
           topupsTodayCount: stats.topupsTodayCount ?? 0,
@@ -129,7 +135,9 @@ export default function AdminDashboard() {
                 {data.activeReward.rewardName}
               </div>
               <div className="text-sm" style={{ color: 'var(--color-ink-light)' }}>
-                Cada {data.activeReward.visitsRequired} visitas
+                {data.activeReward.upgrade
+                  ? `A las ${data.activeReward.visitsRequired} visitas · ${data.activeReward.upgrade.rewardName} a las ${data.activeReward.upgrade.visitsRequired}`
+                  : `Cada ${data.activeReward.visitsRequired} visitas`}
               </div>
             </div>
             <Link

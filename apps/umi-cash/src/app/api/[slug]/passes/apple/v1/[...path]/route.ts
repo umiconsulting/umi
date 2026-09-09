@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateApplePass, isAppleWalletConfigured } from '@/lib/pass-apple';
 import { getRewardProfileForCard } from '@/lib/prisma-helpers';
+import { walletRewardFields } from '@/lib/reward-tiers';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant, getActivePromo } from '@/lib/tenant';
 
@@ -184,7 +185,7 @@ async function handleGetPass(req: NextRequest, slug: string, serial: string) {
     return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
   }
 
-  const [{ visitsRequired, rewardName }, locations] = await Promise.all([
+  const [rewardProfile, locations] = await Promise.all([
     getRewardProfileForCard(tenant.id, card),
     prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),
   ]);
@@ -201,9 +202,8 @@ async function handleGetPass(req: NextRequest, slug: string, serial: string) {
       customerName,
       balanceCentavos: card.balance_cents,
       visitsThisCycle: card.visits_this_cycle,
-      visitsRequired,
       pendingRewards: card.pending_rewards,
-      rewardName,
+      ...walletRewardFields(rewardProfile, card.metadata),
       totalVisits: card.total_visits,
       serial: pass.serial_number!,
       authToken: pass.auth_token!,

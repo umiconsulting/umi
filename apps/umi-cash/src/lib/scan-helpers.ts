@@ -4,6 +4,8 @@ import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { sendApplePushUpdate } from '@/lib/push-apple';
 import { isGoogleWalletConfigured, updateGoogleWalletObject } from '@/lib/pass-google';
+import type { RewardProfile } from '@/lib/reward-profile';
+import { bankedReward, isBaseReady, readPendingTier1, walletRewardFields } from '@/lib/reward-tiers';
 
 /** Read the cached lifecycle nudge message off the card's metadata jsonb. */
 export function readLifecycleMessage(metadata: unknown): string | null {
@@ -44,15 +46,44 @@ export function lifecycleMetadata(existing: unknown, message: string | null): Pr
   } as Prisma.InputJsonObject;
 }
 
-export function buildCardSummary(
-  card: { visits_this_cycle: number; pending_rewards: number; balance_cents: number },
-  visitsRequired: number,
+/**
+ * Reward-shaped fields every card payload carries (scan preview/commit, seals,
+ * customer card, customer profile). `visitsRequired`/`rewardName` are the cycle's
+ * (top-tier) values so existing progress math keeps working; the ladder extras are
+ * null/absent-equivalent for a single-reward tenant.
+ */
+export function cardRewardFields(
+  card: { visits_this_cycle: number; metadata?: unknown },
+  profile: RewardProfile,
 ) {
+  const pendingTier1 = readPendingTier1(card.metadata);
+  return {
+    visitsRequired: profile.visitsRequired,
+    rewardName: profile.rewardName,
+    rewardDescription: profile.rewardDescription,
+    baseReward: profile.baseTier
+      ? {
+          visitsRequired: profile.baseTier.visitsRequired,
+          rewardName: profile.baseTier.rewardName,
+          ready: isBaseReady(profile, card.visits_this_cycle),
+        }
+      : null,
+    pendingRewardName: bankedReward(profile, pendingTier1).rewardName,
+  };
+}
+
+export function buildCardSummary(
+  card: { visits_this_cycle: number; pending_rewards: number; balance_cents: number; metadata?: unknown },
+  profile: RewardProfile,
+) {
+  const reward = cardRewardFields(card, profile);
   return {
     visitsThisCycle: card.visits_this_cycle,
-    visitsRequired,
+    visitsRequired: reward.visitsRequired,
     pendingRewards: card.pending_rewards,
     balanceMXN: formatMXN(card.balance_cents),
+    baseReward: reward.baseReward,
+    pendingRewardName: reward.pendingRewardName,
   };
 }
 
@@ -76,10 +107,9 @@ export function buildCardSummary(
 export async function triggerWalletUpdates(
   cardId: string,
   cardNumber: string,
-  card: { tenant_id: string; visits_this_cycle: number; pending_rewards: number; balance_cents: number; total_visits: number },
+  card: { tenant_id: string; visits_this_cycle: number; pending_rewards: number; balance_cents: number; total_visits: number; metadata?: unknown },
   customerName: string | null,
-  visitsRequired: number,
-  rewardName: string,
+  profile: RewardProfile,
   createdAt: Date,
   tenantName: string,
   tenantSlug: string,
@@ -97,9 +127,8 @@ export async function triggerWalletUpdates(
       customerName: customerName || DEFAULT_CUSTOMER_NAME,
       balanceCentavos: card.balance_cents,
       visitsThisCycle: card.visits_this_cycle,
-      visitsRequired,
       pendingRewards: card.pending_rewards,
-      rewardName,
+      ...walletRewardFields(profile, card.metadata),
       totalVisits: card.total_visits,
       memberSince: createdAt.toISOString(),
       tenantName,

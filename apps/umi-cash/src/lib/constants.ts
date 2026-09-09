@@ -8,7 +8,13 @@ export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
 
 export const SCAN_ACTIONS = {
   VISIT: 'VISIT',
+  /** Redeem a BANKED reward (pending_rewards > 0). */
   REDEEM: 'REDEEM',
+  /**
+   * Two-tier ladder only: cash out the lower tier straight off the in-progress
+   * cycle (visits_this_cycle >= baseTier.visitsRequired). Consumes the card.
+   */
+  REDEEM_BASE: 'REDEEM_BASE',
   BIRTHDAY_REDEEM: 'BIRTHDAY_REDEEM',
 } as const;
 

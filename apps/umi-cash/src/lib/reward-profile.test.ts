@@ -18,6 +18,7 @@ describe('resolveRewardProfile', () => {
       rewardName: 'Bebida gratis',
       rewardDescription: 'Cualquier bebida del menú',
       redemptionConfigId: 'cfg-default',
+      baseTier: null,
     });
   });
 
@@ -36,6 +37,7 @@ describe('resolveRewardProfile', () => {
       rewardName: DEFAULT_REWARD_NAME,
       rewardDescription: null,
       redemptionConfigId: null,
+      baseTier: null,
     });
   });
 
@@ -44,5 +46,33 @@ describe('resolveRewardProfile', () => {
     expect(p.rewardName).toBe('Postre gratis');
     expect(p.redemptionConfigId).toBe('cfg-override');
     expect(p.visitsRequired).toBe(DEFAULT_VISITS_REQUIRED);
+  });
+
+  describe('two-tier ladder (upgrade config)', () => {
+    const egrDefault = { id: 'cfg-cap', visits_required: 7, reward_name: 'Capuccino', reward_description: null };
+    const egrUpgrade = { id: 'cfg-rocas', visits_required: 9, reward_name: 'Bebida rocas', reward_description: 'Rocas, frappé o caliente' };
+
+    it('runs the cycle to the upgrade tier and keeps the default as the early cash-out', () => {
+      expect(resolveRewardProfile(egrDefault, null, egrUpgrade)).toEqual({
+        visitsRequired: 9,
+        rewardName: 'Bebida rocas',
+        rewardDescription: 'Rocas, frappé o caliente',
+        redemptionConfigId: 'cfg-rocas',
+        baseTier: { visitsRequired: 7, rewardName: 'Capuccino', rewardDescription: null, configId: 'cfg-cap' },
+      });
+    });
+
+    it('lets a per-client override replace the LOWER tier only', () => {
+      const p = resolveRewardProfile(egrDefault, override, egrUpgrade);
+      expect(p.rewardName).toBe('Bebida rocas');
+      expect(p.redemptionConfigId).toBe('cfg-rocas');
+      expect(p.baseTier).toEqual({ visitsRequired: 7, rewardName: 'Postre gratis', rewardDescription: null, configId: 'cfg-override' });
+    });
+
+    it('ignores an upgrade that does not sit above the default threshold', () => {
+      const bad = { ...egrUpgrade, visits_required: 7 };
+      expect(resolveRewardProfile(egrDefault, null, bad).baseTier).toBeNull();
+      expect(resolveRewardProfile(egrDefault, null, bad).visitsRequired).toBe(7);
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenant } from '@/lib/tenant';
 import { generateStampStrip } from '@/lib/strip-generator';
+import { parseStripState } from '@/lib/reward-tiers';
 
 // sharp needs the Node runtime (not edge).
 export const runtime = 'nodejs';
@@ -12,8 +13,9 @@ const MAX_REQUIRED = 20;
 /**
  * Public, content-addressed stamp-card image used as the Google Wallet heroImage.
  *
- * The URL encodes the exact stamp state — `/api/{slug}/stamp-strip/{filled}-{required}.png`
- * — so the bytes for a given state never change. That makes it safe to cache
+ * The URL encodes the exact stamp state — `/api/{slug}/stamp-strip/{filled}-{required}.png`,
+ * or `{filled}-{required}-b{base}.png` on a two-tier ladder (slots from `base` on are
+ * bonus stamps) — so the bytes for a given state never change. That makes it safe to cache
  * forever (immutable): when a customer advances a stamp, the object's heroImage
  * points at a *different* URL and Google fetches it fresh. No cache-busting needed.
  *
@@ -25,14 +27,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { slug: string; state: string } },
 ) {
-  const match = params.state.replace(/\.png$/i, '').match(/^(\d+)-(\d+)$/);
-  if (!match) return new NextResponse('Invalid state', { status: 400 });
-
-  const required = parseInt(match[2], 10);
-  if (!Number.isInteger(required) || required < 1 || required > MAX_REQUIRED) {
-    return new NextResponse('Invalid required', { status: 400 });
-  }
-  const filled = Math.max(0, Math.min(parseInt(match[1], 10), required));
+  const state = parseStripState(params.state, MAX_REQUIRED);
+  if (!state) return new NextResponse('Invalid state', { status: 400 });
+  const { filled, required, bonusFrom } = state;
 
   // Background color, in priority order: explicit ?bg= override → the tenant's secondary
   // color (best-effort; skipped when there's no DB, e.g. a Vercel preview) → transparent,
@@ -54,6 +51,13 @@ export async function GET(
   const filledUrl = `/logos/${params.slug}-stamp-filled.png`;
   const emptyUrl = `/logos/${params.slug}-stamp-empty.png`;
   const welcomeUrl = `/logos/${params.slug}-stamp-welcome.png`;
+  const bonus = bonusFrom
+    ? {
+        fromIndex: bonusFrom,
+        filledUrl: `/logos/${params.slug}-stamp-bonus-filled.png`,
+        emptyUrl: `/logos/${params.slug}-stamp-bonus-empty.png`,
+      }
+    : null;
 
   try {
     const png = await generateStampStrip(
@@ -63,6 +67,7 @@ export async function GET(
       emptyUrl,
       bgColor,
       welcomeUrl,
+      bonus,
     );
     return new NextResponse(png as unknown as BodyInit, {
       headers: {

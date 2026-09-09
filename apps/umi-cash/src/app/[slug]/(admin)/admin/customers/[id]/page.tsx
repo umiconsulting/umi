@@ -19,6 +19,9 @@ interface CustomerDetail {
   recentTransactions: { id: string; type: string; amountCentavos: number; description: string | null; createdAt: string }[];
   viewerIsAdmin: boolean;
   rewardName: string;
+  /** Two-tier ladder (null = single reward). */
+  baseReward?: { visitsRequired: number; rewardName: string; ready: boolean } | null;
+  pendingRewardName?: string;
   customReward: { name: string; description: string | null } | null;
 }
 
@@ -222,11 +225,18 @@ export default function CustomerDetailPage() {
           <div>
             <span className="u-eyebrow" style={{ fontSize: 10 }}>Recompensa</span>
             <p className="text-sm font-medium" style={{ color: 'var(--color-ink)' }}>
-              {customer.rewardName}
+              {customer.baseReward
+                ? `${customer.baseReward.visitsRequired} visitas: ${customer.baseReward.rewardName} · ${customer.visitsRequired} visitas: ${customer.rewardName}`
+                : customer.rewardName}
               {customer.customReward && (
                 <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Personalizada</span>
               )}
             </p>
+            {customer.baseReward?.ready && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-brand)' }}>
+                Puede canjear {customer.baseReward.rewardName} ya, o seguir hasta {customer.visitsRequired} visitas.
+              </p>
+            )}
             {customer.customReward?.description && (
               <p className="text-xs mt-0.5" style={{ color: 'var(--color-ink-light)' }}>{customer.customReward.description}</p>
             )}
@@ -325,6 +335,7 @@ export default function CustomerDetailPage() {
           <div className="u-eyebrow mb-2" style={{ color: 'var(--color-brand)' }}>Recompensa disponible</div>
           <p className="u-display mb-3" style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-ink)', margin: 0 }}>
             {customer.pendingRewards} recompensa{customer.pendingRewards > 1 ? 's' : ''} pendiente{customer.pendingRewards > 1 ? 's' : ''}
+            {customer.pendingRewardName && ` · ${customer.pendingRewardName}`}
           </p>
           {confirmRedeem ? (
             <div className="space-y-2 mt-3">

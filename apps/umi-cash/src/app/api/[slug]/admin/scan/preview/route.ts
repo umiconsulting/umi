@@ -7,6 +7,7 @@ import { resolveScanTarget } from '@/lib/scan-resolve';
 import { formatMXN } from '@/lib/currency';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { tenantStartOfDay } from '@/lib/timezone';
+import { cardRewardFields } from '@/lib/scan-helpers';
 
 const PreviewSchema = z.object({
   qrPayload: z.string().min(1),
@@ -53,8 +54,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         },
       }),
     ]);
-    const { visitsRequired, rewardName } = rewardProfile;
-
     // Check if already visited today (calendar day in tenant timezone)
     const recentVisit = await prisma.visit_events.findFirst({
       where: { tenant_id: tenant.id, loyalty_card_id: card.id, occurred_at: { gte: tenantStartOfDay(tenant.timezone) } },
@@ -67,11 +66,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       customer: { name: card.person?.display_name ?? null },
       card: {
         visitsThisCycle: card.visits_this_cycle,
-        visitsRequired,
         pendingRewards: card.pending_rewards,
         balanceMXN: formatMXN(card.balance_cents),
         balanceCentavos: card.balance_cents,
-        rewardName,
+        // visitsRequired / rewardName (cycle values) + baseReward / pendingRewardName (ladder)
+        ...cardRewardFields(card, rewardProfile),
         visitLimitReached: !!recentVisit,
         lastVisitAt: recentVisit?.occurred_at ?? null,
       },

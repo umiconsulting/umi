@@ -8,6 +8,13 @@
 import { SignJWT } from 'jose';
 import { signWalletBarcode } from './auth';
 import { formatMXN } from './currency';
+import {
+  ladderSummary,
+  nextRewardCopy,
+  pendingRewardsCopy,
+  profileFromWalletFields,
+  stripState,
+} from './reward-tiers';
 
 const ISSUER_ID = (process.env.GOOGLE_WALLET_ISSUER_ID || '').trim();
 const CLASS_ID_PREFIX = (process.env.GOOGLE_WALLET_CLASS_ID || 'loyalty_v2').trim();
@@ -38,6 +45,13 @@ export interface GooglePassData {
   visitsRequired: number;
   pendingRewards: number;
   rewardName: string;
+  /**
+   * Two-tier ladder: the lower tier the customer may cash out before the cycle
+   * completes (see reward-tiers.ts). null/undefined = single reward.
+   */
+  baseReward?: { visitsRequired: number; rewardName: string } | null;
+  /** Banked rewards that must be honored as the lower tier (cards.metadata.pending_tier1). */
+  pendingTier1?: number;
   totalVisits: number;
   memberSince: string;
   tenantName?: string;
@@ -58,8 +72,9 @@ function resolveObjectId(data: GooglePassData): string {
 }
 
 function getLoyaltyObject(data: GooglePassData) {
-  const remaining = data.visitsRequired - data.visitsThisCycle;
   const objectId = resolveObjectId(data);
+  const profile = profileFromWalletFields(data);
+  const pendingTier1 = data.pendingTier1 ?? 0;
 
   // Visual stamp progress lives in the heroImage (a rendered stamp strip); the
   // customer name lives in accountName. So the only text modules left are the
@@ -87,30 +102,15 @@ function getLoyaltyObject(data: GooglePassData) {
   // Reward status — copy escalates as the customer nears the reward so the line
   // pulls its weight on the card face (surfaced there by the class cardTemplateOverride)
   // and in the details view. The `pending_rewards` / `next_reward` ids are referenced
-  // by that override — keep them stable.
-  if (data.pendingRewards > 0) {
-    const plural = data.pendingRewards > 1;
-    textModules.push({
-      header: plural ? 'RECOMPENSAS DISPONIBLES' : 'RECOMPENSA LISTA',
-      body: plural
-        ? `🎉 Tienes ${data.pendingRewards} ${data.rewardName} — ¡canjéalas en tienda!`
-        : `🎉 Tu ${data.rewardName} te espera — ¡canjéala en tienda!`,
-      id: 'pending_rewards',
-    });
-  } else {
-    let body: string;
-    if (remaining === 1) {
-      body = `¡Última visita! Tu próxima compra desbloquea ${data.rewardName} 🎁`;
-    } else if (remaining === 2) {
-      body = `¡Ya casi! Solo 2 visitas para ${data.rewardName}`;
-    } else {
-      body = `${remaining} visitas para ${data.rewardName}`;
-    }
-    textModules.push({
-      header: 'PRÓXIMA RECOMPENSA',
-      body,
-      id: 'next_reward',
-    });
+  // by that override — keep them stable. Copy lives in reward-tiers.ts, shared with
+  // the Apple pass and the web card.
+  const pending = pendingRewardsCopy(profile, data.pendingRewards, pendingTier1);
+  if (pending) textModules.push({ ...pending, id: 'pending_rewards' });
+  // Single reward: the progress line yields to the banked reward (as before). On a
+  // ladder both show — a banked drink doesn't stop the running cycle from mattering,
+  // and the "o 2 visitas más y ..." choice is the whole point.
+  if (!pending || profile.baseTier) {
+    textModules.push({ ...nextRewardCopy(profile, data.visitsThisCycle), id: 'next_reward' });
   }
 
   // Saldo as a STRING text module. `secondaryLoyaltyPoints` (money) is the native
@@ -163,6 +163,10 @@ function getLoyaltyObject(data: GooglePassData) {
             { label: 'Tarjeta', value: data.cardNumber },
           ],
         },
+        // Ladder tenants spell out both tiers in the details view.
+        ...(profile.baseTier
+          ? [{ columns: [{ label: 'Recompensas', value: ladderSummary(profile) ?? '' }] }]
+          : []),
       ],
     },
     linksModuleData: {
@@ -180,10 +184,12 @@ function getLoyaltyObject(data: GooglePassData) {
   // so a stamp advance points at a new URL and Google re-fetches it; a fixed URL would be
   // served from Google's image cache and never update. Skipped when tenantSlug is absent —
   // the URL (and the whole pass, whose classId is slug-derived) would be malformed anyway.
+  // On a ladder the state carries the bonus boundary (`-b7`) so the extra slots render
+  // in their own color.
   if (data.tenantSlug) {
     object.heroImage = {
       sourceUri: {
-        uri: `${APP_URL}/api/${data.tenantSlug}/stamp-strip/${data.visitsThisCycle}-${data.visitsRequired}.png`,
+        uri: `${APP_URL}/api/${data.tenantSlug}/stamp-strip/${stripState(profile, data.visitsThisCycle)}.png`,
       },
       contentDescription: {
         defaultValue: {
