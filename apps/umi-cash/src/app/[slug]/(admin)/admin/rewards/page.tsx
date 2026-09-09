@@ -43,6 +43,8 @@ export default function RewardsPage() {
   const [message, setMessage] = useState('');
   const [messageIsSuccess, setMessageIsSuccess] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncMessage, setResyncMessage] = useState('');
 
   useEffect(() => { setRole(localStorage.getItem('userRole')); loadConfig(); }, [slug]);
 
@@ -88,6 +90,29 @@ export default function RewardsPage() {
     if (res.ok) { setMessage('Recompensa actualizada'); setMessageIsSuccess(true); await loadConfig(); }
     else { setMessage(data.error); setMessageIsSuccess(false); }
     setSaving(false);
+  }
+
+  // Re-render every customer's pass from current state, without changing anything.
+  // The escape hatch for a pass that didn't pick up a settings change.
+  async function handleResync() {
+    if (role !== 'ADMIN') return;
+    if (!confirm('¿Actualizar los pases de todos los clientes con la configuración actual?\n\nNo envía notificaciones; solo refresca lo que ven en su Wallet.')) return;
+    setResyncing(true);
+    setResyncMessage('');
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/reward-config/resync`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        const g = data.google ?? { total: 0, refreshed: 0, failed: 0 };
+        setResyncMessage(`Pases actualizados · Apple: ${data.apple?.total ?? 0} · Google: ${g.refreshed}/${g.total}${g.failed ? ` (${g.failed} con error)` : ''}`);
+      } else {
+        setResyncMessage(data.error ?? 'No se pudieron actualizar los pases');
+      }
+    } catch {
+      setResyncMessage('Error de conexión al actualizar los pases');
+    } finally {
+      setResyncing(false);
+    }
   }
 
   const PRESETS = ['Cookie de temporada', 'Americano helado', 'Latte helado', 'Café de la casa', 'Croissant', 'Pan de temporada'];
@@ -137,6 +162,30 @@ export default function RewardsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {role === 'ADMIN' && active && (
+        <Surface className="p-4 mb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold" style={{ color: 'var(--color-ink)' }}>Pases de clientes</div>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-ink-light)' }}>
+                Los pases se actualizan solos al guardar. Si alguno no cambió, vuelve a enviarlos a todos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleResync}
+              disabled={resyncing}
+              className="u-btn u-btn-secondary px-3 flex-shrink-0"
+            >
+              {resyncing ? 'Actualizando...' : 'Actualizar pases'}
+            </button>
+          </div>
+          {resyncMessage && (
+            <p className="text-xs mt-2" style={{ color: 'var(--color-ink)' }}>{resyncMessage}</p>
+          )}
+        </Surface>
       )}
 
       {role === 'ADMIN' ? (

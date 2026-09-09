@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendApplePushUpdate } from '@/lib/push-apple';
 import { isAuthorizedCron } from '@/lib/cron-auth';
+import { getTenant } from '@/lib/tenant';
+import { refreshGoogleWalletObjectsForTenant, type GoogleRefreshResult } from '@/lib/wallet-refresh';
+
+// A tenant-wide refresh walks every pass; keep the invocation alive for it.
+export const maxDuration = 300;
 
 /**
  * POST /api/umi/push-passes
- * Trigger Apple Wallet push updates for specific cards or entire tenants.
+ * Trigger wallet refreshes for specific cards (Apple push) or entire tenants (Apple
+ * push + a silent re-render of every Google object from current state).
  * Auth: Bearer CRON_SECRET
  *
  * Body: { cardIds?: string[], tenantSlugs?: string[] }
@@ -58,5 +64,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ pushed, total: targetCardIds.length });
+  // Google objects only change when we patch them — refresh each tenant's fleet.
+  const google: Record<string, GoogleRefreshResult> = {};
+  for (const slug of tenantSlugs ?? []) {
+    const tenant = await getTenant(slug);
+    if (tenant) google[slug] = await refreshGoogleWalletObjectsForTenant(tenant);
+  }
+
+  return NextResponse.json({ pushed, total: targetCardIds.length, google });
 }

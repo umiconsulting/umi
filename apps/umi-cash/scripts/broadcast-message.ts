@@ -22,7 +22,8 @@ import type { Prisma } from '@prisma/client';
 import { getTenantConfig } from '../src/lib/tenant';
 import { sendApplePushUpdate } from '../src/lib/push-apple';
 import { updateGoogleWalletObject } from '../src/lib/pass-google';
-import { getActiveRewardConfig, rewardConfigDefaults } from '../src/lib/prisma-helpers';
+import { getRewardProfileForCard } from '../src/lib/prisma-helpers';
+import { walletRewardFields } from '../src/lib/reward-tiers';
 import { DEFAULT_CUSTOMER_NAME } from '../src/lib/constants';
 
 async function main() {
@@ -50,9 +51,6 @@ async function main() {
       accounts: { include: { people: true } },
     },
   });
-
-  const rewardConfig = await getActiveRewardConfig(tenant.id);
-  const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
 
   console.log(`Tenant: ${tenant.name} (${slug})`);
   console.log(`Message: "${message}"`);
@@ -93,9 +91,9 @@ async function main() {
         customerName: card.accounts?.people?.display_name || DEFAULT_CUSTOMER_NAME,
         balanceCentavos: card.balances?.balance ?? card.balance_cents,
         visitsThisCycle: card.visits_this_cycle,
-        visitsRequired,
         pendingRewards: card.pending_rewards,
-        rewardName,
+        // Per-card profile: override + two-tier ladder, exactly what a scan renders.
+        ...walletRewardFields(await getRewardProfileForCard(tenant.id, card), metadata),
         totalVisits: card.total_visits,
         memberSince: card.created_at.toISOString(),
         tenantName: tenant.name,
