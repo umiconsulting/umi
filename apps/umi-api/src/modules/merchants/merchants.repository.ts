@@ -288,19 +288,26 @@ export class MerchantsRepository {
    * Runs on the RLS app pool (`withMerchant`) with an explicit `merchant_id`
    * predicate, like the other merchant reads.
    */
-  async loadBranding(
-    merchantId: string,
-  ): Promise<{ brandColor: string | null; secondaryColor: string | null }> {
+  async loadBranding(merchantId: string): Promise<{
+    brandColor: string | null;
+    secondaryColor: string | null;
+    businessDayStart: string | null;
+  }> {
     const { rows } = await this.pg.withMerchant((c) =>
-      c.query<{ brandColor: string | null; secondaryColor: string | null }>(
-        `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor"
+      c.query<{
+        brandColor: string | null;
+        secondaryColor: string | null;
+        businessDayStart: string | null;
+      }>(
+        `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor",
+                business_day_start::text AS "businessDayStart"
          FROM merchant.merchant
          WHERE id = $1::uuid
          LIMIT 1`,
         [merchantId],
       ),
     );
-    return rows[0] ?? { brandColor: null, secondaryColor: null };
+    return rows[0] ?? { brandColor: null, secondaryColor: null, businessDayStart: null };
   }
 
   /** Locations with the (merchant) timezone, oldest first (merchant-neutral, deterministic). */
@@ -483,16 +490,17 @@ export class MerchantsRepository {
 
   async updateMerchantSettings(
     merchantId: string,
-    patch: { name?: string; timezone?: string },
+    patch: { name?: string; timezone?: string; businessDayStart?: string },
   ): Promise<void> {
     await this.pg.withMerchant((c) =>
       c.query(
         `UPDATE merchant.merchant
          SET name = COALESCE($2, name),
              timezone = COALESCE($3, timezone),
+             business_day_start = COALESCE($4::time, business_day_start),
              updated_at = now()
          WHERE id = $1::uuid`,
-        [merchantId, patch.name ?? null, patch.timezone ?? null],
+        [merchantId, patch.name ?? null, patch.timezone ?? null, patch.businessDayStart ?? null],
       ),
     );
   }

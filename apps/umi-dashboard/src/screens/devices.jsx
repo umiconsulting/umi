@@ -1,4 +1,5 @@
 import { useState, useEffect, useId } from 'react';
+import { Select } from '@/components/select.jsx';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
@@ -736,7 +737,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
             <label htmlFor={`${uid}-pos-device-mobility`}>
               <Trans>Modalidad</Trans>
             </label>
-            <select
+            <Select
               id={`${uid}-pos-device-mobility`}
               className="select"
               style={{ height: 52, borderRadius: 14 }}
@@ -745,7 +746,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
             >
               <option value="static">{mobilityLabel('static')}</option>
               <option value="mobile">{mobilityLabel('mobile')}</option>
-            </select>
+            </Select>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
               <Trans>
                 Estático es una caja fija en el mostrador. Móvil es una terminal que se lleva a la
@@ -1195,7 +1196,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
             <label htmlFor={`${uid}-estacion-asignada`}>
               <Trans>Estación asignada</Trans>
             </label>
-            <select
+            <Select
               id={`${uid}-estacion-asignada`}
               className="select"
               style={{ height: 52, borderRadius: 14 }}
@@ -1208,7 +1209,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
                   {s.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="field">
@@ -1731,7 +1732,7 @@ const AddDevicePanel = ({
             <label htmlFor={`${uid}-device-location`}>
               <Trans>Sucursal</Trans>
             </label>
-            <select
+            <Select
               id={`${uid}-device-location`}
               className="select"
               style={{ height: 52, borderRadius: 14 }}
@@ -1752,7 +1753,7 @@ const AddDevicePanel = ({
                   {location.name}
                 </option>
               ))}
-            </select>
+            </Select>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
               <Trans>El dispositivo y sus estaciones quedarán vinculados a esta sucursal.</Trans>
             </span>
@@ -1762,7 +1763,7 @@ const AddDevicePanel = ({
             <label htmlFor={`${uid}-device-product`}>
               <Trans>Producto del dispositivo</Trans>
             </label>
-            <select
+            <Select
               id={`${uid}-device-product`}
               className="select"
               style={{ height: 52, borderRadius: 14 }}
@@ -1789,7 +1790,7 @@ const AddDevicePanel = ({
               >
                 {posEnabled ? 'UmiPOS' : t`UmiPOS — producto no activo`}
               </option>
-            </select>
+            </Select>
             {(!kdsEnabled || !posEnabled) && (
               <div id={purchaseMessageId} className="device-product-help" role="note">
                 <span aria-hidden="true">
@@ -1833,7 +1834,7 @@ const AddDevicePanel = ({
                   <Trans>Estación asignada</Trans>
                 </label>
                 {hasStations ? (
-                  <select
+                  <Select
                     id={`${uid}-assign-to-station`}
                     className="select"
                     style={{ height: 52, borderRadius: 14 }}
@@ -1849,7 +1850,7 @@ const AddDevicePanel = ({
                         </option>
                       );
                     })}
-                  </select>
+                  </Select>
                 ) : (
                   <>
                     <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
@@ -1992,7 +1993,7 @@ const AddDevicePanel = ({
                     <label htmlFor={`${uid}-pos-platform`}>
                       <Trans>Plataforma</Trans>
                     </label>
-                    <select
+                    <Select
                       id={`${uid}-pos-platform`}
                       className="select"
                       value={posPlatform}
@@ -2004,13 +2005,13 @@ const AddDevicePanel = ({
                       <option value="windows">Windows</option>
                       <option value="android">Android</option>
                       <option value="ios">iOS</option>
-                    </select>
+                    </Select>
                   </div>
                   <div className="field">
                     <label htmlFor={`${uid}-pos-mobility`}>
                       <Trans>Modalidad</Trans>
                     </label>
-                    <select
+                    <Select
                       id={`${uid}-pos-mobility`}
                       className="select"
                       value={posMobility}
@@ -2018,7 +2019,7 @@ const AddDevicePanel = ({
                     >
                       <option value="static">{mobilityLabel('static')}</option>
                       <option value="mobile">{mobilityLabel('mobile')}</option>
-                    </select>
+                    </Select>
                     <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
                       <Trans>
                         Estático es una caja fija en el mostrador. Móvil es una terminal que se

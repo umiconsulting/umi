@@ -905,6 +905,17 @@ create table merchant.product_category (
   merchant_id   uuid not null references merchant.merchant(id) on delete cascade,
   name          text not null,
   display_order integer not null default 0,
+  -- The POS tint painted behind photo-less products so a barista groups them at a
+  -- glance. `#RRGGBB`, never null: a new category STARTS on a random entry of a
+  -- curated 16-colour palette (mutually distinguishable; the POS picks black/white
+  -- ink by luminance) and the owner recolours it in the dashboard. There is no
+  -- "automatic" state to select — every category always owns a concrete colour.
+  color         text not null check (color ~ '^#[0-9a-fA-F]{6}$')
+                default ((array[
+                  '#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4',
+                  '#f032e6','#bfef45','#469990','#9a6324','#800000','#808000',
+                  '#000075','#fabed4','#ffd8b1','#aaffc3'
+                ]::text[])[floor(random() * 16) + 1]),
   created_at    timestamptz not null default now()
 );
 -- The catalog sync gets-or-creates a category BY NAME on every run. build-v2 keyed

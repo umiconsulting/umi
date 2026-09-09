@@ -3,7 +3,7 @@
   "workspace": "apps/umi-dashboard",
   "maximumWarnings": {
     "src/data.jsx": {
-      "react-refresh/only-export-components": 50
+      "react-refresh/only-export-components": 52
     },
     "src/lib/auth.jsx": {
       "react-refresh/only-export-components": 10

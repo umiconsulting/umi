@@ -18,6 +18,8 @@ final class AppConfig {
     required this.release,
     this.runningOnWeb = false,
     this.deviceKeyKind = '',
+    this.updateGithubOwner = '',
+    this.updateGithubRepo = '',
   });
 
   factory AppConfig.fromEnvironment() {
@@ -53,6 +55,17 @@ final class AppConfig {
       'UMIPOS_DEVICE_KEY',
       defaultValue: '',
     );
+    // The GitHub repo that publishes desktop release artifacts. When set (and the
+    // build runs as a Linux AppImage), the in-app updater pulls the latest
+    // release AppImage from here. Empty disables the in-app updater.
+    const updateOwner = String.fromEnvironment(
+      'UMIPOS_UPDATE_GH_OWNER',
+      defaultValue: '',
+    );
+    const updateRepo = String.fromEnvironment(
+      'UMIPOS_UPDATE_GH_REPO',
+      defaultValue: '',
+    );
     return AppConfig(
       environment: AppEnvironment.values.firstWhere(
         (value) => value.name == environmentValue,
@@ -69,6 +82,8 @@ final class AppConfig {
       release: ReleaseIdentity.fromEnvironment(),
       runningOnWeb: kIsWeb,
       deviceKeyKind: deviceKey,
+      updateGithubOwner: updateOwner,
+      updateGithubRepo: updateRepo,
     );
   }
 
@@ -99,6 +114,12 @@ final class AppConfig {
   /// the poll loop, so switching it off restores the previous behaviour exactly.
   final bool realtimeEnrollmentEnabled;
   final ReleaseIdentity release;
+
+  /// GitHub owner/repo that publishes desktop release AppImages. Both empty
+  /// disables the in-app updater (the AppImage still self-updates through the
+  /// embedded zsync feed and an external AppImageUpdate).
+  final String updateGithubOwner;
+  final String updateGithubRepo;
 
   AppException? validate() {
     if (environment == AppEnvironment.invalid) {

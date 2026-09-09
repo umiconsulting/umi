@@ -645,7 +645,7 @@ void main() {
     },
   );
 
-  testWidgets('refuses to open a shift on an amount it cannot read', (
+  testWidgets('opens a shift with the counted denomination total', (
     tester,
   ) async {
     final repository = _FakeCashRepository();
@@ -676,23 +676,27 @@ void main() {
     );
     await tester.pump();
 
-    final field = find.byType(TextField).first;
+    // The opening float is now counted on the denomination keypad (audit F3),
+    // so there is no free-text amount to mistype. Tapping the MXN 1000 and
+    // MXN 500 rows once each totals 1,500.00 — the same drawer, counted, not
+    // typed.
     final button = find.widgetWithText(FilledButton, 'Abrir turno de caja');
-
-    // Exactly what typing 50000 into a field holding "0.00" used to produce.
-    // It parsed as zero and opened the shift on an empty drawer.
-    await tester.enterText(field, '0.0050000');
+    final adds = find.byIcon(Icons.add_circle_outline);
+    expect(adds, findsWidgets);
+    await tester.ensureVisible(adds.at(0));
+    await tester.tap(adds.at(0)); // MXN 1000.00
     await tester.pump();
-    expect(find.text('Escribe un monto válido, por ejemplo 1,500.00.'), findsOneWidget);
-    expect(tester.widget<FilledButton>(button).onPressed, isNull);
-
-    await tester.enterText(field, '1,500.00');
+    await tester.ensureVisible(adds.at(1));
+    await tester.tap(adds.at(1)); // MXN 500.00
     await tester.pump();
+
     expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
 
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
     await tester.tap(button);
     await tester.pumpAndSettle();
-    // One thousand five hundred pesos, not one peso fifty.
+    // One thousand five hundred pesos, summed from the counted denominations.
     expect(repository.openedWith?.openingFloat['minorUnits'], 150000);
   });
 }

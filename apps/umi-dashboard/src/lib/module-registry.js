@@ -74,6 +74,14 @@ export const MODULES = {
     product: 'dashboard',
     permissions: ['customer.read'],
   },
+  triage: {
+    id: 'triage',
+    label: msg`Atención`,
+    icon: 'WhatsApp',
+    section: 'CUSTOMERS',
+    product: 'conversaflow',
+    permissions: ['customer.read'],
+  },
   // `members` and `gift-cards` are folded into the `loyalty-value` hub. Their routes
   // redirect there, so they no longer need their own module entries.
   hours: {
@@ -127,14 +135,35 @@ export const MODULES = {
     // different axis from `role`, which reads the CAFÉ membership.
     platform: 'super_admin',
   },
+  reportes: {
+    id: 'reportes',
+    label: msg`Reportes`,
+    icon: 'TrendUp',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: ['sale.lifecycle', 'sale.exception.read'],
+    locationScoped: true,
+    // A nested sidebar dropdown, not tabs. Ventas is the default page and owns the sales
+    // records, including the receipts/print-custody view reached from inside it; Reembolsos
+    // is the separate loss-prevention lens. See ADR 2026-09-08 (Reportes por trabajo, no
+    // por documento).
+    children: [
+      { id: 'reportes', label: msg`Ventas` },
+      { id: 'reportes/reembolsos', label: msg`Reembolsos` },
+    ],
+  },
   'cash-shifts': {
     id: 'cash-shifts',
     label: msg`Caja y turnos`,
     icon: 'DollarSign',
     section: 'OPERATIONS',
     product: 'dashboard',
-    permissions: ['sale.lifecycle', 'sale.exception.read', 'cash.shift.read'],
+    permissions: ['cash.shift.read'],
     locationScoped: true,
+    children: [
+      { id: 'cash-shifts', label: msg`Turnos de caja` },
+      { id: 'cash-shifts/registros', label: msg`Registros` },
+    ],
   },
   'catalog-inventory': {
     id: 'catalog-inventory',
@@ -186,11 +215,13 @@ export const MODULE_ORDER = [
   // /operations URL stays as a bridge for organization/locations/memberships until
   // those get dedicated coverage.
   'orders',
+  'reportes',
   'cash-shifts',
   'kitchen',
   // CUSTOMERS — the customer through-line. Loyalty, gift cards, rewards, and wallet
   // are tabs of one "Lealtad y valor" hub now, not separate rows or a "Crecimiento" theme.
   'customers',
+  'triage',
   'loyalty-value',
   // BUSINESS — the assets and people behind the shop.
   'catalog-inventory',

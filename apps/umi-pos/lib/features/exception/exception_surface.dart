@@ -128,22 +128,36 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   }
 
   Widget _blocked(AppLocalizations l, SaleExceptionState state) {
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
     final refund = state.eligibility?.refund;
-    final codes = (refund?['blockCodes'] as List<Object?>? ?? const [])
-        .map((code) => _blockLabel(l, '$code'))
+    // Each block code names WHY the sale cannot be refunded. Show the specific
+    // reason and the next step, never the same sentence as the title.
+    final reasons = (refund?['blockCodes'] as List<Object?>? ?? const [])
+        .map((code) => _blockDetail(spanish, '$code'))
         .join('\n');
     return _status(
       Icons.block_outlined,
-      l.refundBlockedMessage,
-      codes.isEmpty ? l.supportRequiredMessage : codes,
+      spanish
+          ? 'No se puede reembolsar esta venta'
+          : 'This sale cannot be refunded',
+      reasons.isEmpty
+          ? (spanish
+                ? 'Pide una revisión de soporte para continuar.'
+                : 'Ask support to review this sale before you continue.')
+          : reasons,
     );
   }
 
-  Widget _failure(AppLocalizations l, SaleExceptionState state) => _status(
-    Icons.error_outline,
-    l.refundOperationFailedMessage,
-    _errorLabel(l, state.errorCode),
-  );
+  Widget _failure(AppLocalizations l, SaleExceptionState state) {
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    // Title is a fixed heading; the body carries the specific cause and the
+    // next step for the returned error code — the two must never be identical.
+    return _status(
+      Icons.error_outline,
+      l.refundOperationFailedMessage,
+      _errorDetail(spanish, state.errorCode),
+    );
+  }
 
   Widget _unknown(AppLocalizations l, SaleExceptionState state) {
     final correlation =
@@ -651,18 +665,102 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           'pricing_error',
         ];
 
-  String _blockLabel(AppLocalizations l, String code) => switch (code) {
-    'policy_window_expired' => l.refundPolicyExpiredMessage,
-    'payment_outcome_unknown' => l.paymentOutcomeUnknownMessage,
-    'fully_refunded' => l.fullyRefundedLabel,
-    _ => l.refundBlockedMessage,
+  // Server eligibility block codes -> a specific reason plus what to do next.
+  String _blockDetail(bool spanish, String code) => switch (code) {
+    'policy_window_expired' =>
+      spanish
+          ? 'El periodo permitido para el reembolso venció.'
+          : 'The allowed refund period has ended.',
+    'policy_disabled' =>
+      spanish
+          ? 'Los reembolsos y anulaciones están desactivados en esta sucursal. Pide al dueño que los active.'
+          : 'Refunds and voids are disabled for this branch. Ask the owner to enable them.',
+    'fully_refunded' =>
+      spanish
+          ? 'Esta venta ya se reembolsó por completo.'
+          : 'This sale is already fully refunded.',
+    'void_not_eligible' =>
+      spanish
+          ? 'Esta venta ya no se puede anular. Usa un reembolso.'
+          : 'This sale can no longer be voided. Use a refund instead.',
+    'payment_outcome_unknown' =>
+      spanish
+          ? 'Se desconoce el resultado del pago original. Verifícalo antes de reembolsar.'
+          : 'The original payment outcome is unknown. Verify it before you refund.',
+    _ =>
+      spanish
+          ? 'Esta venta no cumple una regla del reembolso. Pide apoyo a un gerente.'
+          : 'This sale fails a refund rule. Ask a manager for help.',
   };
 
-  String _errorLabel(AppLocalizations l, String? code) => switch (code) {
-    'PAYMENT_OUTCOME_UNKNOWN' => l.paymentOutcomeUnknownMessage,
-    'APPROVAL_EXPIRED' => l.approvalExpiredMessage,
-    'CASH_SHIFT_NOT_ELIGIBLE' => l.refundBlockedMessage,
-    _ => l.refundOperationFailedMessage,
+  // Server error codes on a failed commit -> a specific cause plus what to do
+  // next. The default keeps the code visible so support can trace it.
+  String _errorDetail(bool spanish, String? code) => switch (code) {
+    'PERMISSION_DENIED' || 'PERMISSION_REVOKED' =>
+      spanish
+          ? 'No tienes permiso para esta acción. Pide a un gerente que la autorice.'
+          : 'You do not have permission for this action. Ask a manager to authorize it.',
+    'APPROVAL_REQUIRED' =>
+      spanish
+          ? 'Se requiere la aprobación de un gerente. Pide el PIN del gerente.'
+          : 'A manager approval is required. Ask for the manager PIN.',
+    'APPROVAL_EXPIRED' =>
+      spanish
+          ? 'La aprobación venció. Solicita una aprobación nueva.'
+          : 'The approval expired. Request a new approval.',
+    'APPROVAL_FINGERPRINT_MISMATCH' || 'APPROVAL_REUSED' =>
+      spanish
+          ? 'La aprobación ya no es válida. Solicita una aprobación nueva con un gerente distinto al operador.'
+          : 'The approval is no longer valid. Request a new one from a manager other than the operator.',
+    'CASH_REFUND_NOT_AVAILABLE' =>
+      spanish
+          ? 'No hay efectivo disponible para el reembolso. Abre un turno de caja o usa otro método.'
+          : 'No cash is available for the refund. Open a cash shift or use another method.',
+    'CASH_SHIFT_NOT_ELIGIBLE' =>
+      spanish
+          ? 'El turno de caja no permite este reembolso. Abre un turno válido en esta caja.'
+          : 'The cash shift does not allow this refund. Open a valid shift on this register.',
+    'INSUFFICIENT_EXPECTED_CASH' =>
+      spanish
+          ? 'No hay suficiente efectivo en la caja para el reembolso.'
+          : 'There is not enough cash in the drawer for this refund.',
+    'REFUND_NOT_ELIGIBLE' =>
+      spanish
+          ? 'Esta venta no es elegible para el reembolso.'
+          : 'This sale is not eligible for a refund.',
+    'SALE_NOT_FOUND' ||
+    'ORIGINAL_RECEIPT_NOT_FOUND' ||
+    'SALE_EXCEPTION_NOT_FOUND' =>
+      spanish
+          ? 'No se encontró la venta original. Actualiza la lista e intenta de nuevo.'
+          : 'The original sale was not found. Refresh the list and try again.',
+    'REFUND_AMOUNT_OUT_OF_RANGE' ||
+    'REFUND_QUANTITY_EXCEEDS_REMAINING' ||
+    'REFUND_TOTAL_INVALID' ||
+    'REFUND_SELECTION_INVALID' =>
+      spanish
+          ? 'La cantidad del reembolso no es válida. Revisa las líneas y el importe.'
+          : 'The refund amount is not valid. Check the lines and the amount.',
+    'STALE_PREVIEW' ||
+    'STALE_SALE' ||
+    'SALE_EXCEPTION_CONTEXT_CHANGED' ||
+    'SALE_EXCEPTION_CONFLICT' ||
+    'OPTIMISTIC_VERSION_CONFLICT' =>
+      spanish
+          ? 'La venta cambió. Cierra esta ventana y vuelve a abrir el reembolso.'
+          : 'The sale changed. Close this window and open the refund again.',
+    'PAYMENT_OUTCOME_UNKNOWN' =>
+      spanish
+          ? 'Se desconoce el resultado de la terminal. Verifica la operación original.'
+          : 'The terminal outcome is unknown. Verify the original operation.',
+    'TERMINAL_REFUND_CONFIRMATION_REQUIRED' =>
+      spanish
+          ? 'Confirma el resultado del reembolso en la terminal.'
+          : 'Confirm the refund outcome on the terminal.',
+    _ =>
+      spanish
+          ? 'Vuelve a intentar. Si el problema sigue, pide apoyo a un gerente.${code == null ? '' : ' (Código: $code)'}'
+          : 'Try again. If it keeps failing, ask a manager for help.${code == null ? '' : ' (Code: $code)'}',
   };
 
   String _phaseLabel(AppLocalizations l, SaleExceptionPhase phase) =>

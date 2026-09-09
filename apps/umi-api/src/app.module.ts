@@ -43,6 +43,7 @@ import { PosInventoryModule } from './modules/pos-inventory/pos-inventory.module
 import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
 import { PosHardwareModule } from './modules/pos-hardware/pos-hardware.module';
 import { DashboardOperationsModule } from './modules/dashboard-operations/dashboard-operations.module';
+import { DashboardCatalogModule } from './modules/dashboard-catalog/dashboard-catalog.module';
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
 import { ReleaseModule } from './shared/release/release.module';
@@ -95,6 +96,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     PosCustomerValueModule,
     PosHardwareModule,
     DashboardOperationsModule,
+    DashboardCatalogModule,
     AdministrativeCommandModule,
     PlatformBootstrapModule,
     OrdersModule,

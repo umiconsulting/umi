@@ -24,4 +24,14 @@ export class KdsPosController {
   ) {
     return this.kds.statusForPos(user, merchantId, sourceOrderId, query);
   }
+
+  // The whole-location kitchen board for the POS-role device's unified KDS mode.
+  @Get('board')
+  board(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(PosKitchenOrderQuery)) query: PosKitchenOrderQuery,
+  ) {
+    return this.kds.boardForPos(user, merchantId, query);
+  }
 }

@@ -1,35 +1,49 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
-import { formatNumber, formatTime } from '@/lib/format.js';
-import { RegionHead, XSep } from '@/shell.jsx';
-import { useConversationsData } from '@/data.jsx';
+import { formatDateTime, formatNumber } from '@/lib/format.js';
+import { RegionHead } from '@/shell.jsx';
+import { useTriageData } from '@/data.jsx';
 
-const ConversationsScreen = () => {
+function waitingLabel(value) {
+  if (!value) return '—';
+  return formatDateTime(value, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * The attention queue: WhatsApp conversations where the customer is waiting on a
+ * reply — oldest-waiting first, so the most overdue is on top. The AI handles most
+ * chats; this surfaces the ones a human should look at. A row opens the customer.
+ */
+const TriageScreen = () => {
   const { t } = useLingui();
-  const [page, setPage] = useState(1);
-  const { data, loading } = useConversationsData({ page });
+  const navigate = useNavigate();
+  const { data, loading } = useTriageData();
   const conversations = data?.conversations || [];
   const total = data?.total || 0;
-  const totalPages = data?.totalPages || 1;
-  const active = conversations.filter((c) => c.status === 'active').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <RegionHead
-        title={t`Conversaciones WhatsApp`}
+        title={t`Atención`}
         note={
           loading ? (
             <Trans>Cargando…</Trans>
           ) : (
             <Plural
-              value={active}
-              one="# conversación activa ahora mismo."
-              other="# conversaciones activas ahora mismo."
+              value={total}
+              one="# cliente espera respuesta."
+              other="# clientes esperan respuesta."
             />
           )
         }
-        count={{ value: formatNumber(total), label: t`en total` }}
+        count={{ value: formatNumber(total), label: t`en espera` }}
       />
 
       <div className="log-list">
@@ -38,31 +52,24 @@ const ConversationsScreen = () => {
             className="card"
             style={{ padding: '42px 28px', textAlign: 'center', color: 'var(--ink-3)' }}
           >
-            <I.WhatsApp size={30} style={{ opacity: 0.35, marginBottom: 10 }} />
+            <I.Check size={30} style={{ opacity: 0.35, marginBottom: 10 }} />
             <div style={{ fontWeight: 600 }}>
-              <Trans>No hay conversaciones.</Trans>
+              <Trans>Nadie espera respuesta. Umi está al día.</Trans>
             </div>
           </div>
         )}
         {conversations.map((conversation) => (
-          <div className="log-row" key={conversation.id}>
-            <span className="t">
-              {conversation.lastMessageAt ? formatTime(conversation.lastMessageAt) : '—'}
-            </span>
-            <span
-              className={'marker ' + (conversation.status === 'active' ? 'info' : 'warn')}
-              aria-hidden="true"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="4"
-                strokeLinecap="round"
-              >
-                <line x1="4" y1="4" x2="20" y2="20" />
-                <line x1="20" y1="4" x2="4" y2="20" />
-              </svg>
+          <button
+            type="button"
+            className="log-row triage-row focusable"
+            key={conversation.id}
+            onClick={() =>
+              navigate('/customers/' + encodeURIComponent(conversation.customerId || ''))
+            }
+          >
+            <span className="t">{waitingLabel(conversation.waitingSince)}</span>
+            <span className="marker warn" aria-hidden="true">
+              <I.WhatsApp size={13} />
             </span>
             <div className="body">
               <div>
@@ -74,47 +81,17 @@ const ConversationsScreen = () => {
                 </span>
               </div>
               <div className="meta">
-                {conversation.summary || conversation.currentState || t`Sin resumen`}
-                <XSep />{' '}
-                <Plural value={conversation.messageCount || 0} one="# mensaje" other="# mensajes" />
+                {conversation.lastMessage || conversation.summary || t`Sin resumen`}
               </div>
             </div>
-            <span
-              className={
-                'badge ' + (conversation.status === 'active' ? 'badge-admin' : 'badge-staff')
-              }
-            >
-              {conversation.status || t`desconocido`}
+            <span className="badge badge-trial">
+              <Trans>Espera</Trans>
             </span>
-          </div>
+          </button>
         ))}
       </div>
-
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
-          </button>
-          <span
-            style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', alignSelf: 'center' }}
-          >
-            {page} / {totalPages}
-          </span>
-          <button
-            className="btn btn-ghost btn-sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          >
-            <Trans>Siguiente</Trans> <I.ChevronRight size={14} />
-          </button>
-        </div>
-      )}
     </div>
   );
 };
 
-export default ConversationsScreen;
+export default TriageScreen;

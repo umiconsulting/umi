@@ -291,7 +291,11 @@ export class PosCashRepository {
       throw new Error('CASH_POLICY_DENIED');
     }
     const businessDate = await client.query<{ value: string }>(
-      `SELECT (now() at time zone coalesce(location.timezone,merchant.timezone))::date::text AS value
+      // MUST match merchant.tg_business_date (60_triggers.sql): the trading day is
+      // (now in the MERCHANT timezone) minus business_day_start, cast to date. Deriving it
+      // any other way (e.g. a plain ::date, or the location timezone) lets a shift opened at
+      // 01:00 land on a different day than the sales it holds once business_day_start != 00:00.
+      `SELECT (((now() at time zone merchant.timezone) - merchant.business_day_start::interval))::date::text AS value
          FROM merchant.location location
          JOIN merchant.merchant merchant ON merchant.id=location.merchant_id
         WHERE location.id=$1::uuid AND location.merchant_id=$2::uuid`,
@@ -1366,7 +1370,9 @@ export class PosCashRepository {
           : null;
         const closeSummary = closeSummaryResult?.rows[0]?.summary ?? null;
         const businessDateResult = await client.query<{ businessDate: string }>(
-          `SELECT (now() at time zone coalesce(location.timezone,merchant.timezone))::date::text
+          // Same trading-day derivation as merchant.tg_business_date (see the open path):
+          // (now in the merchant timezone) − business_day_start, so cash-up and sales agree.
+          `SELECT (((now() at time zone merchant.timezone) - merchant.business_day_start::interval))::date::text
                     AS "businessDate"
              FROM merchant.location location
              JOIN merchant.merchant merchant ON merchant.id=location.merchant_id

@@ -1,0 +1,11 @@
+# Cloudflare Pages SPA fallback.
+#
+# The dashboard is a single-page React app (react-router). Cloudflare Pages
+# serves a real static file when the path matches one (assets, logos,
+# index.html); for every other path it must return index.html so the client
+# router can resolve the route. Without this rule a deep link such as
+# /caja/turnos returns 404 on a hard refresh.
+#
+# 200 = rewrite (serve index.html, keep the URL). Static assets still win first,
+# so this only catches client routes.
+/*    /index.html    200

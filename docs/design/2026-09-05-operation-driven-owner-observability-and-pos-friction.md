@@ -187,3 +187,127 @@ Concurrency note: another session is running a dashboard i18n (lingui) + token m
 Delivered server-side and verified via the live API: the `registers` domain `detail` now carries a movement summary — `MXN · Movimientos N` plus `Sin venta M` when any no-sale drawer opens exist (the shrinkage signal). It renders in the existing "Detalle" column, so no dashboard-client edit was needed — deliberately, because a peer session is mid-migration on the dashboard screens. A richer chronological movement log (the DomainSummary view) is deferred until that migration settles. Fed from `cash_movement` + `no_sale_drawer_event`, both owner-readable. Gates clean.
 
 This completes all four §4.1 owner quick-win domains at the data layer (Turnos, Ventas, Reembolsos, Registros). Remaining owner "bigger" items (Resumen roll-up, Pedidos/Cocina timing) are client-side on screens the peer session is actively editing, so they are held to avoid clobbering that work.
+
+## 10. Status update — Pedidos order detail enriched (2026-09-05)
+
+Delivered and verified live on the dashboard: the **individual order tab** (`OrderDetail` in `orders.jsx`) now shows the full scope of an order, not just channel + items + one total. This is §2.5's headline (order lifecycle timing) plus the rest of the order model made visible.
+
+The order detail read follows the same "one deep projection" shape as the operations `facts` seam (§2.0): the enrichment is one enriched SELECT in `orders.repository.ts`, mapped once in `orders.service.ts`, consumed by one client view. No new endpoint.
+
+Added to the detail tab:
+
+- **Lifecycle timeline** — `Nuevo → Preparando → Listo → Completado/Cancelado`, each with the moment it was reached, the time spent in that state, the operator (`order_event.staff_id → staff.name`, when present), and a total. The current, still-open state of an active order colours by age (warn ≥ 10 min, danger ≥ 20 min). The rail uses fuller, deeper tones (strong ink labels + a `--info`/`--warning`/`--success`/`--ink-1`/`--danger` dot per state, deep ink for `Completado` instead of grey) rather than the washed status tokens — all theme-aware, so it holds in both Umi and Midnight (verified in both). Built from `merchant.order_event` (`kind='status_changed'`); `placed` is taken from `placed_at`, since backfilled orders carry no opening event, and each later milestone is the FIRST time that status was reached, so a re-fire does not scramble the line.
+- **Meta strip** — status badge, handoff (`fulfillment_type`), and reference, which the sheet never showed before.
+- **Money split** — `gross − discount = total` from the `merchant.order_total` view (was one number). Discount lines list their `order_discount` label; comps colour differently.
+- **Voided lines** — a void is now SHOWN struck-through with an "Anulado" chip and its reason (ORDER_MODEL §3 waste visibility), instead of filtered out. The article count and the total still use live lines only, so a void does not inflate either.
+- **Per-line modifiers** (`order_item_modifier`) and the **cancel reason** for a canceled order.
+
+Engineering notes:
+
+- The projection adds voided lines, `order_event`, `order_item_modifier`, `order_discount` and the `gross`/`discount` columns of `order_total`. All are owner-readable under the request RLS context (`order_event`/`order_item` scope through the parent order; `order_item_modifier`/`order_discount` through their own `merchant_id`) — verified by running the exact query as `api_login` with the merchant GUCs set. The `authorized_by → umi.user` join was dropped: `api_login` cannot read `umi.user`, and approver identity is the Reembolsos surface (§2.4), not this one.
+- Verified live against the rehearsal DB (Kalala Café) through the real owner API: a completed order renders its timeline, item and modifier; a canceled order renders two `Anulado` lines with their modifiers and a total that counts only the live line.
+
+Gates: API `tsc` clean, 10/10 orders service unit tests pass (a new case covers the money split, voided-line exclusion from the count, modifiers and the lifecycle); dashboard ESLint clean (a now-dead `react-hooks/purity` suppression pruned after the fix), Prettier clean, i18n extracted + English catalog complete + `compile --strict` clean, production build clean.
+
+**Status is read-only on this screen (2026-09-05).** The transition controls were removed from both the order list card (`Cocina` / `Listo` / `Cerrar`) and the detail tab (`Avanzar estado`). Advancing the lifecycle belongs to the kitchen (Cocina / KDS), where the physical action happens; the owner's order screen observes the status, it does not drive it. The status badge stays as a read-only display. The `transition` endpoint and its service stay in place (unused by this screen) for the kitchen surface. This matches the §2.6 rule that live cook control stays on the KDS device while the owner sees load and timing.
+
+Remaining owner "bigger" items: the Resumen roll-up, the Cocina per-station timing, and the order-list row aging colour (§2.5's row-level ask, distinct from this tab).
+
+## 11. Status update — money hub full redesign (2026-09-05) — SUPERSEDED by §12
+
+> The KPI-hero + stat-tiles + tables treatment described here was rejected in review as
+> "too much like a dashboard." The seam and the server `facts` it introduced still stand;
+> only the client presentation changed. See §12 for the current editorial design and the
+> refund-placement decision.
+
+Delivered and verified live: the whole **Caja y turnos** hub (`cash-shifts.jsx`) is redesigned. All five tabs — Ventas, Recibos, Reembolsos, Turnos de caja, Registros — now render a purpose-built domain view instead of the generic reference table. This is §2.1–§2.4 completed at the client layer, on the §2.0 seam.
+
+The seam is now the shape §2.0 described: `DomainWorkspace` renders `DOMAIN_VIEWS[domain]` when one exists, else the generic table (untouched — every other domain still uses it). One registry entry plus one component adds a rich domain; nothing else changes.
+
+Shared primitives keep the five tabs one system: `KpiRow` + `Kpi` (the roll-up header, reusing the `.kpi` tokens), one `StatusBadge` vocabulary (colour is a redundant cue — the status word always shows, WCAG 1.4.11), and `CopyButton`. Each view is a pure function of `rows` (with `facts`).
+
+Per tab:
+
+- **Turnos de caja** — a KPI header (open shifts, expected cash in open drawers, "por revisar", net closed variance), a live open/in-progress strip (operator, expected cash, opening float, "abierto hace …" from `openedAt`, a `Requiere revisión` flag on `reconciliation_required`), and a reconciliation history (Expected / Counted / Variance as sign + word — Cuadrado/Sobrante/Faltante — + colour).
+- **Ventas** — KPIs (count, total sold, average ticket, discounted count + total) and a table with the operator and a discount flag on every sale.
+- **Recibos** — KPIs (total, printed, queued, failed) and a table keyed by print status.
+- **Reembolsos** — the shrinkage-control surface: KPIs (exceptions, total refunded, voids, approved) and a table with type, original receipt, operator, reason, approver flag, and amount.
+- **Registros** — KPIs (registers, in use, movements, no-sale opens) and register cards; the no-sale count is the shrinkage signal.
+
+**Server (`dashboard-operations.repository.ts`).** Each domain's SELECT now projects a typed `facts` JSON, the §2.0 shape: `openedAt`/`closedAt` on `cash_shifts`; `{operator, discountMinorUnits}` on `sales`; `{exceptionType, reasonCode, operator, approved, originalReceipt}` on `refunds_voids`; `{movements, noSaleOpens, status}` on `registers`. All from joins already owner-readable under the request RLS context (verified live). `facts` is `z.record(z.unknown())` in the contract — opaque passthrough, so **no contract or Dart codegen** changed.
+
+**One deliberate non-duplication.** The client never re-derives the merchant's variance tolerance or close-approval threshold. The shift `status` already carries the authoritative outcome the server computed against that policy (`reconciliation_required` = a blocked close), so "por revisar" and the attention accent key off `status`, not a client-side threshold. Colouring a nonzero variance on a _closed_ shift is honest (the close was tolerated or approved); a blocked shift is the red flag.
+
+**Domain-label i18n.** The workspace heading used the API's Spanish domain `label`, so it stayed Spanish in English mode. Fixed with a client `DOMAIN_LABELS` message map (all 20 domains), rendered through `i18n._()` with a fallback to the server label. The heading now follows the active language ("Cash shifts", "Refunds and voids", …).
+
+**Verified live** against the rehearsal DB (Kalala Café, Chapultepec) through the real owner API, in **both** Spanish/Umi and English/Midnight: the five views render real data — a closed shift shows `Faltante $110.00` (expected $708 vs counted $598) and the net-variance KPI reads −$110.00; Reembolsos shows an approved full refund + void with their original receipts and reason. Colours and badges hold in both themes; the new strings resolve in English.
+
+Gates: API `tsc` clean, ESLint/Prettier clean, 8/8 dashboard-operations tests. Dashboard ESLint/Prettier clean, i18n extracted + 59 new English strings + `compile --strict` clean, production build clean.
+
+Still deferred (as in §9): the Registros full chronological movement log (an event-shaped `cash_movement` + `no_sale_drawer_event` query), and the Resumen roll-up + Cocina timing on screens owned elsewhere.
+
+## 12. Status update — money hub as a calm editorial briefing (2026-09-06)
+
+The §11 treatment was rejected in review: "this is not supposed to be like a dashboard —
+remember the feeling the owner must get from it." The owner opening this must feel **calm
+and safe**, reading an honest account of "is my money okay, and who did what" — not
+operating a metrics cockpit. This is the product's own stated intent, recovered from the
+dossier: `login-redesign-research.md` — _"Beauty = honesty + craft… trust reads as beauty"_
+(Rams: honest, unobtrusive) and _"think outside the database — your UI doesn't need to map
+1:1 to your data's fields"_; `redesign-research-psychology-flow.md` §9 — _design around
+**jobs, not tables**; do not expose the schema as the UI_; and the app's **broadsheet /
+masthead** identity. The direction was confirmed with the owner before the rebuild ("calm
+editorial briefing").
+
+**The design, applied to all five tabs (Ventas, Recibos, Reembolsos, Turnos de caja,
+Registros).** Each tab is one quiet rhythm, on the canvas, with generous whitespace:
+
+1. **A lede** — one honest sentence with a state dot ("Todo cuadrado. Nada requiere tu
+   atención." / "1 turno necesita tu revisión." / "Recibos: 7 · todos impresos.").
+2. **A few unboxed figures** — a small label over a display-face, tabular figure; two or
+   three, separated by whitespace, a single hairline beneath. No tile grid.
+3. **Narrative rows** — each item as a sentence (a state dot, a subject, a muted predicate,
+   the amount on the right in the display face), hairline dividers. Jobs, not a data table.
+
+The KPI-tile and table components from §11 (`KpiRow`, `Kpi`, `StatusBadge`, the reconciliation
+table) were removed and replaced by editorial primitives (`Lede`, `FigureStat`, `FigureRow`,
+`NarrativeRow`, `BriefSection`, `StateDot`, `RowAmount`) reused across the five views, so a
+tuning change flows to all five from one place. The five money-hub domains render on the
+canvas (`MONEY_HUB` in `operations-workspace.jsx`); every other domain keeps the generic
+card+table, untouched. Colour stays state-only (variance, attention) with sign + word, never
+colour alone; money uses tabular slashed-zero numerals.
+
+**Refund placement — a real correction (research-backed).** The dashboard no longer
+initiates refunds. A **cash** refund physically needs a person at the drawer with the
+customer present; Toast's own docs state Toast Web cannot issue cash refunds because it
+"does not access the cash drawer," and Square/Shopify "remote cash refunds" are a
+book-keeping fiction that records money returned with no one witnessing it leave the drawer —
+a fraud vector. So the owner's role is **observe + govern, not execute**:
+
+- **Reembolsos** is now an accountability surface only — each exception shows type, original
+  receipt, operator, reason, and approver, with the honest line: "Los reembolsos y las
+  anulaciones se hacen en la caja, con el cliente presente. Aquí los revisas: quién, por qué
+  y quién autorizó."
+- The **"Reembolsar" initiation button was removed from Ventas.** The `refund.*` command and
+  its dialog stay in the code for a future card-not-present ("charged twice yesterday")
+  refund-from-transaction surface, which is the one refund that legitimately belongs remotely
+  — a separate, scoped feature, not this screen.
+- Legitimate dashboard actions are kept: **Reimprimir** (Recibos — not money movement) and
+  **Configurar** (Registros — configuration).
+
+This also answers §2.4's "Reembolsos" item more correctly than §11 did: the owner observes
+and authorises the exception; the register, with the customer, executes it.
+
+**Verified live** (Playwright) against the rehearsal DB (Kalala Café, Chapultepec) through
+the real owner API, across all five tabs in **both** Spanish/Umi and English/Midnight: the
+editorial layout holds, semantic colours and MX$ tabular numerals read on true black, and
+every new string resolves in English (the Midnight surface==canvas is black, so depth comes
+from hairlines and the warm/figure treatment, not surface contrast).
+
+Gates: dashboard ESLint/Prettier clean, i18n extracted + English catalog complete +
+`compile --strict` clean, production build clean. Server `facts` (§11) unchanged, so the API
+`tsc` + dashboard-operations tests from §11 still stand.
+
+Follow-ups: a dark/English polish is done; remaining are the deferred §9 items and an
+optional card-not-present refund-from-transaction surface (permission-gated, reason-required)
+if the business wants remote card refunds.

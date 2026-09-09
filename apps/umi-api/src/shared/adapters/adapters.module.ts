@@ -7,6 +7,7 @@ import { EmailAdapter } from './email.adapter';
 import { ZettleAdapter } from './zettle.adapter';
 import { GeocodeAdapter } from './geocode.adapter';
 import { WalletPassAdapter } from './wallet-pass.adapter';
+import { FacturapiAdapter } from './facturapi.adapter';
 
 /**
  * One canonical wrapper per external service (the only place each is reached).
@@ -25,6 +26,7 @@ import { WalletPassAdapter } from './wallet-pass.adapter';
     ZettleAdapter,
     WalletPassAdapter,
     GeocodeAdapter,
+    FacturapiAdapter,
   ],
   exports: [
     AnthropicAdapter,
@@ -34,6 +36,7 @@ import { WalletPassAdapter } from './wallet-pass.adapter';
     ZettleAdapter,
     WalletPassAdapter,
     GeocodeAdapter,
+    FacturapiAdapter,
   ],
 })
 export class AdaptersModule {}

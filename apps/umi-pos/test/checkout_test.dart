@@ -666,92 +666,91 @@ void main() {
     },
   );
 
-  testWidgets(
-    'checkout sheet renders authoritative totals and payment methods',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(1280, 1800);
-      addTearDown(tester.view.reset);
-      final repository = _CartRepository();
-      final cart = CartController(
-        repository: repository,
-        telemetry: const SafeTelemetry(
-          enabled: false,
-          context: TelemetryContext(
-            appVersion: 'test',
-            environment: 'test',
-            platform: 'test',
-          ),
-          exporter: NoopTelemetryExporter(),
+  testWidgets('checkout sheet renders authoritative totals and payment methods', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    // Tall enough that the redesigned tender sheet (hero total, method tile,
+    // keypad, change block, receipt, charge button) lays out at once, so every
+    // asserted part is on-screen without scrolling.
+    tester.view.physicalSize = const Size(1280, 3200);
+    addTearDown(tester.view.reset);
+    final repository = _CartRepository();
+    final cart = CartController(
+      repository: repository,
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
         ),
-      );
-      await cart.open(
-        repository.cart.merchantId,
-        repository.cart.locationId,
-        repository.cart.operatorSessionId,
-      );
-      final root = testRoot();
-      final checkout = _controller(_CheckoutRepository());
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: FilledButton(
-                onPressed: () => showCheckoutSheet(
-                  context,
-                  checkout: checkout,
-                  cashShiftId: null,
-                  cart: cart,
-                  entry: root.entry,
-                  sales: root.sales,
-                ),
-                child: const Text('open'),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+    await cart.open(
+      repository.cart.merchantId,
+      repository.cart.locationId,
+      repository.cart.operatorSessionId,
+    );
+    final root = testRoot();
+    final checkout = _controller(_CheckoutRepository());
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => showCheckoutSheet(
+                context,
+                checkout: checkout,
+                cashShiftId: null,
+                cart: cart,
+                entry: root.entry,
+                sales: root.sales,
               ),
+              child: const Text('open'),
             ),
           ),
         ),
-      );
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-      expect(find.text('Authoritative checkout'), findsOneWidget);
-      expect(find.text('Cash'), findsWidgets);
-      expect(find.text('Payment selection'), findsOneWidget);
-      expect(find.text('Exact amount'), findsOneWidget);
-      expect(find.text('MXN 116.00'), findsWidgets);
-      final review = find.text('Review authoritative totals');
-      for (var index = 0; index < 6 && review.evaluate().isEmpty; index++) {
-        await tester.drag(find.byType(ListView).first, const Offset(0, -300));
-        await tester.pump();
-      }
-      await tester.tap(review);
-      await tester.pumpAndSettle();
-      expect(find.text('Manual terminal', skipOffstage: false), findsWidgets);
-      expect(
-        find.text('Custom tip percent', skipOffstage: false),
-        findsOneWidget,
-      );
-      expect(
-        find.text('Custom tip amount', skipOffstage: false),
-        findsOneWidget,
-      );
-      expect(find.text('Percentage', skipOffstage: false), findsOneWidget);
-      expect(find.text('Fixed amount', skipOffstage: false), findsOneWidget);
-      expect(
-        find.text('Receipt destination', skipOffstage: false),
-        findsOneWidget,
-      );
-      await tester.pumpWidget(const SizedBox());
-      root.dispose();
-      cart.dispose();
-      checkout.dispose();
-    },
-  );
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.text('Authoritative checkout'), findsOneWidget);
+    // The redesigned SOTA tender screen: a hero total, the payment-method tile,
+    // the cash-received flow with quick-cash notes and an on-screen keypad, the
+    // colour-coded change block, and the receipt options.
+    expect(find.text('TOTAL'), findsOneWidget);
+    expect(find.text('Payment selection'), findsOneWidget);
+    expect(find.text('Cash'), findsWidgets);
+    expect(find.text('Cash received'), findsOneWidget);
+    expect(find.text('Exact amount'), findsOneWidget);
+    expect(find.text('MXN 500.00'), findsOneWidget); // a quick-cash note
+    expect(find.text('7'), findsWidgets); // a keypad key
+    expect(find.text('Change due'), findsOneWidget);
+    expect(find.text('Receipt destination'), findsOneWidget);
+    expect(find.text('MXN 116.00'), findsWidgets);
+    // One-tap checkout: the charge button reviews the total server-side and, when
+    // it matches what the cashier saw, commits in the same action. It is the last
+    // FilledButton (after the harness's own "open" button).
+    final charge = find.byType(FilledButton).last;
+    await tester.ensureVisible(charge);
+    await tester.tap(charge);
+    await tester.pumpAndSettle();
+    // The completed screen is the PoloTab-style change/paid summary.
+    expect(find.text('Paid'), findsOneWidget);
+    expect(find.text('New order'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    root.dispose();
+    cart.dispose();
+    checkout.dispose();
+  });
 }

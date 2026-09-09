@@ -182,6 +182,54 @@ abstract class AppLocalizations {
   /// **'Reintentar'**
   String get retryAction;
 
+  /// No description provided for @updateAvailableTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualización disponible'**
+  String get updateAvailableTitle;
+
+  /// No description provided for @updateRequiredBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta versión de UmiPOS ya no es compatible. Actualiza para continuar.'**
+  String get updateRequiredBody;
+
+  /// No description provided for @updateAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar ahora'**
+  String get updateAction;
+
+  /// No description provided for @updateInProgress.
+  ///
+  /// In es, this message translates to:
+  /// **'Descargando la actualización…'**
+  String get updateInProgress;
+
+  /// No description provided for @updateReadyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualización lista'**
+  String get updateReadyTitle;
+
+  /// No description provided for @updateReadyBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Reinicia UmiPOS para usar la versión nueva.'**
+  String get updateReadyBody;
+
+  /// No description provided for @updateRestartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reiniciar ahora'**
+  String get updateRestartAction;
+
+  /// No description provided for @updateFailedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.'**
+  String get updateFailedBody;
+
   /// No description provided for @diagnosticsAction.
   ///
   /// In es, this message translates to:

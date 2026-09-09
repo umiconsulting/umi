@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Sidebar, ProfileButton } from './shell.jsx';
+import { Sidebar, ProfileMenu } from './shell.jsx';
 import { withI18n } from '@/test/i18n.jsx';
 import { msg } from '@lingui/core/macro';
 
@@ -31,21 +31,37 @@ describe('Dashboard shell accessibility', () => {
   });
 });
 
-describe('Topbar profile button', () => {
-  it('wears the operator initials and labels itself for a screen reader', () => {
-    const markup = renderToStaticMarkup(
-      withI18n(<ProfileButton name="Lucio Martínez" email="lucio@umi.mx" onClick={() => {}} />),
-    );
-    expect(markup).toContain('>LM<');
-    expect(markup).toContain('aria-label="Tu perfil"');
-  });
-
-  it('marks the current page when the profile screen is active', () => {
+describe('Topbar account menu', () => {
+  it('wears the operator initials and opens an account menu for a screen reader', () => {
     const markup = renderToStaticMarkup(
       withI18n(
-        <ProfileButton name="Lucio Martínez" email="lucio@umi.mx" active onClick={() => {}} />,
+        <ProfileMenu
+          name="Lucio Martínez"
+          email="lucio@umi.mx"
+          onProfile={() => {}}
+          onSignOut={() => {}}
+        />,
       ),
     );
-    expect(markup).toContain('aria-current="page"');
+    expect(markup).toContain('>LM<');
+    expect(markup).toContain('aria-label="Cuenta"');
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).toContain('aria-expanded="false"');
+  });
+
+  it('keeps the pill lit while the profile screen is active', () => {
+    const markup = renderToStaticMarkup(
+      withI18n(
+        <ProfileMenu
+          name="Lucio Martínez"
+          email="lucio@umi.mx"
+          active
+          onProfile={() => {}}
+          onSignOut={() => {}}
+        />,
+      ),
+    );
+    expect(markup).toContain('profile-toggle');
+    expect(markup).toContain('active');
   });
 });

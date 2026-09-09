@@ -246,6 +246,12 @@ export const configSchema = z
     DEFAULT_MERCHANT_ID: z.string().uuid().optional(),
     ZETTLE_CLIENT_ID: z.string().optional(),
     ZETTLE_API_KEY: z.string().optional(),
+    // Facturapi (CFDI 4.0 PAC front — ADR 2026-09-08). The USER KEY manages issuing
+    // Organizations (one per merchant emisor); per-merchant stamping uses that
+    // Organization's own secret key, held with the merchant's fiscal profile — not here.
+    // Optional until the fiscal flow is wired (Fase 3b).
+    FACTURAPI_USER_KEY: z.string().optional(),
+    FACTURAPI_BASE_URL: z.string().url().default('https://www.facturapi.io/v2'),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
     SMTP_USER: z.string().optional(),

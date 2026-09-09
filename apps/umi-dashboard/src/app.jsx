@@ -28,12 +28,14 @@ import DevicesScreen from '@/screens/devices.jsx';
 import StaffScreen from '@/screens/staff.jsx';
 import LoyaltyValueScreen from '@/screens/loyalty-value.jsx';
 import CustomersScreen from '@/screens/customers.jsx';
+import TriageScreen from '@/screens/conversations.jsx';
 import HoursScreen from '@/screens/hours.jsx';
 import SettingsScreen from '@/screens/settings.jsx';
 import ProductsBillingScreen from '@/screens/products-billing.jsx';
 import CafesScreen from '@/screens/cafes.jsx';
 import OperationsScreen from '@/screens/operations.jsx';
 import CashShiftsScreen from '@/screens/cash-shifts.jsx';
+import ReportesScreen from '@/screens/reportes.jsx';
 import CatalogInventoryScreen from '@/screens/catalog-inventory.jsx';
 import DiagnosticsScreen from '@/screens/diagnostics.jsx';
 import CocinaScreen from '@/screens/cocina.jsx';
@@ -144,6 +146,8 @@ function DashboardLayout() {
   const rawScreen = location.pathname.split('/').filter(Boolean)[0] || 'overview';
   const screen =
     rawScreen === 'conversations' || rawScreen === 'insights' ? 'customers' : rawScreen;
+  // The full path (e.g. "reportes/recibos") drives nested-nav sub-item highlighting.
+  const activeFull = location.pathname.replace(/^\/+/, '').split('?')[0] || 'overview';
 
   useEffect(() => {
     if (merchant?.primaryColor)
@@ -200,6 +204,7 @@ function DashboardLayout() {
       />
       <Sidebar
         active={screen}
+        activeFull={activeFull}
         onChange={nav}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed((c) => !c)}
@@ -208,7 +213,6 @@ function DashboardLayout() {
         merchants={merchantState?.merchants}
         selectedMerchantId={merchantState?.selectedMerchantId}
         onMerchantChange={merchantState?.setSelectedMerchantId}
-        onSignOut={signOut}
       />
       <main className="main">
         <Topbar
@@ -225,6 +229,7 @@ function DashboardLayout() {
           profileActive={screen === 'profile'}
           userName={session?.user?.displayName}
           userEmail={session?.user?.email}
+          onSignOut={signOut}
         />
         <div className="screen-body" key={screen}>
           <Routes>
@@ -253,10 +258,37 @@ function DashboardLayout() {
               }
             />
             <Route
+              path="reportes"
+              element={
+                <GuardedScreen moduleKey="reportes">
+                  <ReportesScreen view="sales" />
+                </GuardedScreen>
+              }
+            />
+            {/* Recibos dissolved into the Ventas view (ADR 2026-09-08). Redirect old
+                links and bookmarks to Reportes → Ventas, where the receipts view now lives. */}
+            <Route path="reportes/recibos" element={<Navigate to="/reportes" replace />} />
+            <Route
+              path="reportes/reembolsos"
+              element={
+                <GuardedScreen moduleKey="reportes">
+                  <ReportesScreen view="refunds_voids" />
+                </GuardedScreen>
+              }
+            />
+            <Route
               path="cash-shifts"
               element={
                 <GuardedScreen moduleKey="cash-shifts">
-                  <CashShiftsScreen />
+                  <CashShiftsScreen view="cash_shifts" />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="cash-shifts/registros"
+              element={
+                <GuardedScreen moduleKey="cash-shifts">
+                  <CashShiftsScreen view="registers" />
                 </GuardedScreen>
               }
             />
@@ -313,6 +345,14 @@ function DashboardLayout() {
               element={
                 <GuardedScreen moduleKey="customers">
                   <CustomersScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="triage"
+              element={
+                <GuardedScreen moduleKey="triage">
+                  <TriageScreen />
                 </GuardedScreen>
               }
             />

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import '../bootstrap/bootstrap_controller.dart';
 import '../bootstrap/bootstrap_state.dart';
 import '../bootstrap/composition_root.dart';
 import '../core/localization/app_localizations.dart';
 import '../core/navigation/app_navigation.dart';
 import '../core/theme/umi_theme.dart';
+import '../core/update/desktop_updater.dart';
 import '../features/catalog/catalog_surface.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_surface.dart';
@@ -173,6 +173,7 @@ final class _GuardedSurface extends StatelessWidget {
         checkout: root.checkout,
         sales: root.sales,
         kitchenStatus: root.kitchenStatus,
+        kitchenBoard: root.kitchenBoard,
         customerValue: root.customerValue,
         exceptions: root.exceptions,
         inventory: root.inventory,
@@ -182,7 +183,7 @@ final class _GuardedSurface extends StatelessWidget {
         offlineJournal: root.offlineJournal,
         offlineRecovery: root.offlineRecovery,
       ),
-      AppRoute.recoverableError => _FailureSurface(controller: root.controller),
+      AppRoute.recoverableError => _FailureSurface(root: root),
       AppRoute.diagnostics => _DiagnosticsSurface(root: root),
       _ => _UnknownRoute(root: root),
     };
@@ -204,29 +205,102 @@ final class _LoadingSurface extends StatelessWidget {
   }
 }
 
-final class _FailureSurface extends StatelessWidget {
-  const _FailureSurface({required this.controller});
-  final BootstrapController controller;
+enum _UpdateStage { idle, updating, ready, failed }
+
+final class _FailureSurface extends StatefulWidget {
+  const _FailureSurface({required this.root});
+  final AppCompositionRoot root;
+
+  @override
+  State<_FailureSurface> createState() => _FailureSurfaceState();
+}
+
+class _FailureSurfaceState extends State<_FailureSurface> {
+  _UpdateStage _stage = _UpdateStage.idle;
+
+  bool get _isUpgradeRequired =>
+      widget.root.controller.state.diagnosticCategory == 'upgradeRequired';
+
+  bool get _canSelfUpdate =>
+      _isUpgradeRequired && widget.root.updater.isSupported;
+
+  Future<void> _runUpdate() async {
+    setState(() => _stage = _UpdateStage.updating);
+    final result = await widget.root.updater.update();
+    if (!mounted) return;
+    setState(() {
+      _stage = result.outcome == DesktopUpdateOutcome.applied
+          ? _UpdateStage.ready
+          : _UpdateStage.failed;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final controller = widget.root.controller;
     final retryable =
         controller.state.phase == BootstrapPhase.recoverableFailure ||
         controller.state.phase == BootstrapPhase.storageUnavailable;
+
+    late final IconData icon;
+    late final String title;
+    late final String message;
+    Widget? action;
+
+    if (_stage == _UpdateStage.updating) {
+      icon = Icons.downloading_outlined;
+      title = l10n.updateAvailableTitle;
+      message = l10n.updateInProgress;
+      action = const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: CircularProgressIndicator(),
+      );
+    } else if (_stage == _UpdateStage.ready) {
+      icon = Icons.check_circle_outline;
+      title = l10n.updateReadyTitle;
+      message = l10n.updateReadyBody;
+      action = ElevatedButton(
+        onPressed: widget.root.updater.relaunch,
+        child: Text(l10n.updateRestartAction),
+      );
+    } else if (_stage == _UpdateStage.failed) {
+      icon = Icons.error_outline;
+      title = l10n.updateAvailableTitle;
+      message = l10n.updateFailedBody;
+      action = ElevatedButton(
+        onPressed: _runUpdate,
+        child: Text(l10n.updateAction),
+      );
+    } else if (_canSelfUpdate) {
+      icon = Icons.system_update_alt_outlined;
+      title = l10n.updateAvailableTitle;
+      message = l10n.updateRequiredBody;
+      action = ElevatedButton(
+        onPressed: _runUpdate,
+        child: Text(l10n.updateAction),
+      );
+    } else {
+      icon = Icons.error_outline;
+      title = l10n.recoverableFailureTitle;
+      message = l10n.configurationInvalidBody;
+      action = retryable
+          ? ElevatedButton(
+              onPressed: controller.retry,
+              child: Text(l10n.retryAction),
+            )
+          : null;
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: StatusCard(
-            icon: Icons.error_outline,
-            title: l10n.recoverableFailureTitle,
-            message: l10n.configurationInvalidBody,
-            action: retryable
-                ? ElevatedButton(
-                    onPressed: controller.retry,
-                    child: Text(l10n.retryAction),
-                  )
-                : null,
+            icon: icon,
+            title: title,
+            message: message,
+            action: action,
           ),
         ),
       ),

@@ -22,16 +22,21 @@ Future<void> showCheckoutSheet(
   required EntryController entry,
   required SaleLifecycleController sales,
   CustomerValueController? customerValue,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  builder: (_) => _CheckoutSheet(
-    checkout: checkout,
-    cashShiftId: cashShiftId,
-    cart: cart,
-    entry: entry,
-    sales: sales,
-    customerValue: customerValue,
+}) => Navigator.of(context).push(
+  // PoloTab pays on a full screen, not a sheet — a focused, low-light surface.
+  MaterialPageRoute<void>(
+    fullscreenDialog: true,
+    builder: (_) => Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: _CheckoutSheet(
+        checkout: checkout,
+        cashShiftId: cashShiftId,
+        cart: cart,
+        entry: entry,
+        sales: sales,
+        customerValue: customerValue,
+      ),
+    ),
   ),
 );
 
@@ -148,7 +153,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (controller == null ||
         fingerprint == null ||
         cart == null ||
-        operator == null) {
+        operator == null ||
+        customerId == null) {
+      // No customer attached: an anonymous sale has no loyalty or stored value
+      // to preview, so do not start the lookup.
       return;
     }
     final key = '$customerId:${cart.version}:$fingerprint';
@@ -262,178 +270,137 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         ? null
         : PaymentSummary.fromJson(state.result!.paymentSummary!);
     return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .9,
-        child: Padding(
-          padding: const EdgeInsets.all(UmiSpacing.lg),
-          child: switch (state.phase) {
-            CheckoutPhase.completed => _receipt(context, state.result!),
-            CheckoutPhase.provisional => _provisional(
-              context,
-              state.provisionalReceipt!,
+      child: Padding(
+        padding: const EdgeInsets.all(UmiSpacing.lg),
+        child: switch (state.phase) {
+          CheckoutPhase.completed => _receipt(context, state.result!),
+          CheckoutPhase.provisional => _provisional(
+            context,
+            state.provisionalReceipt!,
+          ),
+          CheckoutPhase.paymentUnknown => _unknown(context, state.result!),
+          CheckoutPhase.processing || CheckoutPhase.repricing => Center(
+            child: Semantics(
+              liveRegion: true,
+              label: l.paymentProcessing,
+              child: const CircularProgressIndicator(),
             ),
-            CheckoutPhase.paymentUnknown => _unknown(context, state.result!),
-            CheckoutPhase.processing || CheckoutPhase.repricing => Center(
-              child: Semantics(
-                liveRegion: true,
-                label: l.paymentProcessing,
-                child: const CircularProgressIndicator(),
-              ),
-            ),
-            CheckoutPhase.failure => _checkoutError(context, state.errorCode),
-            _ => ListView(
-              children: [
-                Text(
-                  l.checkoutTitle,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                Text(widget.entry.state.selectedTenant?.name ?? ''),
-                Text(widget.entry.state.selectedBranch?.name ?? ''),
-                Text(
-                  '${l.operatorLabel}: '
-                  '${widget.entry.state.operator?.staffId ?? ''}',
-                ),
-                const SizedBox(height: UmiSpacing.lg),
-                _AmountRow(
-                  label: l.subtotalLabel,
-                  value: _money(totals.subtotal),
-                ),
-                _AmountRow(label: l.taxLabel, value: _money(totals.tax)),
-                _AmountRow(
-                  label: l.totalLabel,
-                  value: _money(totals.grandTotal),
-                  emphasized: true,
-                ),
-                if (paymentSummary != null) ...[
-                  _AmountRow(
-                    label: l.appliedAmountLabel,
-                    value: _money(paymentSummary.appliedAmount),
-                  ),
-                  _AmountRow(
-                    label: l.remainingBalanceLabel,
-                    value: _money(paymentSummary.remainingBalance),
-                  ),
-                  _AmountRow(
-                    label: l.changeDueLabel,
-                    value: _money(paymentSummary.change),
-                  ),
-                ],
-                Text('${l.businessDateLabel}: ${totals.businessDate}'),
-                if (widget.customerValue != null) _customerValueSection(totals),
-                const SizedBox(height: UmiSpacing.lg),
-                Text(
-                  l.tenderSelectionTitle,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: UmiSpacing.sm,
-                  children: [
-                    FilterChip(
-                      label: Text(l.cashPayment),
-                      selected: cashEnabled,
-                      onSelected: (selected) => _setCash(selected, totals),
+          ),
+          CheckoutPhase.failure => _checkoutError(context, state.errorCode),
+          _ => ListView(
+            children: [
+              // Compact header: the title and a close affordance, with the where
+              // and who folded into one muted line — the amount, not the chrome,
+              // is what the cashier reads first.
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.checkoutTitle,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    if (policy?.manualTerminalEnabled ?? false)
-                      FilterChip(
-                        label: Text(l.manualTerminalLabel),
-                        selected: terminalEnabled,
-                        onSelected: (selected) =>
-                            _setTerminal(selected, totals),
-                      ),
-                  ],
-                ),
-                if (cashEnabled) ...[
-                  const SizedBox(height: UmiSpacing.md),
-                  Text(
-                    l.cashTenderTitle,
-                    style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  const SizedBox(height: UmiSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: cashApplied,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: cashAmountFormatters,
-                          decoration: InputDecoration(
-                            labelText: l.tenderAmountLabel,
-                            errorText: parseMinorUnits(cashApplied.text) == null
-                                ? l.invalidAmountMessage
-                                : null,
-                          ),
-                          onChanged: (_) => setState(() {
-                            dirty = true;
-                            tenderEdited = true;
-                          }),
-                        ),
-                      ),
-                      const SizedBox(width: UmiSpacing.md),
-                      Expanded(
-                        child: TextField(
-                          controller: cashReceived,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: cashAmountFormatters,
-                          decoration: InputDecoration(
-                            labelText: l.cashReceivedLabel,
-                            errorText:
-                                parseMinorUnits(cashReceived.text) == null
-                                ? l.invalidAmountMessage
-                                : null,
-                          ),
-                          onChanged: (_) => setState(() {
-                            dirty = true;
-                            tenderEdited = true;
-                          }),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: UmiSpacing.sm),
-                  Wrap(
-                    spacing: UmiSpacing.sm,
-                    runSpacing: UmiSpacing.sm,
-                    children: [
-                      ActionChip(
-                        label: Text(l.exactAmountAction),
-                        onPressed: () => _setCashReceived(
-                          (totals.grandTotal['minorUnits']! as num).toInt(),
-                        ),
-                      ),
-                      for (final value in const [10000, 20000, 50000])
-                        ActionChip(
-                          label: Text(
-                            _money({
-                              'currency': totals.grandTotal['currency'],
-                              'minorUnits': value,
-                            }),
-                          ),
-                          onPressed: () => _setCashReceived(value),
-                        ),
-                    ],
+                  IconButton(
+                    tooltip: l.closeAction,
+                    onPressed: () => _closeCheckout(context),
+                    icon: const Icon(Icons.close),
                   ),
                 ],
-                if (terminalEnabled) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  Text(
-                    l.manualTerminalLabel,
-                    style: Theme.of(context).textTheme.titleSmall,
+              ),
+              Text(
+                [
+                  widget.entry.state.selectedTenant?.name,
+                  widget.entry.state.selectedBranch?.name,
+                  widget.entry.operatorName,
+                ].whereType<String>().where((v) => v.isNotEmpty).join(' · '),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: UmiSpacing.lg),
+              // The amount due, extra-large — the number the cashier verifies at a
+              // glance and the star of the tender screen (SOTA POS convention).
+              _TotalHero(
+                label: l.totalLabel,
+                amount: _money(totals.grandTotal),
+              ),
+              const SizedBox(height: UmiSpacing.md),
+              _AmountRow(
+                label: l.subtotalLabel,
+                value: _money(totals.subtotal),
+              ),
+              _AmountRow(label: l.taxLabel, value: _money(totals.tax)),
+              if (paymentSummary != null) ...[
+                _AmountRow(
+                  label: l.appliedAmountLabel,
+                  value: _money(paymentSummary.appliedAmount),
+                ),
+                _AmountRow(
+                  label: l.remainingBalanceLabel,
+                  value: _money(paymentSummary.remainingBalance),
+                ),
+                _AmountRow(
+                  label: l.changeDueLabel,
+                  value: _money(paymentSummary.change),
+                ),
+              ],
+              Text(
+                '${l.businessDateLabel}: ${totals.businessDate}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              // Loyalty and stored value only apply when a customer is
+              // attached. An anonymous sale showed a permanent "Consulta en
+              // curso." block and fired a lookup for a customer that does not
+              // exist — hide the block and skip the lookup (see also
+              // `_loadCustomerValuePreview`).
+              if (widget.customerValue != null && _hasCustomer)
+                _customerValueSection(totals),
+              const SizedBox(height: UmiSpacing.lg),
+              Text(
+                l.tenderSelectionTitle,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: UmiSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MethodTile(
+                      icon: Icons.payments_outlined,
+                      label: l.cashPayment,
+                      selected: cashEnabled,
+                      onTap: () => _setCash(!cashEnabled, totals),
+                    ),
                   ),
-                  const SizedBox(height: UmiSpacing.sm),
+                  if (policy?.manualTerminalEnabled ?? false) ...[
+                    const SizedBox(width: UmiSpacing.md),
+                    Expanded(
+                      child: _MethodTile(
+                        icon: Icons.credit_card_outlined,
+                        label: l.manualTerminalLabel,
+                        selected: terminalEnabled,
+                        onTap: () => _setTerminal(!terminalEnabled, totals),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (cashEnabled) ...[
+                const SizedBox(height: UmiSpacing.lg),
+                // Split tender only: how much of the bill goes on cash (the rest
+                // is charged to the card). A single-method cash sale collects the
+                // whole total, so this field is hidden and the total stands.
+                if (terminalEnabled) ...[
                   TextField(
-                    controller: terminalAmount,
+                    controller: cashApplied,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
                     inputFormatters: cashAmountFormatters,
                     decoration: InputDecoration(
-                      labelText: l.tenderAmountLabel,
-                      errorText: parseMinorUnits(terminalAmount.text) == null
+                      labelText: l.cashTenderTitle,
+                      errorText: parseMinorUnits(cashApplied.text) == null
                           ? l.invalidAmountMessage
                           : null,
                     ),
@@ -442,223 +409,363 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       tenderEdited = true;
                     }),
                   ),
-                  const SizedBox(height: UmiSpacing.sm),
-                  Wrap(
-                    spacing: UmiSpacing.sm,
-                    runSpacing: UmiSpacing.sm,
-                    children: [
-                      ChoiceChip(
-                        label: Text(l.terminalProcessingAction),
-                        selected:
-                            terminalStatus == 'operator_processing_externally',
-                        onSelected: (_) =>
-                            _terminalOutcome('operator_processing_externally'),
-                      ),
-                      ChoiceChip(
-                        label: Text(l.terminalSuccessAction),
-                        selected: terminalStatus == 'confirmed_success',
-                        onSelected: (_) =>
-                            _terminalOutcome('confirmed_success'),
-                      ),
-                      ChoiceChip(
-                        label: Text(l.terminalFailureAction),
-                        selected: terminalStatus == 'operator_reported_failure',
-                        onSelected: (_) =>
-                            _terminalOutcome('operator_reported_failure'),
-                      ),
-                      ChoiceChip(
-                        label: Text(l.terminalUnknownAction),
-                        selected: terminalStatus == 'outcome_unknown',
-                        onSelected: (_) => _terminalOutcome('outcome_unknown'),
-                      ),
-                    ],
-                  ),
+                  const SizedBox(height: UmiSpacing.md),
                 ],
-                if (policy?.tip['enabled'] == true) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  Text(
-                    l.tipLabel,
-                    style: Theme.of(context).textTheme.titleMedium,
+                // Cash received: a big right-aligned amount the keypad and the
+                // quick-cash notes both drive, so a barista never hunts for the
+                // decimal key on a busy till.
+                TextField(
+                  controller: cashReceived,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                  Wrap(
-                    spacing: UmiSpacing.sm,
-                    children: [
-                      ChoiceChip(
-                        label: Text(l.noTipAction),
-                        selected: tipKind == 'none',
-                        onSelected: (_) => _clearTip(),
-                      ),
-                      for (final raw
-                          in policy!.tip['presetBasisPoints']! as List<Object?>)
-                        ChoiceChip(
-                          label: Text('${(raw as num).toInt() ~/ 100}%'),
-                          selected:
-                              tipKind == 'percentage' &&
-                              tipBasisPoints == raw.toInt(),
-                          onSelected: (_) => _setTipPercentage(raw.toInt()),
+                  inputFormatters: cashAmountFormatters,
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  decoration: InputDecoration(
+                    labelText: l.cashReceivedLabel,
+                    errorText: parseMinorUnits(cashReceived.text) == null
+                        ? l.invalidAmountMessage
+                        : null,
+                  ),
+                  onChanged: (_) => setState(() {
+                    dirty = true;
+                    tenderEdited = true;
+                  }),
+                ),
+                const SizedBox(height: UmiSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QuickCashButton(
+                        label: l.exactAmountAction,
+                        onTap: () => _setCashReceived(
+                          (totals.grandTotal['minorUnits']! as num).toInt(),
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: UmiSpacing.sm),
-                  Row(
-                    children: [
-                      if (policy.tip['customPercentageEnabled'] == true)
-                        Expanded(
-                          child: TextField(
-                            controller: customTipPercent,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: l.customTipPercentLabel,
-                            ),
-                            onChanged: _setCustomTipPercentage,
-                          ),
-                        ),
-                      if (policy.tip['customPercentageEnabled'] == true &&
-                          policy.tip['customFixedEnabled'] == true)
-                        const SizedBox(width: UmiSpacing.md),
-                      if (policy.tip['customFixedEnabled'] == true)
-                        Expanded(
-                          child: TextField(
-                            controller: customTipFixed,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            decoration: InputDecoration(
-                              labelText: l.customTipFixedLabel,
-                            ),
-                            onChanged: _setCustomTipFixed,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                if (policy?.discount['enabled'] == true) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  Text(
-                    l.discountLabel,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Wrap(
-                    spacing: UmiSpacing.sm,
-                    children: [
-                      ChoiceChip(
-                        label: Text(l.percentageDiscountAction),
-                        selected: discountType == 'order_percentage',
-                        onSelected: (_) => _setDiscountType('order_percentage'),
                       ),
-                      ChoiceChip(
-                        label: Text(l.fixedDiscountAction),
-                        selected: discountType == 'order_fixed',
-                        onSelected: (_) => _setDiscountType('order_fixed'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: UmiSpacing.sm),
-                  Row(
-                    children: [
+                    ),
+                    for (final value in const [10000, 20000, 50000]) ...[
+                      const SizedBox(width: UmiSpacing.sm),
                       Expanded(
-                        child: TextField(
-                          controller: discountPercent,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: false,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: discountType == 'order_fixed'
-                                ? l.discountAmountLabel
-                                : l.discountPercentLabel,
-                          ),
-                          onChanged: (_) => setState(() => dirty = true),
-                        ),
-                      ),
-                      const SizedBox(width: UmiSpacing.md),
-                      Expanded(
-                        child: TextField(
-                          controller: discountReason,
-                          decoration: InputDecoration(
-                            labelText: l.discountReasonLabel,
-                          ),
-                          onChanged: (_) => setState(() => dirty = true),
+                        child: _QuickCashButton(
+                          label: _money({
+                            'currency': totals.grandTotal['currency'],
+                            'minorUnits': value,
+                          }),
+                          onTap: () => _setCashReceived(value),
                         ),
                       ),
                     ],
+                  ],
+                ),
+                const SizedBox(height: UmiSpacing.md),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 340),
+                    child: _Numpad(onKey: _pushDigit),
                   ),
-                ],
+                ),
+                // The change due, extra-large and colour-coded, live as the
+                // cashier counts the cash — the star of the cash flow, never a
+                // small row lost among the totals.
+                const SizedBox(height: UmiSpacing.md),
+                Builder(
+                  builder: (context) {
+                    final es =
+                        Localizations.localeOf(context).languageCode == 'es';
+                    final received = _minorUnits(cashReceived.text);
+                    final change = received - grandTotal;
+                    final owes = change < 0;
+                    final scheme = Theme.of(context).colorScheme;
+                    final tone = owes
+                        ? scheme.errorContainer
+                        : scheme.primaryContainer;
+                    final ink = owes
+                        ? scheme.onErrorContainer
+                        : scheme.onPrimaryContainer;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: UmiSpacing.lg,
+                        vertical: UmiSpacing.md,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tone,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            owes
+                                ? (es ? 'Falta por cobrar' : 'Amount due')
+                                : (es ? 'Cambio' : 'Change due'),
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleMedium?.copyWith(color: ink),
+                          ),
+                          Text(
+                            _money({
+                              'currency':
+                                  totals.grandTotal['currency'] as String? ??
+                                  '',
+                              'minorUnits': change.abs(),
+                            }),
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: ink,
+                                ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+              if (terminalEnabled) ...[
                 const SizedBox(height: UmiSpacing.lg),
                 Text(
-                  l.receiptDestinationLabel,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  l.manualTerminalLabel,
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
+                const SizedBox(height: UmiSpacing.sm),
+                TextField(
+                  controller: terminalAmount,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: cashAmountFormatters,
+                  decoration: InputDecoration(
+                    labelText: l.tenderAmountLabel,
+                    errorText: parseMinorUnits(terminalAmount.text) == null
+                        ? l.invalidAmountMessage
+                        : null,
+                  ),
+                  onChanged: (_) => setState(() {
+                    dirty = true;
+                    tenderEdited = true;
+                  }),
+                ),
+                const SizedBox(height: UmiSpacing.sm),
                 Wrap(
                   spacing: UmiSpacing.sm,
                   runSpacing: UmiSpacing.sm,
                   children: [
                     ChoiceChip(
-                      label: Text(l.displayReceiptAction),
-                      selected: receiptDestination == 'display',
-                      onSelected: (_) => _setReceiptDestination('display'),
+                      label: Text(l.terminalProcessingAction),
+                      selected:
+                          terminalStatus == 'operator_processing_externally',
+                      onSelected: (_) =>
+                          _terminalOutcome('operator_processing_externally'),
                     ),
                     ChoiceChip(
-                      label: Text(l.printLaterAction),
-                      selected: receiptDestination == 'print_later',
-                      onSelected: (_) => _setReceiptDestination('print_later'),
+                      label: Text(l.terminalSuccessAction),
+                      selected: terminalStatus == 'confirmed_success',
+                      onSelected: (_) => _terminalOutcome('confirmed_success'),
                     ),
                     ChoiceChip(
-                      label: Text(l.noReceiptAction),
-                      selected: receiptDestination == 'none',
-                      onSelected: (_) => _setReceiptDestination('none'),
+                      label: Text(l.terminalFailureAction),
+                      selected: terminalStatus == 'operator_reported_failure',
+                      onSelected: (_) =>
+                          _terminalOutcome('operator_reported_failure'),
+                    ),
+                    ChoiceChip(
+                      label: Text(l.terminalUnknownAction),
+                      selected: terminalStatus == 'outcome_unknown',
+                      onSelected: (_) => _terminalOutcome('outcome_unknown'),
                     ),
                   ],
                 ),
-                if (state.errorCode != null) ...[
-                  const SizedBox(height: UmiSpacing.md),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      _recoveryMessage(l, state.errorCode!),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ),
-                ],
-                if (state.phase == CheckoutPhase.confirmationRequired) ...[
-                  const SizedBox(height: UmiSpacing.lg),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(l.totalsConfirmedBody),
-                  ),
-                ],
+              ],
+              if (policy?.tip['enabled'] == true) ...[
                 const SizedBox(height: UmiSpacing.lg),
-                FilledButton(
-                  // An unreadable amount never leaves the terminal. Sending it
-                  // meant tendering a number the cashier did not type.
-                  onPressed: !_amountsReadable
-                      ? null
-                      : state.phase == CheckoutPhase.awaitingApproval
-                      ? () => _requestApproval(context)
-                      : state.phase == CheckoutPhase.confirmationRequired &&
-                            !dirty
-                      ? () => _confirm()
-                      : () => _review(totals),
-                  child: Text(
-                    state.phase == CheckoutPhase.awaitingApproval
-                        ? l.managerApprovalAction
-                        : state.phase == CheckoutPhase.confirmationRequired &&
-                              !dirty
-                        ? l.confirmAndPayAction
-                        : l.checkoutAction,
-                  ),
+                Text(
+                  l.tipLabel,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                TextButton(
-                  onPressed: () => _closeCheckout(context),
-                  child: Text(l.closeAction),
+                Wrap(
+                  spacing: UmiSpacing.sm,
+                  children: [
+                    ChoiceChip(
+                      label: Text(l.noTipAction),
+                      selected: tipKind == 'none',
+                      onSelected: (_) => _clearTip(),
+                    ),
+                    for (final raw
+                        in policy!.tip['presetBasisPoints']! as List<Object?>)
+                      ChoiceChip(
+                        label: Text('${(raw as num).toInt() ~/ 100}%'),
+                        selected:
+                            tipKind == 'percentage' &&
+                            tipBasisPoints == raw.toInt(),
+                        onSelected: (_) => _setTipPercentage(raw.toInt()),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: UmiSpacing.sm),
+                Row(
+                  children: [
+                    if (policy.tip['customPercentageEnabled'] == true)
+                      Expanded(
+                        child: TextField(
+                          controller: customTipPercent,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: l.customTipPercentLabel,
+                          ),
+                          onChanged: _setCustomTipPercentage,
+                        ),
+                      ),
+                    if (policy.tip['customPercentageEnabled'] == true &&
+                        policy.tip['customFixedEnabled'] == true)
+                      const SizedBox(width: UmiSpacing.md),
+                    if (policy.tip['customFixedEnabled'] == true)
+                      Expanded(
+                        child: TextField(
+                          controller: customTipFixed,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: l.customTipFixedLabel,
+                          ),
+                          onChanged: _setCustomTipFixed,
+                        ),
+                      ),
+                  ],
                 ),
               ],
-            ),
-          },
-        ),
+              if (policy?.discount['enabled'] == true) ...[
+                const SizedBox(height: UmiSpacing.lg),
+                Text(
+                  l.discountLabel,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Wrap(
+                  spacing: UmiSpacing.sm,
+                  children: [
+                    ChoiceChip(
+                      label: Text(l.percentageDiscountAction),
+                      selected: discountType == 'order_percentage',
+                      onSelected: (_) => _setDiscountType('order_percentage'),
+                    ),
+                    ChoiceChip(
+                      label: Text(l.fixedDiscountAction),
+                      selected: discountType == 'order_fixed',
+                      onSelected: (_) => _setDiscountType('order_fixed'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: UmiSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: discountPercent,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: false,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: discountType == 'order_fixed'
+                              ? l.discountAmountLabel
+                              : l.discountPercentLabel,
+                        ),
+                        onChanged: (_) => setState(() => dirty = true),
+                      ),
+                    ),
+                    const SizedBox(width: UmiSpacing.md),
+                    Expanded(
+                      child: TextField(
+                        controller: discountReason,
+                        decoration: InputDecoration(
+                          labelText: l.discountReasonLabel,
+                        ),
+                        onChanged: (_) => setState(() => dirty = true),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: UmiSpacing.lg),
+              Text(
+                l.receiptDestinationLabel,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              Wrap(
+                spacing: UmiSpacing.sm,
+                runSpacing: UmiSpacing.sm,
+                children: [
+                  ChoiceChip(
+                    label: Text(l.displayReceiptAction),
+                    selected: receiptDestination == 'display',
+                    onSelected: (_) => _setReceiptDestination('display'),
+                  ),
+                  ChoiceChip(
+                    label: Text(l.printLaterAction),
+                    selected: receiptDestination == 'print_later',
+                    onSelected: (_) => _setReceiptDestination('print_later'),
+                  ),
+                  ChoiceChip(
+                    label: Text(l.noReceiptAction),
+                    selected: receiptDestination == 'none',
+                    onSelected: (_) => _setReceiptDestination('none'),
+                  ),
+                ],
+              ),
+              if (state.errorCode != null) ...[
+                const SizedBox(height: UmiSpacing.md),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _recoveryMessage(l, state.errorCode!),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+              if (state.phase == CheckoutPhase.confirmationRequired) ...[
+                const SizedBox(height: UmiSpacing.lg),
+                Semantics(liveRegion: true, child: Text(l.totalsConfirmedBody)),
+              ],
+              const SizedBox(height: UmiSpacing.lg),
+              FilledButton(
+                // An unreadable amount never leaves the terminal. Sending it
+                // meant tendering a number the cashier did not type.
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(64),
+                  textStyle: Theme.of(context).textTheme.titleLarge,
+                ),
+                onPressed: !_amountsReadable
+                    ? null
+                    : state.phase == CheckoutPhase.awaitingApproval
+                    ? () => _requestApproval(context)
+                    : state.phase == CheckoutPhase.confirmationRequired &&
+                          !dirty
+                    ? () => _confirm()
+                    : () => _review(totals),
+                child: Text(
+                  state.phase == CheckoutPhase.awaitingApproval
+                      ? l.managerApprovalAction
+                      : state.phase == CheckoutPhase.confirmationRequired &&
+                            !dirty
+                      ? l.confirmAndPayAction
+                      // The total rides on the button, so the cashier confirms
+                      // the amount at the moment of the tap (SOTA convention).
+                      : '${l.checkoutAction} · ${_money(totals.grandTotal)}',
+                ),
+              ),
+              const SizedBox(height: UmiSpacing.sm),
+              TextButton(
+                onPressed: () => _closeCheckout(context),
+                child: Text(l.closeAction),
+              ),
+            ],
+          ),
+        },
       ),
     );
   }
@@ -1272,6 +1379,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// safe for the running totals shown while the cashier is still typing.
   int _minorUnits(String raw) => parseMinorUnits(raw) ?? 0;
 
+  /// A customer is attached to the sale, so loyalty and stored value apply.
+  bool get _hasCustomer => widget.sales.state.sale?.customer != null;
+
   /// Every money field on the sheet is a well-formed amount.
   bool get _amountsReadable {
     for (final field in [
@@ -1330,6 +1440,29 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     dirty = true;
     tenderEdited = true;
   });
+
+  /// The on-screen keypad edits the cash-received field: a POS often has no
+  /// keyboard, so digits, one decimal point (capped at two places) and a
+  /// backspace go straight into the amount the change is figured from.
+  void _pushDigit(String key) {
+    var text = cashReceived.text;
+    if (key == 'back') {
+      if (text.isEmpty) return;
+      text = text.substring(0, text.length - 1);
+    } else if (key == '.') {
+      if (text.contains('.')) return;
+      text = text.isEmpty ? '0.' : '$text.';
+    } else {
+      final dot = text.indexOf('.');
+      if (dot >= 0 && text.length - dot > 2) return;
+      text = text == '0' ? key : '$text$key';
+    }
+    setState(() {
+      cashReceived.text = text;
+      dirty = true;
+      tenderEdited = true;
+    });
+  }
 
   void _terminalOutcome(String value) => setState(() {
     terminalStatus = value;
@@ -1747,54 +1880,151 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   Widget _receipt(BuildContext context, CheckoutResult result) {
     final l = AppLocalizations.of(context);
+    final es = Localizations.localeOf(context).languageCode == 'es';
     final receipt = ReceiptSnapshot.fromJson(result.receipt!);
+    final summary = result.paymentSummary == null
+        ? null
+        : PaymentSummary.fromJson(result.paymentSummary!);
+    final currency = receipt.grandTotal['currency'] as String? ?? '';
+    final totalMinor = (receipt.grandTotal['minorUnits'] as num?)?.toInt() ?? 0;
+    final changeMinor = summary == null
+        ? 0
+        : (summary.change['minorUnits'] as num?)?.toInt() ?? 0;
+    final receivedMinor = totalMinor + changeMinor;
+    Map<String, Object?> money(int minor) => {
+      'currency': currency,
+      'minorUnits': minor,
+    };
+    // PoloTab's completion screen: the change to hand back in huge blue, the amount
+    // paid in huge white, a one-line receipt summary, and two actions.
+    const brandBlue = Color(0xFF2E7DFF);
+    final display = Theme.of(context).textTheme.displayLarge;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.check_circle_outline, size: 64),
+        const Spacer(),
         Text(
-          l.saleCompletedTitle,
+          es ? 'Cambio a dar' : 'Change due',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        SelectableText(receipt.receiptRef, textAlign: TextAlign.center),
-        const Divider(),
-        Expanded(
-          child: ListView(
-            children: [
-              ...receipt.lines.map((raw) {
-                final line = ReceiptLineSnapshot.fromJson(raw);
-                return ListTile(
-                  title: Text(line.description),
-                  subtitle: Text(
-                    '${line.quantity} × ${_money(line.unitPrice)}',
-                  ),
-                  trailing: Text(_money(line.lineTotal)),
-                );
-              }),
-              const Divider(),
-              _AmountRow(
-                label: l.totalLabel,
-                value: _money(receipt.grandTotal),
-                emphasized: true,
-              ),
-              Text('${l.businessDateLabel}: ${receipt.businessDate}'),
-            ],
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
-        FilledButton(
-          onPressed: () async {
-            if (!committed) {
-              committed = true;
-              await widget.sales.checkoutCommitted();
-            }
-            if (context.mounted) Navigator.pop(context);
-          },
-          child: Text(l.finishSaleAction),
+        const SizedBox(height: UmiSpacing.xs),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _money(money(changeMinor)),
+            style: display?.copyWith(
+              color: brandBlue,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const SizedBox(height: UmiSpacing.lg),
+        Text(
+          es ? 'Pagado' : 'Paid',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: UmiSpacing.xs),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            _money(receipt.grandTotal),
+            style: display?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+        const SizedBox(height: UmiSpacing.md),
+        Text(
+          '${es ? 'Recibiste' : 'Received'}: ${_money(money(receivedMinor))}   ·   '
+          '${es ? 'Consumo' : 'Total'}: ${_money(receipt.grandTotal)}',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const Spacer(),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showReceiptDetail(context, l, receipt),
+                icon: const Icon(Icons.receipt_long_outlined),
+                label: Text(es ? 'Ver comprobante' : 'View receipt'),
+              ),
+            ),
+            const SizedBox(width: UmiSpacing.md),
+            Expanded(
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(56),
+                ),
+                onPressed: () async {
+                  if (!committed) {
+                    committed = true;
+                    await widget.sales.checkoutCommitted();
+                  }
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: Text(es ? 'Nuevo pedido' : 'New order'),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
+
+  Future<void> _showReceiptDetail(
+    BuildContext context,
+    AppLocalizations l,
+    ReceiptSnapshot receipt,
+  ) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: SelectableText(receipt.receiptRef),
+      content: SizedBox(
+        width: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final raw in receipt.lines)
+              Builder(
+                builder: (_) {
+                  final line = ReceiptLineSnapshot.fromJson(raw);
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(line.description),
+                    subtitle: Text(
+                      '${line.quantity} × ${_money(line.unitPrice)}',
+                    ),
+                    trailing: Text(_money(line.lineTotal)),
+                  );
+                },
+              ),
+            const Divider(),
+            _AmountRow(
+              label: l.totalLabel,
+              value: _money(receipt.grandTotal),
+              emphasized: true,
+            ),
+            Text('${l.businessDateLabel}: ${receipt.businessDate}'),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: Text(l.closeAction),
+        ),
+      ],
+    ),
+  );
 
   Widget _checkoutError(BuildContext context, String? code) {
     final l = AppLocalizations.of(context);
@@ -1809,6 +2039,191 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             child: Text(l.retryAction),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The amount due, rendered extra-large in a tinted card — the anchor of the
+/// tender screen. It scales down rather than wrap so a four-figure total still
+/// fits on one line.
+final class _TotalHero extends StatelessWidget {
+  const _TotalHero({required this.label, required this.amount});
+  final String label;
+  final String amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: UmiSpacing.lg,
+        vertical: UmiSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              amount,
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: scheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A payment method as a big, labelled, tappable tile (not a chip): the two or
+/// three ways to pay are the first decision on the screen, so they get real
+/// targets and a clear selected state.
+final class _MethodTile extends StatelessWidget {
+  const _MethodTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: selected
+          ? scheme.primaryContainer
+          : scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 72,
+          padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: selected
+                    ? scheme.onPrimaryContainer
+                    : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: UmiSpacing.sm),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: selected
+                        ? scheme.onPrimaryContainer
+                        : scheme.onSurface,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (selected)
+                Icon(Icons.check_circle, color: scheme.primary, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A quick-cash note button: exact change, or the bills a barista actually takes,
+/// sized as a real touch target so the common tenders are one tap away.
+final class _QuickCashButton extends StatelessWidget {
+  const _QuickCashButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+    onPressed: onTap,
+    style: OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(48),
+      padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
+    ),
+    child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
+  );
+}
+
+/// The on-screen numeric keypad. A till may have no keyboard, so cash is entered
+/// here; keys are wide, high-contrast, and drive the cash-received field.
+final class _Numpad extends StatelessWidget {
+  const _Numpad({required this.onKey});
+  final ValueChanged<String> onKey;
+
+  @override
+  Widget build(BuildContext context) {
+    const keys = [
+      '1', '2', '3', //
+      '4', '5', '6', //
+      '7', '8', '9', //
+      '.', '0', 'back',
+    ];
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: UmiSpacing.sm,
+      crossAxisSpacing: UmiSpacing.sm,
+      childAspectRatio: 2,
+      children: [
+        for (final key in keys) _KeyButton(label: key, onTap: () => onKey(key)),
+      ],
+    );
+  }
+}
+
+final class _KeyButton extends StatelessWidget {
+  const _KeyButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Center(
+          child: label == 'back'
+              ? const Icon(Icons.backspace_outlined)
+              : Text(label, style: Theme.of(context).textTheme.headlineSmall),
+        ),
       ),
     );
   }

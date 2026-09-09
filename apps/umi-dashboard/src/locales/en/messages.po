@@ -52,6 +52,7 @@ msgstr "Loading business…"
 
 #: src/app.jsx
 #: src/screens/cafes.jsx
+#: src/screens/categories-workspace.jsx
 #: src/screens/conversations.jsx
 #: src/screens/customers.jsx
 #: src/screens/gift-cards.jsx
@@ -61,6 +62,26 @@ msgstr "Loading business…"
 #: src/screens/staff.jsx
 msgid "Cargando…"
 msgstr "Loading…"
+
+#: src/components/customer-transcript.jsx
+msgid "(sin texto)"
+msgstr "(no text)"
+
+#: src/components/customer-transcript.jsx
+msgid "Cargando mensajes anteriores…"
+msgstr "Loading earlier messages…"
+
+#: src/components/customer-transcript.jsx
+msgid "Cargando conversación…"
+msgstr "Loading conversation…"
+
+#: src/components/customer-transcript.jsx
+msgid "No se pudo cargar la conversación."
+msgstr "The conversation could not be loaded."
+
+#: src/components/customer-transcript.jsx
+msgid "Sin mensajes en esta conversación."
+msgstr "No messages in this conversation."
 
 #: src/data.jsx
 msgid "Sesión expirada"
@@ -116,6 +137,7 @@ msgstr "Incorrect or expired code."
 
 #: src/lib/module-registry.js
 #: src/screens/customers.jsx
+#: src/screens/ventas-report.jsx
 msgid "Resumen"
 msgstr "Overview"
 
@@ -145,9 +167,15 @@ msgstr "Team and access"
 
 #: src/lib/module-registry.js
 #: src/screens/customers.jsx
+#: src/screens/operations-workspace.jsx
 #: src/shell.jsx
 msgid "Clientes"
 msgstr "Customers"
+
+#: src/lib/module-registry.js
+#: src/screens/conversations.jsx
+msgid "Atención"
+msgstr "Attention"
 
 #: src/lib/module-registry.js
 msgid "Horarios"
@@ -169,10 +197,36 @@ msgid "Cafés"
 msgstr "Cafés"
 
 #: src/lib/module-registry.js
-#: src/screens/cash-shifts.jsx
+#: src/shell.jsx
+msgid "Reportes"
+msgstr "Reports"
+
+#: src/lib/module-registry.js
+#: src/screens/operations-workspace.jsx
+msgid "Ventas"
+msgstr "Sales"
+
+#: src/lib/module-registry.js
+#: src/screens/caja-turnos.jsx
+#: src/screens/reembolsos.jsx
+msgid "Reembolsos"
+msgstr "Refunds"
+
+#: src/lib/module-registry.js
 #: src/shell.jsx
 msgid "Caja y turnos"
 msgstr "Cash and shifts"
+
+#: src/lib/module-registry.js
+#: src/screens/caja-turnos.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Turnos de caja"
+msgstr "Cash shifts"
+
+#: src/lib/module-registry.js
+#: src/screens/operations-workspace.jsx
+msgid "Registros"
+msgstr "Registers"
 
 #: src/lib/module-registry.js
 #: src/screens/catalog-inventory.jsx
@@ -182,6 +236,7 @@ msgstr "Catalog and inventory"
 
 #: src/lib/module-registry.js
 #: src/screens/diagnostics.jsx
+#: src/screens/operations-workspace.jsx
 #: src/shell.jsx
 msgid "Diagnóstico"
 msgstr "Diagnostics"
@@ -193,7 +248,6 @@ msgid "Lealtad y valor"
 msgstr "Loyalty and value"
 
 #: src/lib/module-registry.js
-#: src/screens/orders.jsx
 #: src/shell.jsx
 msgid "Cocina"
 msgstr "Kitchen"
@@ -225,6 +279,7 @@ msgstr "Open café"
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
+#: src/screens/recibos.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Cerrar"
@@ -345,50 +400,333 @@ msgstr "Public address"
 msgid "por id"
 msgstr "by id"
 
-#: src/screens/cash-shifts.jsx
-msgid "Ventas"
-msgstr "Sales"
+#: src/screens/caja-turnos.jsx
+msgid "Abriendo"
+msgstr "Opening"
 
-#: src/screens/cash-shifts.jsx
-msgid "Recibos"
-msgstr "Receipts"
+#: src/screens/caja-turnos.jsx
+msgid "Abierto"
+msgstr "Open"
 
-#: src/screens/cash-shifts.jsx
-msgid "Reembolsos"
-msgstr "Refunds"
+#: src/screens/caja-turnos.jsx
+msgid "Suspendido"
+msgstr "Suspended"
 
-#: src/screens/cash-shifts.jsx
-msgid "Turnos de caja"
-msgstr "Cash shifts"
+#: src/screens/caja-turnos.jsx
+msgid "Traspaso"
+msgstr "Handoff"
 
-#: src/screens/cash-shifts.jsx
-msgid "Registros"
-msgstr "Registers"
+#: src/screens/caja-turnos.jsx
+msgid "En arqueo"
+msgstr "Counting"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Conciliación"
+msgstr "Reconciliation"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cerrando"
+msgstr "Closing"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cerrado"
+msgstr "Closed"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Bloqueado"
+msgstr "Blocked"
+
+#: src/screens/caja-turnos.jsx
+msgid "Recuperado"
+msgstr "Recovered"
+
+#: src/screens/caja-turnos.jsx
+msgid "Fondo de apertura"
+msgstr "Opening float"
+
+#: src/screens/caja-turnos.jsx
+msgid "Venta en efectivo"
+msgstr "Cash sale"
+
+#: src/screens/caja-turnos.jsx
+msgid "Ingreso a caja"
+msgstr "Cash paid in"
+
+#: src/screens/caja-turnos.jsx
+msgid "Retiro de caja"
+msgstr "Cash paid out"
+
+#: src/screens/caja-turnos.jsx
+msgid "Retiro a caja fuerte"
+msgstr "Safe drop"
+
+#: src/screens/caja-turnos.jsx
+msgid "Reembolso en efectivo"
+msgstr "Cash refund"
+
+#: src/screens/caja-turnos.jsx
+msgid "Corrección de caja"
+msgstr "Drawer correction"
+
+#: src/screens/caja-turnos.jsx
+msgid "Traspaso de turno"
+msgstr "Shift handoff"
+
+#: src/screens/caja-turnos.jsx
+msgid "Arqueo"
+msgstr "Count"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/recibos.jsx
+#: src/screens/ventas-report.jsx
+msgid "Total"
+msgstr "Total"
+
+#: src/screens/caja-turnos.jsx
+msgid "pendiente"
+msgstr "pending"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cargando turno…"
+msgstr "Loading shift…"
+
+#: src/screens/caja-turnos.jsx
+msgid "Ventas en efectivo"
+msgstr "Cash sales"
+
+#: src/screens/caja-turnos.jsx
+msgid "Ingresos"
+msgstr "Paid in"
+
+#: src/screens/caja-turnos.jsx
+msgid "Retiros"
+msgstr "Paid out"
+
+#: src/screens/caja-turnos.jsx
+msgid "Caja fuerte"
+msgstr "Safe drop"
+
+#: src/screens/caja-turnos.jsx
+msgid "Turno"
+msgstr "Shift"
+
+#: src/screens/caja-turnos.jsx
+msgid "Abrió"
+msgstr "Opened by"
+
+#: src/screens/caja-turnos.jsx
+msgid "Contó"
+msgstr "Counted by"
+
+#: src/screens/caja-turnos.jsx
+msgid "Aprobó"
+msgstr "Approved by"
+
+#: src/screens/caja-turnos.jsx
+msgid "La cuenta del turno"
+msgstr "The shift cash math"
+
+#: src/screens/caja-turnos.jsx
+msgid "Efectivo esperado"
+msgstr "Expected cash"
+
+#: src/screens/caja-turnos.jsx
+msgid "Efectivo contado"
+msgstr "Cash counted"
+
+#: src/screens/caja-turnos.jsx
+msgid "Pendiente"
+msgstr "Pending"
+
+#: src/screens/caja-turnos.jsx
+msgid "Diferencia"
+msgstr "Variance"
+
+#: src/screens/caja-turnos.jsx
+msgid "Denominaciones de apertura"
+msgstr "Opening denominations"
+
+#: src/screens/caja-turnos.jsx
+msgid "Denominaciones del arqueo"
+msgstr "Count denominations"
+
+#: src/screens/caja-turnos.jsx
+msgid "Libro de caja del turno"
+msgstr "Shift cash ledger"
+
+#: src/screens/caja-turnos.jsx
+msgid "Sin movimientos en el turno."
+msgstr "No movements in the shift."
+
+#: src/screens/caja-turnos.jsx
+msgid "Arqueos"
+msgstr "Counts"
+
+#. placeholder {0}: c.attempt
+#: src/screens/caja-turnos.jsx
+msgid "Intento {0}"
+msgstr "Attempt {0}"
+
+#: src/screens/caja-turnos.jsx
+msgid "Sin arqueos todavía."
+msgstr "No counts yet."
+
+#: src/screens/caja-turnos.jsx
+msgid "Trazabilidad del turno"
+msgstr "Shift traceability"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cajas abiertas"
+msgstr "Open drawers"
+
+#: src/screens/caja-turnos.jsx
+msgid "Efectivo esperado en caja"
+msgstr "Expected cash in drawer"
+
+#: src/screens/caja-turnos.jsx
+msgid "Requieren atención"
+msgstr "Need attention"
+
+#: src/screens/caja-turnos.jsx
+msgid "Diferencia neta"
+msgstr "Net variance"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cargando turnos…"
+msgstr "Loading shifts…"
+
+#: src/screens/caja-turnos.jsx
+msgid "No hay turnos de caja en esta vista."
+msgstr "No cash shifts in this view."
 
 #: src/screens/catalog-inventory.jsx
+#: src/screens/operations-workspace.jsx
 msgid "Catálogo"
 msgstr "Catalog"
+
+#: src/screens/catalog-inventory.jsx
+msgid "Categorías"
+msgstr "Categories"
 
 #: src/screens/catalog-inventory.jsx
 #: src/screens/operations-workspace.jsx
 msgid "Inventario"
 msgstr "Inventory"
 
-#: src/screens/conversations.jsx
-msgid "Conversaciones WhatsApp"
-msgstr "WhatsApp conversations"
+#: src/screens/categories-workspace.jsx
+#~ msgid "color propio"
+#~ msgstr "custom color"
+
+#: src/screens/categories-workspace.jsx
+#~ msgid "color automático"
+#~ msgstr "automatic color"
+
+#: src/screens/categories-workspace.jsx
+#~ msgid "Usar el color automático"
+#~ msgstr "Use the automatic color"
+
+#: src/screens/categories-workspace.jsx
+#~ msgid "Automático"
+#~ msgstr "Automatic"
+
+#: src/screens/categories-workspace.jsx
+#~ msgid "El color se ve en el punto de venta detrás de los productos sin foto, para ubicarlos por categoría."
+#~ msgstr "The color shows in the POS behind products without a photo, to find them by category."
+
+#: src/screens/categories-workspace.jsx
+msgid "No se pudo guardar"
+msgstr "Could not save"
+
+#: src/screens/categories-workspace.jsx
+msgid "Nombre de la categoría"
+msgstr "Category name"
+
+#: src/screens/categories-workspace.jsx
+msgid "1 producto"
+msgstr "1 product"
+
+#. placeholder {0}: category.productCount
+#: src/screens/categories-workspace.jsx
+msgid "{0} productos"
+msgstr "{0} products"
+
+#: src/screens/categories-workspace.jsx
+msgid "Color en el POS"
+msgstr "Color in the POS"
+
+#: src/screens/categories-workspace.jsx
+#: src/screens/hours.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/settings.jsx
+msgid "Guardar"
+msgstr "Save"
+
+#: src/screens/categories-workspace.jsx
+msgid "Ya existe una categoría con ese nombre"
+msgstr "A category with this name already exists"
+
+#: src/screens/categories-workspace.jsx
+msgid "No se pudo crear"
+msgstr "Could not create"
+
+#: src/screens/categories-workspace.jsx
+msgid "Nueva categoría"
+msgstr "New category"
+
+#: src/screens/categories-workspace.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/profile.jsx
+#: src/screens/settings.jsx
+msgid "Nombre"
+msgstr "Name"
+
+#: src/screens/categories-workspace.jsx
+#: src/screens/devices.jsx
+msgid "Crear"
+msgstr "Create"
+
+#: src/screens/categories-workspace.jsx
+msgid "Cada categoría empieza con un color al azar; cámbialo cuando quieras. Se ve en el punto de venta detrás de los productos sin foto, para ubicarlos por categoría."
+msgstr "Each category starts with a random color; change it whenever you want. It shows in the POS behind products without a photo, to find them by category."
+
+#: src/screens/categories-workspace.jsx
+msgid "Aún no hay categorías. Crea la primera arriba."
+msgstr "There are no categories yet. Create the first one above."
 
 #: src/screens/conversations.jsx
-msgid "{active, plural, one {# conversación activa ahora mismo.} other {# conversaciones activas ahora mismo.}}"
-msgstr "{active, plural, one {# active conversation right now.} other {# active conversations right now.}}"
+#~ msgid "Conversaciones WhatsApp"
+#~ msgstr "WhatsApp conversations"
 
 #: src/screens/conversations.jsx
-msgid "en total"
-msgstr "in total"
+#~ msgid "{active, plural, one {# conversación activa ahora mismo.} other {# conversaciones activas ahora mismo.}}"
+#~ msgstr "{active, plural, one {# active conversation right now.} other {# active conversations right now.}}"
 
 #: src/screens/conversations.jsx
-msgid "No hay conversaciones."
-msgstr "No conversations."
+#~ msgid "en total"
+#~ msgstr "in total"
+
+#: src/screens/conversations.jsx
+#~ msgid "No hay conversaciones."
+#~ msgstr "No conversations."
+
+#: src/screens/conversations.jsx
+msgid "{total, plural, one {# cliente espera respuesta.} other {# clientes esperan respuesta.}}"
+msgstr "{total, plural, one {# customer is waiting for a reply.} other {# customers are waiting for a reply.}}"
+
+#: src/screens/conversations.jsx
+msgid "en espera"
+msgstr "waiting"
+
+#: src/screens/conversations.jsx
+msgid "Nadie espera respuesta. Umi está al día."
+msgstr "No one is waiting for a reply. Umi is all caught up."
 
 #: src/screens/conversations.jsx
 msgid "Cliente WhatsApp"
@@ -398,42 +736,25 @@ msgstr "WhatsApp customer"
 msgid "Sin resumen"
 msgstr "No summary"
 
-#. placeholder {0}: conversation.messageCount || 0
 #: src/screens/conversations.jsx
-#: src/screens/customers.jsx
-msgid "{0, plural, one {# mensaje} other {# mensajes}}"
-msgstr "{0, plural, one {# message} other {# messages}}"
+msgid "Espera"
+msgstr "Waiting"
 
-#: src/screens/conversations.jsx
 #: src/screens/customers.jsx
-#: src/screens/operations-workspace.jsx
-msgid "desconocido"
-msgstr "unknown"
-
-#: src/screens/conversations.jsx
-#: src/screens/customers.jsx
-#: src/screens/gift-cards.jsx
-#: src/screens/members.jsx
-#: src/screens/operations-workspace.jsx
-msgid "Anterior"
-msgstr "Previous"
-
-#: src/screens/conversations.jsx
-#: src/screens/customers.jsx
-#: src/screens/gift-cards.jsx
-#: src/screens/members.jsx
-#: src/screens/operations-workspace.jsx
-msgid "Siguiente"
-msgstr "Next"
+#~ msgid "{total, plural, one {# cliente} other {# clientes}}"
+#~ msgstr "{total, plural, one {# customer} other {# customers}}"
 
 #: src/screens/customers.jsx
 #: src/screens/orders.jsx
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
 #: src/screens/staff.jsx
 msgid "Todos"
 msgstr "All"
 
 #: src/screens/customers.jsx
 #: src/screens/loyalty-value.jsx
+#: src/screens/operations-workspace.jsx
 #: src/shell.jsx
 msgid "Lealtad"
 msgstr "Loyalty"
@@ -467,9 +788,10 @@ msgstr "Search customers, phone, email"
 msgid "Filtros de clientes"
 msgstr "Customer filters"
 
+#. placeholder {0}: customers.length
 #: src/screens/customers.jsx
-msgid "{total, plural, one {# cliente} other {# clientes}}"
-msgstr "{total, plural, one {# customer} other {# customers}}"
+msgid "{0, plural, one {# cliente} other {# clientes}}"
+msgstr "{0, plural, one {# customer} other {# customers}}"
 
 #: src/screens/customers.jsx
 msgid "plataforma de clientes"
@@ -486,6 +808,10 @@ msgstr "No customers found"
 #: src/screens/customers.jsx
 msgid "Prueba otra búsqueda u otro filtro."
 msgstr "Try another search or filter."
+
+#: src/screens/customers.jsx
+msgid "Cargar más"
+msgstr "Load more"
 
 #: src/screens/customers.jsx
 msgid "Sin actividad reciente"
@@ -507,10 +833,24 @@ msgstr "Conversation history lives under each customer."
 msgid "Conversación de WhatsApp"
 msgstr "WhatsApp conversation"
 
+#. placeholder {0}: conversation.messageCount || 0
+#: src/screens/customers.jsx
+msgid "{0, plural, one {# mensaje} other {# mensajes}}"
+msgstr "{0, plural, one {# message} other {# messages}}"
+
 #. placeholder {0}: fmtTime(conversation.lastMessageAt || conversation.updatedAt)
 #: src/screens/customers.jsx
 msgid "último {0}"
 msgstr "last {0}"
+
+#: src/screens/customers.jsx
+#: src/screens/operations-workspace.jsx
+msgid "desconocido"
+msgstr "unknown"
+
+#: src/screens/customers.jsx
+msgid "Conversaciones"
+msgstr "Conversations"
 
 #: src/screens/customers.jsx
 msgid "Sin pedidos vinculados"
@@ -1157,10 +1497,6 @@ msgid "Creando…"
 msgstr "Creating…"
 
 #: src/screens/devices.jsx
-msgid "Crear"
-msgstr "Create"
-
-#: src/screens/devices.jsx
 msgid "No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo."
 msgstr "The code could not be created. Check the location and try again."
 
@@ -1341,6 +1677,7 @@ msgid "Recuperación"
 msgstr "Recovery"
 
 #: src/screens/diagnostics.jsx
+#: src/screens/operations-workspace.jsx
 msgid "Auditoría"
 msgstr "Audit"
 
@@ -1470,11 +1807,14 @@ msgid "Destinatario"
 msgstr "Recipient"
 
 #: src/screens/gift-cards.jsx
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
 msgid "Monto"
 msgstr "Amount"
 
 #: src/screens/gift-cards.jsx
 #: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
 msgid "Estado"
 msgstr "Status"
 
@@ -1497,6 +1837,18 @@ msgstr "REDEEMED"
 #: src/screens/gift-cards.jsx
 msgid "ABIERTA"
 msgstr "OPEN"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Anterior"
+msgstr "Previous"
+
+#: src/screens/gift-cards.jsx
+#: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Siguiente"
+msgstr "Next"
 
 #: src/screens/hours.jsx
 msgid "Lunes"
@@ -1596,12 +1948,6 @@ msgstr "Opening hours"
 #: src/screens/hours.jsx
 msgid "Cuándo abre y cierra cada día de la semana."
 msgstr "When each day of the week opens and closes."
-
-#: src/screens/hours.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/settings.jsx
-msgid "Guardar"
-msgstr "Save"
 
 #: src/screens/hours.jsx
 #: src/screens/settings.jsx
@@ -1827,10 +2173,12 @@ msgid "Si hay una cuenta con ese correo, te mandamos un enlace para reestablecer
 msgstr "If there is an account with that email, we sent a link to reset your password. It expires in 15 minutes."
 
 #: src/screens/loyalty-value.jsx
+#: src/screens/operations-workspace.jsx
 msgid "Recompensas"
 msgstr "Rewards"
 
 #: src/screens/loyalty-value.jsx
+#: src/screens/recibos.jsx
 msgid "Monedero"
 msgstr "Wallet"
 
@@ -1876,13 +2224,6 @@ msgid "Tarjeta: <0>{0}</0>."
 msgstr "Card: <0>{0}</0>."
 
 #: src/screens/members.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/profile.jsx
-#: src/screens/settings.jsx
-msgid "Nombre"
-msgstr "Name"
-
-#: src/screens/members.jsx
 msgid "Número, sin código de país"
 msgstr "Number, without country code"
 
@@ -1926,6 +2267,8 @@ msgid "Miembro"
 msgstr "Member"
 
 #: src/screens/members.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
 msgid "Tarjeta"
 msgstr "Card"
 
@@ -2019,6 +2362,158 @@ msgstr "goal: {0}"
 msgid "meta sin configurar"
 msgstr "goal not set"
 
+#. placeholder {0}: formatOperationMoney(expected, it.currency)
+#: src/screens/operations-workspace.jsx
+#~ msgid "Esperado <0>{0}</0>"
+#~ msgstr "Expected <0>{0}</0>"
+
+#. placeholder {0}: formatOperationMoney(counted, it.currency)
+#: src/screens/operations-workspace.jsx
+#~ msgid "Contado {0}"
+#~ msgstr "Counted {0}"
+
+#. placeholder {0}: formatOperationMoney(variance, it.currency)
+#: src/screens/operations-workspace.jsx
+#~ msgid "Diferencia {0}"
+#~ msgstr "Variance {0}"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Abierto hace {duration}"
+#~ msgstr "Open for {duration}"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Requiere revisión"
+#~ msgstr "Needs review"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "en cajones abiertos"
+#~ msgstr "in open drawers"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "turnos con diferencia o bloqueados"
+#~ msgstr "shifts with a variance or blocked"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "turnos cerrados en esta vista"
+#~ msgstr "closed shifts in this view"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Sin turnos abiertos."
+#~ msgstr "No open shifts."
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Sin turnos cerrados en esta vista."
+#~ msgstr "No closed shifts in this view."
+
+#. placeholder {0}: formatOperationMoney(f.openingFloatMinorUnits, shift.currency)
+#: src/screens/operations-workspace.jsx
+#~ msgid "Fondo {0}"
+#~ msgstr "Float {0}"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "abierto hace {duration}"
+#~ msgstr "open for {duration}"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "{reviewCount, plural, one {# turno requiere tu revisión} other {# turnos requieren tu revisión}}"
+#~ msgstr "{reviewCount, plural, one {# shift needs your review} other {# shifts need your review}}"
+
+#. placeholder {0}: formatOperationMoney(netClosedVariance, currency)
+#: src/screens/operations-workspace.jsx
+#~ msgid "Diferencia neta {0} en turnos cerrados"
+#~ msgstr "Net variance {0} in closed shifts"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Turnos bloqueados en conciliación"
+#~ msgstr "Shifts blocked in reconciliation"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Todo cuadrado"
+#~ msgstr "All balanced"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Ningún turno requiere tu atención ahora."
+#~ msgstr "No shift needs your attention now."
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Efectivo esperado en cajones"
+#~ msgstr "Expected cash in drawers"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "{openCount, plural, one {En # turno abierto ahora} other {En # turnos abiertos ahora}}"
+#~ msgstr "{openCount, plural, one {In # open shift now} other {In # open shifts now}}"
+
+#. placeholder {0}: closed.length
+#: src/screens/operations-workspace.jsx
+#~ msgid "Diferencia neta de {0} turnos cerrados"
+#~ msgstr "Net variance from {0} closed shifts"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Por revisar"
+#~ msgstr "To review"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Turnos cerrados"
+#~ msgstr "Closed shifts"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Turnos abiertos y en curso"
+#~ msgstr "Open and in-progress shifts"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Esperado"
+#~ msgstr "Expected"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Contado"
+#~ msgstr "Counted"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Duración"
+#~ msgstr "Duration"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Aún no hay turnos cerrados en esta vista."
+#~ msgstr "No closed shifts in this view yet."
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Total vendido"
+#~ msgstr "Total sold"
+
+#. placeholder {0}: item.publicReference
+#: src/screens/operations-workspace.jsx
+#~ msgid "Copiar {0}"
+#~ msgstr "Copy {0}"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Excepciones"
+#~ msgstr "Exceptions"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Total devuelto"
+#~ msgstr "Total refunded"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "vía PIN de gerente"
+#~ msgstr "with a manager PIN"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "Copiar referencia"
+#~ msgstr "Copy the reference"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "entradas y salidas de efectivo"
+#~ msgstr "cash in and out"
+
+#: src/screens/operations-workspace.jsx
+#~ msgid "aperturas de cajón sin venta"
+#~ msgstr "no-sale drawer opens"
+
+#. placeholder {0}: String(item.status || '').replaceAll('_', ' ')
+#: src/screens/operations-workspace.jsx
+#~ msgid "{0} · {moves} movimientos · {noSaleOpens} sin venta"
+#~ msgstr "{0} · {moves} movements · {noSaleOpens} no-sale"
+
 #: src/screens/operations-workspace.jsx
 msgid "No tienes el permiso requerido para esta operación."
 msgstr "You do not have the permission required for this operation."
@@ -2042,6 +2537,48 @@ msgstr "Look up the original command in the Recovery center."
 #: src/screens/operations-workspace.jsx
 msgid "El servicio no está disponible. Intenta de nuevo después."
 msgstr "The service is unavailable. Try again later."
+
+#: src/screens/operations-workspace.jsx
+msgid "Organización"
+msgstr "Organization"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ubicaciones"
+msgstr "Locations"
+
+#: src/screens/operations-workspace.jsx
+msgid "Usuarios y membresías"
+msgstr "Users and memberships"
+
+#: src/screens/operations-workspace.jsx
+msgid "Dispositivos POS"
+msgstr "POS devices"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+#: src/screens/ventas-report.jsx
+msgid "Recibos"
+msgstr "Receipts"
+
+#: src/screens/operations-workspace.jsx
+msgid "Reembolsos y anulaciones"
+msgstr "Refunds and voids"
+
+#: src/screens/operations-workspace.jsx
+msgid "Wallet"
+msgstr "Wallet"
+
+#: src/screens/operations-workspace.jsx
+msgid "Gift cards"
+msgstr "Gift cards"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cocina y KDS"
+msgstr "Kitchen and KDS"
+
+#: src/screens/operations-workspace.jsx
+msgid "Centro de recuperación"
+msgstr "Recovery center"
 
 #: src/screens/operations-workspace.jsx
 msgid "PIN del aprobador"
@@ -2069,10 +2606,12 @@ msgid "Consultar elegibilidad"
 msgstr "Check eligibility"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
 msgid "Tipo"
 msgstr "Type"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
 msgid "Motivo"
 msgstr "Reason"
 
@@ -2266,6 +2805,7 @@ msgid "Emitir y revelar"
 msgstr "Issue and reveal"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/ventas-report.jsx
 msgid "Producto"
 msgstr "Product"
 
@@ -2290,6 +2830,7 @@ msgid "Código de barras"
 msgstr "Barcode"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/ventas-report.jsx
 msgid "Categoría"
 msgstr "Category"
 
@@ -2402,43 +2943,303 @@ msgstr "Use the domain action."
 msgid "Consulta antes de repetir."
 msgstr "Check before retrying."
 
-#. placeholder {0}: formatOperationMoney(f.openingFloatMinorUnits, it.currency)
 #: src/screens/operations-workspace.jsx
-msgid "Fondo {0}"
-msgstr "Float {0}"
-
-#. placeholder {0}: formatOperationMoney(expected, it.currency)
-#: src/screens/operations-workspace.jsx
-msgid "Esperado <0>{0}</0>"
-msgstr "Expected <0>{0}</0>"
-
-#. placeholder {0}: formatOperationMoney(counted, it.currency)
-#: src/screens/operations-workspace.jsx
-msgid "Contado {0}"
-msgstr "Counted {0}"
-
-#. placeholder {0}: formatOperationMoney(variance, it.currency)
-#: src/screens/operations-workspace.jsx
-msgid "Diferencia {0}"
-msgstr "Variance {0}"
-
-#. placeholder {0}: selected?.requiredPermissions?.join(t` o `) || '—'
-#: src/screens/operations-workspace.jsx
-msgid "Permiso: {0}"
-msgstr "Permission: {0}"
+msgid "Cuadrado"
+msgstr "Balanced"
 
 #: src/screens/operations-workspace.jsx
-#: src/screens/operations.jsx
-msgid " o "
-msgstr " or "
+msgid "Sobrante"
+msgstr "Over"
 
 #: src/screens/operations-workspace.jsx
-msgid "Configurar ruta"
-msgstr "Configure route"
+msgid "Faltante"
+msgstr "Short"
 
 #: src/screens/operations-workspace.jsx
-msgid "Administrar"
-msgstr "Manage"
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
+msgid "Anulación"
+msgstr "Void"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
+msgid "Reembolso parcial"
+msgstr "Partial refund"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
+msgid "Reembolso total"
+msgstr "Full refund"
+
+#: src/screens/operations-workspace.jsx
+msgid "Impreso"
+msgstr "Printed"
+
+#: src/screens/operations-workspace.jsx
+msgid "Falló"
+msgstr "Failed"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Sin imprimir"
+msgstr "Not printed"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "En cola"
+msgstr "Queued"
+
+#: src/screens/operations-workspace.jsx
+msgid "Imprimiendo"
+msgstr "Printing"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Disponible"
+msgstr "Available"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "En uso"
+msgstr "In use"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Archivado"
+msgstr "Archived"
+
+#: src/screens/operations-workspace.jsx
+msgid "{reviewCount, plural, one {# turno necesita tu revisión.} other {# turnos necesitan tu revisión.}}"
+msgstr "{reviewCount, plural, one {# shift needs your review.} other {# shifts need your review.}}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Todo cuadrado. Nada requiere tu atención."
+msgstr "All balanced. Nothing needs your attention."
+
+#: src/screens/operations-workspace.jsx
+msgid "En caja ahora"
+msgstr "In the drawer now"
+
+#: src/screens/operations-workspace.jsx
+msgid "Diferencia del día"
+msgstr "Variance today"
+
+#: src/screens/operations-workspace.jsx
+msgid "Turnos abiertos"
+msgstr "Open shifts"
+
+#. placeholder {0}: formatOperationMoney(f.openingFloatMinorUnits, s.currency)
+#: src/screens/operations-workspace.jsx
+msgid "Abrió {0} · lleva {dur}"
+msgstr "Opened {0} · running for {dur}"
+
+#. placeholder {0}: formatOperationMoney(f.openingFloatMinorUnits, s.currency)
+#: src/screens/operations-workspace.jsx
+msgid "Abrió {0}"
+msgstr "Opened {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "No hay turnos abiertos ahora."
+msgstr "No open shifts now."
+
+#: src/screens/operations-workspace.jsx
+msgid "Historial de turnos"
+msgstr "Shift history"
+
+#. placeholder {0}: formatOperationMoney(f.expectedCashMinorUnits, s.currency)
+#. placeholder {1}: formatOperationMoney(f.countedCashMinorUnits, s.currency)
+#. placeholder {2}: formatOperationDate(s.occurredAt)
+#: src/screens/operations-workspace.jsx
+msgid "Esperaba {0}, contó {1} · cerró {2}"
+msgstr "Expected {0}, counted {1} · closed {2}"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+#: src/screens/ventas-report.jsx
+msgid "Efectivo"
+msgstr "Cash"
+
+#: src/screens/operations-workspace.jsx
+msgid "Venta"
+msgstr "Sale"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cargando la venta…"
+msgstr "Loading the sale…"
+
+#: src/screens/operations-workspace.jsx
+msgid "No se encontró el recibo de esta venta."
+msgstr "No receipt found for this sale."
+
+#. placeholder {0}: money(line.discount)
+#: src/screens/operations-workspace.jsx
+msgid "Descuento {0}"
+msgstr "Discount {0}"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/recibos.jsx
+msgid "Subtotal"
+msgstr "Subtotal"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/recibos.jsx
+msgid "Descuento"
+msgstr "Discount"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Impuestos"
+msgstr "Tax"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Pago"
+msgstr "Payment"
+
+#: src/screens/operations-workspace.jsx
+msgid "Recibido"
+msgstr "Received"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cambio"
+msgstr "Change"
+
+#. placeholder {0}: items.length
+#. placeholder {1}: formatOperationMoney(total, currency)
+#: src/screens/operations-workspace.jsx
+msgid "Ventas: {0} · {1} vendido."
+msgstr "Sales: {0} · {1} sold."
+
+#: src/screens/operations-workspace.jsx
+msgid "Aún no hay ventas en esta vista."
+msgstr "No sales in this view yet."
+
+#: src/screens/operations-workspace.jsx
+msgid "Vendido"
+msgstr "Sold"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/orders.jsx
+#: src/screens/ventas-report.jsx
+msgid "Ticket promedio"
+msgstr "Average ticket"
+
+#: src/screens/operations-workspace.jsx
+msgid "Con descuento"
+msgstr "With a discount"
+
+#. placeholder {0}: formatOperationMoney(discount, item.currency)
+#: src/screens/operations-workspace.jsx
+msgid "desc. {0}"
+msgstr "disc. {0}"
+
+#. placeholder {0}: items.length
+#: src/screens/operations-workspace.jsx
+msgid "Recibos: {0} · {failed} no se imprimieron."
+msgstr "Receipts: {0} · {failed} did not print."
+
+#. placeholder {0}: items.length
+#: src/screens/operations-workspace.jsx
+msgid "Recibos: {0} · {queued} en cola."
+msgstr "Receipts: {0} · {queued} queued."
+
+#. placeholder {0}: items.length
+#: src/screens/operations-workspace.jsx
+msgid "Recibos: {0} · todos impresos."
+msgstr "Receipts: {0} · all printed."
+
+#. placeholder {0}: items.length
+#: src/screens/operations-workspace.jsx
+msgid "Recibos: {0}."
+msgstr "Receipts: {0}."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Impresos"
+msgstr "Printed"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Fallidos"
+msgstr "Failed"
+
+#. placeholder {0}: formatOperationDate(item.occurredAt)
+#: src/screens/operations-workspace.jsx
+msgid "emitido {0}"
+msgstr "issued {0}"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Reimprimir"
+msgstr "Reprint"
+
+#. placeholder {0}: items.length
+#. placeholder {1}: formatOperationMoney(total, currency)
+#: src/screens/operations-workspace.jsx
+msgid "Excepciones: {0} · {1} devuelto."
+msgstr "Exceptions: {0} · {1} refunded."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Sin reembolsos ni anulaciones en esta vista."
+msgstr "No refunds or voids in this view."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Devuelto"
+msgstr "Refunded"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Anulaciones"
+msgstr "Voids"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Con aprobación"
+msgstr "Approved"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
+#: src/screens/registros.jsx
+msgid "Movimientos"
+msgstr "Movements"
+
+#: src/screens/operations-workspace.jsx
+msgid "aprobado por gerente"
+msgstr "approved by a manager"
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Los reembolsos y las anulaciones se hacen en la caja, con el cliente presente. Aquí los revisas: quién, por qué y quién autorizó."
+msgstr "Refunds and voids are made at the register, with the customer present. Here you review them: who, why, and who approved."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "{noSale} aperturas de cajón sin venta — conviene revisarlas."
+msgstr "{noSale} no-sale drawer opens — worth a review."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Cajas en orden. Ninguna apertura de cajón sin venta."
+msgstr "Registers in order. No no-sale drawer opens."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Sin venta"
+msgstr "No-sale"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cajas registradoras"
+msgstr "Registers"
+
+#: src/screens/operations-workspace.jsx
+msgid "{moves} movimientos · {noSaleOpens} sin venta"
+msgstr "{moves} movements · {noSaleOpens} no-sale"
 
 #: src/screens/operations-workspace.jsx
 msgid "Ubicación"
@@ -2454,6 +3255,11 @@ msgid "Requiere permiso: {0}"
 msgstr "Requires permission: {0}"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/operations.jsx
+msgid " o "
+msgstr " or "
+
+#: src/screens/operations-workspace.jsx
 msgid "No fue posible cargar esta operación."
 msgstr "This operation could not be loaded."
 
@@ -2465,6 +3271,24 @@ msgstr "Loading authorized data…"
 msgid "No hay datos para este alcance."
 msgstr "There is no data for this scope."
 
+#. placeholder {0}: Math.floor(cursor / 20) + 1
+#: src/screens/operations-workspace.jsx
+msgid "Página {0}"
+msgstr "Page {0}"
+
+#. placeholder {0}: selected?.requiredPermissions?.join(t` o `) || '—'
+#: src/screens/operations-workspace.jsx
+msgid "Permiso: {0}"
+msgstr "Permission: {0}"
+
+#: src/screens/operations-workspace.jsx
+msgid "Configurar ruta"
+msgstr "Configure route"
+
+#: src/screens/operations-workspace.jsx
+msgid "Administrar"
+msgstr "Manage"
+
 #: src/screens/operations-workspace.jsx
 msgid "Referencia"
 msgstr "Reference"
@@ -2474,14 +3298,17 @@ msgid "Detalle"
 msgstr "Detail"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
 msgid "Importe"
 msgstr "Amount"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/reembolsos.jsx
 msgid "Fecha"
 msgstr "Date"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
 #: src/screens/staff.jsx
 msgid "Acciones"
 msgstr "Actions"
@@ -2493,10 +3320,6 @@ msgstr "Refund"
 #: src/screens/operations-workspace.jsx
 msgid "Operar"
 msgstr "Operate"
-
-#: src/screens/operations-workspace.jsx
-msgid "Reimprimir"
-msgstr "Reprint"
 
 #: src/screens/operations-workspace.jsx
 msgid "Ajustar"
@@ -2520,11 +3343,6 @@ msgstr "Recover"
 msgid "Copiar referencia {0}"
 msgstr "Copy reference {0}"
 
-#. placeholder {0}: Math.floor(cursor / 20) + 1
-#: src/screens/operations-workspace.jsx
-msgid "Página {0}"
-msgstr "Page {0}"
-
 #. placeholder {0}: permissions.length
 #: src/screens/operations-workspace.jsx
 msgid "{0, plural, one {# permiso efectivo} other {# permisos efectivos}}"
@@ -2544,6 +3362,10 @@ msgid "Requiere {0}"
 msgstr "Requires {0}"
 
 #: src/screens/orders.jsx
+#~ msgid "Avanzar estado"
+#~ msgstr "Advance status"
+
+#: src/screens/orders.jsx
 msgid "Nuevo"
 msgstr "New"
 
@@ -2555,6 +3377,26 @@ msgstr "Preparing"
 msgctxt "order status"
 msgid "Listo"
 msgstr "Ready"
+
+#: src/screens/orders.jsx
+msgid "Consola"
+msgstr "Console"
+
+#: src/screens/orders.jsx
+msgid "Para recoger"
+msgstr "Pickup"
+
+#: src/screens/orders.jsx
+msgid "Para comer aquí"
+msgstr "Dine in"
+
+#: src/screens/orders.jsx
+msgid "A domicilio"
+msgstr "Delivery"
+
+#: src/screens/orders.jsx
+msgid "Activos"
+msgstr "Active"
 
 #: src/screens/orders.jsx
 msgid "Nuevos"
@@ -2577,14 +3419,6 @@ msgstr "Completed"
 msgid "Cancelados"
 msgstr "Canceled"
 
-#: src/screens/orders.jsx
-msgid "Activos"
-msgstr "Active"
-
-#: src/screens/orders.jsx
-msgid "Consola"
-msgstr "Console"
-
 #. placeholder {0}: displayed.length
 #: src/screens/orders.jsx
 msgid "{0} de {totalToday} mostrados."
@@ -2595,16 +3429,12 @@ msgid "hoy"
 msgstr "today"
 
 #: src/screens/orders.jsx
-msgid "Ticket promedio"
-msgstr "Average ticket"
+msgid "Origen"
+msgstr "Source"
 
 #: src/screens/orders.jsx
 msgid "Cancelaciones"
 msgstr "Cancellations"
-
-#: src/screens/orders.jsx
-msgid "Origen"
-msgstr "Source"
 
 #: src/screens/orders.jsx
 msgid "Sin pedidos"
@@ -2623,8 +3453,8 @@ msgid "Artículos"
 msgstr "Items"
 
 #: src/screens/orders.jsx
-msgid "Total"
-msgstr "Total"
+msgid "Reembolsado"
+msgstr "Refunded"
 
 #: src/screens/orders.jsx
 msgid "Hace"
@@ -2652,8 +3482,33 @@ msgid "No hay artículos disponibles para este pedido."
 msgstr "There are no items available for this order."
 
 #: src/screens/orders.jsx
-msgid "Avanzar estado"
-msgstr "Advance status"
+msgid "Total neto"
+msgstr "Net total"
+
+#: src/screens/orders.jsx
+msgid "Motivo de cancelación:"
+msgstr "Cancellation reason:"
+
+#: src/screens/orders.jsx
+msgid "Anulado"
+msgstr "Voided"
+
+#: src/screens/orders.jsx
+msgid "Ciclo del pedido"
+msgstr "Order lifecycle"
+
+#: src/screens/orders.jsx
+msgid "Abierto hace"
+msgstr "Open for"
+
+#: src/screens/orders.jsx
+msgid "Duración total"
+msgstr "Total time"
+
+#. placeholder {0}: fmtDuration(durMs)
+#: src/screens/orders.jsx
+msgid "en curso · {0}"
+msgstr "in progress · {0}"
 
 #: src/screens/overview.jsx
 msgid "Ingresos del mes"
@@ -2891,7 +3746,6 @@ msgid "Un producto activo decide qué secciones existen en la consola. El rol de
 msgstr "An active product decides which sections exist in the console. Each person's role decides what they can do inside them — but a role does not activate a missing product."
 
 #: src/screens/profile.jsx
-#: src/shell.jsx
 msgid "Dueño"
 msgstr "Owner"
 
@@ -2984,6 +3838,193 @@ msgstr "Sign-in method"
 #: src/screens/profile.jsx
 msgid "La sesión se renueva"
 msgstr "Session renews"
+
+#: src/screens/recibos.jsx
+#~ msgid "El recibo oficial se imprime en la caja. Aquí revisas cuáles se imprimieron y puedes ordenar una COPIA controlada cuando el cliente la pide."
+#~ msgstr "The official receipt prints at the register. Here you review which receipts printed. You can order a controlled COPY when the customer asks for one."
+
+#: src/screens/recibos.jsx
+#: src/screens/ventas-report.jsx
+msgid "Terminal manual"
+msgstr "Manual terminal"
+
+#: src/screens/recibos.jsx
+msgid "Terminal"
+msgstr "Terminal"
+
+#: src/screens/recibos.jsx
+msgid "Tarjeta de regalo"
+msgstr "Gift card"
+
+#: src/screens/recibos.jsx
+msgid "Detalle del recibo"
+msgstr "Receipt detail"
+
+#: src/screens/recibos.jsx
+msgid "Este recibo no tiene una venta ligada, así que no hay un detalle que mostrar. Aún puedes reimprimir la copia."
+msgstr "This receipt has no linked sale. There is no detail to show. You can still reprint the copy."
+
+#: src/screens/recibos.jsx
+msgid "Cargando detalle…"
+msgstr "Loading detail…"
+
+#: src/screens/recibos.jsx
+msgid "No se pudo cargar el detalle de esta venta."
+msgstr "This sale's detail could not be loaded."
+
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
+msgid "Operador"
+msgstr "Operator"
+
+#: src/screens/recibos.jsx
+msgid "Fecha comercial"
+msgstr "Business date"
+
+#: src/screens/recibos.jsx
+msgid "Concepto"
+msgstr "Item"
+
+#: src/screens/recibos.jsx
+msgid "Cant."
+msgstr "Qty"
+
+#: src/screens/recibos.jsx
+msgid "Propina"
+msgstr "Tip"
+
+#: src/screens/recibos.jsx
+msgid "cambio"
+msgstr "change"
+
+#: src/screens/recibos.jsx
+msgid "Actividad"
+msgstr "Activity"
+
+#: src/screens/recibos.jsx
+msgid "Emitido"
+msgstr "Issued"
+
+#: src/screens/recibos.jsx
+msgid "aprobado"
+msgstr "approved"
+
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
+msgid "en esta vista"
+msgstr "in this view"
+
+#: src/screens/recibos.jsx
+msgid "Total facturado"
+msgstr "Total billed"
+
+#: src/screens/recibos.jsx
+msgid "Cargando recibos…"
+msgstr "Loading receipts…"
+
+#: src/screens/recibos.jsx
+msgid "Aún no hay recibos en esta vista."
+msgstr "No receipts in this view yet."
+
+#: src/screens/recibos.jsx
+msgid "Buscar por recibo, monto o fecha…"
+msgstr "Search by receipt, amount or date…"
+
+#: src/screens/recibos.jsx
+msgid "Buscar recibos"
+msgstr "Search receipts"
+
+#: src/screens/recibos.jsx
+msgid "Filtrar por estado"
+msgstr "Filter by status"
+
+#: src/screens/recibos.jsx
+msgid "Recibo"
+msgstr "Receipt"
+
+#: src/screens/recibos.jsx
+msgid "Ningún recibo coincide con la búsqueda."
+msgstr "No receipt matches your search."
+
+#: src/screens/recibos.jsx
+msgid "Abre un recibo para ver la venta con sus conceptos, impuestos y forma de pago. El recibo oficial se imprime en la caja; aquí puedes ordenar una COPIA controlada cuando el cliente la pide."
+msgstr "Open a receipt to see the sale: its items, taxes and payment method. The official receipt prints at the register. You can order a controlled COPY here when the customer asks for it."
+
+#: src/screens/reembolsos.jsx
+msgid "Parciales"
+msgstr "Partial"
+
+#: src/screens/reembolsos.jsx
+msgid "Sin operador"
+msgstr "No operator"
+
+#: src/screens/reembolsos.jsx
+msgid "totales"
+msgstr "full"
+
+#: src/screens/reembolsos.jsx
+msgid "reembolsos"
+msgstr "refunds"
+
+#: src/screens/reembolsos.jsx
+msgid "ventas anuladas"
+msgstr "voided sales"
+
+#: src/screens/reembolsos.jsx
+msgid "de gerente"
+msgstr "by manager"
+
+#: src/screens/reembolsos.jsx
+msgid "Cargando movimientos…"
+msgstr "Loading movements…"
+
+#: src/screens/reembolsos.jsx
+msgid "Por operador"
+msgstr "By operator"
+
+#: src/screens/reembolsos.jsx
+msgid "Filtrar por tipo"
+msgstr "Filter by type"
+
+#: src/screens/reembolsos.jsx
+msgid "Recibo original"
+msgstr "Original receipt"
+
+#: src/screens/reembolsos.jsx
+msgid "Aprobación"
+msgstr "Approval"
+
+#: src/screens/reembolsos.jsx
+msgid "Sí"
+msgstr "Yes"
+
+#: src/screens/registros.jsx
+msgid "Cajas en uso"
+msgstr "Registers in use"
+
+#: src/screens/registros.jsx
+msgid "Disponibles"
+msgstr "Available"
+
+#: src/screens/registros.jsx
+msgid "Aperturas sin venta"
+msgstr "No-sale opens"
+
+#: src/screens/registros.jsx
+msgid "Cargando cajas…"
+msgstr "Loading registers…"
+
+#: src/screens/registros.jsx
+msgid "No hay cajas registradoras en esta vista."
+msgstr "No registers in this view."
+
+#: src/screens/registros.jsx
+msgid "{attention} cajas requieren conciliación."
+msgstr "{attention} registers need reconciliation."
+
+#: src/screens/registros.jsx
+msgid "Cada caja es un cajón físico. El movimiento y las aperturas sin venta se registran en el POS; aquí vigilas la custodia y las excepciones."
+msgstr "Each register is a physical drawer. The POS records movements and no-sale opens. Here you watch custody and exceptions."
 
 #: src/screens/reset-password.jsx
 msgid "Las contraseñas no coinciden"
@@ -3104,6 +4145,14 @@ msgstr "Business name"
 #: src/screens/settings.jsx
 msgid "Ciudad"
 msgstr "City"
+
+#: src/screens/settings.jsx
+msgid "Inicio del día operativo"
+msgstr "Business day start"
+
+#: src/screens/settings.jsx
+msgid "Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café nocturno usa p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche que la abrió. No cambia días ya cerrados."
+msgstr "Time the sales day starts. 00:00 = local midnight. A late-night café uses e.g. 04:00 so a 1 a.m. sale counts toward the night that opened it. It does not change days already closed."
 
 #: src/screens/settings.jsx
 msgid "Estado de la cuenta"
@@ -3431,11 +4480,11 @@ msgid "p. ej. la del centro, junto al parque"
 msgstr "e.g. the downtown one, next to the park"
 
 #: src/screens/staff.jsx
-#: src/shell.jsx
 msgid "Admin"
 msgstr "Admin"
 
 #: src/screens/staff.jsx
+#: src/screens/ventas-report.jsx
 msgid "Barista"
 msgstr "Barista"
 
@@ -3704,22 +4753,151 @@ msgstr "Enter the person's name."
 msgid "Guardar acceso"
 msgstr "Save access"
 
+#: src/screens/ventas-report.jsx
+#~ msgid "Productos más vendidos"
+#~ msgstr "Top-selling products"
+
+#: src/screens/ventas-report.jsx
+#~ msgid "Aún no hay ventas en este periodo."
+#~ msgstr "No sales in this period yet."
+
+#: src/screens/ventas-report.jsx
+msgid "Hoy"
+msgstr "Today"
+
+#: src/screens/ventas-report.jsx
+msgid "Ayer"
+msgstr "Yesterday"
+
+#: src/screens/ventas-report.jsx
+msgid "7 días"
+msgstr "7 days"
+
+#: src/screens/ventas-report.jsx
+msgid "30 días"
+msgstr "30 days"
+
+#: src/screens/ventas-report.jsx
+msgid "Venta por hora"
+msgstr "Sales by hour"
+
+#: src/screens/ventas-report.jsx
+msgid "Venta por día"
+msgstr "Sales by day"
+
+#: src/screens/ventas-report.jsx
+msgid "Serie de ventas del periodo"
+msgstr "Sales series for the period"
+
+#: src/screens/ventas-report.jsx
+msgid "Método de pago"
+msgstr "Payment method"
+
+#: src/screens/ventas-report.jsx
+msgid "Hora"
+msgstr "Hour"
+
+#: src/screens/ventas-report.jsx
+msgid "Agrupar por"
+msgstr "Group by"
+
+#: src/screens/ventas-report.jsx
+msgid "Unidades"
+msgstr "Units"
+
+#: src/screens/ventas-report.jsx
+msgid "Venta neta"
+msgstr "Net sales"
+
+#: src/screens/ventas-report.jsx
+msgid "% del total"
+msgstr "% of total"
+
+#: src/screens/ventas-report.jsx
+msgid "Rango de fechas"
+msgstr "Date range"
+
+#: src/screens/ventas-report.jsx
+msgid "Vista"
+msgstr "View"
+
+#: src/screens/ventas-report.jsx
+msgid "Tabla dinámica"
+msgstr "Pivot table"
+
+#: src/screens/ventas-report.jsx
+msgid "No se pudo cargar el reporte de ventas."
+msgstr "The sales report could not be loaded."
+
+#: src/screens/ventas-report.jsx
+msgid "Cargando ventas…"
+msgstr "Loading sales…"
+
+#: src/screens/ventas-report.jsx
+msgid "Ventas netas"
+msgstr "Net sales"
+
+#: src/screens/ventas-report.jsx
+msgid "vs. período anterior"
+msgstr "vs. prior period"
+
+#: src/screens/ventas-report.jsx
+msgid "Órdenes"
+msgstr "Orders"
+
+#: src/screens/ventas-report.jsx
+msgid "en el periodo"
+msgstr "in the period"
+
+#: src/screens/ventas-report.jsx
+msgid "por orden"
+msgstr "per order"
+
+#: src/screens/ventas-report.jsx
+msgid "Ítems vendidos"
+msgstr "Items sold"
+
+#: src/screens/ventas-report.jsx
+msgid "Descuentos"
+msgstr "Discounts"
+
+#: src/screens/ventas-report.jsx
+msgid "Propinas"
+msgstr "Tips"
+
 #. placeholder {0}: THEME_NAME[resolveTheme('system')]
 #: src/shell.jsx
 #~ msgid "Sistema ({0})"
 #~ msgstr "System ({0})"
 
 #: src/shell.jsx
-msgid "Tema: {current}. Cambiar a {nextLabel}."
-msgstr "Theme: {current}. Switch to {nextLabel}."
+#~ msgid "Consola del dueño"
+#~ msgstr "Owner console"
 
 #: src/shell.jsx
-msgid "Tema actual: {current}. Cambiar a {nextLabel}."
-msgstr "Current theme: {current}. Switch to {nextLabel}."
+#~ msgid "Tema: {current}. Cambiar a {nextLabel}."
+#~ msgstr "Theme: {current}. Switch to {nextLabel}."
 
 #: src/shell.jsx
-msgid "Tu perfil"
-msgstr "Your profile"
+#~ msgid "Tema actual: {current}. Cambiar a {nextLabel}."
+#~ msgstr "Current theme: {current}. Switch to {nextLabel}."
+
+#: src/shell.jsx
+msgid "Tema"
+msgstr "Theme"
+
+#. placeholder {0}: THEME_NAME[resolved]
+#: src/shell.jsx
+msgid "Tema: {0}"
+msgstr "Theme: {0}"
+
+#: src/shell.jsx
+msgid "Cuenta"
+msgstr "Account"
+
+#: src/shell.jsx
+msgid "Mi perfil"
+msgstr "My profile"
 
 #: src/shell.jsx
 msgid "HOY"
@@ -3758,16 +4936,16 @@ msgid "Horario y disponibilidad"
 msgstr "Hours and availability"
 
 #: src/shell.jsx
+msgid "Tu perfil"
+msgstr "Your profile"
+
+#: src/shell.jsx
 msgid "Idioma"
 msgstr "Language"
 
 #: src/shell.jsx
 msgid "Mostrar u ocultar el menú"
 msgstr "Show or hide the menu"
-
-#: src/shell.jsx
-msgid "Consola del dueño"
-msgstr "Owner console"
 
 #: src/shell.jsx
 msgid "Negocio"

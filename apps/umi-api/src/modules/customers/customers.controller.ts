@@ -49,6 +49,19 @@ export class CustomersController {
     return { orders: await this.customers.orders(merchant.merchantId, contactId) };
   }
 
+  @Get('customers/:contactId/conversations/:conversationId/messages')
+  async messages(
+    @Merchant() merchant: MerchantAccess,
+    @Param('contactId') contactId: string,
+    @Param('conversationId') conversationId: string,
+    @Query() query: Record<string, string>,
+  ) {
+    return this.customers.messages(merchant.merchantId, contactId, conversationId, {
+      cursor: query.cursor,
+      limit: query.limit,
+    });
+  }
+
   @Get('customers/:contactId/cash')
   async cash(@Merchant() merchant: MerchantAccess, @Param('contactId') contactId: string) {
     const products = await this.customers.loadProducts(merchant.merchantId);
@@ -64,5 +77,10 @@ export class CustomersController {
   async insights(@Merchant() merchant: MerchantAccess) {
     const products = await this.customers.loadProducts(merchant.merchantId);
     return this.customers.insights(merchant.merchantId, products);
+  }
+
+  @Get('insights/triage')
+  async triage(@Merchant() merchant: MerchantAccess, @Query() query: Record<string, string>) {
+    return this.customers.triage(merchant.merchantId, { limit: query.limit });
   }
 }

@@ -46,14 +46,14 @@ const EXPECTED_DASHBOARD = {
   line: '#DDE3F0',
   'line-soft': '#E8ECF5',
   'line-strong': '#C8D1E5',
-  success: '#447644',
-  'success-soft': '#E4F0E1',
-  danger: '#B33A35',
-  'danger-soft': '#F4DEDB',
-  warning: '#8F6621',
-  'warning-soft': '#F6E9D0',
-  info: '#7692CB',
-  'info-soft': '#DEE6F4',
+  success: '#287C42',
+  'success-soft': '#D8F9DD',
+  danger: '#AC312A',
+  'danger-soft': '#FDE9E6',
+  warning: '#8A5F18',
+  'warning-soft': '#FAE4C7',
+  info: '#1F6CB0',
+  'info-soft': '#E5F0FC',
   'tenant-brand': '#B5605A',
   'r-pill': '9999px',
   'r-lg': '12px',
@@ -63,7 +63,7 @@ const EXPECTED_DASHBOARD = {
   'shadow-card': '0 1px 2px rgba(19, 31, 68, 0.04)',
   'shadow-pop': '0 24px 60px -24px rgba(19, 31, 68, 0.32), 0 2px 8px rgba(19, 31, 68, 0.06)',
   'shadow-inner': 'inset 0 0 0 1px rgba(19, 31, 68, 0.05)',
-  'font-display': '"Fraunces", "Source Serif 4", Georgia, serif',
+  'font-display': '"Inter Tight", "Inter", system-ui, sans-serif',
   'font-body': '"Source Sans 3", "Source Sans Pro", system-ui, sans-serif',
   'font-mono': '"JetBrains Mono", ui-monospace, "SF Mono", monospace',
   ease: 'cubic-bezier(.2,.7,.2,1)',
@@ -122,8 +122,42 @@ function parseCssVars(css) {
   return map;
 }
 
-// Only the tokens the Midnight theme overrides. Every other token keeps its Umi
-// (:root) value in every theme (see dashboard.json — a leaf's $themes map).
+// The tokens each dark theme overrides. Every other token keeps its Umi (:root)
+// value in every theme (see dashboard.json — a leaf's $themes map). 'dark' is the
+// deep ocean-at-night palette (and the OS-dark default, $themeMeta.prefersDark);
+// 'midnight' is the all-black palette. Both override the SAME set of tokens.
+const EXPECTED_DASHBOARD_DARK = {
+  canvas: '#070C18',
+  'canvas-2': '#0C1322',
+  surface: '#0F1728',
+  'surface-warm': '#0F1626',
+  'surface-warm-border': '#273150',
+  'sidebar-bg': '#070C16',
+  'sidebar-bg-deep': '#04070E',
+  'ink-1': '#EDF1F8',
+  'ink-2': '#99A2B5',
+  'ink-3': '#727B8F',
+  'ink-4': '#565E70',
+  'ink-warm': '#EDEDED',
+  'ink-warm-soft': '#A0A0A0',
+  'ink-warm-mute': '#6E6E6E',
+  line: '#1E273D',
+  'line-soft': '#151C2E',
+  'line-strong': '#2D3854',
+  success: '#7CD591',
+  'success-soft': '#102816',
+  danger: '#ED7668',
+  'danger-soft': '#331511',
+  warning: '#FCBE62',
+  'warning-soft': '#2E1E06',
+  info: '#67AAED',
+  'info-soft': '#0D2034',
+  'tenant-brand': '#C77B72',
+  'shadow-card': '0 1px 2px rgba(0, 0, 0, 0.5)',
+  'shadow-pop': '0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)',
+  'shadow-inner': 'inset 0 0 0 1px rgba(255, 255, 255, 0.06)',
+};
+
 const EXPECTED_DASHBOARD_MIDNIGHT = {
   canvas: '#000000',
   'canvas-2': '#0D0D0D',
@@ -142,14 +176,14 @@ const EXPECTED_DASHBOARD_MIDNIGHT = {
   line: '#2A2A2A',
   'line-soft': '#1C1C1C',
   'line-strong': '#3A3A3A',
-  success: '#62B36B',
-  'success-soft': '#12211A',
-  danger: '#E5706B',
-  'danger-soft': '#251312',
-  warning: '#D9A441',
-  'warning-soft': '#241D10',
-  info: '#7FA2E0',
-  'info-soft': '#131A26',
+  success: '#7CD591',
+  'success-soft': '#102816',
+  danger: '#ED7668',
+  'danger-soft': '#331511',
+  warning: '#FCBE62',
+  'warning-soft': '#2E1E06',
+  info: '#67AAED',
+  'info-soft': '#0D2034',
   'tenant-brand': '#C77B72',
   'shadow-card': '0 1px 2px rgba(0, 0, 0, 0.5)',
   'shadow-pop': '0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)',
@@ -160,18 +194,24 @@ test('dashboard.css :root reproduces the default Umi token set 1:1', () => {
   assert.deepEqual(parseCssVars(block(distText('dashboard.css'), ':root {')), EXPECTED_DASHBOARD);
 });
 
-test('dashboard.css Midnight theme overrides exactly the tokens that declare it', () => {
+test('dashboard.css dark themes override exactly the tokens that declare them', () => {
   const css = distText('dashboard.css');
-  const choice = parseCssVars(block(css, '[data-theme="midnight"] {'));
-  assert.deepEqual(choice, EXPECTED_DASHBOARD_MIDNIGHT);
-  // The OS-preference block must carry the identical override set, so the picker
-  // and the system setting can never resolve to different palettes.
+  assert.deepEqual(parseCssVars(block(css, '[data-theme="dark"] {')), EXPECTED_DASHBOARD_DARK);
+  assert.deepEqual(
+    parseCssVars(block(css, '[data-theme="midnight"] {')),
+    EXPECTED_DASHBOARD_MIDNIGHT,
+  );
+  // The OS-preference block must carry the prefersDark theme ('dark') verbatim, so
+  // the picker and the system setting can never resolve to different palettes.
   const osPref = parseCssVars(block(css, ':root:not([data-theme]) {'));
-  assert.deepEqual(osPref, EXPECTED_DASHBOARD_MIDNIGHT);
+  assert.deepEqual(osPref, EXPECTED_DASHBOARD_DARK);
 });
 
-test('every Midnight override names a real Umi token (no orphan theme-only vars)', () => {
+test('every dark override names a real Umi token (no orphan theme-only vars)', () => {
   const umi = parseCssVars(block(distText('dashboard.css'), ':root {'));
+  for (const name of Object.keys(EXPECTED_DASHBOARD_DARK)) {
+    assert.ok(name in umi, `dark override --${name} has no :root base`);
+  }
   for (const name of Object.keys(EXPECTED_DASHBOARD_MIDNIGHT)) {
     assert.ok(name in umi, `Midnight override --${name} has no :root base`);
   }
