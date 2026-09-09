@@ -31,7 +31,7 @@ y esquema). Es un desarrollo desde cero, con requisitos legales y de dinero real
 En México el **ticket** (recibo de venta, ya implementado) **no** es deducible. Para deducir, el
 cliente necesita un **CFDI 4.0** (factura electrónica timbrada por el SAT). El dueño vive en la
 brecha entre los dos: el JTBD #1 de la investigación es "convertir un ticket en factura, rápido,
-incluso días después" (el momento *¿me facturas?*). Ningún competidor lo resuelve.
+incluso días después" (el momento _¿me facturas?_). Ningún competidor lo resuelve.
 
 ## Requisitos del CFDI 4.0 (lo que obliga la arquitectura)
 
@@ -89,8 +89,8 @@ backend exista — sin botones muertos.
 2. **Custodia del CSD (quién guarda el sello del comercio).** Es una decisión legal y de
    seguridad, y define el esquema:
    - **A — Umi integra un PAC; el CSD de cada comercio vive en el PAC.** Umi timbra por cuenta
-     del comercio; Umi no guarda llaves privadas en claro. *(Recomendado: menor carga de
-     seguridad y responsabilidad.)*
+     del comercio; Umi no guarda llaves privadas en claro. _(Recomendado: menor carga de
+     seguridad y responsabilidad.)_
    - **B — Umi custodia los CSD** (.cer/.key + contraseña) y los usa contra el PAC. Máximo
      control, máxima responsabilidad (HSM/cifrado, cumplimiento).
    - **C — Embeber un SaaS de facturación de punta a punta** (el proveedor hace todo, Umi

@@ -107,31 +107,31 @@ shared key for kitchen routing and reports. Payments and lending are the money e
 
 Status is graded from the code and the build-v3 schema, not from the roadmap claims.
 
-| Domain | Status | Evidence and gap |
-| --- | --- | --- |
-| Sale and order entry | Done | 3-pane cart/rail/products, suspend/resume/history (`catalog_surface.dart:796`). Gap: order-type pills are UI-only, never saved to the sale. |
-| Catalog | Done | Colour-bar rail, photo/placeholder tiles, search, modifiers/variants. Category colors server-assigned (`20_merchant.sql:913`). |
-| Checkout / tender | Partial | Cash, manual terminal, stored-value, keypad, one-tap confirm. No integrated card. Hardcoded quick-cash denominations. |
-| Cash management | Done | Open/close pipeline, movements, denomination counter, idempotent crash recovery. |
-| Refunds / voids / exceptions | Done | All 4 known blockers fixed. `pos_sale_exception` RLS present (`90_rls.sql:631`). |
-| KDS backend and routing | Done | Authoritative kitchen projection, deterministic station routing, ordered events (`kds.service.ts:241`). Advance is device-token only. |
-| KDS client (Flutter) | Missing | Read-only flat board (~5%). No columns, no per-item state/timers, no commands, 8s poll. Real KDS is still SwiftUI `umi-kds` (2,617 lines, not retired). |
-| Device roles and identity | Partial | Pair/rotate/revoke with ed25519/es256 proof-of-possession (`auth.service.ts:222`). Gap: no device-role attribute; no hardware attestation. |
-| Customer display | Missing | Exists only as a simulator peripheral. No app render mode. |
-| Printing | Partial | Receipts done (hardware deferred to Gate 13). No kitchen-ticket printing. |
-| Offline journal and replay | Partial | Durable encrypted journal, idempotent replay, recovery center. Gap: no OS connectivity source; no auto-replay on reconnect (`platform_adapters.dart:27`). |
-| Realtime | Partial | Socket.IO nudge channels for pairing and dashboard. POS/KDS are poll-based. Single-replica (needs a Redis adapter). |
-| Loyalty program | Partial | Real event-sourced points ledger, wired at checkout (`37_pos_customer_value.sql:211`). Missing: tiers, reward catalog CRUD, enable switch (ships `enabled=false`), birthday/expiry crons. |
-| Gift cards and stored value | Done | Two complete issue/redeem/balance systems over `merchant.loyalty_gift_card` plus an append-only ledger. |
-| Wallet passes | Partial | Apple pkpass signing, APNs, and Google Wallet in code. Blocked by unset secrets and un-ported crons. |
-| Customers / CRM identity | Partial | Flat `merchant.customer`+`contact` model with E.164 and deterministic WhatsApp/phone match. Missing: automatic merge-candidate detection. The `platform.contacts` spine was retired by design. |
-| Payments gateway | Missing | Manual/attested recording only. Tenders are cash / manual_terminal. Status hardcoded `captured`. No auth/capture/settlement/surcharge. |
-| Ordering channels | Partial | One `writeOrder` seam. Producers: WhatsApp and POS. `web`/`dashboard` are reserved enums with no writer. Online ordering not built. |
-| Automations | Done | BullMQ worker and repeatable schedulers. Two lifecycle families flag-off for cutover. No owner-facing automations builder. |
-| Dashboard (owner web) | Done | Every hook hits a real `/api/merchants/...` route. No mock layer. i18n (Lingui) complete: 1 untranslated of 975. |
-| Reporting / analytics | Missing | No POS-sales rollups or product-mix model. Owner "revenue" is a loyalty top-up proxy. |
-| Contract / versioning | Done | 10.3K-line contract, `CONTRACT_VERSION=2.18.0`, heavy zod on POS surfaces. Thin reporting contract. |
-| Multi-tenant / RLS | Done | Layered fail-closed RLS with a build-time guard (`90_rls.sql:648`). Cash-shift and refund device-scoping bugs fixed. |
+| Domain                       | Status  | Evidence and gap                                                                                                                                                                               |
+| ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sale and order entry         | Done    | 3-pane cart/rail/products, suspend/resume/history (`catalog_surface.dart:796`). Gap: order-type pills are UI-only, never saved to the sale.                                                    |
+| Catalog                      | Done    | Colour-bar rail, photo/placeholder tiles, search, modifiers/variants. Category colors server-assigned (`20_merchant.sql:913`).                                                                 |
+| Checkout / tender            | Partial | Cash, manual terminal, stored-value, keypad, one-tap confirm. No integrated card. Hardcoded quick-cash denominations.                                                                          |
+| Cash management              | Done    | Open/close pipeline, movements, denomination counter, idempotent crash recovery.                                                                                                               |
+| Refunds / voids / exceptions | Done    | All 4 known blockers fixed. `pos_sale_exception` RLS present (`90_rls.sql:631`).                                                                                                               |
+| KDS backend and routing      | Done    | Authoritative kitchen projection, deterministic station routing, ordered events (`kds.service.ts:241`). Advance is device-token only.                                                          |
+| KDS client (Flutter)         | Missing | Read-only flat board (~5%). No columns, no per-item state/timers, no commands, 8s poll. Real KDS is still SwiftUI `umi-kds` (2,617 lines, not retired).                                        |
+| Device roles and identity    | Partial | Pair/rotate/revoke with ed25519/es256 proof-of-possession (`auth.service.ts:222`). Gap: no device-role attribute; no hardware attestation.                                                     |
+| Customer display             | Missing | Exists only as a simulator peripheral. No app render mode.                                                                                                                                     |
+| Printing                     | Partial | Receipts done (hardware deferred to Gate 13). No kitchen-ticket printing.                                                                                                                      |
+| Offline journal and replay   | Partial | Durable encrypted journal, idempotent replay, recovery center. Gap: no OS connectivity source; no auto-replay on reconnect (`platform_adapters.dart:27`).                                      |
+| Realtime                     | Partial | Socket.IO nudge channels for pairing and dashboard. POS/KDS are poll-based. Single-replica (needs a Redis adapter).                                                                            |
+| Loyalty program              | Partial | Real event-sourced points ledger, wired at checkout (`37_pos_customer_value.sql:211`). Missing: tiers, reward catalog CRUD, enable switch (ships `enabled=false`), birthday/expiry crons.      |
+| Gift cards and stored value  | Done    | Two complete issue/redeem/balance systems over `merchant.loyalty_gift_card` plus an append-only ledger.                                                                                        |
+| Wallet passes                | Partial | Apple pkpass signing, APNs, and Google Wallet in code. Blocked by unset secrets and un-ported crons.                                                                                           |
+| Customers / CRM identity     | Partial | Flat `merchant.customer`+`contact` model with E.164 and deterministic WhatsApp/phone match. Missing: automatic merge-candidate detection. The `platform.contacts` spine was retired by design. |
+| Payments gateway             | Missing | Manual/attested recording only. Tenders are cash / manual_terminal. Status hardcoded `captured`. No auth/capture/settlement/surcharge.                                                         |
+| Ordering channels            | Partial | One `writeOrder` seam. Producers: WhatsApp and POS. `web`/`dashboard` are reserved enums with no writer. Online ordering not built.                                                            |
+| Automations                  | Done    | BullMQ worker and repeatable schedulers. Two lifecycle families flag-off for cutover. No owner-facing automations builder.                                                                     |
+| Dashboard (owner web)        | Done    | Every hook hits a real `/api/merchants/...` route. No mock layer. i18n (Lingui) complete: 1 untranslated of 975.                                                                               |
+| Reporting / analytics        | Missing | No POS-sales rollups or product-mix model. Owner "revenue" is a loyalty top-up proxy.                                                                                                          |
+| Contract / versioning        | Done    | 10.3K-line contract, `CONTRACT_VERSION=2.18.0`, heavy zod on POS surfaces. Thin reporting contract.                                                                                            |
+| Multi-tenant / RLS           | Done    | Layered fail-closed RLS with a build-time guard (`90_rls.sql:648`). Cash-shift and refund device-scoping bugs fixed.                                                                           |
 
 Two notes:
 
@@ -144,24 +144,24 @@ Two notes:
 
 Legend: ● strong/native, ◐ partial/add-on/third-party, ○ absent.
 
-| Capability | Umi | Lightspeed | Toast | Square | Odoo | PoloTab |
-| --- | :---: | :---: | :---: | :---: | :---: | :---: |
-| POS and table service | ◐ | ● | ● | ● | ● | ● |
-| Full KDS client | ○ | ● | ● | ◐ | ◐ | ● |
-| Online / web ordering | ○ | ● | ● | ● | ● | ◐ |
-| QR order and pay | ○ | ● | ● | ● | ● | ● |
-| Delivery integration | ○ | ● | ● | ● | ◐ | ● |
-| Loyalty program | ◐ | ◐ | ● | ● | ● | ○ |
-| Gift cards / stored value | ● | ● | ● | ● | ● | ○ |
-| Email / SMS marketing | ○ | ◐ | ● | ● | ● | ○ |
-| WhatsApp identity / CRM | ◐ | ○ | ○ | ○ | ◐ | ◐ |
-| Integrated payments gateway | ○ | ● | ● | ● | ◐ | ● |
-| Ingredient inventory / recipes | ◐ | ● | ● | ◐ | ● | ● |
-| Sales analytics / reporting | ○ | ● | ● | ● | ● | ● |
-| Owner dashboard | ● | ● | ● | ● | ● | ● |
-| Public API / marketplace | ○ | ◐ | ● | ● | ● | ○ |
-| Self-order kiosk | ○ | ◐ | ● | ● | ● | ○ |
-| Native-first offline + device identity | ● | ◐ | ◐ | ○ | ◐ | ● |
+| Capability                             | Umi | Lightspeed | Toast | Square | Odoo | PoloTab |
+| -------------------------------------- | :-: | :--------: | :---: | :----: | :--: | :-----: |
+| POS and table service                  |  ◐  |     ●      |   ●   |   ●    |  ●   |    ●    |
+| Full KDS client                        |  ○  |     ●      |   ●   |   ◐    |  ◐   |    ●    |
+| Online / web ordering                  |  ○  |     ●      |   ●   |   ●    |  ●   |    ◐    |
+| QR order and pay                       |  ○  |     ●      |   ●   |   ●    |  ●   |    ●    |
+| Delivery integration                   |  ○  |     ●      |   ●   |   ●    |  ◐   |    ●    |
+| Loyalty program                        |  ◐  |     ◐      |   ●   |   ●    |  ●   |    ○    |
+| Gift cards / stored value              |  ●  |     ●      |   ●   |   ●    |  ●   |    ○    |
+| Email / SMS marketing                  |  ○  |     ◐      |   ●   |   ●    |  ●   |    ○    |
+| WhatsApp identity / CRM                |  ◐  |     ○      |   ○   |   ○    |  ◐   |    ◐    |
+| Integrated payments gateway            |  ○  |     ●      |   ●   |   ●    |  ◐   |    ●    |
+| Ingredient inventory / recipes         |  ◐  |     ●      |   ●   |   ◐    |  ●   |    ●    |
+| Sales analytics / reporting            |  ○  |     ●      |   ●   |   ●    |  ●   |    ●    |
+| Owner dashboard                        |  ●  |     ●      |   ●   |   ●    |  ●   |    ●    |
+| Public API / marketplace               |  ○  |     ◐      |   ●   |   ●    |  ●   |    ○    |
+| Self-order kiosk                       |  ○  |     ◐      |   ●   |   ●    |  ●   |    ○    |
+| Native-first offline + device identity |  ●  |     ◐      |   ◐   |   ○    |  ◐   |    ●    |
 
 ---
 

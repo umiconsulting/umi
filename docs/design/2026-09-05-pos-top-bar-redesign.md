@@ -20,31 +20,31 @@
 
 ## Structural decisions
 
-| # | Decision | UX (rule + source) | Meta (main plan) | Verdict |
-| --- | --- | --- | --- | --- |
-| D1 | Give each primary action a visible **text label** (not only a tooltip) | An icon needs a visible label; a tooltip does not satisfy it (NN/g icon usability) | The barista recognises instead of recalls → less friction each use | ✅ |
-| D2 | Cap the bar at **~4 primary actions**; the rest go to a **"Más" overflow** | ≤3-4 trailing icons, rest to overflow (Material 3, Apple HIG) | Less noise on the barista's frequent path | ✅ |
-| D3 | Split by **frequency**: frequent stays on the surface, rare goes to overflow | Progressive disclosure; hidden nav is costly (~50% less discoverable, ~39% slower) so only the rare is hidden (NN/g) | Protects the barista's speed; only the rare is hidden | ✅ |
-| D4 | Consolidate identity + exit into one **account menu** (operator · branch · Lock · Logout) | Group related controls; separate status/identity from actions (Apple HIG) | Frees space for the frequent actions; keeps Lock one tap away | ✅ |
+| #   | Decision                                                                                  | UX (rule + source)                                                                                                   | Meta (main plan)                                                   | Verdict |
+| --- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------- |
+| D1  | Give each primary action a visible **text label** (not only a tooltip)                    | An icon needs a visible label; a tooltip does not satisfy it (NN/g icon usability)                                   | The barista recognises instead of recalls → less friction each use | ✅      |
+| D2  | Cap the bar at **~4 primary actions**; the rest go to a **"Más" overflow**                | ≤3-4 trailing icons, rest to overflow (Material 3, Apple HIG)                                                        | Less noise on the barista's frequent path                          | ✅      |
+| D3  | Split by **frequency**: frequent stays on the surface, rare goes to overflow              | Progressive disclosure; hidden nav is costly (~50% less discoverable, ~39% slower) so only the rare is hidden (NN/g) | Protects the barista's speed; only the rare is hidden              | ✅      |
+| D4  | Consolidate identity + exit into one **account menu** (operator · branch · Lock · Logout) | Group related controls; separate status/identity from actions (Apple HIG)                                            | Frees space for the frequent actions; keeps Lock one tap away      | ✅      |
 
 ## Per-item decisions
 
-| # | Item | Decision | UX (rule + source) | Meta | Verdict |
-| --- | --- | --- | --- | --- | --- |
-| D5 | Nueva venta | **Primary (out of the kebab)** | Most frequent action; never bury the frequent (NN/g) | ⚡ barista → top priority | ✅ |
-| D6 | Centro de caja → **"Caja"** | **Primary (open/close drawer)**; corte/report → dashboard | Cashier ends drawer on POS; reconciliation/report is back-office (Square, Toast) | Barista action stays; owner's corte moves to dashboard | ✅ |
-| D7 | Ventas (history) | **Primary**; refund/void gated by role inside | Same-day lookup/reprint is front-of-house; void/refund gated (Toast) | Lookup = barista; refund = $ gated | ✅ |
-| D8 | Adjuntar cliente | **Primary** | Per-transaction, frequent | ⚡ barista | ✅ |
-| D9 | Suspender / Cancelar | **Overflow** (Cancelar confirmed + role) | Rarer; destructive → overflow low-priority (Apple) | Off the frequent path; risk controlled | ✅ |
-| D10 | Centro de clientes (CRM) | **Overflow** | Not a per-transaction task (progressive disclosure) | Not ⚡ barista | ✅ |
-| D11 | Inventario | **Overflow / manager** (quick "86" stays a later add) | Inventory edit is a manager permission (Square) | Admin/control → gated | ✅ |
-| D12 | Centro de hardware | **Overflow now; setup → dashboard**; POS keeps status + reprint + open-drawer | Hardware setup is back-office in all 4 vendors | Removes an admin tool from the fast path | ✅ |
-| D13 | Recuperación (offline) | **Overflow** (ideally contextual when pending) | Rare technical exception (progressive disclosure) | Zero noise unless it matters | ✅ |
-| D14 | Bloquear | **Account menu (one tap)** | Frequent on a shared terminal; safety | ⚡ + safety → reachable | ✅ |
-| D15 | Cerrar sesión | **Account menu** | End-of-shift, rarer than Lock (Apple overflow-low-priority) | Off the primary bar | ✅ |
-| D16 | Estado de conexión | **Keep visible (compact)** | Visibility of system status | Tells the barista what is possible | ✅ |
-| D17 | Operador + sucursal | **Fold into the account menu** | Group identity/status apart from actions (Apple) | Frees space | ✅ |
-| D18 | Diagnóstico (debug) | **Overflow, debug-only** (unchanged gating) | Developer tool, not production | Not barista-facing | ✅ |
+| #   | Item                        | Decision                                                                      | UX (rule + source)                                                               | Meta                                                   | Verdict |
+| --- | --------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------ | ------- |
+| D5  | Nueva venta                 | **Primary (out of the kebab)**                                                | Most frequent action; never bury the frequent (NN/g)                             | ⚡ barista → top priority                              | ✅      |
+| D6  | Centro de caja → **"Caja"** | **Primary (open/close drawer)**; corte/report → dashboard                     | Cashier ends drawer on POS; reconciliation/report is back-office (Square, Toast) | Barista action stays; owner's corte moves to dashboard | ✅      |
+| D7  | Ventas (history)            | **Primary**; refund/void gated by role inside                                 | Same-day lookup/reprint is front-of-house; void/refund gated (Toast)             | Lookup = barista; refund = $ gated                     | ✅      |
+| D8  | Adjuntar cliente            | **Primary**                                                                   | Per-transaction, frequent                                                        | ⚡ barista                                             | ✅      |
+| D9  | Suspender / Cancelar        | **Overflow** (Cancelar confirmed + role)                                      | Rarer; destructive → overflow low-priority (Apple)                               | Off the frequent path; risk controlled                 | ✅      |
+| D10 | Centro de clientes (CRM)    | **Overflow**                                                                  | Not a per-transaction task (progressive disclosure)                              | Not ⚡ barista                                         | ✅      |
+| D11 | Inventario                  | **Overflow / manager** (quick "86" stays a later add)                         | Inventory edit is a manager permission (Square)                                  | Admin/control → gated                                  | ✅      |
+| D12 | Centro de hardware          | **Overflow now; setup → dashboard**; POS keeps status + reprint + open-drawer | Hardware setup is back-office in all 4 vendors                                   | Removes an admin tool from the fast path               | ✅      |
+| D13 | Recuperación (offline)      | **Overflow** (ideally contextual when pending)                                | Rare technical exception (progressive disclosure)                                | Zero noise unless it matters                           | ✅      |
+| D14 | Bloquear                    | **Account menu (one tap)**                                                    | Frequent on a shared terminal; safety                                            | ⚡ + safety → reachable                                | ✅      |
+| D15 | Cerrar sesión               | **Account menu**                                                              | End-of-shift, rarer than Lock (Apple overflow-low-priority)                      | Off the primary bar                                    | ✅      |
+| D16 | Estado de conexión          | **Keep visible (compact)**                                                    | Visibility of system status                                                      | Tells the barista what is possible                     | ✅      |
+| D17 | Operador + sucursal         | **Fold into the account menu**                                                | Group identity/status apart from actions (Apple)                                 | Frees space                                            | ✅      |
+| D18 | Diagnóstico (debug)         | **Overflow, debug-only** (unchanged gating)                                   | Developer tool, not production                                                   | Not barista-facing                                     | ✅      |
 
 ## Resulting bar
 

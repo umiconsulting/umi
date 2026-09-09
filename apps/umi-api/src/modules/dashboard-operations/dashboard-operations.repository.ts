@@ -379,12 +379,36 @@ export class DashboardOperationsRepository {
         };
         const window =
           query.range === 'today'
-            ? { start: today, end: today, priorStart: shift(today, -1), priorEnd: shift(today, -1), bucket: 'hour' as const }
+            ? {
+                start: today,
+                end: today,
+                priorStart: shift(today, -1),
+                priorEnd: shift(today, -1),
+                bucket: 'hour' as const,
+              }
             : query.range === 'yesterday'
-              ? { start: shift(today, -1), end: shift(today, -1), priorStart: shift(today, -2), priorEnd: shift(today, -2), bucket: 'hour' as const }
+              ? {
+                  start: shift(today, -1),
+                  end: shift(today, -1),
+                  priorStart: shift(today, -2),
+                  priorEnd: shift(today, -2),
+                  bucket: 'hour' as const,
+                }
               : query.range === 'last_7_days'
-                ? { start: shift(today, -6), end: today, priorStart: shift(today, -13), priorEnd: shift(today, -7), bucket: 'day' as const }
-                : { start: shift(today, -29), end: today, priorStart: shift(today, -59), priorEnd: shift(today, -30), bucket: 'day' as const };
+                ? {
+                    start: shift(today, -6),
+                    end: today,
+                    priorStart: shift(today, -13),
+                    priorEnd: shift(today, -7),
+                    bucket: 'day' as const,
+                  }
+                : {
+                    start: shift(today, -29),
+                    end: today,
+                    priorStart: shift(today, -59),
+                    priorEnd: shift(today, -30),
+                    bucket: 'day' as const,
+                  };
 
         const wp = [merchantId, window.start, window.end, locationId];
         const priorWp = [merchantId, window.priorStart, window.priorEnd, locationId];
@@ -698,7 +722,8 @@ export class DashboardOperationsRepository {
         const refunds = Number(sums.rows[0]?.refunds ?? 0);
         const drawer = Number(sums.rows[0]?.drawer ?? 0);
         const handoff = Number(sums.rows[0]?.handoff ?? 0);
-        const expected = opening + cashSales + paidIn - paidOut - safeDrop - refunds + drawer + handoff;
+        const expected =
+          opening + cashSales + paidIn - paidOut - safeDrop - refunds + drawer + handoff;
 
         const lastCount = countRows.rows[countRows.rows.length - 1] ?? null;
         const showCounted = ['counting', 'reconciliation_required', 'closing', 'closed'].includes(

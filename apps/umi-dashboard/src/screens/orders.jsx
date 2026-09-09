@@ -381,7 +381,9 @@ const OrderRow = ({ order, onSelect }) => {
             }}
           >
             {formatMoneyUnits(
-              (order.refunded_amount ?? 0) > 0 ? (order.net_amount ?? 0) : (order.total_amount ?? 0),
+              (order.refunded_amount ?? 0) > 0
+                ? (order.net_amount ?? 0)
+                : (order.total_amount ?? 0),
             )}
           </div>
           {(order.refunded_amount ?? 0) > 0 ? (
@@ -587,7 +589,11 @@ const OrderDetail = ({ order, onClose }) => {
               }}
             >
               <div className="eyebrow">
-                {(order.refunded_amount ?? 0) > 0 ? <Trans>Total neto</Trans> : <Trans>Total</Trans>}
+                {(order.refunded_amount ?? 0) > 0 ? (
+                  <Trans>Total neto</Trans>
+                ) : (
+                  <Trans>Total</Trans>
+                )}
               </div>
               <div
                 style={{

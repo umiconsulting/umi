@@ -31,25 +31,25 @@ The prior cycle delivered two wins; the live app confirms both. Keep them.
 
 ## 3. Findings summary
 
-| ID  | Area          | Finding                                                                   | Rule           | Severity |
-| --- | ------------- | ------------------------------------------------------------------------ | -------------- | -------- |
-| F1  | Order input   | Modifiers flatten 3 dimensions into 12 cryptic compound chips            | R8, R9, R13    | High     |
-| F2  | Order input   | Crucial modifiers are optional; an ambiguous drink can be sold           | R13, R6        | High     |
-| F3  | Shift close   | The blind count is one free-text field; no denomination keypad or total  | R15            | High     |
-| F4  | Shift         | The active-shift screen shows no drawer state (float, expected, time)    | R16, R17       | High     |
-| F5  | Shift close   | The close path hides behind "Iniciar conteo ciego"; no "Cerrar turno"   | R12, R16       | High     |
-| F6  | Exceptions    | The refund/void block is a generic, duplicated error with no reason      | R-error        | High     |
-| F7  | Order input   | Most product tiles are a generic cup icon; hard to recognize at a glance | R8             | Medium   |
-| F8  | Order input   | The grid and category rail mix non-sellable and admin items             | R9             | Medium   |
-| F9  | Order input   | No most-sold / favourites set for the top drinks                        | R9, R3         | Medium   |
-| F10 | Exceptions    | Sale-history actions are three tiny icon-only buttons, no labels        | R1, R8         | Medium   |
-| F11 | Checkout      | The sheet shows the operator UUID, not the operator name               | R8             | Medium   |
-| F12 | Checkout      | A loyalty lookup ("Consulta en curso") runs on every sale, anonymous too | R10            | Medium   |
-| F13 | Exceptions    | The sales sheet has no visible close control                            | R-control      | Medium   |
-| F14 | Login         | The PIN entry is a text field, not an on-screen number pad              | R1, R3         | Medium   |
-| F15 | Shift         | The action row gives cash moves and shift lifecycle equal weight        | R12            | Low      |
-| F16 | Checkout      | Two pre-filled cash fields make it unclear which to edit for change     | R14            | Low      |
-| F17 | All           | Touch-target sizes are not verified against R1/R2                       | R1, R2         | Verify   |
+| ID  | Area        | Finding                                                                  | Rule        | Severity |
+| --- | ----------- | ------------------------------------------------------------------------ | ----------- | -------- |
+| F1  | Order input | Modifiers flatten 3 dimensions into 12 cryptic compound chips            | R8, R9, R13 | High     |
+| F2  | Order input | Crucial modifiers are optional; an ambiguous drink can be sold           | R13, R6     | High     |
+| F3  | Shift close | The blind count is one free-text field; no denomination keypad or total  | R15         | High     |
+| F4  | Shift       | The active-shift screen shows no drawer state (float, expected, time)    | R16, R17    | High     |
+| F5  | Shift close | The close path hides behind "Iniciar conteo ciego"; no "Cerrar turno"    | R12, R16    | High     |
+| F6  | Exceptions  | The refund/void block is a generic, duplicated error with no reason      | R-error     | High     |
+| F7  | Order input | Most product tiles are a generic cup icon; hard to recognize at a glance | R8          | Medium   |
+| F8  | Order input | The grid and category rail mix non-sellable and admin items              | R9          | Medium   |
+| F9  | Order input | No most-sold / favourites set for the top drinks                         | R9, R3      | Medium   |
+| F10 | Exceptions  | Sale-history actions are three tiny icon-only buttons, no labels         | R1, R8      | Medium   |
+| F11 | Checkout    | The sheet shows the operator UUID, not the operator name                 | R8          | Medium   |
+| F12 | Checkout    | A loyalty lookup ("Consulta en curso") runs on every sale, anonymous too | R10         | Medium   |
+| F13 | Exceptions  | The sales sheet has no visible close control                             | R-control   | Medium   |
+| F14 | Login       | The PIN entry is a text field, not an on-screen number pad               | R1, R3      | Medium   |
+| F15 | Shift       | The action row gives cash moves and shift lifecycle equal weight         | R12         | Low      |
+| F16 | Checkout    | Two pre-filled cash fields make it unclear which to edit for change      | R14         | Low      |
+| F17 | All         | Touch-target sizes are not verified against R1/R2                        | R1, R2      | Verify   |
 
 `R-error` and `R-control` are named rules from the research file (§5 error messages, §9 Clover Cancel/controllability) that sit outside the numbered checklist.
 
@@ -197,28 +197,28 @@ The refund flow has a good structure (type → reason → scope → one confirm,
 
 ## 10. Checklist result (research §13)
 
-| Rule                               | Result | Note                                             |
-| ---------------------------------- | ------ | ------------------------------------------------ |
-| R1 target size ≥ 48 dp             | Verify | measure chips and sale-history icons (F10, F17)  |
-| R2 spacing ≥ 8 dp                  | Verify | F17                                              |
-| R3 thumb zone, top products larger | Fail   | no most-sold set; tiles uniform (F9)             |
-| R4 single-tap add                  | Pass   | delivered                                        |
-| R5 tap budget                      | Pass   | checkout collapse delivered                      |
-| R6 confirmation discipline         | Partial| checkout good; F2 lets an ambiguous order pass   |
-| R7 undo                            | Fail   | no undo window found; hard dialogs used          |
-| R8 recognition                     | Fail   | F1, F7, F10, F11 — compound labels, glyphs, UUID |
-| R9 grid chunking                   | Fail   | F8, F9 — admin items, no most-sold               |
-| R10 feedback ≤ 0.1 s               | Partial| F12 loyalty pending on every sale                |
-| R11 contrast                       | Verify | not measured                                     |
-| R12 fixed placement / hierarchy    | Partial| F5, F15 — close hidden, flat action row          |
-| R13 forced choice when crucial     | Fail   | F1, F2                                            |
-| R14 change display                 | Partial| chips help; verify persistence (F16)             |
-| R15 denomination keypad            | Fail   | F3 — single field                                |
-| R16 numbered shift flow            | Fail   | F4, F5                                            |
-| R17 variance shown                 | Fail   | F4 — no expected/actual/variance on screen       |
-| R18 resume a partial count         | Pass*  | recovery gap fixed in the prior cycle (verify live)|
-| R19 exception authorization        | Pass   | manager-PIN gating exists                         |
-| R20 reason capture + scope         | Pass   | refund flow captures type, reason, scope         |
+| Rule                               | Result  | Note                                                |
+| ---------------------------------- | ------- | --------------------------------------------------- |
+| R1 target size ≥ 48 dp             | Verify  | measure chips and sale-history icons (F10, F17)     |
+| R2 spacing ≥ 8 dp                  | Verify  | F17                                                 |
+| R3 thumb zone, top products larger | Fail    | no most-sold set; tiles uniform (F9)                |
+| R4 single-tap add                  | Pass    | delivered                                           |
+| R5 tap budget                      | Pass    | checkout collapse delivered                         |
+| R6 confirmation discipline         | Partial | checkout good; F2 lets an ambiguous order pass      |
+| R7 undo                            | Fail    | no undo window found; hard dialogs used             |
+| R8 recognition                     | Fail    | F1, F7, F10, F11 — compound labels, glyphs, UUID    |
+| R9 grid chunking                   | Fail    | F8, F9 — admin items, no most-sold                  |
+| R10 feedback ≤ 0.1 s               | Partial | F12 loyalty pending on every sale                   |
+| R11 contrast                       | Verify  | not measured                                        |
+| R12 fixed placement / hierarchy    | Partial | F5, F15 — close hidden, flat action row             |
+| R13 forced choice when crucial     | Fail    | F1, F2                                              |
+| R14 change display                 | Partial | chips help; verify persistence (F16)                |
+| R15 denomination keypad            | Fail    | F3 — single field                                   |
+| R16 numbered shift flow            | Fail    | F4, F5                                              |
+| R17 variance shown                 | Fail    | F4 — no expected/actual/variance on screen          |
+| R18 resume a partial count         | Pass*   | recovery gap fixed in the prior cycle (verify live) |
+| R19 exception authorization        | Pass    | manager-PIN gating exists                           |
+| R20 reason capture + scope         | Pass    | refund flow captures type, reason, scope            |
 
 `Pass*` = fixed in code (`pos-cash.repository.ts`); confirm on a clean shift.
 
@@ -229,25 +229,25 @@ All 17 findings were implemented and verified against the live Linux POS
 is clean; the POS test suite passes except two pre-existing failures unrelated
 to this work (see below).
 
-| ID  | What shipped | File(s) | Verified live |
-| --- | ------------ | ------- | ------------- |
-| F1  | `_Detail` honours `required`/`minSelections`/`maxSelections`: single-select chips when `max==1`, multi capped at `max`, a per-group hint (`Requerido`/`Elige una`/`Hasta N`/`Opcional`) | `catalog_surface.dart` | Renders per metadata (hint shows). Single-select needs the menu SQL below. |
-| F2  | "Agregar al carrito" disabled until every required group is satisfied | `catalog_surface.dart` | Same — active once a group is `min≥1` |
-| F3  | Denomination keypad with a live running total for the blind count **and** the opening float; feeds the `denominations` the API already stores | `denomination_counter.dart` (new), `cash_surface.dart` | Yes — keypad with all MXN denominations + `Total contado` |
-| F4  | Shift status card shows time-open (`Abierto hace 4 h 4 min`) | `cash_surface.dart` | Yes |
-| F5  | Numbered close flow: `Cierre de turno` card with steps 1 Contar → 2 Registrar diferencia → 3 Conciliar → 4 Cerrar, current step highlighted with its action | `cash_surface.dart` | Yes |
-| F6  | Post-sale block/failure maps each server code to a specific message + next step; title ≠ body | `exception_surface.dart` | Code paths mapped (real codes) |
-| F7  | Colour + initials placeholder for photo-less products | `catalog_surface.dart` | Yes — distinct tiles (3Q, AG, AM…) |
-| F8  | Zero-price (non-sellable) products hidden from the grid | `catalog_surface.dart` | Yes — RENTA ESPACIOS gone |
-| F9  | `Frecuentes` quick-add rail from this register's add history (device-local) | `frequent_products.dart` (new), `catalog_surface.dart` | Yes — chip appears after an add |
-| F10 | Sale-history actions become one labelled `Acciones de la venta` menu | `sale_surface.dart` | Compiles; same gating |
-| F11 | Checkout header shows the operator name, not the UUID | `checkout_surface.dart` | Yes — `Operador: Barista Kalala` |
-| F12 | Loyalty lookup only when a customer is attached | `checkout_surface.dart` | Yes — no block on anonymous sale |
-| F13 | Close button on the sales-history sheet | `sale_surface.dart` | Compiles |
-| F14 | On-screen numeric PIN keypad (large targets, masked dots) | `entry_surface.dart` | Yes |
-| F15 | Actions grouped: `Movimientos de caja` vs `Turno` vs `Cierre de turno` | `cash_surface.dart` | Yes |
-| F16 | `Cambio` shown as a large, prominent number | `checkout_surface.dart` | Yes |
-| F17 | New widgets built at ≥48 dp (PIN keys ≥88 dp) | (new widgets) | Partial — a full measurement pass is still owed on the older chips |
+| ID  | What shipped                                                                                                                                                                            | File(s)                                                | Verified live                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| F1  | `_Detail` honours `required`/`minSelections`/`maxSelections`: single-select chips when `max==1`, multi capped at `max`, a per-group hint (`Requerido`/`Elige una`/`Hasta N`/`Opcional`) | `catalog_surface.dart`                                 | Renders per metadata (hint shows). Single-select needs the menu SQL below. |
+| F2  | "Agregar al carrito" disabled until every required group is satisfied                                                                                                                   | `catalog_surface.dart`                                 | Same — active once a group is `min≥1`                                      |
+| F3  | Denomination keypad with a live running total for the blind count **and** the opening float; feeds the `denominations` the API already stores                                           | `denomination_counter.dart` (new), `cash_surface.dart` | Yes — keypad with all MXN denominations + `Total contado`                  |
+| F4  | Shift status card shows time-open (`Abierto hace 4 h 4 min`)                                                                                                                            | `cash_surface.dart`                                    | Yes                                                                        |
+| F5  | Numbered close flow: `Cierre de turno` card with steps 1 Contar → 2 Registrar diferencia → 3 Conciliar → 4 Cerrar, current step highlighted with its action                             | `cash_surface.dart`                                    | Yes                                                                        |
+| F6  | Post-sale block/failure maps each server code to a specific message + next step; title ≠ body                                                                                           | `exception_surface.dart`                               | Code paths mapped (real codes)                                             |
+| F7  | Colour + initials placeholder for photo-less products                                                                                                                                   | `catalog_surface.dart`                                 | Yes — distinct tiles (3Q, AG, AM…)                                         |
+| F8  | Zero-price (non-sellable) products hidden from the grid                                                                                                                                 | `catalog_surface.dart`                                 | Yes — RENTA ESPACIOS gone                                                  |
+| F9  | `Frecuentes` quick-add rail from this register's add history (device-local)                                                                                                             | `frequent_products.dart` (new), `catalog_surface.dart` | Yes — chip appears after an add                                            |
+| F10 | Sale-history actions become one labelled `Acciones de la venta` menu                                                                                                                    | `sale_surface.dart`                                    | Compiles; same gating                                                      |
+| F11 | Checkout header shows the operator name, not the UUID                                                                                                                                   | `checkout_surface.dart`                                | Yes — `Operador: Barista Kalala`                                           |
+| F12 | Loyalty lookup only when a customer is attached                                                                                                                                         | `checkout_surface.dart`                                | Yes — no block on anonymous sale                                           |
+| F13 | Close button on the sales-history sheet                                                                                                                                                 | `sale_surface.dart`                                    | Compiles                                                                   |
+| F14 | On-screen numeric PIN keypad (large targets, masked dots)                                                                                                                               | `entry_surface.dart`                                   | Yes                                                                        |
+| F15 | Actions grouped: `Movimientos de caja` vs `Turno` vs `Cierre de turno`                                                                                                                  | `cash_surface.dart`                                    | Yes                                                                        |
+| F16 | `Cambio` shown as a large, prominent number                                                                                                                                             | `checkout_surface.dart`                                | Yes                                                                        |
+| F17 | New widgets built at ≥48 dp (PIN keys ≥88 dp)                                                                                                                                           | (new widgets)                                          | Partial — a full measurement pass is still owed on the older chips         |
 
 ### Follow-ups (not code in the POS app)
 

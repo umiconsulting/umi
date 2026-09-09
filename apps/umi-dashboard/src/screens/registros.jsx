@@ -49,7 +49,9 @@ function Stat({ label, value, tone }) {
 
 function StatusPill({ status }) {
   const { i18n } = useLingui();
-  const label = STATUS_LABEL[status] ? i18n._(STATUS_LABEL[status]) : String(status || '').replaceAll('_', ' ');
+  const label = STATUS_LABEL[status]
+    ? i18n._(STATUS_LABEL[status])
+    : String(status || '').replaceAll('_', ' ');
   const attn = ATTENTION.has(status);
   const inUse = status === 'in_use';
   return (
@@ -83,8 +85,18 @@ export default function Registros() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        <Stat label={<Trans>Cajas en uso</Trans>} value={inUse} tone={inUse ? 'var(--merchant-brand)' : undefined} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 12,
+        }}
+      >
+        <Stat
+          label={<Trans>Cajas en uso</Trans>}
+          value={inUse}
+          tone={inUse ? 'var(--merchant-brand)' : undefined}
+        />
         <Stat label={<Trans>Disponibles</Trans>} value={available} />
         <Stat label={<Trans>Movimientos</Trans>} value={movements} />
         <Stat
@@ -119,7 +131,13 @@ export default function Registros() {
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 14,
+            }}
+          >
             {items.map((item) => {
               const moves = item.facts?.movements ?? 0;
               const opens = item.facts?.noSaleOpens ?? 0;
@@ -136,12 +154,34 @@ export default function Registros() {
                     borderColor: attn ? 'var(--danger)' : opens ? 'var(--warning)' : 'var(--line)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                    }}
+                  >
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: 15,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {item.title}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: 'var(--ink-3)',
+                          fontFamily: 'var(--font-mono)',
+                          marginTop: 2,
+                        }}
+                      >
                         {item.publicReference}
                       </div>
                     </div>
@@ -152,7 +192,15 @@ export default function Registros() {
                       <div className="eyebrow">
                         <Trans>Movimientos</Trans>
                       </div>
-                      <div className="figures" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 18, marginTop: 4 }}>
+                      <div
+                        className="figures"
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 600,
+                          fontSize: 18,
+                          marginTop: 4,
+                        }}
+                      >
                         {moves}
                       </div>
                     </div>
@@ -181,8 +229,8 @@ export default function Registros() {
 
           <p style={{ color: 'var(--ink-3)', fontSize: 13, margin: 0, maxWidth: '64ch' }}>
             <Trans>
-              Cada caja es un cajón físico. El movimiento y las aperturas sin venta se registran en el
-              POS; aquí vigilas la custodia y las excepciones.
+              Cada caja es un cajón físico. El movimiento y las aperturas sin venta se registran en
+              el POS; aquí vigilas la custodia y las excepciones.
             </Trans>
           </p>
         </>

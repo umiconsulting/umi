@@ -76,13 +76,13 @@ pills not persisted.
 ## 3. Checkout / tender — ✅ (🔴 no integrated card by design; 🟡 quick-cash + offline split)
 
 - Cash: default-on, method tile + numpad + change (`checkout_surface.dart:369-375,
-  462-468, 473-524`); numpad `_Numpad` (`:2182-2230`), one-decimal / 2dp guard
+462-468, 473-524`); numpad `_Numpad` (`:2182-2230`), one-decimal / 2dp guard
   (`:1447-1465`).
 - Manual card terminal: policy-gated (`policy.manualTerminalEnabled`,
   `:376-386`), emitted as `manual_terminal`/`external_terminal`; four outcome chips
   processing/success/failure/unknown (`:555-578`) with full `payment_unknown` →
   `queryUnknownPayment` polling + recovery (`checkout_controller.dart:283-337, 449,
-  472-474`). 🔴 **No integrated/PSP card reader** anywhere — "card" = operator-driven
+472-474`). 🔴 **No integrated/PSP card reader** anywhere — "card" = operator-driven
   manual terminal only. (Consistent with the manual-terminal model, not necessarily a defect.)
 - Colour-coded change: errorContainer (owes) vs primaryContainer (change due)
   (`:473-524`).
@@ -134,6 +134,7 @@ Full flow in `apps/umi-pos/lib/features/exception/` + API `apps/umi-api/src/modu
   error-code specific guidance, compensating receipt.
 
 Known 4 blockers — VERIFIED:
+
 1. **Missing exception policy** → FIXED. Server policy exists:
    `pos-exception.repository.ts:46-47` (`refundsEnabled`/`voidsEnabled`),
    `:1508` reads `refunds_enabled`/`voids_enabled`, `:1655-1656` emits `policy_disabled`
@@ -145,13 +146,13 @@ Known 4 blockers — VERIFIED:
    of the current reason set (`exception_surface.dart:253-258`), so switching type
    can't leave a stale value that asserts.
 4. **pos_sale_exception RLS** → present. `merchant.pos_sale_exception` has RLS enabled
-   + restrictive `device_scoping` + `merchant_location_isolation`
-   (`docs/migration/build-v3/90_rls.sql:631-632`,
-   `docs/migration/build-v3/44_dashboard_operational_wiring.sql:58`,
-   `docs/migration/build-v3/34_pos_exception.sql:539`). Refund runs end-to-end from the
-   POS operator (device-scoped) session. (Note: the RESTRICTIVE `device_scoping` class
-   is the same pattern that hides device-less owner sessions in the dashboard cash-shift
-   bug from memory — fine for the device-bound POS, worth watching for any owner surface.)
+   - restrictive `device_scoping` + `merchant_location_isolation`
+     (`docs/migration/build-v3/90_rls.sql:631-632`,
+     `docs/migration/build-v3/44_dashboard_operational_wiring.sql:58`,
+     `docs/migration/build-v3/34_pos_exception.sql:539`). Refund runs end-to-end from the
+     POS operator (device-scoped) session. (Note: the RESTRICTIVE `device_scoping` class
+     is the same pattern that hides device-less owner sessions in the dashboard cash-shift
+     bug from memory — fine for the device-bound POS, worth watching for any owner surface.)
 
 ## 6. Offline / sync / reliability — 🟡 (mature data path, connectivity wiring gaps)
 
@@ -318,17 +319,18 @@ real**; the **device-role model does not exist**.
 
 ## Known items — verified status
 
-| Known item | Claim | Verified |
-|---|---|---|
-| KDS+POS unification | ADR accepted, Phase 1 shipped, retiring umi-kds | ✅ ADR accepted; Phase 1 (read-only board) shipped and promoted to bottom nav; Phases 2–5 NOT started; umi-kds NOT retired (2,617 lines live). |
-| Refund/void 4 blockers | missing policy, saleId cart-vs-committed, reason-dropdown crash, RLS | ✅ All four verified fixed (see §5). |
-| Status-advance | advance only via device token; commercial advance doesn't reach KDS | ✅ Confirmed. Device-token-only commands; POS + dashboard read-only; commercial (`customer_order`) advance is a separate, non-kitchen flow (§9). |
+| Known item             | Claim                                                                | Verified                                                                                                                                         |
+| ---------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| KDS+POS unification    | ADR accepted, Phase 1 shipped, retiring umi-kds                      | ✅ ADR accepted; Phase 1 (read-only board) shipped and promoted to bottom nav; Phases 2–5 NOT started; umi-kds NOT retired (2,617 lines live).   |
+| Refund/void 4 blockers | missing policy, saleId cart-vs-committed, reason-dropdown crash, RLS | ✅ All four verified fixed (see §5).                                                                                                             |
+| Status-advance         | advance only via device token; commercial advance doesn't reach KDS  | ✅ Confirmed. Device-token-only commands; POS + dashboard read-only; commercial (`customer_order`) advance is a separate, non-kitchen flow (§9). |
 
 ---
 
 ## Prioritized unfinished list
 
 **P0 — blocks a real KDS deployment (ADR Phases 2–5)**
+
 1. Device-role model (`pos | kds | customer_display`) + unattended KDS station session
    (no operator PIN). Today KDS mode reuses the POS operator session — ADR flags this as
    an open escalation risk (`...-adr.md:127-150, 203-211`). §7.
@@ -338,25 +340,15 @@ real**; the **device-role model does not exist**.
    state machine that fails-closed on commands. §8, §13.
 4. KDS heartbeat + device pairing/identity/revocation ported to Flutter. §13.
 
-**P1 — parity + correctness**
-5. Multi-column-by-status board + master-detail + per-item state + time targets in
-   Flutter (backend contract already supports all of it). §8.
-6. Order-type (dine-in/takeout) not persisted to the sale/comanda — wire it through
-   checkout/note or remove the misleading UI+comments. §1.
-7. Offline auto-replay-on-reconnect + a real OS-level connectivity source
-   (`connectivity_plus` or ping); today draining is coupled to the catalog screen. §6.
-8. Verify the mobile hardware-key native path on device — `DeviceKeySigner.kt:26-28`
-   is flagged "NOT compiled or run … must be exercised on a device before trusted"; the
-   default build ships the software key whose seed is readable from secure storage. §7.
+**P1 — parity + correctness** 5. Multi-column-by-status board + master-detail + per-item state + time targets in
+Flutter (backend contract already supports all of it). §8. 6. Order-type (dine-in/takeout) not persisted to the sale/comanda — wire it through
+checkout/note or remove the misleading UI+comments. §1. 7. Offline auto-replay-on-reconnect + a real OS-level connectivity source
+(`connectivity_plus` or ping); today draining is coupled to the catalog screen. §6. 8. Verify the mobile hardware-key native path on device — `DeviceKeySigner.kt:26-28`
+is flagged "NOT compiled or run … must be exercised on a device before trusted"; the
+default build ships the software key whose seed is readable from secure storage. §7.
 
-**P2 — polish / by-design gaps to confirm as intended**
-9. Customer-display app mode (only a simulator peripheral exists today). §10.
-10. Kitchen-ticket printing (explicitly deferred; confirm whether pilots need it). §11.
-11. Retire `umi-kds` once Flutter reaches the ADR §5 parity gate. §13.
-12. Quick-cash denominations hardcoded; variant price-delta hidden in picker;
-    zero-price product addable via barcode scan. §2–3.
-13. Accepted P2s: unreachable `_ReadyShell` catalog placeholder
-    (`entry_surface.dart:581-625`, `catalogNotImplemented`) and a `StubToolsService`
-    historical comment (`UMIPOS_FINAL_SOFTWARE_CERTIFICATION.md:118-119`).
-14. Integrated/PSP card processing absent (manual terminal only) — confirm this matches
-    product intent. §3.
+**P2 — polish / by-design gaps to confirm as intended** 9. Customer-display app mode (only a simulator peripheral exists today). §10. 10. Kitchen-ticket printing (explicitly deferred; confirm whether pilots need it). §11. 11. Retire `umi-kds` once Flutter reaches the ADR §5 parity gate. §13. 12. Quick-cash denominations hardcoded; variant price-delta hidden in picker;
+zero-price product addable via barcode scan. §2–3. 13. Accepted P2s: unreachable `_ReadyShell` catalog placeholder
+(`entry_surface.dart:581-625`, `catalogNotImplemented`) and a `StubToolsService`
+historical comment (`UMIPOS_FINAL_SOFTWARE_CERTIFICATION.md:118-119`). 14. Integrated/PSP card processing absent (manual terminal only) — confirm this matches
+product intent. §3.

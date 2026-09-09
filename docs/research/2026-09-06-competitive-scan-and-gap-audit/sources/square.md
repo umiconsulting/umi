@@ -7,7 +7,9 @@ Compiled 2026-09-06 for Umi competitive analysis. Sources are official squareup.
 ## 0. Pricing / packaging (foundation for everything)
 
 ### Unified plans (launched Oct 6, 2025) — replaced 18 à-la-carte subscriptions with 3 plans
+
 Source: https://squareup.com/us/en/press/unified-pricing-and-packaging
+
 - **Square Free — $0/mo per location.** Includes POS, websites, online ordering, invoicing, Square Banking. No monthly fee; pay per transaction only.
 - **Square Plus — $49/mo per location.** Advanced POS features across all 7 POS "modes" (QSR, bars, salons, retailers, etc.), advanced inventory, loyalty, marketing, staff management. In-person rate 2.5% + 15¢.
 - **Square Premium — $149/mo per location.** Nearly all Square software + 24/7 phone support + advanced reporting. In-person rate 2.4% + 15¢.
@@ -15,7 +17,9 @@ Source: https://squareup.com/us/en/press/unified-pricing-and-packaging
 - Claim: sellers adopting Square software "see 9% higher sales" (2024 internal).
 
 ### Restaurants pricing page (has some restaurant-specific add-on framing + a new "Pro" tier)
+
 Source: https://squareup.com/us/en/point-of-sale/restaurants/pricing
+
 - Square Free: item/menu mgmt, pickup, local delivery, branded online ordering page. KDS & Kiosk apps NOT included.
 - Square Plus: inventory tracking, close-of-day reports. KDS app add-on $30/mo per device; Kiosk app add-on $50/mo per device. (Restaurant "best value.")
 - Square Premium: coursing + seat management. KDS app add-on $20/mo per device; Kiosk app add-on $30/mo per device.
@@ -25,7 +29,9 @@ Source: https://squareup.com/us/en/point-of-sale/restaurants/pricing
 ---
 
 ## 1. Square for Restaurants POS / register
+
 Sources:
+
 - https://squareup.com/us/en/point-of-sale/restaurants
 - https://squareup.com/help/us/en/article/6424-create-menus-with-square-for-restaurants (menus)
 - https://squareup.com/help/us/en/article/6426-modifiers-and-categories-with-square-for-restaurants (modifiers)
@@ -48,7 +54,9 @@ Positioning: "Cool. Calm. Connected tech." Cloud POS for single- and multi-locat
 ---
 
 ## 2. Square KDS
+
 Sources:
+
 - https://squareup.com/us/en/point-of-sale/restaurants/kitchen-display-system
 - https://squareup.com/help/us/en/article/7959-route-orders-with-your-kds (routing)
 - https://squareup.com/help/us/en/article/7944-get-started-with-square-kds-android (setup)
@@ -62,7 +70,9 @@ Features: digital tickets, customizable ticket layouts + timers + notifications,
 ---
 
 ## 3. Online ordering / delivery / QR
+
 Sources:
+
 - https://squareup.com/us/en/online-ordering
 - https://squareup.com/help/us/en/article/7142-set-up-self-serve-ordering-and-qr-codes-with-square-online
 - https://squareup.com/us/en/point-of-sale/restaurants/food-delivery-software
@@ -75,6 +85,7 @@ Sources:
 **QR order & pay** (help/7142): Dashboard > Channels > Square Online > Website Settings > QR code ordering > Set up per location. Configure ordering stations (auto-assign or manual entry), hours, timezone, SMS alerts, ticket prefs. Download QR codes (unique per station or identical). Customer scans at table → mobile web ordering page → items + special requests → pays on phone. Order appears on POS and feeds kitchen printer or KDS. No cash/card handling.
 
 **Delivery**:
+
 - **On-demand via DoorDash** (Square dispatches a Dasher): seller pays flat $1.50/order to Square + flat DoorDash fee; can pass fees to buyer or run delivery promos.
 - **Self / in-house delivery**: your own drivers. Can't run in-house + on-demand at same location simultaneously, but can switch anytime.
 - **Direct DoorDash integration** (press/townsquare): manage DoorDash orders, items, menus from Square Dashboard — no extra tablet, no double entry; item availability/pricing auto-syncs to DoorDash. Also Uber Eats direct. Order integrations aggregate in-house/online/delivery/QR into one workflow.
@@ -82,7 +93,9 @@ Sources:
 ---
 
 ## 4. Loyalty / Marketing / Gift Cards
+
 Sources:
+
 - https://squareup.com/us/en/software/loyalty
 - https://squareup.com/help/us/en/article/3952-create-a-loyalty-program-with-square
 - https://squareup.com/help/us/en/article/7794-get-started-with-square-loyalty-promotions
@@ -98,13 +111,16 @@ Sources:
 ---
 
 ## 5. Payments / processing / tipping / Tap to Pay / Afterpay
+
 Sources:
+
 - https://squareup.com/us/en/payments/our-fees
 - https://squareup.com/help/us/en/article/7788-afterpay-and-square-faq
 - https://squareup.com/help/us/en/article/7786-get-started-with-tap-to-pay-on-iphone
 - https://squareup.com/help/us/en/article/7960-get-started-with-tap-to-pay-on-android
 
 **Processing rates (by plan)**:
+
 - In-person tap/dip/swipe: Free 2.6%+15¢ / Plus 2.5%+15¢ / Premium 2.4%+15¢
 - Online: Free 3.3%+30¢ / Plus & Premium 2.9%+30¢
 - Online API (all): 2.9%+30¢
@@ -121,7 +137,9 @@ Sources:
 ---
 
 ## 6. Hardware / devices
+
 Sources:
+
 - https://squareup.com/us/en/hardware
 - https://squareup.com/us/en/hardware/kiosk ; help/8310 (kiosk setup); help/8380 (kiosk troubleshoot)
 - https://squareup.com/help/us/en/article/8245-set-up-printer-profiles
@@ -129,6 +147,7 @@ Sources:
 - https://squareup.com/help/us/en/article/6334-hardware-compatibility-by-device
 
 Products + prices:
+
 - **Square Register (2nd gen, NEW)** — $899 / $44/mo×24. Two screens (merchant + customer), all-in-one, no phone/tablet needed.
 - **Square Handheld** — $399 / $37/mo×12. Mobile POS.
 - **Square Terminal** — $299 / $27/mo×12. All-in-one w/ built-in receipt printer.
@@ -136,12 +155,14 @@ Products + prices:
 - **Square Kiosk** — $149 / $14/mo×12. Self-service iPad kiosk; VESA 100×100 mounts (wall/counter/stand); + Kiosk software subscription ($50/mo Plus, $30/mo Premium per device).
 - Readers: contactless+chip, magstripe. Accessories, hardware kits.
 - Peripherals: KDS (Android tablet), kitchen printers, label printers, keyboard, barcode scanners, cash drawers. USB accessories plug into hub on power cord (Stand/Register/Terminal); Ethernet via router → wifi to device.
-**Device management**: Dashboard > Settings > Device Management > Devices (assign modes, routing) + Profiles + printer profiles. Kiosk onboarding via Device Management > Kiosk.
+  **Device management**: Dashboard > Settings > Device Management > Devices (assign modes, routing) + Profiles + printer profiles. Kiosk onboarding via Device Management > Kiosk.
 
 ---
 
 ## 7. Dashboard / reporting / analytics
+
 Sources:
+
 - https://squareup.com/help/us/en/article/6433-reporting-with-square-for-restaurants
 - https://squareup.com/help/us/en/article/8142-get-real-time-sales-data-on-square-restaurants-pos
 - https://squareup.com/help/us/en/article/8579-review-daily-sales-for-your-restaurant
@@ -153,7 +174,9 @@ Square Dashboard (web + iOS app). Reports: sales summary (closed sales, partial 
 ---
 
 ## 8. Inventory / item library / vendors / COGS
+
 Sources:
+
 - https://squareup.com/us/en/point-of-sale/features/inventory-management
 - https://squareup.com/us/en/inventory-management/restaurants (MarketMan)
 - https://squareup.com/us/en/press/square-restaurant-inventory-marketman
@@ -165,12 +188,15 @@ Base inventory (in POS): item library (Dashboard > Items), CSV import, stock cou
 ---
 
 ## 9. Multi-location
+
 - Team-member location assignment gates access to data/menus/features per assigned location; can view shifts/availability across multiple locations. Per-location pricing ($/location). Menus assignable to single/multiple locations; per-location item + channel settings. Square for Franchises = separate add-on for large multi-unit. Section/kitchen reports roll up across devices+locations.
 
 ---
 
 ## 10. Integrations / App Marketplace / Developer API / offline API
+
 Sources:
+
 - https://developer.squareup.com/us/en ; /docs ; /reference/square
 - https://developer.squareup.com/docs/app-marketplace/faq
 - https://developer.squareup.com/docs/pos-api/cookbook/offline-mode
@@ -181,7 +207,9 @@ Sources:
 ---
 
 ## 11. Team / Payroll / Shifts / permissions
+
 Sources:
+
 - https://squareup.com/us/en/point-of-sale/team-management/features (→ redirects to Square Advanced Access)
 - https://squareup.com/us/en/staff/shifts/features ; /staff/shifts
 - https://squareup.com/help/us/en/article/7155-scheduling-with-team-management
@@ -194,7 +222,9 @@ Sources:
 ---
 
 ## 12. Offline mode / reliability
+
 Sources:
+
 - https://squareup.com/help/us/en/article/7777-process-card-payments-with-offline-mode
 - https://squareup.com/help/us/en/article/8551-view-offline-payments
 - https://squareup.com/au/en/payments/features/offline
@@ -204,13 +234,16 @@ Offline mode = capture cash + card while disconnected, upload on reconnect. Avai
 ---
 
 ## 13. Kiosk / customer-facing display
+
 Sources: /us/en/hardware/kiosk ; help/8310 ; help/5492 (customer display / Terminal as customer display)
+
 - **Square Kiosk**: self-order iPad kiosk; customers browse menu, customize (incl. text modifiers), pay; feeds POS + KDS/printer. Reduces labor. Kiosk software $50/mo (Plus) / $30/mo (Premium) per device + $149 hardware.
 - **Customer display**: Square Register has dual screens (customer-facing); Square Terminal can pair as a customer display to a Square POS device (help/5492) for order confirm + tip + pay.
 
 ---
 
 ## 14. Adjacent products (brief)
+
 - **Square Appointments**: bookings/scheduling (staff availability, online booking, reminders); has its own free/paid tiers; Bookings API. Beauty/services focused but relevant to reservations.
 - **Square Invoices**: send invoices, recurring, ACH 1%/card 3.3%+30¢; free tier + Invoices Plus.
 - **Square Banking**: checking/savings/loans; Square Capital = merchant cash advance/loans based on Square sales history; instant transfers/payouts (fee). Bundled free.
@@ -219,6 +252,7 @@ Sources: /us/en/hardware/kiosk ; help/8310 ; help/5492 (customer display / Termi
 ---
 
 ## KEY COMPETITIVE OBSERVATIONS (for Umi)
+
 - Everything is one connected cloud graph: menu/item/category/order/customer shared across POS, online, kiosk, KDS, delivery — single source of truth. Category doubles as kitchen-routing + reporting key.
 - Per-location + per-device pricing stacks up fast (KDS/Kiosk are per-device add-ons on top of $49–$149/loc). Deep inventory (MarketMan) is +$99/loc.
 - KDS is Android-only; POS is iPad-first (plus Android for SfR). Fragmented OS story.

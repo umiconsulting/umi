@@ -17,15 +17,15 @@ sub-tabs**. None is a single page. The depth is mostly transaction and
 marketing data. Only Square has a real two-way message inbox, and even Square
 keeps it on a separate surface, not inside the profile.
 
-| | Toast (Guestbook / Guest CRM) | Square (Customer Directory) | Lightspeed (Restaurant K / Retail X) |
-|---|---|---|---|
-| Surface | Guests → Guestbook (web only) | Customers → Directory | Customers (Back Office) |
-| Structure | List → profile → 6 modules | List → profile → sections | List → profile → tabs |
-| Profile tabs | Overview, Booking, Feedback, Loyalty, Marketing, Details | Contact, Activity, Loyalty, Notes, Files, Appointments, Cards on file, Groups | Retail: Store credit, Account, Loyalty + Sales history. Restaurant: contact + notes (loyalty/gift separate) |
-| Value metrics | Lifetime spend, avg spend, avg tip, channel mix, top items, last order | Visit frequency, spend, purchase behaviour | Sales history, balances |
-| Chat / thread | **No** in CRM. Two-way SMS only in Toast Tables (bookings), booking-topic only | **Yes** — Square Messages, unified 2-way inbox (SMS + email) + AI "Square Assistant". Separate surface; not confirmed inside profile | **No.** Broadcast marketing only; business-level "SMS history" log. Two-way only via third-party (Ikeono) or the separate DMS product |
-| Identity / merge | Auto-created from orders/loyalty; select-two merge | Instant Profiles from card; duplicate flag + merge | Phone-as-"customer code" lookup + manual merge |
-| Custom fields | Tags + notes | Custom fields + notes + files | Retail groups; custom fields unverified |
+|                  | Toast (Guestbook / Guest CRM)                                                  | Square (Customer Directory)                                                                                                          | Lightspeed (Restaurant K / Retail X)                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface          | Guests → Guestbook (web only)                                                  | Customers → Directory                                                                                                                | Customers (Back Office)                                                                                                               |
+| Structure        | List → profile → 6 modules                                                     | List → profile → sections                                                                                                            | List → profile → tabs                                                                                                                 |
+| Profile tabs     | Overview, Booking, Feedback, Loyalty, Marketing, Details                       | Contact, Activity, Loyalty, Notes, Files, Appointments, Cards on file, Groups                                                        | Retail: Store credit, Account, Loyalty + Sales history. Restaurant: contact + notes (loyalty/gift separate)                           |
+| Value metrics    | Lifetime spend, avg spend, avg tip, channel mix, top items, last order         | Visit frequency, spend, purchase behaviour                                                                                           | Sales history, balances                                                                                                               |
+| Chat / thread    | **No** in CRM. Two-way SMS only in Toast Tables (bookings), booking-topic only | **Yes** — Square Messages, unified 2-way inbox (SMS + email) + AI "Square Assistant". Separate surface; not confirmed inside profile | **No.** Broadcast marketing only; business-level "SMS history" log. Two-way only via third-party (Ikeono) or the separate DMS product |
+| Identity / merge | Auto-created from orders/loyalty; select-two merge                             | Instant Profiles from card; duplicate flag + merge                                                                                   | Phone-as-"customer code" lookup + manual merge                                                                                        |
+| Custom fields    | Tags + notes                                                                   | Custom fields + notes + files                                                                                                        | Retail groups; custom fields unverified                                                                                               |
 
 **The opening for Umi.** Restaurant CRM software does not do conversation. The
 customer record and the conversation are two separate places for every leader.
@@ -43,12 +43,13 @@ support (`*-support.lightspeedhq.com`).
 
 **Frontend** (`apps/umi-dashboard/src/screens/customers.jsx`, 985 lines): already
 a two-pane master/detail.
+
 - Left: customer list. Search + filters (Todos, WhatsApp, Lealtad, Notas,
   Revisión). Rows show avatar, name, phone, last-touch, product icons, spend,
   visits. Pagination.
 - Right: profile with tabs — Resumen (3 metrics + timeline), WhatsApp, Pedidos,
   Lealtad (add-seals / top-up / scan), Notas, Datos (identity + merge candidates
-  + data-quality).
+  - data-quality).
 - Data via bespoke hooks in `data.jsx` (`useCustomersData`, `useCustomerDetail`,
   `useCustomerInsights`, `useConversationsData`). No caching/query library.
 
@@ -58,6 +59,7 @@ conversation **metadata** — a summary, a message count, a status badge. There 
 
 **Backend** (`apps/umi-api/src/modules/customers/`): already the right shape — a
 **Customer 360 read/composition layer** gated on the `dashboard` product.
+
 - `CustomersController`: `GET customers` (list rollup), `GET customers/:id`
   (composite detail), and per-facet endpoints `/timeline`, `/conversations`,
   `/orders`, `/cash`, `/identity`, plus `/insights/customer-platform`.
@@ -85,6 +87,7 @@ spine. It is a query/composition problem, not a storage problem. Every
 performance decision follows from that.
 
 Principles:
+
 1. **Identity is the spine.** One resolved identity (`platform.contacts` +
    `contact_identities`) is the join key. Nothing merges silently.
 2. **Contexts own; Customers composes.** WhatsApp, orders, loyalty/cash, memory
@@ -107,6 +110,7 @@ Principles:
    triage (stream and append, never poll).
 
 Layers:
+
 ```
 Client read model   list (virtualized) · profile shell + lazy facets · transcript (virtualized + streamed)
 Delivery            snapshot API (req/resp)            realtime channel (transcript, triage)
@@ -122,21 +126,22 @@ Identity spine      platform.contacts / contact_identities  (join key + merge/qu
 The stack is ~70% reuse of what Umi already has, plus two high-leverage backend
 changes.
 
-| Layer | Pick | Why |
-|---|---|---|
-| Identity spine | `platform.contacts` / `contact_identities` (reuse) | One join key. |
-| List read | On-demand lateral rollup **+ stored `last_activity_at` + keyset cursor** | Removes the only cost that scales with total contacts. |
-| Profile read | **Narrow shell query + lazy per-facet endpoints** (already exist) | TTFB = fastest query, not slowest of six. |
-| Search | **`pg_trgm` GIN** on name/email/normalized-phone; btree for exact | Serves `contains`; FTS stays for message/memory content. |
-| Snapshot delivery | REST under RLS + short-TTL `private` cache | Cache list + shell for seconds; `no-store` on money/live facets. |
-| Live delivery | **Existing Socket.IO dashboard gateway** + a new per-conversation room | "Socket is a wake-up, not a delivery gate" — nudge over socket, payload over RLS REST. |
-| Change signal | App-publish at write → in-process bus; add `LISTEN/NOTIFY` at multi-instance | Skip logical replication; REST-under-RLS stays the truth. |
-| Client data | **TanStack Query v5** (replace bespoke hooks) | Dedup, stale-while-revalidate, hover-prefetch, infinite, optimistic (~13 kB). |
-| List render | **`@tanstack/react-virtual`** (headless, ~3 kB) | Constant DOM; pairs with `useInfiniteQuery`. |
-| Transcript render | **`react-virtuoso`** free `Virtuoso` (code-split) | Bottom-anchoring + prepend-with-scroll-lock are free. Avoid the paid Message List. |
-| Perceived speed | `keepPreviousData` + hover/route prefetch + `useTransition` | Removes blank states; clicks feel instant. |
+| Layer             | Pick                                                                         | Why                                                                                    |
+| ----------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Identity spine    | `platform.contacts` / `contact_identities` (reuse)                           | One join key.                                                                          |
+| List read         | On-demand lateral rollup **+ stored `last_activity_at` + keyset cursor**     | Removes the only cost that scales with total contacts.                                 |
+| Profile read      | **Narrow shell query + lazy per-facet endpoints** (already exist)            | TTFB = fastest query, not slowest of six.                                              |
+| Search            | **`pg_trgm` GIN** on name/email/normalized-phone; btree for exact            | Serves `contains`; FTS stays for message/memory content.                               |
+| Snapshot delivery | REST under RLS + short-TTL `private` cache                                   | Cache list + shell for seconds; `no-store` on money/live facets.                       |
+| Live delivery     | **Existing Socket.IO dashboard gateway** + a new per-conversation room       | "Socket is a wake-up, not a delivery gate" — nudge over socket, payload over RLS REST. |
+| Change signal     | App-publish at write → in-process bus; add `LISTEN/NOTIFY` at multi-instance | Skip logical replication; REST-under-RLS stays the truth.                              |
+| Client data       | **TanStack Query v5** (replace bespoke hooks)                                | Dedup, stale-while-revalidate, hover-prefetch, infinite, optimistic (~13 kB).          |
+| List render       | **`@tanstack/react-virtual`** (headless, ~3 kB)                              | Constant DOM; pairs with `useInfiniteQuery`.                                           |
+| Transcript render | **`react-virtuoso`** free `Virtuoso` (code-split)                            | Bottom-anchoring + prepend-with-scroll-lock are free. Avoid the paid Message List.     |
+| Perceived speed   | `keepPreviousData` + hover/route prefetch + `useTransition`                  | Removes blank states; clicks feel instant.                                             |
 
 ### Backend detail
+
 - **List:** move the default sort key to a stored `last_activity_at` on
   `merchant.customer` (written by the owning modules or a trigger). Keyset-page
   on `(last_activity_at, id)` (the cursor pattern already exists in
@@ -144,7 +149,7 @@ changes.
   `(merchant_id, customer_id)` indexes on every child table the laterals touch,
   and `(merchant_id, last_activity_at DESC, id DESC)` for the sort.
 - **Promote to a maintained summary table** only when a merchant passes ~10–20k
-  contacts *and* owners sort/filter by a rolled-up metric (value/visits). A
+  contacts _and_ owners sort/filter by a rolled-up metric (value/visits). A
   materialized view is the middle option (minutes of staleness OK). Not needed
   yet.
 - **Profile shell:** write a dedicated narrow shell query — do **not** reuse the
@@ -154,10 +159,11 @@ changes.
   email/phone. Normalize the phone query with the same normalizer as the stored
   value. Not full-text (reserve tsvector for message/memory content).
 - **RLS:** wrap the resolver call as `merchant_id = (select
-  umi.current_merchant())` for a per-statement InitPlan and index use; keep the
+umi.current_merchant())` for a per-statement InitPlan and index use; keep the
   `merchant_id` index on every table; policies `TO authenticated`.
 
 ### Realtime detail
+
 - Reuse the Socket.IO dashboard gateway. Triage nudges on the per-merchant room,
   then REST refetch. Transcript nudges on a new per-conversation room, then REST
   refetch of the tail.
@@ -167,6 +173,7 @@ changes.
   REST under RLS is the source of truth; the push is only "look again".
 
 ### Client detail
+
 - TanStack Query v5. Shell from `placeholderData` reading the list query's cached
   row; per-tab `useQuery` keyed `['customer', id, facet]`; prefetch the
   likely-next tab and the row on hover; `keepPreviousData` on the paginated list.
@@ -184,7 +191,7 @@ changes.
    `"$user", public, extensions`, so unqualified `gin_trgm_ops` resolves — but
    schema-qualify it in DDL (`extensions.gin_trgm_ops`) to be safe.
 2. **The RLS resolver is `STABLE`** — `umi.current_merchant()` is `language sql
-   stable` (`00_foundation.sql:23`, `90_rls.sql:12`). But all 44 policy
+stable` (`00_foundation.sql:23`, `90_rls.sql:12`). But all 44 policy
    references use the **bare** form `merchant_id = umi.current_merchant()`; zero
    use `(select …)`. Wrapping in `(select …)` gives a per-statement InitPlan and
    lets the `merchant_id` index be used. Pure perf rewrite; same rows, same
@@ -196,6 +203,7 @@ changes.
    moved behind Cloudflare's proxy.)
 
 Runtime re-confirm (any environment):
+
 ```sql
 select extname, extnamespace::regnamespace from pg_extension where extname='pg_trgm';
 select proname, provolatile from pg_proc where proname='current_merchant';   -- expect s
@@ -206,6 +214,7 @@ select proname, provolatile from pg_proc where proname='current_merchant';   -- 
 ## 6. Sources
 
 Competitor (all official):
+
 - Toast Guestbook — https://support.toasttab.com/en/article/Access-Your-Guest-Data-with-the-Guest-Report
 - Toast Tables 2-way SMS — https://support.toasttab.com/en/article/How-do-I-turn-on-Two-Way-SMS
 - Toast SMS Marketing (broadcast) — https://support.toasttab.com/en/article/SMS-Marketing-FAQ
@@ -217,6 +226,7 @@ Competitor (all official):
 - Lightspeed SMS (broadcast) — https://retail-support.lightspeedhq.com/hc/en-us/articles/360011038433-SMS-Marketing
 
 Tech (primary):
+
 - Postgres LIMIT/OFFSET — https://www.postgresql.org/docs/current/queries-limit.html · keyset — https://use-the-index-luke.com/no-offset
 - Postgres pg_trgm — https://www.postgresql.org/docs/current/pgtrgm.html
 - Postgres Materialized Views — https://www.postgresql.org/docs/current/rules-materializedviews.html

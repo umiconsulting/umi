@@ -15,19 +15,20 @@ su cuenta** — ningún PAC lo hace por ti.
 
 ## 1. Matriz de comparación
 
-| Proveedor | Tipo | API / SDK | Sandbox | Multiemisor (una cuenta → muchos RFC) | Custodia del CSD | $ / timbre | Factura global | API autofactura |
-|---|---|---|---|---|---|---|---|---|
-| **Facturapi** | Capa sobre un PAC **no revelado** | **REST/JSON**. SDK oficial **Node/TS**, .NET, Java, PHP | Gratis, llaves de prueba `sk_test_*` | **El mejor** — API "Organizations", **sin costo ni tope por organización** | El comercio sube el CSD; **Facturapi guarda las llaves**. Sin claim de HSM | **$0.60** + **$299/mes** base (multi-RFC incluido). Los timbres **no expiran** | Sí (objeto `global`, `S01`) | **Sí** — portal QR con marca (factura.space); **$599/organización** |
-| **Facturama** | Capa sobre **3 PAC** sin nombre (de FreshBooks) | REST, Basic Auth. SDK Node/JS oficial pero **poco mantenido**; sin TS oficial | Gratis (`dev.facturama.mx`); CSD de prueba del SAT | **Sí** — "API Multiemisor" por RFC. **Sin objeto de subcuenta**; esos CFDI **no aparecen en su panel** | El comercio sube el CSD; **Facturama guarda las llaves**. Sin HSM | Módulo API **$1,650/año con 100 folios**, luego **$0.50 / $0.45 / $0.40** por volumen | Sí (`XAXX010101000`, `S01`) | **Sin portal llave en mano**; lo construyes tú |
-| **SW sapien** (Luna Soft) | **PAC directo** (aut. 16543, 2013) | **REST** (Bearer) + SOAP heredado. SDK **Node** oficial + .NET/PHP/Java/Python/Ruby | Gratis (`services.test.sw.com.mx`); 5 timbres prod gratis | **Sí** — modelo distribuidor + "API Usuarios V2" (subcuenta por RFC) | El comercio sube el CSD; **SW lo guarda** ("sitio seguro"). Sin claim de HSM | Tienda pública solo vía Odoo (lo demás por cotización); mínimo **$250/año** | Sí (su blog cita el plazo de 24 h) | **Sí** — portal + API "Web tickets" + QR |
-| **Finkok** | **PAC directo** (aut. 10852, 2013) | **SOAP primero** (núcleo); REST solo para PDF. **Sin SDK oficial** (comunidad) | Gratis (`demo-facturacion.finkok.com`); CSD de prueba del SAT | **Sí** — una cuenta, muchos RFC; WS "Registro de Clientes" + socios/créditos | **Flexible** — tú firmas el XML (**las llaves se quedan contigo**) o subes el CSD (`sign_stamp`). Sin HSM | Pospago: **$150 mín (0–500)**, **$0.30** de 501+ (+IVA). Sin mínimo de volumen | Soportada (XML genérico) | Sí — WS "Crear ticket" |
-| **Formas Digitales** | **PAC directo** (RFC FCG840618N51) | **Solo SOAP**. Solo librería **Java** oficial; sin REST/Node/TS | Gratis; credenciales demo `pruebasWS/pruebasWS` | **Sí** — "WS Admin Digital", usuarios `distribuidor`/`cliente` | En la API de timbrado **el integrador firma localmente**; los flujos alojados guardan el CSD. Sin HSM | **No pública** | Genérica; sin página específica ni mención de RMF 2026 | Sí — WS AutoFactura |
-| **Prodigia (PADE)** *(secundario)* | **PAC directo** | **REST + SOAP**. Sin SDK Node/TS oficial | Gratis (`pruebas.pade.mx`) | **Sí** — API "Distribuidores 2.0" (`registrarAsociado` por RFC) | **Flexible** — `CERT_DEFAULT` guardado o base64 por request. Sin HSM | **No pública**; timbres **sin expiración** | Soportada; Autofactura arma la global diaria | Sí — portal + API |
-| **Solución Factible** *(secundario)* | **PAC directo** (2011) | **Solo SOAP**. Sin SDK Node/TS oficial | Gratis; credenciales demo públicas | **Sí** — "emisores ilimitados", **cobro por timbre, no por cliente** | En el WS de timbrado **el comercio sella** (envía el XML). Custodia alojada no documentada | **No pública** | Vía Autofactura; `XAXX` + RMF 2026 no confirmados | Sí — portal con marca |
+| Proveedor                            | Tipo                                            | API / SDK                                                                           | Sandbox                                                       | Multiemisor (una cuenta → muchos RFC)                                                                  | Custodia del CSD                                                                                          | $ / timbre                                                                            | Factura global                                         | API autofactura                                                     |
+| ------------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------- |
+| **Facturapi**                        | Capa sobre un PAC **no revelado**               | **REST/JSON**. SDK oficial **Node/TS**, .NET, Java, PHP                             | Gratis, llaves de prueba `sk_test_*`                          | **El mejor** — API "Organizations", **sin costo ni tope por organización**                             | El comercio sube el CSD; **Facturapi guarda las llaves**. Sin claim de HSM                                | **$0.60** + **$299/mes** base (multi-RFC incluido). Los timbres **no expiran**        | Sí (objeto `global`, `S01`)                            | **Sí** — portal QR con marca (factura.space); **$599/organización** |
+| **Facturama**                        | Capa sobre **3 PAC** sin nombre (de FreshBooks) | REST, Basic Auth. SDK Node/JS oficial pero **poco mantenido**; sin TS oficial       | Gratis (`dev.facturama.mx`); CSD de prueba del SAT            | **Sí** — "API Multiemisor" por RFC. **Sin objeto de subcuenta**; esos CFDI **no aparecen en su panel** | El comercio sube el CSD; **Facturama guarda las llaves**. Sin HSM                                         | Módulo API **$1,650/año con 100 folios**, luego **$0.50 / $0.45 / $0.40** por volumen | Sí (`XAXX010101000`, `S01`)                            | **Sin portal llave en mano**; lo construyes tú                      |
+| **SW sapien** (Luna Soft)            | **PAC directo** (aut. 16543, 2013)              | **REST** (Bearer) + SOAP heredado. SDK **Node** oficial + .NET/PHP/Java/Python/Ruby | Gratis (`services.test.sw.com.mx`); 5 timbres prod gratis     | **Sí** — modelo distribuidor + "API Usuarios V2" (subcuenta por RFC)                                   | El comercio sube el CSD; **SW lo guarda** ("sitio seguro"). Sin claim de HSM                              | Tienda pública solo vía Odoo (lo demás por cotización); mínimo **$250/año**           | Sí (su blog cita el plazo de 24 h)                     | **Sí** — portal + API "Web tickets" + QR                            |
+| **Finkok**                           | **PAC directo** (aut. 10852, 2013)              | **SOAP primero** (núcleo); REST solo para PDF. **Sin SDK oficial** (comunidad)      | Gratis (`demo-facturacion.finkok.com`); CSD de prueba del SAT | **Sí** — una cuenta, muchos RFC; WS "Registro de Clientes" + socios/créditos                           | **Flexible** — tú firmas el XML (**las llaves se quedan contigo**) o subes el CSD (`sign_stamp`). Sin HSM | Pospago: **$150 mín (0–500)**, **$0.30** de 501+ (+IVA). Sin mínimo de volumen        | Soportada (XML genérico)                               | Sí — WS "Crear ticket"                                              |
+| **Formas Digitales**                 | **PAC directo** (RFC FCG840618N51)              | **Solo SOAP**. Solo librería **Java** oficial; sin REST/Node/TS                     | Gratis; credenciales demo `pruebasWS/pruebasWS`               | **Sí** — "WS Admin Digital", usuarios `distribuidor`/`cliente`                                         | En la API de timbrado **el integrador firma localmente**; los flujos alojados guardan el CSD. Sin HSM     | **No pública**                                                                        | Genérica; sin página específica ni mención de RMF 2026 | Sí — WS AutoFactura                                                 |
+| **Prodigia (PADE)** _(secundario)_   | **PAC directo**                                 | **REST + SOAP**. Sin SDK Node/TS oficial                                            | Gratis (`pruebas.pade.mx`)                                    | **Sí** — API "Distribuidores 2.0" (`registrarAsociado` por RFC)                                        | **Flexible** — `CERT_DEFAULT` guardado o base64 por request. Sin HSM                                      | **No pública**; timbres **sin expiración**                                            | Soportada; Autofactura arma la global diaria           | Sí — portal + API                                                   |
+| **Solución Factible** _(secundario)_ | **PAC directo** (2011)                          | **Solo SOAP**. Sin SDK Node/TS oficial                                              | Gratis; credenciales demo públicas                            | **Sí** — "emisores ilimitados", **cobro por timbre, no por cliente**                                   | En el WS de timbrado **el comercio sella** (envía el XML). Custodia alojada no documentada                | **No pública**                                                                        | Vía Autofactura; `XAXX` + RMF 2026 no confirmados      | Sí — portal con marca                                               |
 
 ## 2. Detalle por proveedor
 
 ### Facturapi — el más orientado a desarrollador
+
 - **Tipo:** capa sobre un PAC autorizado, **no es PAC**; no nombra al PAC de fondo.
   ([intro](https://docs.facturapi.io/en/docs/intro/), [qué es un PAC](https://www.facturapi.io/en/blog/what-is-a-pac))
 - **API/SDK:** REST/JSON puro, sin SOAP. SDK oficial Node (TS primero), .NET, Java, PHP.
@@ -58,6 +59,7 @@ su cuenta** — ningún PAC lo hace por ti.
   Lyft, Femsa, Cuenca. Sin SLA numérico publicado.
 
 ### Facturama
+
 - Capa sobre **3 PAC** sin nombre; de FreshBooks desde 2020. Dos productos: **API Web** (un RFC,
   visible en panel) y **API Multiemisor** (muchos RFC, CFDI **solo consultables por API**).
   ([API](https://facturama.mx/api-facturacion-electronica),
@@ -71,6 +73,7 @@ su cuenta** — ningún PAC lo hace por ti.
   entregados; sin status público. ([Trustpilot](https://es.trustpilot.com/review/facturama.mx))
 
 ### SW sapien (Luna Soft)
+
 - **PAC directo**, aut. 16543 desde 2013. REST (Bearer) + SOAP; SDK **Node** oficial + varios.
   ([SAT SW](https://www.gob.mx/sat/acciones-y-programas/sw-smarterweb),
   [APIs](https://developers.sw.com.mx/article-categories/apis/),
@@ -86,6 +89,7 @@ su cuenta** — ningún PAC lo hace por ti.
   [web tickets](https://developers.sw.com.mx/knowledge-base/portal-de-web-tickets/))
 
 ### Finkok
+
 - **PAC directo**, aut. 10852 desde 2013. **SOAP primero**; REST solo PDF; **sin SDK oficial**
   (usar `phpcfdi/finkok` de la comunidad o envolver los WSDL).
   ([SAT Finkok](https://www.gob.mx/sat/acciones-y-programas/finkok),
@@ -100,6 +104,7 @@ su cuenta** — ningún PAC lo hace por ti.
   público; documentación en español y centrada en SOAP.
 
 ### Formas Digitales (Forsedi)
+
 - **PAC directo** (RFC FCG840618N51). **Solo SOAP**, solo librería **Java**; sin REST/Node/TS.
   Multiemisor por "WS Admin Digital". En la API de timbrado **el integrador firma localmente**.
   Precio no público. Es el mayor esfuerzo de integración para un stack TypeScript.
@@ -107,12 +112,14 @@ su cuenta** — ningún PAC lo hace por ti.
   [métodos timbrado](https://forsedi.facturacfdi.mx/developers/metodos-timbrado))
 
 ### Prodigia (PADE) — secundario
+
 - **PAC directo**, REST + SOAP, API "Distribuidores 2.0" (multiemisor por RFC), custodia flexible,
   cancelación con acuse, Autofactura. Precio no público; **timbres sin expiración**; ~99.9% de
   disponibilidad. Sin SDK Node/TS oficial.
   ([docs](https://docs.prodigia.com.mx/), [distribuidores](https://docs.prodigia.com.mx/api-distribuidores.html))
 
 ### Solución Factible — secundario
+
 - **PAC directo** (2011), **solo SOAP**, credenciales demo públicas. Mensaje muy pro-SaaS:
   "emisores ilimitados", **"pago por timbre, no por cliente"**. El comercio sella en el WS de
   timbrado. Precio no público; sin SDK Node/TS oficial.
@@ -138,6 +145,7 @@ multiinquilino a la vez:
 cerca.** Como Umi construye la abstracción de PAC de todos modos, cablear un PAC directo de
 respaldo quita dos riesgos de Facturapi: (a) **dependencia de un solo PAC no revelado**, y
 (b) depender del uptime de un solo proveedor.
+
 - **SW sapien** es el "PAC directo que aún se siente moderno": REST + Bearer, SDK Node oficial,
   multiemisor por subcuenta, portal de autofactura. Es el salto más corto desde un adaptador con
   forma de Facturapi.

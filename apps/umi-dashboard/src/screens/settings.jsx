@@ -380,9 +380,9 @@ const SettingsScreen = () => {
             />
             <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
               <Trans>
-                Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café
-                nocturno usa p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche
-                que la abrió. No cambia días ya cerrados.
+                Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café nocturno usa
+                p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche que la abrió. No
+                cambia días ya cerrados.
               </Trans>
             </div>
           </div>

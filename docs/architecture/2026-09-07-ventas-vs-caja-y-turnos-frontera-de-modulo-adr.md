@@ -3,9 +3,9 @@
 - Fecha: 2026-09-07
 - Estado: Propuesto (decisión de frontera de módulo). Los **dos prototipos de interfaz
   están completos y funcionan al 100%** como demo con datos de ejemplo (cada control hace
-  algo real; sin botones muertos): *Reportes* (rango de fechas que recalcula todo,
+  algo real; sin botones muertos): _Reportes_ (rango de fechas que recalcula todo,
   comparación con Δ, búsqueda que filtra, multi-sucursal con roll-up, tabla dinámica con
-  agrupar-por/orden, Propinas real) y *Caja y turnos* (multi-sucursal, pulse calculado,
+  agrupar-por/orden, Propinas real) y _Caja y turnos_ (multi-sucursal, pulse calculado,
   aprobar diferencia y nota como cambios de estado reales, denominaciones, ordenar por
   diferencia). Falta el trabajo de producto: el modelo de lectura agregado de ventas en la
   API y el recableado del ingreso del Overview (ver "Es nuevo").
@@ -27,13 +27,13 @@
   reconcilia a `netSalesMinorUnits`), servicio y controlador. Agrega ventas netas, órdenes,
   ticket, ítems, descuentos, delta vs. período anterior, **mezcla de pago** (efectivo /
   terminal manual — el POS aún no captura tarjeta/monedero), **mezcla de producto** (unidades
-  + venta neta por producto/categoría, sin margen porque la línea no lleva costo) y una
-  **serie por hora o por día**. Frontend: `src/screens/ventas-report.jsx` (selector de rango
-  Hoy/Ayer/7d/30d, KPIs con delta, gráfico de serie, mezcla de pago y tabla de productos)
-  montado en la pestaña Ventas de Reportes vía `useSalesSummary` en `data.jsx`. Contract,
-  API (tsc) y dashboard (vite) compilan en verde. Pendiente: dimensiones de la tabla dinámica
-  por barista/hora, el detalle del turno (denominaciones, trazabilidad, aprobar) y el
-  recableado del ingreso del Overview.
+  - venta neta por producto/categoría, sin margen porque la línea no lleva costo) y una
+    **serie por hora o por día**. Frontend: `src/screens/ventas-report.jsx` (selector de rango
+    Hoy/Ayer/7d/30d, KPIs con delta, gráfico de serie, mezcla de pago y tabla de productos)
+    montado en la pestaña Ventas de Reportes vía `useSalesSummary` en `data.jsx`. Contract,
+    API (tsc) y dashboard (vite) compilan en verde. Pendiente: dimensiones de la tabla dinámica
+    por barista/hora, el detalle del turno (denominaciones, trazabilidad, aprobar) y el
+    recableado del ingreso del Overview.
 - Actualización 2026-09-07 (3): se implementó el **detalle del turno de caja** de extremo a
   extremo (read-only, respetando "el efectivo es solo-POS"). Backend: endpoint
   `GET …/operations/cash-shifts/:shiftId` con contrato `CashShiftDetail`
@@ -55,8 +55,8 @@
   del ingreso del Overview.
 - Actualización 2026-09-07 (4): navegación y diseño alineados al prototipo, y brechas de
   dato cerradas donde el POS ya captura.
-  - **Menú anidado (no pestañas):** el sidebar ahora expande *Reportes* → Ventas · Recibos ·
-    Reembolsos y *Caja y turnos* → Turnos de caja · Registros, cada uno con su sub-ruta
+  - **Menú anidado (no pestañas):** el sidebar ahora expande _Reportes_ → Ventas · Recibos ·
+    Reembolsos y _Caja y turnos_ → Turnos de caja · Registros, cada uno con su sub-ruta
     (`module-registry.js` `children`, `shell.jsx` render anidado + `activeFull`, `app.jsx`
     sub-rutas). Se quitaron los `HubTabs`.
   - **Ventas = cockpit del prototipo:** tarjetas KPI en caja, alternador Resumen / Tabla
@@ -67,7 +67,7 @@
     `receipt.snapshot->'tip'`.
   - **Caja y turnos:** pulse en tarjetas y detalle (cuenta del turno, denominaciones, libro,
     separación de funciones, trazabilidad) desde `cashShiftDetail`.
-  - **Acento del diseño:** las dos pantallas aplican el azul del prototipo (#0F5BFF) *scoped*
+  - **Acento del diseño:** las dos pantallas aplican el azul del prototipo (#0F5BFF) _scoped_
     vía `--merchant-brand` en el contenedor, sin tocar el tema global.
   - **Mapa CodeGraph (sync + trace):** `salesSummary` controller:36 → service:80 → repo;
     `cashShiftDetail` controller:46 → service:94 → repo; `useSalesSummary` (data.jsx:1100) →
@@ -111,16 +111,16 @@ competidores (●).
 Ventas y caja son superficies **distintas** en todos los sistemas revisados. No es
 redundancia; son lentes distintas de la misma venta:
 
-- **PoloTab** (norte de diseño): "Venta" es un reporte bajo *Reportes*; "Caja" es una
-  entrada bajo *Trazabilidad*. Son dos secciones de navegación distintas.
-- **Toast**: un módulo *Reports*, pero con categorías separadas "Sales" y "Cash & Loss
+- **PoloTab** (norte de diseño): "Venta" es un reporte bajo _Reportes_; "Caja" es una
+  entrada bajo _Trazabilidad_. Son dos secciones de navegación distintas.
+- **Toast**: un módulo _Reports_, pero con categorías separadas "Sales" y "Cash & Loss
   Management".
-- **Square**: *Reports → Sales* aparte del reporte de *Cash Drawer Shift*.
-- **Odoo**: *Reporting → Orders* aparte de *Sessions* (la caja/turno) aparte de
-  *Accounting* (el asiento contable).
-- **Lightspeed**: reportes de ventas aparte de *Fiscal → Cash drawer* aparte de *Financial
-  Services*.
-- **Clover**: *Reporting* aparte de *Sales activity → Cash log*.
+- **Square**: _Reports → Sales_ aparte del reporte de _Cash Drawer Shift_.
+- **Odoo**: _Reporting → Orders_ aparte de _Sessions_ (la caja/turno) aparte de
+  _Accounting_ (el asiento contable).
+- **Lightspeed**: reportes de ventas aparte de _Fiscal → Cash drawer_ aparte de _Financial
+  Services_.
+- **Clover**: _Reporting_ aparte de _Sales activity → Cash log_.
 
 ## Modelo conceptual: una venta, tres lentes
 
@@ -172,13 +172,13 @@ Se corrió una deduplicación antes de decidir. Hallazgos con evidencia:
 
 ## Decisión
 
-1. **Dos módulos, no uno.** *Reportes* (comercial) y *Caja y turnos* (custodia). *Reportes*
+1. **Dos módulos, no uno.** _Reportes_ (comercial) y _Caja y turnos_ (custodia). _Reportes_
    es un módulo con un menú desplegable anidado; su primera página (por defecto) es
-   *Ventas*, con *Rentabilidad* y *Propinas* como hermanas. *Ventas* abre en un resumen
+   _Ventas_, con _Rentabilidad_ y _Propinas_ como hermanas. _Ventas_ abre en un resumen
    escaneable (KPIs + gráfico + tabla) con la **tabla dinámica** a un clic (agrupar por
    producto/categoría/barista/hora, orden por columna, exportar/guardar).
-2. **Re-hogar los registros de venta.** Recibos y Reembolsos pasan a *Reportes* (grupo
-   «Registros de venta»). Turnos de caja y Registros quedan en *Caja y turnos*.
+2. **Re-hogar los registros de venta.** Recibos y Reembolsos pasan a _Reportes_ (grupo
+   «Registros de venta»). Turnos de caja y Registros quedan en _Caja y turnos_.
 3. **Una sola fuente de la venta.** `merchant.pos_committed_sale` + `merchant.receipt_snapshot`.
    Ventas lee `grand_total` (todos los métodos); Caja lee la porción de efectivo de
    `merchant.cash_ledger_entry`.
@@ -205,7 +205,7 @@ Es nuevo:
 - Un **modelo de lectura agregado de ventas** (rollups: ventas netas, ticket promedio,
   órdenes, mezcla por método, mezcla de producto, franjas horarias, rentabilidad/COGS,
   período contra período y año contra año, por sucursal y por cadena). No existe.
-- El módulo de interfaz *Reportes* (con *Ventas* como página por defecto, una barra de
+- El módulo de interfaz _Reportes_ (con _Ventas_ como página por defecto, una barra de
   filtros persistente —rango de fechas, comparación, sucursal— y una tabla dinámica con
   agrupar-por, orden por columna y exportación).
 - El recableado del ingreso del Overview hacia el nuevo modelo, y el retiro del proxy.

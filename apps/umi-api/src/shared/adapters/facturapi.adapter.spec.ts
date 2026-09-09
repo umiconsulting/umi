@@ -35,7 +35,9 @@ describe('FacturapiAdapter', () => {
     const [url, opts] = fetchSpy.mock.calls[0];
     expect(url).toBe(`${BASE}/organizations`);
     expect(opts.method).toBe('POST');
-    expect(opts.headers.Authorization).toBe(`Basic ${Buffer.from('sk_user_X:').toString('base64')}`);
+    expect(opts.headers.Authorization).toBe(
+      `Basic ${Buffer.from('sk_user_X:').toString('base64')}`,
+    );
   });
 
   it('stampInvoice POSTs /invoices with Basic auth (org key as user, blank password)', async () => {
@@ -48,7 +50,9 @@ describe('FacturapiAdapter', () => {
     const [url, opts] = fetchSpy.mock.calls[0];
     expect(url).toBe(`${BASE}/invoices`);
     expect(opts.method).toBe('POST');
-    expect(opts.headers.Authorization).toBe(`Basic ${Buffer.from('sk_test_ABC:').toString('base64')}`);
+    expect(opts.headers.Authorization).toBe(
+      `Basic ${Buffer.from('sk_test_ABC:').toString('base64')}`,
+    );
     expect(JSON.parse(opts.body)).toEqual(INVOICE);
   });
 
@@ -70,7 +74,10 @@ describe('FacturapiAdapter', () => {
   it('honors a configured base URL and encodes the invoice id', async () => {
     const fetchSpy = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
     vi.stubGlobal('fetch', fetchSpy);
-    await adapterWith({ FACTURAPI_BASE_URL: 'https://sandbox.example/v2' }).getInvoice('sk', 'inv 1');
+    await adapterWith({ FACTURAPI_BASE_URL: 'https://sandbox.example/v2' }).getInvoice(
+      'sk',
+      'inv 1',
+    );
     expect(fetchSpy.mock.calls[0][0]).toBe('https://sandbox.example/v2/invoices/inv%201');
   });
 });

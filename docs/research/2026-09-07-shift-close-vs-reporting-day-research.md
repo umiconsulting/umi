@@ -68,12 +68,12 @@ This file checks whether (b) is the industry norm or an outlier — and whether 
 
 ## 2. Comparison table
 
-| Vendor | Drawer decoupled from sales day? | Reporting-day definition (calendar vs configurable close-hour) | Multiple shifts/day summed on dashboard? | Separate cash vs sales reports? | Midnight / timezone handling |
-| --- | --- | --- | --- | --- | --- |
-| **Toast** | **YES.** Cash-drawer closeout and Close Out Day are "separate features"; the Z report "data updates in real time as sales occur," and "Printing the Z Report does not turn the day over" ([Close Out Day/Z](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture)) | **Configurable business day / close-out hour.** Auto-closes "By default at 4:00 a.m." ([Close Out Day/Z](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture)); the Z report is "a one-day sales summary for the **entire business day**" ([Close-out overview](https://doc.toasttab.com/doc/platformguide/platformCloseOutDayOverview.html)). Cut-off changed via Toast Care | **YES** — many drawer closes roll up into one business day; drawer reconciliation is per-drawer, the business day is the roll-up ([Cash Mgmt](https://support.toasttab.com/en/article/Cash-Management-Overview)) | **YES.** Cash Management / Shift Review (drawer, over/short) vs Sales Summary (orders & sales) are distinct reports ([Sales Summary](https://support.toasttab.com/en/article/Sales-Summary-Report)) | Auto-close **4:00 a.m. ET** for US, **4:00 a.m. local** for UK/IE/AU/CA ([Close Out Day/Z](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture)) |
-| **Square** | **YES.** `CashDrawerShift` is its own object; "Cash drawers" is a report **distinct from** "Sales summary" ([Dashboard reports](https://squareup.com/help/us/en/article/5072-summaries-and-reports-from-the-online-dashboard)). Ending a drawer does not touch the sales day | **Configurable reporting hours.** "The **start time will determine the calendar day that sales will be attributed to**"; set multiple custom ranges + timezone ([Reporting hours](https://squareup.com/help/us/en/article/7192-set-up-reporting-hours)). Default is the calendar day | **YES.** Multiple `CashDrawerShift`s per location/day, listed by time range; sales sum on the reporting day regardless ([CashDrawerShift API](https://developer.squareup.com/reference/square/objects/CashDrawerShift)) | **YES.** Cash Drawers report vs Sales summary are separate dashboard reports ([Dashboard reports](https://squareup.com/help/us/en/article/5072-summaries-and-reports-from-the-online-dashboard)) | Reporting timeframe carries its **own timezone**; a bar closing past midnight sets the day-start via reporting hours ([Reporting hours](https://squareup.com/help/us/en/article/7192-set-up-reporting-hours)) |
-| **Clover** | **YES.** Batch **closeout is card settlement**, not a sales reset; the **Cash Log** is its own report; dashboard sales run on date ranges ([Voids/refunds](https://docs.clover.com/dev/docs/voids-and-refunds), [Cash Log](https://www.clover.com/en-US/help/run-cash-log-report)) | **Calendar date ranges** (Today/Yesterday/Last 7/30/custom) on the dashboard ([Date-range reports](https://www.clover.com/en-US/help/run-historical-reports-with-date-range-filters)). A Toast/Square-style *sales* day-start hour is **NOT VERIFIED**; batch time is configurable but is a settlement clock | **YES** — batches settle independently; dashboard sums the date range chosen, not per batch ([Closeout settings](https://www.clover.com/en-US/help/understand-closeout-settings)) | **YES.** Cash Log (drawer events) vs Sales reports are separate ([Cash Log](https://www.clover.com/en-US/help/run-cash-log-report)) | Auto-batch closeout time configurable via support (commonly ~default overnight); location-timezone dates. Exact defaults **NOT VERIFIED** (SPA) |
-| **Lightspeed (K-Series)** | **MOSTLY.** Back-office sales run on a **business day**; but the **on-POS Shift report** *is* a per-"sales period" reset window opened/closed by staff — a real shift-scoped report that coexists with the day ([Shift reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports)) | **Configurable "Start of day."** "Most businesses have a default **Start of day at 5:30 am local time**"; "To adjust your Start of day, contact Support" ([Tempo](https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo)) | **YES.** Several sales periods/shifts in a day; the business day (Start-of-day → next Start-of-day) rolls them up ([Shift reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports)) | **YES.** Cash drawer report (shift→user→drawer, over/short) vs Sales Summary are distinct ([Cash drawer report](https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report)) | Start-of-day is **local time**; business day spans midnight (e.g. 5:30 → 5:29) ([Tempo](https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo)) |
+| Vendor                    | Drawer decoupled from sales day?                                                                                                                                                                                                                                                                                         | Reporting-day definition (calendar vs configurable close-hour)                                                                                                                                                                                                                                                                                                                                        | Multiple shifts/day summed on dashboard?                                                                                                                                                                                    | Separate cash vs sales reports?                                                                                                                                                                                | Midnight / timezone handling                                                                                                                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Toast**                 | **YES.** Cash-drawer closeout and Close Out Day are "separate features"; the Z report "data updates in real time as sales occur," and "Printing the Z Report does not turn the day over" ([Close Out Day/Z](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture))                                | **Configurable business day / close-out hour.** Auto-closes "By default at 4:00 a.m." ([Close Out Day/Z](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture)); the Z report is "a one-day sales summary for the **entire business day**" ([Close-out overview](https://doc.toasttab.com/doc/platformguide/platformCloseOutDayOverview.html)). Cut-off changed via Toast Care | **YES** — many drawer closes roll up into one business day; drawer reconciliation is per-drawer, the business day is the roll-up ([Cash Mgmt](https://support.toasttab.com/en/article/Cash-Management-Overview))            | **YES.** Cash Management / Shift Review (drawer, over/short) vs Sales Summary (orders & sales) are distinct reports ([Sales Summary](https://support.toasttab.com/en/article/Sales-Summary-Report))            | Auto-close **4:00 a.m. ET** for US, **4:00 a.m. local** for UK/IE/AU/CA ([Close Out Day/Z](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture))                                      |
+| **Square**                | **YES.** `CashDrawerShift` is its own object; "Cash drawers" is a report **distinct from** "Sales summary" ([Dashboard reports](https://squareup.com/help/us/en/article/5072-summaries-and-reports-from-the-online-dashboard)). Ending a drawer does not touch the sales day                                             | **Configurable reporting hours.** "The **start time will determine the calendar day that sales will be attributed to**"; set multiple custom ranges + timezone ([Reporting hours](https://squareup.com/help/us/en/article/7192-set-up-reporting-hours)). Default is the calendar day                                                                                                                  | **YES.** Multiple `CashDrawerShift`s per location/day, listed by time range; sales sum on the reporting day regardless ([CashDrawerShift API](https://developer.squareup.com/reference/square/objects/CashDrawerShift))     | **YES.** Cash Drawers report vs Sales summary are separate dashboard reports ([Dashboard reports](https://squareup.com/help/us/en/article/5072-summaries-and-reports-from-the-online-dashboard))               | Reporting timeframe carries its **own timezone**; a bar closing past midnight sets the day-start via reporting hours ([Reporting hours](https://squareup.com/help/us/en/article/7192-set-up-reporting-hours)) |
+| **Clover**                | **YES.** Batch **closeout is card settlement**, not a sales reset; the **Cash Log** is its own report; dashboard sales run on date ranges ([Voids/refunds](https://docs.clover.com/dev/docs/voids-and-refunds), [Cash Log](https://www.clover.com/en-US/help/run-cash-log-report))                                       | **Calendar date ranges** (Today/Yesterday/Last 7/30/custom) on the dashboard ([Date-range reports](https://www.clover.com/en-US/help/run-historical-reports-with-date-range-filters)). A Toast/Square-style _sales_ day-start hour is **NOT VERIFIED**; batch time is configurable but is a settlement clock                                                                                          | **YES** — batches settle independently; dashboard sums the date range chosen, not per batch ([Closeout settings](https://www.clover.com/en-US/help/understand-closeout-settings))                                           | **YES.** Cash Log (drawer events) vs Sales reports are separate ([Cash Log](https://www.clover.com/en-US/help/run-cash-log-report))                                                                            | Auto-batch closeout time configurable via support (commonly ~default overnight); location-timezone dates. Exact defaults **NOT VERIFIED** (SPA)                                                               |
+| **Lightspeed (K-Series)** | **MOSTLY.** Back-office sales run on a **business day**; but the **on-POS Shift report** _is_ a per-"sales period" reset window opened/closed by staff — a real shift-scoped report that coexists with the day ([Shift reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports)) | **Configurable "Start of day."** "Most businesses have a default **Start of day at 5:30 am local time**"; "To adjust your Start of day, contact Support" ([Tempo](https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo))                                                                                                                         | **YES.** Several sales periods/shifts in a day; the business day (Start-of-day → next Start-of-day) rolls them up ([Shift reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports)) | **YES.** Cash drawer report (shift→user→drawer, over/short) vs Sales Summary are distinct ([Cash drawer report](https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report)) | Start-of-day is **local time**; business day spans midnight (e.g. 5:30 → 5:29) ([Tempo](https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo))           |
 
 ## 3. Per-vendor detail
 
@@ -89,22 +89,22 @@ turns anything over.
   > "Close Out Day is the manager screen on the Toast POS that closes out the business day, paid
   > checks, orders, and clocked-in employees. Cash drawer closeout is the per-drawer cash
   > reconciliation done at end of shift. They are separate features."
-  ([Close Out Day, Z Report, and Auto-Capture](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture)) — VENDOR-PRIMARY.
-  And the Z report is a **live** view, not a reset:
+  > ([Close Out Day, Z Report, and Auto-Capture](https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture)) — VENDOR-PRIMARY.
+  > And the Z report is a **live** view, not a reset:
   > "Printing the Z Report does not turn the day over. The data updates in real time as sales
   > occur." (same) — VENDOR-PRIMARY.
 - **(2) The reporting day is a configurable close-out hour.** Toast auto-rolls the business day
   on a clock, not on a drawer:
   > "By default at 4:00 a.m. each day, Toast will: Close out any unclosed checks that were in
   > Paid status at the time of close." (same) — VENDOR-PRIMARY.
-  The Z report is explicitly a **whole-business-day** summary:
+  > The Z report is explicitly a **whole-business-day** summary:
   > "The Z report is a one-day sales summary for the entire business day."
-  ([Close-out overview, platform guide](https://doc.toasttab.com/doc/platformguide/platformCloseOutDayOverview.html)) — VENDOR-PRIMARY.
-  The cut-off hour is configurable (not self-service). Toast documents it as a **default** and
-  routes changes through Customer Care; per Toast support material the business-day cut-off may be
-  set to a time between 12:00 a.m. and 7:00 a.m. in the restaurant's timezone, defaulting to
-  4:00 a.m. — the "12 a.m.–7 a.m. window" wording is **VENDOR-PRIMARY (indexed description)**; the
-  4:00 a.m. default and "contact Care to change" are clean primary.
+  > ([Close-out overview, platform guide](https://doc.toasttab.com/doc/platformguide/platformCloseOutDayOverview.html)) — VENDOR-PRIMARY.
+  > The cut-off hour is configurable (not self-service). Toast documents it as a **default** and
+  > routes changes through Customer Care; per Toast support material the business-day cut-off may be
+  > set to a time between 12:00 a.m. and 7:00 a.m. in the restaurant's timezone, defaulting to
+  > 4:00 a.m. — the "12 a.m.–7 a.m. window" wording is **VENDOR-PRIMARY (indexed description)**; the
+  > 4:00 a.m. default and "contact Care to change" are clean primary.
 - **(3) Multiple shifts per day summed.** Cash Management runs **per drawer / per employee** with
   its own over/short, while the day rolls all of them up; a shift close reconciles one drawer and
   the business day continues ([Cash Management Overview](https://support.toasttab.com/en/article/Cash-Management-Overview),
@@ -114,7 +114,7 @@ turns anything over.
   opened, not when the payment is processed" — [Sales Summary Report](https://support.toasttab.com/en/article/Sales-Summary-Report));
   cash/over-short lives in **Cash Management / Shift Review**. Different reports, different axes. —
   VENDOR-PRIMARY.
-- **(5) What a close *triggers*.** The **day** close (4 a.m. auto or manual Close Out Day) is
+- **(5) What a close _triggers_.** The **day** close (4 a.m. auto or manual Close Out Day) is
   what auto-captures card batches and clocks out staff; the **drawer** close only reconciles cash.
   The dashboard is otherwise a running view of the business day, and printing a Z report changes
   nothing ("does not turn the day over"). — VENDOR-PRIMARY.
@@ -135,10 +135,10 @@ turns anything over.
 - **(2) The reporting day is configurable "reporting hours."** Square lets you attribute sales to
   a day by a configurable start time, not a fixed midnight:
   > "The **start time will determine the calendar day that sales will be attributed to**."
-  ([Set up reporting hours](https://squareup.com/help/us/en/article/7192-set-up-reporting-hours)) — VENDOR-PRIMARY.
-  You "set up multiple custom time ranges to best represent your business hours" and "choose a
-  timezone." Default behaviour is the plain calendar day; a late-closing venue moves the day-start
-  so post-midnight sales land on the prior day.
+  > ([Set up reporting hours](https://squareup.com/help/us/en/article/7192-set-up-reporting-hours)) — VENDOR-PRIMARY.
+  > You "set up multiple custom time ranges to best represent your business hours" and "choose a
+  > timezone." Default behaviour is the plain calendar day; a late-closing venue moves the day-start
+  > so post-midnight sales land on the prior day.
 - **(3) Multiple shifts per day summed.** `ListCashDrawerShifts` returns all shifts for a
   location over a time range ("scan shift activity … identify which shifts require attention"),
   i.e. many shifts coexist under one day and sales sum across them
@@ -146,7 +146,7 @@ turns anything over.
 - **(4) Separate cash vs sales reports.** Confirmed by the dashboard report list: "Sales summary
   … Item sales … Cash drawers …" are distinct entries
   ([Dashboard reports](https://squareup.com/help/us/en/article/5072-summaries-and-reports-from-the-online-dashboard)) — VENDOR-PRIMARY.
-- **(5) What a close *triggers*.** Square's cash-drawer API is **read-only reporting**; a drawer
+- **(5) What a close _triggers_.** Square's cash-drawer API is **read-only reporting**; a drawer
   close writes a reconciliation record (variance), it does not roll the sales day. The dashboard
   shows the running reporting-day totals independently. — VENDOR-PRIMARY (spec).
 - **(6) Timezone / midnight.** The reporting timeframe carries its own timezone and start time;
@@ -156,7 +156,7 @@ turns anything over.
 
 ### 3.3 Clover — batch closeout is card settlement, not a sales-day reset
 
-Clover is the vendor where the "close resets the day" intuition is most likely to be *wrong*,
+Clover is the vendor where the "close resets the day" intuition is most likely to be _wrong_,
 because Clover's most prominent "close" is the **payment batch**, which is a settlement clock, not
 a reporting boundary.
 
@@ -183,7 +183,7 @@ a reporting boundary.
 - **(4) Separate cash vs sales reports.** Cash Log (Event / Amount / Reason / Employee; filter by
   employee/event/device) is distinct from Sales reports
   ([Cash Log](https://www.clover.com/en-US/help/run-cash-log-report)) — VENDOR-PRIMARY (indexed description).
-- **(5) What a close *triggers*.** A batch closeout submits card transactions for clearing and
+- **(5) What a close _triggers_.** A batch closeout submits card transactions for clearing and
   emails a closeout report; it is a **settlement** event, not a sales-day turnover. — VENDOR-PRIMARY
   (voids/refunds dev doc) + indexed description.
 - **(6) Timezone / midnight.** Dates follow the location; the auto-batch time is configurable via
@@ -192,35 +192,35 @@ a reporting boundary.
 
 ### 3.4 Lightspeed (K-Series) — a configurable "Start of day" business day, plus an on-POS shift report
 
-Lightspeed is the important nuance: it has **both** a business-day window *and* a genuine
+Lightspeed is the important nuance: it has **both** a business-day window _and_ a genuine
 shift-scoped on-POS report — so it partly supports the "shift resets a report" intuition, but only
 for the **on-terminal Shift report**, not the back-office business day.
 
 - **(1) Drawer decoupled — mostly.** The **cash drawer report** (hierarchy shift → user →
   drawer; columns Reported / Lifts-drops / Takings / Total / Difference) is a reconciliation report
   distinct from sales analytics ([Cash drawer report](https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report)) —
-  VENDOR-PRIMARY. **But** the on-POS **Shift report** *is* a per-shift window: "A sales period is
+  VENDOR-PRIMARY. **But** the on-POS **Shift report** _is_ a per-shift window: "A sales period is
   the period between when an employee starts it and the same or another employee ends it," and it
   "shows the sales and business data for the current sales period, a sales period on the current
   day, or the previous day's sales period"
   ([Shift reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports)) —
-  VENDOR-PRIMARY. So a staff-opened sales period does scope *that* report; the **Back Office** sales
+  VENDOR-PRIMARY. So a staff-opened sales period does scope _that_ report; the **Back Office** sales
   reports still run on the business day and date range.
 - **(2) The reporting day is a configurable "Start of day."** Lightspeed derives its business day
   from a configurable start hour:
   > "Most businesses have a default **Start of day at 5:30 am local time**." … "To adjust your
   > **Start of day**, contact Support." … "Tempo updates its data once per day, depending on the
   > restaurant's Start of day."
-  ([Understanding Lightspeed Tempo](https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo)) —
-  VENDOR-PRIMARY. The business day therefore spans midnight (e.g. 5:30 a.m. → 5:29 a.m. next day) —
-  the "5:30→5:29" framing is INFERENCE from the Start-of-day quote plus the business-settings model.
+  > ([Understanding Lightspeed Tempo](https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo)) —
+  > VENDOR-PRIMARY. The business day therefore spans midnight (e.g. 5:30 a.m. → 5:29 a.m. next day) —
+  > the "5:30→5:29" framing is INFERENCE from the Start-of-day quote plus the business-settings model.
 - **(3) Multiple shifts per day summed.** Several sales periods/shifts can open and close in one
   day; the business day (Start-of-day → next Start-of-day) is the roll-up the Back Office reports on
   ([Shift reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports)). — VENDOR-PRIMARY.
 - **(4) Separate cash vs sales reports.** Cash drawer report (over/short, denominations) vs Sales
   Summary are separate ([Cash drawer report](https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report),
   [About Reports](https://k-series-support.lightspeedhq.com/hc/en-us/articles/1260804657209-About-Reports)) — VENDOR-PRIMARY.
-- **(5) What a close *triggers*.** Ending a **sales period/shift** finalizes that on-POS Shift
+- **(5) What a close _triggers_.** Ending a **sales period/shift** finalizes that on-POS Shift
   report (the closest thing here to a "shift Z-report"); it does **not** reset the Back Office
   business-day sales. Closing the **cash drawer** reconciles cash only. — VENDOR-PRIMARY + INFERENCE.
 - **(6) Timezone / midnight.** Start of day is **local time**, configurable via Support; the day
@@ -234,13 +234,13 @@ for the **on-terminal Shift report**, not the back-office business day.
 **dashboard runs on a reporting/business-day window**, and closing a cash drawer/shift **only
 reconciles cash** — it never zeros the day's sales totals. Sales accumulate on the day regardless
 of how many drawers open and close inside it; **cash reconciliation and sales analytics are
-separate reports on separate axes** at every vendor. Three of the four even reject the *pure*
+separate reports on separate axes** at every vendor. Three of the four even reject the _pure_
 calendar day in favour of a **configurable day-start / close-out hour that spans midnight**: Toast
 (default 4:00 a.m., cut-off configurable via Care), Square (reporting-hours start time "determines
 the calendar day that sales will be attributed to"), and Lightspeed (Start of day, default
 5:30 a.m. local, configurable via Support). Clover is the exception on configurability — its
 dashboard reports on plain **calendar date ranges**, and its most prominent "close" (batch
-closeout) is a **card-settlement clock**, not a reporting-day boundary; a configurable *sales*
+closeout) is a **card-settlement clock**, not a reporting-day boundary; a configurable _sales_
 day-start hour was **NOT VERIFIED** for Clover. The only place a "shift" scopes a report is
 Lightspeed's **on-POS Shift report** for one sales period — and even that coexists with the
 business-day Back Office reports rather than replacing them. **A shift close never resets the
@@ -256,7 +256,7 @@ dashboard; the business-day window does the roll-over.**
 2. **Umi's configurable `business_day_start` is the right choice, and it beats a pure calendar
    day.** Three of four leaders use a configurable day-start hour precisely for cafés/bars that
    serve past midnight — exactly Umi's `business_day_start` default `'00:00'` with a late-night
-   café setting `'04:00'`. Keep it; do **not** hardcode 00:00. Umi already derives *every*
+   café setting `'04:00'`. Keep it; do **not** hardcode 00:00. Umi already derives _every_
    `business_date` (sale, cart, receipt, exception, gift card, loyalty, cash-up) from that one
    column via `tg_business_date`, which is the single-source-of-truth property Toast calls out
    ("its cash-up, its revenue report and its receipt must all agree about which day that is").
@@ -274,10 +274,10 @@ dashboard; the business-day window does the roll-over.**
    times has three `cash_shift`s inside one `business_date`; the dashboard sums all sales on that
    date and shows three drawer reconciliations beneath. This is the Toast/Square/Lightspeed
    behaviour verbatim.
-6. **A drawer close should *trigger* only cash-side finalization** (variance calc, custody
+6. **A drawer close should _trigger_ only cash-side finalization** (variance calc, custody
    release, optional receipt/Z-style drawer report) — **not** a sales-day turnover. If Umi ever
    wants a per-shift "Z report" surface, model it on Lightspeed's on-POS **Shift report** (a
-   read scoped to one shift/sales-period) that lives *alongside* the business-day dashboard, never
+   read scoped to one shift/sales-period) that lives _alongside_ the business-day dashboard, never
    replacing it.
 7. **Be explicit about the timezone pivot.** Umi already derives `business_date` from the
    **merchant `timezone`** (`v_at at time zone v_tz`), which is better than Toast's US-ET quirk
@@ -290,7 +290,7 @@ dashboard; the business-day window does the roll-over.**
 - **Toast:** the exact "cut-off can be set between 12:00 a.m. and 7:00 a.m." window is from Toast
   support **indexed text**, not a cleanly rendered quote; the 4:00 a.m. default, US-ET vs local,
   "does not turn the day over," and the drawer-vs-day separation are clean VENDOR-PRIMARY.
-- **Square:** whether ending a `CashDrawerShift` has *any* effect on sales reporting is confirmed
+- **Square:** whether ending a `CashDrawerShift` has _any_ effect on sales reporting is confirmed
   negative by the separate-report model but not stated as a sentence; the reporting-hours
   day-start quote is clean primary.
 - **Clover:** the biggest gap. Whether Clover offers a **configurable sales day-start hour** (as
@@ -305,6 +305,7 @@ dashboard; the business-day window does the roll-over.**
 ## 6. Primary sources
 
 Toast:
+
 - Close Out Day, Z Report, and Auto-Capture (4 a.m. default; "does not turn the day over"; drawer vs day are separate features; ET vs local): https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture
 - Close-out day overview — platform guide ("Z report is a one-day sales summary for the entire business day"): https://doc.toasttab.com/doc/platformguide/platformCloseOutDayOverview.html
 - Sales Summary Report (orders/sales by service period or custom hours; sale recorded at check open): https://support.toasttab.com/en/article/Sales-Summary-Report
@@ -312,24 +313,28 @@ Toast:
 - Shift Review Overview (per-shift over/short reconciliation): https://support.toasttab.com/en/article/Shift-Review-Overview
 
 Square:
+
 - Set up reporting hours ("start time will determine the calendar day that sales will be attributed to"; custom ranges; timezone): https://squareup.com/help/us/en/article/7192-set-up-reporting-hours
 - Summaries and reports from the online Dashboard (Sales summary vs Cash drawers are separate reports): https://squareup.com/help/us/en/article/5072-summaries-and-reports-from-the-online-dashboard
 - CashDrawerShift object (OPEN/ENDED/CLOSED; own cash math): https://developer.squareup.com/reference/square/objects/CashDrawerShift
 - Cash Drawer Shift reporting (list shifts by location + time range): https://developer.squareup.com/docs/cashdrawershift-api/reporting
 
 Clover:
+
 - Handle voids and refunds ("before the daily batch closes" — batch = settlement clock): https://docs.clover.com/dev/docs/voids-and-refunds
 - Run a cash log report (Cash Log is its own report; drawer events): https://www.clover.com/en-US/help/run-cash-log-report
 - Run historical reports with date-range filters (Today/Yesterday/custom): https://www.clover.com/en-US/help/run-historical-reports-with-date-range-filters
 - Understand closeout methods and settings / Check details for an automatic batch closeout (configurable batch time): https://www.clover.com/en-US/help/understand-closeout-settings · https://www.clover.com/en-US/help/check-details-for-an-automatic-batch-closeout
 
 Lightspeed (K-Series):
+
 - Understanding Lightspeed Tempo ("Start of day at 5:30 am local time"; "contact Support" to adjust): https://k-series-support.lightspeedhq.com/hc/en-us/articles/43687798096027-Understanding-Lightspeed-Tempo
 - Shift reports ("A sales period is the period between when an employee starts it and … ends it"; current/previous day's sales period): https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports
 - Cash drawer report (shift→user→drawer; Reported/Lifts-drops/Takings/Total/Difference): https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report
 - About Reports (Back Office sales reports by date range): https://k-series-support.lightspeedhq.com/hc/en-us/articles/1260804657209-About-Reports
 
 Umi (internal, for framing):
+
 - `docs/migration/build-v3/20_merchant.sql` — `business_day_start`; sale `business_date` derived, never caller-supplied
 - `docs/migration/build-v3/60_triggers.sql` — `merchant.tg_business_date()` (subtract day-start, cast to date)
 - `docs/migration/build-v3/33_pos_cash.sql` — `merchant.cash_shift` / `cash_ledger_entry` carry their own `business_date`

@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import { Trans } from '@lingui/react/macro';
 import { useLingui } from '@lingui/react/macro';
-import {
-  useCatalogCategories,
-  createCatalogCategory,
-  updateCatalogCategory,
-} from '@/data.jsx';
+import { useCatalogCategories, createCatalogCategory, updateCatalogCategory } from '@/data.jsx';
 
 // A category always owns a concrete colour (the server starts it on a curated
 // palette entry, see the API). There is no "automatic" state to select — the owner
@@ -74,9 +70,7 @@ function CategoryRow({ category, onSaved }) {
             <Trans>{category.productCount} productos</Trans>
           )}
         </span>
-        {error ? (
-          <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span>
-        ) : null}
+        {error ? <span style={{ color: 'var(--danger)', fontSize: 12 }}>{error}</span> : null}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
@@ -164,8 +158,8 @@ export default function CategoriesWorkspace() {
     <div style={{ display: 'grid', gap: 12 }}>
       <p className="muted" style={{ margin: 0 }}>
         <Trans>
-          Cada categoría empieza con un color al azar; cámbialo cuando quieras. Se ve en el
-          punto de venta detrás de los productos sin foto, para ubicarlos por categoría.
+          Cada categoría empieza con un color al azar; cámbialo cuando quieras. Se ve en el punto de
+          venta detrás de los productos sin foto, para ubicarlos por categoría.
         </Trans>
       </p>
       <CreateCategory onCreated={reload} />

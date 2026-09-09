@@ -113,10 +113,20 @@ function DenominationTable({ title, rows, currency }) {
   const total = rows.reduce((sum, r) => sum + r.valueMinorUnits, 0);
   return (
     <div style={{ border: '1px solid var(--line)', borderRadius: 10, overflow: 'hidden' }}>
-      <div className="eyebrow" style={{ padding: '10px 12px', borderBottom: '1px solid var(--line)' }}>
+      <div
+        className="eyebrow"
+        style={{ padding: '10px 12px', borderBottom: '1px solid var(--line)' }}
+      >
         {title}
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, fontFamily: 'var(--font-mono)' }}>
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: 12.5,
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} style={{ borderTop: i ? '1px solid var(--line-soft)' : 'none' }}>
@@ -175,22 +185,54 @@ function ShiftDetail({ shiftId }) {
   const m = d.math;
   const vTone = toneOf(m.varianceMinorUnits, m.toleranceMinorUnits);
   const terms = [
-    { label: <Trans>Fondo de apertura</Trans>, value: formatOperationMoney(m.openingMinorUnits, d.currency), op: null },
-    { label: <Trans>Ventas en efectivo</Trans>, value: formatOperationMoney(m.cashSalesMinorUnits, d.currency), op: '+' },
+    {
+      label: <Trans>Fondo de apertura</Trans>,
+      value: formatOperationMoney(m.openingMinorUnits, d.currency),
+      op: null,
+    },
+    {
+      label: <Trans>Ventas en efectivo</Trans>,
+      value: formatOperationMoney(m.cashSalesMinorUnits, d.currency),
+      op: '+',
+    },
   ];
   if (m.paidInMinorUnits > 0)
-    terms.push({ label: <Trans>Ingresos</Trans>, value: formatOperationMoney(m.paidInMinorUnits, d.currency), op: '+' });
+    terms.push({
+      label: <Trans>Ingresos</Trans>,
+      value: formatOperationMoney(m.paidInMinorUnits, d.currency),
+      op: '+',
+    });
   if (m.paidOutMinorUnits > 0)
-    terms.push({ label: <Trans>Retiros</Trans>, value: formatOperationMoney(m.paidOutMinorUnits, d.currency), op: '−' });
+    terms.push({
+      label: <Trans>Retiros</Trans>,
+      value: formatOperationMoney(m.paidOutMinorUnits, d.currency),
+      op: '−',
+    });
   if (m.safeDropMinorUnits > 0)
-    terms.push({ label: <Trans>Caja fuerte</Trans>, value: formatOperationMoney(m.safeDropMinorUnits, d.currency), op: '−' });
+    terms.push({
+      label: <Trans>Caja fuerte</Trans>,
+      value: formatOperationMoney(m.safeDropMinorUnits, d.currency),
+      op: '−',
+    });
   if (m.refundsMinorUnits > 0)
-    terms.push({ label: <Trans>Reembolsos</Trans>, value: formatOperationMoney(m.refundsMinorUnits, d.currency), op: '−' });
+    terms.push({
+      label: <Trans>Reembolsos</Trans>,
+      value: formatOperationMoney(m.refundsMinorUnits, d.currency),
+      op: '−',
+    });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
           <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22 }}>
             {d.register || <Trans>Turno</Trans>}
           </h3>
@@ -216,16 +258,48 @@ function ShiftDetail({ shiftId }) {
           {terms.map((term, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {term.op ? (
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--ink-3)' }}>{term.op}</span>
+                <span
+                  style={{ fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--ink-3)' }}
+                >
+                  {term.op}
+                </span>
               ) : null}
-              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 9, padding: '9px 13px', minWidth: 96 }}>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>{term.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15 }}>{term.value}</div>
+              <div
+                style={{
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 9,
+                  padding: '9px 13px',
+                  minWidth: 96,
+                }}
+              >
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>
+                  {term.label}
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15 }}>
+                  {term.value}
+                </div>
               </div>
             </div>
           ))}
-          <span style={{ alignSelf: 'center', fontFamily: 'var(--font-display)', fontSize: 20, color: 'var(--ink-3)' }}>=</span>
-          <div style={{ background: 'color-mix(in srgb, var(--merchant-brand) 12%, transparent)', borderRadius: 9, padding: '9px 13px', minWidth: 110 }}>
+          <span
+            style={{
+              alignSelf: 'center',
+              fontFamily: 'var(--font-display)',
+              fontSize: 20,
+              color: 'var(--ink-3)',
+            }}
+          >
+            =
+          </span>
+          <div
+            style={{
+              background: 'color-mix(in srgb, var(--merchant-brand) 12%, transparent)',
+              borderRadius: 9,
+              padding: '9px 13px',
+              minWidth: 110,
+            }}
+          >
             <div style={{ fontSize: 11, color: 'var(--merchant-brand)', marginBottom: 4 }}>
               <Trans>Efectivo esperado</Trans>
             </div>
@@ -233,21 +307,68 @@ function ShiftDetail({ shiftId }) {
               {formatOperationMoney(m.expectedMinorUnits, d.currency)}
             </div>
           </div>
-          <span style={{ alignSelf: 'center', fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--ink-3)' }}>vs</span>
-          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--line-strong)', borderRadius: 9, padding: '9px 13px', minWidth: 110 }}>
+          <span
+            style={{
+              alignSelf: 'center',
+              fontFamily: 'var(--font-display)',
+              fontSize: 15,
+              color: 'var(--ink-3)',
+            }}
+          >
+            vs
+          </span>
+          <div
+            style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--line-strong)',
+              borderRadius: 9,
+              padding: '9px 13px',
+              minWidth: 110,
+            }}
+          >
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>
               <Trans>Efectivo contado</Trans>
             </div>
             <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 16 }}>
-              {m.countedMinorUnits == null ? <Trans>Pendiente</Trans> : formatOperationMoney(m.countedMinorUnits, d.currency)}
+              {m.countedMinorUnits == null ? (
+                <Trans>Pendiente</Trans>
+              ) : (
+                formatOperationMoney(m.countedMinorUnits, d.currency)
+              )}
             </div>
           </div>
-          <span style={{ alignSelf: 'center', fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--ink-3)' }}>→</span>
-          <div style={{ borderRadius: 9, padding: '9px 13px', minWidth: 120, background: vTone ? `color-mix(in srgb, ${vTone} 14%, transparent)` : 'var(--surface-2)' }}>
+          <span
+            style={{
+              alignSelf: 'center',
+              fontFamily: 'var(--font-display)',
+              fontSize: 18,
+              color: 'var(--ink-3)',
+            }}
+          >
+            →
+          </span>
+          <div
+            style={{
+              borderRadius: 9,
+              padding: '9px 13px',
+              minWidth: 120,
+              background: vTone
+                ? `color-mix(in srgb, ${vTone} 14%, transparent)`
+                : 'var(--surface-2)',
+            }}
+          >
             <div style={{ fontSize: 11, color: vTone || 'var(--ink-3)', marginBottom: 4 }}>
               <Trans>Diferencia</Trans>
             </div>
-            <div className="figures" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 18, color: vTone || 'var(--ink-1)' }}>
+            <div
+              className="figures"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 600,
+                fontSize: 18,
+                color: vTone || 'var(--ink-1)',
+              }}
+            >
               {m.varianceMinorUnits == null ? '—' : signedMoney(m.varianceMinorUnits, d.currency)}
             </div>
           </div>
@@ -255,13 +376,30 @@ function ShiftDetail({ shiftId }) {
       </div>
 
       {(d.openingDenominations.length || d.countDenominations) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-          <DenominationTable title={<Trans>Denominaciones de apertura</Trans>} rows={d.openingDenominations} currency={d.currency} />
-          <DenominationTable title={<Trans>Denominaciones del arqueo</Trans>} rows={d.countDenominations} currency={d.currency} />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 14,
+          }}
+        >
+          <DenominationTable
+            title={<Trans>Denominaciones de apertura</Trans>}
+            rows={d.openingDenominations}
+            currency={d.currency}
+          />
+          <DenominationTable
+            title={<Trans>Denominaciones del arqueo</Trans>}
+            rows={d.countDenominations}
+            currency={d.currency}
+          />
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 20 }} className="cash-detail-grid">
+      <div
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) minmax(0, 1fr)', gap: 20 }}
+        className="cash-detail-grid"
+      >
         {/* ledger */}
         <section>
           <div className="eyebrow" style={{ marginBottom: 8 }}>
@@ -271,11 +409,26 @@ function ShiftDetail({ shiftId }) {
             {d.ledger.length ? (
               d.ledger.map((line, i) => {
                 const neutral = line.type === 'count_observation' || line.type === 'opening_float';
-                const color = neutral ? 'var(--ink-3)' : line.amountMinorUnits < 0 ? 'var(--danger)' : 'var(--success)';
+                const color = neutral
+                  ? 'var(--ink-3)'
+                  : line.amountMinorUnits < 0
+                    ? 'var(--danger)'
+                    : 'var(--success)';
                 return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 2px', borderBottom: '1px solid var(--line-soft)' }}>
+                  <div
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '9px 2px',
+                      borderBottom: '1px solid var(--line-soft)',
+                    }}
+                  >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5 }}>{ENTRY_LABEL[line.type] ? i18n._(ENTRY_LABEL[line.type]) : line.type}</div>
+                      <div style={{ fontSize: 13.5 }}>
+                        {ENTRY_LABEL[line.type] ? i18n._(ENTRY_LABEL[line.type]) : line.type}
+                      </div>
                       <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
                         {formatOperationDate(line.occurredAt)}
                         {line.receiptNumber ? ` · ${line.receiptNumber}` : ''}
@@ -283,8 +436,19 @@ function ShiftDetail({ shiftId }) {
                         {line.note ? ` · ${line.note}` : ''}
                       </div>
                     </div>
-                    <div className="figures" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 13.5, color, whiteSpace: 'nowrap' }}>
-                      {neutral ? formatOperationMoney(line.amountMinorUnits, d.currency) : signedMoney(line.amountMinorUnits, d.currency)}
+                    <div
+                      className="figures"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        fontSize: 13.5,
+                        color,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {neutral
+                        ? formatOperationMoney(line.amountMinorUnits, d.currency)
+                        : signedMoney(line.amountMinorUnits, d.currency)}
                     </div>
                   </div>
                 );
@@ -305,7 +469,17 @@ function ShiftDetail({ shiftId }) {
             </div>
             {d.counts.length ? (
               d.counts.map((c) => (
-                <div key={c.attempt} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '7px 2px', fontSize: 13, borderBottom: '1px solid var(--line-soft)' }}>
+                <div
+                  key={c.attempt}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    padding: '7px 2px',
+                    fontSize: 13,
+                    borderBottom: '1px solid var(--line-soft)',
+                  }}
+                >
                   <span style={{ color: 'var(--ink-3)' }}>
                     <Trans>Intento {c.attempt}</Trans> · {c.state.replaceAll('_', ' ')}
                   </span>
@@ -325,9 +499,22 @@ function ShiftDetail({ shiftId }) {
               <Trans>Trazabilidad del turno</Trans>
             </div>
             {d.traza.map((t, i) => (
-              <div key={i} style={{ padding: '7px 2px', borderBottom: '1px solid var(--line-soft)' }}>
+              <div
+                key={i}
+                style={{ padding: '7px 2px', borderBottom: '1px solid var(--line-soft)' }}
+              >
                 <div style={{ fontSize: 13 }}>{t.text}</div>
-                {t.at ? <div style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{formatOperationDate(t.at)}</div> : null}
+                {t.at ? (
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      color: 'var(--ink-3)',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    {formatOperationDate(t.at)}
+                  </div>
+                ) : null}
               </div>
             ))}
           </section>
@@ -359,10 +546,23 @@ export default function CajaTurnos() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 12,
+        }}
+      >
         <Stat label={<Trans>Cajas abiertas</Trans>} value={openCount} />
-        <Stat label={<Trans>Efectivo esperado en caja</Trans>} value={formatOperationMoney(expected, currency)} />
-        <Stat label={<Trans>Requieren atención</Trans>} value={attention} tone={attention ? 'var(--warning)' : undefined} />
+        <Stat
+          label={<Trans>Efectivo esperado en caja</Trans>}
+          value={formatOperationMoney(expected, currency)}
+        />
+        <Stat
+          label={<Trans>Requieren atención</Trans>}
+          value={attention}
+          tone={attention ? 'var(--warning)' : undefined}
+        />
         <Stat
           label={<Trans>Diferencia neta</Trans>}
           value={closed.length ? signedMoney(net, currency) : '—'}
@@ -379,7 +579,14 @@ export default function CajaTurnos() {
           <Trans>No hay turnos de caja en esta vista.</Trans>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 320px) minmax(0, 1fr)', gap: 20 }} className="caja-grid">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 320px) minmax(0, 1fr)',
+            gap: 20,
+          }}
+          className="caja-grid"
+        >
           <aside
             role="listbox"
             aria-label={t`Turnos de caja`}
@@ -407,13 +614,37 @@ export default function CajaTurnos() {
                     boxShadow: isSel ? '0 0 0 1px var(--merchant-brand)' : undefined,
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>{s.facts?.register || s.title}</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>
+                      {s.facts?.register || s.title}
+                    </span>
                     <StatusPill status={s.status} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, color: 'var(--ink-3)' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      fontSize: 12,
+                      color: 'var(--ink-3)',
+                    }}
+                  >
                     <span>{s.facts?.operator || '—'}</span>
-                    <span className="figures" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: vt || 'var(--ink-3)' }}>
+                    <span
+                      className="figures"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 600,
+                        color: vt || 'var(--ink-3)',
+                      }}
+                    >
                       {v == null ? '—' : signedMoney(v, s.currency)}
                     </span>
                   </div>

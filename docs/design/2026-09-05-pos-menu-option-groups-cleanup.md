@@ -69,14 +69,14 @@ case/spelling merges are valid regardless of the role.
 
 **Milk / part 3** (uses):
 
-| Canonical      | Raw variants found                         | Uses |
-| -------------- | ------------------------------------------ | ---- |
-| Almendra       | almendra · Almendra · ALMENDRA             | 186  |
-| Avena          | avena · Avena · AVENA                       | 192  |
-| Coco           | coco · Coco · COCO                          | 192  |
-| Deslactosada   | deslactosada · Deslactosada · DESLACTOSADA | 180  |
-| Lavanda        | Lavanda · LAVANDA                          | 7    |
-| Soya           | soya · Soya · SOYA                          | 192  |
+| Canonical    | Raw variants found                         | Uses |
+| ------------ | ------------------------------------------ | ---- |
+| Almendra     | almendra · Almendra · ALMENDRA             | 186  |
+| Avena        | avena · Avena · AVENA                      | 192  |
+| Coco         | coco · Coco · COCO                         | 192  |
+| Deslactosada | deslactosada · Deslactosada · DESLACTOSADA | 180  |
+| Lavanda      | Lavanda · LAVANDA                          | 7    |
+| Soya         | soya · Soya · SOYA                         | 192  |
 
 Also seen elsewhere: `deslctosada` (missing "a" — a genuine typo, fix to
 `Deslactosada`).
@@ -148,51 +148,51 @@ Pumpkin Spice Latte's `GDE·Frappe·Almendra` at **+$1026.00**, DIRTY TARO's
 
 ### 6.0 Summary
 
-| Product | Dims | Options | Grid | Non-additive | Casing conflicts |
-| --- | --- | --- | --- | --- | --- |
-| Americano Limón  | 2 | 4 | complete | 0 | — |
-| Capuccino | 2 | 10 | complete | 0 | — |
-| Caramelo Kafe | 3 | 30 | complete | 0 | — |
-| Caramelo vainilla | 3 | 30 | complete | 0 | — |
-| Chai | 3 | 30 | complete | 0 | — |
-| Chapata | 2 | 4 | complete | 0 | — |
-| Chocofresa | 3 | 30 | complete | 0 | — |
-| Chocolate | 3 | 30 | complete | 1 | — |
-| Cold Brew | 2 | 6 | complete | 0 | — |
-| DIRTY TARO | 3 | 30 | complete | 2 | — |
-| Dirty Chai | 3 | 30 | complete | 0 | — |
-| KIDS | 3 | 15 | complete | 0 | — |
-| Latte Regular | 3 | 20 | complete | 0 | — |
-| Lavanda Latte | 3 | 30 | complete | 1 | — |
-| Limonada | 3 | 24 | complete | 0 | — |
-| Mascabado Latte | 3 | 30 | complete | 0 | — |
-| Matcha Agua | 2 | 6 | complete | 0 | — |
-| Matcha Blanco | 3 | 30 | complete | 9 | — |
-| Matcha Foam | 3 | 40 | complete | 0 | — |
-| Matcha Latte | 3 | 30 | complete | 0 | — |
-| Matcha Lavanda | 3 | 30 | complete | 0 | — |
-| Matcha Mascabado | 3 | 30 | complete | 0 | — |
-| Matcha Pumpkin Spice Latte | 3 | 30 | complete | 0 | — |
-| Matcha Rosa | 3 | 30 | complete | 0 | — |
-| Matcha Salted Caramel | 3 | 30 | complete | 0 | — |
-| Matcha Sugar Free | 3 | 30 | complete | 0 | — |
-| Matcha Vainilla | 3 | 30 | complete | 0 | — |
-| Moka | 3 | 30 | complete | 0 | — |
-| Moka Blanco | 3 | 30 | complete | 1 | — |
-| Pumpkin Spice Latte | 3 | 30 | complete | 3 | — |
-| Rosa Latte | 3 | 30 | complete | 11 | — |
-| SHAKEN ESPRESSO | 3 | 90 | complete | 13 | — |
-| SMOOTHIES DE PROTEINA | 2 | 8 | complete | 0 | — |
-| SMORE'S | 3 | 30 | complete | 0 | — |
-| Salted Caramel | 3 | 30 | complete | 0 | — |
-| Sugar Free Latte | 3 | 30 | complete | 0 | — |
-| TARO | 3 | 30 | complete | 0 | — |
-| Te Lavanda Manzanilla | 2 | 4 | complete | 0 | — |
-| Tisana | 2 | 6 | complete | 1 | — |
-| VASO DOBLE REDONDO | 2 | 99 | complete | 0 | — |
-| Vainilla Latte | 3 | 30 | complete | 0 | — |
+| Product                    | Dims | Options | Grid     | Non-additive | Casing conflicts |
+| -------------------------- | ---- | ------- | -------- | ------------ | ---------------- |
+| Americano Limón            | 2    | 4       | complete | 0            | —                |
+| Capuccino                  | 2    | 10      | complete | 0            | —                |
+| Caramelo Kafe              | 3    | 30      | complete | 0            | —                |
+| Caramelo vainilla          | 3    | 30      | complete | 0            | —                |
+| Chai                       | 3    | 30      | complete | 0            | —                |
+| Chapata                    | 2    | 4       | complete | 0            | —                |
+| Chocofresa                 | 3    | 30      | complete | 0            | —                |
+| Chocolate                  | 3    | 30      | complete | 1            | —                |
+| Cold Brew                  | 2    | 6       | complete | 0            | —                |
+| DIRTY TARO                 | 3    | 30      | complete | 2            | —                |
+| Dirty Chai                 | 3    | 30      | complete | 0            | —                |
+| KIDS                       | 3    | 15      | complete | 0            | —                |
+| Latte Regular              | 3    | 20      | complete | 0            | —                |
+| Lavanda Latte              | 3    | 30      | complete | 1            | —                |
+| Limonada                   | 3    | 24      | complete | 0            | —                |
+| Mascabado Latte            | 3    | 30      | complete | 0            | —                |
+| Matcha Agua                | 2    | 6       | complete | 0            | —                |
+| Matcha Blanco              | 3    | 30      | complete | 9            | —                |
+| Matcha Foam                | 3    | 40      | complete | 0            | —                |
+| Matcha Latte               | 3    | 30      | complete | 0            | —                |
+| Matcha Lavanda             | 3    | 30      | complete | 0            | —                |
+| Matcha Mascabado           | 3    | 30      | complete | 0            | —                |
+| Matcha Pumpkin Spice Latte | 3    | 30      | complete | 0            | —                |
+| Matcha Rosa                | 3    | 30      | complete | 0            | —                |
+| Matcha Salted Caramel      | 3    | 30      | complete | 0            | —                |
+| Matcha Sugar Free          | 3    | 30      | complete | 0            | —                |
+| Matcha Vainilla            | 3    | 30      | complete | 0            | —                |
+| Moka                       | 3    | 30      | complete | 0            | —                |
+| Moka Blanco                | 3    | 30      | complete | 1            | —                |
+| Pumpkin Spice Latte        | 3    | 30      | complete | 3            | —                |
+| Rosa Latte                 | 3    | 30      | complete | 11           | —                |
+| SHAKEN ESPRESSO            | 3    | 90      | complete | 13           | —                |
+| SMOOTHIES DE PROTEINA      | 2    | 8       | complete | 0            | —                |
+| SMORE'S                    | 3    | 30      | complete | 0            | —                |
+| Salted Caramel             | 3    | 30      | complete | 0            | —                |
+| Sugar Free Latte           | 3    | 30      | complete | 0            | —                |
+| TARO                       | 3    | 30      | complete | 0            | —                |
+| Te Lavanda Manzanilla      | 2    | 4       | complete | 0            | —                |
+| Tisana                     | 2    | 6       | complete | 1            | —                |
+| VASO DOBLE REDONDO         | 2    | 99      | complete | 0            | —                |
+| Vainilla Latte             | 3    | 30      | complete | 0            | —                |
 
-### Americano Limón  — base $78.00, 2 dims, 4 options (complete)
+### Americano Limón — base $78.00, 2 dims, 4 options (complete)
 
 - Dim 1: CH (+$0.00) · GDE (+$10.00)
 - Dim 2: Mineral (+$0.00) · Natural (−$2.00)

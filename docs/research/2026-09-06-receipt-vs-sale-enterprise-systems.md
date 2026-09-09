@@ -32,7 +32,7 @@
 Across every system studied, a **"sale/order/transaction"** is the durable commercial record — it
 owns the **line items** and it is the thing everything else references. A **"receipt"** is, in the
 common case, **not a separate record but a rendered artifact of that sale** (a URL, an email, a PDF,
-a printout). The systems that *do* persist a distinct "receipt" entity fall into two camps that both
+a printout). The systems that _do_ persist a distinct "receipt" entity fall into two camps that both
 differ from the everyday POS meaning of the word:
 
 1. **Payments and e-commerce APIs (Stripe, Square, Shopify)** — the receipt is a **rendered view /
@@ -40,8 +40,8 @@ differ from the everyday POS meaning of the word:
    order/invoice; money/tender lives on the charge/payment/transaction; refunds and voids are their
    own money records that reference the sale.
 2. **Accounting APIs (QuickBooks, Xero)** — the word "receipt" is a **terminology trap**. QuickBooks
-   `SalesReceipt` means a *paid-in-full sale* (immediate payment, no receivable), and Xero `Receipts`
-   means a *draft expense-claim* a user files — neither is a customer proof-of-purchase. The real
+   `SalesReceipt` means a _paid-in-full sale_ (immediate payment, no receivable), and Xero `Receipts`
+   means a _draft expense-claim_ a user files — neither is a customer proof-of-purchase. The real
    axis here is immediate-payment sale vs. sale-on-credit.
 3. **ERP / retail (NetSuite, SAP, Oracle Retail) and the retail standard (ARTS)** — there is no
    "receipt" money entity; the sale is a chain of linked documents (order → fulfillment → invoice →
@@ -63,8 +63,8 @@ sit relative to each other is the axis on which systems disagree (see [§13](#13
 | **Stripe** | Rendered view — `receipt_url` on the Charge; no Receipt object | Invoice (`lines`) | PaymentIntent / Charge / Refund | Refund object; partial via `amount_refunded`; no "void" — uncaptured intents are canceled | 1 PaymentIntent → 1 latest Charge → many Refunds; payment + each refund get their own receipt |
 | **Square** | Rendered view — `receipt_url`/`receipt_number` on Payment; only a `ReceiptOptions` config object exists | Order (`line_items`) | Payment + Tender | PaymentRefund object; void = CANCELED Payment status | 1 Order → many Tenders, many Payments, many Refunds |
 | **Shopify** | No receipt entity at all — the Order is the record | Order (`lineItems`), RefundLineItem | OrderTransaction (`kind` = sale/authorization/capture/refund/void) | Refund object + `kind:REFUND`; void = `kind:VOID` | 1 Order → many OrderTransactions, many Refunds |
-| **QuickBooks Online** | Persisted, but `SalesReceipt` = a *paid-in-full sale*, not a proof-of-purchase | SalesReceipt / Invoice / CreditMemo / RefundReceipt | SalesReceipt & RefundReceipt (deposit acct); Payment (settles invoices) | RefundReceipt (cash out now); CreditMemo (credit vs balance) | Invoice → many Payments; Payment → many Invoices/CreditMemos |
-| **Xero** | Persisted, but `Receipts` = a *draft expense-claim* (deprecated), not a sale | Invoice (`ACCREC`) or BankTransaction (`RECEIVE`) | Payment; or the BankTransaction itself | CreditNote (`ACCRECCREDIT`) | Invoice → many Payments; cash sale = one RECEIVE bank txn |
+| **QuickBooks Online** | Persisted, but `SalesReceipt` = a _paid-in-full sale_, not a proof-of-purchase | SalesReceipt / Invoice / CreditMemo / RefundReceipt | SalesReceipt & RefundReceipt (deposit acct); Payment (settles invoices) | RefundReceipt (cash out now); CreditMemo (credit vs balance) | Invoice → many Payments; Payment → many Invoices/CreditMemos |
+| **Xero** | Persisted, but `Receipts` = a _draft expense-claim_ (deprecated), not a sale | Invoice (`ACCREC`) or BankTransaction (`RECEIVE`) | Payment; or the BankTransaction itself | CreditNote (`ACCRECCREDIT`) | Invoice → many Payments; cash sale = one RECEIVE bank txn |
 | **Oracle NetSuite** | No receipt entity; Cash Sale/Invoice rendered via PDF/HTML template | Cash Sale (lines + money) / Invoice (lines only) | Cash Sale (immediate) / Customer Payment (deferred) | Cash Refund (reverses Cash Sale); Credit Memo (reverses Invoice) | 1 Sales Order → many Item Fulfillments, many Invoices, many Payments |
 | **SAP S/4HANA (SD)** | No receipt entity; the Billing Document (invoice) is the customer document | Sales Order / Billing Document | Billing Document + FI posting | Credit/debit memo; invoice reversal (cancellation) | 1 Sales Order → many Deliveries, many Billing Documents |
 | **Oracle Retail Xstore** | Rendered/printed artifact + a lookup barcode into the stored transaction | RetailTransaction (in DB) | RetailTransaction tender step | Return transaction (verified / unverified / blind) references original | 1 transaction → 1 printed receipt; returns are new transactions |
@@ -79,33 +79,33 @@ The receipt is an attribute/URL of the Charge, not its own object.
 - A Charge has three receipt fields — `receipt_email`, `receipt_number`, `receipt_url` — all
   attributes of the Charge; there is no separate "Receipt" object in the Charge reference.
   **[PRIMARY]** — <https://docs.stripe.com/api/charges/object>
-- `receipt_url` is a rendered document kept in sync with charge state. Verbatim: *"This is the URL to
+- `receipt_url` is a rendered document kept in sync with charge state. Verbatim: _"This is the URL to
   view the receipt for this charge. The receipt is kept up-to-date to the latest state of the charge,
   including any refunds. If the charge is for an Invoice, the receipt will be stylized as an Invoice
-  receipt."* **[PRIMARY]** — <https://docs.stripe.com/api/charges/object>
-- `receipt_number` verbatim: *"This is the transaction number that appears on email receipts sent for
-  this charge. This attribute will be `null` until a receipt has been sent."* — the receipt "number"
+  receipt."_ **[PRIMARY]** — <https://docs.stripe.com/api/charges/object>
+- `receipt_number` verbatim: _"This is the transaction number that appears on email receipts sent for
+  this charge. This attribute will be `null` until a receipt has been sent."_ — the receipt "number"
   only exists once a receipt is actually sent. **[PRIMARY]** — <https://docs.stripe.com/api/charges/object>
-- A PaymentIntent points to a single latest Charge: `latest_charge` = *"ID of the latest Charge object
-  created by this PaymentIntent."* The PaymentIntent also carries its own `receipt_email`.
+- A PaymentIntent points to a single latest Charge: `latest_charge` = _"ID of the latest Charge object
+  created by this PaymentIntent."_ The PaymentIntent also carries its own `receipt_email`.
   **[PRIMARY]** — <https://docs.stripe.com/api/payment_intents/object>
 - The receipt is a rendered artifact, not an API object. Verbatim (the doc localizes to the reader;
-  served here in Spanish): *"Cada recibo tiene una URL que el cliente puede ver en un navegador web.
-  Para vincular un recibo desde tu aplicación, usa el atributo receipt_url del objeto Charge."*
+  served here in Spanish): _"Cada recibo tiene una URL que el cliente puede ver en un navegador web.
+  Para vincular un recibo desde tu aplicación, usa el atributo receipt_url del objeto Charge."_
   (Each receipt has a URL the customer can view in a browser; to link a receipt from your app, use the
   Charge object's `receipt_url` attribute.) **[PRIMARY]** — <https://docs.stripe.com/receipts>
-- Stripe generates receipts for both payments **and** refunds. Verbatim: *"Stripe crea recibos para
-  todos los pagos y reembolsos correctos"* (Stripe creates receipts for all successful payments and
+- Stripe generates receipts for both payments **and** refunds. Verbatim: _"Stripe crea recibos para
+  todos los pagos y reembolsos correctos"_ (Stripe creates receipts for all successful payments and
   refunds). So one charge that is later refunded can produce more than one receipt.
   **[PRIMARY]** — <https://docs.stripe.com/receipts>
 - Refund is its own persisted object linked to a charge and/or PaymentIntent (`charge`, `payment_intent`),
   and the Charge holds a `refunds` list ("A list of refunds that have been applied to the charge") — so
-  one charge : many refunds. The Refund object has its own `receipt_number` = *"the transaction number
-  that appears on email receipts sent for this refund."*
+  one charge : many refunds. The Refund object has its own `receipt_number` = _"the transaction number
+  that appears on email receipts sent for this refund."_
   **[PRIMARY]** — <https://docs.stripe.com/api/refunds/object>, <https://docs.stripe.com/api/charges/object>
 - Money vs. line items: Charge/PaymentIntent/Refund carry money and have **no line items**. Line items
-  live only on the **Invoice**, whose `lines` field = *"The individual line items that make up the
-  invoice."* An Invoice has its own `receipt_number`, `hosted_invoice_url`, and `invoice_pdf`.
+  live only on the **Invoice**, whose `lines` field = _"The individual line items that make up the
+  invoice."_ An Invoice has its own `receipt_number`, `hosted_invoice_url`, and `invoice_pdf`.
   **[PRIMARY]** — <https://docs.stripe.com/api/invoices/object>
 - Partial vs. full refund state lives on the Charge: `amount_refunded` ("can be less than the amount
   attribute … if a partial refund was issued") and `refunded` ("Whether the charge has been fully
@@ -121,29 +121,29 @@ payments and refunds each generate their own receipt and receipt number.
 Object model: **Order (line items + tenders) ↔ Payment (money) ↔ PaymentRefund**. The receipt is a
 URL on the Payment/Tender, not its own object.
 
-- The Order carries the line items. Verbatim: the Order *"contains all information related to a single
-  order to process with Square, including line items that specify the products to purchase."*
-  `line_items` = *"The line items included in the order."* It also holds read-only `tenders`
-  (*"The tenders that were used to pay for the order"*), `refunds`, and `returns` — so the Order is the
+- The Order carries the line items. Verbatim: the Order _"contains all information related to a single
+  order to process with Square, including line items that specify the products to purchase."_
+  `line_items` = _"The line items included in the order."_ It also holds read-only `tenders`
+  (_"The tenders that were used to pay for the order"_), `refunds`, and `returns` — so the Order is the
   aggregate record and can have multiple tenders (split tender) and refunds.
   **[PRIMARY]** — <https://developer.squareup.com/reference/square/objects/Order>
-- The Payment carries money/tender, not line items, and links to the Order by id: `order_id` = *"The ID
-  of the order associated with the payment."* It tracks `amount_money`, `total_money`, `refunded_money`,
+- The Payment carries money/tender, not line items, and links to the Order by id: `order_id` = _"The ID
+  of the order associated with the payment."_ It tracks `amount_money`, `total_money`, `refunded_money`,
   `refund_ids`, and `status` (APPROVED, PENDING, COMPLETED, CANCELED, FAILED).
   **[PRIMARY]** — <https://developer.squareup.com/reference/square/objects/Payment>
-- The receipt is a rendered URL on the Payment, not a persisted Receipt object. `receipt_url` = *"The URL
-  for the payment's receipt. The field is only populated for COMPLETED payments."* `receipt_number` =
-  *"The payment's receipt number. The field is missing if a payment is canceled."*
+- The receipt is a rendered URL on the Payment, not a persisted Receipt object. `receipt_url` = _"The URL
+  for the payment's receipt. The field is only populated for COMPLETED payments."_ `receipt_number` =
+  _"The payment's receipt number. The field is missing if a payment is canceled."_
   **[PRIMARY]** — <https://developer.squareup.com/reference/square/objects/Payment>
 - There is no standalone Receipt object; Square exposes only a `ReceiptOptions` object that configures
   receipt print/reprint actions.
   **[PRIMARY]** — <https://developer.squareup.com/reference/square/objects/ReceiptOptions>
-- The Tender is the split-tender / money-method unit: *"Represents a tender (i.e., a method of payment)
-  used in a Square transaction."* Each Tender has `amount_money`, a required `type` (CARD, CASH,
+- The Tender is the split-tender / money-method unit: _"Represents a tender (i.e., a method of payment)
+  used in a Square transaction."_ Each Tender has `amount_money`, a required `type` (CARD, CASH,
   BANK_ACCOUNT, BUY_NOW_PAY_LATER, SQUARE_ACCOUNT), and `payment_id`.
   **[PRIMARY]** — <https://developer.squareup.com/reference/square/objects/Tender>
-- Refunds are their own persisted objects: PaymentRefund *"Represents a refund of a payment made using
-  Square. Contains information about the original payment and the amount of money refunded."* It links
+- Refunds are their own persisted objects: PaymentRefund _"Represents a refund of a payment made using
+  Square. Contains information about the original payment and the amount of money refunded."_ It links
   back to both `payment_id` and `order_id`, with its own `id`, `status`, `amount_money`, and timestamps.
   **[PRIMARY]** — <https://developer.squareup.com/reference/square/objects/PaymentRefund>
 
@@ -155,31 +155,31 @@ CANCELED Payment status. One Order : many Tenders / Payments / Refunds.
 
 Object model: **Order (line items) → OrderTransaction (money) + Refund**. There is no "receipt" object.
 
-- The Order is the record of the sale: *"The `Order` object represents a customer's request to purchase
-  one or more products from a store."* It carries `lineItems`, plus connections to `transactions`,
+- The Order is the record of the sale: _"The `Order` object represents a customer's request to purchase
+  one or more products from a store."_ It carries `lineItems`, plus connections to `transactions`,
   `refunds`, and money fields `totalPriceSet` ("total price … before returns") and
   `currentTotalPriceSet` ("total price … after returns").
   **[PRIMARY]** — <https://shopify.dev/docs/api/admin-graphql/latest/objects/Order>
 - There is no receipt object or receipt field on the Order — the Order itself is the record; receipts/
   confirmations are order-status pages and emails, not a modeled entity.
   **[PRIMARY]** — <https://shopify.dev/docs/api/admin-graphql/latest/objects/Order>
-- Money movement lives on OrderTransaction: *"The `OrderTransaction` object represents a payment
+- Money movement lives on OrderTransaction: _"The `OrderTransaction` object represents a payment
   transaction that's associated with an order … such as a customer paying for a purchase or receiving a
-  refund …"* One order has many transactions, linked via `parentTransaction` (authorization → capture).
+  refund …"_ One order has many transactions, linked via `parentTransaction` (authorization → capture).
   **[PRIMARY]** — <https://shopify.dev/docs/api/admin-graphql/latest/objects/OrderTransaction>
-- Transaction type is the `kind` enum. Verbatim: SALE = *"An authorization and capture performed together
-  in a single step."*; REFUND = *"A partial or full return of captured funds to the cardholder. A refund
-  can happen only after a capture is processed."*; VOID = *"A cancelation of an authorization
-  transaction."* (plus AUTHORIZATION, CAPTURE, CHANGE, EMV_AUTHORIZATION, SUGGESTED_REFUND).
+- Transaction type is the `kind` enum. Verbatim: SALE = _"An authorization and capture performed together
+  in a single step."_; REFUND = _"A partial or full return of captured funds to the cardholder. A refund
+  can happen only after a capture is processed."_; VOID = _"A cancelation of an authorization
+  transaction."_ (plus AUTHORIZATION, CAPTURE, CHANGE, EMV_AUTHORIZATION, SUGGESTED_REFUND).
   **[PRIMARY]** — <https://shopify.dev/docs/api/admin-graphql/latest/enums/OrderTransactionKind>
-- Refund is its own object tied to an Order: *"The `Refund` object represents a financial record of money
-  returned to a customer from an order."* It holds `refundLineItems`, `transactions`, `totalRefundedSet`,
-  and a non-null `order`. Key caveat verbatim: *"The existence of a `Refund` object doesn't guarantee
-  that the money has been returned to the customer."* — actual money movement is confirmed on the
+- Refund is its own object tied to an Order: _"The `Refund` object represents a financial record of money
+  returned to a customer from an order."_ It holds `refundLineItems`, `transactions`, `totalRefundedSet`,
+  and a non-null `order`. Key caveat verbatim: _"The existence of a `Refund` object doesn't guarantee
+  that the money has been returned to the customer."_ — actual money movement is confirmed on the
   associated OrderTransaction.
   **[PRIMARY]** — <https://shopify.dev/docs/api/admin-graphql/latest/objects/Refund>
-- The DraftOrder is the pre-sale record that becomes an Order: *"An order that a merchant creates on
-  behalf of a customer."* The `draftOrderComplete` mutation converts it into a regular Order.
+- The DraftOrder is the pre-sale record that becomes an Order: _"An order that a merchant creates on
+  behalf of a customer."_ The `draftOrderComplete` mutation converts it into a regular Order.
   **[PRIMARY]** — <https://shopify.dev/docs/api/admin-graphql/latest/objects/DraftOrder>
 
 **Shopify takeaway:** no receipt object — the Order is the persisted record and receipts are
@@ -193,31 +193,31 @@ The word "receipt" is persisted here but does **not** mean a proof-of-purchase �
 immediate-payment sale vs. sale-on-credit.
 
 - `SalesReceipt` = a sale with payment collected at the same moment; it carries **both** the line items
-  and the tender and creates **no** Accounts Receivable. Verbatim: *"A SalesReceipt object represents the
+  and the tender and creates **no** Accounts Receivable. Verbatim: _"A SalesReceipt object represents the
   sales receipt that is given to a customer. A sales receipt is similar to an invoice. However, for a
-  sales receipt, payment is received as part of the sale of goods and services."* Money routes straight
-  to cash/bank: *"The sales receipt specifies a deposit account where the customer's payment is
-  deposited. If the deposit account is not specified, the Undeposited Account is used."*
+  sales receipt, payment is received as part of the sale of goods and services."_ Money routes straight
+  to cash/bank: _"The sales receipt specifies a deposit account where the customer's payment is
+  deposited. If the deposit account is not specified, the Undeposited Account is used."_
   **[PRIMARY]** — <https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/salesreceipt>
 - `Invoice` = a sale on credit; the customer pays later, which is what creates the receivable. Verbatim:
-  *"An Invoice represents a sales form where the customer pays for a product or service later."* It is
-  settled by a linked Payment (*"Links to payments applied to an Invoice object are returned … with
-  LinkedTxn.TxnType set to Payment."*).
+  _"An Invoice represents a sales form where the customer pays for a product or service later."_ It is
+  settled by a linked Payment (_"Links to payments applied to an Invoice object are returned … with
+  LinkedTxn.TxnType set to Payment."_).
   **[PRIMARY]** — <https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/invoice>
 - `Payment` = the money/tender record for credit sales; it applies cash against invoices and carries no
-  sale line items. Verbatim: *"A Payment object records a payment in QuickBooks. The payment can be
+  sale line items. Verbatim: _"A Payment object records a payment in QuickBooks. The payment can be
   applied for a particular customer against multiple Invoices and Credit Memos. It can also be created
-  without any Invoice or Credit Memo, by just specifying an amount."* An unapplied Payment *"is recorded
-  as a credit."*
+  without any Invoice or Credit Memo, by just specifying an amount."_ An unapplied Payment _"is recorded
+  as a credit."_
   **[PRIMARY]** — <https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/payment>
 - `RefundReceipt` = an immediate cash refund (the mirror of a SalesReceipt); money leaves a bank/asset
-  account now. Verbatim: *"A RefundReceipt object represents a refund to the customer for a product or
-  service that was provided."* Its required `DepositToAccountRef` is the *"Account from which payment
-  money is refunded."*
+  account now. Verbatim: _"A RefundReceipt object represents a refund to the customer for a product or
+  service that was provided."_ Its required `DepositToAccountRef` is the _"Account from which payment
+  money is refunded."_
   **[PRIMARY]** — <https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/refundreceipt>
 - `CreditMemo` = a credit against what the customer owes; it carries sale line items but returns no cash
-  by itself. Verbatim: *"The CreditMemo object is a financial transaction representing a refund or credit
-  of payment or part of a payment for goods or services that have been sold."*
+  by itself. Verbatim: _"The CreditMemo object is a financial transaction representing a refund or credit
+  of payment or part of a payment for goods or services that have been sold."_
   **[PRIMARY]** — <https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/creditmemo>
 
 **QBO takeaway:** sale + line items live on `SalesReceipt` (paid now), `Invoice` (credit),
@@ -232,21 +232,21 @@ client-rendered SPAs; the quotes below are from Xero's official OpenAPI spec, wh
 1:1 to the cited pages: <https://raw.githubusercontent.com/XeroAPI/Xero-OpenAPI/master/xero_accounting.yaml>)
 
 - `Invoices` holds the sale and its line items; a sales invoice is `Type: ACCREC` (accounts receivable).
-  The endpoint summary is *"Retrieves sales invoices or purchase bills"*; the receivable is tracked on
-  the invoice itself: `AmountDue` = *"Amount remaining to be paid on invoice"*, `AmountPaid` = *"Sum of
-  payments received for invoice."*
+  The endpoint summary is _"Retrieves sales invoices or purchase bills"_; the receivable is tracked on
+  the invoice itself: `AmountDue` = _"Amount remaining to be paid on invoice"_, `AmountPaid` = _"Sum of
+  payments received for invoice."_
   **[PRIMARY-SPEC]** — <https://developer.xero.com/documentation/api/accounting/invoices>
 - `Payments` holds the money; a payment only applies to an invoice or credit note (plus pre/overpayments)
-  and never carries line items. Summary: *"Creates a single payment for invoice or credit notes."*
-  `Amount` = *"The amount of the payment. Must be less than or equal to the outstanding amount owing on
-  the invoice …"*; `PaymentType` enum distinguishes `ACCRECPAYMENT` (customer) vs `ACCPAYPAYMENT`
+  and never carries line items. Summary: _"Creates a single payment for invoice or credit notes."_
+  `Amount` = _"The amount of the payment. Must be less than or equal to the outstanding amount owing on
+  the invoice …"_; `PaymentType` enum distinguishes `ACCRECPAYMENT` (customer) vs `ACCPAYPAYMENT`
   (supplier).
   **[PRIMARY-SPEC]** — <https://developer.xero.com/documentation/api/accounting/payments>
 - `Receipts` is **not** a customer sales receipt — it is a **draft expense-claim receipt** (money a user/
-  employee spent), and the endpoint is deprecated. Summaries: *"Retrieves draft expense claim receipts
-  for any user"* / *"Creates draft expense claim receipts for any user."* The `Receipt` schema has a
+  employee spent), and the endpoint is deprecated. Summaries: _"Retrieves draft expense claim receipts
+  for any user"_ / _"Creates draft expense claim receipts for any user."_ The `Receipt` schema has a
   `User` field and a `Status` enum of `DRAFT / SUBMITTED / AUTHORISED / DECLINED / VOIDED` — an
-  expense-claim lifecycle, not a sales lifecycle. The page title carries *"(Deprecated)."*
+  expense-claim lifecycle, not a sales lifecycle. The page title carries _"(Deprecated)."_
   **[PRIMARY-SPEC]** (title "(Deprecated)" confirmed **[PRIMARY]** from the live page) —
   <https://developer.xero.com/documentation/api/accounting/receipts>
 - `CreditNotes` handle refunds/credits; a customer (sales) credit note is `Type: ACCRECCREDIT`, carries
@@ -272,29 +272,29 @@ is no distinct "receipt" money entity.
   Item Fulfillment, Credit Memo, Cash Refund, Return Authorization, Customer Deposit, Deposit Application.
   **[PRIMARY]** — <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/chapter_N3191224.html>
 - A **Cash Sale** is the sale record for immediate payment and carries **both** line items and money.
-  Verbatim: *"A cash sale is a transaction that records the sale of goods or services for which you
-  receive immediate payment …"* and *"cash sale line-items specify the goods and services sold and their
+  Verbatim: _"A cash sale is a transaction that records the sale of goods or services for which you
+  receive immediate payment …"_ and _"cash sale line-items specify the goods and services sold and their
   sales amounts. The sum of all sales amounts plus any applicable tax equals the total amount paid for
-  this sale."* It *"posts this as money added to the Undeposited Funds account,"* cleared by a later
+  this sale."_ It _"posts this as money added to the Undeposited Funds account,"_ cleared by a later
   Deposit.
   **[PRIMARY]** — <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N3192506.html>
 - An **Invoice** is the sale record for deferred payment; it carries line items only, and money against
-  it lives in a **separate Customer Payment** record: *"The Payment record lists a payment made in
-  response to an invoice … Payment is applied to decrease or eliminate the amount due."*
+  it lives in a **separate Customer Payment** record: _"The Payment record lists a payment made in
+  response to an invoice … Payment is applied to decrease or eliminate the amount due."_
   **[PRIMARY]** — <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_1512507518.html>,
   <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N3194809.html>
-  - The one-sentence Invoice definition (*"An invoice transaction creates a bill for goods, services (or
+  - The one-sentence Invoice definition (_"An invoice transaction creates a bill for goods, services (or
     both) sold to a customer for which payment is not received at the time of delivery … each invoice
-    consists of multiple line items …"*) was only re-quotable from the search snippet of the help page.
+    consists of multiple line items …"_) was only re-quotable from the search snippet of the help page.
     **[PRIMARY-SNIPPET]** — <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N3678746.html>
-- The document flow and the branch that decides Cash Sale vs. Invoice, verbatim: *"Each sales transaction
+- The document flow and the branch that decides Cash Sale vs. Invoice, verbatim: _"Each sales transaction
   starts as a cash sale. For cash-and-carry sales with split payments, the cash sale turns into an
   invoice. For delivery orders, sales orders are created. When delivery orders are processed and shipped,
-  item fulfillments are created from the sales order."* — fulfillment is a separate Item Fulfillment
+  item fulfillments are created from the sales order."_ — fulfillment is a separate Item Fulfillment
   record; payment terms decide Cash Sale vs. Invoice.
   **[PRIMARY]** — <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4290511404.html>
-- Refunds/returns are separate reversing records. A **Cash Refund** reverses a Cash Sale: *"A cash refund
-  transaction records the return of money to a customer who immediately paid for goods or services …"*;
+- Refunds/returns are separate reversing records. A **Cash Refund** reverses a Cash Sale: _"A cash refund
+  transaction records the return of money to a customer who immediately paid for goods or services …"_;
   a **Credit Memo** is the equivalent reversal on the Invoice side.
   **[PRIMARY]** — <https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N3192213.html>
 - The printed "receipt" is a rendering of the persisted record (e.g. the "Standard Cash Sale PDF/HTML
@@ -310,27 +310,27 @@ transactions; the "receipt" is a print template of the record.
 SAP models the chain as distinct, separately persisted documents joined by a **document flow**; the
 customer-facing money document is the **Billing Document** (invoice).
 
-- Verbatim: *"The document flow shows consecutive documents that are directly tied to a business
-  transaction. The individual documents form document chains."* The system displays for each document
-  *"all preceding and subsequent documents."* The SD chain objects named on that page include the
-  *"sales order,"* the *"delivery,"* and the billing objects *"invoice and invoice reversal,"* *"credit
-  memo,"* and *"debit memo."*
+- Verbatim: _"The document flow shows consecutive documents that are directly tied to a business
+  transaction. The individual documents form document chains."_ The system displays for each document
+  _"all preceding and subsequent documents."_ The SD chain objects named on that page include the
+  _"sales order,"_ the _"delivery,"_ and the billing objects _"invoice and invoice reversal,"_ _"credit
+  memo,"_ and _"debit memo."_
   **[PRIMARY]** — <https://help.sap.com/doc/b183ce53118d4308e10000000a174cb4/700_SFIN3E%20006/en-US/b4dfb65334e6b54ce10000000a174cb4.html>
-- Which document carries what: the Sales Order and its items drive the process (*"the sales order item is
-  the root object for the subsequent process steps"*); the Outbound Delivery is the fulfillment/goods
-  movement (*"Posting goods issue for the outbound delivery is the last step of the outbound delivery
-  process"*); billing then produces the invoice.
+- Which document carries what: the Sales Order and its items drive the process (_"the sales order item is
+  the root object for the subsequent process steps"_); the Outbound Delivery is the fulfillment/goods
+  movement (_"Posting goods issue for the outbound delivery is the last step of the outbound delivery
+  process"_); billing then produces the invoice.
   **[PRIMARY]** — <https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/25a41481f62e469ba0e61015a0d39d20/610fb16c6f8341e0a0725eeb3abb00ed.html>
 - The Billing Document is the customer-facing money/invoice document, created "with reference to" a
-  preceding document. A billing document type *"categorizes different types of billing documents (such
+  preceding document. A billing document type _"categorizes different types of billing documents (such
   as invoices, credit memos and debit memos, as well as the associated cancellation documents) … to
   facilitate the correct billing of different preceding documents (such as outbound deliveries or billing
-  document requests)."*
+  document requests)."_
   **[PRIMARY-SNIPPET]** (S/4 Help SPA did not render; first-party snippet) —
   <https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/7b24a64d9d0941bda1afa753263d9e39/d96fb6535fe6b74ce10000000a174cb4.html>
-- Returns/reversals are their own billing documents: *"A credit memo is a billing document created with
+- Returns/reversals are their own billing documents: _"A credit memo is a billing document created with
   reference to a credit memo request or invoice that reduces receivables … A debit memo is a billing
-  document … that increases receivables."* Invoice cancellation is a further "invoice reversal" document.
+  document … that increases receivables."_ Invoice cancellation is a further "invoice reversal" document.
   **[PRIMARY-SNIPPET]** — <https://help.sap.com/docs/SAP_S4HANA_ON-PREMISE/7b24a64d9d0941bda1afa753263d9e39/1670b6535fe6b74ce10000000a174cb4.html>
 
 **SAP SD takeaway:** the customer "proof" is the Billing Document (invoice) — a persisted document
@@ -343,20 +343,20 @@ many deliveries → many billing documents.
 The POS persists the **RetailTransaction** in its database and treats the **receipt** as printed output
 and a lookup key back into that transaction.
 
-- Capability list, verbatim: *"scanning items, applying price adjustments, tendering, and printing
-  receipts as well as processing returns."* On tendering: *"When ready to tender, select the amount due
-  to show a list of tenders and continue payment to complete the transaction."* — the receipt is output
+- Capability list, verbatim: _"scanning items, applying price adjustments, tendering, and printing
+  receipts as well as processing returns."_ On tendering: _"When ready to tender, select the amount due
+  to show a list of tenders and continue payment to complete the transaction."_ — the receipt is output
   of the completed transaction, not its own money record.
   **[PRIMARY]** — <https://docs.oracle.com/en/industries/retail/retail-xstore-point-of-service/25.0/rpxmo/introduction-oracle-retail-xstore-pos.htm>
-- The receipt is a lookup key into the stored transaction. Verbatim: *"A return using the customer's
+- The receipt is a lookup key into the stored transaction. Verbatim: _"A return using the customer's
   original sale receipt to locate the transaction information stored in the database is a verified
-  return."* And: *"scan the barcode on the customer's original receipt. The system recognizes that this
+  return."_ And: _"scan the barcode on the customer's original receipt. The system recognizes that this
   is a sale receipt barcode rather than an item identifier. If the original transaction is found in the
-  database … the original transaction information is shown."*
+  database … the original transaction information is shown."_
   **[PRIMARY]** — <https://docs.oracle.com/en/industries/retail/retail-xstore-point-of-service/24.0/rpxmo/return-transactions.htm>
 - Returns handle receipt-found, receipt-not-found, and no-receipt as distinct return transactions:
-  *"A blind return is a return without a receipt. An unverified return is a return where the customer has
-  a sale receipt, but it cannot be found in the database."* A return is a new transaction that may
+  _"A blind return is a return without a receipt. An unverified return is a return where the customer has
+  a sale receipt, but it cannot be found in the database."_ A return is a new transaction that may
   reference the original.
   **[PRIMARY]** — <https://docs.oracle.com/en/industries/retail/retail-xstore-point-of-service/24.0/rpxmo/return-transactions.htm>
 
@@ -370,38 +370,38 @@ the receipt-vs-transaction distinction, and it is open and first-party at the OM
 (Association for Retail Technology Standards) was created by NRF and is now co-managed by NRF and OMG.
 
 - The `RetailTransaction` is one entity spanning both merchandise and money, in tiers. Verbatim:
-  *"RetailTransaction entity instances are created at the point where the store's merchandise and
-  services are transformed into tender and credited as sales (or the reverse for returns)."* And: *"The
+  _"RetailTransaction entity instances are created at the point where the store's merchandise and
+  services are transformed into tender and credited as sales (or the reverse for returns)."_ And: _"The
   retail transaction is organized into three tiers: Transaction level, Line level, and Line modifier
-  level."*
+  level."_
   **[PRIMARY]** — <https://www.omg.org/retail-depository/arts-odm-73/retail_transaction.htm>
-- Formal definition, verbatim: *"A type of Transaction that records the business conducted between the
+- Formal definition, verbatim: _"A type of Transaction that records the business conducted between the
   retail enterprise and another party involving the exchange in ownership and/or accountability for
-  merchandise and/or tender or involving the exchange of tender for services."* It "contains"
+  merchandise and/or tender or involving the exchange of tender for services."_ It "contains"
   `RetailTransactionLineItem` and "has" `RetailTransactionTotal`.
   **[PRIMARY]** — <https://www.omg.org/retail-depository/arts-odm-73/%7B497BD484-D2D2-4DA1-B60B-AF575ADFC2E1%7D+00000000.html>
 - **Line items and money are two subtypes of the same base line-item entity** — the load-bearing point.
-  The base `RetailTransactionLineItem` is *"A detail line item of a RetailTransaction …"* whose
-  `RetailTransactionLineItemTypeCode` denotes *"the type of retail transaction line item, such as
-  Sale/Return, Void, miscellaneous fee, etc."* It specializes into `SaleReturnLineItem` (merchandise)
+  The base `RetailTransactionLineItem` is _"A detail line item of a RetailTransaction …"_ whose
+  `RetailTransactionLineItemTypeCode` denotes _"the type of retail transaction line item, such as
+  Sale/Return, Void, miscellaneous fee, etc."_ It specializes into `SaleReturnLineItem` (merchandise)
   and `TenderLineItem` (money).
   **[PRIMARY]** — <https://www.omg.org/retail-depository/arts-odm-73/%7B7BCA3AF9-F3BF-4C5A-A552-35955F08EDF0%7D+00000000.html>
-- The tender subtype, verbatim: *"A line item component of a RetailTransaction that records the
-  settlement of that transaction with an offsetting, valid tender type."* `TenderAmount` = *"The monetary
-  value … of the tender submitted by the Customer"*; `AmountAppliedToTransaction` = *"The monetary amount
-  being applied to the TransactionTotal."* Merchandise and tender sit in the SAME transaction as separate
+- The tender subtype, verbatim: _"A line item component of a RetailTransaction that records the
+  settlement of that transaction with an offsetting, valid tender type."_ `TenderAmount` = _"The monetary
+  value … of the tender submitted by the Customer"_; `AmountAppliedToTransaction` = _"The monetary amount
+  being applied to the TransactionTotal."_ Merchandise and tender sit in the SAME transaction as separate
   line-item rows.
   **[PRIMARY]** — <https://www.omg.org/retail-depository/arts-odm-73/%7B2B6FA1B6-5860-42C7-BBC1-A122C059B2CE%7D+00000000.html>
 - The **receipt is modeled as a separate, linked document entity** — the exact distinction this note is
-  about. Verbatim: a document is *"an artifact that is created and given to a customer (either as a piece
-  of paper, or digital image) to memorialize an underlying retail transaction,"* and *"a document exists
-  as an entity that is separate from, but linked to an underlying retail transaction"* (the
+  about. Verbatim: a document is _"an artifact that is created and given to a customer (either as a piece
+  of paper, or digital image) to memorialize an underlying retail transaction,"_ and _"a document exists
+  as an entity that is separate from, but linked to an underlying retail transaction"_ (the
   `RetailTransactionDocument` entity).
   **[PRIMARY]** — <https://www.omg.org/retail-depository/arts-odm-73/logical_02302.htm>
 - **POSLog vs. the stored record:** the transaction message on the wire is distinct from the durable
-  record. Verbatim: *"POSLOG is a message specification used to contain business information that is moved
+  record. Verbatim: _"POSLOG is a message specification used to contain business information that is moved
   from one point to another. In relative terms it is transient data. The transactions stored in the ARTS
-  ODM … are permanent records of retail business activities."*
+  ODM … are permanent records of retail business activities."_
   **[PRIMARY]** — <https://www.omg.org/retail-depository/arts-odm-73/arts_transaction_concepts.htm>
 - Scale, for context: the ARTS ODM is described as "133 subject areas, over 850 entities, over 1,700
   relationships and over 6,800 attributes." **[SECONDARY]** (trade press, not the OMG spec) —
@@ -417,25 +417,25 @@ is the cleanest formal statement that "receipt" ≠ "the sale record."
 A fiscal or tax receipt is a **legally-defined document**, mandated by content and integrity rules, and
 separable from the merchant's internal sale record.
 
-- A fiscal receipt must carry mandated data at the moment of sale. OECD, verbatim: requirements *"state
+- A fiscal receipt must carry mandated data at the moment of sale. OECD, verbatim: requirements _"state
   the details of what data – usually termed fiscal data – must be recorded and printed on the purchase
   receipt at the time of the transaction. This can include the amount of the sale, the amount of VAT /
   sales tax due, the time, date, and invoice number … and the type of receipt (such as final bill,
-  non-final bill or refund)."*
+  non-final bill or refund)."_
   **[PRIMARY]** — <https://www.oecd.org/content/dam/oecd/en/publications/reports/2019/03/implementing-online-cash-registers_8d53d1a6/bfd36ca2-en.pdf> (para. 22)
-- The fiscal receipt is authenticated independently of the sale line data. OECD, verbatim: *"The digital
+- The fiscal receipt is authenticated independently of the sale line data. OECD, verbatim: _"The digital
   signature is stored with the transaction data and also printed on the customer's receipt, e.g. as a
-  Quick Response (QR) code."*
+  Quick Response (QR) code."_
   **[PRIMARY]** — same OECD PDF (para. 23)
-- A digital (e-)receipt can hold the same legal status as paper. OECD, verbatim: *"Where digital receipts
+- A digital (e-)receipt can hold the same legal status as paper. OECD, verbatim: _"Where digital receipts
   are recognised to have the same legal status as a hard copy, this can make it significantly easier for
-  consumers to exercise legal rights to return goods."*
+  consumers to exercise legal rights to return goods."_
   **[PRIMARY]** — same OECD PDF (para. 13)
 - The customer-facing tax document in the EU is the VAT invoice — legally mandated, with prescribed
-  content, distinct from internal accounting records. EU Taxation and Customs Union: an invoice *"is proof
-  that allows the business to deduct VAT,"* must be issued *"whenever goods or services are supplied,"*
+  content, distinct from internal accounting records. EU Taxation and Customs Union: an invoice _"is proof
+  that allows the business to deduct VAT,"_ must be issued _"whenever goods or services are supplied,"_
   and must carry a fixed content set (date, unique sequential number, supplier/customer details and VAT
-  IDs, description/quantity, unit price, VAT rate and amount). *"Simplified invoices"* (the retail-receipt
+  IDs, description/quantity, unit price, VAT rate and amount). _"Simplified invoices"_ (the retail-receipt
   form) are a recognized lighter variant.
   **[PRIMARY]** — <https://taxation-customs.ec.europa.eu/taxation/vat/vat-businesses/invoicing_en>
 
@@ -487,13 +487,13 @@ exchange is a return plus a new sale, not a mutation.
    it is a rendered URL/email, or absent entirely. ARTS and tax law say yes — a distinct linked document
    (`RetailTransactionDocument`) / mandated legal instrument.
 2. **What the word "receipt" even means.** In POS/payments it is a proof-of-purchase. In QuickBooks
-   `SalesReceipt` it is a *paid-in-full sale record*. In Xero `Receipts` it is a *draft expense-claim* a
+   `SalesReceipt` it is a _paid-in-full sale record_. In Xero `Receipts` it is a _draft expense-claim_ a
    user files. Same word, three different meanings — a genuine naming hazard when integrating across
    systems.
 3. **Are line items and money in one record or two?** Immediate-payment models fuse them (NetSuite Cash
    Sale, QBO SalesReceipt); credit models and payment APIs split them (Invoice vs. Payment/Charge/
    Transaction). ARTS keeps one transaction but two line-item subtypes.
-4. **Where "void" lives.** Shopify makes it a transaction `kind`; Square makes it a Payment *status*
+4. **Where "void" lives.** Shopify makes it a transaction `kind`; Square makes it a Payment _status_
    (CANCELED); Stripe has no explicit void (an uncaptured PaymentIntent is canceled); NetSuite/SAP/ARTS
    express it as a reversing document / line-type.
 
@@ -527,17 +527,17 @@ exchange is a return plus a new sale, not a mutation.
   SAP S/4HANA Billing Document Type and Credit/Debit Memo definitions; the one-sentence NetSuite Invoice
   definition.
 - **Unverified / could not fully confirm:**
-  - *Square split-tender per-Tender `receipt_url`:* confirmed that `receipt_url` exists on `Payment` and
+  - _Square split-tender per-Tender `receipt_url`:_ confirmed that `receipt_url` exists on `Payment` and
     that an `Order` holds multiple `tenders`; did **not** read a `receipt_url` field on the `Tender`
     object itself. Treat "each tender has its own receipt URL" as likely-but-unconfirmed.
-  - *Stripe refund receipt as a fully separate rendered document:* the receipts page confirms Stripe
+  - _Stripe refund receipt as a fully separate rendered document:_ the receipts page confirms Stripe
     creates receipts for refunds and the `Refund` object has its own `receipt_number`, but the same page
     says the Charge `receipt_url` is "kept up-to-date … including any refunds" — no single sentence
     reconciles whether the refund receipt is a distinct URL or the updated charge URL.
-  - *QBO Invoice → literal "Accounts Receivable":* the Invoice page says the customer "pays … later" and
+  - _QBO Invoice → literal "Accounts Receivable":_ the Invoice page says the customer "pays … later" and
     links to `Payment`, which implies A/R, but the exact phrase "Accounts Receivable" was not in the
     fetched entity-page body. The A/R behavior is standard but not verbatim-quoted.
-  - *Xero cash-sale "which method to use":* both mechanisms (`ACCREC` invoice + `Payment`; `RECEIVE` bank
+  - _Xero cash-sale "which method to use":_ both mechanisms (`ACCREC` invoice + `Payment`; `RECEIVE` bank
     transaction) are verified to exist; no Xero prose prescribing one over the other for a cash sale was
     fetched — the preference is synthesis, not a quote.
 - **Could not reach / paywalled (open first-party substitute used):** Oracle Retail Xstore DB/DTV

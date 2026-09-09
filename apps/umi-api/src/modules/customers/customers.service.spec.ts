@@ -155,10 +155,16 @@ describe('CustomersService.messages', () => {
       'utf8',
     ).toString('base64url');
     await h.svc.messages('t1', CID, CONV, { cursor });
-    expect(h.repo.messages).toHaveBeenCalledWith('t1', CID, CONV, {
-      occurredAt: '2026-01-02T00:00:00.000Z',
-      id: CID,
-    }, 31);
+    expect(h.repo.messages).toHaveBeenCalledWith(
+      't1',
+      CID,
+      CONV,
+      {
+        occurredAt: '2026-01-02T00:00:00.000Z',
+        id: CID,
+      },
+      31,
+    );
   });
 });
 

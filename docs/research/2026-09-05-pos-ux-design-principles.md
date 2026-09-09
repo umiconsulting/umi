@@ -24,27 +24,27 @@ Two rules balance each other. Rule 3 says cut taps. Rule 4 says keep the one con
 
 ## 2. Concrete numbers table
 
-| Rule owner | Metric | Value | Label | Link |
-| --- | --- | --- | --- | --- |
-| W3C WCAG 2.5.5 (AAA) | Minimum touch target | 44 × 44 CSS px | STANDARD | [w3.org](https://www.w3.org/WAI/WCAG21/Understanding/target-size.html) |
-| W3C WCAG 2.5.8 (AA) | Minimum touch target | 24 × 24 CSS px (or spacing) | STANDARD | [w3.org](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) |
-| Apple HIG | Minimum tappable area | 44 × 44 pt | GUIDELINE | [apple.com](https://developer.apple.com/design/human-interface-guidelines/accessibility) |
-| Material / Android | Minimum touch target; spacing | 48 × 48 dp (~9 mm; range 7-10 mm); ≥ 8 dp | GUIDELINE | [support.google.com](https://support.google.com/accessibility/android/answer/7101858?hl=en) |
-| NN/g | Rendered target; spacing; fingertip | 1 cm × 1 cm; ~2 mm; fingertip 1.6-2 cm, thumb 2.5 cm | HEURISTIC | [nngroup.com](https://www.nngroup.com/articles/touch-target-size/) |
-| Fitts 1954 | Movement time | MT = a + b·log2(2D/W) | LAW | [psycnet](https://psycnet.apa.org/record/1955-02059-001) |
-| Card, Moran & Newell 1980 / Kieras 1997 | Button press K; mental step M | K 0.20 s (200 ms); M 1.35 s | LAW | [Kieras](https://www.cs.umd.edu/~golbeck/INST631/KSM.pdf), [CACM](https://dl.acm.org/doi/10.1145/358886.358895) |
-| NN/g | Response-time limits | 0.1 s instant; 1 s flow; 10 s attention | HEURISTIC | [nngroup.com](https://www.nngroup.com/articles/response-times-3-important-limits/) |
-| Hick 1952 | Choice reaction time | RT = a + b·log2(n + 1) | LAW | [QJEP](https://www.tandfonline.com/doi/abs/10.1080/17470215208416600) |
-| Miller 1956 | Span of immediate memory | ~7 ± 2 chunks | LAW | [Psych. Review](https://psycnet.apa.org/doi/10.1037/h0043158) |
-| W3C WCAG 1.4.3 (AA) | Text contrast | 4.5:1 normal; 3:1 large | STANDARD | [w3.org](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html) |
-| W3C WCAG 1.4.11 (AA) | Non-text (UI) contrast | 3:1 | STANDARD | [w3.org](https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html) |
-| ISO 9241-110:2020 | Interaction principles | 7 principles (see §5, §6) | STANDARD | [iso.org](https://www.iso.org/standard/75258.html) |
-| ISO 9241-11:2018 | Usability definition | effectiveness, efficiency, satisfaction, in a context of use | STANDARD | [iso.org](https://www.iso.org/standard/63500.html) |
-| Square (help) | Refund path | Transactions → payment → Issue refund → items/amount → reason → Refund | VENDOR | [squareup.com](https://squareup.com/help/us/en/article/5060-process-refunds-with-square) |
-| Toast (platform guide) | Void path | manager code if no permission; void reason optional/configurable | VENDOR | [toasttab.com](https://doc.toasttab.com/doc/platformguide/adminVoidingOrders.html) |
-| Toast (support) | Cash over/short | Over/Short = Expected − Actual closeout cash | VENDOR | [toasttab.com](https://support.toasttab.com/en/article/Cash-Drawer-Reports-Overview) |
-| Square (help) | Cash session | Starting Cash → Start Drawer; End Drawer → count → variance | VENDOR | [squareup.com](https://squareup.com/help/us/en/article/8344-start-and-end-a-cash-drawer-session) |
-| Clover (dev docs) | Tender flow | include a Cancel button; customer-facing flow full-screen | VENDOR | [clover.com](https://docs.clover.com/dev/docs/custom-tenders) |
+| Rule owner                              | Metric                              | Value                                                                  | Label     | Link                                                                                                            |
+| --------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------- |
+| W3C WCAG 2.5.5 (AAA)                    | Minimum touch target                | 44 × 44 CSS px                                                         | STANDARD  | [w3.org](https://www.w3.org/WAI/WCAG21/Understanding/target-size.html)                                          |
+| W3C WCAG 2.5.8 (AA)                     | Minimum touch target                | 24 × 24 CSS px (or spacing)                                            | STANDARD  | [w3.org](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html)                                  |
+| Apple HIG                               | Minimum tappable area               | 44 × 44 pt                                                             | GUIDELINE | [apple.com](https://developer.apple.com/design/human-interface-guidelines/accessibility)                        |
+| Material / Android                      | Minimum touch target; spacing       | 48 × 48 dp (~9 mm; range 7-10 mm); ≥ 8 dp                              | GUIDELINE | [support.google.com](https://support.google.com/accessibility/android/answer/7101858?hl=en)                     |
+| NN/g                                    | Rendered target; spacing; fingertip | 1 cm × 1 cm; ~2 mm; fingertip 1.6-2 cm, thumb 2.5 cm                   | HEURISTIC | [nngroup.com](https://www.nngroup.com/articles/touch-target-size/)                                              |
+| Fitts 1954                              | Movement time                       | MT = a + b·log2(2D/W)                                                  | LAW       | [psycnet](https://psycnet.apa.org/record/1955-02059-001)                                                        |
+| Card, Moran & Newell 1980 / Kieras 1997 | Button press K; mental step M       | K 0.20 s (200 ms); M 1.35 s                                            | LAW       | [Kieras](https://www.cs.umd.edu/~golbeck/INST631/KSM.pdf), [CACM](https://dl.acm.org/doi/10.1145/358886.358895) |
+| NN/g                                    | Response-time limits                | 0.1 s instant; 1 s flow; 10 s attention                                | HEURISTIC | [nngroup.com](https://www.nngroup.com/articles/response-times-3-important-limits/)                              |
+| Hick 1952                               | Choice reaction time                | RT = a + b·log2(n + 1)                                                 | LAW       | [QJEP](https://www.tandfonline.com/doi/abs/10.1080/17470215208416600)                                           |
+| Miller 1956                             | Span of immediate memory            | ~7 ± 2 chunks                                                          | LAW       | [Psych. Review](https://psycnet.apa.org/doi/10.1037/h0043158)                                                   |
+| W3C WCAG 1.4.3 (AA)                     | Text contrast                       | 4.5:1 normal; 3:1 large                                                | STANDARD  | [w3.org](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html)                                     |
+| W3C WCAG 1.4.11 (AA)                    | Non-text (UI) contrast              | 3:1                                                                    | STANDARD  | [w3.org](https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast.html)                                    |
+| ISO 9241-110:2020                       | Interaction principles              | 7 principles (see §5, §6)                                              | STANDARD  | [iso.org](https://www.iso.org/standard/75258.html)                                                              |
+| ISO 9241-11:2018                        | Usability definition                | effectiveness, efficiency, satisfaction, in a context of use           | STANDARD  | [iso.org](https://www.iso.org/standard/63500.html)                                                              |
+| Square (help)                           | Refund path                         | Transactions → payment → Issue refund → items/amount → reason → Refund | VENDOR    | [squareup.com](https://squareup.com/help/us/en/article/5060-process-refunds-with-square)                        |
+| Toast (platform guide)                  | Void path                           | manager code if no permission; void reason optional/configurable       | VENDOR    | [toasttab.com](https://doc.toasttab.com/doc/platformguide/adminVoidingOrders.html)                              |
+| Toast (support)                         | Cash over/short                     | Over/Short = Expected − Actual closeout cash                           | VENDOR    | [toasttab.com](https://support.toasttab.com/en/article/Cash-Drawer-Reports-Overview)                            |
+| Square (help)                           | Cash session                        | Starting Cash → Start Drawer; End Drawer → count → variance            | VENDOR    | [squareup.com](https://squareup.com/help/us/en/article/8344-start-and-end-a-cash-drawer-session)                |
+| Clover (dev docs)                       | Tender flow                         | include a Cancel button; customer-facing flow full-screen              | VENDOR    | [clover.com](https://docs.clover.com/dev/docs/custom-tenders)                                                   |
 
 ## 3. Touch targets and Fitts's law
 

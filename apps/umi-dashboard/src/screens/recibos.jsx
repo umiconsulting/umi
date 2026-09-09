@@ -40,9 +40,29 @@ const EXCEPTION_LABEL = {
 /** A boxed KPI tile: label, big mono value, optional meta line. */
 function Kpi({ label, value, tone, meta }) {
   return (
-    <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: '14px 16px', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div
+      style={{
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        padding: '14px 16px',
+        background: 'var(--surface)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+      }}
+    >
       <div className="eyebrow">{label}</div>
-      <div className="figures" style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 24, letterSpacing: '-0.02em', lineHeight: 1, color: tone || 'var(--ink-1)' }}>
+      <div
+        className="figures"
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontWeight: 600,
+          fontSize: 24,
+          letterSpacing: '-0.02em',
+          lineHeight: 1,
+          color: tone || 'var(--ink-1)',
+        }}
+      >
         {value}
       </div>
       {meta ? <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{meta}</div> : null}
@@ -62,7 +82,12 @@ function StatusPill({ status }) {
   return (
     <span
       className="sub-pill"
-      style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, color: tone, fontWeight: 600, whiteSpace: 'nowrap' }}
+      style={{
+        background: `color-mix(in srgb, ${tone} 16%, transparent)`,
+        color: tone,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}
     >
       <ReceiptStatusLabel status={status} />
     </span>
@@ -72,9 +97,21 @@ function StatusPill({ status }) {
 /** One line of the detail totals block. `strong` renders the grand total. */
 function TotalRow({ label, value, strong }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: strong ? 15 : 13, fontWeight: strong ? 700 : 500, padding: strong ? '8px 0 0' : '2px 0', borderTop: strong ? '1px solid var(--line)' : 'none' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 12,
+        fontSize: strong ? 15 : 13,
+        fontWeight: strong ? 700 : 500,
+        padding: strong ? '8px 0 0' : '2px 0',
+        borderTop: strong ? '1px solid var(--line)' : 'none',
+      }}
+    >
       <span style={{ color: strong ? 'var(--ink-1)' : 'var(--ink-3)' }}>{label}</span>
-      <span className="figures" style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-1)' }}>{value}</span>
+      <span className="figures" style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-1)' }}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -93,7 +130,14 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
   const payments =
     snap?.payments ||
     (snap?.payment
-      ? [{ tenderId: 'single', method: snap.payment.method, amount: snap.payment.amount, change: 0 }]
+      ? [
+          {
+            tenderId: 'single',
+            method: snap.payment.method,
+            amount: snap.payment.amount,
+            change: 0,
+          },
+        ]
       : []);
   const exceptions = data?.exceptions || [];
 
@@ -105,12 +149,29 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
         aria-modal="true"
         aria-label={t`Detalle del recibo`}
         onClick={(event) => event.stopPropagation()}
-        style={{ maxWidth: 560, width: '100%', maxHeight: '90vh', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}
+        style={{
+          maxWidth: 560,
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
           <div>
             <h3 style={{ margin: 0, fontFamily: 'var(--font-mono)' }}>{row.publicReference}</h3>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{formatOperationDate(row.occurredAt)}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+              {formatOperationDate(row.occurredAt)}
+            </div>
           </div>
           <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
             ×
@@ -134,7 +195,15 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
           </p>
         ) : (
           <>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 18px', fontSize: 12.5, alignItems: 'center' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '6px 18px',
+                fontSize: 12.5,
+                alignItems: 'center',
+              }}
+            >
               <span>
                 <span style={{ color: 'var(--ink-3)' }}>
                   <Trans>Operador</Trans>:{' '}
@@ -151,9 +220,19 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
             </div>
 
             <div style={{ overflowX: 'auto', border: '1px solid var(--line)', borderRadius: 12 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 360 }}>
+              <table
+                style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 360 }}
+              >
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--line)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-3)' }}>
+                  <tr
+                    style={{
+                      borderBottom: '1px solid var(--line)',
+                      fontSize: 10.5,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      color: 'var(--ink-3)',
+                    }}
+                  >
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>
                       <Trans>Concepto</Trans>
                     </th>
@@ -171,14 +250,34 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
                       <td style={{ padding: '8px 12px' }}>
                         <div style={{ fontWeight: 500 }}>{ln.description}</div>
                         {ln.variantName ? (
-                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{ln.variantName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                            {ln.variantName}
+                          </div>
                         ) : null}
                         {ln.modifiers && ln.modifiers.length ? (
-                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{ln.modifiers.join(' · ')}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                            {ln.modifiers.join(' · ')}
+                          </div>
                         ) : null}
                       </td>
-                      <td style={{ padding: '8px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{ln.quantity}</td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatOperationMoney(ln.lineTotal, currency)}</td>
+                      <td
+                        style={{
+                          padding: '8px 8px',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {ln.quantity}
+                      </td>
+                      <td
+                        style={{
+                          padding: '8px 12px',
+                          textAlign: 'right',
+                          fontFamily: 'var(--font-mono)',
+                        }}
+                      >
+                        {formatOperationMoney(ln.lineTotal, currency)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -186,13 +285,31 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TotalRow label={<Trans>Subtotal</Trans>} value={formatOperationMoney(snap.subtotal, currency)} />
+              <TotalRow
+                label={<Trans>Subtotal</Trans>}
+                value={formatOperationMoney(snap.subtotal, currency)}
+              />
               {snap.discountTotal ? (
-                <TotalRow label={<Trans>Descuento</Trans>} value={'−' + formatOperationMoney(snap.discountTotal, currency)} />
+                <TotalRow
+                  label={<Trans>Descuento</Trans>}
+                  value={'−' + formatOperationMoney(snap.discountTotal, currency)}
+                />
               ) : null}
-              <TotalRow label={<Trans>Impuestos</Trans>} value={formatOperationMoney(snap.taxTotal, currency)} />
-              {snap.tip ? <TotalRow label={<Trans>Propina</Trans>} value={formatOperationMoney(snap.tip, currency)} /> : null}
-              <TotalRow label={<Trans>Total</Trans>} value={formatOperationMoney(snap.grandTotal, currency)} strong />
+              <TotalRow
+                label={<Trans>Impuestos</Trans>}
+                value={formatOperationMoney(snap.taxTotal, currency)}
+              />
+              {snap.tip ? (
+                <TotalRow
+                  label={<Trans>Propina</Trans>}
+                  value={formatOperationMoney(snap.tip, currency)}
+                />
+              ) : null}
+              <TotalRow
+                label={<Trans>Total</Trans>}
+                value={formatOperationMoney(snap.grandTotal, currency)}
+                strong
+              />
             </div>
 
             {payments.length ? (
@@ -202,7 +319,15 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {payments.map((p) => (
-                    <div key={p.tenderId} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12.5 }}>
+                    <div
+                      key={p.tenderId}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        fontSize: 12.5,
+                      }}
+                    >
                       <span>
                         {i18n._(METHOD_LABEL[p.method] || p.method)}
                         {p.change ? (
@@ -212,7 +337,9 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
                           </span>
                         ) : null}
                       </span>
-                      <span className="figures" style={{ fontFamily: 'var(--font-mono)' }}>{formatOperationMoney(p.amount, currency)}</span>
+                      <span className="figures" style={{ fontFamily: 'var(--font-mono)' }}>
+                        {formatOperationMoney(p.amount, currency)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -223,21 +350,59 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
               <div className="eyebrow" style={{ marginBottom: 6 }}>
                 <Trans>Actividad</Trans>
               </div>
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <ul
+                style={{
+                  listStyle: 'none',
+                  margin: 0,
+                  padding: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
                 <li style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
                   <Trans>Emitido</Trans> · {formatOperationDate(snap.issuedAt)}
                 </li>
                 {exceptions.map((ex) => (
-                  <li key={ex.id} style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: '1px solid var(--line-soft)', paddingTop: 8 }}>
+                  <li
+                    key={ex.id}
+                    style={{
+                      fontSize: 12.5,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      borderTop: '1px solid var(--line-soft)',
+                      paddingTop: 8,
+                    }}
+                  >
                     <span>
-                      <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{i18n._(EXCEPTION_LABEL[ex.exceptionType] || ex.exceptionType)}</span>
+                      <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                        {i18n._(EXCEPTION_LABEL[ex.exceptionType] || ex.exceptionType)}
+                      </span>
                       {' · '}
                       {ex.operator || '—'}
-                      {ex.approved ? <span style={{ color: 'var(--success)' }}> · {t`aprobado`}</span> : null}
-                      {ex.reasonCode ? <span style={{ color: 'var(--ink-3)' }}> · {String(ex.reasonCode).replaceAll('_', ' ')}</span> : null}
-                      <span style={{ color: 'var(--ink-3)' }}> · {formatOperationDate(ex.occurredAt)}</span>
+                      {ex.approved ? (
+                        <span style={{ color: 'var(--success)' }}> · {t`aprobado`}</span>
+                      ) : null}
+                      {ex.reasonCode ? (
+                        <span style={{ color: 'var(--ink-3)' }}>
+                          {' '}
+                          · {String(ex.reasonCode).replaceAll('_', ' ')}
+                        </span>
+                      ) : null}
+                      <span style={{ color: 'var(--ink-3)' }}>
+                        {' '}
+                        · {formatOperationDate(ex.occurredAt)}
+                      </span>
                     </span>
-                    <span className="figures" style={{ fontFamily: 'var(--font-mono)', color: 'var(--danger)', whiteSpace: 'nowrap' }}>
+                    <span
+                      className="figures"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        color: 'var(--danger)',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       −{formatOperationMoney(ex.totalMinorUnits, ex.currency)}
                     </span>
                   </li>
@@ -248,8 +413,20 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
         )}
 
         {row.status !== 'not_printed' ? (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => onReprint(row)}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 8,
+              borderTop: '1px solid var(--line)',
+              paddingTop: 12,
+            }}
+          >
+            <button
+              className="btn btn-secondary btn-sm"
+              type="button"
+              onClick={() => onReprint(row)}
+            >
               <Trans>Reimprimir</Trans>
             </button>
           </div>
@@ -306,8 +483,20 @@ export default function Recibos() {
     const activeCol = sort.col === col;
     return (
       <th
-        onClick={() => setSort((s) => (s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' }))}
-        style={{ padding: '9px 12px', textAlign: alignRight ? 'right' : 'left', fontWeight: 600, cursor: 'pointer', userSelect: 'none', color: activeCol ? 'var(--ink-1)' : 'var(--ink-3)', whiteSpace: 'nowrap' }}
+        onClick={() =>
+          setSort((s) =>
+            s.col === col ? { col, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'desc' },
+          )
+        }
+        style={{
+          padding: '9px 12px',
+          textAlign: alignRight ? 'right' : 'left',
+          fontWeight: 600,
+          cursor: 'pointer',
+          userSelect: 'none',
+          color: activeCol ? 'var(--ink-1)' : 'var(--ink-3)',
+          whiteSpace: 'nowrap',
+        }}
       >
         {node} {activeCol ? (sort.dir === 'asc' ? '▲' : '▼') : ''}
       </th>
@@ -316,12 +505,38 @@ export default function Recibos() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
-        <Kpi label={<Trans>Recibos</Trans>} value={items.length} meta={<Trans>en esta vista</Trans>} />
-        <Kpi label={<Trans>Impresos</Trans>} value={printed} tone={printed ? 'var(--success)' : undefined} />
-        <Kpi label={<Trans>En cola</Trans>} value={queued} tone={queued ? 'var(--warning)' : undefined} />
-        <Kpi label={<Trans>Fallidos</Trans>} value={failed} tone={failed ? 'var(--danger)' : undefined} />
-        <Kpi label={<Trans>Total facturado</Trans>} value={formatOperationMoney(billed, currency)} meta={<Trans>en esta vista</Trans>} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+          gap: 12,
+        }}
+      >
+        <Kpi
+          label={<Trans>Recibos</Trans>}
+          value={items.length}
+          meta={<Trans>en esta vista</Trans>}
+        />
+        <Kpi
+          label={<Trans>Impresos</Trans>}
+          value={printed}
+          tone={printed ? 'var(--success)' : undefined}
+        />
+        <Kpi
+          label={<Trans>En cola</Trans>}
+          value={queued}
+          tone={queued ? 'var(--warning)' : undefined}
+        />
+        <Kpi
+          label={<Trans>Fallidos</Trans>}
+          value={failed}
+          tone={failed ? 'var(--danger)' : undefined}
+        />
+        <Kpi
+          label={<Trans>Total facturado</Trans>}
+          value={formatOperationMoney(billed, currency)}
+          meta={<Trans>en esta vista</Trans>}
+        />
       </div>
 
       {state.loading && !state.loaded ? (
@@ -341,25 +556,77 @@ export default function Recibos() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t`Buscar por recibo, monto o fecha…`}
               aria-label={t`Buscar recibos`}
-              style={{ maxWidth: 360, padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--surface)', color: 'var(--ink-1)', fontSize: 13 }}
+              style={{
+                maxWidth: 360,
+                padding: '8px 12px',
+                border: '1px solid var(--line)',
+                borderRadius: 10,
+                background: 'var(--surface)',
+                color: 'var(--ink-1)',
+                fontSize: 13,
+              }}
             />
-            <div role="group" aria-label={t`Filtrar por estado`} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div
+              role="group"
+              aria-label={t`Filtrar por estado`}
+              style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}
+            >
               {FILTERS.map((f) => (
-                <button key={f.id} type="button" className={'btn btn-sm ' + (filter === f.id ? 'btn-primary' : 'btn-secondary')} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+                <button
+                  key={f.id}
+                  type="button"
+                  className={'btn btn-sm ' + (filter === f.id ? 'btn-primary' : 'btn-secondary')}
+                  aria-pressed={filter === f.id}
+                  onClick={() => setFilter(f.id)}
+                >
                   {i18n._(f.label)}
                 </button>
               ))}
             </div>
           </div>
 
-          <section style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
+          <section
+            style={{
+              border: '1px solid var(--line)',
+              borderRadius: 14,
+              background: 'var(--surface)',
+              overflow: 'hidden',
+            }}
+          >
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 560 }}>
+              <table
+                style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 560 }}
+              >
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--line)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--ink-3)' }}><Trans>Recibo</Trans></th>
+                  <tr
+                    style={{
+                      borderBottom: '1px solid var(--line)',
+                      fontSize: 10.5,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    <th
+                      style={{
+                        padding: '9px 12px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      <Trans>Recibo</Trans>
+                    </th>
                     {th('date', <Trans>Emitido</Trans>, false)}
-                    <th style={{ padding: '9px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--ink-3)' }}><Trans>Estado</Trans></th>
+                    <th
+                      style={{
+                        padding: '9px 12px',
+                        textAlign: 'left',
+                        fontWeight: 600,
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      <Trans>Estado</Trans>
+                    </th>
                     {th('amount', <Trans>Monto</Trans>, true)}
                     <th style={{ padding: '9px 12px' }} aria-label={t`Acciones`} />
                   </tr>
@@ -367,7 +634,10 @@ export default function Recibos() {
                 <tbody>
                   {sorted.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '20px 12px', color: 'var(--ink-3)', fontSize: 13 }}>
+                      <td
+                        colSpan={5}
+                        style={{ padding: '20px 12px', color: 'var(--ink-3)', fontSize: 13 }}
+                      >
                         <Trans>Ningún recibo coincide con la búsqueda.</Trans>
                       </td>
                     </tr>
@@ -385,19 +655,45 @@ export default function Recibos() {
                               event.stopPropagation();
                               setDetailRow(item);
                             }}
-                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink-2)', textAlign: 'left' }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              cursor: 'pointer',
+                              fontFamily: 'var(--font-mono)',
+                              fontWeight: 600,
+                              color: 'var(--ink-2)',
+                              textAlign: 'left',
+                            }}
                           >
                             {item.publicReference}
                           </button>
                         </td>
-                        <td style={{ padding: '9px 12px', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{formatOperationDate(item.occurredAt)}</td>
+                        <td
+                          style={{
+                            padding: '9px 12px',
+                            color: 'var(--ink-3)',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {formatOperationDate(item.occurredAt)}
+                        </td>
                         <td style={{ padding: '9px 12px' }}>
                           <StatusPill status={item.status} />
                         </td>
-                        <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                        <td
+                          style={{
+                            padding: '9px 12px',
+                            textAlign: 'right',
+                            fontFamily: 'var(--font-mono)',
+                            fontWeight: 600,
+                          }}
+                        >
                           {formatOperationMoney(item.amountMinorUnits, item.currency)}
                         </td>
-                        <td style={{ padding: '7px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <td
+                          style={{ padding: '7px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}
+                        >
                           {item.status !== 'not_printed' ? (
                             <button
                               className="btn btn-secondary btn-sm"

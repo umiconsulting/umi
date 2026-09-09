@@ -25,7 +25,7 @@ The brief's premise ("no loyalty in build-v3") is **false** — v3 kept loyalty 
 - **Earn/redeem wired end-to-end**: POS checkout → `merchant.commit_customer_value_closeout` (`pos-checkout.repository.ts:1238` → `38:381`) writes earn pending/committed via `append_loyalty_points` (`38:433`). Two-phase reward redeem: authorize hold `points_authorized` (`pos-customer-value.repository.ts:1101`) + reservation (`:1055`) → closeout `points_redeemed` (`38:463`) → release `points_released` (`:1294`). Manual adjustment via `commit_points_adjustment` (`38:323`) with approval gate >500 pts. Stamps credited by `cash-scan.service.ts:313`.
 - **Contract is real points**, not an estimate: `pos-customer-value.ts` (1025 L) `PointsBalance` (`:312`), `PointsEarnPreview/Commit` (`:328/348`), `RewardType` incl `points_to_value` (`:356`). Endpoints: `customer-value/preview`, `rewards/authorize+release`, `stored-value/authorize+release`, `points/adjustments/preview+commit` (`pos-customer-value.controller.ts:70-134`).
 
-**Gaps**: 🔴 **membership tiers do not exist** (no tier table/column anywhere — new schema + logic needed). 🟡 **program ships OFF by default** — `loyalty_program.enabled` default false, `policy_version='pilot-deny-v1'` (`37:177,184`); earn only fires `if v_policy.enabled` (`38:408`); **nothing in the API sets `enabled=true`** — no program-enablement/policy surface. 🟡 **no CRUD for the points reward catalog** (points rewards are read-only in the POS path; only the stamp reward config is writable, `cash.repository.ts:408`). 🟡 **birthday-issuance + points-expiry crons not ported** — birthday grants are read/redeemed but never *created* by a daily job (`20:790` comment); `points_expired_foundation` has no expiry job. (No cron infra for these in umi-api yet.)
+**Gaps**: 🔴 **membership tiers do not exist** (no tier table/column anywhere — new schema + logic needed). 🟡 **program ships OFF by default** — `loyalty_program.enabled` default false, `policy_version='pilot-deny-v1'` (`37:177,184`); earn only fires `if v_policy.enabled` (`38:408`); **nothing in the API sets `enabled=true`** — no program-enablement/policy surface. 🟡 **no CRUD for the points reward catalog** (points rewards are read-only in the POS path; only the stamp reward config is writable, `cash.repository.ts:408`). 🟡 **birthday-issuance + points-expiry crons not ported** — birthday grants are read/redeemed but never _created_ by a daily job (`20:790` comment); `points_expired_foundation` has no expiry job. (No cron infra for these in umi-api yet.)
 
 ---
 
@@ -81,7 +81,7 @@ The brief's premise ("no loyalty in build-v3") is **false** — v3 kept loyalty 
 - **Pairing state machine complete**: begin→claim→poll→approve/deny→acknowledge + rotate/revoke/replacement (`devices/devices.service.ts:44-366`; routes `devices.controller.ts:44-227`). Tables `runtime.device_enrollment_request` + `device_pairing_session`, hashed setup/polling/installation/credential values, attempt caps, TTL 5 min (`30_device_pairing.sql:5-83`; `devices.service.ts:58-113`).
 - **Credentials**: HMAC-derived device credential + `credential_version` rotation, lifecycle `enrollment_pending|active|rotation_required|rotated|revoked|replaced|retired`, `device_revocation_ck`, one live install per tablet (`20_merchant.sql:1544-1605`). Auth matches `(public_id, installation_hash, credential_hash)` (`devices.service.ts:267-282`).
 - **Roles = 2**: `DeviceType = ['pos_terminal','kds']` (`packages/contract/src/device.ts:14`; DB checks `20_merchant.sql:1550`, `30_device_pairing.sql:10`). **customer-display is a hardware peripheral, not an enrolled device role** (`40_pos_hardware_runtime.sql:36,84`); KDS is delivered as a **mode of the POS device** (`kds-pos.controller.ts:28-36`).
-- **Hardware-backed identity 🟡**: `verifyDeviceProof` verifies ed25519 (software) **and** es256/P-256 (Secure Enclave/Keystore/TPM format) signatures over `installationId|timestamp` (`devices/device-proof.ts:57-115`); enforced in `pinLogin`/refresh (`auth.service.ts:222-245,277,349`). **Gap A**: server proves key *possession*, not that the key is hardware-backed — no Apple App Attest/DeviceCheck, no Android Play Integrity/key-attestation chain (acceptance path pre-wired, `device-proof.ts:15-20`). **Gap B**: proof is skipped when no key registered (`auth.service.ts:231`) — keyless device falls back to bearer only.
+- **Hardware-backed identity 🟡**: `verifyDeviceProof` verifies ed25519 (software) **and** es256/P-256 (Secure Enclave/Keystore/TPM format) signatures over `installationId|timestamp` (`devices/device-proof.ts:57-115`); enforced in `pinLogin`/refresh (`auth.service.ts:222-245,277,349`). **Gap A**: server proves key _possession_, not that the key is hardware-backed — no Apple App Attest/DeviceCheck, no Android Play Integrity/key-attestation chain (acceptance path pre-wired, `device-proof.ts:15-20`). **Gap B**: proof is skipped when no key registered (`auth.service.ts:231`) — keyless device falls back to bearer only.
 - **Revocation ✅**: `revoke()`/`rotate()` via integrity command bus with audit events (`devices.service.ts:284-366`); DB enforces revoked state.
 
 **What's needed**: real attestation to prove the es256 key is hardware-backed; require a registered key at enrollment so proof is unconditional.
@@ -152,12 +152,14 @@ The brief's premise ("no loyalty in build-v3") is **false** — v3 kept loyalty 
 - **Products/entitlements**: 5 products `cash|conversaflow|kds|dashboard|pos` (`entitlements.ts:21`), `EntitlementGuard`+`@RequireProduct`, `umi.plan`/`umi.subscription` (`10_umi.sql:311,333`), active statuses `active|trialing`.
 
 ### Verified known items
+
 - **cash_shift device_scoping (owner "Turnos de caja" empty)** — **FIXED** in build-v3: policy rewritten to `using(true)` with the device predicate moved to `WITH CHECK` (writes only); reads fall through to merchant_isolation + location_narrowing (`90_rls.sql:573-611`). Owner (device-less) sessions can now read shifts.
 - **pos_sale_exception device_scoping (owner "Reembolsos" empty)** — **FIXED** identically: `using(true)`, `WITH CHECK` pins writes to acting device or authorized dashboard `refund.preview|commit` administrative_command; append-only (`90_rls.sql:613-646`). Owner can now read refunds/voids.
 - **pos_sale_exception RLS for refunds/voids** — present and correct (append-only, device-or-command write auth) (`34_pos_exception.sql:105-234,464-472`; `90_rls.sql:631-646`).
 - **Category colors server-assigned (contract 2.18.0)** — **confirmed/complete**: `merchant.product_category.color` NOT NULL, `#RRGGBB` check, default random of 16-colour palette (`20_merchant.sql:913`); server assigns the **least-used** palette entry on create (random tiebreak) (`dashboard-catalog.repository.ts:48-66`); owner recolours in dashboard (`dashboard-catalog.controller.ts`). No "automatic" state.
 
 ### RLS risks / notes
+
 - `location_narrowing` opt-outs (`staff`, `loyalty_visit`) and `not_device_scoped` (stock/loyalty ledgers, kitchen_command/device_station) are deliberate — each documented (`90_rls.sql:474-483,654-665`). Worth a periodic re-review that ledger tables truly need no device scoping.
 - `platform`/`core` schemas (CRM identity, `core.product_instances` referenced by entitlements) are absent from build-v3 → cross-DB coupling; entitlement guard's source-of-truth spans a DB build-v3 doesn't create.
 
@@ -176,20 +178,20 @@ The brief's premise ("no loyalty in build-v3") is **false** — v3 kept loyalty 
 
 ## Domain status summary
 
-| # | Domain | Status | One-line |
-|---|---|---|---|
-| 1 | Loyalty | 🟡 | Real dual-model backend (event-sourced points + legacy stamps/saldo), fully wired at checkout; missing tiers (🔴), points-reward CRUD, enablement surface, issuance/expiry crons; ships pilot-OFF. |
-| 2 | Ordering / channels | 🟡 | POS + WhatsApp real via one `writeOrder` seam; `web`/`dashboard` channels reserved-only → online ordering 🔴 not built. Linear lifecycle, manual dashboard transition. |
-| 3 | Payments | 🟡→🔴 | Manual/attested recording only (cash + manual_terminal); no gateway auth/capture/settlement; tips ✅, surcharge/settlement 🔴. Zettle = catalog sync only. |
-| 4 | Gift cards | ✅ | Two complete issue/redeem/balance systems (POS + cash) over one ledger; dashboard UI wired. |
-| 4b | Wallet / passes | ✅ code / 🟡 config | Genuine Apple pkpass+APNs+PassKit web service and Google Wallet; blocked only by unset optional secrets + un-ported crons. |
-| 5 | Devices & identity | ✅ | Full pairing/rotate/revoke; ed25519+es256 proof-of-possession enforced; true HW attestation is the honest gap; 2 roles. |
-| 6 | Automations | ✅ | Real BullMQ worker + repeatable schedulers; 2 lifecycle families flag-OFF by design; RealToolsService live. |
-| 7 | CRM identity | 🟡 | Flat `merchant.customer`+`contact` model finished (E.164, WhatsApp match, Customer 360, operator merge); `platform.*` spine abandoned by design; auto merge-candidate detection missing. |
-| 8 | Realtime | 🟡 | Socket.IO nudge channels for pairing + dashboard only; POS/KDS poll-based; single-replica (needs Redis adapter). |
-| 9 | Contract | ✅ | 10.3K L, v2.18.0, heavy zod on POS; thin on reporting; minor entitlement drift. |
-| 10 | Multi-tenant / RLS | ✅ | Layered fail-closed RLS with build-time guard; both known owner-blindness bugs FIXED; category colors done. |
-| 11 | Reporting | 🟡 | No analytics model; live ad-hoc JS aggregation, loyalty/Cash-scoped; no POS-sales report, product mix, or true LTV/cohort. |
+| #   | Domain              | Status              | One-line                                                                                                                                                                                           |
+| --- | ------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Loyalty             | 🟡                  | Real dual-model backend (event-sourced points + legacy stamps/saldo), fully wired at checkout; missing tiers (🔴), points-reward CRUD, enablement surface, issuance/expiry crons; ships pilot-OFF. |
+| 2   | Ordering / channels | 🟡                  | POS + WhatsApp real via one `writeOrder` seam; `web`/`dashboard` channels reserved-only → online ordering 🔴 not built. Linear lifecycle, manual dashboard transition.                             |
+| 3   | Payments            | 🟡→🔴               | Manual/attested recording only (cash + manual_terminal); no gateway auth/capture/settlement; tips ✅, surcharge/settlement 🔴. Zettle = catalog sync only.                                         |
+| 4   | Gift cards          | ✅                  | Two complete issue/redeem/balance systems (POS + cash) over one ledger; dashboard UI wired.                                                                                                        |
+| 4b  | Wallet / passes     | ✅ code / 🟡 config | Genuine Apple pkpass+APNs+PassKit web service and Google Wallet; blocked only by unset optional secrets + un-ported crons.                                                                         |
+| 5   | Devices & identity  | ✅                  | Full pairing/rotate/revoke; ed25519+es256 proof-of-possession enforced; true HW attestation is the honest gap; 2 roles.                                                                            |
+| 6   | Automations         | ✅                  | Real BullMQ worker + repeatable schedulers; 2 lifecycle families flag-OFF by design; RealToolsService live.                                                                                        |
+| 7   | CRM identity        | 🟡                  | Flat `merchant.customer`+`contact` model finished (E.164, WhatsApp match, Customer 360, operator merge); `platform.*` spine abandoned by design; auto merge-candidate detection missing.           |
+| 8   | Realtime            | 🟡                  | Socket.IO nudge channels for pairing + dashboard only; POS/KDS poll-based; single-replica (needs Redis adapter).                                                                                   |
+| 9   | Contract            | ✅                  | 10.3K L, v2.18.0, heavy zod on POS; thin on reporting; minor entitlement drift.                                                                                                                    |
+| 10  | Multi-tenant / RLS  | ✅                  | Layered fail-closed RLS with build-time guard; both known owner-blindness bugs FIXED; category colors done.                                                                                        |
+| 11  | Reporting           | 🟡                  | No analytics model; live ad-hoc JS aggregation, loyalty/Cash-scoped; no POS-sales report, product mix, or true LTV/cohort.                                                                         |
 
 ## Prioritized unfinished list (backend)
 

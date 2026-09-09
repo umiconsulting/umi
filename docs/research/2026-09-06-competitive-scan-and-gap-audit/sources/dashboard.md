@@ -24,6 +24,7 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
 ## Per-area status
 
 ### Navigation / IA — ✅ Done (~90% of redesign)
+
 - 6 sections HOME/OPERATIONS/CUSTOMERS/BUSINESS/CONFIGURATION/PLATFORM
   (`lib/module-registry.js` `MODULE_ORDER` :175-206). `Crecimiento`/GROWTH **removed**.
 - `operations` (Centro operativo) **dissolved from nav** — not in `MODULE_ORDER`; route
@@ -35,6 +36,7 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
 - Deferred (see redesign plan §8): Ajustes consolidation, `operations.jsx` deletion.
 
 ### Overview / KPIs (overview.jsx) — 🟡 Partial
+
 - Real data (`useOverviewData`, `overview.jsx:16`). Follows an "honesty doctrine":
   renders `–` / "sin calcular" for uncomputed metrics rather than faking
   (`overview.jsx:26-56, 108-131`). Many deltas (`revenueDeltaPct`, `memberDeltaPct`,
@@ -45,11 +47,13 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
 - Redesign plan explicitly **defers** Panorama Phase-2 cockpit deepening (plan §8).
 
 ### Cafés / locations (cafes.jsx, settings.jsx) — ✅ Done
+
 - Platform-gated (`cafes.jsx:355` `platformRole !== 'super_admin'`), `useCafes` +
   `provisionCafe` (`cafes.jsx:7,350`). Locations: create/save + geocoding in settings
   (`data.jsx:1143-1179`, `settings.jsx:1186,1358,1492`).
 
 ### Catalog & Inventory (catalog-inventory.jsx) — 🟡 Partial
+
 - Tabs Catálogo / Categorías / Inventario (`catalog-inventory.jsx:12-16`).
 - Catalog: full create/edit via `CatalogDialog` (`operations-workspace.jsx:937`).
 - Inventory: `InventoryDialog` "Operar" adjustments (`operations-workspace.jsx:315`) —
@@ -57,17 +61,20 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
   (`catalog-inventory.jsx:9-10`). Generic-table domain; functional, read + adjust only.
 
 ### Categories / colors (categories-workspace.jsx) — ✅ Done
+
 - Real CRUD + color picker; persists via `createCatalogCategory`/`updateCatalogCategory`
   (`categories-workspace.jsx:28-39,108-124`). Server seeds a curated palette colour; owner
   recolours; POS paints it behind photo-less products. **Known item: category colors =
   DONE.**
 
 ### Orders (orders.jsx) — ✅ Done (read-only by design)
+
 - `useOrdersData` (`orders.jsx:79`), filters/channels/counts. Lifecycle status is
   **READ-ONLY** here — advanced from KDS/Cocina (`orders.jsx:404-407,606-607`). Matches
   the product rule (dashboard/KDS boards are read-only for advance).
 
 ### Cash & shifts / turnos (cash-shifts.jsx) — ✅ Done
+
 - Tabs Ventas·Recibos·Reembolsos·Turnos de caja·Registros (`cash-shifts.jsx:11-17`).
 - Purpose-built editorial views: `CashShiftsView`, `SalesView`, `ReceiptsView`,
   `RefundsView`, `RegistersView` (`operations-workspace.jsx:2298-2304`).
@@ -76,24 +83,29 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
   record + authorized actions.
 
 ### Kitchen / cocina (cocina.jsx) — 🟡 Partial
+
 - Thin wrapper → `DomainWorkspace domain="kitchen"` (`cocina.jsx:9`). Generic table +
   `KitchenRouteDialog` for station routing (`operations-workspace.jsx:1178`). Setup only;
   live cook board stays on KDS/overview by design. Functional but minimal.
 
 ### Devices (devices.jsx) — ✅ Done
+
 - Largest real screen (2231 lines). Full enroll/pair/approve/deny/revoke via `data.jsx`
   (`:682-811`). `console.error` only on failures (`devices.jsx:635,648,942,956,1699,2134`).
   Hardware domain removed by owner decision (redesign plan corrections, §7).
 
 ### Members / Staff (staff.jsx) — ✅ Done
+
 - `createStaffMember`/`updateStaffMember`, roles, permissions, invites, PIN
   (`staff.jsx:10-15,54-56`). Real.
 
 ### Gift cards (gift-cards.jsx) — ✅ Done
+
 - `issueGiftCard` + `redeemGiftCardByCode` + `useGiftCardsData` (`gift-cards.jsx:7`). Now a
   tab of the loyalty-value hub; `/gift-cards` redirects.
 
 ### Loyalty (members.jsx + loyalty-value hub) — 🟡 Partial
+
 - **Members is a REAL program, not an estimator**: `registerMember`, `useMembersData`,
   sort by visits/balance/LTV/inactive (`members.jsx:8,19-25,45`); reward-config edited in
   settings (`settings.jsx:22`, `data.jsx:353,531`).
@@ -103,6 +115,7 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
   policy; rewards program config lives in settings, not this tab.
 
 ### Customers & Conversations / CRM (customers.jsx, conversations.jsx) — ✅ Done (real)
+
 - **Customer 360 is real, not a scaffold**: profile tabs, timeline
   (`customers.jsx:288-291,925`), insights metrics (`useCustomerInsights` →
   `/insights/customer-platform`, `data.jsx:978-987`, `customers.jsx:945-946`), identity
@@ -114,25 +127,30 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
   redirect.
 
 ### Hours (hours.jsx) — ✅ Done
+
 - Business hours, special notice, phone blocklist, WhatsApp pause **persisted** via
   `acceptsOrders` from `hoursData` (`hours.jsx:109,126,166-173`). conversaflow-gated.
 
 ### Diagnostics (diagnostics.jsx) — 🟡 Partial
+
 - Wrapper → `DomainWorkspace` recovery/audit/diagnostics (`diagnostics.jsx:10-14`).
   Generic tables + `RecoveryDialog` (`operations-workspace.jsx:1266`). Admin-gated
   (`module-registry.js` permissions `audit.read`,`hardware.diagnostics`). Functional but
   generic presentation; owner-insights-migration classification only partially applied.
 
 ### Settings (settings.jsx) — ✅ Done (mostly)
+
 - 1661 lines. Business profile, voice/tone assistant (conversaflow-gated,
   `settings.jsx:432-533`), locations + geocoding, reward config (`data.jsx:531`). D9
   "Ajustes consolidation" (fold hours + products-billing into tabs here) **deferred**
   (plan §8) — they stay separate CONFIGURATION items.
 
 ### Profile (profile.jsx) — ✅ Done
+
 - Personal, ungated (`app.jsx:374`). Access method + permissions view.
 
 ### Billing / products (products-billing.jsx) — 🟡 Partial
+
 - **Display-only** entitlement status cards (dashboard/conversaflow/kds/cash/
   observability) — `isProductStatusActive` (`products-billing.jsx:53,101-135`). **No actual
   billing / subscription / payment management.** Platform-gated with a documented masking
@@ -140,17 +158,20 @@ other domain renders a generic card+table (`operations-workspace.jsx:2298-2308`)
   (`module-registry.js` `products-billing` comment :~95-115).
 
 ### Automations — 🔴 Missing (as a dashboard surface)
+
 - No dedicated automations/rules/workflow builder screen exists (grep for
   automation/rule/trigger/flujo finds only comments). Automation is owned by ConversaFlow
   (WhatsApp auto-orders); the dashboard exposes only voice/tone (settings), hours, and the
   WhatsApp pause. Absent if automations are expected in-dashboard; likely out of scope.
 
 ### Auth / login (login.jsx, reset-password.jsx) — ✅ Done
+
 - Email/password + OTP flow (`login.jsx`; "000000" at :419 is placeholder text only),
   reset-password min-8 (`reset-password.jsx:136`). `RequireAuth` gate (`app.jsx:432-450`)
   via `lib/auth.jsx`.
 
 ### i18n / localization — ✅ Done (essentially complete)
+
 - Lingui, Spanish source + English catalog. **1 empty `msgstr` out of 975 msgids** in
   `src/locales/en/messages.po`. **Zero `lingui/no-unlocalized-strings` suppressions**
   (`eslint-suppressions.json` holds only `no-unused-vars` ×14, `react-hooks/*` ×7).

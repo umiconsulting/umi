@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { hasDashboardPermission } from '../dashboard-operations/dashboard-operations.policy';
 import { DashboardCatalogRepository } from './dashboard-catalog.repository';

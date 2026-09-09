@@ -173,7 +173,17 @@ export class CustomersRepository {
              )
            ORDER BY c.last_activity_at DESC, c.id DESC
            LIMIT $7`,
-          [merchantId, q.contactId, q.contactUuid, q.filter, q.search, like, q.limit + 1, q.cursorTs, q.cursorId],
+          [
+            merchantId,
+            q.contactId,
+            q.contactUuid,
+            q.filter,
+            q.search,
+            like,
+            q.limit + 1,
+            q.cursorTs,
+            q.cursorId,
+          ],
         )
       ).rows;
 

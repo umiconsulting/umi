@@ -17,9 +17,22 @@ export interface ManagedCategory {
  * black or white ink by luminance, so light and dark entries are both legible.
  * Kept in step with the DB column default in `20_merchant.sql`. */
 const CATEGORY_PALETTE = [
-  '#e6194b', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6',
-  '#bfef45', '#469990', '#9a6324', '#800000', '#808000', '#000075', '#fabed4',
-  '#ffd8b1', '#aaffc3',
+  '#e6194b',
+  '#3cb44b',
+  '#4363d8',
+  '#f58231',
+  '#911eb4',
+  '#42d4f4',
+  '#f032e6',
+  '#bfef45',
+  '#469990',
+  '#9a6324',
+  '#800000',
+  '#808000',
+  '#000075',
+  '#fabed4',
+  '#ffd8b1',
+  '#aaffc3',
 ] as const;
 
 @Injectable()

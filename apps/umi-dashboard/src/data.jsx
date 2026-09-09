@@ -495,7 +495,10 @@ async function _loadTriage(ctx) {
 async function _loadOperations(ctx, domain, cursor, merchantWide, limit) {
   const merchantId = _merchantId(ctx);
   if (!merchantId) return EMPTY_OPERATIONS;
-  const query = new URLSearchParams({ domain: domain || 'organization', limit: String(limit || 20) });
+  const query = new URLSearchParams({
+    domain: domain || 'organization',
+    limit: String(limit || 20),
+  });
   const locationId = merchantWide ? '' : _locationId(ctx);
   if (locationId) query.set('locationId', locationId);
   if (cursor) query.set('cursor', String(cursor));
@@ -1271,7 +1274,13 @@ function useOperationsData(domain, cursor, refresh, merchantWide, limit) {
     function () {
       return _loadOperations(ctx, domain, cursor, merchantWide, limit);
     },
-    _deps(ctx, [domain || 'organization', cursor || 0, refresh || 0, merchantWide ? 1 : 0, limit || 20]),
+    _deps(ctx, [
+      domain || 'organization',
+      cursor || 0,
+      refresh || 0,
+      merchantWide ? 1 : 0,
+      limit || 20,
+    ]),
     EMPTY_OPERATIONS,
   );
 }

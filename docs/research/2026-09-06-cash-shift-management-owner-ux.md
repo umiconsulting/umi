@@ -1,7 +1,7 @@
 # Cash-shift management — the owner/manager UX in enterprise POS
 
 - **Date:** 2026-09-06
-- **Question:** How do leading POS / back-office systems model a *cash shift* (drawer session) and its reconciliation, and how do they present that to the **owner/manager** in the back office (not the cashier's on-terminal flow)?
+- **Question:** How do leading POS / back-office systems model a _cash shift_ (drawer session) and its reconciliation, and how do they present that to the **owner/manager** in the back office (not the cashier's on-terminal flow)?
 - **Scope:** Square, Toast, Lightspeed Restaurant (K-series), Clover, Shopify POS. Data model + owner-facing UX + the concrete actions an owner can take.
 - **Method / source labels:** Each claim is tagged.
   - `PRIMARY` — vendor product/help documentation.
@@ -26,24 +26,25 @@
 
 ## Cross-system comparison
 
-| Dimension | Square | Toast | Lightspeed K-series | Clover | Shopify POS |
-|---|---|---|---|---|---|
-| Shift a first-class object? | **Yes** — `CashDrawerShift` API entity | Yes — cash drawer + shift review | Yes — shift → user → drawer reports | **Log**, not a reconciled object | **Yes** — register session |
-| States | `OPEN` / `ENDED` / `CLOSED` | Active / Open / Closed | Open / Closed (period) | (per-event log) | Open / Closed |
-| Opening float | `opened_cash_money` | Start balance | Opening count | (n/a in log) | Starting float |
-| Expected cash | `expected_cash_money` (can go negative) | expected balance | `Total` = lifts+drops+takings | — | expected = start + cash payments |
-| Counted cash | `closed_cash_money` | counted at close | `Reported` (denominations on click) | — | final count |
-| Variance | expected vs closed | Cash over / short / none | `Difference` = reported − total | — | discrepancy at **start & end** |
-| Pay-in / pay-out | `PAID_IN` / `PAID_OUT` events | Pay In / Pay Out | Lifts / drops | Paid in / paid out events | cash added / removed |
-| Separation of duties | opener / ender / **closer** = 3 roles | drawer locked to employee | user per drawer | employee per event | staff per session |
-| Owner can act from back office | **Read-only** (API) | Reopen, approve, adjust, complete | Export / print / journal | Filter / export | **Close remotely**, note, export |
-| Editable after close? | (audited once) | **Yes — reopen** | Report only | Log only | **No — immutable** |
+| Dimension                      | Square                                  | Toast                             | Lightspeed K-series                 | Clover                           | Shopify POS                      |
+| ------------------------------ | --------------------------------------- | --------------------------------- | ----------------------------------- | -------------------------------- | -------------------------------- |
+| Shift a first-class object?    | **Yes** — `CashDrawerShift` API entity  | Yes — cash drawer + shift review  | Yes — shift → user → drawer reports | **Log**, not a reconciled object | **Yes** — register session       |
+| States                         | `OPEN` / `ENDED` / `CLOSED`             | Active / Open / Closed            | Open / Closed (period)              | (per-event log)                  | Open / Closed                    |
+| Opening float                  | `opened_cash_money`                     | Start balance                     | Opening count                       | (n/a in log)                     | Starting float                   |
+| Expected cash                  | `expected_cash_money` (can go negative) | expected balance                  | `Total` = lifts+drops+takings       | —                                | expected = start + cash payments |
+| Counted cash                   | `closed_cash_money`                     | counted at close                  | `Reported` (denominations on click) | —                                | final count                      |
+| Variance                       | expected vs closed                      | Cash over / short / none          | `Difference` = reported − total     | —                                | discrepancy at **start & end**   |
+| Pay-in / pay-out               | `PAID_IN` / `PAID_OUT` events           | Pay In / Pay Out                  | Lifts / drops                       | Paid in / paid out events        | cash added / removed             |
+| Separation of duties           | opener / ender / **closer** = 3 roles   | drawer locked to employee         | user per drawer                     | employee per event               | staff per session                |
+| Owner can act from back office | **Read-only** (API)                     | Reopen, approve, adjust, complete | Export / print / journal            | Filter / export                  | **Close remotely**, note, export |
+| Editable after close?          | (audited once)                          | **Yes — reopen**                  | Report only                         | Log only                         | **No — immutable**               |
 
 ---
 
 ## Per-system detail
 
 ### Square — Cash Drawer Shifts API (the cleanest data model)
+
 - **First-class object `CashDrawerShift`** with `state` = `OPEN` / `ENDED` / `CLOSED`, `opened_at` / `ended_at` / `closed_at`. `PRIMARY-SPEC` — https://developer.squareup.com/reference/square/objects/CashDrawerShift
 - Money fields, each **computed by summing its event type**: `opened_cash_money` (float), `cash_payment_money` (`CASH_TENDER_PAYMENT` + `CASH_TENDER_CANCELED_PAYMENT`), `cash_refunds_money` (`CASH_TENDER_REFUND`), `cash_paid_in_money` (`PAID_IN`), `cash_paid_out_money` (`PAID_OUT`), `expected_cash_money` (float + payments + paid-in − refunds − paid-out — **"can be negative if employees have not correctly recorded all the events"**), `closed_cash_money` ("found in the cash drawer at the end of the shift by an **auditing employee**"). `PRIMARY-SPEC`
 - **Three distinct people** per shift: `opening_team_member_id`, `ending_team_member_id`, `closing_team_member_id`, plus `team_member_ids[]` (everyone logged in). Separation of duties baked into the schema. `PRIMARY-SPEC`
@@ -51,6 +52,7 @@
 - `description` is a free-text field used for **discrepancy notes**. The API is **read-only** (list/retrieve) — no write endpoints. `PRIMARY-SPEC`
 
 ### Toast — Cash Management + Shift Review (the richest owner actions)
+
 - Drawers are **Active / Open / Closed** and can be **locked to a specific employee**; the system separates "cash in hand" from "cash in drawer". `PRIMARY` — https://support.toasttab.com/en/article/Cash-Management-Overview
 - Permission-gated actions: **Adjust Cash Drawer Start Balance**, **Pay Out**, **No Sale**. `PRIMARY`
 - **Shift Review flow** (POS, guided, each step checkmarked): close checks → declare cash tips → **reconcile cash and tips** → **close cash drawers** (count) → clock out. System computes **"Cash over, Cash short, or No difference"**; differences over a **configured threshold require manager approval**; 45-char comment for variance. `PRIMARY` — https://support.toasttab.com/en/article/Shift-Review-Overview
@@ -58,16 +60,19 @@
 - Day-level: **Close Out Day / Z-report**. `PRIMARY` — https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture
 
 ### Lightspeed Restaurant K-series — back-office Cash drawer report (the cleanest drill-down hierarchy)
+
 - Report hierarchy: **shift report → user report → drawer report** (you open the shift first, then its users and drawers). `PRIMARY` — https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports
 - **Cash drawer report** columns: `User`, `Date`, `Period` (open/close hours), `Reported` (counted — **click to see the denomination breakdown**), `Lifts/drops` (net added/removed), `Takings` (all registered payments), `Total` (= lifts + drops + takings), `Difference` (= reported − total). `PRIMARY` — https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report
 - Owner actions: **export CSV / print PDF**, **download a "Cash management journal"** of individual lifts and drops, **sort by user/date**, adjust timeframe, click a count to see denominations. `PRIMARY`
 
 ### Clover — Cash Log (the lightest model: a log, not a reconciled shift)
-- **Cash Log** is a free app that "tracks all customer cash transactions and manager cash drawer activities". Accessed at **Dashboard → Sales activity → Cash log**. `PRIMARY` — https://www.clover.com/en-US/help/run-cash-log-report *(help page rendered as an empty SPA shell on fetch; fields below are from the vendor's own search description — see appendix)*
+
+- **Cash Log** is a free app that "tracks all customer cash transactions and manager cash drawer activities". Accessed at **Dashboard → Sales activity → Cash log**. `PRIMARY` — https://www.clover.com/en-US/help/run-cash-log-report _(help page rendered as an empty SPA shell on fetch; fields below are from the vendor's own search description — see appendix)_
 - Report columns: **Event** (transaction or adjustment — paid in / paid out / no-sale), **Amount**, **Reason** (what prompted the drawer opening/adjustment), **Employee**. Date ranges (Today / Yesterday / 7 / 30 / custom); **filter by employee, event, or device type**. `PRIMARY (vendor description)`
 - Clover models **cash events**, not a first-class reconciled shift with expected/counted — the lightest of the five. `INFERENCE`
 
 ### Shopify POS — register sessions + admin cash-tracking reports (the closest analog to an owner dashboard)
+
 - A **register session** records all cash activity for an interval: **starting float**, cash added/removed, **final count**. Expected = starting + cash payments received. `PRIMARY` — https://help.shopify.com/en/manual/sell-in-person/shopify-pos/cash-register-management/cash-tracking
 - **Two discrepancies:** **Discrepancy at start** (prior session's end vs this session's counted start) and **Discrepancy at end** (expected vs counted at close). `PRIMARY`
 - **Owner actions from Admin** (back office): view session list (filter by location + date); open a session's detail; **close a session remotely** when the device couldn't; **export CSV** (whole summary / all sessions / selected); **add notes** when closing; print/export. Per-session reports: **Session** (overview), **Net payments** (by payment type), **Session activity** (log of every cash movement incl. drawer openings). `PRIMARY` — https://help.shopify.com/en/manual/sell-in-person/shopify-pos/cash-register-management/register-sessions-in-shopify-admin
@@ -80,7 +85,7 @@
 
 A cash shift is: **one drawer · one device · one location · one time window**, holding
 `opening float` **+** `cash sales` **+** `pay-ins` **−** `cash refunds` **−** `pay-outs` **−** `safe drops` **= expected`,
-counted as `counted`, yielding `variance = counted − expected` classed as **over / short / balanced** against a **tolerance**. Individual sales attach through an **append-only event ledger**. Reconciliation is the whole point; the owner's job is to spot and resolve variance. `INFERENCE`
+counted as `counted`, yielding `variance = counted − expected`classed as **over / short / balanced** against a **tolerance**. Individual sales attach through an **append-only event ledger**. Reconciliation is the whole point; the owner's job is to spot and resolve variance.`INFERENCE`
 
 ## Owner-facing UX patterns that recur
 
@@ -94,46 +99,46 @@ counted as `counted`, yielding `variance = counted − expected` classed as **ov
 
 ## Superset of distinct owner/manager actions (tagged by system)
 
-1. List shifts by location + date range — *Square, Toast, Lightspeed, Clover, Shopify*
-2. **Sort/triage by discrepancy amount** — *Shopify* (by user/date — *Lightspeed*)
-3. Filter by employee / event type / device — *Clover*
-4. See expected vs counted cash and the variance — *all*
-5. Drill into the shift's event ledger (every movement in sequence) — *Square, Shopify, Lightspeed*
-6. Trace a cash entry to its underlying payment/sale — *Square, Shopify*
-7. See opening float / starting cash — *all*
-8. See pay-ins and pay-outs (lifts/drops) — *all*
-9. See cash **refunds** within the shift as a distinct total — *Square*
-10. View the **denomination breakdown** of a count — *Lightspeed, Square*
-11. See **who opened / who ended / who counted** (separation of duties) — *Square, Toast*
-12. See the **reason / description** for a movement or a variance — *Clover, Toast, Square*
-13. Compare cash **across locations** — *Shopify*
-14. Monitor **active (in-progress)** vs closed shifts — *Toast, Square*
-15. See **discrepancy at start** (opening) as well as at end — *Shopify*
-16. **Approve** an over/short beyond a threshold — *Toast*
-17. **Reopen** a closed shift to reallocate entries / recalc tips — *Toast* (Shopify forbids this)
-18. **Close a shift remotely** from the back office — *Shopify*
-19. **Complete/close a shift for a departed employee** — *Toast*
-20. **Adjust a closed drawer's balance / start balance** — *Toast*
-21. Add a **note/comment** to a shift or at close — *Shopify, Toast, Square*
-22. **Export CSV** (whole / all / selected) — *Square, Shopify, Lightspeed, Clover*
-23. **Print / PDF** a report — *Lightspeed, Shopify*
-24. Generate an end-of-day **Z-report / close-out day** — *Toast, Lightspeed*
-25. **Reconcile tips** (cash vs credit) per shift — *Toast*
-26. Download a **cash-management journal** of lifts/drops — *Lightspeed*
-27. Review **no-sale** drawer opens — *Clover, Toast*
-28. Set **thresholds/permissions** that gate cash actions — *Toast*
+1. List shifts by location + date range — _Square, Toast, Lightspeed, Clover, Shopify_
+2. **Sort/triage by discrepancy amount** — _Shopify_ (by user/date — _Lightspeed_)
+3. Filter by employee / event type / device — _Clover_
+4. See expected vs counted cash and the variance — _all_
+5. Drill into the shift's event ledger (every movement in sequence) — _Square, Shopify, Lightspeed_
+6. Trace a cash entry to its underlying payment/sale — _Square, Shopify_
+7. See opening float / starting cash — _all_
+8. See pay-ins and pay-outs (lifts/drops) — _all_
+9. See cash **refunds** within the shift as a distinct total — _Square_
+10. View the **denomination breakdown** of a count — _Lightspeed, Square_
+11. See **who opened / who ended / who counted** (separation of duties) — _Square, Toast_
+12. See the **reason / description** for a movement or a variance — _Clover, Toast, Square_
+13. Compare cash **across locations** — _Shopify_
+14. Monitor **active (in-progress)** vs closed shifts — _Toast, Square_
+15. See **discrepancy at start** (opening) as well as at end — _Shopify_
+16. **Approve** an over/short beyond a threshold — _Toast_
+17. **Reopen** a closed shift to reallocate entries / recalc tips — _Toast_ (Shopify forbids this)
+18. **Close a shift remotely** from the back office — _Shopify_
+19. **Complete/close a shift for a departed employee** — _Toast_
+20. **Adjust a closed drawer's balance / start balance** — _Toast_
+21. Add a **note/comment** to a shift or at close — _Shopify, Toast, Square_
+22. **Export CSV** (whole / all / selected) — _Square, Shopify, Lightspeed, Clover_
+23. **Print / PDF** a report — _Lightspeed, Shopify_
+24. Generate an end-of-day **Z-report / close-out day** — _Toast, Lightspeed_
+25. **Reconcile tips** (cash vs credit) per shift — _Toast_
+26. Download a **cash-management journal** of lifts/drops — _Lightspeed_
+27. Review **no-sale** drawer opens — _Clover, Toast_
+28. Set **thresholds/permissions** that gate cash actions — _Toast_
 
 ## Where systems disagree
 
 - **Object vs log:** reconciled shift object (Square/Shopify/Toast/Lightspeed) vs event log (Clover).
 - **Editable after close:** Toast reopens; Shopify is immutable; Square audits once; Umi is append-only with a `recovered` path.
-- **One discrepancy or two:** Shopify tracks opening *and* closing; the rest track closing only.
+- **One discrepancy or two:** Shopify tracks opening _and_ closing; the rest track closing only.
 - **Owner write-power:** Square API is read-only; Clover/Lightspeed read+export; Shopify remote-close+note; Toast full reopen/approve/adjust.
 - **State granularity:** Square 3 states; Umi 10 (`opening, open, suspended, handoff_pending, counting, reconciliation_required, closing, closed, blocked, recovered`).
 
 ## Implications for the Umi "Turnos de caja" redesign (gaps to close)
 
-*(Umi already matches the core: expected/counted/variance, an append-only ledger, sale linkage, tolerance policy, active/closed split, export button.)*
+_(Umi already matches the core: expected/counted/variance, an append-only ledger, sale linkage, tolerance policy, active/closed split, export button.)_
 
 - **Add an opening (start) discrepancy**, not only the closing one — Shopify's two-discrepancy model; catches overnight/float mismatch.
 - **Show separation of duties** — who opened vs who counted vs who approved (Umi has `opening_operator_id`, `responsible_operator_id`, and the approver via `elevation_grant`; Square proves the pattern).
@@ -153,6 +158,7 @@ counted as `counted`, yielding `variance = counted − expected` classed as **ov
 - Not covered (out of scope / not reached): Oracle Simphony/Micros, Revel, NetSuite cash posting. The earlier background run captured "Lightspeed K-series and Oracle" before a session rate-limit terminated it; Oracle notes were not recovered and are omitted rather than sourced from memory.
 
 ### Sources
+
 - Square: https://developer.squareup.com/reference/square/objects/CashDrawerShift · https://developer.squareup.com/docs/cashdrawershift-api/reporting · https://developer.squareup.com/reference/square/cash-drawers-api
 - Toast: https://support.toasttab.com/en/article/Cash-Management-Overview · https://support.toasttab.com/en/article/Shift-Review-Overview · https://support.toasttab.com/en/article/Close-Out-Day-Z-Report-Auto-Capture
 - Lightspeed K-series: https://k-series-support.lightspeedhq.com/hc/en-us/articles/4403156150171-Cash-drawer-report · https://k-series-support.lightspeedhq.com/hc/en-us/articles/360050436394-Managing-cash-drawer-operations · https://k-series-support.lightspeedhq.com/hc/en-us/articles/360051089653-Shift-reports
