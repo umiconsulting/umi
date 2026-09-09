@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, Suspense } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -13,6 +13,8 @@ import {
   useCustomerInsights,
   useCustomersData,
 } from '@/data.jsx';
+// Code-split: react-virtuoso + the transcript load only when a conversation opens.
+const CustomerTranscript = React.lazy(() => import('@/components/customer-transcript.jsx'));
 
 const FILTERS = [
   { id: '', label: msg`Todos` },
@@ -113,7 +115,6 @@ function CustomersList({ selectedId }) {
   const { t, i18n } = useLingui();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const [page, setPage] = useState(Number(params.get('page') || 1));
   const [search, setSearch] = useState(params.get('q') || '');
   const filter = params.get('filter') || '';
   const [debouncedSearch, setDebouncedSearch] = useState(search);
@@ -123,36 +124,32 @@ function CustomersList({ selectedId }) {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reads the previous params through the functional updater instead of closing over
-  // `params`. This effect both READS and WRITES the search params, so simply adding
-  // `params` to the dep array — what exhaustive-deps literally asks for — would loop:
-  // the effect sets params, the new URLSearchParams identity re-triggers it, forever.
-  // Taking `prev` removes the closure entirely, so there is nothing stale to track.
+  // Sync the debounced search into the URL (?q=). Keyset paging replaced the page
+  // number, so there is no page to track. The functional updater reads `prev`
+  // instead of closing over `params`, so this read+write effect never loops.
   useEffect(() => {
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         if (debouncedSearch) next.set('q', debouncedSearch);
         else next.delete('q');
-        if (page > 1) next.set('page', String(page));
-        else next.delete('page');
+        next.delete('page');
         return next;
       },
       { replace: true },
     );
-  }, [debouncedSearch, page, setParams]);
+  }, [debouncedSearch, setParams]);
 
-  const { data, loading, error } = useCustomersData({ page, search: debouncedSearch, filter });
-  const customers = data?.customers || [];
-  const total = data?.total || 0;
-  const totalPages = data?.totalPages || 1;
+  const { customers, loading, error, hasMore, loadingMore, fetchMore, source } = useCustomersData({
+    search: debouncedSearch,
+    filter,
+  });
 
   function changeFilter(id) {
     const next = new URLSearchParams(params);
     if (id) next.set('filter', id);
     else next.delete('filter');
     next.delete('page');
-    setPage(1);
     setParams(next);
   }
 
@@ -171,10 +168,7 @@ function CustomersList({ selectedId }) {
             className="input"
             placeholder={t`Buscar clientes, teléfono, correo`}
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
         <div className="seg customer-filter" role="tablist" aria-label={t`Filtros de clientes`}>
@@ -195,10 +189,10 @@ function CustomersList({ selectedId }) {
           {loading ? (
             <Trans>Cargando…</Trans>
           ) : (
-            <Plural value={total} one="# cliente" other="# clientes" />
+            <Plural value={customers.length} one="# cliente" other="# clientes" />
           )}
         </span>
-        <span>{data?.source || t`plataforma de clientes`}</span>
+        <span>{source || t`plataforma de clientes`}</span>
       </div>
 
       {error && (
@@ -234,29 +228,16 @@ function CustomersList({ selectedId }) {
             onOpen={() => openCustomer(customer.id)}
           />
         ))}
+        {hasMore && (
+          <button
+            className="btn btn-ghost btn-sm customer-load-more"
+            disabled={loadingMore}
+            onClick={() => fetchMore()}
+          >
+            {loadingMore ? <Trans>Cargando…</Trans> : <Trans>Cargar más</Trans>}
+          </button>
+        )}
       </div>
-
-      {totalPages > 1 && (
-        <div className="customer-pager">
-          <button
-            className="btn btn-ghost btn-sm"
-            disabled={page <= 1}
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
-          >
-            <I.ChevronLeft size={14} /> <Trans>Anterior</Trans>
-          </button>
-          <span>
-            {page} / {totalPages}
-          </span>
-          <button
-            className="btn btn-ghost btn-sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-          >
-            <Trans>Siguiente</Trans> <I.ChevronRight size={14} />
-          </button>
-        </div>
-      )}
     </section>
   );
 }
@@ -300,7 +281,7 @@ function Timeline({ items }) {
   );
 }
 
-function ConversationList({ conversations }) {
+function ConversationList({ conversations, onOpen }) {
   const { t } = useLingui();
   if (!conversations?.length)
     return (
@@ -313,7 +294,12 @@ function ConversationList({ conversations }) {
   return (
     <div className="profile-stack">
       {conversations.map((conversation) => (
-        <div className="profile-row" key={conversation.id}>
+        <button
+          type="button"
+          className="profile-row conversation-row focusable"
+          key={conversation.id}
+          onClick={() => onOpen(conversation.id)}
+        >
           <span className="profile-row-icon">
             <I.WhatsApp size={17} />
           </span>
@@ -328,10 +314,38 @@ function ConversationList({ conversations }) {
           <span className={'badge ' + statusBadge(conversation.status)}>
             {conversation.status || t`desconocido`}
           </span>
-        </div>
+        </button>
       ))}
     </div>
   );
+}
+
+/** WhatsApp tab: the conversation list, drilling into a live transcript. */
+function WhatsAppPanel({ customerId, conversations }) {
+  const [openId, setOpenId] = useState(null);
+  if (openId) {
+    return (
+      <div className="wa-panel">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm wa-back"
+          onClick={() => setOpenId(null)}
+        >
+          <I.ChevronLeft size={14} /> <Trans>Conversaciones</Trans>
+        </button>
+        <Suspense
+          fallback={
+            <div className="transcript-state">
+              <span className="pulse" />
+            </div>
+          }
+        >
+          <CustomerTranscript customerId={customerId} conversationId={openId} />
+        </Suspense>
+      </div>
+    );
+  }
+  return <ConversationList conversations={conversations} onOpen={setOpenId} />;
 }
 
 function OrdersList({ orders }) {
@@ -925,7 +939,9 @@ function CustomerProfile({ customerId }) {
             <Timeline items={data?.timeline || []} />
           </>
         )}
-        {activeTab === 'whatsapp' && <ConversationList conversations={data?.conversations || []} />}
+        {activeTab === 'whatsapp' && (
+          <WhatsAppPanel customerId={customerId} conversations={data?.conversations || []} />
+        )}
         {activeTab === 'orders' && <OrdersList orders={data?.orders || []} />}
         {activeTab === 'loyalty' && (
           <LoyaltyPanel cash={data?.cash} onCredited={() => setRefresh((n) => n + 1)} />

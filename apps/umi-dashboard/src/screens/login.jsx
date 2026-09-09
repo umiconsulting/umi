@@ -300,21 +300,6 @@ export default function LoginScreen() {
             <Trans>Supervisa la operación de tu negocio al momento, desde un solo panel.</Trans>
           </p>
         </div>
-        <svg
-          className="login-waves"
-          viewBox="0 0 600 220"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M0 130 C120 78,240 178,360 118 S560 66,600 128 L600 220 L0 220 Z"
-            fill="rgba(118,146,203,.20)"
-          />
-          <path
-            d="M0 160 C140 118,260 200,380 150 S560 118,600 168 L600 220 L0 220 Z"
-            fill="rgba(168,187,222,.12)"
-          />
-        </svg>
       </aside>
 
       {/* Right — form */}

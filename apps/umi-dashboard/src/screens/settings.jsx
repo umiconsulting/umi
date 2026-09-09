@@ -139,6 +139,7 @@ const SettingsScreen = () => {
       handle: merchant.handle,
       cardPrefix: merchant.cardPrefix,
       subscription: merchant.subscriptionStatus,
+      businessDayStart: merchant.businessDayStart || '00:00',
     });
     setBrand({
       primary: merchant.primaryColor || '#B5605A',
@@ -217,6 +218,7 @@ const SettingsScreen = () => {
       saveMerchantSettings({
         name: biz.name,
         city: biz.city,
+        businessDayStart: biz.businessDayStart,
         primaryColor: brand.primary,
         secondaryColor: brand.secondary,
         passStyle: 'stamps',
@@ -364,6 +366,25 @@ const SettingsScreen = () => {
               value={biz.city || ''}
               onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
             />
+          </div>
+          <div className="field">
+            <label htmlFor={`${uid}-business-day-start`}>
+              <Trans>Inicio del día operativo</Trans>
+            </label>
+            <input
+              id={`${uid}-business-day-start`}
+              type="time"
+              className="input tall"
+              value={biz.businessDayStart || '00:00'}
+              onChange={(e) => setBiz((b) => ({ ...b, businessDayStart: e.target.value }))}
+            />
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
+              <Trans>
+                Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café
+                nocturno usa p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche
+                que la abrió. No cambia días ya cerrados.
+              </Trans>
+            </div>
           </div>
           <div className="field">
             <span className="field-label">

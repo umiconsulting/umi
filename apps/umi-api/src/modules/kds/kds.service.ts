@@ -505,6 +505,28 @@ export class KdsService {
     return result;
   }
 
+  /** The whole-location kitchen board for a POS-role device (the unified KDS mode,
+   * PoloTab-style): the operator session is authorized like `statusForPos`, then
+   * every active station of the location is snapshotted and mapped to the shared
+   * `KitchenOrderProjection` shape. Read-only — commands stay on the device path. */
+  async boardForPos(user: AuthUser, merchantId: string, query: PosKitchenOrderQuery) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    const allowed = await this.repo.authorizePos(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+    );
+    if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const stations = await this.repo.listStations(merchantId, query.locationId);
+    const stationIds = stations.map((station) => station.id);
+    if (stationIds.length === 0) return { ok: true as const, data: [] };
+    const rows = await this.repo.boardSnapshot(merchantId, query.locationId, stationIds);
+    return { ok: true as const, data: rows.map(toSnapshotRow) };
+  }
+
   async listDevicesForDashboard(
     merchantId: string,
     locationId: string | null,
@@ -855,6 +877,72 @@ export class KdsService {
     }
     return { ok: true, data: result.result };
   }
+
+  /**
+   * Forward advance (start → ready → complete) from a permission-guarded staff session —
+   * the dashboard/owner or a POS operator, NOT the device-token path. It reuses the same
+   * `executeKitchenCommand` the device command and the recall path use, so the event
+   * spine, optimistic concurrency and the commercial mirror stay identical. Each command
+   * type is gated at the controller by its own permission (kitchen.prepare/ready/complete).
+   * The station comes from the ticket's own routing, so the caller need not know it; an
+   * explicit stationId is honoured only when the ticket is actually routed to it.
+   */
+  async advanceFromDashboard(
+    merchantId: string,
+    actorUserId: string | null,
+    ticketId: string,
+    commandType: 'start_preparation' | 'mark_order_ready' | 'complete',
+    body: Record<string, unknown>,
+  ): Promise<{ ok: true; data: unknown }> {
+    const actorId = asSessionActorId(actorUserId);
+    const identity = kitchenCommandIdentity(body);
+    if (!actorId || !identity) {
+      throw new BadRequestException({ error: 'kitchen_advance_fields_required' });
+    }
+    const order = await this.repo.loadOrderForScope(merchantId, ticketId, asUuid(ticketId));
+    if (!order || !order.location_id || !order.station_ids?.length) {
+      throw new NotFoundException({ error: 'ticket_not_found' });
+    }
+    const requestedStation = asUuid(body.stationId ?? body.station_id);
+    if (requestedStation && !order.station_ids.includes(requestedStation)) {
+      throw new NotFoundException({ error: 'ticket_not_found' });
+    }
+    const stationId = requestedStation ?? order.station_ids[0];
+    const result = await this.repo.executeKitchenCommand({
+      session: {
+        deviceId: null,
+        merchantId,
+        locationId: order.location_id,
+        stationId,
+        deviceName: null,
+        permissions: [kitchenPermission(commandType)],
+      },
+      actorUserId: actorId,
+      order,
+      commandId: identity.commandId,
+      idempotencyKey: identity.idempotencyKey,
+      correlationId: identity.correlationId,
+      expectedVersion: identity.expectedVersion,
+      commandType,
+      targetStatus: null,
+      itemIds: [],
+      reasonCode: null,
+      reasonNote: null,
+      priority: null,
+      payloadFingerprint: sha256Hex(
+        JSON.stringify({
+          ticketId,
+          stationId,
+          commandType,
+          expectedVersion: identity.expectedVersion,
+        }),
+      ),
+    });
+    if (result.status === 'conflict') {
+      throw new ConflictException(result.result);
+    }
+    return { ok: true, data: result.result };
+  }
 }
 
 // ── pure helpers (exported for unit tests) ─────────────────────────────────
@@ -884,6 +972,16 @@ function kitchenCommandIdentity(body: Record<string, unknown>): {
     return null;
   }
   return { commandId, idempotencyKey, correlationId, expectedVersion };
+}
+
+// The actor id comes from the authenticated session, not an untrusted request body, so it
+// is validated loosely (any RFC-shaped UUID). The strict `asUuid` enforces the v4
+// version/variant bits and would reject the non-v4 UUIDs Umi mints for users — a real id
+// like `29b4e9bf-16ff-f3b2-...` is a valid Postgres uuid but not a strict v4.
+const LOOSE_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function asSessionActorId(value: unknown): string | null {
+  const input = asText(value);
+  return LOOSE_UUID_RE.test(input) ? input : null;
 }
 
 function kitchenPermission(commandType: string): string {
@@ -974,7 +1072,9 @@ function remapItems(items: unknown): unknown[] {
       status: i.status ?? 'queued',
       displayOrder: i.display_order ?? i.displayOrder,
       targetSeconds: i.targetSeconds ?? null,
-      version: i.version ?? 1,
+      // Postgres returns bigint as a string; the contract types version as a
+      // number, so coerce (as with lastEventSequence below).
+      version: Number(i.version ?? 1),
     };
   });
 }
@@ -995,7 +1095,7 @@ function toSnapshotRow(t: TicketRow) {
     preparationStartedAt:
       (t as TicketRow & { preparation_started_at?: string }).preparation_started_at ?? null,
     updatedAt: t.updated_at,
-    version: (t as TicketRow & { version?: number }).version ?? 1,
+    version: Number((t as TicketRow & { version?: number }).version ?? 1),
     lastEventSequence: Number(t.last_event_sequence),
     items: remapItems(t.items),
   };
@@ -1014,7 +1114,7 @@ function toEventRow(e: EventRow) {
     payload: e.payload,
     locationId: e.location_id,
     stationId: e.station_id ?? null,
-    aggregateVersion: e.aggregate_version ?? 1,
+    aggregateVersion: Number(e.aggregate_version ?? 1),
     correlationId: e.correlation_id ?? 'kitchen-event',
   };
 }

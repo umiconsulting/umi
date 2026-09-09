@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
-import { formatMoneyUnits } from '@/lib/format.js';
+import { formatMoneyUnits, formatDateTime } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
-import { transitionOrder, useOrdersData } from '@/data.jsx';
+import { useOrdersData } from '@/data.jsx';
 
 // Screen 6 — Pedidos / Commercial Orders
 // Data: merchant.customer_order (order-writer). Every channel writes here: POS
@@ -15,7 +15,7 @@ import { transitionOrder, useOrdersData } from '@/data.jsx';
 //   placed | preparing | ready | completed | canceled
 
 const ORDER_STATUS_META = {
-  placed: { label: msg`Nuevo`, color: 'var(--umi-blue)', bg: 'rgba(118,146,203,0.12)' },
+  placed: { label: msg`Nuevo`, color: 'var(--info)', bg: 'rgba(118,146,203,0.12)' },
   preparing: { label: msg`Preparando`, color: 'var(--warning)', bg: 'var(--warning-soft)' },
   ready: {
     label: msg({ message: 'Listo', context: 'order status' }),
@@ -26,20 +26,18 @@ const ORDER_STATUS_META = {
   canceled: { label: msg`Cancelado`, color: 'var(--danger)', bg: 'var(--danger-soft)' },
 };
 
-const STATUS_RAIL = [
-  { status: 'placed', label: msg`Nuevos` },
-  { status: 'preparing', label: msg`En preparación` },
-  { status: 'ready', label: msg`Listos` },
-  { status: 'completed', label: msg`Completados` },
-  { status: 'canceled', label: msg`Cancelados` },
-];
-
-const LIST_FILTERS = [
-  { id: 'active', label: msg`Activos` },
-  { id: 'completed', label: msg`Completados` },
-  { id: 'cancelled', label: msg`Cancelados` },
-  { id: 'all', label: msg`Todos` },
-];
+// Fuller tones for the lifecycle rail DOTS. The muted status tokens (soft periwinkle for
+// placed, grey for completed) read washed-out, so completed uses the deep ink instead of
+// grey. Only THEME-AWARE tokens here — --umi-navy is not redefined for the dark theme, so
+// it would be invisible on a dark canvas; --info/--ink-1/--success/--warning/--danger all
+// follow the theme.
+const TIMELINE_TONE = {
+  placed: 'var(--info)', // theme-aware blue
+  preparing: 'var(--warning)', // amber
+  ready: 'var(--success)', // green
+  completed: 'var(--ink-1)', // deep ink, not grey
+  canceled: 'var(--danger)', // red
+};
 
 const ACTIVE_STATUSES = ['placed', 'preparing', 'ready'];
 
@@ -57,6 +55,17 @@ const CHANNEL_FILTERS = [
   { id: 'pos', label: 'POS' },
   { id: 'whatsapp', label: 'WhatsApp' },
 ];
+
+// How the order is handed off (customer_order.fulfillment_type).
+const FULFILLMENT_META = {
+  pickup: msg`Para recoger`,
+  dine_in: msg`Para comer aquí`,
+  delivery: msg`A domicilio`,
+};
+
+// Active orders whose current state is still running — the ones that age.
+const AGING_WARN_MS = 10 * 60 * 1000;
+const AGING_DANGER_MS = 20 * 60 * 1000;
 
 /** Brand names stay as strings; everything else is a message descriptor. */
 const text = (i18n, value) => (typeof value === 'string' ? value : i18n._(value));
@@ -86,8 +95,27 @@ const OrdersScreen = () => {
       return o.status === 'completed' || ACTIVE_STATUSES.indexOf(o.status) !== -1;
     })
     .reduce(function (s, o) {
-      return s + (parseFloat(o.total_amount) || 0);
+      // Net of committed refunds/voids, so average ticket reflects money actually kept.
+      return s + (parseFloat(o.net_amount ?? o.total_amount) || 0);
     }, 0);
+
+  const activeCount = (counts.placed || 0) + (counts.preparing || 0) + (counts.ready || 0);
+  // One status control: the per-status counts and the group shortcuts, merged into a
+  // single row of selectable chips (replaces the old status rail + filter tabs).
+  const STATUS_FILTERS = [
+    { id: 'active', label: t`Activos`, count: activeCount, color: null },
+    { id: 'placed', label: t`Nuevos`, count: counts.placed || 0, color: 'var(--info)' },
+    {
+      id: 'preparing',
+      label: t`En preparación`,
+      count: counts.preparing || 0,
+      color: 'var(--warning)',
+    },
+    { id: 'ready', label: t`Listos`, count: counts.ready || 0, color: 'var(--success)' },
+    { id: 'completed', label: t`Completados`, count: counts.completed || 0, color: 'var(--ink-3)' },
+    { id: 'canceled', label: t`Cancelados`, count: counts.canceled || 0, color: 'var(--danger)' },
+    { id: 'all', label: t`Todos`, count: totalToday, color: null },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -105,64 +133,108 @@ const OrdersScreen = () => {
         }
       />
 
-      {/* Status summary rail */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {STATUS_RAIL.map(function (item) {
-          var meta = ORDER_STATUS_META[item.status];
-          var cnt = counts[item.status] || 0;
-          return (
-            <div
-              key={item.status}
+      {/* One status control — per-status counts and the group shortcuts, merged */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {STATUS_FILTERS.map(function (f) {
+            var on = filter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setFilter(f.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '7px 13px',
+                  borderRadius: 2,
+                  background: on ? 'var(--canvas-2)' : 'transparent',
+                  border: '1px solid ' + (on ? 'var(--line-strong)' : 'var(--line)'),
+                  cursor: 'pointer',
+                }}
+              >
+                {f.color ? (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: f.color,
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: on ? 'var(--ink-1)' : 'var(--ink-2)',
+                  }}
+                >
+                  {f.count}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: on ? 'var(--ink-2)' : 'var(--ink-3)',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {f.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {/* Channel filter (order origin) — top-right of the filter row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="seg" role="tablist" aria-label={t`Origen`}>
+            {CHANNEL_FILTERS.map(function (f) {
+              return (
+                <button
+                  key={f.id || 'all'}
+                  className={channel === f.id ? 'on' : ''}
+                  onClick={() => setChannel(f.id)}
+                >
+                  {text(i18n, f.label)}
+                </button>
+              );
+            })}
+          </div>
+          {loading && (
+            <span
+              className="pulse"
+              aria-label={t`Cargando…`}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 14px',
-                borderRadius: 10,
-                background: meta.bg,
-                border: '1px solid ' + meta.color + '33',
-                cursor: 'pointer',
+                display: 'inline-block',
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--umi-blue)',
               }}
-              onClick={() => setFilter(item.status)}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: meta.color,
-                  flexShrink: 0,
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: meta.color,
-                  letterSpacing: '0.04em',
-                }}
-              >
-                {cnt}
-              </span>
-              <span
-                style={{
-                  fontSize: 11.5,
-                  color: 'var(--ink-2)',
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {i18n._(item.label)}
-              </span>
-            </div>
-          );
-        })}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Orders list — the day's summary pinned top-right of the container */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div
           style={{
-            marginLeft: 'auto',
             display: 'flex',
+            justifyContent: 'flex-end',
             gap: 18,
-            alignItems: 'center',
             fontSize: 12.5,
             color: 'var(--ink-3)',
           }}
@@ -180,125 +252,46 @@ const OrdersScreen = () => {
             </b>
           </span>
         </div>
-      </div>
 
-      {/* Filter tabs + channel filter */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div className="seg" role="tablist">
-          {LIST_FILTERS.map(function (f) {
-            return (
-              <button
-                key={f.id}
-                className={filter === f.id ? 'on' : ''}
-                onClick={() => setFilter(f.id)}
-              >
-                {i18n._(f.label)}
-              </button>
-            );
-          })}
-        </div>
-        <div className="seg" role="tablist" aria-label={t`Origen`}>
-          {CHANNEL_FILTERS.map(function (f) {
-            return (
-              <button
-                key={f.id || 'all'}
-                className={channel === f.id ? 'on' : ''}
-                onClick={() => setChannel(f.id)}
-              >
-                {text(i18n, f.label)}
-              </button>
-            );
-          })}
-        </div>
-        {loading && (
-          <span
-            style={{
-              fontSize: 12,
-              color: 'var(--ink-3)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+        {displayed.length === 0 ? (
+          <div
+            className="card"
+            style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}
           >
-            <span
-              className="pulse"
-              style={{
-                display: 'inline-block',
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--umi-blue)',
-              }}
-            />
-            <Trans>Cargando…</Trans>
-          </span>
+            <I.Receipt size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+              <Trans>Sin pedidos</Trans>
+            </div>
+            <div style={{ fontSize: 13 }}>
+              <Trans>No hay pedidos en este filtro.</Trans>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {displayed.map(function (order) {
+              return (
+                <OrderRow key={order.order_id} order={order} onSelect={() => setSelected(order)} />
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Orders list */}
-      {displayed.length === 0 ? (
-        <div
-          className="card"
-          style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}
-        >
-          <I.Receipt size={32} style={{ opacity: 0.3, marginBottom: 12 }} />
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
-            <Trans>Sin pedidos</Trans>
-          </div>
-          <div style={{ fontSize: 13 }}>
-            <Trans>No hay pedidos en este filtro.</Trans>
-          </div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {displayed.map(function (order) {
-            return (
-              <OrderRow
-                key={order.order_id}
-                order={order}
-                onSelect={() => setSelected(order)}
-                onTransition={async (status) => {
-                  await transitionOrder(order.order_id, status);
-                  setRefresh((r) => r + 1);
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {selected && (
-        <OrderDetail
-          order={selected}
-          onClose={() => setSelected(null)}
-          onTransition={async (status) => {
-            await transitionOrder(selected.order_id, status);
-            setSelected(null);
-            setRefresh((r) => r + 1);
-          }}
-        />
-      )}
+      {selected && <OrderDetail order={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 };
 
-const OrderRow = ({ order, onSelect, onTransition }) => {
+const OrderRow = ({ order, onSelect }) => {
   const { t, i18n } = useLingui();
   const meta = ORDER_STATUS_META[order.status] || ORDER_STATUS_META.placed;
   const channel = CHANNEL_META[order.source] || CHANNEL_META.web;
   const isActive = ACTIVE_STATUSES.indexOf(order.status) !== -1;
+  const [now] = useState(() => Date.now());
 
   function fmtAgo(iso) {
     if (!iso) return '—';
-    var ms = Date.now() - new Date(iso).getTime();
+    var ms = now - new Date(iso).getTime();
     if (ms < 60000) return Math.floor(ms / 1000) + 's';
     if (ms < 3600000) return Math.floor(ms / 60000) + ' min';
     return Math.floor(ms / 3600000) + 'h';
@@ -307,10 +300,10 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
   return (
     <div
       className={'list-card ' + (isActive ? '' : 'dim')}
-      style={{ padding: 0, paddingRight: 18 }}
+      style={{ padding: 0, paddingRight: 18, borderRadius: 0 }}
     >
-      {/* Status strip */}
-      <div className="l-strip" style={{ background: meta.color }} />
+      {/* Status bar — the solid colour signal (Direction C) */}
+      <div className="l-strip" style={{ background: meta.color, borderRadius: 0 }} />
       <div
         style={{
           paddingTop: 16,
@@ -322,24 +315,14 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
           alignItems: 'center',
         }}
       >
-        {/* Status badge */}
-        <div
-          style={{
-            width: 88,
-            textAlign: 'center',
-            padding: '5px 0',
-            borderRadius: 8,
-            background: meta.bg,
-            border: '1px solid ' + meta.color + '40',
-            flexShrink: 0,
-          }}
-        >
+        {/* Status — colour-only caps text; the left bar carries the colour, no fill */}
+        <div style={{ width: 96, flexShrink: 0 }}>
           <span
             style={{
               fontSize: 11,
               fontWeight: 700,
               color: meta.color,
-              letterSpacing: '0.06em',
+              letterSpacing: '0.07em',
               textTransform: 'uppercase',
             }}
           >
@@ -347,26 +330,9 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
           </span>
         </div>
 
-        {/* Channel badge */}
-        <div
-          style={{
-            minWidth: 92,
-            textAlign: 'center',
-            padding: '5px 0',
-            borderRadius: 8,
-            background: channel.bg,
-            border: '1px solid ' + channel.color + '40',
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: channel.color,
-              letterSpacing: '0.05em',
-            }}
-          >
+        {/* Channel — quiet muted text, no fill */}
+        <div style={{ minWidth: 84, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: 'var(--ink-3)', letterSpacing: '0.03em' }}>
             {text(i18n, channel.label)}
           </span>
         </div>
@@ -414,9 +380,20 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
               letterSpacing: '-0.01em',
             }}
           >
-            {formatMoneyUnits(order.total_amount ?? 0)}
+            {formatMoneyUnits(
+              (order.refunded_amount ?? 0) > 0 ? (order.net_amount ?? 0) : (order.total_amount ?? 0),
+            )}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>MXN</div>
+          {(order.refunded_amount ?? 0) > 0 ? (
+            <div
+              style={{ fontSize: 11, color: 'var(--danger)', marginTop: 1 }}
+              title={t`Reembolsado`}
+            >
+              −{formatMoneyUnits(order.refunded_amount)}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>MXN</div>
+          )}
         </div>
 
         {/* Time */}
@@ -436,22 +413,9 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
           </div>
         </div>
 
+        {/* Status is READ-ONLY here: the status is advanced from the kitchen (Cocina/KDS),
+            not from the owner's order list. Only the detail entry point remains. */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          {order.status === 'placed' && (
-            <button className="btn btn-secondary btn-sm" onClick={() => onTransition('preparing')}>
-              <Trans>Cocina</Trans>
-            </button>
-          )}
-          {order.status === 'preparing' && (
-            <button className="btn btn-primary btn-sm" onClick={() => onTransition('ready')}>
-              <Trans context="order status">Listo</Trans>
-            </button>
-          )}
-          {order.status === 'ready' && (
-            <button className="btn btn-primary btn-sm" onClick={() => onTransition('completed')}>
-              <Trans>Cerrar</Trans>
-            </button>
-          )}
           <button className="btn-icon" onClick={onSelect} aria-label={t`Detalle del pedido`}>
             <I.ChevronRight size={15} />
           </button>
@@ -461,23 +425,79 @@ const OrderRow = ({ order, onSelect, onTransition }) => {
   );
 };
 
-const OrderDetail = ({ order, onClose, onTransition }) => {
+const OrderDetail = ({ order, onClose }) => {
   const { t, i18n } = useLingui();
   const items = order.items || [];
+  const liveItems = items.filter((i) => !i.voided);
+  const voidedItems = items.filter((i) => i.voided);
+  const discounts = order.discounts || [];
   const channel = CHANNEL_META[order.source] || CHANNEL_META.web;
   const channelLabel = text(i18n, channel.label);
+  const statusMeta = ORDER_STATUS_META[order.status] || ORDER_STATUS_META.placed;
+  const fulfillment = order.fulfillment_type ? FULFILLMENT_META[order.fulfillment_type] : null;
+  const hasDiscount = (order.discount_amount ?? 0) > 0;
+  const timeline = buildTimeline(order);
+
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose}></div>
       <aside className="sheet">
         <div className="sheet-head">
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div className="eyebrow">
               <Trans>Pedido · {channelLabel}</Trans>
             </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
               {order.customer_name || t`Sin nombre`}
             </h2>
+            {/* Meta strip — status, reference, handoff (were invisible before) */}
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                alignItems: 'center',
+                marginTop: 10,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: statusMeta.color,
+                  background: statusMeta.bg,
+                  border: '1px solid ' + statusMeta.color + '40',
+                  borderRadius: 8,
+                  padding: '3px 9px',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {i18n._(statusMeta.label)}
+              </span>
+              {fulfillment && (
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--ink-2)',
+                    background: 'var(--canvas-2)',
+                    borderRadius: 8,
+                    padding: '3px 9px',
+                  }}
+                >
+                  {i18n._(fulfillment)}
+                </span>
+              )}
+              <span
+                style={{
+                  fontSize: 11.5,
+                  color: 'var(--ink-3)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                <Trans>Ref.</Trans> {String(order.public_reference || '').slice(0, 8)}
+              </span>
+            </div>
           </div>
           <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
             <I.X size={16} />
@@ -501,87 +521,381 @@ const OrderDetail = ({ order, onClose, onTransition }) => {
               </div>
             )}
           </div>
+
+          {/* Lifecycle — placed → preparing → ready → completed, time in each state */}
+          <OrderTimeline timeline={timeline} order={order} i18n={i18n} />
+
+          {/* Items */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {items.length === 0 ? (
+            <div className="eyebrow">
+              <Trans>Artículos</Trans>
+            </div>
+            {liveItems.length === 0 && voidedItems.length === 0 ? (
               <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
                 <Trans>No hay artículos disponibles para este pedido.</Trans>
               </div>
             ) : (
-              items.map((item) => (
-                <div key={item.item_id} className="list-card" style={{ padding: 14 }}>
-                  <div style={{ paddingLeft: 14, flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <b>
-                        {item.quantity}× {item.name}
-                      </b>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
-                        {formatMoneyUnits(item.unit_price ?? 0)}
-                      </span>
-                    </div>
-                    {item.variant_name && (
-                      <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3 }}>
-                        {item.variant_name}
-                      </div>
-                    )}
-                    {item.notes && (
-                      <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 6 }}>
-                        {item.notes}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
+              <>
+                {liveItems.map((item) => (
+                  <OrderItemLine key={item.item_id} item={item} />
+                ))}
+                {voidedItems.map((item) => (
+                  <OrderItemLine key={item.item_id} item={item} voided i18n={i18n} />
+                ))}
+              </>
             )}
           </div>
-          <div
-            style={{
-              marginTop: 14,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <div className="eyebrow">
-              <Trans>Total</Trans>
-            </div>
+
+          {/* Money — gross − discount = total (ORDER_MODEL §4) */}
+          <div className="card" style={{ padding: 16, marginTop: 6 }}>
+            {hasDiscount && (
+              <>
+                <MoneyRow label={<Trans>Subtotal</Trans>} value={order.gross_amount ?? 0} muted />
+                {discounts.length === 0 ? (
+                  <MoneyRow
+                    label={<Trans>Descuento</Trans>}
+                    value={-(order.discount_amount ?? 0)}
+                    accent="var(--warning)"
+                  />
+                ) : (
+                  discounts.map((d, idx) => (
+                    <MoneyRow
+                      key={idx}
+                      label={d.label || <Trans>Descuento</Trans>}
+                      value={-(d.amount ?? 0)}
+                      accent={d.kind === 'comp' ? 'var(--danger)' : 'var(--warning)'}
+                    />
+                  ))
+                )}
+                <div
+                  style={{ borderTop: '1px solid var(--line)', margin: '10px 0 0', paddingTop: 10 }}
+                />
+              </>
+            )}
+            {(order.refunded_amount ?? 0) > 0 && (
+              <MoneyRow
+                label={<Trans>Reembolsado</Trans>}
+                value={-(order.refunded_amount ?? 0)}
+                accent="var(--danger)"
+              />
+            )}
             <div
               style={{
-                fontWeight: 700,
-                fontSize: 22,
-                fontFamily: 'var(--font-display)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
               }}
             >
-              {formatMoneyUnits(order.total_amount ?? 0)}
+              <div className="eyebrow">
+                {(order.refunded_amount ?? 0) > 0 ? <Trans>Total neto</Trans> : <Trans>Total</Trans>}
+              </div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 22,
+                  fontFamily: 'var(--font-display)',
+                }}
+              >
+                {formatMoneyUnits(
+                  (order.refunded_amount ?? 0) > 0
+                    ? (order.net_amount ?? 0)
+                    : (order.total_amount ?? 0),
+                )}
+              </div>
             </div>
           </div>
+
+          {order.status === 'canceled' && order.cancel_reason && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-start',
+                color: 'var(--danger)',
+                fontSize: 12.5,
+                background: 'var(--danger-soft)',
+                border: '1px solid var(--danger)40',
+                borderRadius: 10,
+                padding: '10px 12px',
+              }}
+            >
+              <I.AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>
+                <Trans>Motivo de cancelación:</Trans> {order.cancel_reason}
+              </span>
+            </div>
+          )}
         </div>
+        {/* No status control here: the status is advanced from the kitchen (Cocina/KDS).
+            The owner's order view is read-only for the lifecycle. */}
         <div className="sheet-foot">
           <button className="btn btn-ghost" onClick={onClose}>
             <Trans>Cerrar</Trans>
           </button>
-          {order.status !== 'completed' && order.status !== 'canceled' && (
-            <button
-              className="btn btn-primary"
-              onClick={() => onTransition(nextStatus(order.status))}
-            >
-              <Trans>Avanzar estado</Trans>
-            </button>
-          )}
         </div>
       </aside>
     </>
   );
 };
 
-function nextStatus(status) {
-  if (status === 'placed') return 'preparing';
-  if (status === 'preparing') return 'ready';
-  if (status === 'ready') return 'completed';
-  return status;
-}
+/** One order line — live or voided — with its modifiers and notes. */
+const OrderItemLine = ({ item, voided, i18n }) => {
+  const modifiers = item.modifiers || [];
+  return (
+    <div className="list-card" style={{ padding: 14, opacity: voided ? 0.6 : 1 }}>
+      <div style={{ paddingLeft: 14, flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <b style={{ textDecoration: voided ? 'line-through' : 'none' }}>
+            {item.quantity}× {item.name}
+          </b>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-2)' }}>
+            {formatMoneyUnits(item.unit_price ?? 0)}
+          </span>
+        </div>
+        {item.variant_name && (
+          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 3 }}>
+            {item.variant_name}
+          </div>
+        )}
+        {modifiers.length > 0 && (
+          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {modifiers.map((m, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  fontSize: 12,
+                  color: 'var(--ink-3)',
+                }}
+              >
+                <span>
+                  + {m.quantity > 1 ? m.quantity + '× ' : ''}
+                  {m.name}
+                </span>
+                {m.price_delta !== 0 && (
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>
+                    {m.price_delta > 0 ? '+' : ''}
+                    {formatMoneyUnits(m.price_delta)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {item.notes && (
+          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 6 }}>{item.notes}</div>
+        )}
+        {voided && (
+          <div style={{ marginTop: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--danger)',
+                background: 'var(--danger-soft)',
+                borderRadius: 6,
+                padding: '2px 6px',
+              }}
+            >
+              {i18n._(msg`Anulado`)}
+            </span>
+            {item.void_reason && (
+              <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{item.void_reason}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/** A single money line in the breakdown (subtotal / discount / etc.). */
+const MoneyRow = ({ label, value, muted, accent }) => (
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+      color: accent || (muted ? 'var(--ink-3)' : 'var(--ink-1)'),
+      fontSize: 13,
+    }}
+  >
+    <span>{label}</span>
+    <span style={{ fontFamily: 'var(--font-mono)' }}>{formatMoneyUnits(value)}</span>
+  </div>
+);
+
+/** The status spine as a vertical timeline with time-in-state and aging. */
+const OrderTimeline = ({ timeline, order, i18n }) => {
+  // Captured once (React purity): a still-open state's elapsed time is a snapshot.
+  const [now] = useState(() => Date.now());
+  if (!timeline || timeline.length === 0) return null;
+  const isActive = ACTIVE_STATUSES.indexOf(order.status) !== -1;
+  const startMs = timeline[0].at ? new Date(timeline[0].at).getTime() : null;
+  const lastMs = timeline[timeline.length - 1].at
+    ? new Date(timeline[timeline.length - 1].at).getTime()
+    : null;
+  const totalMs = startMs != null ? (isActive ? now : (lastMs ?? now)) - startMs : null;
+
+  return (
+    <div className="card" style={{ padding: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
+        <div className="eyebrow">
+          <Trans>Ciclo del pedido</Trans>
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--ink-3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
+          <I.Clock size={13} />
+          {isActive ? <Trans>Abierto hace</Trans> : <Trans>Duración total</Trans>}{' '}
+          <b style={{ color: 'var(--ink-1)', fontFamily: 'var(--font-mono)' }}>
+            {fmtDuration(totalMs)}
+          </b>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {timeline.map((step, idx) => {
+          const meta = ORDER_STATUS_META[step.status] || ORDER_STATUS_META.placed;
+          const tone = TIMELINE_TONE[step.status] || meta.color;
+          const isLast = idx === timeline.length - 1;
+          const stepMs = step.at ? new Date(step.at).getTime() : null;
+          const nextMs =
+            !isLast && timeline[idx + 1].at ? new Date(timeline[idx + 1].at).getTime() : null;
+          // Time spent IN this state: to the next milestone, or (for the current, still-open
+          // state of an active order) up to now.
+          let durMs = null;
+          let ongoing = false;
+          if (nextMs != null && stepMs != null) durMs = nextMs - stepMs;
+          else if (isLast && isActive && stepMs != null) {
+            durMs = now - stepMs;
+            ongoing = true;
+          }
+          const durColor = ongoing ? agingColor(durMs) : 'var(--ink-3)';
+          return (
+            <div key={idx} style={{ display: 'flex', gap: 12 }}>
+              {/* rail: dot + connector */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span
+                  style={{
+                    width: 11,
+                    height: 11,
+                    borderRadius: '50%',
+                    background: tone,
+                    boxShadow: '0 0 0 3px var(--surface)',
+                    flexShrink: 0,
+                    marginTop: 4,
+                  }}
+                />
+                {!isLast && (
+                  <span
+                    style={{ width: 2, flex: 1, background: 'var(--line-strong)', minHeight: 20 }}
+                  />
+                )}
+              </div>
+              {/* content */}
+              <div style={{ flex: 1, paddingBottom: isLast ? 0 : 14 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink-1)' }}>
+                    {i18n._(meta.label)}
+                  </span>
+                  <span style={{ fontSize: 12, color: durColor, fontFamily: 'var(--font-mono)' }}>
+                    {ongoing ? <Trans>en curso · {fmtDuration(durMs)}</Trans> : fmtDuration(durMs)}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                  {step.at ? formatDateTime(step.at) : '—'}
+                  {step.operator ? ' · ' + step.operator : ''}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 function itemsCount(order) {
-  return Array.isArray(order.items) ? order.items.length : 0;
+  return Array.isArray(order.items) ? order.items.filter((i) => !i.voided).length : 0;
+}
+
+// Build the lifecycle timeline from the order_event spine. 'placed' always starts at
+// placed_at (backfilled orders carry no 'placed' event); each later milestone is the
+// FIRST time that status was reached, so a re-fire (preparing after ready) does not
+// scramble the line. A current status set without an event still shows, from updated_at.
+function buildTimeline(order) {
+  const events = Array.isArray(order.events) ? order.events : [];
+  const firstByStatus = {};
+  events.forEach((e) => {
+    if (e.status && !firstByStatus[e.status]) {
+      firstByStatus[e.status] = { at: e.occurred_at, operator: e.operator || null };
+    }
+  });
+  const steps = [
+    {
+      status: 'placed',
+      at: order.placed_at || order.created_at || null,
+      operator: (firstByStatus.placed && firstByStatus.placed.operator) || null,
+    },
+  ];
+  ['preparing', 'ready', 'completed', 'canceled'].forEach((s) => {
+    if (firstByStatus[s]) {
+      steps.push({ status: s, at: firstByStatus[s].at, operator: firstByStatus[s].operator });
+    }
+  });
+  if (order.status && order.status !== 'placed' && !firstByStatus[order.status]) {
+    steps.push({ status: order.status, at: order.updated_at || null, operator: null });
+  }
+  return steps;
+}
+
+// A coarse, human duration: seconds → minutes → hours → days. Never negative.
+function fmtDuration(ms) {
+  if (ms == null || ms < 0) return '—';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + ' s';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  if (h < 24) {
+    const rem = m % 60;
+    return rem ? h + ' h ' + String(rem).padStart(2, '0') + ' min' : h + ' h';
+  }
+  const d = Math.floor(h / 24);
+  return d + ' d ' + (h % 24) + ' h';
+}
+
+// Colour a still-running state by how long it has been sitting — the aging signal.
+function agingColor(ms) {
+  if (ms == null) return 'var(--ink-3)';
+  if (ms >= AGING_DANGER_MS) return 'var(--danger)';
+  if (ms >= AGING_WARN_MS) return 'var(--warning)';
+  return 'var(--success)';
 }
 
 export default OrdersScreen;

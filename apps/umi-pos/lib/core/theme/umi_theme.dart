@@ -24,11 +24,14 @@ abstract final class UmiMotion {
 }
 
 abstract final class UmiTheme {
-  static const _primary = Color(0xFF6857D9);
-  static const _darkSurface = Color(0xFF17171D);
+  // PoloTab-style palette: a bright blue primary on a neutral near-black ground
+  // with slightly lighter grey panels — the tender-floor look a barista reads in
+  // low light without the old violet cast.
+  static const _primary = Color(0xFF2E7DFF);
+  static const _darkSurface = Color(0xFF23252B);
 
   static ThemeData dark() =>
-      _theme(Brightness.dark, const Color(0xFF0E0E13), _darkSurface);
+      _theme(Brightness.dark, const Color(0xFF121317), _darkSurface);
 
   static ThemeData light() =>
       _theme(Brightness.light, const Color(0xFFF7F6FB), Colors.white);
@@ -100,11 +103,17 @@ abstract final class UmiTheme {
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
+        // PoloTab's primary buttons are the vivid brand blue with white text, not
+        // Material's pale dark-mode primary tint — so pin the colour explicitly.
         style: FilledButton.styleFrom(
           minimumSize: const Size(
             UmiTouchTarget.minimum,
             UmiTouchTarget.primary,
           ),
+          backgroundColor: _primary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: _primary.withValues(alpha: .38),
+          disabledForegroundColor: Colors.white.withValues(alpha: .70),
           shape: controlShape,
         ),
       ),

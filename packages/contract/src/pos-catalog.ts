@@ -13,12 +13,16 @@ export const CatalogSaleAction = z.enum(['merchandise', 'gift_card']);
 export const CatalogMoney = z
   .object({ minorUnits: z.number().int().nonnegative(), currency: z.string().regex(/^[A-Z]{3}$/) })
   .strict();
+/** A category tint the POS paints behind photo-less products so a barista groups
+ * them at a glance. `#RRGGBB`; null means the terminal derives a stable colour. */
+export const CatalogCategoryColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const CatalogCategory = z
   .object({
     id: Uuid,
     name: z.string().min(1).max(160),
     displayOrder: z.number().int(),
     enabled: z.boolean(),
+    color: CatalogCategoryColor.nullable(),
   })
   .strict();
 export const ProductMedia = z

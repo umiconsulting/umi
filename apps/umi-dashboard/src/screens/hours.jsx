@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Select } from '@/components/select.jsx';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
@@ -287,7 +288,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <I.Clock size={14} style={{ color: 'var(--ink-3)' }} />
-              <select
+              <Select
                 aria-label={t`Zona horaria`}
                 className="select"
                 style={{ height: 36, fontSize: 13, padding: '0 32px 0 12px' }}
@@ -298,7 +299,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 <option value="America/Monterrey">America / Monterrey (GMT−6)</option>
                 <option value="America/Tijuana">America / Tijuana (GMT−7)</option>
                 <option value="America/Cancun">America / Cancun (GMT−5)</option>
-              </select>
+              </Select>
               {isDirty && (
                 <button
                   className="btn btn-primary focusable"

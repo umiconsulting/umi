@@ -1,10 +1,17 @@
 import { t } from '@lingui/core/macro';
-import { useState as useStateD, useEffect as useEffectD } from 'react';
+import {
+  useState as useStateD,
+  useEffect as useEffectD,
+  useMemo as useMemoD,
+  useRef as useRefD,
+} from 'react';
 import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from '@/lib/config.js';
 import { getAuthHeaders, refreshSession, handleSessionExpired } from '@/lib/auth.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { isProductActive } from '@/lib/module-registry.js';
 import { routes } from '@umi/contract/routes';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
 
 const EMPTY_OVERVIEW = {};
 const EMPTY_STATIONS = [];
@@ -15,7 +22,6 @@ const EMPTY_PAIRINGS = [];
 const EMPTY_MERCHANT = null;
 const EMPTY_ORDERS = [];
 const EMPTY_MEMBERS = { customers: [], total: 0, page: 1, totalPages: 1 };
-const EMPTY_CUSTOMERS = { customers: [], total: 0, page: 1, totalPages: 1, source: null };
 const EMPTY_CUSTOMER_DETAIL = {
   customer: null,
   timeline: [],
@@ -364,6 +370,7 @@ async function _loadMerchant(ctx) {
     stripImageUrl: cashSettings?.stripImageUrl || s.stripImageUrl || '',
     passStyle: cashSettings?.passStyle || s.passStyle || 'stamps',
     subscriptionStatus: s.subscriptionStatus || 'ACTIVE',
+    businessDayStart: s.businessDayStart || '00:00',
     topupEnabled: s.topupEnabled,
     selfRegistration: cashSettings?.selfRegistration ?? s.selfRegistration,
     birthdayRewardEnabled: cashSettings?.birthdayRewardEnabled ?? s.birthdayRewardEnabled,
@@ -417,10 +424,8 @@ async function _loadMembers(ctx, opts) {
 
 async function _loadCustomers(ctx, opts) {
   opts = opts || {};
-  const q = new URLSearchParams({
-    page: String(opts.page || 1),
-    limit: String(opts.limit || 20),
-  });
+  const q = new URLSearchParams({ limit: String(opts.limit || 20) });
+  if (opts.cursor) q.set('cursor', String(opts.cursor));
   if (opts.search) q.set('search', opts.search);
   if (opts.filter) q.set('filter', opts.filter);
   return _apiFetch(_merchantPath(ctx, '/customers?' + q));
@@ -429,6 +434,25 @@ async function _loadCustomers(ctx, opts) {
 async function _loadCustomerDetail(ctx, customerId) {
   if (!customerId) return EMPTY_CUSTOMER_DETAIL;
   return _apiFetch(_merchantPath(ctx, '/customers/' + encodeURIComponent(customerId)));
+}
+
+// One page of a conversation's transcript. `cursor` (opaque) walks OLDER; a null
+// cursor loads the newest page. Returns { messages: oldest-first, nextCursor }.
+async function _loadConversationMessages(ctx, customerId, conversationId, cursor) {
+  if (!customerId || !conversationId) return { messages: [], nextCursor: null };
+  const q = new URLSearchParams({ limit: '30' });
+  if (cursor) q.set('cursor', String(cursor));
+  return _apiFetch(
+    _merchantPath(
+      ctx,
+      '/customers/' +
+        encodeURIComponent(customerId) +
+        '/conversations/' +
+        encodeURIComponent(conversationId) +
+        '/messages?' +
+        q,
+    ),
+  );
 }
 
 async function _loadCustomerInsights(ctx) {
@@ -461,14 +485,52 @@ async function _loadConversations(ctx, opts) {
   return _apiFetch(_merchantPath(ctx, '/conversaflow/conversations?' + q));
 }
 
-async function _loadOperations(ctx, domain, cursor, merchantWide) {
+// The triage / attention queue: WhatsApp conversations where the customer is
+// waiting on a reply (the bot ran, the last word is the customer's).
+async function _loadTriage(ctx) {
+  if (!_active(ctx, 'conversaflow')) return { conversations: [], total: 0 };
+  return _apiFetch(_merchantPath(ctx, '/insights/triage'));
+}
+
+async function _loadOperations(ctx, domain, cursor, merchantWide, limit) {
   const merchantId = _merchantId(ctx);
   if (!merchantId) return EMPTY_OPERATIONS;
-  const query = new URLSearchParams({ domain: domain || 'organization', limit: '20' });
+  const query = new URLSearchParams({ domain: domain || 'organization', limit: String(limit || 20) });
   const locationId = merchantWide ? '' : _locationId(ctx);
   if (locationId) query.set('locationId', locationId);
   if (cursor) query.set('cursor', String(cursor));
   return _apiFetch(`${routes.merchants.operations(merchantId)}?${query}`);
+}
+
+// The Reportes → Ventas aggregate: net sales, product mix, payment mix, and a time
+// series for a business-date range. Location-scoped like the operations snapshot.
+async function _loadSalesSummary(ctx, range) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return null;
+  const query = new URLSearchParams({ range: range || 'today' });
+  const locationId = _locationId(ctx);
+  if (locationId) query.set('locationId', locationId);
+  return _apiFetch(`${routes.merchants.operations(merchantId)}/reports/sales?${query}`);
+}
+
+// One cash shift's reconciliation detail (roles, cash-math, denominations, ledger,
+// counts, trazabilidad). Read on demand when the owner opens a shift in Caja y turnos.
+async function _loadCashShiftDetail(ctx, shiftId) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !shiftId) return null;
+  return _apiFetch(
+    `${routes.merchants.operations(merchantId)}/cash-shifts/${encodeURIComponent(shiftId)}`,
+  );
+}
+
+// One sale's receipt snapshot — the rendered sale, read on demand when the owner
+// opens a sale in the money hub. Returns { receiptNumber, snapshot }.
+async function loadSaleReceipt(saleId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(
+    `${routes.merchants.operations(merchantId)}/sales/${encodeURIComponent(saleId)}/receipt`,
+  );
 }
 
 async function executeAdministrativeCommand(operation, targetAggregateId, options) {
@@ -940,18 +1002,56 @@ function useMembersData(opts) {
   );
 }
 
+// Keyset-paged customer list on TanStack Query's infinite cache. The list orders by
+// the indexed last_activity_at, and the backend returns an opaque `nextCursor`; there
+// is no page number and no total-count query.
 function useCustomersData(opts) {
   const ctx = useMerchant();
-  var page = opts && opts.page ? opts.page : 1;
-  var search = opts && opts.search ? opts.search : '';
-  var filter = opts && opts.filter ? opts.filter : '';
-  return _useAsync(
+  const merchantId = _merchantId(ctx);
+  const search = opts && opts.search ? opts.search : '';
+  const filter = opts && opts.filter ? opts.filter : '';
+  const ctxRef = useRefD(ctx);
+  useEffectD(
     function () {
-      return _loadCustomers(ctx, { page: page, search: search, filter: filter });
+      ctxRef.current = ctx;
     },
-    _deps(ctx, [page, search, filter]),
-    EMPTY_CUSTOMERS,
+    [ctx],
   );
+  const query = useInfiniteQuery({
+    queryKey: ['customers', merchantId || '', search, filter],
+    queryFn: function (arg) {
+      return _loadCustomers(ctxRef.current, {
+        cursor: arg.pageParam,
+        search: search,
+        filter: filter,
+        limit: 20,
+      });
+    },
+    initialPageParam: null,
+    getNextPageParam: function (lastPage) {
+      return (lastPage && lastPage.nextCursor) || undefined;
+    },
+    enabled: Boolean(merchantId),
+  });
+  const customers = useMemoD(
+    function () {
+      return query.data && query.data.pages
+        ? query.data.pages.flatMap(function (p) {
+            return p.customers || [];
+          })
+        : [];
+    },
+    [query.data],
+  );
+  return {
+    customers: customers,
+    loading: query.isLoading,
+    error: query.isError ? (query.error && query.error.message) || 'error' : null,
+    hasMore: Boolean(query.hasNextPage),
+    loadingMore: query.isFetchingNextPage,
+    fetchMore: query.fetchNextPage,
+    source: query.data && query.data.pages && query.data.pages[0] ? query.data.pages[0].source : '',
+  };
 }
 
 function useCustomerDetail(customerId, refresh) {
@@ -963,6 +1063,107 @@ function useCustomerDetail(customerId, refresh) {
     _deps(ctx, [customerId || '', refresh || 0]),
     EMPTY_CUSTOMER_DETAIL,
   );
+}
+
+// A large fixed base so prepending OLDER messages only ever decreases the index of
+// the first row; the newest message keeps a stable index, which is what lets
+// react-virtuoso hold scroll position on prepend.
+const TRANSCRIPT_START_INDEX = 1_000_000;
+
+// The WhatsApp transcript: keyset history via TanStack Query's infinite cache, PLUS
+// a live overlay. A realtime nudge (Socket.IO, driven by a Postgres NOTIFY on the
+// message insert) pulls the freshest page and merges it over the history by id, so
+// a new message appends at the bottom without disturbing scroll-up (older) paging.
+// Returns display-ready `messages` (oldest→newest, deduped) and a `firstItemIndex`
+// that moves ONLY on prepend.
+function useConversationMessages(customerId, conversationId) {
+  const ctx = useMerchant();
+  const merchantId = _merchantId(ctx);
+  const ctxRef = useRefD(ctx);
+  useEffectD(
+    function () {
+      ctxRef.current = ctx; // keep the nudge's fetch closure on the current merchant ctx
+    },
+    [ctx],
+  );
+
+  const infinite = useInfiniteQuery({
+    queryKey: [
+      'customer',
+      merchantId || '',
+      customerId || '',
+      'conversation',
+      conversationId || '',
+      'messages',
+    ],
+    queryFn: ({ pageParam }) =>
+      _loadConversationMessages(ctxRef.current, customerId, conversationId, pageParam),
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
+    enabled: Boolean(merchantId && customerId && conversationId),
+  });
+
+  // The overlay is tagged with its conversation id, so a stale overlay from a
+  // previously-open thread is simply ignored below — no reset effect needed.
+  const [live, setLive] = useStateD({ id: null, messages: [] });
+  useEffectD(
+    function () {
+      if (!merchantId || !customerId || !conversationId) return undefined;
+      let active = true;
+      const off = subscribeConversationMessages({
+        merchantId,
+        conversationId,
+        onNudge: function () {
+          _loadConversationMessages(ctxRef.current, customerId, conversationId, null)
+            .then(function (page) {
+              if (active) setLive({ id: conversationId, messages: (page && page.messages) || [] });
+            })
+            .catch(function () {});
+        },
+      });
+      return function () {
+        active = false;
+        off();
+      };
+    },
+    [merchantId, customerId, conversationId],
+  );
+
+  const messages = useMemoD(
+    function () {
+      const byId = new Map();
+      const pages = infinite.data && infinite.data.pages;
+      if (pages) {
+        for (const page of pages) for (const m of page.messages || []) byId.set(m.id, m);
+      }
+      const liveMessages = live.id === conversationId ? live.messages : [];
+      for (const m of liveMessages) byId.set(m.id, m);
+      return Array.from(byId.values()).sort(function (a, b) {
+        if (a.occurredAt < b.occurredAt) return -1;
+        if (a.occurredAt > b.occurredAt) return 1;
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      });
+    },
+    [infinite.data, live, conversationId],
+  );
+
+  const pages = (infinite.data && infinite.data.pages) || [];
+  const firstPageLen = pages[0] && pages[0].messages ? pages[0].messages.length : 0;
+  let historyLen = 0;
+  for (const page of pages) historyLen += (page.messages || []).length;
+  const olderLoaded = Math.max(0, historyLen - firstPageLen);
+  const firstItemIndex = TRANSCRIPT_START_INDEX - olderLoaded;
+
+  return {
+    messages,
+    firstItemIndex,
+    fetchOlder: infinite.fetchNextPage,
+    hasOlder: infinite.hasNextPage,
+    isFetchingOlder: infinite.isFetchingNextPage,
+    isLoading: infinite.isLoading,
+    isError: infinite.isError,
+    error: infinite.error,
+  };
 }
 
 function useCustomerInsights(refresh) {
@@ -1053,14 +1254,65 @@ function useConversationsData(opts) {
   );
 }
 
-function useOperationsData(domain, cursor, refresh, merchantWide) {
+function useTriageData() {
   const ctx = useMerchant();
   return _useAsync(
     function () {
-      return _loadOperations(ctx, domain, cursor, merchantWide);
+      return _loadTriage(ctx);
     },
-    _deps(ctx, [domain || 'organization', cursor || 0, refresh || 0, merchantWide ? 1 : 0]),
+    _deps(ctx, []),
+    { conversations: [], total: 0 },
+  );
+}
+
+function useOperationsData(domain, cursor, refresh, merchantWide, limit) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadOperations(ctx, domain, cursor, merchantWide, limit);
+    },
+    _deps(ctx, [domain || 'organization', cursor || 0, refresh || 0, merchantWide ? 1 : 0, limit || 20]),
     EMPTY_OPERATIONS,
+  );
+}
+
+// The Reportes → Ventas aggregate for a range ('today' | 'yesterday' | 'last_7_days' |
+// 'last_30_days'). Re-fetches when the range, merchant, or location changes.
+function useSalesSummary(range, refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadSalesSummary(ctx, range);
+    },
+    _deps(ctx, [range || 'today', refresh || 0]),
+    null,
+  );
+}
+
+// One cash shift's reconciliation detail for the Caja y turnos drill-down. Null shiftId
+// means no shift is selected; re-fetches when the shift or merchant changes.
+function useCashShiftDetail(shiftId, refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadCashShiftDetail(ctx, shiftId);
+    },
+    _deps(ctx, [shiftId || '', refresh || 0]),
+    null,
+  );
+}
+
+// One committed sale's receipt snapshot (lines, tender, operator, totals) for the money-hub
+// sale detail. A null saleId means no sale is open; re-fetches when the sale, merchant, or
+// location changes. Returns { receiptNumber, snapshot } or null.
+function useSaleReceipt(saleId, refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return saleId ? loadSaleReceipt(saleId) : Promise.resolve(null);
+    },
+    _deps(ctx, [saleId || '', refresh || 0]),
+    null,
   );
 }
 
@@ -1199,6 +1451,47 @@ async function provisionCafe(payload) {
   });
 }
 
+// ── Catalog categories: the POS colour the owner edits, populated from products ──
+const EMPTY_CATEGORIES = { items: [] };
+
+async function _loadCatalogCategories(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return EMPTY_CATEGORIES;
+  const res = await _apiFetch(
+    `/api/merchants/${encodeURIComponent(merchantId)}/catalog/categories`,
+  );
+  return { items: (res && res.items) || [] };
+}
+
+function useCatalogCategories(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadCatalogCategories(ctx);
+    },
+    _deps(ctx, [refresh || 0]),
+    EMPTY_CATEGORIES,
+  );
+}
+
+async function createCatalogCategory(input) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(`/api/merchants/${encodeURIComponent(merchantId)}/catalog/categories`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+async function updateCatalogCategory(categoryId, patch) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(
+    `/api/merchants/${encodeURIComponent(merchantId)}/catalog/categories/${encodeURIComponent(categoryId)}`,
+    { method: 'PATCH', body: JSON.stringify(patch) },
+  );
+}
+
 export {
   useCafes,
   provisionCafe,
@@ -1211,6 +1504,7 @@ export {
   useMembersData,
   useCustomersData,
   useCustomerDetail,
+  useConversationMessages,
   useCustomerInsights,
   useStaffData,
   useRolesData,
@@ -1218,11 +1512,20 @@ export {
   useVoiceConfig,
   useGiftCardsData,
   useConversationsData,
+  useTriageData,
   // This hook follows the existing data module boundary. Do not increase the warning baseline.
   // eslint-disable-next-line react-refresh/only-export-components
   useOperationsData,
   // eslint-disable-next-line react-refresh/only-export-components
+  useSalesSummary,
+  // eslint-disable-next-line react-refresh/only-export-components
+  useCashShiftDetail,
+  // eslint-disable-next-line react-refresh/only-export-components
+  useSaleReceipt,
+  // eslint-disable-next-line react-refresh/only-export-components
   executeAdministrativeCommand,
+  // eslint-disable-next-line react-refresh/only-export-components
+  loadSaleReceipt,
   saveMerchantSettings,
   saveRewardConfig,
   saveBusinessHours,
@@ -1268,5 +1571,11 @@ export {
   updateKdsStation,
   deleteKdsStation,
   useKdsConnection,
+  // eslint-disable-next-line react-refresh/only-export-components
+  useCatalogCategories,
+  // eslint-disable-next-line react-refresh/only-export-components
+  createCatalogCategory,
+  // eslint-disable-next-line react-refresh/only-export-components
+  updateCatalogCategory,
   _LIVE as DATA_IS_LIVE,
 };

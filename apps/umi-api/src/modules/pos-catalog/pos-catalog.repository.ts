@@ -51,7 +51,7 @@ export class PosCatalogRepository {
   async categories(merchantId: string): Promise<CatalogCategory[]> {
     const { rows } = await this.pg.tquery<CatalogCategory>(
       merchantId,
-      `SELECT c.id::text, c.name, c.display_order AS "displayOrder", true AS enabled
+      `SELECT c.id::text, c.name, c.display_order AS "displayOrder", true AS enabled, c.color
        FROM merchant.product_category c
        WHERE c.merchant_id = $1::uuid
          AND EXISTS (
@@ -81,7 +81,7 @@ export class PosCatalogRepository {
               (p.barcode IS NOT NULL) AS "hasBarcode",
               CASE WHEN c.id IS NULL THEN NULL ELSE jsonb_build_object(
                 'id', c.id::text, 'name', c.name, 'displayOrder', c.display_order,
-                'enabled', true) END AS category,
+                'enabled', true, 'color', c.color) END AS category,
               p.price::text AS "priceMinorUnits", business.currency,
               p.tax_rate_basis_points AS "taxRateBasisPoints",
               p.sale_action AS "saleAction",

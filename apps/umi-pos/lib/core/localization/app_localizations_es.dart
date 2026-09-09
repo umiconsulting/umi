@@ -56,6 +56,32 @@ class AppLocalizationsEs extends AppLocalizations {
   String get retryAction => 'Reintentar';
 
   @override
+  String get updateAvailableTitle => 'Actualización disponible';
+
+  @override
+  String get updateRequiredBody =>
+      'Esta versión de UmiPOS ya no es compatible. Actualiza para continuar.';
+
+  @override
+  String get updateAction => 'Actualizar ahora';
+
+  @override
+  String get updateInProgress => 'Descargando la actualización…';
+
+  @override
+  String get updateReadyTitle => 'Actualización lista';
+
+  @override
+  String get updateReadyBody => 'Reinicia UmiPOS para usar la versión nueva.';
+
+  @override
+  String get updateRestartAction => 'Reiniciar ahora';
+
+  @override
+  String get updateFailedBody =>
+      'No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.';
+
+  @override
   String get diagnosticsAction => 'Ver diagnóstico';
 
   @override

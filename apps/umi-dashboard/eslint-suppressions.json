@@ -66,9 +66,6 @@
   "src/screens/orders.jsx": {
     "no-unused-vars": {
       "count": 1
-    },
-    "react-hooks/purity": {
-      "count": 1
     }
   },
   "src/screens/overview.jsx": {

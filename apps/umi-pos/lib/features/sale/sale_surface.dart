@@ -271,9 +271,20 @@ final class _SaleCenterState extends State<_SaleCenter> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                l.saleHistoryTitle,
-                style: Theme.of(context).textTheme.headlineMedium,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l.saleHistoryTitle,
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l.closeAction,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
               ),
               const SizedBox(height: UmiSpacing.md),
               TextField(
@@ -406,59 +417,88 @@ final class _SaleCenterState extends State<_SaleCenter> {
                                         : null,
                                     child: Text(l.resumeSaleAction),
                                   ),
-                                if (sale.state == 'committed' &&
-                                    sale.sourceOrderId != null &&
-                                    widget.onKitchenStatus != null)
-                                  IconButton(
+                                // Post-sale actions were three look-alike,
+                                // icon-only buttons. Collect them into one
+                                // clearly labelled menu so each choice reads as
+                                // a full action, not a guessed glyph.
+                                if (sale.state == 'committed')
+                                  PopupMenuButton<String>(
                                     tooltip:
                                         Localizations.localeOf(
                                               context,
                                             ).languageCode ==
                                             'es'
-                                        ? 'Estado de cocina'
-                                        : 'Kitchen status',
-                                    onPressed: () =>
-                                        _showKitchenStatus(context, sale),
-                                    icon: const Icon(
-                                      Icons.soup_kitchen_outlined,
-                                    ),
-                                  ),
-                                if (sale.state == 'committed' &&
-                                    widget.exceptions != null &&
-                                    widget.permissions.allows(
-                                      'sale.exception.read',
-                                    ))
-                                  IconButton(
-                                    tooltip: l.saleExceptionAction,
-                                    onPressed: () => showSaleExceptionDialog(
-                                      context,
-                                      controller: widget.exceptions!,
-                                      saleId: sale.committedSaleId ?? sale.id,
-                                    ),
-                                    icon: const Icon(
-                                      Icons.assignment_return_outlined,
-                                    ),
-                                  ),
-                                if (sale.state == 'committed')
-                                  IconButton(
-                                    tooltip: l.reprintReceiptAction,
-                                    onPressed: () async {
-                                      await widget.lifecycle.openReceipt(sale);
-                                      if (context.mounted) {
-                                        await _showReceipt(
-                                          context,
-                                          widget.lifecycle.state.receipt,
-                                          receiptId: sale.receiptId,
-                                          onPrint: widget.onPrint,
-                                          canPrint: widget.permissions.allows(
-                                            'hardware.printer.print',
-                                          ),
-                                        );
+                                        ? 'Acciones de la venta'
+                                        : 'Sale actions',
+                                    icon: const Icon(Icons.more_vert),
+                                    onSelected: (value) async {
+                                      switch (value) {
+                                        case 'kitchen':
+                                          await _showKitchenStatus(
+                                            context,
+                                            sale,
+                                          );
+                                        case 'exception':
+                                          await showSaleExceptionDialog(
+                                            context,
+                                            controller: widget.exceptions!,
+                                            saleId:
+                                                sale.committedSaleId ?? sale.id,
+                                          );
+                                        case 'reprint':
+                                          await widget.lifecycle.openReceipt(
+                                            sale,
+                                          );
+                                          if (context.mounted) {
+                                            await _showReceipt(
+                                              context,
+                                              widget.lifecycle.state.receipt,
+                                              receiptId: sale.receiptId,
+                                              onPrint: widget.onPrint,
+                                              canPrint: widget.permissions
+                                                  .allows(
+                                                    'hardware.printer.print',
+                                                  ),
+                                            );
+                                          }
                                       }
                                     },
-                                    icon: const Icon(
-                                      Icons.receipt_long_outlined,
-                                    ),
+                                    itemBuilder: (_) => [
+                                      if (sale.sourceOrderId != null &&
+                                          widget.onKitchenStatus != null)
+                                        PopupMenuItem(
+                                          value: 'kitchen',
+                                          child: _MenuAction(
+                                            icon: Icons.soup_kitchen_outlined,
+                                            label:
+                                                Localizations.localeOf(
+                                                      context,
+                                                    ).languageCode ==
+                                                    'es'
+                                                ? 'Estado de cocina'
+                                                : 'Kitchen status',
+                                          ),
+                                        ),
+                                      if (widget.exceptions != null &&
+                                          widget.permissions.allows(
+                                            'sale.exception.read',
+                                          ))
+                                        PopupMenuItem(
+                                          value: 'exception',
+                                          child: _MenuAction(
+                                            icon: Icons
+                                                .assignment_return_outlined,
+                                            label: l.saleExceptionAction,
+                                          ),
+                                        ),
+                                      PopupMenuItem(
+                                        value: 'reprint',
+                                        child: _MenuAction(
+                                          icon: Icons.receipt_long_outlined,
+                                          label: l.reprintReceiptAction,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                               ],
                             ),
@@ -567,6 +607,22 @@ final class _Filter extends StatelessWidget {
     label: Text(label),
     selected: selected,
     onSelected: (_) => onSelected(),
+  );
+}
+
+final class _MenuAction extends StatelessWidget {
+  const _MenuAction({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon),
+      const SizedBox(width: UmiSpacing.md),
+      Flexible(child: Text(label)),
+    ],
   );
 }
 

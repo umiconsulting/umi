@@ -144,10 +144,13 @@ describe('Gate 3C cash persistence', () => {
     expect(repository).not.toContain('max(counted_minor_units)');
   });
 
-  it('derives the shift business date on the server', () => {
-    expect(repository).toContain(
-      'now() at time zone coalesce(location.timezone,merchant.timezone)',
-    );
+  it('derives the shift business date on the server, honoring business_day_start', () => {
+    // Must mirror merchant.tg_business_date: (now in the merchant timezone) minus
+    // business_day_start, cast to date — so a late-night café's shift lands on the same
+    // trading day as the sales it holds. The client never supplies the date.
+    expect(repository).toContain('now() at time zone merchant.timezone');
+    expect(repository).toContain('merchant.business_day_start::interval');
+    expect(repository).not.toContain('coalesce(location.timezone,merchant.timezone)');
     expect(repository).not.toContain('dto.businessDate');
   });
 

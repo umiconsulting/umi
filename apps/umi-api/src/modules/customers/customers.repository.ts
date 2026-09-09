@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 export interface CustomerListQuery {
-  page: number;
   limit: number;
   search: string;
   filter: string;
   contactId: string;
   contactUuid: string;
+  cursorTs: string | null;
+  cursorId: string | null;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -34,13 +35,16 @@ export type Row = Record<string, any>;
 export class CustomersRepository {
   constructor(private readonly pg: PgService) {}
 
-  /** The platform customer list (one lateral-join rollup per customer). */
+  /**
+   * The platform customer list (one lateral-join rollup per customer). Keyset-paged
+   * on the indexed `(last_activity_at, id)` — no OFFSET, and no COUNT: the frontend
+   * pages with `nextCursor`, and `limit + 1` reveals whether more rows remain.
+   */
   async listCustomers(
     merchantId: string,
     q: CustomerListQuery,
-  ): Promise<{ rows: Row[]; total: number }> {
+  ): Promise<{ rows: Row[]; nextCursor: { ts: string; id: string } | null }> {
     const like = `%${q.search}%`;
-    const skip = (q.page - 1) * q.limit;
     return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
@@ -64,7 +68,8 @@ export class CustomersRepository {
              COALESCE(memory_summary.memory_count, 0)::int AS memory_count,
              0::int AS data_quality_count,
              COALESCE(merge_summary.merge_candidate_count, 0)::int AS merge_candidate_count,
-             last_touch.last_touch_at
+             c.last_activity_at AS last_touch_at,
+             c.last_activity_at::text AS activity_cursor
            FROM merchant.customer AS c
            LEFT JOIN LATERAL (
              SELECT ci.normalized_value
@@ -147,17 +152,6 @@ export class CustomersRepository {
              -- detector; dedup is now customer.merged_into_id). 0, like gift_card/data_quality.
              SELECT 0 AS merge_candidate_count, NULL::timestamptz AS last_merge_at
            ) AS merge_summary ON true
-           LEFT JOIN LATERAL (
-             SELECT max(ts) AS last_touch_at
-             FROM (VALUES
-               (c.updated_at),
-               (cash_summary.last_cash_at),
-               (conversation_summary.last_conversation_at),
-               (order_summary.last_order_at),
-               (memory_summary.last_memory_at),
-               (merge_summary.last_merge_at)
-             ) AS touch(ts)
-           ) AS last_touch ON true
            WHERE c.merchant_id = $1::uuid
              AND ($2 = '' OR c.id = $3::uuid)
              AND (
@@ -173,65 +167,43 @@ export class CustomersRepository {
                OR phone_identity.normalized_value ILIKE $6
                OR email_identity.normalized_value ILIKE $6
              )
-           ORDER BY last_touch.last_touch_at DESC NULLS LAST, c.created_at DESC
-           LIMIT $7 OFFSET $8`,
-          [merchantId, q.contactId, q.contactUuid, q.filter, q.search, like, q.limit, skip],
+             AND (
+               $8::timestamptz IS NULL
+               OR (c.last_activity_at, c.id) < ($8::timestamptz, $9::uuid)
+             )
+           ORDER BY c.last_activity_at DESC, c.id DESC
+           LIMIT $7`,
+          [merchantId, q.contactId, q.contactUuid, q.filter, q.search, like, q.limit + 1, q.cursorTs, q.cursorId],
         )
       ).rows;
 
-      const total = (
-        await c.query<{ count: number }>(
-          `SELECT count(*)::int AS count
-           FROM merchant.customer AS c
-           LEFT JOIN LATERAL (
-             SELECT ci.normalized_value
-             FROM merchant.contact AS ci
-             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
-               AND ch.key IN ('phone', 'whatsapp')
-               AND ci.normalized_value IS NOT NULL
-             LIMIT 1
-           ) AS phone_identity ON true
-           LEFT JOIN LATERAL (
-             SELECT ci.normalized_value
-             FROM merchant.contact AS ci
-             JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
-             WHERE ci.merchant_id = c.merchant_id AND ci.customer_id = c.id
-               AND ch.key = 'email' AND ci.normalized_value IS NOT NULL
-             LIMIT 1
-           ) AS email_identity ON true
-           WHERE c.merchant_id = $1::uuid
-             AND ($2 = '' OR c.id = $3::uuid)
-             AND (
-               $4 = ''
-               OR ($4 = 'whatsapp' AND EXISTS (SELECT 1 FROM merchant.conversation AS cv WHERE cv.merchant_id = c.merchant_id AND cv.customer_id = c.id))
-               OR ($4 = 'cash' AND EXISTS (SELECT 1 FROM merchant.loyalty_card AS ca WHERE ca.merchant_id = c.merchant_id AND ca.customer_id = c.id))
-               OR ($4 = 'memory' AND EXISTS (SELECT 1 FROM merchant.customer_fact AS cn WHERE cn.merchant_id = c.merchant_id AND cn.customer_id = c.id))
-               OR ($4 = 'review' AND false) -- no merge-candidate source in build-v3 (dedup = customer.merged_into_id)
-             )
-             AND (
-               $5 = ''
-               OR c.name ILIKE $6
-               OR phone_identity.normalized_value ILIKE $6
-               OR email_identity.normalized_value ILIKE $6
-             )`,
-          [merchantId, q.contactId, q.contactUuid, q.filter, q.search, like],
-        )
-      ).rows[0]?.count;
-
-      return { rows, total: Number(total ?? rows.length) };
+      const hasMore = rows.length > q.limit;
+      const page = hasMore ? rows.slice(0, q.limit) : rows;
+      const last = page[page.length - 1];
+      const nextCursor =
+        hasMore && last ? { ts: String(last.activity_cursor), id: String(last.id) } : null;
+      return { rows: page, nextCursor };
     });
+  }
+
+  /** A plain merchant-scoped count for the insights header (no laterals, no COUNT-over-rollup). */
+  async countCustomers(merchantId: string): Promise<number> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ count: number }>(
+        `SELECT count(*)::int AS count FROM merchant.customer WHERE merchant_id = $1::uuid`,
+        [merchantId],
+      ),
+    );
+    return Number(rows[0]?.count ?? 0);
   }
 
   async timeline(merchantId: string, contactId: string): Promise<Row[]> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
+        // WhatsApp messages are intentionally excluded: the full transcript now
+        // lives in its own tab, so the Overview activity feed stays a summary of
+        // orders and memory instead of flooding with every chat line.
         `SELECT * FROM (
-           SELECT 'whatsapp_message' AS type, m.id::text AS id, m.created_at AS occurred_at, m.sender AS label, COALESCE(m.body, '') AS detail, 'conversaflow' AS product
-           FROM merchant.message AS m
-           JOIN merchant.conversation AS cv ON cv.id = m.conversation_id
-           WHERE cv.customer_id = $1::uuid AND cv.merchant_id = $2::uuid
-           UNION ALL
            SELECT 'order' AS type, o.id::text AS id, o.created_at AS occurred_at, o.status AS label, o.id::text AS detail, 'orders' AS product
            FROM merchant.customer_order AS o
            WHERE o.customer_id = $1::uuid AND o.merchant_id = $2::uuid
@@ -267,6 +239,58 @@ export class CustomersRepository {
          ORDER BY cv.last_message_at DESC NULLS LAST
          LIMIT 40`,
         [contactId, merchantId],
+      ),
+    );
+    return rows;
+  }
+
+  /**
+   * One conversation's message thread (the transcript), newest-first for keyset
+   * paging. RLS: `merchant.message` is parent-scoped through `merchant.conversation`
+   * (90_rls.sql: message → conversation via conversation_id), so the join to `cv`
+   * both enforces merchant isolation and pins the thread to this customer. Ordered
+   * by `occurred_at` (the real message time, not the ingest `created_at`) with `id`
+   * as the keyset tiebreaker. `occurred_cursor` is Postgres's own full-precision
+   * text render of `occurred_at`, so the cursor round-trips without millisecond
+   * truncation dropping or repeating a boundary message.
+   */
+  async messages(
+    merchantId: string,
+    contactId: string,
+    conversationId: string,
+    cursor: { occurredAt: string; id: string } | null,
+    limit: number,
+  ): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT
+           m.id::text,
+           m.direction,
+           m.sender,
+           m.body,
+           m.delivery_status,
+           m.occurred_at,
+           m.occurred_at::text AS occurred_cursor,
+           m.created_at
+         FROM merchant.message AS m
+         JOIN merchant.conversation AS cv ON cv.id = m.conversation_id
+         WHERE cv.id = $1::uuid
+           AND cv.merchant_id = $2::uuid
+           AND cv.customer_id = $3::uuid
+           AND (
+             $4::timestamptz IS NULL
+             OR (m.occurred_at, m.id) < ($4::timestamptz, $5::uuid)
+           )
+         ORDER BY m.occurred_at DESC, m.id DESC
+         LIMIT $6`,
+        [
+          conversationId,
+          merchantId,
+          contactId,
+          cursor?.occurredAt ?? null,
+          cursor?.id ?? null,
+          limit,
+        ],
       ),
     );
     return rows;
@@ -384,6 +408,55 @@ export class CustomersRepository {
       ).rows[0]?.total;
       return { rows, total: Number(total ?? 0) };
     });
+  }
+
+  /**
+   * The triage queue: open conversations whose most recent message is from the
+   * customer — i.e. the customer is waiting on a reply. The AI's own escalation
+   * state lives in the sealed `runtime.conversation_state` (not readable on the
+   * umi_app pool), so "needs attention" is derived from readable signals only.
+   * Oldest-waiting first, because that is the most overdue. RLS scopes every table.
+   */
+  async triage(merchantId: string, limit: number): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT
+           cv.id::text,
+           cv.customer_id::text AS customer_id,
+           co.name AS customer_name,
+           ph.normalized_value AS customer_phone,
+           cv.status,
+           cv.summary,
+           last.sender AS last_sender,
+           last.body AS last_message,
+           last.occurred_at AS waiting_since
+         FROM merchant.conversation AS cv
+         JOIN merchant.customer AS co ON co.merchant_id = cv.merchant_id AND co.id = cv.customer_id
+         LEFT JOIN LATERAL (
+           SELECT m.sender, m.body, m.occurred_at
+           FROM merchant.message AS m
+           WHERE m.conversation_id = cv.id
+           ORDER BY m.occurred_at DESC, m.id DESC
+           LIMIT 1
+         ) AS last ON true
+         LEFT JOIN LATERAL (
+           SELECT ci.normalized_value
+           FROM merchant.contact AS ci
+           JOIN umi.channel_type AS ch ON ch.id = ci.channel_id
+           WHERE ci.merchant_id = co.merchant_id AND ci.customer_id = co.id
+             AND ch.key IN ('phone', 'whatsapp') AND ci.normalized_value IS NOT NULL
+           ORDER BY ci.is_primary DESC, ci.updated_at DESC
+           LIMIT 1
+         ) AS ph ON true
+         WHERE cv.merchant_id = $1::uuid
+           AND cv.status = 'open'
+           AND last.sender = 'customer'
+         ORDER BY last.occurred_at ASC
+         LIMIT $2`,
+        [merchantId, limit],
+      ),
+    );
+    return rows;
   }
 
   async identity(

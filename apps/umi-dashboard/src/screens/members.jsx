@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Select } from '@/components/select.jsx';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
@@ -100,13 +101,13 @@ function RegisterMemberDialog({ onClose, onRegistered }) {
               />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <select value={dial} onChange={(e) => setDial(e.target.value)} disabled={pending}>
+              <Select value={dial} onChange={(e) => setDial(e.target.value)} disabled={pending}>
                 {DIAL_CODES.map((d) => (
                   <option key={d.dial} value={d.dial}>
                     {d.label}
                   </option>
                 ))}
-              </select>
+              </Select>
               <input
                 style={{ flex: 1 }}
                 type="tel"
@@ -210,7 +211,7 @@ const MembersScreen = () => {
         count={{ value: formatNumber(total), label: t`miembros` }}
         actions={
           <>
-            <select
+            <Select
               aria-label={t`Ordenar clientes`}
               className="select"
               style={{ height: 38, fontSize: 13, padding: '0 32px 0 12px' }}
@@ -225,7 +226,7 @@ const MembersScreen = () => {
                   {i18n._(o.label)}
                 </option>
               ))}
-            </select>
+            </Select>
             <button className="btn" type="button" onClick={() => setShowRegister(true)}>
               <I.Plus size={14} /> <Trans>Registrar miembro</Trans>
             </button>

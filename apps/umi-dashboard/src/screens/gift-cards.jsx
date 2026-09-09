@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Select } from '@/components/select.jsx';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate, formatMoney, formatNumber } from '@/lib/format.js';
@@ -82,14 +83,14 @@ function RedeemGiftCardDialog({ onClose, onRedeemed }) {
               />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <select
+              <Select
                 value={channel}
                 onChange={(e) => setChannel(e.target.value)}
                 disabled={pending}
               >
                 <option value="phone">{t`Teléfono`}</option>
                 <option value="email">{t`Correo`}</option>
-              </select>
+              </Select>
               <input
                 style={{ flex: 1 }}
                 type={channel === 'email' ? 'email' : 'tel'}
@@ -238,14 +239,14 @@ function IssueGiftCardDialog({ onClose, onIssued }) {
               />
             </label>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <select
+              <Select
                 value={channel}
                 onChange={(e) => setChannel(e.target.value)}
                 disabled={pending}
               >
                 <option value="email">{t`Correo`}</option>
                 <option value="phone">{t`Teléfono`}</option>
-              </select>
+              </Select>
               <input
                 style={{ flex: 1 }}
                 type={channel === 'email' ? 'email' : 'tel'}

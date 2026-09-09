@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { deviceStatus, KdsService, stationKeyFromName, ticketBelongsToDevice } from './kds.service';
 import {
@@ -643,5 +643,110 @@ describe('KdsService.heartbeat realtime wake-up', () => {
     repo.sessionLastUsedAt.mockResolvedValue(new Date(Date.now() - 2_000).toISOString());
     await svc.heartbeat(SESSION, null);
     expect(realtime.emitDevicesChanged).not.toHaveBeenCalled();
+  });
+});
+
+// Forward advance from a permission-guarded staff session (dashboard/POS operator), the
+// sibling of the recall-only `transitionFromDashboard`. It reuses the same deep
+// `executeKitchenCommand` path the device command uses, so start/ready/complete finally
+// have a permission-gated entry point that is NOT the device-token path.
+describe('KdsService.advanceFromDashboard', () => {
+  const ACTOR = '33333333-3333-4333-8333-333333333333';
+  const ST1 = '11111111-1111-4111-8111-111111111111';
+  const ST2 = '22222222-2222-4222-8222-222222222222';
+  const ORDER = {
+    id: 'o1',
+    merchant_id: 't1',
+    location_id: 'loc-1',
+    station_ids: [ST1],
+    status: 'queued',
+    version: '1',
+  };
+
+  it('advances a ticket to preparation, reusing executeKitchenCommand', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    const res = await svc.advanceFromDashboard('t1', ACTOR, 'o1', 'start_preparation', {
+      ...COMMAND,
+    });
+    expect(res.ok).toBe(true);
+    expect(repo.executeKitchenCommand).toHaveBeenCalledTimes(1);
+    const arg = repo.executeKitchenCommand.mock.calls[0][0];
+    expect(arg.commandType).toBe('start_preparation');
+    expect(arg.actorUserId).toBe(ACTOR);
+    expect(arg.session).toMatchObject({
+      merchantId: 't1',
+      locationId: 'loc-1',
+      stationId: ST1,
+      deviceId: null,
+    });
+  });
+
+  it('maps ready and complete command types straight through', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    await svc.advanceFromDashboard('t1', ACTOR, 'o1', 'mark_order_ready', { ...COMMAND });
+    expect(repo.executeKitchenCommand.mock.calls[0][0].commandType).toBe('mark_order_ready');
+    await svc.advanceFromDashboard('t1', ACTOR, 'o1', 'complete', { ...COMMAND });
+    expect(repo.executeKitchenCommand.mock.calls[1][0].commandType).toBe('complete');
+  });
+
+  it('honours an explicit stationId the ticket is routed to', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue({ ...ORDER, station_ids: [ST1, ST2] });
+    await svc.advanceFromDashboard('t1', ACTOR, 'o1', 'start_preparation', {
+      ...COMMAND,
+      stationId: ST2,
+    });
+    expect(repo.executeKitchenCommand.mock.calls[0][0].session.stationId).toBe(ST2);
+  });
+
+  it('accepts a session actor id that is a valid UUID but not a strict v4', async () => {
+    // Umi mints user ids like this (version nibble `f`); the strict asUuid would reject it.
+    const REAL_ACTOR = '29b4e9bf-16ff-f3b2-6499-b885014589a5';
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    const res = await svc.advanceFromDashboard('t1', REAL_ACTOR, 'o1', 'start_preparation', {
+      ...COMMAND,
+    });
+    expect(res.ok).toBe(true);
+    expect(repo.executeKitchenCommand.mock.calls[0][0].actorUserId).toBe(REAL_ACTOR);
+  });
+
+  it('rejects when the optimistic-concurrency identity is missing', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    await expect(
+      svc.advanceFromDashboard('t1', ACTOR, 'o1', 'start_preparation', {}),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.executeKitchenCommand).not.toHaveBeenCalled();
+  });
+
+  it('is NOT_FOUND when the ticket does not exist for the merchant', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(null);
+    await expect(
+      svc.advanceFromDashboard('t1', ACTOR, 'missing', 'start_preparation', { ...COMMAND }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('is NOT_FOUND when an explicit station is not one the ticket is routed to', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    await expect(
+      svc.advanceFromDashboard('t1', ACTOR, 'o1', 'start_preparation', {
+        ...COMMAND,
+        stationId: '99999999-9999-4999-8999-999999999999',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('maps a repository conflict to CONFLICT', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    repo.executeKitchenCommand.mockResolvedValue({ status: 'conflict', result: { error: 'x' } });
+    await expect(
+      svc.advanceFromDashboard('t1', ACTOR, 'o1', 'start_preparation', { ...COMMAND }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

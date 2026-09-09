@@ -1,0 +1,12 @@
+#!/bin/sh
+# AppImage entrypoint for UmiPOS.
+#
+# The Flutter Linux bundle expects its `data/` and `lib/` directories next to the
+# `umi_pos` executable, so we run from inside usr/bin rather than from the mount
+# root. LD_LIBRARY_PATH points at the bundled Flutter/GTK shared objects.
+HERE="$(dirname "$(readlink -f "${0}")")"
+export LD_LIBRARY_PATH="${HERE}/usr/bin/lib:${LD_LIBRARY_PATH}"
+# Expose the bundled appimageupdatetool to the in-app self-updater.
+export PATH="${HERE}/usr/bin:${PATH}"
+cd "${HERE}/usr/bin" || exit 1
+exec ./umi_pos "$@"

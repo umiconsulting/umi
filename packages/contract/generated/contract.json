@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "195893f1dbf3098e6556d6d4ed6b7d29068f26d83cf5cb2f15712c768edeecf5",
-  "contractVersion": "2.17.0",
+  "contentHash": "10d0ccd3c48a83f0f393ceb8ebb0d62b82c78d45dd5c9a028570d516bc74697d",
+  "contractVersion": "2.18.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -9049,6 +9049,17 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "color": {
+                "anyOf": [
+                  {
+                    "pattern": "^#[0-9a-fA-F]{6}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "displayOrder": {
                 "type": "integer"
               },
@@ -9069,7 +9080,8 @@
               "id",
               "name",
               "displayOrder",
-              "enabled"
+              "enabled",
+              "color"
             ],
             "type": "object"
           },
@@ -9091,6 +9103,17 @@
     "CatalogCategory": {
       "additionalProperties": false,
       "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[0-9a-fA-F]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "displayOrder": {
           "type": "integer"
         },
@@ -9111,7 +9134,8 @@
         "id",
         "name",
         "displayOrder",
-        "enabled"
+        "enabled",
+        "color"
       ],
       "type": "object"
     },
@@ -9300,6 +9324,17 @@
                   {
                     "additionalProperties": false,
                     "properties": {
+                      "color": {
+                        "anyOf": [
+                          {
+                            "pattern": "^#[0-9a-fA-F]{6}$",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "displayOrder": {
                         "type": "integer"
                       },
@@ -9320,7 +9355,8 @@
                       "id",
                       "name",
                       "displayOrder",
-                      "enabled"
+                      "enabled",
+                      "color"
                     ],
                     "type": "object"
                   },
@@ -9554,6 +9590,17 @@
             {
               "additionalProperties": false,
               "properties": {
+                "color": {
+                  "anyOf": [
+                    {
+                      "pattern": "^#[0-9a-fA-F]{6}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "displayOrder": {
                   "type": "integer"
                 },
@@ -9574,7 +9621,8 @@
                 "id",
                 "name",
                 "displayOrder",
-                "enabled"
+                "enabled",
+                "color"
               ],
               "type": "object"
             },
@@ -9985,6 +10033,17 @@
             {
               "additionalProperties": false,
               "properties": {
+                "color": {
+                  "anyOf": [
+                    {
+                      "pattern": "^#[0-9a-fA-F]{6}$",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "displayOrder": {
                   "type": "integer"
                 },
@@ -10005,7 +10064,8 @@
                 "id",
                 "name",
                 "displayOrder",
-                "enabled"
+                "enabled",
+                "color"
               ],
               "type": "object"
             },
@@ -26841,6 +26901,24 @@
         "recovery.query_original"
       ],
       "type": "string"
+    },
+    "DashboardConversationMessageEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "conversationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "merchantId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "merchantId",
+        "conversationId"
+      ],
+      "type": "object"
     },
     "DashboardDevicesChangedEvent": {
       "additionalProperties": false,

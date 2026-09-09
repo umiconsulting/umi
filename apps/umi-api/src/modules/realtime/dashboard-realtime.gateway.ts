@@ -6,6 +6,7 @@ import {
   type OnGatewayInit,
 } from '@nestjs/websockets';
 import {
+  DASHBOARD_EVENT_CONVERSATION_MESSAGE,
   DASHBOARD_EVENT_DEVICES_CHANGED,
   DASHBOARD_REALTIME_NAMESPACE,
   dashboardRoom,
@@ -42,6 +43,11 @@ export class DashboardRealtimeGateway implements OnGatewayInit, OnGatewayConnect
   onModuleInit(): void {
     this.events.stream$.subscribe((event) => {
       this.server?.to(dashboardRoom(event.merchantId)).emit(DASHBOARD_EVENT_DEVICES_CHANGED, event);
+    });
+    this.events.conversationMessage$.subscribe((event) => {
+      this.server
+        ?.to(dashboardRoom(event.merchantId))
+        .emit(DASHBOARD_EVENT_CONVERSATION_MESSAGE, event);
     });
   }
 

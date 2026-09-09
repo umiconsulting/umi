@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { DevicesModule } from '../devices/devices.module';
 import { DashboardRealtimeGateway } from './dashboard-realtime.gateway';
+import { MessageNotifyListener } from './message-notify.listener';
 import { PairingRealtimeGateway } from './pairing-realtime.gateway';
 
 /**
@@ -10,6 +11,6 @@ import { PairingRealtimeGateway } from './pairing-realtime.gateway';
  */
 @Module({
   imports: [DevicesModule, AuthModule],
-  providers: [PairingRealtimeGateway, DashboardRealtimeGateway],
+  providers: [PairingRealtimeGateway, DashboardRealtimeGateway, MessageNotifyListener],
 })
 export class RealtimeModule {}

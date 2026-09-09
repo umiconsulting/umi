@@ -3,10 +3,17 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('POS cash center SQL regression', () => {
-  it('uses the merchant timezone for the cash business date', () => {
+  it('derives the cash business date in the merchant timezone, honoring business_day_start', () => {
     const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
-    expect(source).toContain('now() at time zone coalesce(location.timezone,merchant.timezone)');
+    // The cash business date MUST match merchant.tg_business_date: (now in the merchant
+    // timezone) minus business_day_start, cast to date. A late-night café with
+    // business_day_start != 00:00 would otherwise open a shift on a different trading day
+    // than the sales it holds.
+    expect(source).toContain('now() at time zone merchant.timezone');
+    expect(source).toContain('merchant.business_day_start::interval');
     expect(source).not.toContain('SELECT current_date::text');
+    // The old location-timezone coalesce ignored business_day_start — it must be gone.
+    expect(source).not.toContain('coalesce(location.timezone,merchant.timezone)');
   });
 
   it('uses contiguous parameters for the active shift query', () => {

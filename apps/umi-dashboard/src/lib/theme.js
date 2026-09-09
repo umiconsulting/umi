@@ -2,15 +2,16 @@
 // One place that owns the console theme choice.
 //
 // Themes are NAMED, not a light/dark switch. 'umi' is the default theme (the
-// original light palette, served by :root). 'midnight' is the first alternate
-// (dark). More themes can be added later: add the palette under each token's
-// $themes map in packages/tokens and add the name to THEMES here.
+// original light palette, served by :root). Two dark themes follow: 'dark' (the
+// deep "ocean at night" palette, and the one the OS dark preference resolves to)
+// and 'midnight' (the all-black palette). More themes can be added later: add the
+// palette under each token's $themes map in packages/tokens and the name to THEMES.
 //
 // The stored preference is a theme name or 'system':
 //   - 'system' stores nothing and removes the data-theme attribute; the OS
 //     preference then governs through the @media (prefers-color-scheme) block in
 //     the generated token stylesheet (@umi/tokens/dashboard.css), which maps OS
-//     dark to PREFERS_DARK ('midnight').
+//     dark to PREFERS_DARK ('dark').
 //   - a theme name writes data-theme on <html>, which always wins over the OS.
 //
 // index.html sets the attribute BEFORE first paint from the same storage key, so
@@ -24,9 +25,9 @@ const KEY = 'umi-theme';
 // valid explicit choice (data-theme="umi" pins it and blocks the OS override).
 const DEFAULT_THEME = 'umi';
 // Every selectable theme, in picker order. Keep in step with packages/tokens.
-const THEMES = ['umi', 'midnight'];
+const THEMES = ['umi', 'dark', 'midnight'];
 // The theme the OS dark preference resolves to under 'system'.
-const PREFERS_DARK = 'midnight';
+const PREFERS_DARK = 'dark';
 
 // Read the stored preference. Any unknown or absent value means 'system', so a
 // cleared or blocked localStorage degrades to following the OS.

@@ -1,7 +1,9 @@
 import React from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { I, UmiX } from './icons.jsx';
+import { I } from './icons.jsx';
+import { Select } from '@/components/select.jsx';
+import { Menu } from '@/components/menu.jsx';
 import { LOCALES, activateLocale } from '@/lib/i18n.js';
 import { formatDate, formatTime } from '@/lib/format.js';
 import { initialsFrom } from '@/screens/profile-format.js';
@@ -9,65 +11,149 @@ import {
   getThemePreference,
   setThemePreference,
   resolveTheme,
-  nextToggleTheme,
   subscribeTheme,
 } from '@/lib/theme.js';
 
-// ThemeToggle — one topbar button that switches the console theme between the
-// only two themes: Umi (the default light palette) and Midnight (dark). It is a
-// two-state switch, not a three-stop cycle: there is no 'System' stop. A person
-// who never picked, or whose choice was cleared, starts on whatever the OS asks
-// for (resolveTheme), and the first click pins the other theme. The icon shows
-// the CURRENT theme (a sun for Umi, a moon for Midnight); the label names the
-// theme the next click selects, so the control reads the same to a screen reader
-// as it looks. State lives in src/lib/theme.js — this only subscribes so it
-// re-renders when the OS preference flips or another tab changes the choice.
-// Theme names are proper nouns, so they are not localized.
-const THEME_ICON = { umi: I.Sun, midnight: I.Moon };
-const THEME_NAME = { umi: 'Umi', midnight: 'Midnight' };
+// Layout effect on the client, plain effect on the server — matches the isomorphic
+// pattern in components/select.jsx so measuring never warns during SSR (tests).
+const useIsoLayoutEffect =
+  typeof document !== 'undefined' ? React.useLayoutEffect : React.useEffect;
 
-const ThemeToggle = () => {
+// Fan one node out to several refs (object or callback). Used to give the profile
+// pill both the menu's trigger ref and our own measuring ref.
+const setRefs =
+  (...refs) =>
+  (node) => {
+    for (const r of refs) {
+      if (typeof r === 'function') r(node);
+      else if (r) r.current = node;
+    }
+  };
+
+// ThemeMenu — the console theme picker in the topbar. Three NAMED themes: Umi (the
+// light default), Oscuro (the deep "ocean at night" dark) and Midnight (all black).
+// It is a small menu, not a two-state toggle: three themes need a real pick. The
+// trigger shows a sun for the light theme and a moon for either dark one; the menu
+// marks the active theme with a check. There is no 'System' stop — a person who
+// never picked follows the OS (resolveTheme), and picking a theme pins it (data-
+// theme wins over the OS). State lives in src/lib/theme.js — this only subscribes so
+// it re-renders when the OS preference flips or another tab changes the choice.
+// Theme names are fixed labels, not localized.
+const THEME_ICON = { umi: I.Sun, dark: I.Moon, midnight: I.Moon };
+const THEME_NAME = { umi: 'Umi', dark: 'Oscuro', midnight: 'Midnight' };
+const THEME_ORDER = ['umi', 'dark', 'midnight'];
+// A blank leading slot, so the unselected rows align with the checked one.
+const Blank = () => null;
+
+const ThemeMenu = () => {
   const { t } = useLingui();
   const [pref, setPref] = React.useState(getThemePreference);
   React.useEffect(() => subscribeTheme(setPref), []);
-  const resolved = resolveTheme(pref); // always 'umi' or 'midnight'
-  const nextTheme = nextToggleTheme(pref); // the other one
-  const Glyph = THEME_ICON[resolved];
-  const current = THEME_NAME[resolved];
-  const nextLabel = THEME_NAME[nextTheme];
+  const resolved = resolveTheme(pref); // concrete theme on screen
+  const Glyph = THEME_ICON[resolved] || I.Moon;
+  const items = THEME_ORDER.map((name) => ({
+    key: name,
+    label: THEME_NAME[name],
+    icon: name === resolved ? I.Check : Blank,
+    onSelect: () => setThemePreference(name),
+  }));
   return (
-    <button
-      type="button"
-      className="btn btn-ghost btn-sm theme-toggle focusable"
-      onClick={() => setThemePreference(nextTheme)}
-      title={t`Tema: ${current}. Cambiar a ${nextLabel}.`}
-      aria-label={t`Tema actual: ${current}. Cambiar a ${nextLabel}.`}
-    >
-      <Glyph size={18} aria-hidden="true" />
-    </button>
+    <Menu
+      align="end"
+      label={t`Tema`}
+      items={items}
+      renderTrigger={({ ref, open, props }) => (
+        <button
+          type="button"
+          ref={ref}
+          className={'btn btn-ghost btn-sm theme-toggle focusable' + (open ? ' active' : '')}
+          title={t`Tema: ${THEME_NAME[resolved]}`}
+          aria-label={t`Tema: ${THEME_NAME[resolved]}`}
+          {...props}
+        >
+          <Glyph size={18} aria-hidden="true" />
+        </button>
+      )}
+    />
   );
 };
 
-// ProfileButton — the topbar entry to "Tu perfil", set beside the theme toggle.
-// It wears the operator's initials, the same monogram the sidebar avatar uses,
-// so a person recognizes their own account at a glance. It is a plain button:
-// the layout owns the navigation, because the shell has no router.
-const ProfileButton = ({ name, email, active = false, onClick }) => {
+// ProfileButton — the account pill in the topbar, set beside the theme toggle. It
+// wears the operator's initials, the same monogram the sidebar avatar uses, so a
+// person recognizes their own account at a glance, and it carries a caret so it
+// reads as a menu, not a link. It is the trigger for `ProfileMenu`: it forwards its
+// ref and spreads the menu's click/aria props, and `open` tints it while the menu
+// is down. `active` keeps it lit while the profile screen itself is showing.
+const ProfileButton = React.forwardRef(function ProfileButton(
+  { name, email, open = false, active = false, ...rest },
+  ref,
+) {
   const { t } = useLingui();
   const initials = initialsFrom(name, email);
   return (
     <button
       type="button"
-      className={'btn btn-ghost btn-sm profile-toggle focusable' + (active ? ' active' : '')}
-      onClick={onClick}
-      title={t`Tu perfil`}
-      aria-label={t`Tu perfil`}
-      aria-current={active ? 'page' : undefined}
+      ref={ref}
+      className={
+        'btn btn-ghost btn-sm profile-toggle focusable' + (open || active ? ' active' : '')
+      }
+      title={t`Cuenta`}
+      aria-label={t`Cuenta`}
+      {...rest}
     >
       <span className="profile-toggle-avatar" aria-hidden="true">
         {initials}
       </span>
+      {name ? <span className="profile-toggle-name">{name}</span> : null}
+      <I.ChevronDown size={14} className="profile-toggle-caret" aria-hidden="true" />
     </button>
+  );
+});
+
+// ProfileMenu — the account dropdown in the topbar. The profile pill opens our
+// custom Menu with two commands: "Mi perfil" (open the profile screen) and "Cerrar
+// sesión". It folds the old standalone logout icon into this one control, so a
+// person's identity and the two things they do with it read as one place.
+const ProfileMenu = ({ name, email, active = false, onProfile, onSignOut }) => {
+  const { t } = useLingui();
+  const pillRef = React.useRef(null);
+  const [pillWidth, setPillWidth] = React.useState();
+
+  // Measure the pill at its natural (content) width, then pin it 15% longer so it
+  // reads as roomy as the menu it opens. The Menu copies the trigger's width exactly
+  // (widthFactor 1), so the button and its dropdown end up the SAME length. Re-runs
+  // when the name changes: reset to auto first so the old fixed width does not skew
+  // the measurement.
+  useIsoLayoutEffect(() => {
+    const el = pillRef.current;
+    if (!el) return;
+    el.style.width = 'auto';
+    const natural = el.getBoundingClientRect().width;
+    setPillWidth(Math.round(natural * 1.15));
+  }, [name, email]);
+
+  const items = [
+    onProfile && { key: 'profile', label: t`Mi perfil`, onSelect: onProfile },
+    onSignOut && { key: 'signout', label: t`Cerrar sesión`, onSelect: onSignOut, danger: true },
+  ].filter(Boolean);
+  return (
+    <Menu
+      align="end"
+      label={t`Cuenta`}
+      items={items}
+      widthFactor={1}
+      renderTrigger={({ ref, open, props }) => (
+        <ProfileButton
+          ref={setRefs(ref, pillRef)}
+          name={name}
+          email={email}
+          open={open}
+          active={active}
+          style={pillWidth ? { width: pillWidth } : undefined}
+          {...props}
+        />
+      )}
+    />
   );
 };
 
@@ -85,6 +171,7 @@ const SECTION_LABELS = {
 const SCREEN_TITLES = {
   overview: msg`Panorama`,
   operations: msg`Centro operativo`,
+  reportes: msg`Reportes`,
   'cash-shifts': msg`Caja y turnos`,
   'catalog-inventory': msg`Catálogo e inventario`,
   'loyalty-value': msg`Lealtad y valor`,
@@ -93,6 +180,7 @@ const SCREEN_TITLES = {
   devices: msg`Dispositivos`,
   staff: msg`Equipo y permisos`,
   customers: msg`Clientes`,
+  triage: msg`Atención`,
   members: msg`Lealtad`,
   'gift-cards': msg`Tarjetas de regalo`,
   hours: msg`Horario y disponibilidad`,
@@ -113,10 +201,11 @@ const LocaleSelect = ({ variant = 'panel' }) => {
   const { t, i18n } = useLingui();
   const topbar = variant === 'topbar';
   return (
-    <select
-      className={'select locale-select' + (topbar ? ' locale-select-topbar' : '')}
+    <Select
+      className={'select locale-select' + (topbar ? ' topbar-select' : '')}
       value={i18n.locale}
       onChange={(e) => activateLocale(e.target.value)}
+      hideCheck
       aria-label={t`Idioma`}
       title={t`Idioma`}
       style={topbar ? undefined : { width: '100%', height: 34, borderRadius: 8, fontSize: 12 }}
@@ -126,7 +215,7 @@ const LocaleSelect = ({ variant = 'panel' }) => {
           {l.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 };
 
@@ -159,17 +248,21 @@ const formatMerchantGreetingName = (merchantName, maxLength = 30) => {
 
 const Sidebar = ({
   active,
+  activeFull,
   onChange,
   collapsed,
   onToggleCollapse,
-  merchantName,
   navItems,
   merchants,
   selectedMerchantId,
   onMerchantChange,
-  onSignOut,
 }) => {
   const { t, i18n } = useLingui();
+  // Per-group open/closed override. A parent group is a pure disclosure toggle: clicking it
+  // opens or closes its nested items and never navigates — only the nested items navigate.
+  // Value `true`/`false` is an explicit user choice; `undefined` falls back to the route
+  // (a group shows open while you are inside it). This is what lets the dropdown close again.
+  const [openGroups, setOpenGroups] = React.useState({});
   const sections = [];
   let current = null;
   const items = navItems || [];
@@ -192,15 +285,9 @@ const Sidebar = ({
       </button>
 
       <div className="side-head">
-        <UmiX size={32} color="#7692CB" />
         {!collapsed && (
-          <div>
-            <div className="side-brand-name">
-              umi<em>· dash</em>
-            </div>
-            <div className="side-brand-sub">
-              <Trans>Consola del dueño</Trans>
-            </div>
+          <div className="side-brand-name">
+            umi<em>dash</em>
           </div>
         )}
       </div>
@@ -217,57 +304,73 @@ const Sidebar = ({
           )}
           {sec.items.map((item) => {
             const Ic = I[item.icon] || I.Settings;
+            const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+            // Open when explicitly toggled open; otherwise default to the route (open while
+            // you are inside the group). An explicit `false` keeps it closed even inside.
+            const expanded = hasChildren && (openGroups[item.id] ?? active === item.id);
             return (
-              <button
-                key={item.id}
-                type="button"
-                className={'side-item focusable x-active' + (active === item.id ? ' active' : '')}
-                onClick={() => onChange(item.id)}
-                aria-current={active === item.id ? 'page' : undefined}
-                title={collapsed ? i18n._(item.label) : undefined}
-              >
-                <span className="ic">
-                  <Ic />
-                </span>
-                <span className="label">{i18n._(item.label)}</span>
-                {item.badge && (
-                  <span className={'badge-side' + (item.badgeKind === 'warn' ? ' warn' : '')}>
-                    {item.badge}
+              <React.Fragment key={item.id}>
+                <button
+                  type="button"
+                  className={'side-item focusable x-active' + (active === item.id ? ' active' : '')}
+                  onClick={() => {
+                    if (hasChildren) {
+                      // A parent group is a pure dropdown: toggle its nested items open/shut
+                      // and never navigate. Only the nested items below change the screen.
+                      setOpenGroups((prev) => ({ ...prev, [item.id]: !expanded }));
+                      return;
+                    }
+                    onChange(item.id);
+                  }}
+                  aria-current={active === item.id ? 'page' : undefined}
+                  aria-expanded={hasChildren ? expanded : undefined}
+                  title={collapsed ? i18n._(item.label) : undefined}
+                >
+                  <span className="ic">
+                    <Ic />
                   </span>
-                )}
-              </button>
+                  <span className="label">{i18n._(item.label)}</span>
+                  {hasChildren && !collapsed && (
+                    <span
+                      className="ic"
+                      style={{ marginLeft: 'auto', opacity: 0.55 }}
+                      aria-hidden="true"
+                    >
+                      {expanded ? <I.ChevronDown size={14} /> : <I.ChevronRight size={14} />}
+                    </span>
+                  )}
+                  {item.badge && (
+                    <span className={'badge-side' + (item.badgeKind === 'warn' ? ' warn' : '')}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+                {expanded &&
+                  !collapsed &&
+                  item.children.map((child) => (
+                    <button
+                      key={child.id}
+                      type="button"
+                      className={
+                        'side-item side-subitem focusable x-active' +
+                        (activeFull === child.id ? ' active' : '')
+                      }
+                      onClick={() => onChange(child.id)}
+                      aria-current={activeFull === child.id ? 'page' : undefined}
+                      style={{ paddingLeft: 34, fontSize: 13 }}
+                    >
+                      <span className="label">{i18n._(child.label)}</span>
+                    </button>
+                  ))}
+              </React.Fragment>
             );
           })}
         </React.Fragment>
       ))}
 
       <div className="side-foot" style={{ flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
-          <div className="avatar">OW</div>
-          {!collapsed && (
-            <div className="uname" style={{ flex: 1 }}>
-              <div>
-                <Trans>Dueño</Trans>
-              </div>
-              <div className="sm">
-                <Trans>Admin</Trans> · {merchantName || '—'}
-              </div>
-            </div>
-          )}
-          {!collapsed && onSignOut && (
-            <button
-              className="btn-icon"
-              onClick={onSignOut}
-              aria-label={t`Cerrar sesión`}
-              title={t`Cerrar sesión`}
-              style={{ opacity: 0.6 }}
-            >
-              <I.Power size={14} />
-            </button>
-          )}
-        </div>
         {!collapsed && merchants?.length > 1 && (
-          <select
+          <Select
             className="select"
             value={selectedMerchantId || ''}
             onChange={(e) => onMerchantChange?.(e.target.value)}
@@ -279,30 +382,9 @@ const Sidebar = ({
                 {merchant.name}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
-      {!collapsed && (
-        <div style={{ paddingTop: 10, marginTop: 6, borderTop: '1px solid var(--side-line)' }}>
-          <div
-            style={{
-              fontSize: 9,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: 'var(--side-text-3)',
-              marginBottom: 6,
-            }}
-          >
-            v1.0 <XSep dark />{' '}
-            {formatDate(new Date(2026, 3, 1), { month: 'long', year: 'numeric' })}
-          </div>
-          <div className="brand-mod" aria-hidden="true">
-            {Array.from({ length: 24 }).map((_, i) => (
-              <span key={i} className={[2, 5, 8, 11, 14, 17, 20].includes(i) ? 'lit' : ''} />
-            ))}
-          </div>
-        </div>
-      )}
     </aside>
   );
 };
@@ -336,6 +418,7 @@ const Topbar = ({
   profileActive = false,
   userName,
   userEmail,
+  onSignOut,
 }) => {
   const { t, i18n } = useLingui();
   const hour = new Date().getHours();
@@ -352,6 +435,7 @@ const Topbar = ({
 
   const locationScoped = [
     'orders',
+    'reportes',
     'devices',
     'hours',
     'cash-shifts',
@@ -396,35 +480,35 @@ const Topbar = ({
             )}
           </h1>
           <div className="top-actions">
-            {onProfile ? (
-              <ProfileButton
-                name={userName}
-                email={userEmail}
-                active={profileActive}
-                onClick={onProfile}
-              />
-            ) : null}
-            <ThemeToggle />
+            <ThemeMenu />
             <LocaleSelect variant="topbar" />
-            {onMenu ? (
-              <button className="btn btn-ghost btn-sm focusable nav-toggle" onClick={onMenu}>
-                <Trans>Menú</Trans>
-              </button>
-            ) : null}
             {showLocationSelect ? (
-              <select
-                className="select"
+              <Select
+                className="select topbar-select"
                 value={selectedLocationId || ''}
                 onChange={(e) => onLocationChange?.(e.target.value)}
                 aria-label={t`Sucursal`}
-                style={{ height: 38, borderRadius: 10, minWidth: 160, fontSize: 13 }}
               >
                 {activeLocations.map((location) => (
                   <option key={location.id} value={location.id}>
                     {location.name}
                   </option>
                 ))}
-              </select>
+              </Select>
+            ) : null}
+            {onProfile || onSignOut ? (
+              <ProfileMenu
+                name={userName}
+                email={userEmail}
+                active={profileActive}
+                onProfile={onProfile}
+                onSignOut={onSignOut}
+              />
+            ) : null}
+            {onMenu ? (
+              <button className="btn btn-ghost btn-sm focusable nav-toggle" onClick={onMenu}>
+                <Trans>Menú</Trans>
+              </button>
             ) : null}
           </div>
         </div>
@@ -596,4 +680,15 @@ const HubTabs = ({ tabs, active, onChange, ariaLabel }) => {
   );
 };
 
-export { Sidebar, Topbar, RegionHead, Spark, MiniBars, XSep, HubTabs, LocaleSelect, ProfileButton };
+export {
+  Sidebar,
+  Topbar,
+  RegionHead,
+  Spark,
+  MiniBars,
+  XSep,
+  HubTabs,
+  LocaleSelect,
+  ProfileButton,
+  ProfileMenu,
+};

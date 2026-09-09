@@ -15,6 +15,7 @@ import '../core/security/keystore_device_key.dart';
 import '../core/security/tpm_backend.dart';
 import '../core/security/tpm_device_key.dart';
 import '../core/storage/storage.dart';
+import '../core/update/desktop_updater.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_repository.dart';
 import '../features/cash/cash_controller.dart';
@@ -39,6 +40,7 @@ import '../features/hardware/hardware_service.dart';
 import '../features/hardware/pilot_hardware_adapters.dart';
 import '../features/inventory/inventory_controller.dart';
 import '../features/inventory/inventory_repository.dart';
+import '../features/kitchen/kitchen_board_controller.dart';
 import '../features/kitchen/kitchen_status_repository.dart';
 import '../features/offline/connectivity_controller.dart';
 import '../features/offline/offline_checkout_service.dart';
@@ -69,12 +71,14 @@ final class AppCompositionRoot {
     required this.checkout,
     required this.sales,
     this.kitchenStatus,
+    this.kitchenBoard,
     this.customerValue,
     required this.connectivity,
     required this.offlineJournal,
     this.inventory,
     this.hardware,
     this.offlineRecovery,
+    this.updater = const NoopDesktopUpdater(),
   }) {
     if (!kIsWeb && hardware != null) {
       entry.addListener(_scheduleHardwareRelay);
@@ -263,6 +267,9 @@ final class AppCompositionRoot {
         telemetry: telemetry,
       ),
       kitchenStatus: ApiKitchenStatusRepository(apiClient),
+      kitchenBoard: KitchenBoardController(
+        ApiKitchenBoardRepository(apiClient),
+      ),
       customerValue: CustomerValueController(
         ApiCustomerValueRepository(apiClient),
       ),
@@ -327,6 +334,11 @@ final class AppCompositionRoot {
       inventory: InventoryController(ApiInventoryRepository(apiClient)),
       hardware: hardware,
       offlineRecovery: offlineRecovery,
+      updater: createDesktopUpdater(
+        owner: config.updateGithubOwner,
+        repo: config.updateGithubRepo,
+        currentVersion: config.release.version,
+      ),
     );
   }
 
@@ -348,12 +360,17 @@ final class AppCompositionRoot {
   final CheckoutController checkout;
   final SaleLifecycleController sales;
   final KitchenStatusRepository? kitchenStatus;
+  final KitchenBoardController? kitchenBoard;
   final CustomerValueController? customerValue;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
   final InventoryController? inventory;
   final HardwareService? hardware;
   final OfflineRecoveryController? offlineRecovery;
+
+  /// Desktop self-updater. A no-op unless the build runs as a Linux AppImage
+  /// with an update repo configured.
+  final DesktopUpdater updater;
   Timer? _hardwareRelayTimer;
   bool _hardwareRelayBusy = false;
 
@@ -409,6 +426,7 @@ final class AppCompositionRoot {
     cash.dispose();
     checkout.dispose();
     sales.dispose();
+    kitchenBoard?.dispose();
     customerValue?.dispose();
     connectivity.dispose();
     offlineRecovery?.dispose();

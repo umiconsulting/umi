@@ -23,7 +23,9 @@ describe('Gate 2F offline replay migration', () => {
 
   it('enables merchant RLS and device scope on replay state', () => {
     expect(sql).toContain('offline_replay_command');
-    expect(sql).toContain('merchant_id = umi.current_merchant()');
+    // Wrapped in a scalar sub-select so the STABLE resolver runs once per statement
+    // (InitPlan) and the merchant_id index is used — see 61_customer_activity rationale.
+    expect(sql).toContain('merchant_id = (select umi.current_merchant())');
     expect(sql).toContain('device_scoping');
   });
 
