@@ -197,9 +197,7 @@ function CustomersList({ selectedId }) {
             schema.table identifier (e.g. "merchant.customers") do not leak it
             into the UI — fall back to the friendly label. */}
         <span>
-          {source && !/^[a-z_]+\.[a-z_]+$/i.test(source)
-            ? source
-            : t`plataforma de clientes`}
+          {source && !/^[a-z_]+\.[a-z_]+$/i.test(source) ? source : t`plataforma de clientes`}
         </span>
       </div>
 
@@ -1200,11 +1198,7 @@ function CustomerProfile({ customerId }) {
 
       <div className="profile-body">
         {activeTab === 'overview' && (
-          <OverviewTab
-            customerId={customerId}
-            customer={customer}
-            kpis={data?.kpis}
-          />
+          <OverviewTab customerId={customerId} customer={customer} kpis={data?.kpis} />
         )}
         {activeTab === 'whatsapp' && (
           <WhatsAppPanel customerId={customerId} conversations={data?.conversations || []} />
