@@ -84,23 +84,27 @@ jobs:
 
       - name: Write build env
         run: |
-          # The deploy target branch selects the environment. A push to build-v3
-          # is the staging preview and points at the staging API; main and every
-          # per-PR preview use the production API origin. All values are public
-          # build-time config (an API origin and a version string).
+          # The deploy target branch selects the environment. Production (main)
+          # calls the API directly — it is already same-site with the dashboard.
+          # Every preview (build-v3 and per-PR) instead ships VITE_API_BASE=""
+          # so the SPA calls the API SAME-ORIGIN through public/_worker.js; that
+          # keeps the session cookie first-party, which Safari iOS ITP requires
+          # (…pages.dev and …umiconsulting.co are different sites). The preview
+          # backend is chosen at runtime by the Pages "Preview" env var
+          # API_ORIGIN. All values here are public build-time config.
           BRANCH="${{ github.head_ref || github.ref_name }}"
-          if [ "$BRANCH" = "build-v3" ]; then
-            ENVIRONMENT=staging
-            API_BASE=https://api-staging.umiconsulting.co
-            PUBLIC_URL=https://build-v3.umi-dashboard.pages.dev
-            CONTRACT_VERSION=2.18.0
-          else
+          if [ "$BRANCH" = "main" ]; then
             ENVIRONMENT=production
             API_BASE=https://api.umiconsulting.co
             PUBLIC_URL=https://dashboard.umiconsulting.co
             CONTRACT_VERSION=2.13.0
+          else
+            ENVIRONMENT=staging
+            API_BASE=
+            PUBLIC_URL=https://build-v3.umi-dashboard.pages.dev
+            CONTRACT_VERSION=2.18.0
           fi
-          echo "Build env: branch=$BRANCH environment=$ENVIRONMENT api=$API_BASE"
+          echo "Build env: branch=$BRANCH environment=$ENVIRONMENT api=${API_BASE:-(same-origin)}"
           cat > apps/umi-dashboard/.env.production.local <<EOF
           VITE_UMI_ENVIRONMENT=$ENVIRONMENT
           VITE_AUTH_MODE=cookie
