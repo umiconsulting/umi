@@ -192,7 +192,12 @@ function CustomersList({ selectedId }) {
             <Plural value={customers.length} one="# cliente" other="# clientes" />
           )}
         </span>
-        <span>{source || t`plataforma de clientes`}</span>
+        {/* `source` is a human label; when the API hands back a raw
+            schema.table identifier (e.g. "merchant.customers") do not leak it
+            into the UI — fall back to the friendly label. */}
+        <span>
+          {source && !/^[a-z_]+\.[a-z_]+$/i.test(source) ? source : t`plataforma de clientes`}
+        </span>
       </div>
 
       {error && (

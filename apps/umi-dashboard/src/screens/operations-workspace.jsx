@@ -2451,7 +2451,7 @@ export function DomainWorkspace({ domain }) {
                   <Trans>Permiso: {selected?.requiredPermissions?.join(t` o `) || '—'}</Trans>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
                 {domain === 'catalog' && (
                   <button
                     className="btn btn-secondary"
