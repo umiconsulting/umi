@@ -462,6 +462,21 @@ const Topbar = ({
     <header className="topbar">
       <div className="masthead">
         <div className="masthead-row">
+          {/* The drawer trigger. It is the FIRST child so CSS can put it hard left
+              on a phone with the action cluster pushed right. It is icon-only, so
+              the accessible name is explicit — a bare hamburger announces nothing.
+              It reuses the already-extracted `Menú` msgid: a new string would need
+              `lingui extract` plus an English translation, and `compile --strict`
+              runs in the build. */}
+          {onMenu ? (
+            <button
+              className="btn btn-icon focusable nav-toggle"
+              onClick={onMenu}
+              aria-label={t`Menú`}
+            >
+              <I.Menu size={18} />
+            </button>
+          ) : null}
           <h1 className="h-page">
             {screen === 'overview' ? (
               <>
@@ -504,11 +519,6 @@ const Topbar = ({
                 onProfile={onProfile}
                 onSignOut={onSignOut}
               />
-            ) : null}
-            {onMenu ? (
-              <button className="btn btn-ghost btn-sm focusable nav-toggle" onClick={onMenu}>
-                <Trans>Menú</Trans>
-              </button>
             ) : null}
           </div>
         </div>
