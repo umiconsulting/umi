@@ -273,6 +273,21 @@ table th {
   white-space: nowrap;
 }
 
+/* The one scroll region in the rail. The brand head and account foot sit outside
+   it and stay put; the nav grows to fill the space between them and scrolls on its
+   own when the menu is taller than the panel — with touch momentum, and overscroll
+   contained so a swipe past the end does not drag the page behind the drawer. */
+.side-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .side-section {
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -280,14 +295,19 @@ table th {
   color: var(--side-text-3);
   padding: 14px 12px 6px;
   white-space: nowrap;
+  /* A child of the scrolling `.side-nav` flex column: never let it shrink, or a
+     long menu squeezes every row instead of scrolling. */
+  flex-shrink: 0;
 }
 .side-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 40px;
-  padding: 0 12px;
+  height: 44px;
+  padding: 0 14px;
   border-radius: 10px;
+  /* Hold full height inside the scrolling nav — see `.side-section`. */
+  flex-shrink: 0;
   color: var(--side-text-2);
   font-size: 14px;
   font-weight: 500;
@@ -345,7 +365,12 @@ table th {
 }
 
 .side-foot {
+  /* Pinned to the foot of the rail: it sits outside the scrolling `.side-nav`, so
+     the café switcher and account stay in place while the menu scrolls above them.
+     `margin-top: auto` is the fallback for when the nav is shorter than the panel;
+     `flex-shrink: 0` stops a tall menu from squeezing it. */
   margin-top: auto;
+  flex-shrink: 0;
   padding-top: 14px;
   border-top: 1px solid var(--side-line);
   display: flex;
@@ -2763,7 +2788,7 @@ time,
 }
 .customer-head-stats span {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   height: 30px;
   padding: 0 12px;
@@ -2950,6 +2975,25 @@ time,
 .customer-profile {
   padding: 0;
   overflow: hidden;
+}
+/* Back chevron for the narrow-screen master-detail view; the media query below
+   reveals it and swaps the list out for the profile. */
+.profile-back {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 13px 16px;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.profile-back:hover {
+  color: var(--ink-1);
 }
 .profile-head {
   display: flex;
@@ -3325,16 +3369,29 @@ time,
     padding: 18px 14px 36px;
     gap: 18px;
   }
-  .topbar {
-    align-items: flex-start;
-  }
   .greet .hello {
     font-size: 26px;
   }
+  /* The phone masthead is two rows. Row 1 carries the controls: the drawer button
+     hard left, the action cluster hard right. Row 2 is the title, full width — a
+     greeting and four controls do not share 390px. The order lives here, not in
+     the markup, so the title keeps its place in the reading order. */
+  .masthead-row {
+    align-items: center;
+  }
+  .nav-toggle {
+    order: 1;
+  }
   .top-actions {
-    width: 100%;
+    order: 2;
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
     overflow-x: auto;
-    justify-content: flex-start;
+  }
+  .masthead-row .h-page {
+    order: 3;
+    flex-basis: 100%;
   }
   .ed-head {
     align-items: flex-start;
@@ -3344,6 +3401,26 @@ time,
   .customers-layout,
   .profile-split {
     grid-template-columns: 1fr;
+  }
+  /* Master-detail: one pane at a time. With no customer chosen only the list
+     shows; once one is open the profile takes its place and the back chevron
+     returns to the list — no more scrolling past the list to a stacked panel. */
+  .customers-layout:not(.has-selection) .customer-profile {
+    display: none;
+  }
+  .customers-layout.has-selection .customers-list {
+    display: none;
+  }
+  .profile-back {
+    display: inline-flex;
+  }
+  .customer-profile.placeholder .profile-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .customer-profile.placeholder {
+    position: relative;
   }
   .customer-list-scroll {
     max-height: none;
@@ -3357,6 +3434,11 @@ time,
   }
   .profile-head {
     flex-direction: column;
+  }
+  /* Scoped past the account screen's global `.profile-head { align-items: center }`
+     (defined later in this file), which otherwise centers the stacked title card. */
+  .customer-profile .profile-head {
+    align-items: flex-start;
   }
   .profile-actions {
     justify-content: flex-start;
@@ -3869,10 +3951,9 @@ time,
     transform: translateX(-100%);
     transition: transform var(--dur-2) var(--ease-out);
     box-shadow: var(--shadow-pop);
-    /* The base rule is `overflow: hidden`, which would clip the nav below the fold
-       on a short screen. The drawer scrolls inside itself instead. */
-    overflow-x: hidden;
-    overflow-y: auto;
+    /* The panel itself clips; `.side-nav` inside it is the scroll region, so the
+       brand and account foot stay pinned while a long menu scrolls between them. */
+    overflow: hidden;
   }
   .app.nav-open .side {
     transform: translateX(0);
@@ -3884,8 +3965,21 @@ time,
     z-index: 55;
     background: rgba(19, 31, 68, 0.34);
   }
+  /* The drawer trigger now sits OUTSIDE .top-actions, so it does not inherit the
+     cluster's 32px ghost treatment. State it here: same size and weight as the
+     controls beside it, so the topbar still reads as one row of controls. */
   .nav-toggle {
     display: inline-flex;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-2);
+  }
+  .nav-toggle:hover {
+    background: var(--canvas-2);
+    color: var(--ink-1);
   }
   /* `collapsed` is the desktop icon rail. It has no meaning in the drawer, and the
      base `.app.collapsed` rule would otherwise hide every label in it — collapse the
@@ -3904,7 +3998,32 @@ time,
     display: none;
   }
   .main {
-    padding: 20px 20px 48px;
+    /* No top padding: the space above the masthead lives on `.topbar` instead, so
+       it reads the same at rest and when the bar is pinned to the top of the screen. */
+    padding: 0 20px 48px;
+    /* The window is the scroll container on this layout, but the base rule sets
+       `overflow: hidden`, which makes `.main` its own (never-scrolling) scroll
+       container — a sticky child would pin to `.main` and scroll away with it.
+       Relax the vertical axis to `visible` so the topbar can pin to the window;
+       keep the horizontal axis clipped so the page still never scrolls sideways. */
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+  /* The masthead follows the operator down the page: on a phone the whole shell is
+     one long scroll, and losing the café name, branch, connection dot and clock at
+     the first swipe is exactly when they are wanted. It bleeds to the pane edges so
+     the hairline reads edge-to-edge, and sits under the drawer (z 60) and its scrim
+     (z 55) so an open menu still covers it. */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    padding-top: 20px;
+    padding-bottom: 12px;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--line);
   }
   /* A table is the one thing that legitimately exceeds the pane. Its own card
      carries the scroll, so the page never inherits one. `:has` is supported by
@@ -3929,7 +4048,13 @@ time,
 
 @media (max-width: 720px) {
   .main {
-    padding: 16px 14px 40px;
+    padding: 0 14px 40px;
+  }
+  /* Match the sticky masthead's full-bleed and top space to the tighter phone gutter. */
+  .topbar {
+    margin-inline: -14px;
+    padding-inline: 14px;
+    padding-top: 16px;
   }
   .masthead-row {
     align-items: flex-start;
@@ -4311,4 +4436,45 @@ time,
 }
 .triage-row:hover {
   background: var(--canvas);
+}
+
+/* ---------------------------------------------------------------------------
+   Phone overflow guards (≤640px).
+
+   On a phone several screens laid content wider than the viewport and it was
+   CLIPPED (not scrollable) by `.main { overflow: hidden }`: a `.fade-up`
+   content wrapper that some screens make an inline grid sized its single track
+   to max-content, and nested flex wrappers (`.ed-head`, its `.actions`, the
+   `.hub-tabs`/`.seg` control strips) default to `min-width: auto`, so they
+   refused to shrink to the column and ran off the right edge — the drawer
+   button, the "Registrar" action, the role filter and the hub tabs all ended
+   up unreachable. These rules let those wrappers shrink to the phone column;
+   the control strips then scroll or wrap, and wide data tables keep the
+   horizontal scroll they already get from the ≤1080px rule.
+   --------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  /* A content wrapper that a screen turned into a grid must track the column,
+     not its widest child (overrides the inline grid-template on the element). */
+  .fade-up {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  /* Let the wrapper chain shrink instead of growing to content width. */
+  .fade-up > *,
+  .ed-head,
+  .ed-head > * {
+    min-width: 0;
+  }
+  /* Region header actions wrap under the title and never exceed the column. */
+  .ed-head .actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    max-width: 100%;
+  }
+  /* Segmented controls and hub tabs stay on the phone and scroll/wrap. */
+  .seg,
+  .hub-tabs {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }

@@ -33,6 +33,16 @@ const I = {
       <path d="M9 21V9" />
     </Icon>
   ),
+  // The drawer trigger. Three rules — the mark every operator already reads as
+  // "open the navigation". The button that wears it is icon-only, so it carries
+  // its own accessible name (see the Topbar).
+  Menu: (p) => (
+    <Icon {...p}>
+      <path d="M3 6h18" />
+      <path d="M3 12h18" />
+      <path d="M3 18h18" />
+    </Icon>
+  ),
   Users: (p) => (
     <Icon {...p}>
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />

@@ -193,7 +193,14 @@ function CustomersList({ selectedId }) {
             <Plural value={customers.length} one="# cliente" other="# clientes" />
           )}
         </span>
-        <span>{source || t`plataforma de clientes`}</span>
+        {/* `source` is a human label; when the API hands back a raw
+            schema.table identifier (e.g. "merchant.customers") do not leak it
+            into the UI — fall back to the friendly label. */}
+        <span>
+          {source && !/^[a-z_]+\.[a-z_]+$/i.test(source)
+            ? source
+            : t`plataforma de clientes`}
+        </span>
       </div>
 
       {error && (
@@ -1062,10 +1069,22 @@ function EmptyState({ icon, title, detail }) {
 
 function CustomerProfile({ customerId }) {
   const { t, i18n } = useLingui();
+  const [params] = useSearchParams();
   const [tab, setTab] = useState('overview');
   const [refresh, setRefresh] = useState(0);
   const { data, loading, error } = useCustomerDetail(customerId, refresh);
   const customer = data?.customer;
+
+  // Keep the active search/filter so the back chevron returns to the same list.
+  // The chevron only shows on narrow screens, where the profile replaces the
+  // list inside `customers-layout` instead of stacking below it.
+  const backTo = '/customers' + (params.toString() ? '?' + params.toString() : '');
+  const backBar = (
+    <Link className="profile-back focusable" to={backTo} aria-label={t`Volver a la lista`}>
+      <I.ChevronLeft size={16} />
+      <Trans>Clientes</Trans>
+    </Link>
+  );
 
   if (!customerId) {
     return (
@@ -1087,6 +1106,7 @@ function CustomerProfile({ customerId }) {
   if (loading) {
     return (
       <section className="customer-profile placeholder">
+        {backBar}
         <span className="pulse" />
         <strong>
           <Trans>Cargando cliente</Trans>
@@ -1098,6 +1118,7 @@ function CustomerProfile({ customerId }) {
   if (error || !customer) {
     return (
       <section className="customer-profile placeholder danger-state">
+        {backBar}
         <I.AlertTriangle size={30} />
         <strong>
           <Trans>Cliente no encontrado</Trans>
@@ -1114,6 +1135,7 @@ function CustomerProfile({ customerId }) {
 
   return (
     <section className="customer-profile">
+      {backBar}
       <header className="profile-head">
         <div className="profile-title">
           <span className="avatar-lg customer-avatar large">{initials(customer.displayName)}</span>
@@ -1130,6 +1152,9 @@ function CustomerProfile({ customerId }) {
           <span className={'badge ' + statusBadge(customer.status)}>
             {customer.status || t`activo`}
           </span>
+          {data?.kpis?.segment && SEGMENT_LABEL[data.kpis.segment] && (
+            <SegmentBadge segment={data.kpis.segment} />
+          )}
           {customer.dataQuality?.needsReview && (
             <span className="badge badge-trial">
               <Trans>Revisión</Trans>
@@ -1234,7 +1259,7 @@ export default function CustomersScreen() {
         </div>
       </div>
 
-      <div className="customers-layout">
+      <div className={'customers-layout' + (customerId ? ' has-selection' : '')}>
         <CustomersList selectedId={customerId} />
         <CustomerProfile customerId={customerId} />
       </div>
