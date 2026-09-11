@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 import { HAS_PLATFORM_GRANT, PLATFORM_GRANT_CTE } from '../auth/rbac.sql';
+import type { SegmentThresholdsDto } from './dto/update-settings.dto';
 
 export interface MerchantSummary {
   id: string;
@@ -292,22 +293,46 @@ export class MerchantsRepository {
     brandColor: string | null;
     secondaryColor: string | null;
     businessDayStart: string | null;
+    segmentThresholds: Record<string, unknown>;
   }> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<{
         brandColor: string | null;
         secondaryColor: string | null;
         businessDayStart: string | null;
+        segmentThresholds: Record<string, unknown> | null;
       }>(
         `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor",
-                business_day_start::text AS "businessDayStart"
+                business_day_start::text AS "businessDayStart",
+                segment_thresholds AS "segmentThresholds"
          FROM merchant.merchant
          WHERE id = $1::uuid
          LIMIT 1`,
         [merchantId],
       ),
     );
-    return rows[0] ?? { brandColor: null, secondaryColor: null, businessDayStart: null };
+    const row = rows[0];
+    return {
+      brandColor: row?.brandColor ?? null,
+      secondaryColor: row?.secondaryColor ?? null,
+      businessDayStart: row?.businessDayStart ?? null,
+      segmentThresholds: row?.segmentThresholds ?? {},
+    };
+  }
+
+  /**
+   * Just the owner-tuned segment cutoffs (jsonb), for the Customer-360 KPI path.
+   * Empty object when unset — the caller merges it over the code defaults.
+   */
+  async loadSegmentThresholds(merchantId: string): Promise<Record<string, unknown>> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ segmentThresholds: Record<string, unknown> | null }>(
+        `SELECT segment_thresholds AS "segmentThresholds"
+         FROM merchant.merchant WHERE id = $1::uuid LIMIT 1`,
+        [merchantId],
+      ),
+    );
+    return rows[0]?.segmentThresholds ?? {};
   }
 
   /** Locations with the (merchant) timezone, oldest first (merchant-neutral, deterministic). */
@@ -490,7 +515,12 @@ export class MerchantsRepository {
 
   async updateMerchantSettings(
     merchantId: string,
-    patch: { name?: string; timezone?: string; businessDayStart?: string },
+    patch: {
+      name?: string;
+      timezone?: string;
+      businessDayStart?: string;
+      segmentThresholds?: SegmentThresholdsDto;
+    },
   ): Promise<void> {
     await this.pg.withMerchant((c) =>
       c.query(
@@ -498,9 +528,16 @@ export class MerchantsRepository {
          SET name = COALESCE($2, name),
              timezone = COALESCE($3, timezone),
              business_day_start = COALESCE($4::time, business_day_start),
+             segment_thresholds = COALESCE($5::jsonb, segment_thresholds),
              updated_at = now()
          WHERE id = $1::uuid`,
-        [merchantId, patch.name ?? null, patch.timezone ?? null, patch.businessDayStart ?? null],
+        [
+          merchantId,
+          patch.name ?? null,
+          patch.timezone ?? null,
+          patch.businessDayStart ?? null,
+          patch.segmentThresholds ? JSON.stringify(patch.segmentThresholds) : null,
+        ],
       ),
     );
   }

@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { MerchantAccess } from '../auth/auth.types';
+import { SEGMENT_THRESHOLDS } from '../customers/customer-kpis';
+import type { UpdateSettingsDto } from './dto/update-settings.dto';
 import {
   MerchantsRepository,
   type LocationRow,
@@ -25,6 +27,8 @@ export interface Capabilities {
     secondaryColor: string | null;
     /** Trading-day rollover hour, `HH:MM:SS` (merchant.business_day_start). */
     businessDayStart: string | null;
+    /** Owner-tuned customer-segment cutoffs (merchant.segment_thresholds); {} when unset. */
+    segmentThresholds: Record<string, unknown>;
   };
   selectedLocation: LocationRow | null;
   locations: LocationRow[];
@@ -126,6 +130,7 @@ export class MerchantsService {
         brandColor: branding.brandColor,
         secondaryColor: branding.secondaryColor,
         businessDayStart: branding.businessDayStart,
+        segmentThresholds: branding.segmentThresholds,
       },
       selectedLocation,
       locations,
@@ -156,15 +161,18 @@ export class MerchantsService {
       secondaryColor: capabilities.merchant.secondaryColor ?? '#E8C9A3',
       // The trading-day rollover hour as HH:MM for a time input; default local midnight.
       businessDayStart: (capabilities.merchant.businessDayStart ?? '00:00:00').slice(0, 5),
+      // Effective segment cutoffs = code defaults merged with the owner's overrides, so
+      // the settings screen shows real numbers even when nothing has been stored yet.
+      segmentThresholds: {
+        ...SEGMENT_THRESHOLDS,
+        ...(capabilities.merchant.segmentThresholds ?? {}),
+      },
       products: capabilities.products,
       locations: capabilities.locations,
     };
   }
 
-  async updateSettings(
-    merchantId: string,
-    patch: { name?: string; timezone?: string; businessDayStart?: string },
-  ): Promise<void> {
+  async updateSettings(merchantId: string, patch: UpdateSettingsDto): Promise<void> {
     await this.repo.updateMerchantSettings(merchantId, patch);
   }
 

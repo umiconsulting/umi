@@ -292,81 +292,88 @@ const Sidebar = ({
         )}
       </div>
 
-      {sections.map((sec) => (
-        <React.Fragment key={sec.name}>
-          {/* No `0{si+1} /`. The groups are not a sequence — Configuración does not
+      {/* Only the nav list scrolls: the brand stays pinned at the top and the
+          account foot at the bottom, so a long menu on a short phone never buries
+          them. `.side` clips; this is the one scroll region. */}
+      <nav className="side-nav">
+        {sections.map((sec) => (
+          <React.Fragment key={sec.name}>
+            {/* No `0{si+1} /`. The groups are not a sequence — Configuración does not
               follow Crecimiento, and reordering the nav would not renumber
               anything. The number was there to look considered. */}
-          {!collapsed && (
-            <div className="side-section">
-              {SECTION_LABELS[sec.name] ? i18n._(SECTION_LABELS[sec.name]) : sec.name}
-            </div>
-          )}
-          {sec.items.map((item) => {
-            const Ic = I[item.icon] || I.Settings;
-            const hasChildren = Array.isArray(item.children) && item.children.length > 0;
-            // Open when explicitly toggled open; otherwise default to the route (open while
-            // you are inside the group). An explicit `false` keeps it closed even inside.
-            const expanded = hasChildren && (openGroups[item.id] ?? active === item.id);
-            return (
-              <React.Fragment key={item.id}>
-                <button
-                  type="button"
-                  className={'side-item focusable x-active' + (active === item.id ? ' active' : '')}
-                  onClick={() => {
-                    if (hasChildren) {
-                      // A parent group is a pure dropdown: toggle its nested items open/shut
-                      // and never navigate. Only the nested items below change the screen.
-                      setOpenGroups((prev) => ({ ...prev, [item.id]: !expanded }));
-                      return;
+            {!collapsed && (
+              <div className="side-section">
+                {SECTION_LABELS[sec.name] ? i18n._(SECTION_LABELS[sec.name]) : sec.name}
+              </div>
+            )}
+            {sec.items.map((item) => {
+              const Ic = I[item.icon] || I.Settings;
+              const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+              // Open when explicitly toggled open; otherwise default to the route (open while
+              // you are inside the group). An explicit `false` keeps it closed even inside.
+              const expanded = hasChildren && (openGroups[item.id] ?? active === item.id);
+              return (
+                <React.Fragment key={item.id}>
+                  <button
+                    type="button"
+                    className={
+                      'side-item focusable x-active' + (active === item.id ? ' active' : '')
                     }
-                    onChange(item.id);
-                  }}
-                  aria-current={active === item.id ? 'page' : undefined}
-                  aria-expanded={hasChildren ? expanded : undefined}
-                  title={collapsed ? i18n._(item.label) : undefined}
-                >
-                  <span className="ic">
-                    <Ic />
-                  </span>
-                  <span className="label">{i18n._(item.label)}</span>
-                  {hasChildren && !collapsed && (
-                    <span
-                      className="ic"
-                      style={{ marginLeft: 'auto', opacity: 0.55 }}
-                      aria-hidden="true"
-                    >
-                      {expanded ? <I.ChevronDown size={14} /> : <I.ChevronRight size={14} />}
-                    </span>
-                  )}
-                  {item.badge && (
-                    <span className={'badge-side' + (item.badgeKind === 'warn' ? ' warn' : '')}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-                {expanded &&
-                  !collapsed &&
-                  item.children.map((child) => (
-                    <button
-                      key={child.id}
-                      type="button"
-                      className={
-                        'side-item side-subitem focusable x-active' +
-                        (activeFull === child.id ? ' active' : '')
+                    onClick={() => {
+                      if (hasChildren) {
+                        // A parent group is a pure dropdown: toggle its nested items open/shut
+                        // and never navigate. Only the nested items below change the screen.
+                        setOpenGroups((prev) => ({ ...prev, [item.id]: !expanded }));
+                        return;
                       }
-                      onClick={() => onChange(child.id)}
-                      aria-current={activeFull === child.id ? 'page' : undefined}
-                      style={{ paddingLeft: 34, fontSize: 13 }}
-                    >
-                      <span className="label">{i18n._(child.label)}</span>
-                    </button>
-                  ))}
-              </React.Fragment>
-            );
-          })}
-        </React.Fragment>
-      ))}
+                      onChange(item.id);
+                    }}
+                    aria-current={active === item.id ? 'page' : undefined}
+                    aria-expanded={hasChildren ? expanded : undefined}
+                    title={collapsed ? i18n._(item.label) : undefined}
+                  >
+                    <span className="ic">
+                      <Ic />
+                    </span>
+                    <span className="label">{i18n._(item.label)}</span>
+                    {hasChildren && !collapsed && (
+                      <span
+                        className="ic"
+                        style={{ marginLeft: 'auto', opacity: 0.55 }}
+                        aria-hidden="true"
+                      >
+                        {expanded ? <I.ChevronDown size={14} /> : <I.ChevronRight size={14} />}
+                      </span>
+                    )}
+                    {item.badge && (
+                      <span className={'badge-side' + (item.badgeKind === 'warn' ? ' warn' : '')}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                  {expanded &&
+                    !collapsed &&
+                    item.children.map((child) => (
+                      <button
+                        key={child.id}
+                        type="button"
+                        className={
+                          'side-item side-subitem focusable x-active' +
+                          (activeFull === child.id ? ' active' : '')
+                        }
+                        onClick={() => onChange(child.id)}
+                        aria-current={activeFull === child.id ? 'page' : undefined}
+                        style={{ paddingLeft: 34, fontSize: 13 }}
+                      >
+                        <span className="label">{i18n._(child.label)}</span>
+                      </button>
+                    ))}
+                </React.Fragment>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </nav>
 
       <div className="side-foot" style={{ flexDirection: 'column', gap: 8 }}>
         {!collapsed && merchants?.length > 1 && (

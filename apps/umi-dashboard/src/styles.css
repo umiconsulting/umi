@@ -273,6 +273,21 @@ table th {
   white-space: nowrap;
 }
 
+/* The one scroll region in the rail. The brand head and account foot sit outside
+   it and stay put; the nav grows to fill the space between them and scrolls on its
+   own when the menu is taller than the panel — with touch momentum, and overscroll
+   contained so a swipe past the end does not drag the page behind the drawer. */
+.side-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 .side-section {
   font-size: 10px;
   letter-spacing: 0.18em;
@@ -280,14 +295,19 @@ table th {
   color: var(--side-text-3);
   padding: 14px 12px 6px;
   white-space: nowrap;
+  /* A child of the scrolling `.side-nav` flex column: never let it shrink, or a
+     long menu squeezes every row instead of scrolling. */
+  flex-shrink: 0;
 }
 .side-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 40px;
-  padding: 0 12px;
+  height: 44px;
+  padding: 0 14px;
   border-radius: 10px;
+  /* Hold full height inside the scrolling nav — see `.side-section`. */
+  flex-shrink: 0;
   color: var(--side-text-2);
   font-size: 14px;
   font-weight: 500;
@@ -345,7 +365,12 @@ table th {
 }
 
 .side-foot {
+  /* Pinned to the foot of the rail: it sits outside the scrolling `.side-nav`, so
+     the café switcher and account stay in place while the menu scrolls above them.
+     `margin-top: auto` is the fallback for when the nav is shorter than the panel;
+     `flex-shrink: 0` stops a tall menu from squeezing it. */
   margin-top: auto;
+  flex-shrink: 0;
   padding-top: 14px;
   border-top: 1px solid var(--side-line);
   display: flex;
@@ -2763,7 +2788,7 @@ time,
 }
 .customer-head-stats span {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   height: 30px;
   padding: 0 12px;
@@ -2951,6 +2976,25 @@ time,
   padding: 0;
   overflow: hidden;
 }
+/* Back chevron for the narrow-screen master-detail view; the media query below
+   reveals it and swaps the list out for the profile. */
+.profile-back {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 13px 16px;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.profile-back:hover {
+  color: var(--ink-1);
+}
 .profile-head {
   display: flex;
   align-items: flex-start;
@@ -3085,6 +3129,138 @@ time,
   font-style: normal;
   margin-top: 3px;
 }
+
+/* ── Customer Overview: AI portrait + KPI tiles ─────────────────────────────── */
+.customer-metrics.hero {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.customer-metrics.secondary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.customer-metrics.secondary .customer-metric {
+  padding: 12px;
+}
+.customer-metrics.secondary .customer-metric strong {
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.2;
+}
+@media (max-width: 900px) {
+  .customer-metrics.hero,
+  .customer-metrics.secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.customer-portrait {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--canvas);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.portrait-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.portrait-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--info-soft);
+  color: var(--umi-navy);
+  flex: 0 0 30px;
+}
+.portrait-titles {
+  flex: 1;
+  min-width: 0;
+}
+.portrait-titles strong {
+  display: block;
+  font-size: 13.5px;
+}
+.portrait-titles small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+.portrait-body {
+  margin: 0;
+  color: var(--ink-1);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.portrait-body.muted {
+  color: var(--ink-3);
+}
+.portrait-body.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.portrait-body.loading .line {
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--line-soft) 25%, var(--line) 37%, var(--line-soft) 63%);
+  background-size: 400% 100%;
+  animation: portrait-shimmer 1.4s ease infinite;
+}
+.portrait-body.loading .line.short {
+  width: 55%;
+}
+@keyframes portrait-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.segment-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.segment-badge.seg-vip {
+  background: var(--info-soft);
+  color: var(--umi-navy);
+}
+.segment-badge.seg-regular {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.segment-badge.seg-new {
+  background: var(--canvas-2);
+  color: var(--ink-2);
+}
+.segment-badge.seg-risk {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.segment-badge.seg-lapsed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.segment-badge.seg-prospect {
+  background: var(--canvas-2);
+  color: var(--ink-3);
+}
+
 .customer-timeline,
 .profile-stack,
 .insight-list {
@@ -3226,6 +3402,26 @@ time,
   .profile-split {
     grid-template-columns: 1fr;
   }
+  /* Master-detail: one pane at a time. With no customer chosen only the list
+     shows; once one is open the profile takes its place and the back chevron
+     returns to the list — no more scrolling past the list to a stacked panel. */
+  .customers-layout:not(.has-selection) .customer-profile {
+    display: none;
+  }
+  .customers-layout.has-selection .customers-list {
+    display: none;
+  }
+  .profile-back {
+    display: inline-flex;
+  }
+  .customer-profile.placeholder .profile-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .customer-profile.placeholder {
+    position: relative;
+  }
   .customer-list-scroll {
     max-height: none;
     min-height: 260px;
@@ -3238,6 +3434,11 @@ time,
   }
   .profile-head {
     flex-direction: column;
+  }
+  /* Scoped past the account screen's global `.profile-head { align-items: center }`
+     (defined later in this file), which otherwise centers the stacked title card. */
+  .customer-profile .profile-head {
+    align-items: flex-start;
   }
   .profile-actions {
     justify-content: flex-start;
@@ -3750,10 +3951,9 @@ time,
     transform: translateX(-100%);
     transition: transform var(--dur-2) var(--ease-out);
     box-shadow: var(--shadow-pop);
-    /* The base rule is `overflow: hidden`, which would clip the nav below the fold
-       on a short screen. The drawer scrolls inside itself instead. */
-    overflow-x: hidden;
-    overflow-y: auto;
+    /* The panel itself clips; `.side-nav` inside it is the scroll region, so the
+       brand and account foot stay pinned while a long menu scrolls between them. */
+    overflow: hidden;
   }
   .app.nav-open .side {
     transform: translateX(0);
@@ -3798,7 +3998,32 @@ time,
     display: none;
   }
   .main {
-    padding: 20px 20px 48px;
+    /* No top padding: the space above the masthead lives on `.topbar` instead, so
+       it reads the same at rest and when the bar is pinned to the top of the screen. */
+    padding: 0 20px 48px;
+    /* The window is the scroll container on this layout, but the base rule sets
+       `overflow: hidden`, which makes `.main` its own (never-scrolling) scroll
+       container — a sticky child would pin to `.main` and scroll away with it.
+       Relax the vertical axis to `visible` so the topbar can pin to the window;
+       keep the horizontal axis clipped so the page still never scrolls sideways. */
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+  /* The masthead follows the operator down the page: on a phone the whole shell is
+     one long scroll, and losing the café name, branch, connection dot and clock at
+     the first swipe is exactly when they are wanted. It bleeds to the pane edges so
+     the hairline reads edge-to-edge, and sits under the drawer (z 60) and its scrim
+     (z 55) so an open menu still covers it. */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    padding-top: 20px;
+    padding-bottom: 12px;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--line);
   }
   /* A table is the one thing that legitimately exceeds the pane. Its own card
      carries the scroll, so the page never inherits one. `:has` is supported by
@@ -3823,7 +4048,13 @@ time,
 
 @media (max-width: 720px) {
   .main {
-    padding: 16px 14px 40px;
+    padding: 0 14px 40px;
+  }
+  /* Match the sticky masthead's full-bleed and top space to the tighter phone gutter. */
+  .topbar {
+    margin-inline: -14px;
+    padding-inline: 14px;
+    padding-top: 16px;
   }
   .masthead-row {
     align-items: flex-start;

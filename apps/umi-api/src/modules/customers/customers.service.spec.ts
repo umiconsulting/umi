@@ -11,9 +11,18 @@ function make() {
     identity: vi.fn(),
     messages: vi.fn(),
     triage: vi.fn(),
+    kpis: vi.fn(),
+    factsFor: vi.fn(),
+    conversationSummaries: vi.fn(),
   };
-  const merchants = { loadProducts: vi.fn() };
-  return { svc: new CustomersService(repo as never, merchants as never), repo, merchants };
+  const merchants = { loadProducts: vi.fn(), loadSegmentThresholds: vi.fn().mockResolvedValue({}) };
+  const anthropic = { createCompletion: vi.fn() };
+  return {
+    svc: new CustomersService(repo as never, merchants as never, anthropic as never),
+    repo,
+    merchants,
+    anthropic,
+  };
 }
 
 const PRODUCTS = {
@@ -165,6 +174,194 @@ describe('CustomersService.messages', () => {
       },
       31,
     );
+  });
+});
+
+describe('CustomersService.kpis → kpisDto', () => {
+  const CID = '00000000-0000-4000-8000-000000000010';
+
+  it('derives average ticket, frequency, segment, channel mix and the money rates', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 6,
+        visit_days: 6,
+        total_spend_cents: 60_000,
+        gross_cents: 66_000,
+        discount_cents: 6_000,
+        first_order_at: new Date(Date.now() - 120 * 86_400_000),
+        last_order_at: new Date(Date.now() - 5 * 86_400_000),
+        dine_in_orders: 4,
+        pickup_orders: 2,
+        delivery_orders: 0,
+        unspecified_orders: 0,
+        tip_total_cents: 3_000,
+        tipped_receipts: 3,
+        refunded_orders: 1,
+      },
+      favorites: [{ name: 'Latte', units: 10, times_ordered: 8 }],
+      category: { category: 'Café', units: 12 },
+      daypart: { daypart_bucket: 1, dow_local: 2 },
+    });
+
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.spend.avgTicketCents).toBe(10_000); // 60000 / 6
+    expect(kpi.frequencyPerMonth).toBe(1.5); // 6 visits over ~4 months
+    expect(kpi.segment).toBe('regular'); // 6 visits, last seen 5d ago → current
+    expect(kpi.channelMix.dominant).toBe('dine_in');
+    expect(kpi.refunds.rate).toBeCloseTo(1 / 6, 5);
+    expect(kpi.discounts.rate).toBeCloseTo(6_000 / 66_000, 5);
+    expect(kpi.tips.attributed).toBe(true);
+    expect(kpi.tips.avgWhenTippedCents).toBe(1_000); // 3000 / 3
+    expect(kpi.favorites[0].name).toBe('Latte');
+    expect(kpi.topCategory?.name).toBe('Café');
+    expect(kpi.daypart).toEqual({ bucket: 1, dow: 2 });
+  });
+
+  it('handles a buyer-less customer without dividing by zero', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: { orders_count: 0, visit_days: 0, total_spend_cents: 0, gross_cents: 0 },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.segment).toBe('prospect');
+    expect(kpi.spend.avgTicketCents).toBe(0);
+    expect(kpi.refunds.rate).toBe(0);
+    expect(kpi.discounts.rate).toBe(0);
+    expect(kpi.channelMix.dominant).toBeNull();
+    expect(kpi.tips.attributed).toBe(false);
+  });
+
+  it('reports the dominant channel as unspecified when most orders lack a fulfillment type', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 33,
+        visit_days: 13,
+        total_spend_cents: 372_600,
+        gross_cents: 372_600,
+        first_order_at: new Date(Date.now() - 180 * 86_400_000),
+        last_order_at: new Date(Date.now() - 2 * 86_400_000),
+        dine_in_orders: 1,
+        pickup_orders: 0,
+        delivery_orders: 0,
+        unspecified_orders: 32,
+      },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.channelMix.dominant).toBe('unspecified'); // not "dine_in" at 3%
+  });
+
+  it('applies owner-configured thresholds (an override flips regular → VIP)', async () => {
+    const h = make();
+    // Lower the VIP floors below this customer's 6 visits / $600 lifetime.
+    h.merchants.loadSegmentThresholds.mockResolvedValue({
+      vipMinVisits: 5,
+      vipMinSpendCents: 50_000,
+    });
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 6,
+        visit_days: 6,
+        total_spend_cents: 60_000,
+        gross_cents: 66_000,
+        first_order_at: new Date(Date.now() - 120 * 86_400_000),
+        last_order_at: new Date(Date.now() - 5 * 86_400_000),
+      },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.segment).toBe('vip'); // would be 'regular' under the default $1k / 8-visit floors
+  });
+});
+
+describe('CustomersService.describe (AI portrait)', () => {
+  const CID = '00000000-0000-4000-8000-000000000011';
+
+  const withOrders = () => ({
+    agg: {
+      orders_count: 4,
+      visit_days: 4,
+      total_spend_cents: 40_000,
+      gross_cents: 40_000,
+      first_order_at: new Date(Date.now() - 60 * 86_400_000),
+      last_order_at: new Date(Date.now() - 3 * 86_400_000),
+    },
+    favorites: [{ name: 'Latte', units: 6, times_ordered: 4 }],
+    category: null,
+    daypart: { daypart_bucket: 1, dow_local: 2 },
+  });
+
+  it('returns null without touching the repo for a non-uuid id', async () => {
+    const h = make();
+    const r = await h.svc.describe('t1', 'nope');
+    expect(r).toEqual({ description: null, generated: false, segment: null });
+    expect(h.repo.kpis).not.toHaveBeenCalled();
+  });
+
+  it('skips the model when there is nothing to describe', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: { orders_count: 0 },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    h.repo.factsFor.mockResolvedValue([]);
+    h.repo.conversationSummaries.mockResolvedValue([]);
+
+    const r = await h.svc.describe('t1', CID);
+    expect(r.description).toBeNull();
+    expect(r.generated).toBe(false);
+    expect(r.segment).toBe('prospect');
+    expect(h.anthropic.createCompletion).not.toHaveBeenCalled();
+  });
+
+  it('synthesises a portrait and caches it (no second model call for the same inputs)', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue(withOrders());
+    h.repo.factsFor.mockResolvedValue([
+      { source: 'preferences', key: 'typical_order', value: 'Latte grande' },
+    ]);
+    h.repo.conversationSummaries.mockResolvedValue([{ summary: 'Preguntó por el menú.' }]);
+    h.anthropic.createCompletion.mockResolvedValue({
+      text: '  Cliente frecuente de mañanas. Casi siempre pide un latte.  ',
+    });
+
+    const first = await h.svc.describe('t1', CID);
+    expect(first.generated).toBe(true);
+    expect(first.description).toBe('Cliente frecuente de mañanas. Casi siempre pide un latte.');
+    expect(h.anthropic.createCompletion).toHaveBeenCalledTimes(1);
+    // The model gets the facts + summaries in the user payload.
+    const payload = h.anthropic.createCompletion.mock.calls[0][0].userMessage as string;
+    expect(payload).toContain('typical_order');
+    expect(payload).toContain('Preguntó por el menú.');
+
+    const second = await h.svc.describe('t1', CID);
+    expect(second.description).toBe(first.description);
+    expect(second.generated).toBe(false); // served from cache
+    expect(h.anthropic.createCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('degrades to null when the model is unavailable (e.g. no API key)', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue(withOrders());
+    h.repo.factsFor.mockResolvedValue([]);
+    h.repo.conversationSummaries.mockResolvedValue([]);
+    h.anthropic.createCompletion.mockResolvedValue(null);
+
+    const r = await h.svc.describe('t1', CID);
+    expect(r.description).toBeNull();
+    expect(r.generated).toBe(false);
+    expect(r.segment).toBe('regular');
   });
 });
 
