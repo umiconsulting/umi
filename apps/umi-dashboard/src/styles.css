@@ -3193,16 +3193,29 @@ time,
     padding: 18px 14px 36px;
     gap: 18px;
   }
-  .topbar {
-    align-items: flex-start;
-  }
   .greet .hello {
     font-size: 26px;
   }
+  /* The phone masthead is two rows. Row 1 carries the controls: the drawer button
+     hard left, the action cluster hard right. Row 2 is the title, full width — a
+     greeting and four controls do not share 390px. The order lives here, not in
+     the markup, so the title keeps its place in the reading order. */
+  .masthead-row {
+    align-items: center;
+  }
+  .nav-toggle {
+    order: 1;
+  }
   .top-actions {
-    width: 100%;
+    order: 2;
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
     overflow-x: auto;
-    justify-content: flex-start;
+  }
+  .masthead-row .h-page {
+    order: 3;
+    flex-basis: 100%;
   }
   .ed-head {
     align-items: flex-start;
@@ -3752,8 +3765,21 @@ time,
     z-index: 55;
     background: rgba(19, 31, 68, 0.34);
   }
+  /* The drawer trigger now sits OUTSIDE .top-actions, so it does not inherit the
+     cluster's 32px ghost treatment. State it here: same size and weight as the
+     controls beside it, so the topbar still reads as one row of controls. */
   .nav-toggle {
     display: inline-flex;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-2);
+  }
+  .nav-toggle:hover {
+    background: var(--canvas-2);
+    color: var(--ink-1);
   }
   /* `collapsed` is the desktop icon rail. It has no meaning in the drawer, and the
      base `.app.collapsed` rule would otherwise hide every label in it — collapse the
