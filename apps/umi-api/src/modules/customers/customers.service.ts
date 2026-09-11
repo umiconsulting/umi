@@ -319,7 +319,8 @@ export class CustomersService {
 
     const tipTotalCents = Number(agg.tip_total_cents || 0);
     const tippedReceipts = Number(agg.tipped_receipts || 0);
-    const avgTipWhenTippedCents = tippedReceipts > 0 ? Math.round(tipTotalCents / tippedReceipts) : 0;
+    const avgTipWhenTippedCents =
+      tippedReceipts > 0 ? Math.round(tipTotalCents / tippedReceipts) : 0;
 
     const refundedOrders = Number(agg.refunded_orders || 0);
     const refundRate = orders > 0 ? refundedOrders / orders : 0;

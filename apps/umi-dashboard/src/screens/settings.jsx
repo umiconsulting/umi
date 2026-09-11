@@ -415,8 +415,8 @@ const SettingsScreen = () => {
               </span>
               <div style={{ fontSize: 12, color: 'var(--ink-3)', margin: '2px 0 10px' }}>
                 <Trans>
-                  Define cuándo un cliente es Frecuente, VIP, En riesgo o Inactivo. Se usa en
-                  el resumen del cliente. Deja los valores por defecto si no estás seguro.
+                  Define cuándo un cliente es Frecuente, VIP, En riesgo o Inactivo. Se usa en el
+                  resumen del cliente. Deja los valores por defecto si no estás seguro.
                 </Trans>
               </div>
               <div

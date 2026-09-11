@@ -66,7 +66,11 @@ export function classifyCustomerSegment(
       : recencyDays > thresholds.activeWindowDays);
 
   if (visits >= thresholds.atRiskMinVisits && overdue) return 'at_risk';
-  if (isCurrent && visits >= thresholds.vipMinVisits && totalSpendCents >= thresholds.vipMinSpendCents)
+  if (
+    isCurrent &&
+    visits >= thresholds.vipMinVisits &&
+    totalSpendCents >= thresholds.vipMinSpendCents
+  )
     return 'vip';
   if (isCurrent && visits >= thresholds.regularMinVisits) return 'regular';
   return 'new';
