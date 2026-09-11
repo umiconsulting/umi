@@ -3183,33 +3183,12 @@ time,
   .app {
     grid-template-columns: 1fr;
   }
-  .side {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    min-height: 0;
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-    padding: 10px;
-    overflow-x: auto;
-  }
-  .side-head,
-  .side-section,
-  .side-foot,
-  .collapse-btn {
-    display: none !important;
-  }
-  .side-item {
-    flex: 0 0 auto;
-    height: 36px;
-    padding: 0 10px;
-    border-radius: 9px;
-    width: auto;
-  }
-  .side-item .label {
-    font-size: 12.5px;
-  }
+  /* The sidebar is NOT laid out in this block. Below 1080 it leaves the grid and
+     becomes a drawer — see the NARROW block at the end of this file. A
+     `flex-direction: row` strip used to live here, and both queries match a phone:
+     the drawer rule overrode `position` only, so the drawer's own items inherited
+     `row` + `overflow-x: auto` and ran sideways inside the 268px panel. The panel
+     has one owner now. */
   .main {
     padding: 18px 14px 36px;
     gap: 18px;
@@ -3758,6 +3737,10 @@ time,
     transform: translateX(-100%);
     transition: transform var(--dur-2) var(--ease-out);
     box-shadow: var(--shadow-pop);
+    /* The base rule is `overflow: hidden`, which would clip the nav below the fold
+       on a short screen. The drawer scrolls inside itself instead. */
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .app.nav-open .side {
     transform: translateX(0);
@@ -3771,6 +3754,22 @@ time,
   }
   .nav-toggle {
     display: inline-flex;
+  }
+  /* `collapsed` is the desktop icon rail. It has no meaning in the drawer, and the
+     base `.app.collapsed` rule would otherwise hide every label in it — collapse the
+     rail on a laptop, resize, and the drawer opens unreadable. */
+  .app.collapsed .side-item .label,
+  .app.collapsed .side-item .badge-side,
+  .app.collapsed .side-brand-name,
+  .app.collapsed .side-brand-sub,
+  .app.collapsed .side-section,
+  .app.collapsed .side-foot .uname {
+    display: revert;
+  }
+  /* Desktop-only affordance: it toggles the icon rail, which the drawer does not
+     use. The scrim closes the drawer on a touch screen. */
+  .collapse-btn {
+    display: none;
   }
   .main {
     padding: 20px 20px 48px;
