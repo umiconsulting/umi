@@ -5,9 +5,15 @@
 # Cloudflare on the real domain until the `dashboard` CNAME is cut over in
 # Squarespace DNS — so this workflow is safe to land before the cutover.
 #
-#   push to main   -> production deployment  (umi-dashboard.pages.dev, then the
-#                     custom domain once the CNAME points here)
-#   pull_request   -> preview deployment     (<branch>.umi-dashboard.pages.dev)
+#   push to main     -> production deployment  (umi-dashboard.pages.dev, then the
+#                       custom domain once the CNAME points here)
+#   push to build-v3 -> staging preview        (build-v3.umi-dashboard.pages.dev,
+#                       built against api-staging.umiconsulting.co)
+#   pull_request     -> preview deployment     (<branch>.umi-dashboard.pages.dev)
+#
+# NOTE: GitHub runs the copy of this workflow that lives ON the pushed branch, so
+# the `build-v3` trigger below only takes effect once this file is merged INTO
+# build-v3 — not from main alone.
 #
 # The dashboard is a static Vite SPA. Every config value is a VITE_* variable
 # baked in AT BUILD TIME — there are no runtime server secrets. The only secret
@@ -25,7 +31,7 @@ name: deploy dashboard (cloudflare pages)
 
 on:
   push:
-    branches: [main]
+    branches: [main, build-v3]
     paths:
       - 'apps/umi-dashboard/**'
       - 'packages/tokens/**'
@@ -78,13 +84,30 @@ jobs:
 
       - name: Write build env
         run: |
+          # The deploy target branch selects the environment. A push to build-v3
+          # is the staging preview and points at the staging API; main and every
+          # per-PR preview use the production API origin. All values are public
+          # build-time config (an API origin and a version string).
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [ "$BRANCH" = "build-v3" ]; then
+            ENVIRONMENT=staging
+            API_BASE=https://api-staging.umiconsulting.co
+            PUBLIC_URL=https://build-v3.umi-dashboard.pages.dev
+            CONTRACT_VERSION=2.18.0
+          else
+            ENVIRONMENT=production
+            API_BASE=https://api.umiconsulting.co
+            PUBLIC_URL=https://dashboard.umiconsulting.co
+            CONTRACT_VERSION=2.13.0
+          fi
+          echo "Build env: branch=$BRANCH environment=$ENVIRONMENT api=$API_BASE"
           cat > apps/umi-dashboard/.env.production.local <<EOF
-          VITE_UMI_ENVIRONMENT=production
+          VITE_UMI_ENVIRONMENT=$ENVIRONMENT
           VITE_AUTH_MODE=cookie
-          VITE_API_BASE=https://api.umiconsulting.co
-          VITE_PUBLIC_URL=https://dashboard.umiconsulting.co
+          VITE_API_BASE=$API_BASE
+          VITE_PUBLIC_URL=$PUBLIC_URL
           VITE_BUSINESS_SLUG=elgranribera
-          VITE_CONTRACT_VERSION=2.13.0
+          VITE_CONTRACT_VERSION=$CONTRACT_VERSION
           VITE_CONFIG_SCHEMA_VERSION=1
           VITE_RELEASE_VERSION=${{ github.ref_name }}
           VITE_RELEASE_GIT_COMMIT=${{ github.sha }}
