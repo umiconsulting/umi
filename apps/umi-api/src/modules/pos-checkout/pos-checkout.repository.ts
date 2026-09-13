@@ -36,6 +36,11 @@ export interface CheckoutCart {
   locationName: string;
   operatorName: string;
   customerId: string | null;
+  // Channel attribution (ADR 2026-09-13-pos-channel-attribution). The upstream commercial
+  // order this cart settles and its channel — null for a plain counter sale (walk_in).
+  // Copied onto pos_committed_sale at commit as a frozen fact.
+  originOrderId: string | null;
+  originChannel: string | null;
   lines: CheckoutLine[];
 }
 
@@ -569,7 +574,8 @@ export class PosCheckoutRepository {
               c.operator_session_id::text AS "operatorSessionId",c.version,
               c.business_date::text AS "businessDate",b.name AS "merchantName",
               br.name AS "locationName",$6::text AS "operatorName",
-              c.customer_id::text AS "customerId"
+              c.customer_id::text AS "customerId",
+              c.origin_order_id::text AS "originOrderId",c.origin_channel AS "originChannel"
        FROM merchant.pos_cart c
        JOIN merchant.merchant b ON b.id=c.merchant_id
        JOIN merchant.location br ON br.id=c.location_id
@@ -1165,8 +1171,8 @@ export class PosCheckoutRepository {
     const sale = await client.query<{ id: string; committedAt: string }>(
       `INSERT INTO merchant.pos_committed_sale
          (merchant_id,location_id,cart_id,order_id,payment_attempt_id,
-          receipt_snapshot_id,totals_fingerprint,cash_shift_id)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid)
+          receipt_snapshot_id,totals_fingerprint,cash_shift_id,origin_order_id,origin_channel)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid,$9::uuid,$10)
        RETURNING id::text,committed_at::text AS "committedAt"`,
       [
         cart.merchantId,
@@ -1177,8 +1183,29 @@ export class PosCheckoutRepository {
         receiptRow.rows[0].id,
         confirmation.fingerprint,
         cashShiftId,
+        cart.originOrderId,
+        cart.originChannel,
       ],
     );
+    // Link, don't merge (ADR 2026-09-13): when this sale settles an upstream commercial
+    // order (e.g. a WhatsApp order), close that order — the status row and the append-only
+    // spine event together (ORDER_MODEL section 1). Guarded to non-terminal orders so a POS
+    // sale never reopens or re-fires a completed/canceled one.
+    if (cart.originOrderId) {
+      const advanced = await client.query(
+        `UPDATE merchant.customer_order
+            SET status='completed',updated_at=now()
+          WHERE id=$1::uuid AND merchant_id=$2::uuid
+            AND status IN ('placed','preparing','ready')`,
+        [cart.originOrderId, cart.merchantId],
+      );
+      if ((advanced.rowCount ?? 0) > 0) {
+        await client.query(
+          `INSERT INTO merchant.order_event (order_id,status) VALUES ($1::uuid,'completed')`,
+          [cart.originOrderId],
+        );
+      }
+    }
     if (cashShiftId && cashTenders[0]) {
       const cash = cashTenders[0];
       const shift = await client.query<{ sequence: string; registerId: string }>(
