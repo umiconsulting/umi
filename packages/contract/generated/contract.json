@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "56ab73be7d1202eeccc5909f693f443325d823c32189d5f8914c83a6abf508fd",
-  "contractVersion": "2.18.0",
+  "contentHash": "c9b48dde91c44e660a3e8115200a6a770a6fa8863e384ed2248f1a7c54678ab3",
+  "contractVersion": "2.19.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
