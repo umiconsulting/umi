@@ -21,48 +21,68 @@ const COLORS = {
   label: '#f1f5f9',
 };
 
-function PlanElement({ element, selected, disabled, onSelect, onChange, snap, area }) {
+function PlanElement({
+  element,
+  selected,
+  disabled,
+  interacting,
+  onInteractionStart,
+  onInteractionEnd,
+  onSelect,
+  onChange,
+  snap,
+  area,
+}) {
   const ref = useRef();
   const transform = useRef();
   useEffect(() => {
     if (selected && !disabled && transform.current) transform.current.nodes([ref.current]);
   }, [selected, disabled]);
+  const commit = (next) => {
+    const fitted = fitElement(next, area, snap);
+    const accepted = onChange(fitted);
+    const position = accepted ? fitted : element;
+    // Reconcile even when snapping produces the existing document coordinates.
+    ref.current.setAttrs({
+      x: position.x,
+      y: position.y,
+      rotation: position.rotation,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    onInteractionEnd(element.id);
+  };
   const endTransform = () => {
     const node = ref.current;
     let width = Math.max(8, Math.round(element.width * node.scaleX()));
     let height = Math.max(8, Math.round(element.height * node.scaleY()));
     if (element.shape !== 'rectangle') height = width = Math.max(width, height);
-    node.scaleX(1);
-    node.scaleY(1);
-    onChange(
-      fitElement(
-        {
-          ...element,
-          width,
-          height,
-          x: node.x(),
-          y: node.y(),
-          rotation: ((Math.round(node.rotation()) % 360) + 360) % 360,
-        },
-        area,
-        snap,
-      ),
-    );
+    commit({
+      ...element,
+      width,
+      height,
+      x: node.x(),
+      y: node.y(),
+      rotation: ((Math.round(node.rotation()) % 360) + 360) % 360,
+    });
   };
   return (
     <>
       <Group
+        _useStrictMode={!interacting}
         ref={ref}
         id={element.id}
         x={element.x}
         y={element.y}
         rotation={element.rotation}
+        scaleX={1}
+        scaleY={1}
         draggable={!disabled}
         onClick={onSelect}
         onTap={onSelect}
-        onDragEnd={(event) =>
-          onChange(fitElement({ ...element, x: event.target.x(), y: event.target.y() }, area, snap))
-        }
+        onDragStart={() => onInteractionStart(element.id)}
+        onDragEnd={() => commit({ ...element, x: ref.current.x(), y: ref.current.y() })}
+        onTransformStart={() => onInteractionStart(element.id)}
         onTransformEnd={endTransform}
       >
         {element.shape === 'round' ? (
@@ -131,6 +151,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [interactionId, setInteractionId] = useState(null);
   const [preview, setPreview] = useState(false);
   const [snap, setSnap] = useState(true);
   const [zoom, setZoom] = useState(1);
@@ -140,6 +161,9 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const recoveryKey = `umi:floor-plan:${merchantId}:${locationId}`;
   const alive = useRef(true);
   const canvas = useRef(null);
+  const interaction = useRef(null);
+  const saveTimer = useRef(null);
+  const saving = useRef(false);
 
   const document = preview ? remote?.published : history.present;
   const area = document?.areas.find((item) => item.id === selectedArea) ?? document?.areas[0];
@@ -150,6 +174,18 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const elementCount =
     history.present?.areas.reduce((count, item) => count + item.elements.length, 0) ?? 0;
   const disabled = preview || busy || !!pendingCommand || error === 'conflict';
+  const controlsDisabled = disabled || interactionId !== null;
+
+  const startInteraction = (id) => {
+    interaction.current = id;
+    clearTimeout(saveTimer.current);
+    setInteractionId(id);
+  };
+  const endInteraction = (id) => {
+    if (interaction.current !== id) return;
+    interaction.current = null;
+    setInteractionId(null);
+  };
 
   useEffect(() => {
     alive.current = true;
@@ -220,7 +256,8 @@ export function FloorPlanEditor({ merchantId, locationId }) {
 
   const submit = useCallback(
     async (publish = false) => {
-      if (busy) return;
+      if (saving.current || interaction.current !== null) return;
+      if (publish && !pendingCommand && (disabled || dirty || !valid || !remote?.draft)) return;
       const command = pendingCommand ?? {
         publish,
         payload: {
@@ -230,6 +267,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           ...(publish ? {} : { document: history.present }),
         },
       };
+      saving.current = true;
       setPendingCommand(command);
       setBusy(true);
       setError(null);
@@ -245,20 +283,22 @@ export function FloorPlanEditor({ merchantId, locationId }) {
       } catch (failure) {
         if (alive.current) setError(failure.status === 409 ? 'conflict' : 'save');
       } finally {
+        saving.current = false;
         if (alive.current) setBusy(false);
       }
     },
-    [busy, pendingCommand, locationId, remote, history.present, merchantId],
+    [pendingCommand, locationId, remote, history.present, merchantId, disabled, dirty, valid],
   );
 
   useEffect(() => {
-    if (!dirty || !valid || busy || error || pendingCommand || preview) return;
-    const timer = setTimeout(() => submit(false), 900);
-    return () => clearTimeout(timer);
-  }, [dirty, valid, serialized, busy, error, preview, pendingCommand, submit]);
+    if (!dirty || !valid || busy || error || pendingCommand || preview || interactionId !== null)
+      return;
+    saveTimer.current = setTimeout(() => submit(false), 900);
+    return () => clearTimeout(saveTimer.current);
+  }, [dirty, valid, serialized, busy, error, preview, pendingCommand, submit, interactionId]);
 
   const editArea = (patch) => {
-    if (disabled) return;
+    if (disabled || saving.current) return false;
     dispatch({
       type: 'edit',
       document: {
@@ -268,9 +308,10 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         ),
       },
     });
+    return true;
   };
   const editElement = (next) => {
-    editArea({ elements: area.elements.map((item) => (item.id === next.id ? next : item)) });
+    return editArea({ elements: area.elements.map((item) => (item.id === next.id ? next : item)) });
   };
   const add = (kind, shape = 'rectangle') => {
     const size =
@@ -298,7 +339,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
     setSelected(next.id);
   };
   const keyboard = (event) => {
-    if (disabled || !element || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
+    if (controlsDisabled || !element || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
     const offsets = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (!offsets[event.key]) return;
     event.preventDefault();
@@ -347,7 +388,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           </span>
           <button
             className="btn"
-            disabled={busy || !!pendingCommand || !remote.published}
+            disabled={busy || !!pendingCommand || interactionId !== null || !remote.published}
             onClick={() => {
               setPreview(!preview);
               setSelected(null);
@@ -358,7 +399,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           <button
             className="btn btn-primary"
             disabled={
-              disabled ||
+              controlsDisabled ||
               dirty ||
               !valid ||
               !remote.draft ||
@@ -405,6 +446,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         <label>
           <Trans>Área</Trans>
           <select
+            disabled={interactionId !== null}
             value={area?.id ?? ''}
             onChange={(event) => {
               setSelectedArea(event.target.value);
@@ -420,7 +462,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </label>
         <button
           className="btn"
-          disabled={disabled || history.present.areas.length >= 20}
+          disabled={controlsDisabled || history.present.areas.length >= 20}
           onClick={() => {
             const next = createLayout(`${t`Área`} ${history.present.areas.length + 1}`).areas[0];
             dispatch({
@@ -435,14 +477,14 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </button>
         <button
           className="btn"
-          disabled={disabled || !history.past.length}
+          disabled={controlsDisabled || !history.past.length}
           onClick={() => dispatch({ type: 'undo' })}
         >
           <Trans>Deshacer</Trans>
         </button>
         <button
           className="btn"
-          disabled={disabled || !history.future.length}
+          disabled={controlsDisabled || !history.future.length}
           onClick={() => dispatch({ type: 'redo' })}
         >
           <Trans>Rehacer</Trans>
@@ -450,6 +492,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         <label className="fp-check">
           <input
             type="checkbox"
+            disabled={controlsDisabled}
             checked={snap}
             onChange={(event) => setSnap(event.target.checked)}
           />
@@ -457,7 +500,11 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </label>
         <label>
           <Trans>Zoom</Trans>
-          <select value={zoom} onChange={(event) => setZoom(Number(event.target.value))}>
+          <select
+            disabled={interactionId !== null}
+            value={zoom}
+            onChange={(event) => setZoom(Number(event.target.value))}
+          >
             {[0.5, 1, 1.5, 2].map((value) => (
               <option key={value} value={value}>
                 {value * 100}%
@@ -472,7 +519,9 @@ export function FloorPlanEditor({ merchantId, locationId }) {
             <Trans>Elementos</Trans>
           </h3>
           <fieldset
-            disabled={disabled || !area || area.elements.length >= 500 || elementCount >= 1000}
+            disabled={
+              controlsDisabled || !area || area.elements.length >= 500 || elementCount >= 1000
+            }
           >
             <button className="btn" onClick={() => add('table', 'round')}>
               <span aria-hidden="true">◯</span>
@@ -508,6 +557,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
                 key={item.id}
                 className={'btn' + (selected === item.id ? ' active' : '')}
                 aria-pressed={selected === item.id}
+                disabled={interactionId !== null}
                 onClick={() => setSelected(item.id)}
               >
                 {item.label}
@@ -562,7 +612,10 @@ export function FloorPlanEditor({ merchantId, locationId }) {
                     key={item.id}
                     element={item}
                     selected={selected === item.id}
-                    disabled={disabled}
+                    disabled={disabled || (interactionId !== null && interactionId !== item.id)}
+                    interacting={interactionId === item.id}
+                    onInteractionStart={startInteraction}
+                    onInteractionEnd={endInteraction}
                     onSelect={() => setSelected(item.id)}
                     onChange={editElement}
                     snap={snap}
@@ -575,7 +628,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </div>
         <aside className="card fp-properties">
           <h3>{element ? t`Propiedades` : t`Área`}</h3>
-          <fieldset disabled={disabled || !area}>
+          <fieldset disabled={controlsDisabled || !area}>
             <label>
               <Trans>Nombre</Trans>
               <input
