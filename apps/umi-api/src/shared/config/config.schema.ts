@@ -235,7 +235,9 @@ export const configSchema = z
     // (e.g. a "flash" model) is a config change, not a code change.
     DEEPSEEK_API_KEY: z.string().optional(),
     DEEPSEEK_BASE_URL: z.string().url().default('https://api.deepseek.com'),
-    DEEPSEEK_MODEL: z.string().default('deepseek-chat'),
+    // `deepseek-flash` = DeepSeek V4.1 Flash (the current first-party id, released
+    // 2026-09-10). The old `deepseek-chat`/`deepseek-reasoner` names are legacy.
+    DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
     VOYAGE_API_KEY: z.string().optional(),
     TWILIO_ACCOUNT_SID: z.string().optional(),
     TWILIO_AUTH_TOKEN: z.string().optional(),
