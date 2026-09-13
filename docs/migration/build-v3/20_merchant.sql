@@ -1865,6 +1865,12 @@ create table merchant.pos_cart (
   -- Server-derived, never client-supplied: a café's day ends at 04:00, not midnight,
   -- and a till whose clock drifted must not be able to move a sale into yesterday.
   business_date date not null,
+  -- Channel attribution (ADR 2026-09-13-pos-channel-attribution). Which upstream commercial
+  -- order / channel this cart is settling. Null = a plain counter sale (walk_in). origin_order_id
+  -- is set when the till picks up an incoming order; origin_channel mirrors that order's source.
+  -- Copied onto pos_committed_sale at commit so reports read a frozen fact, not the live cart.
+  origin_order_id uuid references merchant.customer_order(id),
+  origin_channel  text check (origin_channel in ('walk_in','whatsapp','web','aggregator')),
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
   -- The (merchant_id, location_id) composite FK is added by the sweep at the end of this
@@ -1995,6 +2001,13 @@ create table merchant.pos_committed_sale (
   payment_attempt_id uuid not null references merchant.pos_payment_attempt(id) on delete restrict,
   receipt_snapshot_id uuid not null references merchant.receipt_snapshot(id) on delete restrict,
   totals_fingerprint text not null check (totals_fingerprint ~ '^[a-f0-9]{64}$'),
+  -- Channel attribution FROZEN at commit (ADR 2026-09-13-pos-channel-attribution). order_id is
+  -- this sale's own POS-minted order (source='pos'); origin_order_id links the upstream commercial
+  -- order it settled (e.g. a WhatsApp order) under "link, don't merge". origin_channel is that
+  -- order's source stamped here, so Reportes groups revenue by a frozen fact and never re-reads the
+  -- live order. Null origin_channel = a plain counter sale; the report coalesces it to 'walk_in'.
+  origin_order_id uuid references merchant.customer_order(id) on delete restrict,
+  origin_channel  text check (origin_channel in ('walk_in','whatsapp','web','aggregator')),
   committed_at  timestamptz not null default now(),
   unique (cart_id), unique (order_id), unique (payment_attempt_id), unique (receipt_snapshot_id)
 );

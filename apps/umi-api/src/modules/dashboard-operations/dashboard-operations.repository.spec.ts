@@ -93,3 +93,56 @@ describe('DashboardOperationsRepository', () => {
     expect(result[0].correlationId).toHaveLength(160);
   });
 });
+
+describe('DashboardOperationsRepository.salesSummary — channel attribution', () => {
+  // The channel wedge reads FROZEN money-truth (receipt_snapshot.grand_total) and groups by
+  // the origin_channel denormalized onto the committed sale at checkout — never the mutable
+  // order_total (a working/owed quote). See docs/architecture/2026-09-13-pos-channel-attribution-adr.md.
+  function makeSales(channelRows: unknown[]) {
+    const query = vi.fn((sql: string) => {
+      if (/origin_channel/.test(sql)) return Promise.resolve({ rows: channelRows });
+      if (/m\.timezone/.test(sql))
+        return Promise.resolve({
+          rows: [{ timezone: 'America/Mexico_City', currency: 'MXN', today: '2026-09-13' }],
+        });
+      return Promise.resolve({ rows: [] });
+    });
+    const pg = {
+      runWithMerchant: vi.fn(
+        (_m: string, _u: string, op: (c: { query: typeof query }) => unknown) => op({ query }),
+      ),
+    };
+    return { repository: new DashboardOperationsRepository(pg as never), pg, query };
+  }
+
+  it('attributes committed revenue by the frozen origin_channel, defaulting to walk_in', async () => {
+    const fixture = makeSales([
+      { channel: 'whatsapp', net: '50000', orders: '3' },
+      { channel: 'walk_in', net: '78700', orders: '10' },
+    ]);
+
+    const summary = await fixture.repository.salesSummary(
+      '00000000-0000-4000-8000-000000000003',
+      '1860305f-e864-d745-29e6-fb8830926cc6',
+      { range: 'last_7_days', locationId: undefined },
+      null,
+    );
+
+    expect(fixture.pg.runWithMerchant).toHaveBeenCalled();
+
+    const channelCall = fixture.query.mock.calls.find(([sql]) => /origin_channel/.test(sql));
+    expect(channelCall).toBeDefined();
+    const sql = channelCall![0];
+    // Frozen money-truth, never the working/owed total (ORDER_MODEL §4).
+    expect(sql).toContain('r.grand_total');
+    expect(sql).not.toContain('order_total');
+    expect(sql).toContain("coalesce(s.origin_channel,'walk_in')");
+    expect(sql).toMatch(/GROUP BY/i);
+
+    // channelMix reconciles to the same committed-sale set the top-line net sums.
+    expect(summary.channelMix).toEqual([
+      { channel: 'whatsapp', netSalesMinorUnits: 50000, orders: 3 },
+      { channel: 'walk_in', netSalesMinorUnits: 78700, orders: 10 },
+    ]);
+  });
+});
