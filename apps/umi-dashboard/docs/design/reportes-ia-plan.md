@@ -100,8 +100,13 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
 
 - AI Spanish narrative on Ventas (clone `describe()`; DeepSeek). ~2–4 days.
 - Channel row (POS · WhatsApp · Delivery) on Ventas — the wedge made visible.
-  _Prerequisite:_ clean per-order channel tagging (today WhatsApp orders have
-  `location_id = NULL`, no channel).
+  **✅ SHIPPED 2026-09-13** (PR #166, branch `feat/pos-channel-attribution`). Scoping
+  CHANGED: the fix is UPSTREAM, not a reporting query — the POS now links the committed
+  sale to the incoming order (`origin_order_id` / `origin_channel`, frozen on
+  `pos_committed_sale`), so `channelMix` reads a frozen channel. The Ventas row is held
+  behind an honest "coming" state until the POS incoming-orders surface flows real
+  channels. See [ADR 2026-09-13-pos-channel-attribution](../../../../docs/architecture/2026-09-13-pos-channel-attribution-adr.md).
+  _The old "clean per-order channel tagging" prerequisite was superseded — see §7.4._
 - Compare-to-prior control + data-freshness labels across existing reports.
 - Fix the WhatsApp/delivery attribution data quality (the gate for everything).
 
@@ -135,10 +140,19 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
    Spanish AI summary _carries_ the wedge rather than competing as a bare assistant.
    Differentiate vs. Fudo on native conversational commerce + Customer 360; lead the
    less-crowded delivery-consolidation angle where Umi already has Rappi data.
-4. **Data quality → yes, enforced.** Clean per-order channel/attribution tagging is a
-   **blocking Phase 1 prerequisite**. Today WhatsApp orders carry `location_id = NULL`
-   and no channel tag; the fix (ingestion + backfill) gates the channel row and the
-   wedge — nothing channel-split ships until tagging is trustworthy.
+   **Status 2026-09-13:** the channel ROW + its data shipped (PR #166); the "carried
+   _through_ the narrative" half is pending — it waits for Phase 1 (AI narrative) to
+   reach the integration branch, then `channelMix` feeds the summary.
+4. **Data quality → yes, enforced. MECHANISM REVISED 2026-09-13.** The blocker is real,
+   but the fix is NOT "ingestion + backfill of channel tags". A dig showed the POS mints
+   its own `source='pos'` order at checkout and never links the WhatsApp order it settles,
+   and WhatsApp orders capture no money (`payment` is POS-only) — so backfilling tags
+   cannot attribute POS revenue to WhatsApp. The adopted fix links the sale to its origin
+   order AT CHECKOUT (`origin_order_id` / `origin_channel`, frozen on `pos_committed_sale`);
+   revenue stays frozen (`receipt_snapshot`) and honest, and nothing channel-split reaches
+   owners until real channels flow. Full order-unification stays deferred and is
+   forward-compatible with this seam. See
+   [ADR 2026-09-13-pos-channel-attribution](../../../../docs/architecture/2026-09-13-pos-channel-attribution-adr.md).
 5. **Cost gate → DeepSeek.** The narrative runs on `LLM_PROVIDER=deepseek`
    (Phase 1 shipped, OpenAI-compatible adapter at the `LLM_COMPLETION` choke point),
    behind the existing fingerprint 6h cache + fail-safe null so per-café cost stays
