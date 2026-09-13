@@ -35,6 +35,15 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   String? _context;
   bool _list = false;
   bool _active = true;
+  bool _returningToEntry = false;
+
+  bool get _hasOperatorContext {
+    final state = widget.entry.state;
+    return state.phase == EntryPhase.ready &&
+        state.selectedTenant != null &&
+        state.selectedBranch != null &&
+        state.operator != null;
+  }
 
   @override
   void initState() {
@@ -65,16 +74,30 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final merchant = state.selectedTenant?.id;
     final location = state.selectedBranch?.id;
     final operator = state.operator?.id;
-    if (merchant == null || location == null || operator == null) {
+    if (!_hasOperatorContext ||
+        merchant == null ||
+        location == null ||
+        operator == null) {
       if (_context != null) {
         _context = null;
         widget.controller.clear();
       }
+      if (!_returningToEntry) {
+        _returningToEntry = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _returningToEntry = false;
+          if (!_hasOperatorContext) {
+            // Close the map and any table dialog above the guarded entry screen.
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          }
+        });
+      }
       return;
     }
-    final context = '$merchant:$location:$operator';
-    if (_context != context) {
-      _context = context;
+    final scope = '$merchant:$location:$operator';
+    if (_context != scope) {
+      _context = scope;
       _areaId = null;
     }
     unawaited(
@@ -98,6 +121,18 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   @override
   Widget build(BuildContext context) {
     final es = Localizations.localeOf(context).languageCode == 'es';
+    if (!_hasOperatorContext) {
+      return Scaffold(
+        appBar: AppBar(title: Text(es ? 'Mesas' : 'Tables')),
+        body: Center(
+          child: Text(
+            es
+                ? 'Ingresa tu PIN de operador para ver las mesas.'
+                : 'Enter your operator PIN to view tables.',
+          ),
+        ),
+      );
+    }
     final controller = widget.controller;
     final document = controller.plan?.published;
     final areas = document == null
