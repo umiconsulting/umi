@@ -1,6 +1,6 @@
 # Reportes — Design-System Reference
 
-What to build Reportes *with*, so screens match Umi instead of drifting to generic
+What to build Reportes _with_, so screens match Umi instead of drifting to generic
 defaults. Extracted from the live code 2026-09-13. Companion to
 [`reportes-ia-plan.md`](./reportes-ia-plan.md),
 [`reportes-moodboard.md`](./reportes-moodboard.md), and
@@ -43,19 +43,19 @@ token-driven, so a correctly-tokenised screen themes for free.
 
 ## 2. Components to reuse (don't re-declare)
 
-| Need | Use | Where |
-|---|---|---|
-| Container | `.card` (surface, 1px `--line`, `--r-card`, pad 20) / `.card-warm` | `styles.css:945` |
-| KPI tile | `.kpi` → `.kpi-head .label`, `.kpi-icon` (30², canvas-2), `.kpi-num` (44), `.delta` | `styles.css:976-1044` |
-| Buttons | `.btn` + `.btn-primary/-secondary/-ghost/-sm/-icon` | `styles.css:540+` |
-| Inputs/select | `.input`, `.select` (h44, focus → umi-blue + 3px ring); custom `Select` portal | `styles.css:1253`; `components/select.jsx` |
-| Status/label | `.badge-*` semantic system (active/trial/susp/info/neutral) | `styles.css:721-766` |
-| Segment chips | `.segment-badge.seg-*` | `styles.css:3257` |
-| View toggle | `.seg` / `.seg button.on` | `styles.css:2021` |
-| Hub tier tabs | `.hub-tabs` / `.hub-tab.active` | `styles.css:4115` |
-| Drawer / modal | `.sheet` (right, 480px) + `.sheet-head/-body/-foot`; `.modal` | `styles.css:1688-1735` |
-| Charts | `SeriesChart`, `PaymentMix`, `Pivot` trio | `ventas-report.jsx:70-443` |
-| Rail | `.side` 3-zone (head / scrolling `.side-nav` / pinned `.side-foot`) | `styles.css:231+` |
+| Need           | Use                                                                                 | Where                                      |
+| -------------- | ----------------------------------------------------------------------------------- | ------------------------------------------ |
+| Container      | `.card` (surface, 1px `--line`, `--r-card`, pad 20) / `.card-warm`                  | `styles.css:945`                           |
+| KPI tile       | `.kpi` → `.kpi-head .label`, `.kpi-icon` (30², canvas-2), `.kpi-num` (44), `.delta` | `styles.css:976-1044`                      |
+| Buttons        | `.btn` + `.btn-primary/-secondary/-ghost/-sm/-icon`                                 | `styles.css:540+`                          |
+| Inputs/select  | `.input`, `.select` (h44, focus → umi-blue + 3px ring); custom `Select` portal      | `styles.css:1253`; `components/select.jsx` |
+| Status/label   | `.badge-*` semantic system (active/trial/susp/info/neutral)                         | `styles.css:721-766`                       |
+| Segment chips  | `.segment-badge.seg-*`                                                              | `styles.css:3257`                          |
+| View toggle    | `.seg` / `.seg button.on`                                                           | `styles.css:2021`                          |
+| Hub tier tabs  | `.hub-tabs` / `.hub-tab.active`                                                     | `styles.css:4115`                          |
+| Drawer / modal | `.sheet` (right, 480px) + `.sheet-head/-body/-foot`; `.modal`                       | `styles.css:1688-1735`                     |
+| Charts         | `SeriesChart`, `PaymentMix`, `Pivot` trio                                           | `ventas-report.jsx:70-443`                 |
+| Rail           | `.side` 3-zone (head / scrolling `.side-nav` / pinned `.side-foot`)                 | `styles.css:231+`                          |
 
 Charts key colors off `--merchant-brand` (runtime-injected per tenant) + `--success` /
 `--danger`. Money always `--font-mono` + `tabular-nums`.

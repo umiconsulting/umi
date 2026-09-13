@@ -16,7 +16,7 @@ richness where the operator moves around. Everything below serves that split.
 
 ## PoloTab teardown (north star)
 
-*From: chart-builder, heatmap grouping, multi-sucursal P&L, editable pivot.*
+_From: chart-builder, heatmap grouping, multi-sucursal P&L, editable pivot._
 
 - **Layout:** fixed left rail (~220px / ~56 collapsed) + one wide content column on
   pure white. Low chrome — content sits on white, not in boxed cards. Calm vertical
@@ -51,7 +51,7 @@ dense metric names (COGS/Varianza) without glossary tooltips for a low-literacy 
 
 ## Square teardown
 
-*From: Sales Summary, Locations, COGS, old Sales, nav+export, summary-emails, home.*
+_From: Sales Summary, Locations, COGS, old Sales, nav+export, summary-emails, home._
 
 - **Layout:** two-pane — fixed left report list (~200px) + wide content pane; full-width
   control bar, then a loose chart grid (one full-width line, two half-width below) and
@@ -84,17 +84,17 @@ the grouped nav).
 
 ## Where each wins (take the best of both)
 
-| Dimension | Winner | Umi takes |
-|---|---|---|
-| Reading money (tables) | **Square** | the Gross→Net ledger table + tabular restraint |
-| KPI + delta tiles | tie | Square's "vs prior" default + PoloTab's info tooltip |
-| At-a-glance texture / charts | **PoloTab** | heatmap, waterfall, warmer color, density |
-| Lowering the analytics barrier | **PoloTab** | plain-Spanish builder + Recomendado defaults |
-| Restraint / focus on numbers | **Square** | one accent, high contrast, no chart clutter |
-| Nav / multi-sucursal identity | **PoloTab** | branch switcher pinned; color-coded modules |
-| Report list scale | **Square (2025)** | grouped/collapsible nav, not a flat scroll |
-| Push reporting | **Square** | scheduled summary emails/WhatsApp |
-| Human support | **PoloTab** | branded support pinned in-shell |
+| Dimension                      | Winner            | Umi takes                                            |
+| ------------------------------ | ----------------- | ---------------------------------------------------- |
+| Reading money (tables)         | **Square**        | the Gross→Net ledger table + tabular restraint       |
+| KPI + delta tiles              | tie               | Square's "vs prior" default + PoloTab's info tooltip |
+| At-a-glance texture / charts   | **PoloTab**       | heatmap, waterfall, warmer color, density            |
+| Lowering the analytics barrier | **PoloTab**       | plain-Spanish builder + Recomendado defaults         |
+| Restraint / focus on numbers   | **Square**        | one accent, high contrast, no chart clutter          |
+| Nav / multi-sucursal identity  | **PoloTab**       | branch switcher pinned; color-coded modules          |
+| Report list scale              | **Square (2025)** | grouped/collapsible nav, not a flat scroll           |
+| Push reporting                 | **Square**        | scheduled summary emails/WhatsApp                    |
+| Human support                  | **PoloTab**       | branded support pinned in-shell                      |
 
 **Contrast/legibility is the shared failure** (PoloTab saturated cells, Square gray
 labels) — Umi must beat both by holding a WCAG floor (see `reportes-patterns.md` §7).

@@ -40,15 +40,15 @@ LLM-consumable fact source, and the AI plumbing already ships live.
 Nav is grouped by the operator's job, in the order they care (research §4). This is
 the founder's `recibos-reportes-split-by-job` decision, now evidence-backed.
 
-| # | Job (owner's words) | Surface | Cadence |
-|---|---|---|---|
-| 1 | "¿Cuadró mi caja?" | **Caja y turnos** (corte X/Z, faltante/sobrante) | daily ritual |
-| 2 | "¿Me están robando?" | **Reembolsos / pérdidas** (by cashier, anomaly-flagged) | daily/weekly |
-| 3 | "¿Vendí más o menos?" | **Ventas** (hero KPIs + delta + narrative) | daily glance |
-| 4 | "¿Cómo voy de costos?" | **Costos** (prime cost: labor % + food %) | weekly |
-| 5 | "¿Qué platillo da dinero?" | **Menú** (quadrant) | monthly |
-| 6 | "¿Estoy en regla con el SAT?" | **Fiscal / facturación** (export) | monthly |
-| 7 | Café lens (attach rate, day-part) | woven into Ventas + Menú | always |
+| #   | Job (owner's words)               | Surface                                                 | Cadence      |
+| --- | --------------------------------- | ------------------------------------------------------- | ------------ |
+| 1   | "¿Cuadró mi caja?"                | **Caja y turnos** (corte X/Z, faltante/sobrante)        | daily ritual |
+| 2   | "¿Me están robando?"              | **Reembolsos / pérdidas** (by cashier, anomaly-flagged) | daily/weekly |
+| 3   | "¿Vendí más o menos?"             | **Ventas** (hero KPIs + delta + narrative)              | daily glance |
+| 4   | "¿Cómo voy de costos?"            | **Costos** (prime cost: labor % + food %)               | weekly       |
+| 5   | "¿Qué platillo da dinero?"        | **Menú** (quadrant)                                     | monthly      |
+| 6   | "¿Estoy en regla con el SAT?"     | **Fiscal / facturación** (export)                       | monthly      |
+| 7   | Café lens (attach rate, day-part) | woven into Ventas + Menú                                | always       |
 
 ## 4. Target IA
 
@@ -80,31 +80,33 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
 
 ## 5. Current → target (reuse vs build)
 
-| Piece | State | Action |
-|---|---|---|
-| `salesSummary` aggregate | ✅ rich, LLM-ready | **Reuse** as the fact source for the narrative + KPIs |
-| Ventas Resumen / Pivot | ✅ built | **Extend** — add compare, channel row, export |
-| Reembolsos "Por operador" | ✅ built | **Extend** — period aggregate (drop 50-row cap), anomaly flag |
+| Piece                        | State                                            | Action                                                                            |
+| ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `salesSummary` aggregate     | ✅ rich, LLM-ready                               | **Reuse** as the fact source for the narrative + KPIs                             |
+| Ventas Resumen / Pivot       | ✅ built                                         | **Extend** — add compare, channel row, export                                     |
+| Reembolsos "Por operador"    | ✅ built                                         | **Extend** — period aggregate (drop 50-row cap), anomaly flag                     |
 | Caja y turnos reconciliation | ✅ strong (cash math, X/Z, separation-of-duties) | **Keep**; surface faltante/sobrante as headline; owner read now works (RLS fixed) |
-| AI narrative | ✅ pattern exists (`describe()`) | **Clone** into `/operations/reports/sales/insight` |
-| Export (CSV/PDF) | ❌ none | **Build** — first the contador fiscal export, then per-report CSV |
-| Channel split | ⚠️ SQL-now | **Build query** + fix per-order channel tagging |
-| IVA breakdown | ⚠️ SQL-now | **Build query** (data stored; seed real IVA on products) |
-| Cross-location roll-up | ⚠️ needs GROUP BY | **Build** aggregate queries (RLS already allows) |
-| Menu quadrant | ⚠️ no COGS | **Build** popularity × **retention** first (no COGS); CM later |
-| COGS/margin | ❌ schema gap | **Defer** — needs a cost dimension on inventory |
+| AI narrative                 | ✅ pattern exists (`describe()`)                 | **Clone** into `/operations/reports/sales/insight`                                |
+| Export (CSV/PDF)             | ❌ none                                          | **Build** — first the contador fiscal export, then per-report CSV                 |
+| Channel split                | ⚠️ SQL-now                                       | **Build query** + fix per-order channel tagging                                   |
+| IVA breakdown                | ⚠️ SQL-now                                       | **Build query** (data stored; seed real IVA on products)                          |
+| Cross-location roll-up       | ⚠️ needs GROUP BY                                | **Build** aggregate queries (RLS already allows)                                  |
+| Menu quadrant                | ⚠️ no COGS                                       | **Build** popularity × **retention** first (no COGS); CM later                    |
+| COGS/margin                  | ❌ schema gap                                    | **Defer** — needs a cost dimension on inventory                                   |
 
 ## 6. Phased roadmap
 
 **Phase 1 — Answer + wedge (cheap, high-signal). ~1–2 weeks.**
+
 - AI Spanish narrative on Ventas (clone `describe()`; DeepSeek). ~2–4 days.
 - Channel row (POS · WhatsApp · Delivery) on Ventas — the wedge made visible.
-  *Prerequisite:* clean per-order channel tagging (today WhatsApp orders have
+  _Prerequisite:_ clean per-order channel tagging (today WhatsApp orders have
   `location_id = NULL`, no channel).
 - Compare-to-prior control + data-freshness labels across existing reports.
 - Fix the WhatsApp/delivery attribution data quality (the gate for everything).
 
 **Phase 2 — Close the obvious gaps. ~2–3 weeks.**
+
 - IVA/impuestos breakdown (SQL-now; seed real `tax_rate_basis_points` on products).
 - Net-of-refunds in the Ventas summary; unify the two refund ledgers in the read model.
 - Reembolsos period aggregate + per-cashier anomaly flags (loss-prevention job).
@@ -112,6 +114,7 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
 - Cross-location roll-up (GROUP BY location) for multi-sucursal owners.
 
 **Phase 3 — Depth & differentiation.**
+
 - Menú quadrant — popularity × retention first (Customer 360), CM once COGS exists.
 - Delivery-aggregator consolidation with margin-after-commission (Rappi/UberEats/DiDi).
 - Conversational-health → revenue (needs outcome attribution).
@@ -129,7 +132,7 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
    required, not optional.
 3. **Wedge → channel wedge, delivered through the AI narrative.** The narrative's
    headline job is to surface channel performance (POS · WhatsApp · Delivery); the
-   Spanish AI summary *carries* the wedge rather than competing as a bare assistant.
+   Spanish AI summary _carries_ the wedge rather than competing as a bare assistant.
    Differentiate vs. Fudo on native conversational commerce + Customer 360; lead the
    less-crowded delivery-consolidation angle where Umi already has Rappi data.
 4. **Data quality → yes, enforced.** Clean per-order channel/attribution tagging is a
@@ -146,11 +149,11 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
 - **The demo data is thin and tax-free.** No IVA, no COGS, no card, no tips in the
   Kalala rehearsal set. Design must render honest **"needs data" states**, and Phase 2
   should seed realistic IVA/cost before showing fiscal/margin reports to anyone.
-- **The WhatsApp wedge is contested by Fudo.** Differentiate on *native* conversational
+- **The WhatsApp wedge is contested by Fudo.** Differentiate on _native_ conversational
   commerce + Customer 360, not a bolt-on agent — and lead with delivery consolidation,
   which is less crowded and where Umi already has Rappi data.
 - **Live-query cost.** Every report is ~10 live aggregates with no materialized views;
   cross-location and wide-window reports may need a rollup table before they scale.
 - **AI trust.** Reuse the existing fail-safe null + cache pattern; never show an
   ungrounded number. Narrate only facts computed deterministically.
-- **Lingui gate.** All new copy goes through `<Trans>`/`` t`` `` or CI fails.
+- **Lingui gate.** All new copy goes through `<Trans>`/` t` `` or CI fails.
