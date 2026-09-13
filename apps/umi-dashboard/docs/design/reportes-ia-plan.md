@@ -1,12 +1,35 @@
 # Reportes IA — Proposal
 
 The target information architecture for Umi's Reportes area, grounded in
-[`reportes-ia-research.md`](./reportes-ia-research.md). Draft for founder review —
-open decisions are listed in §7.
+[`reportes-ia-research.md`](./reportes-ia-research.md). The founder decisions are
+locked (§7) and Phase 1 has started to ship. This is the plan of record; §0 gives the
+live status.
+
+Companion dossiers: [research](./reportes-ia-research.md) ·
+[build-gap map](./reportes-build-gaps.md) · [design system](./reportes-design-system.md) ·
+[moodboard](./reportes-moodboard.md) · [patterns](./reportes-patterns.md).
 
 Date 2026-09-13.
 
 ---
+
+## 0. Status (2026-09-13)
+
+- **Decisions** — all five are locked. See §7.
+- **Phase 1, AI Spanish narrative on Ventas** — ✅ shipped on `feat/reportes-ia`
+  (commit `4b83d13`). It adds the route `GET /operations/reports/sales/insight`
+  (`DashboardOperationsService.salesInsight`), the contract `ReportsSalesInsight`, the
+  hook `useSalesInsight`, and a narrative card above the KPI tiles in
+  `ventas-report.jsx`. It clones the live `describe()` pattern: deterministic KPIs, then
+  the LLM, then a djb2 fingerprint, then a 6 h cache, then a fail-safe null.
+- **Phase 1, channel attribution** — ✅ shipped (PR #166, `feat/pos-channel-attribution`).
+  The POS freezes `origin_order_id` and `origin_channel` on the committed sale. The
+  Ventas channel row stays behind an honest "coming" state until real channels flow.
+- **Open work** — feed `channelMix` into the narrative (§7.3), then close the Phase 2
+  gaps and the Phase 3 depth. See §6 and §9.
+- **Caveat** — Phase 1 uses the `LLM_COMPLETION` seam. The seam is now on the
+  `build-v3` integration branch, so the work is self-contained there. In-app
+  verification is still open: the API must run the new route with a DeepSeek key.
 
 ## 1. Thesis
 
@@ -86,9 +109,9 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
 | Ventas Resumen / Pivot       | ✅ built                                         | **Extend** — add compare, channel row, export                                     |
 | Reembolsos "Por operador"    | ✅ built                                         | **Extend** — period aggregate (drop 50-row cap), anomaly flag                     |
 | Caja y turnos reconciliation | ✅ strong (cash math, X/Z, separation-of-duties) | **Keep**; surface faltante/sobrante as headline; owner read now works (RLS fixed) |
-| AI narrative                 | ✅ pattern exists (`describe()`)                 | **Clone** into `/operations/reports/sales/insight`                                |
+| AI narrative                 | ✅ **shipped** (Phase 1, commit `4b83d13`)       | Live at `/operations/reports/sales/insight` (clone of `describe()`)               |
 | Export (CSV/PDF)             | ❌ none                                          | **Build** — first the contador fiscal export, then per-report CSV                 |
-| Channel split                | ⚠️ SQL-now                                       | **Build query** + fix per-order channel tagging                                   |
+| Channel split                | ⚙️ upstream shipped (PR #166); reporting pending | Sale freezes `origin_channel`; wire `channelMix` → narrative + Ventas row         |
 | IVA breakdown                | ⚠️ SQL-now                                       | **Build query** (data stored; seed real IVA on products)                          |
 | Cross-location roll-up       | ⚠️ needs GROUP BY                                | **Build** aggregate queries (RLS already allows)                                  |
 | Menu quadrant                | ⚠️ no COGS                                       | **Build** popularity × **retention** first (no COGS); CM later                    |
@@ -99,6 +122,9 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
 **Phase 1 — Answer + wedge (cheap, high-signal). ~1–2 weeks.**
 
 - AI Spanish narrative on Ventas (clone `describe()`; DeepSeek). ~2–4 days.
+  **✅ SHIPPED 2026-09-13** (commit `4b83d13`): route `/operations/reports/sales/insight`,
+  contract `ReportsSalesInsight`, hook `useSalesInsight`, and a narrative card in
+  `ventas-report.jsx`. In-app verification on staging is still open — see §0.
 - Channel row (POS · WhatsApp · Delivery) on Ventas — the wedge made visible.
   **✅ SHIPPED 2026-09-13** (PR #166, branch `feat/pos-channel-attribution`). Scoping
   CHANGED: the fix is UPSTREAM, not a reporting query — the POS now links the committed
@@ -140,9 +166,10 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
    Spanish AI summary _carries_ the wedge rather than competing as a bare assistant.
    Differentiate vs. Fudo on native conversational commerce + Customer 360; lead the
    less-crowded delivery-consolidation angle where Umi already has Rappi data.
-   **Status 2026-09-13:** the channel ROW + its data shipped (PR #166); the "carried
-   _through_ the narrative" half is pending — it waits for Phase 1 (AI narrative) to
-   reach the integration branch, then `channelMix` feeds the summary.
+   **Status 2026-09-13:** the channel data (PR #166) and the AI narrative (Phase 1,
+   commit `4b83d13`) both shipped. The remaining half is to feed `channelMix` into the
+   narrative and to unhide the Ventas channel row once real channels flow from the POS
+   incoming-orders surface.
 4. **Data quality → yes, enforced. MECHANISM REVISED 2026-09-13.** The blocker is real,
    but the fix is NOT "ingestion + backfill of channel tags". A dig showed the POS mints
    its own `source='pos'` order at checkout and never links the WhatsApp order it settles,
@@ -170,4 +197,40 @@ control** (vs. período anterior) and **data-freshness label** (real-time vs. de
   cross-location and wide-window reports may need a rollup table before they scale.
 - **AI trust.** Reuse the existing fail-safe null + cache pattern; never show an
   ungrounded number. Narrate only facts computed deterministically.
-- **Lingui gate.** All new copy goes through `<Trans>`/` t` `` or CI fails.
+- **Lingui gate.** All new copy goes through `<Trans>`/`t` or CI fails.
+
+## 9. Success metrics & definition of done
+
+Measure the plan by owner behaviour, not by feature count. The demo data is thin, so
+use the pilot cafés (Kalala) as the first signal. Set numeric targets only after real
+IVA and cost data exist (§8).
+
+**Product signals (owner):**
+
+- The owner opens Ventas at least one time each trading day (the "did I sell more?"
+  ritual).
+- The owner reads the AI narrative before the KPI tiles. Measure the narrative view
+  rate and the time to the first answer on the phone (target: an answer above the fold
+  in less than 2 s).
+- Reembolsos anomaly flags cause at least one owner action each week (the theft job).
+
+**Quality gates (every phase):**
+
+- No ungrounded number. The narrative repeats only facts that the code computes.
+  A failed LLM call shows the fail-safe null state, not a guess.
+- Honest "needs data" states for missing IVA, COGS, or channel. Never render `$0` for
+  data that does not exist.
+- All new copy passes the Lingui gate (`<Trans>` / `t`) and the CI lint gate.
+
+**Definition of done, per phase:**
+
+- **Phase 1 — done when:** the narrative is live on staging with a DeepSeek key; the
+  channel row shows real channels (not the "coming" state) for at least one café; and
+  the compare-to-prior control and the freshness label are on every existing report.
+- **Phase 2 — done when:** Ventas shows the IVA breakdown and net-of-refunds from real
+  product tax data; Reembolsos shows a period aggregate with per-cashier anomaly flags;
+  the contador can export a month-end fiscal file; and multi-sucursal owners can roll up
+  across locations.
+- **Phase 3 — done when:** the Menú quadrant ranks items by popularity × retention; the
+  delivery-consolidation view shows the margin after aggregator commission; and true
+  prime cost is available after the inventory cost dimension exists.
