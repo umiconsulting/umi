@@ -14,6 +14,13 @@ abstract interface class CartRepository {
   );
   Future<Cart> prepare(String merchantId, PrepareSaleRequest input);
   Future<Cart> clear(String merchantId, ClearCartRequest input);
+
+  /// The incoming commercial orders (WhatsApp, web, …) this till can pick up.
+  Future<PosIncomingOrders> incomingOrders(String merchantId, CartQuery query);
+
+  /// Bind the active cart to the incoming order it settles, so the committed sale
+  /// freezes the channel. Pass [BindCartOriginRequest.originOrderId] = null to detach.
+  Future<Cart> bindOrigin(String merchantId, BindCartOriginRequest input);
 }
 
 final class ApiCartRepository implements CartRepository {
@@ -96,6 +103,34 @@ final class ApiCartRepository implements CartRepository {
         await _api.request(
           method: ApiMethod.post,
           path: UmiRoutes.posCartClear(merchantId),
+          body: input.toJson(),
+          idempotent: true,
+        ),
+      );
+
+  @override
+  Future<PosIncomingOrders> incomingOrders(
+    String merchantId,
+    CartQuery query,
+  ) async => PosIncomingOrders.fromJson(
+    await _api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posCartIncomingOrders(merchantId),
+        queryParameters: {
+          'locationId': query.locationId,
+          'operatorSessionId': query.operatorSessionId,
+        },
+      ).toString(),
+    ),
+  );
+
+  @override
+  Future<Cart> bindOrigin(String merchantId, BindCartOriginRequest input) async =>
+      Cart.fromJson(
+        await _api.request(
+          method: ApiMethod.post,
+          path: UmiRoutes.posCartBindOrigin(merchantId),
           body: input.toJson(),
           idempotent: true,
         ),
