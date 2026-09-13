@@ -46,6 +46,9 @@ describe('DeepseekAdapter.createCompletion', () => {
     const body = JSON.parse(opts.body);
     expect(body.model).toBe('deepseek-chat');
     expect(body.max_tokens).toBe(100);
+    // Thinking is disabled: deepseek-flash otherwise spends the token budget on
+    // reasoning_content and returns an empty answer at our small max_tokens.
+    expect(body.thinking).toEqual({ type: 'disabled' });
     expect(body.messages).toEqual([
       { role: 'system', content: 'sys' },
       { role: 'user', content: 'usr' },

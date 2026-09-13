@@ -38,6 +38,14 @@ export class DeepseekAdapter implements LlmCompletionProvider {
           model,
           max_tokens: params.maxTokens ?? DEFAULT_MAX_TOKENS,
           temperature: params.temperature ?? 0,
+          // deepseek-flash (V4.1) reasons by default (effort "high"), and the
+          // `reasoning_content` shares the `max_tokens` budget with the answer — at our
+          // small budgets the answer (`content`) comes back empty/truncated. Every caller
+          // on this seam wants a short, direct, deterministic completion (intent, facts,
+          // summary, portrait, sales narrative), none needs chain-of-thought, so disable
+          // thinking (per api-docs.deepseek.com/guides/thinking_mode): direct content, no
+          // wasted reasoning tokens, and `temperature` is honoured again.
+          thinking: { type: 'disabled' },
           messages: [
             { role: 'system', content: params.system },
             { role: 'user', content: params.userMessage },
