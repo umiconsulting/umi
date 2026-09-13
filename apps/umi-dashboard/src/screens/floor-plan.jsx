@@ -707,8 +707,8 @@ export function FloorPlanEditor({ merchantId, locationId }) {
 
 export default function FloorPlanScreen() {
   const context = useMerchant();
-  const merchantId = context?.selectedMerchantId ?? context?.capabilities?.merchant?.id;
-  const locationId = context?.selectedLocationId ?? context?.capabilities?.selectedLocation?.id;
+  const merchantId = context?.selectedMerchantId || context?.capabilities?.merchant?.id;
+  const locationId = context?.selectedLocationId || context?.capabilities?.selectedLocation?.id;
   if (!merchantId || !locationId)
     return (
       <div className="card fp-message">

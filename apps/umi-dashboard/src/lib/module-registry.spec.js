@@ -13,6 +13,14 @@ const capabilities = (permissions) => ({
 });
 
 describe('Dashboard permission navigation', () => {
+  it('lists the floor-plan editor for a merchant manager', () => {
+    const ids = getVisibleModules(capabilities(['merchant.manage'])).map((item) => item.id);
+    expect(ids).toContain('floor-plan');
+    expect(getVisibleModules(capabilities(['catalog.read'])).map((item) => item.id)).not.toContain(
+      'floor-plan',
+    );
+  });
+
   it('shows the operations center through an exact permission', () => {
     expect(getModuleAvailability('operations', capabilities(['inventory.read']))).toEqual({
       available: true,

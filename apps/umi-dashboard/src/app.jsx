@@ -224,7 +224,9 @@ function DashboardLayout() {
           merchantName={merchantName}
           locations={merchantState?.capabilities?.locations || []}
           canSwitchLocations={merchantState?.capabilities?.canSwitchLocations === true}
-          selectedLocationId={merchantState?.selectedLocationId}
+          selectedLocationId={
+            merchantState?.selectedLocationId || merchantState?.capabilities?.selectedLocation?.id
+          }
           onLocationChange={merchantState?.setSelectedLocationId}
           connection={connection}
           onProfile={() => nav('profile')}

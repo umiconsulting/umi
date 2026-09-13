@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Sidebar, ProfileMenu } from './shell.jsx';
+import { Sidebar, ProfileMenu, Topbar } from './shell.jsx';
 import { withI18n } from '@/test/i18n.jsx';
 import { msg } from '@lingui/core/macro';
 
@@ -63,5 +63,36 @@ describe('Topbar account menu', () => {
     );
     expect(markup).toContain('profile-toggle');
     expect(markup).toContain('active');
+  });
+});
+
+describe('Floor-plan location control', () => {
+  const locations = [
+    { id: 'l1', name: 'Centro', status: 'active' },
+    { id: 'l2', name: 'Playa', status: 'active' },
+  ];
+  it('shows the only authorized location without a switch action', () => {
+    const markup = renderToStaticMarkup(
+      withI18n(<Topbar screen="floor-plan" locations={[locations[0]]} selectedLocationId="l1" />),
+    );
+    expect(markup).toContain('aria-label="Sucursal"');
+    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('Centro');
+  });
+
+  it('shows the selected location and permits authorized switches', () => {
+    const markup = renderToStaticMarkup(
+      withI18n(
+        <Topbar
+          screen="floor-plan"
+          locations={locations}
+          selectedLocationId="l2"
+          canSwitchLocations
+        />,
+      ),
+    );
+    expect(markup).toContain('aria-label="Sucursal"');
+    expect(markup).toContain('Playa');
+    expect(markup).not.toContain('disabled=""');
   });
 });

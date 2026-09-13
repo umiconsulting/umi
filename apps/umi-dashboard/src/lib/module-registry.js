@@ -234,6 +234,7 @@ export const MODULE_ORDER = [
   'loyalty-value',
   // BUSINESS — the assets and people behind the shop.
   'catalog-inventory',
+  'floor-plan',
   'devices',
   'staff',
   // CONFIGURATION — set up the business.
