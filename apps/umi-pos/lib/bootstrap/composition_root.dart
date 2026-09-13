@@ -49,6 +49,7 @@ import '../features/offline/offline_policy.dart';
 import '../features/offline/replay_engine.dart';
 import '../features/sale/sale_lifecycle_controller.dart';
 import '../features/sale/sale_repository.dart';
+import '../features/tables/floor_plan_controller.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -72,6 +73,7 @@ final class AppCompositionRoot {
     required this.sales,
     this.kitchenStatus,
     this.kitchenBoard,
+    this.floorPlan,
     this.customerValue,
     required this.connectivity,
     required this.offlineJournal,
@@ -266,6 +268,7 @@ final class AppCompositionRoot {
         cart: cart,
         telemetry: telemetry,
       ),
+      floorPlan: FloorPlanController(ApiFloorPlanRepository(apiClient)),
       kitchenStatus: ApiKitchenStatusRepository(apiClient),
       kitchenBoard: KitchenBoardController(
         ApiKitchenBoardRepository(apiClient),
@@ -361,6 +364,7 @@ final class AppCompositionRoot {
   final SaleLifecycleController sales;
   final KitchenStatusRepository? kitchenStatus;
   final KitchenBoardController? kitchenBoard;
+  final FloorPlanController? floorPlan;
   final CustomerValueController? customerValue;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
@@ -427,6 +431,7 @@ final class AppCompositionRoot {
     checkout.dispose();
     sales.dispose();
     kitchenBoard?.dispose();
+    floorPlan?.dispose();
     customerValue?.dispose();
     connectivity.dispose();
     offlineRecovery?.dispose();

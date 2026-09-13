@@ -38,3 +38,5 @@ export * from './catalog';
 // Zero-dep entitlement vocabulary. Also published as '@umi/contract/entitlements'
 // so the zod-free dashboard bundle can import it without pulling zod.
 export * from './entitlements';
+
+export * from './floor-plan';

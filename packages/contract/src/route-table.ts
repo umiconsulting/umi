@@ -130,6 +130,36 @@ const posMerchantRoute = (input: {
 });
 
 export const ROUTE_TABLE: readonly RouteDef[] = [
+  posMerchantRoute({
+    id: 'pos.floorPlan',
+    method: 'GET',
+    suffix: '/floor-plan',
+    dart: 'posFloorPlan',
+    request: 'PosFloorPlanQuery',
+    response: 'PublishedFloorPlan',
+    permission: 'sale.lifecycle',
+  }),
+  {
+    id: 'floorPlan.read',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/floor-plan',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'floorPlan.save',
+    method: 'PUT',
+    path: '/api/merchants/:merchantId/floor-plan',
+    params: ['merchantId'],
+    dart: null,
+  },
+  {
+    id: 'floorPlan.publish',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/floor-plan/publish',
+    params: ['merchantId'],
+    dart: null,
+  },
   // ── Local authentication (dashboard, umi-cash) ─────────────────────────────
   {
     id: 'auth.login',

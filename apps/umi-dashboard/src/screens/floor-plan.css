@@ -1,0 +1,148 @@
+.floor-plan {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.fp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px;
+}
+.fp-toolbar strong {
+  font-size: 20px;
+}
+.fp-toolbar p,
+.fp-properties p {
+  color: var(--ink-3);
+  font-size: 13px;
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+.fp-actions,
+.fp-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.fp-status {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.fp-workspace {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 220px;
+  gap: 14px;
+  align-items: start;
+}
+.fp-palette,
+.fp-properties {
+  padding: 16px;
+}
+.floor-plan h3 {
+  font-size: 14px;
+  margin: 0 0 14px;
+}
+.floor-plan fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.floor-plan label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.floor-plan input:not([type='checkbox']),
+.floor-plan select {
+  padding: 9px;
+  border: 1px solid var(--line, #dce2de);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--ink);
+  min-width: 0;
+  width: 100%;
+}
+.floor-plan .fp-check {
+  display: flex;
+  align-items: center;
+}
+.fp-palette .btn {
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+}
+.fp-palette h3:not(:first-child) {
+  margin-top: 24px;
+}
+.fp-element-list {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+}
+.fp-element-list .active {
+  outline: 2px solid var(--merchant-brand, #25634d);
+}
+.fp-canvas {
+  overflow: auto;
+  max-height: 72vh;
+  min-height: 400px;
+  background: #f9fbf9;
+  overscroll-behavior: contain;
+}
+.fp-alert {
+  padding: 14px;
+  background: #fff1dc;
+  color: #714400;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+}
+.fp-message {
+  padding: 28px;
+}
+.floor-plan button:focus-visible,
+.floor-plan input:focus-visible,
+.floor-plan select:focus-visible,
+.fp-canvas:focus-visible {
+  outline: 2px solid var(--merchant-brand, #25634d);
+  outline-offset: 3px;
+}
+@media (max-width: 1150px) {
+  .fp-workspace {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+  .fp-properties {
+    grid-column: 1 / -1;
+  }
+  .fp-properties fieldset {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+  }
+}
+@media (max-width: 650px) {
+  .fp-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fp-palette fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fp-properties fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fp-canvas {
+    min-height: 280px;
+  }
+}

@@ -10,7 +10,7 @@ import 'package:umi_pos/features/entry/pairing_socket_client.dart';
 ///
 /// This reads the contract source and fails the moment the mirror stops matching.
 void main() {
-  final source = File('../../packages/contract/src/realtime.ts');
+  final source = File('../../packages/contract/src/realtime-channels.ts');
 
   String contractConstant(String name) {
     final match = RegExp("$name = '([^']+)'").firstMatch(source.readAsStringSync());

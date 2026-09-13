@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "10d0ccd3c48a83f0f393ceb8ebb0d62b82c78d45dd5c9a028570d516bc74697d",
-  "contractVersion": "2.18.0",
+  "contentHash": "a2db316316364a3b95fc4a6376fef6b2a8cc4981864cbf5bc19a81ef489ccd79",
+  "contractVersion": "2.19.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -31273,6 +31273,655 @@
       ],
       "type": "object"
     },
+    "FloorPlanArea": {
+      "additionalProperties": false,
+      "properties": {
+        "elements": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "capacity": {
+                "maximum": 100,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "height": {
+                "maximum": 5000,
+                "minimum": 8,
+                "type": "number"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "table",
+                  "wall",
+                  "counter",
+                  "door",
+                  "label"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "maxLength": 80,
+                "minLength": 1,
+                "pattern": "^[^<>\\u0000-\\u001f]+$",
+                "type": "string"
+              },
+              "rotation": {
+                "exclusiveMaximum": 360,
+                "minimum": 0,
+                "type": "number"
+              },
+              "shape": {
+                "enum": [
+                  "rectangle",
+                  "round",
+                  "square"
+                ],
+                "type": "string"
+              },
+              "width": {
+                "maximum": 5000,
+                "minimum": 8,
+                "type": "number"
+              },
+              "x": {
+                "maximum": 5000,
+                "minimum": 0,
+                "type": "number"
+              },
+              "y": {
+                "maximum": 5000,
+                "minimum": 0,
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "shape",
+              "label",
+              "capacity",
+              "x",
+              "y",
+              "width",
+              "height",
+              "rotation"
+            ],
+            "type": "object"
+          },
+          "maxItems": 500,
+          "type": "array"
+        },
+        "height": {
+          "maximum": 5000,
+          "minimum": 200,
+          "type": "integer"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^<>\\u0000-\\u001f]+$",
+          "type": "string"
+        },
+        "width": {
+          "maximum": 5000,
+          "minimum": 200,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "width",
+        "height",
+        "elements"
+      ],
+      "type": "object"
+    },
+    "FloorPlanDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "areas": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "elements": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "capacity": {
+                      "maximum": 100,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "height": {
+                      "maximum": 5000,
+                      "minimum": 8,
+                      "type": "number"
+                    },
+                    "id": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "table",
+                        "wall",
+                        "counter",
+                        "door",
+                        "label"
+                      ],
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 80,
+                      "minLength": 1,
+                      "pattern": "^[^<>\\u0000-\\u001f]+$",
+                      "type": "string"
+                    },
+                    "rotation": {
+                      "exclusiveMaximum": 360,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "shape": {
+                      "enum": [
+                        "rectangle",
+                        "round",
+                        "square"
+                      ],
+                      "type": "string"
+                    },
+                    "width": {
+                      "maximum": 5000,
+                      "minimum": 8,
+                      "type": "number"
+                    },
+                    "x": {
+                      "maximum": 5000,
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "y": {
+                      "maximum": 5000,
+                      "minimum": 0,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "shape",
+                    "label",
+                    "capacity",
+                    "x",
+                    "y",
+                    "width",
+                    "height",
+                    "rotation"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 500,
+                "type": "array"
+              },
+              "height": {
+                "maximum": 5000,
+                "minimum": 200,
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "maxLength": 80,
+                "minLength": 1,
+                "pattern": "^[^<>\\u0000-\\u001f]+$",
+                "type": "string"
+              },
+              "width": {
+                "maximum": 5000,
+                "minimum": 200,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "width",
+              "height",
+              "elements"
+            ],
+            "type": "object"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        },
+        "schemaVersion": {
+          "const": 1,
+          "type": "number"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "areas"
+      ],
+      "type": "object"
+    },
+    "FloorPlanElement": {
+      "additionalProperties": false,
+      "properties": {
+        "capacity": {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 5000,
+          "minimum": 8,
+          "type": "number"
+        },
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "table",
+            "wall",
+            "counter",
+            "door",
+            "label"
+          ],
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[^<>\\u0000-\\u001f]+$",
+          "type": "string"
+        },
+        "rotation": {
+          "exclusiveMaximum": 360,
+          "minimum": 0,
+          "type": "number"
+        },
+        "shape": {
+          "enum": [
+            "rectangle",
+            "round",
+            "square"
+          ],
+          "type": "string"
+        },
+        "width": {
+          "maximum": 5000,
+          "minimum": 8,
+          "type": "number"
+        },
+        "x": {
+          "maximum": 5000,
+          "minimum": 0,
+          "type": "number"
+        },
+        "y": {
+          "maximum": 5000,
+          "minimum": 0,
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "shape",
+        "label",
+        "capacity",
+        "x",
+        "y",
+        "width",
+        "height",
+        "rotation"
+      ],
+      "type": "object"
+    },
+    "FloorPlanQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId"
+      ],
+      "type": "object"
+    },
+    "FloorPlanState": {
+      "additionalProperties": false,
+      "properties": {
+        "draft": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "areas": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elements": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "capacity": {
+                              "maximum": 100,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "height": {
+                              "maximum": 5000,
+                              "minimum": 8,
+                              "type": "number"
+                            },
+                            "id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "enum": [
+                                "table",
+                                "wall",
+                                "counter",
+                                "door",
+                                "label"
+                              ],
+                              "type": "string"
+                            },
+                            "label": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "pattern": "^[^<>\\u0000-\\u001f]+$",
+                              "type": "string"
+                            },
+                            "rotation": {
+                              "exclusiveMaximum": 360,
+                              "minimum": 0,
+                              "type": "number"
+                            },
+                            "shape": {
+                              "enum": [
+                                "rectangle",
+                                "round",
+                                "square"
+                              ],
+                              "type": "string"
+                            },
+                            "width": {
+                              "maximum": 5000,
+                              "minimum": 8,
+                              "type": "number"
+                            },
+                            "x": {
+                              "maximum": 5000,
+                              "minimum": 0,
+                              "type": "number"
+                            },
+                            "y": {
+                              "maximum": 5000,
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind",
+                            "shape",
+                            "label",
+                            "capacity",
+                            "x",
+                            "y",
+                            "width",
+                            "height",
+                            "rotation"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 500,
+                        "type": "array"
+                      },
+                      "height": {
+                        "maximum": 5000,
+                        "minimum": 200,
+                        "type": "integer"
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "pattern": "^[^<>\\u0000-\\u001f]+$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maximum": 5000,
+                        "minimum": 200,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "width",
+                      "height",
+                      "elements"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 20,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "schemaVersion": {
+                  "const": 1,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "areas"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "published": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "areas": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elements": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "capacity": {
+                              "maximum": 100,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "height": {
+                              "maximum": 5000,
+                              "minimum": 8,
+                              "type": "number"
+                            },
+                            "id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "enum": [
+                                "table",
+                                "wall",
+                                "counter",
+                                "door",
+                                "label"
+                              ],
+                              "type": "string"
+                            },
+                            "label": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "pattern": "^[^<>\\u0000-\\u001f]+$",
+                              "type": "string"
+                            },
+                            "rotation": {
+                              "exclusiveMaximum": 360,
+                              "minimum": 0,
+                              "type": "number"
+                            },
+                            "shape": {
+                              "enum": [
+                                "rectangle",
+                                "round",
+                                "square"
+                              ],
+                              "type": "string"
+                            },
+                            "width": {
+                              "maximum": 5000,
+                              "minimum": 8,
+                              "type": "number"
+                            },
+                            "x": {
+                              "maximum": 5000,
+                              "minimum": 0,
+                              "type": "number"
+                            },
+                            "y": {
+                              "maximum": 5000,
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind",
+                            "shape",
+                            "label",
+                            "capacity",
+                            "x",
+                            "y",
+                            "width",
+                            "height",
+                            "rotation"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 500,
+                        "type": "array"
+                      },
+                      "height": {
+                        "maximum": 5000,
+                        "minimum": 200,
+                        "type": "integer"
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "pattern": "^[^<>\\u0000-\\u001f]+$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maximum": 5000,
+                        "minimum": 200,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "width",
+                      "height",
+                      "elements"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 20,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "schemaVersion": {
+                  "const": 1,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "areas"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedVersion": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locationId",
+        "version",
+        "draft",
+        "publishedVersion",
+        "published",
+        "publishedAt"
+      ],
+      "type": "object"
+    },
     "ForgotPasswordRequest": {
       "additionalProperties": false,
       "properties": {
@@ -52314,6 +52963,24 @@
       ],
       "type": "object"
     },
+    "PosFloorPlanQuery": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId"
+      ],
+      "type": "object"
+    },
     "PosKitchenOrderQuery": {
       "additionalProperties": false,
       "properties": {
@@ -55065,6 +55732,199 @@
         "conflict"
       ],
       "type": "string"
+    },
+    "PublishedFloorPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "published": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "areas": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elements": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "capacity": {
+                              "maximum": 100,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "height": {
+                              "maximum": 5000,
+                              "minimum": 8,
+                              "type": "number"
+                            },
+                            "id": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "enum": [
+                                "table",
+                                "wall",
+                                "counter",
+                                "door",
+                                "label"
+                              ],
+                              "type": "string"
+                            },
+                            "label": {
+                              "maxLength": 80,
+                              "minLength": 1,
+                              "pattern": "^[^<>\\u0000-\\u001f]+$",
+                              "type": "string"
+                            },
+                            "rotation": {
+                              "exclusiveMaximum": 360,
+                              "minimum": 0,
+                              "type": "number"
+                            },
+                            "shape": {
+                              "enum": [
+                                "rectangle",
+                                "round",
+                                "square"
+                              ],
+                              "type": "string"
+                            },
+                            "width": {
+                              "maximum": 5000,
+                              "minimum": 8,
+                              "type": "number"
+                            },
+                            "x": {
+                              "maximum": 5000,
+                              "minimum": 0,
+                              "type": "number"
+                            },
+                            "y": {
+                              "maximum": 5000,
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind",
+                            "shape",
+                            "label",
+                            "capacity",
+                            "x",
+                            "y",
+                            "width",
+                            "height",
+                            "rotation"
+                          ],
+                          "type": "object"
+                        },
+                        "maxItems": 500,
+                        "type": "array"
+                      },
+                      "height": {
+                        "maximum": 5000,
+                        "minimum": 200,
+                        "type": "integer"
+                      },
+                      "id": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "name": {
+                        "maxLength": 80,
+                        "minLength": 1,
+                        "pattern": "^[^<>\\u0000-\\u001f]+$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maximum": 5000,
+                        "minimum": 200,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "width",
+                      "height",
+                      "elements"
+                    ],
+                    "type": "object"
+                  },
+                  "maxItems": 20,
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "schemaVersion": {
+                  "const": 1,
+                  "type": "number"
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "areas"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publishedVersion": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "locationId",
+        "publishedVersion",
+        "published",
+        "publishedAt"
+      ],
+      "type": "object"
+    },
+    "PublishFloorPlanRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedVersion": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "expectedVersion",
+        "idempotencyKey"
+      ],
+      "type": "object"
     },
     "PurchaseRequest": {
       "additionalProperties": false,
@@ -67886,6 +68746,162 @@
       ],
       "type": "object"
     },
+    "SaveFloorPlanRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "additionalProperties": false,
+          "properties": {
+            "areas": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "elements": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "capacity": {
+                          "maximum": 100,
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "height": {
+                          "maximum": 5000,
+                          "minimum": 8,
+                          "type": "number"
+                        },
+                        "id": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "enum": [
+                            "table",
+                            "wall",
+                            "counter",
+                            "door",
+                            "label"
+                          ],
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 80,
+                          "minLength": 1,
+                          "pattern": "^[^<>\\u0000-\\u001f]+$",
+                          "type": "string"
+                        },
+                        "rotation": {
+                          "exclusiveMaximum": 360,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "shape": {
+                          "enum": [
+                            "rectangle",
+                            "round",
+                            "square"
+                          ],
+                          "type": "string"
+                        },
+                        "width": {
+                          "maximum": 5000,
+                          "minimum": 8,
+                          "type": "number"
+                        },
+                        "x": {
+                          "maximum": 5000,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "y": {
+                          "maximum": 5000,
+                          "minimum": 0,
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "shape",
+                        "label",
+                        "capacity",
+                        "x",
+                        "y",
+                        "width",
+                        "height",
+                        "rotation"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 500,
+                    "type": "array"
+                  },
+                  "height": {
+                    "maximum": 5000,
+                    "minimum": 200,
+                    "type": "integer"
+                  },
+                  "id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "name": {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "pattern": "^[^<>\\u0000-\\u001f]+$",
+                    "type": "string"
+                  },
+                  "width": {
+                    "maximum": 5000,
+                    "minimum": 200,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "width",
+                  "height",
+                  "elements"
+                ],
+                "type": "object"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "type": "array"
+            },
+            "schemaVersion": {
+              "const": 1,
+              "type": "number"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "areas"
+          ],
+          "type": "object"
+        },
+        "expectedVersion": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "expectedVersion",
+        "idempotencyKey",
+        "document"
+      ],
+      "type": "object"
+    },
     "ScaleDeviceFoundation": {
       "additionalProperties": false,
       "properties": {
@@ -76105,6 +77121,22 @@
       "pin": false,
       "request": "ExceptionCommandRecoveryQuery",
       "response": "ExceptionCommandRecoveryResult"
+    },
+    "GET /api/v1/pos/merchants/:merchantId/floor-plan": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "sale.lifecycle",
+      "pin": false,
+      "request": "PosFloorPlanQuery",
+      "response": "PublishedFloorPlan"
     },
     "GET /api/v1/pos/merchants/:merchantId/hardware": {
       "approval": false,

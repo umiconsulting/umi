@@ -169,6 +169,7 @@ const SECTION_LABELS = {
 
 /** Screen titles for the masthead. Resolved at render, so they follow the locale. */
 const SCREEN_TITLES = {
+  'floor-plan': msg`Plano de mesas`,
   overview: msg`Panorama`,
   operations: msg`Centro operativo`,
   reportes: msg`Reportes`,
@@ -448,6 +449,7 @@ const Topbar = ({
     'cash-shifts',
     'catalog-inventory',
     'kitchen',
+    'floor-plan',
   ].includes(screen);
   const activeLocations = locations.filter((l) => l.status === 'active');
   const showLocationSelect = locationScoped && canSwitchLocations && activeLocations.length > 1;

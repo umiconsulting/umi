@@ -10,6 +10,15 @@ export { PRODUCT_ACTIVE_STATUSES };
 // `i18n._(module.label)` (Sidebar, Topbar, GuardedScreen).
 
 export const MODULES = {
+  'floor-plan': {
+    id: 'floor-plan',
+    label: msg`Plano de mesas`,
+    icon: 'Layout',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    permissions: ['merchant.manage'],
+    locationScoped: true,
+  },
   overview: {
     id: 'overview',
     label: msg`Resumen`,

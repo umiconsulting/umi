@@ -174,6 +174,7 @@ final class _GuardedSurface extends StatelessWidget {
         sales: root.sales,
         kitchenStatus: root.kitchenStatus,
         kitchenBoard: root.kitchenBoard,
+        floorPlan: root.floorPlan,
         customerValue: root.customerValue,
         exceptions: root.exceptions,
         inventory: root.inventory,

@@ -19,6 +19,7 @@ import { BusinessHoursModule } from './modules/business-hours/business-hours.mod
 import { VoiceModule } from './modules/voice/voice.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CashModule } from './modules/cash/cash.module';
+import { FloorPlanModule } from './modules/floor-plan/floor-plan.module';
 import { KdsModule } from './modules/kds/kds.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { PlatformModule } from './modules/platform/platform.module';
@@ -75,6 +76,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     CustomersModule,
     CashModule,
     KdsModule,
+    FloorPlanModule,
     WalletModule,
     PlatformModule,
     ConversationsModule,

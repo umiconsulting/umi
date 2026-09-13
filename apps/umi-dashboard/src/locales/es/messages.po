@@ -136,6 +136,12 @@ msgid "Código incorrecto o vencido."
 msgstr "Código incorrecto o vencido."
 
 #: src/lib/module-registry.js
+#: src/screens/floor-plan.jsx
+#: src/shell.jsx
+msgid "Plano de mesas"
+msgstr "Plano de mesas"
+
+#: src/lib/module-registry.js
 #: src/screens/customers.jsx
 #: src/screens/ventas-report.jsx
 msgid "Resumen"
@@ -682,6 +688,7 @@ msgid "Nueva categoría"
 msgstr "Nueva categoría"
 
 #: src/screens/categories-workspace.jsx
+#: src/screens/floor-plan.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/profile.jsx
@@ -1196,6 +1203,7 @@ msgid "Recargar ${pesos}"
 msgstr "Recargar ${pesos}"
 
 #: src/screens/customers.jsx
+#: src/screens/floor-plan.jsx
 msgid "Recargar"
 msgstr "Recargar"
 
@@ -1931,6 +1939,203 @@ msgstr "Recuperación"
 #: src/screens/operations-workspace.jsx
 msgid "Auditoría"
 msgstr "Auditoría"
+
+#: src/screens/floor-plan.jsx
+msgid "Salón"
+msgstr "Salón"
+
+#: src/screens/floor-plan.jsx
+msgid "Muro"
+msgstr "Muro"
+
+#: src/screens/floor-plan.jsx
+msgid "Barra"
+msgstr "Barra"
+
+#: src/screens/floor-plan.jsx
+msgid "Puerta"
+msgstr "Puerta"
+
+#: src/screens/floor-plan.jsx
+msgid "Texto"
+msgstr "Texto"
+
+#: src/screens/floor-plan.jsx
+msgid "No se pudo cargar el plano."
+msgstr "No se pudo cargar el plano."
+
+#: src/screens/floor-plan.jsx
+#: src/screens/settings.jsx
+msgid "Reintentar"
+msgstr "Reintentar"
+
+#: src/screens/floor-plan.jsx
+msgid "Carga del plano…"
+msgstr "Carga del plano…"
+
+#: src/screens/floor-plan.jsx
+msgid "Diseña tu espacio y publica el plano en el punto de venta."
+msgstr "Diseña tu espacio y publica el plano en el punto de venta."
+
+#: src/screens/floor-plan.jsx
+msgid "Guardado en curso…"
+msgstr "Guardado en curso…"
+
+#: src/screens/floor-plan.jsx
+msgid "Cambios pendientes"
+msgstr "Cambios pendientes"
+
+#: src/screens/floor-plan.jsx
+msgid "Borrador guardado"
+msgstr "Borrador guardado"
+
+#: src/screens/floor-plan.jsx
+msgid "Nuevo borrador"
+msgstr "Nuevo borrador"
+
+#: src/screens/floor-plan.jsx
+msgid "Volver al borrador"
+msgstr "Volver al borrador"
+
+#: src/screens/floor-plan.jsx
+msgid "Ver publicado"
+msgstr "Ver publicado"
+
+#: src/screens/floor-plan.jsx
+msgid "Publicar"
+msgstr "Publicar"
+
+#: src/screens/floor-plan.jsx
+msgid "Otro usuario cambió el plano. Recarga para obtener la versión actual."
+msgstr "Otro usuario cambió el plano. Recarga para obtener la versión actual."
+
+#: src/screens/floor-plan.jsx
+msgid "No se confirmó el guardado. Reintenta antes de continuar."
+msgstr "No se confirmó el guardado. Reintenta antes de continuar."
+
+#: src/screens/floor-plan.jsx
+msgid "Se descartarán los cambios locales. ¿Recargar el plano?"
+msgstr "Se descartarán los cambios locales. ¿Recargar el plano?"
+
+#: src/screens/floor-plan.jsx
+msgid "Revisa nombres únicos, capacidad y dimensiones. Los elementos deben quedar dentro del área."
+msgstr "Revisa nombres únicos, capacidad y dimensiones. Los elementos deben quedar dentro del área."
+
+#: src/screens/floor-plan.jsx
+msgid "Área"
+msgstr "Área"
+
+#: src/screens/floor-plan.jsx
+msgid "Agregar área"
+msgstr "Agregar área"
+
+#: src/screens/floor-plan.jsx
+msgid "Deshacer"
+msgstr "Deshacer"
+
+#: src/screens/floor-plan.jsx
+msgid "Rehacer"
+msgstr "Rehacer"
+
+#: src/screens/floor-plan.jsx
+msgid "Ajustar a cuadrícula"
+msgstr "Ajustar a cuadrícula"
+
+#: src/screens/floor-plan.jsx
+msgid "Zoom"
+msgstr "Zoom"
+
+#: src/screens/floor-plan.jsx
+msgid "Elementos"
+msgstr "Elementos"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa redonda"
+msgstr "Mesa redonda"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa cuadrada"
+msgstr "Mesa cuadrada"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa rectangular"
+msgstr "Mesa rectangular"
+
+#: src/screens/floor-plan.jsx
+msgid "Lista de elementos"
+msgstr "Lista de elementos"
+
+#: src/screens/floor-plan.jsx
+msgid "Plano. Selecciona un elemento de la lista para editarlo con el teclado."
+msgstr "Plano. Selecciona un elemento de la lista para editarlo con el teclado."
+
+#: src/screens/floor-plan.jsx
+msgid "Propiedades"
+msgstr "Propiedades"
+
+#: src/screens/floor-plan.jsx
+msgid "Forma"
+msgstr "Forma"
+
+#: src/screens/floor-plan.jsx
+msgid "Rectangular"
+msgstr "Rectangular"
+
+#: src/screens/floor-plan.jsx
+msgid "Redonda"
+msgstr "Redonda"
+
+#: src/screens/floor-plan.jsx
+msgid "Cuadrada"
+msgstr "Cuadrada"
+
+#: src/screens/floor-plan.jsx
+msgid "Capacidad"
+msgstr "Capacidad"
+
+#: src/screens/floor-plan.jsx
+msgid "Ancho"
+msgstr "Ancho"
+
+#: src/screens/floor-plan.jsx
+msgid "Alto"
+msgstr "Alto"
+
+#: src/screens/floor-plan.jsx
+msgid "Posición X"
+msgstr "Posición X"
+
+#: src/screens/floor-plan.jsx
+msgid "Posición Y"
+msgstr "Posición Y"
+
+#: src/screens/floor-plan.jsx
+msgid "Rotación"
+msgstr "Rotación"
+
+#: src/screens/floor-plan.jsx
+msgid "Duplicar"
+msgstr "Duplicar"
+
+#: src/screens/floor-plan.jsx
+msgid "Eliminar elemento"
+msgstr "Eliminar elemento"
+
+#: src/screens/floor-plan.jsx
+msgid "Editar área"
+msgstr "Editar área"
+
+#: src/screens/floor-plan.jsx
+msgid "Esta es la versión publicada en el punto de venta."
+msgstr "Esta es la versión publicada en el punto de venta."
+
+#: src/screens/floor-plan.jsx
+msgid "El borrador se guarda automáticamente. Publica para actualizar el punto de venta."
+msgstr "El borrador se guarda automáticamente. Publica para actualizar el punto de venta."
+
+#: src/screens/floor-plan.jsx
+msgid "Selecciona una sucursal para editar su plano."
+msgstr "Selecciona una sucursal para editar su plano."
 
 #: src/screens/gift-cards.jsx
 msgid "No se pudo canjear la tarjeta."
@@ -4707,10 +4912,6 @@ msgstr "Sin guardar"
 #: src/screens/settings.jsx
 msgid "✓ Guardado"
 msgstr "✓ Guardado"
-
-#: src/screens/settings.jsx
-msgid "Reintentar"
-msgstr "Reintentar"
 
 #: src/screens/settings.jsx
 msgid "Apodos (cómo la llaman los clientes)"
