@@ -516,6 +516,18 @@ export class DashboardOperationsRepository {
                 wp,
               );
 
+        // Channel wedge: committed revenue by the frozen origin_channel (default walk_in).
+        // Reads receipt_snapshot.grand_total over the same committed-sale set as the top-line
+        // net, so channelMix reconciles to netSalesMinorUnits. Never order_total (ORDER_MODEL §4).
+        const channels = await client.query<{ channel: string; net: string; orders: string }>(
+          `SELECT coalesce(s.origin_channel,'walk_in') AS channel,
+                  coalesce(sum(r.grand_total),0)::bigint AS net, count(*)::bigint AS orders
+           ${joinSale}
+           WHERE ${range}
+           GROUP BY 1 ORDER BY net DESC`,
+          wp,
+        );
+
         const net = Number(totals.rows[0]?.net ?? 0);
         const orders = Number(totals.rows[0]?.orders ?? 0);
         return {
@@ -536,6 +548,11 @@ export class DashboardOperationsRepository {
           paymentMix: [...payments.rows, ...walletPayments.rows].map((p) => ({
             method: p.method as 'cash' | 'manual_terminal' | 'wallet' | 'gift_card',
             amountMinorUnits: Number(p.amount),
+          })),
+          channelMix: channels.rows.map((c) => ({
+            channel: c.channel as 'walk_in' | 'whatsapp' | 'web' | 'aggregator',
+            netSalesMinorUnits: Number(c.net),
+            orders: Number(c.orders),
           })),
           productMix: products.rows.map((p) => ({
             productId: p.productId,

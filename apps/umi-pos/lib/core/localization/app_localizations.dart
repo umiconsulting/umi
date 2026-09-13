@@ -1406,6 +1406,30 @@ abstract class AppLocalizations {
   /// **'Ventas'**
   String get saleHistoryTitle;
 
+  /// No description provided for @incomingOrdersTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Pedidos entrantes'**
+  String get incomingOrdersTitle;
+
+  /// No description provided for @incomingOrdersEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay pedidos entrantes.'**
+  String get incomingOrdersEmpty;
+
+  /// No description provided for @incomingOrdersError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron cargar los pedidos.'**
+  String get incomingOrdersError;
+
+  /// No description provided for @incomingOrdersTake.
+  ///
+  /// In es, this message translates to:
+  /// **'Atender'**
+  String get incomingOrdersTake;
+
   /// No description provided for @currentSaleLabel.
   ///
   /// In es, this message translates to:

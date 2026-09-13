@@ -14,6 +14,22 @@ describe('Gate 3B checkout persistence', () => {
     expect(source).toContain('sum(quantity_numerator/quantity_denominator)::bigint::text');
   });
 
+  it('freezes channel attribution on the committed sale and closes the linked order', async () => {
+    const source = readFileSync(join(__dirname, 'pos-checkout.repository.ts'), 'utf8');
+    // origin_* is stamped onto the frozen sale fact (ADR 2026-09-13-pos-channel-attribution).
+    expect(source).toContain(
+      'receipt_snapshot_id,totals_fingerprint,cash_shift_id,origin_order_id,origin_channel',
+    );
+    expect(source).toContain('c.origin_order_id::text AS "originOrderId"');
+    // Link, don't merge: a settled upstream order is closed on the append-only spine, and only
+    // from a non-terminal state so a POS sale never reopens a completed/canceled order.
+    expect(source).toContain("SET status='completed'");
+    expect(source).toContain("status IN ('placed','preparing','ready')");
+    expect(source).toContain(
+      "INSERT INTO merchant.order_event (order_id,status) VALUES ($1::uuid,'completed')",
+    );
+  });
+
   it('consumes one exact approval for each required permission', async () => {
     const query = vi
       .fn()
@@ -109,6 +125,8 @@ describe('Gate 3B checkout persistence', () => {
           locationName: 'Local',
           operatorName: 'Cashier',
           customerId: null,
+          originOrderId: null,
+          originChannel: null,
           lines: [],
         },
         id(7),

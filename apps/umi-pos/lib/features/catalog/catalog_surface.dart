@@ -10,6 +10,8 @@ import '../../core/observability/telemetry.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
 import '../cart/cart_controller.dart';
+import '../cart/incoming_orders_controller.dart';
+import '../cart/incoming_orders_surface.dart';
 import '../cash/cash_controller.dart';
 import '../cash/cash_surface.dart';
 import '../checkout/checkout_controller.dart';
@@ -41,6 +43,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.entry,
     required this.catalog,
     required this.cart,
+    this.incomingOrders,
     required this.cash,
     required this.checkout,
     required this.sales,
@@ -59,6 +62,7 @@ final class CatalogSurface extends StatefulWidget {
   final EntryController entry;
   final CatalogController catalog;
   final CartController cart;
+  final IncomingOrdersController? incomingOrders;
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;
@@ -656,6 +660,15 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 entry: widget.entry,
               ),
             ),
+          if (widget.incomingOrders != null)
+            (
+              destination: NavigationDestination(
+                icon: const Icon(Icons.inbox_outlined),
+                selectedIcon: const Icon(Icons.inbox),
+                label: spanish ? 'Pedidos' : 'Orders',
+              ),
+              onTap: () => _openIncomingOrders(context),
+            ),
           (
             destination: NavigationDestination(
               icon: const Icon(Icons.tune_outlined),
@@ -868,6 +881,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     permissions: permissions,
     onHandoffCompleted: widget.entry.lock,
   );
+
+  void _openIncomingOrders(BuildContext context) {
+    final incoming = widget.incomingOrders;
+    final entry = widget.entry.state;
+    final merchant = entry.selectedTenant;
+    final location = entry.selectedBranch;
+    final operator = entry.operator;
+    if (incoming == null ||
+        merchant == null ||
+        location == null ||
+        operator == null) {
+      return;
+    }
+    showIncomingOrders(
+      context,
+      incoming: incoming,
+      cart: widget.cart,
+      merchantId: merchant.id,
+      locationId: location.id,
+      operatorSessionId: operator.id,
+    );
+  }
 
   Future<void> _openSaleCenter(
     BuildContext context,

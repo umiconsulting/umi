@@ -7,10 +7,12 @@ import {
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import type {
+  BindCartOriginRequest,
   Cart,
   CartLineInput,
   ClearCartRequest,
   CreateCartRequest,
+  PosIncomingOrders,
   PrepareSaleRequest,
   RemoveCartLineRequest,
 } from '@umi/contract';
@@ -167,6 +169,43 @@ export class PosCartService {
         return changed ? this.repo.snapshotWithClient(client, merchantId, dto.cartId) : null;
       },
     );
+  }
+
+  // Bind the active cart to the incoming order it settles (channel wedge, ADR 2026-09-13).
+  // Runs through the same idempotency + audit path as every other cart mutation.
+  async bindOrigin(user: AuthUser, merchantId: string, dto: BindCartOriginRequest) {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    return this.command(
+      merchantId,
+      dto.locationId,
+      dto.idempotencyKey,
+      'cart.origin.bind',
+      dto,
+      async (client) => {
+        const changed = await this.repo.bindOrigin(
+          client,
+          merchantId,
+          dto.cartId,
+          dto.expectedVersion,
+          dto.operatorSessionId,
+          dto.originOrderId,
+        );
+        return changed ? this.repo.snapshotWithClient(client, merchantId, dto.cartId) : null;
+      },
+    );
+  }
+
+  // The incoming commercial orders this till can pick up and fulfil. Read-only; authorized by
+  // the same device + operator session as a cart write.
+  async incomingOrders(
+    user: AuthUser,
+    merchantId: string,
+    locationId: string,
+    operatorSessionId: string,
+  ): Promise<PosIncomingOrders> {
+    await this.authorize(user, merchantId, locationId, operatorSessionId);
+    const orders = await this.repo.listIncomingOrders(merchantId, locationId, user.id);
+    return { orders };
   }
 
   private async command(

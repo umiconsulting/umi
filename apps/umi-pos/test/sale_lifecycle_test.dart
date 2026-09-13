@@ -251,6 +251,16 @@ final class _Carts implements CartRepository {
       cart();
   @override
   Future<Cart> clear(String merchantId, ClearCartRequest input) async => cart();
+
+  @override
+  Future<PosIncomingOrders> incomingOrders(
+    String merchantId,
+    CartQuery query,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<Cart> bindOrigin(String merchantId, BindCartOriginRequest input) async =>
+      throw UnimplementedError();
 }
 
 CartController _cartController() => CartController(

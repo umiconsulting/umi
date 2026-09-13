@@ -74,6 +74,20 @@ export const ReportsSeriesPoint = z
   })
   .strict();
 
+// Committed revenue split by the channel a sale originated in — the "channel wedge".
+// `channel` is the origin_channel stamped onto pos_committed_sale AT CHECKOUT (frozen), so
+// the split is reproducible and reconciles to `netSalesMinorUnits` (same committed-sale set).
+// It is NEVER derived from order_total, a mutable working/owed quote (ORDER_MODEL §4). A plain
+// counter sale with no upstream order is `walk_in`; the rest mirror customer_order.source.
+// See docs/architecture/2026-09-13-pos-channel-attribution-adr.md.
+export const ReportsChannelSlice = z
+  .object({
+    channel: z.enum(['walk_in', 'whatsapp', 'web', 'aggregator']),
+    netSalesMinorUnits: Money,
+    orders: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const ReportsSalesSummary = z
   .object({
     merchantId: Uuid,
@@ -86,6 +100,7 @@ export const ReportsSalesSummary = z
     bucket: z.enum(['hour', 'day']),
     totals: ReportsSalesTotals,
     paymentMix: z.array(ReportsPaymentSlice).max(8),
+    channelMix: z.array(ReportsChannelSlice).max(8),
     productMix: z.array(ReportsProductRow).max(200),
     byOperator: z.array(ReportsGroupRow).max(100),
     byHour: z.array(ReportsGroupRow).max(31),
@@ -188,6 +203,7 @@ export const reportsModels = {
   ReportsProductRow,
   ReportsGroupRow,
   ReportsSeriesPoint,
+  ReportsChannelSlice,
   ReportsSalesSummary,
   CashRole,
   CashDenomination,
