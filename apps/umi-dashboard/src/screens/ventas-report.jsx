@@ -19,6 +19,18 @@ const RANGES = [
 ];
 const METHOD_LABEL = { cash: msg`Efectivo`, manual_terminal: msg`Terminal manual` };
 const METHOD_COLOR = { cash: 'var(--success)', manual_terminal: 'var(--merchant-brand)' };
+const CHANNEL_LABEL = {
+  walk_in: msg`Mostrador`,
+  whatsapp: msg`WhatsApp`,
+  web: msg`Web`,
+  aggregator: msg`Reparto`,
+};
+const CHANNEL_COLOR = {
+  walk_in: 'var(--ink-3)',
+  whatsapp: 'var(--success)',
+  web: 'var(--merchant-brand)',
+  aggregator: 'var(--warning, #c77700)',
+};
 
 /** A boxed KPI tile: label, big mono value, and an optional delta or meta line. */
 function Kpi({ label, value, delta, deltaTone, meta }) {
@@ -218,6 +230,102 @@ function PaymentMix({ paymentMix, currency }) {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+// Committed revenue by origin channel — the channel wedge. Until the POS incoming-orders
+// surface links WhatsApp orders, every sale is walk_in and a single-channel bar would
+// misrepresent the mix, so we render an honest "coming" state instead of a fake split
+// (ADR 2026-09-13-pos-channel-attribution section 6). Revenue is frozen (receipt_snapshot),
+// so it reconciles to net sales.
+function ChannelMix({ channelMix, currency }) {
+  const { i18n } = useLingui();
+  const attributed = channelMix.some((c) => c.channel !== 'walk_in');
+  const total = channelMix.reduce((s, c) => s + c.netSalesMinorUnits, 0) || 1;
+  return (
+    <section
+      style={{
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        background: 'var(--surface)',
+        padding: '16px 18px',
+      }}
+    >
+      <div className="eyebrow" style={{ marginBottom: 12 }}>
+        <Trans>Canal de venta</Trans>
+      </div>
+      {!attributed ? (
+        <div style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.5 }}>
+          <Trans>
+            La atribución por canal se activa cuando el punto de venta enlaza los pedidos de
+            WhatsApp. Mientras tanto, las ventas cuentan como mostrador.
+          </Trans>
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              height: 12,
+              borderRadius: 6,
+              overflow: 'hidden',
+              marginBottom: 14,
+            }}
+          >
+            {channelMix.map((c) => (
+              <div
+                key={c.channel}
+                style={{
+                  width: `${(c.netSalesMinorUnits / total) * 100}%`,
+                  background: CHANNEL_COLOR[c.channel] || 'var(--ink-3)',
+                }}
+              />
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {channelMix.map((c) => (
+              <div
+                key={c.channel}
+                style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5 }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: '50%',
+                    background: CHANNEL_COLOR[c.channel] || 'var(--ink-3)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ flex: 1 }}>{i18n._(CHANNEL_LABEL[c.channel] || c.channel)}</span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--ink-3)',
+                    width: 46,
+                    textAlign: 'right',
+                  }}
+                >
+                  {Math.round((c.netSalesMinorUnits / total) * 100)}%
+                </span>
+                <span
+                  className="figures"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 600,
+                    width: 110,
+                    textAlign: 'right',
+                  }}
+                >
+                  {formatOperationMoney(c.netSalesMinorUnits, currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -596,6 +704,8 @@ export default function VentasReport() {
             <SeriesChart series={data?.series || []} bucket={data?.bucket} currency={currency} />
             <PaymentMix paymentMix={data?.paymentMix || []} currency={currency} />
           </div>
+
+          <ChannelMix channelMix={data?.channelMix || []} currency={currency} />
 
           <Pivot
             productMix={data?.productMix || []}
