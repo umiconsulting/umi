@@ -1322,6 +1322,10 @@ msgid "abierto"
 msgstr "open"
 
 #: src/screens/customers.jsx
+msgid "Volver a la lista"
+msgstr "Back to list"
+
+#: src/screens/customers.jsx
 msgid "Elige un cliente"
 msgstr "Choose a customer"
 
@@ -5073,6 +5077,10 @@ msgstr "The sales report could not be loaded."
 #: src/screens/ventas-report.jsx
 msgid "Cargando ventas…"
 msgstr "Loading sales…"
+
+#: src/screens/ventas-report.jsx
+msgid "Resumen del periodo"
+msgstr "Period summary"
 
 #: src/screens/ventas-report.jsx
 msgid "Ventas netas"
