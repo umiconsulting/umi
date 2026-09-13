@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
 import { isProductStatusActive } from '@umi/contract';
-import { AnthropicAdapter } from '../../shared/adapters/anthropic.adapter';
+import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
 import { MerchantsRepository } from '../merchants/merchants.repository';
 import { CustomersRepository, type Row } from './customers.repository';
 import {
@@ -125,7 +125,7 @@ export class CustomersService {
   constructor(
     private readonly repo: CustomersRepository,
     private readonly merchants: MerchantsRepository,
-    private readonly anthropic: AnthropicAdapter,
+    @Inject(LLM_COMPLETION) private readonly llm: LlmCompletionProvider,
   ) {}
 
   /** Merchant product map (drives availability flags in the DTOs). */
@@ -446,7 +446,7 @@ export class CustomersService {
       return { description: cached.text, generated: false, segment: kpi.segment };
     }
 
-    const completion = await this.anthropic.createCompletion({
+    const completion = await this.llm.createCompletion({
       maxTokens: 220,
       system: PORTRAIT_SYSTEM,
       userMessage: JSON.stringify(input),

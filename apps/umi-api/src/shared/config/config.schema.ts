@@ -227,6 +227,15 @@ export const configSchema = z
     CUSTOMER_VALUE_SECRET: z.string().min(32).optional(),
 
     ANTHROPIC_API_KEY: z.string().optional(),
+    // Which provider serves single-shot LLM completions (facts, summaries, the customer
+    // portrait, intent). The WhatsApp bot's tool loop stays on Anthropic for now. Default
+    // 'anthropic' keeps current behavior; set 'deepseek' + DEEPSEEK_API_KEY to switch.
+    LLM_PROVIDER: z.enum(['anthropic', 'deepseek']).default('anthropic'),
+    // DeepSeek uses an OpenAI-compatible API. Model id is configurable so a new tier
+    // (e.g. a "flash" model) is a config change, not a code change.
+    DEEPSEEK_API_KEY: z.string().optional(),
+    DEEPSEEK_BASE_URL: z.string().url().default('https://api.deepseek.com'),
+    DEEPSEEK_MODEL: z.string().default('deepseek-chat'),
     VOYAGE_API_KEY: z.string().optional(),
     TWILIO_ACCOUNT_SID: z.string().optional(),
     TWILIO_AUTH_TOKEN: z.string().optional(),

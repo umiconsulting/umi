@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { AnthropicAdapter } from '../../shared/adapters/anthropic.adapter';
+import { Inject, Injectable } from '@nestjs/common';
+import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
 import { MILK_SYNONYMS, normalizeSynonymText, SIZE_SYNONYMS, TEMP_SYNONYMS } from './synonyms';
 import { sanitizeOutput } from './security.service';
 
@@ -283,7 +283,7 @@ Rules:
 
 @Injectable()
 export class IntentService {
-  constructor(private readonly anthropic: AnthropicAdapter) {}
+  constructor(@Inject(LLM_COMPLETION) private readonly llm: LlmCompletionProvider) {}
 
   async extractIntent(params: {
     turnText: string;
@@ -299,7 +299,7 @@ export class IntentService {
     inputTokens: number;
     outputTokens: number;
   }> {
-    const completion = await this.anthropic.createCompletion({
+    const completion = await this.llm.createCompletion({
       temperature: 0,
       maxTokens: 500,
       system: INTENT_SYSTEM_PROMPT,

@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { AnthropicAdapter } from '../../shared/adapters/anthropic.adapter';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
 import { VoyageAdapter } from '../../shared/adapters/voyage.adapter';
 import { MemoryRepository, type SemanticRow } from './memory.repository';
 import { MessagesRepository } from './messages.repository';
@@ -57,7 +57,7 @@ export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
 
   constructor(
-    private readonly anthropic: AnthropicAdapter,
+    @Inject(LLM_COMPLETION) private readonly llm: LlmCompletionProvider,
     private readonly voyage: VoyageAdapter,
     private readonly memory: MemoryRepository,
     private readonly messages: MessagesRepository,
@@ -201,7 +201,7 @@ export class MemoryService {
     // Fully fail-safe: a thrown Anthropic call (network/rate-limit) or malformed
     // output returns null so the caller keeps existingFacts unchanged.
     try {
-      const completion = await this.anthropic.createCompletion({
+      const completion = await this.llm.createCompletion({
         maxTokens: 256,
         system: `Extract and merge customer preferences from this WhatsApp conversation with a café bot.
 Return ONLY valid JSON with this exact shape:
@@ -240,7 +240,7 @@ Existing facts: ${existingJson}`,
       ? `Previous summary: ${existingSummary}\n\nNew messages to incorporate:\n`
       : '';
 
-    const completion = await this.anthropic.createCompletion({
+    const completion = await this.llm.createCompletion({
       maxTokens: 300,
       system: `You are summarizing a WhatsApp conversation with a café ordering bot.
 Write a concise summary (2-4 sentences) of what was discussed, what the customer ordered or asked about,
