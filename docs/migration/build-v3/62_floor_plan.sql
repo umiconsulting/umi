@@ -24,3 +24,6 @@ create policy floor_plan_scope on merchant.floor_plan
 grant select, insert, update on merchant.floor_plan to api, worker;
 grant select on merchant.floor_plan to readonly;
 comment on table merchant.floor_plan is 'Versioned layout configuration. POS reads only published snapshots. Publication history lives in merchant.audit_event.';
+
+insert into runtime.schema_migration(version,status)
+values ('build-v3-62','applied') on conflict(version) do nothing;

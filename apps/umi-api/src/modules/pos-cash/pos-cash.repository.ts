@@ -431,7 +431,7 @@ export class PosCashRepository {
       `SELECT sequence::text,entry_type AS type,amount_minor_units::text AS "amountMinorUnits",
               cash_received_minor_units::text AS received,
               change_given_minor_units::text AS change
-       FROM merchant.cash_ledger_entry WHERE shift_id=$1::uuid ORDER BY sequence`,
+       FROM merchant.cash_ledger_entry WHERE shift_id=$1::uuid ORDER BY cash_ledger_entry.sequence`,
       [shiftId],
     );
     return calculateExpectedCash(
