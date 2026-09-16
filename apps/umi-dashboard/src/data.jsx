@@ -32,6 +32,7 @@ const EMPTY_CUSTOMER_DETAIL = {
   identity: null,
 };
 const EMPTY_CUSTOMER_DESCRIPTION = { description: null, generated: false, segment: null };
+const EMPTY_SALES_INSIGHT = { narrative: null, generated: false, capturedAt: null };
 const EMPTY_CUSTOMER_INSIGHTS = { metrics: {}, insights: [], source: null };
 const EMPTY_STAFF = { staff: [] };
 const EMPTY_ROLES = { roles: [], permissions: [] };
@@ -527,6 +528,17 @@ async function _loadSalesSummary(ctx, range) {
   const locationId = _locationId(ctx);
   if (locationId) query.set('locationId', locationId);
   return _apiFetch(`${routes.merchants.operations(merchantId)}/reports/sales?${query}`);
+}
+
+// The AI sales narrative over the Ventas summary (same range/scope). Optional and
+// fail-safe: a null narrative means "hide the card", never an error.
+async function _loadSalesInsight(ctx, range) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return EMPTY_SALES_INSIGHT;
+  const query = new URLSearchParams({ range: range || 'today' });
+  const locationId = _locationId(ctx);
+  if (locationId) query.set('locationId', locationId);
+  return _apiFetch(`${routes.merchants.operations(merchantId)}/reports/sales/insight?${query}`);
 }
 
 // One cash shift's reconciliation detail (roles, cash-math, denominations, ledger,
@@ -1322,6 +1334,19 @@ function useSalesSummary(range, refresh) {
   );
 }
 
+// The AI sales narrative for the current range/scope. Lazy companion to useSalesSummary;
+// seeds empty and hides itself on a null narrative (fail-safe).
+function useSalesInsight(range, refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadSalesInsight(ctx, range);
+    },
+    _deps(ctx, [range || 'today', refresh || 0]),
+    EMPTY_SALES_INSIGHT,
+  );
+}
+
 // One cash shift's reconciliation detail for the Caja y turnos drill-down. Null shiftId
 // means no shift is selected; re-fetches when the shift or merchant changes.
 function useCashShiftDetail(shiftId, refresh) {
@@ -1552,6 +1577,7 @@ export {
   useOperationsData,
   // eslint-disable-next-line react-refresh/only-export-components
   useSalesSummary,
+  useSalesInsight,
   // eslint-disable-next-line react-refresh/only-export-components
   useCashShiftDetail,
   // eslint-disable-next-line react-refresh/only-export-components

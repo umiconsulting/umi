@@ -42,6 +42,16 @@ export class DashboardOperationsController {
     return this.operations.salesSummary(user, merchant, query);
   }
 
+  @Get('reports/sales/insight')
+  salesInsight(
+    @CurrentUser() user: AuthUser,
+    @Merchant() merchant: MerchantAccess,
+    @Param('merchantId') _merchantId: string,
+    @Query(new ZodValidationPipe(ReportsSalesQuery)) query: ReportsSalesQuery,
+  ) {
+    return this.operations.salesInsight(user, merchant, query);
+  }
+
   @Get('cash-shifts/:shiftId')
   cashShiftDetail(
     @CurrentUser() user: AuthUser,

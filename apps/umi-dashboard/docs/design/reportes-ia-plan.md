@@ -1,0 +1,236 @@
+# Reportes IA — Proposal
+
+The target information architecture for Umi's Reportes area, grounded in
+[`reportes-ia-research.md`](./reportes-ia-research.md). The founder decisions are
+locked (§7) and Phase 1 has started to ship. This is the plan of record; §0 gives the
+live status.
+
+Companion dossiers: [research](./reportes-ia-research.md) ·
+[build-gap map](./reportes-build-gaps.md) · [design system](./reportes-design-system.md) ·
+[moodboard](./reportes-moodboard.md) · [patterns](./reportes-patterns.md).
+
+Date 2026-09-13.
+
+---
+
+## 0. Status (2026-09-13)
+
+- **Decisions** — all five are locked. See §7.
+- **Phase 1, AI Spanish narrative on Ventas** — ✅ shipped on `feat/reportes-ia`
+  (commit `4b83d13`). It adds the route `GET /operations/reports/sales/insight`
+  (`DashboardOperationsService.salesInsight`), the contract `ReportsSalesInsight`, the
+  hook `useSalesInsight`, and a narrative card above the KPI tiles in
+  `ventas-report.jsx`. It clones the live `describe()` pattern: deterministic KPIs, then
+  the LLM, then a djb2 fingerprint, then a 6 h cache, then a fail-safe null.
+- **Phase 1, channel attribution** — ✅ shipped (PR #166, `feat/pos-channel-attribution`).
+  The POS freezes `origin_order_id` and `origin_channel` on the committed sale. The
+  Ventas channel row stays behind an honest "coming" state until real channels flow.
+- **Open work** — feed `channelMix` into the narrative (§7.3), then close the Phase 2
+  gaps and the Phase 3 depth. See §6 and §9.
+- **Caveat** — Phase 1 uses the `LLM_COMPLETION` seam. The seam is now on the
+  `build-v3` integration branch, so the work is self-contained there. In-app
+  verification is still open: the API must run the new route with a DeepSeek key.
+
+## 1. Thesis
+
+**Reportes is an owner-facing, mobile-first, job-organised answer surface — not a
+chart library.** It leads with the daily rituals every café operator already does
+(cierre de caja, theft check, "did I sell more?"), turns each report into "here's
+what changed and what to do", and earns its wedge by reporting on the two things no
+US giant can and only Fudo partly can: **WhatsApp-driven sales** and **delivery +
+in-store consolidation**. The contador is served by clean **fiscal exports**, not a
+dashboard.
+
+This is mostly a **consolidation + narrative layer + gap-closing** effort, not a
+rebuild: the by-job direction is already half-shipped (Recibos dissolved into Ventas;
+Reembolsos is already a loss-prevention lens), the sales aggregate is a clean
+LLM-consumable fact source, and the AI plumbing already ships live.
+
+## 2. Audience
+
+- **Owner** (primary) — smartphone-first, basic-to-medium digital literacy, wants a
+  glance and a decision. Everything below is designed for the phone first.
+- **Manager/encargado** (first-class, scoped) — the target segment is **owner +
+  manager, multi-shift** (decision §7.2), so the manager is a first-class consumer of
+  **shift-scoped** operational reports (Ventas, Reembolsos, Caja y turnos for their
+  turno), reusing existing role grants (`sale.refund.*`, `cash.shift.close.approve`).
+  Multi-shift makes the business-day rollover, multi-turno-per-day, and per-cashier
+  scoping load-bearing, not optional.
+- **Contador** (not a dashboard user) — consumes a month-end fiscal export.
+
+## 3. The organising principle: jobs, not documents
+
+Nav is grouped by the operator's job, in the order they care (research §4). This is
+the founder's `recibos-reportes-split-by-job` decision, now evidence-backed.
+
+| #   | Job (owner's words)               | Surface                                                 | Cadence      |
+| --- | --------------------------------- | ------------------------------------------------------- | ------------ |
+| 1   | "¿Cuadró mi caja?"                | **Caja y turnos** (corte X/Z, faltante/sobrante)        | daily ritual |
+| 2   | "¿Me están robando?"              | **Reembolsos / pérdidas** (by cashier, anomaly-flagged) | daily/weekly |
+| 3   | "¿Vendí más o menos?"             | **Ventas** (hero KPIs + delta + narrative)              | daily glance |
+| 4   | "¿Cómo voy de costos?"            | **Costos** (prime cost: labor % + food %)               | weekly       |
+| 5   | "¿Qué platillo da dinero?"        | **Menú** (quadrant)                                     | monthly      |
+| 6   | "¿Estoy en regla con el SAT?"     | **Fiscal / facturación** (export)                       | monthly      |
+| 7   | Café lens (attach rate, day-part) | woven into Ventas + Menú                                | always       |
+
+## 4. Target IA
+
+Keep the nav **flat** — Square's 2025 over-nesting is the cautionary tale. Reportes
+stays one OPERATIONS-section entry with a short, stable child list.
+
+```
+Reportes
+├── Ventas            ← the landing answer surface (default)
+│     Resumen · Tabla dinámica · (Recibos folded in)   [existing, extend]
+├── Reembolsos        ← loss-prevention lens, by cajero  [existing, extend]
+├── Menú              ← menu-performance quadrant         [new]
+└── Fiscal            ← CFDI/global status + contador export [new, read-model]
+
+Caja y turnos         ← sibling OPERATIONS entry (cash-first, already strong)
+├── Turnos de caja    [existing]
+└── Registros         [existing]
+```
+
+**Ventas** opens on a phone-sized answer: a hero total + prior-period delta, then a
+one-line **AI narrative in Spanish** ("Ayer vendiste $X, 12% más que el martes;
+Americano y Latte fueron el 40% de las ventas"), then the KPI tiles, the trend chart,
+the payment-mix, and — the wedge — a **channel row (POS · WhatsApp · Delivery)**.
+Tabla dinámica (group by producto/categoría/barista/hora) stays as the power view.
+
+**Every report page** follows the modern bar: filters (rango + sucursal + canal) →
+tabs (Gráficas / Resumen / Desglose) → one-click export. Each carries a **compare
+control** (vs. período anterior) and **data-freshness label** (real-time vs. delayed).
+
+## 5. Current → target (reuse vs build)
+
+| Piece                        | State                                            | Action                                                                            |
+| ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `salesSummary` aggregate     | ✅ rich, LLM-ready                               | **Reuse** as the fact source for the narrative + KPIs                             |
+| Ventas Resumen / Pivot       | ✅ built                                         | **Extend** — add compare, channel row, export                                     |
+| Reembolsos "Por operador"    | ✅ built                                         | **Extend** — period aggregate (drop 50-row cap), anomaly flag                     |
+| Caja y turnos reconciliation | ✅ strong (cash math, X/Z, separation-of-duties) | **Keep**; surface faltante/sobrante as headline; owner read now works (RLS fixed) |
+| AI narrative                 | ✅ **shipped** (Phase 1, commit `4b83d13`)       | Live at `/operations/reports/sales/insight` (clone of `describe()`)               |
+| Export (CSV/PDF)             | ❌ none                                          | **Build** — first the contador fiscal export, then per-report CSV                 |
+| Channel split                | ⚙️ upstream shipped (PR #166); reporting pending | Sale freezes `origin_channel`; wire `channelMix` → narrative + Ventas row         |
+| IVA breakdown                | ⚠️ SQL-now                                       | **Build query** (data stored; seed real IVA on products)                          |
+| Cross-location roll-up       | ⚠️ needs GROUP BY                                | **Build** aggregate queries (RLS already allows)                                  |
+| Menu quadrant                | ⚠️ no COGS                                       | **Build** popularity × **retention** first (no COGS); CM later                    |
+| COGS/margin                  | ❌ schema gap                                    | **Defer** — needs a cost dimension on inventory                                   |
+
+## 6. Phased roadmap
+
+**Phase 1 — Answer + wedge (cheap, high-signal). ~1–2 weeks.**
+
+- AI Spanish narrative on Ventas (clone `describe()`; DeepSeek). ~2–4 days.
+  **✅ SHIPPED 2026-09-13** (commit `4b83d13`): route `/operations/reports/sales/insight`,
+  contract `ReportsSalesInsight`, hook `useSalesInsight`, and a narrative card in
+  `ventas-report.jsx`. In-app verification on staging is still open — see §0.
+- Channel row (POS · WhatsApp · Delivery) on Ventas — the wedge made visible.
+  **✅ SHIPPED 2026-09-13** (PR #166, branch `feat/pos-channel-attribution`). Scoping
+  CHANGED: the fix is UPSTREAM, not a reporting query — the POS now links the committed
+  sale to the incoming order (`origin_order_id` / `origin_channel`, frozen on
+  `pos_committed_sale`), so `channelMix` reads a frozen channel. The Ventas row is held
+  behind an honest "coming" state until the POS incoming-orders surface flows real
+  channels. See [ADR 2026-09-13-pos-channel-attribution](../../../../docs/architecture/2026-09-13-pos-channel-attribution-adr.md).
+  _The old "clean per-order channel tagging" prerequisite was superseded — see §7.4._
+- Compare-to-prior control + data-freshness labels across existing reports.
+- Fix the WhatsApp/delivery attribution data quality (the gate for everything).
+
+**Phase 2 — Close the obvious gaps. ~2–3 weeks.**
+
+- IVA/impuestos breakdown (SQL-now; seed real `tax_rate_basis_points` on products).
+- Net-of-refunds in the Ventas summary; unify the two refund ledgers in the read model.
+- Reembolsos period aggregate + per-cashier anomaly flags (loss-prevention job).
+- Per-report CSV export; the **contador month-end fiscal export** (CFDI/global status).
+- Cross-location roll-up (GROUP BY location) for multi-sucursal owners.
+
+**Phase 3 — Depth & differentiation.**
+
+- Menú quadrant — popularity × retention first (Customer 360), CM once COGS exists.
+- Delivery-aggregator consolidation with margin-after-commission (Rappi/UberEats/DiDi).
+- Conversational-health → revenue (needs outcome attribution).
+- COGS/margin: add a cost dimension to inventory (schema work), then true prime cost.
+
+## 7. Decisions (locked 2026-09-13)
+
+1. **Fiscal scope → export first.** Reportes does **not** issue CFDI. The Fiscal
+   surface is a read-model over facturación state (global status, IVA, cancelaciones)
+   plus a **month-end contador export**. Issuance/timbrado stays the separate backend
+   track. Reportes consumes and reconciles.
+2. **Segment → owner + manager, multi-shift.** The manager is a first-class,
+   **shift-scoped** consumer (see §2). Business-day rollover, multi-turno-per-day, and
+   cross-location roll-up (within one merchant) are in scope; role-scoped views are
+   required, not optional.
+3. **Wedge → channel wedge, delivered through the AI narrative.** The narrative's
+   headline job is to surface channel performance (POS · WhatsApp · Delivery); the
+   Spanish AI summary _carries_ the wedge rather than competing as a bare assistant.
+   Differentiate vs. Fudo on native conversational commerce + Customer 360; lead the
+   less-crowded delivery-consolidation angle where Umi already has Rappi data.
+   **Status 2026-09-13:** the channel data (PR #166) and the AI narrative (Phase 1,
+   commit `4b83d13`) both shipped. The remaining half is to feed `channelMix` into the
+   narrative and to unhide the Ventas channel row once real channels flow from the POS
+   incoming-orders surface.
+4. **Data quality → yes, enforced. MECHANISM REVISED 2026-09-13.** The blocker is real,
+   but the fix is NOT "ingestion + backfill of channel tags". A dig showed the POS mints
+   its own `source='pos'` order at checkout and never links the WhatsApp order it settles,
+   and WhatsApp orders capture no money (`payment` is POS-only) — so backfilling tags
+   cannot attribute POS revenue to WhatsApp. The adopted fix links the sale to its origin
+   order AT CHECKOUT (`origin_order_id` / `origin_channel`, frozen on `pos_committed_sale`);
+   revenue stays frozen (`receipt_snapshot`) and honest, and nothing channel-split reaches
+   owners until real channels flow. Full order-unification stays deferred and is
+   forward-compatible with this seam. See
+   [ADR 2026-09-13-pos-channel-attribution](../../../../docs/architecture/2026-09-13-pos-channel-attribution-adr.md).
+5. **Cost gate → DeepSeek.** The narrative runs on `LLM_PROVIDER=deepseek`
+   (Phase 1 shipped, OpenAI-compatible adapter at the `LLM_COMPLETION` choke point),
+   behind the existing fingerprint 6h cache + fail-safe null so per-café cost stays
+   bounded.
+
+## 8. Risks & honesty notes
+
+- **The demo data is thin and tax-free.** No IVA, no COGS, no card, no tips in the
+  Kalala rehearsal set. Design must render honest **"needs data" states**, and Phase 2
+  should seed realistic IVA/cost before showing fiscal/margin reports to anyone.
+- **The WhatsApp wedge is contested by Fudo.** Differentiate on _native_ conversational
+  commerce + Customer 360, not a bolt-on agent — and lead with delivery consolidation,
+  which is less crowded and where Umi already has Rappi data.
+- **Live-query cost.** Every report is ~10 live aggregates with no materialized views;
+  cross-location and wide-window reports may need a rollup table before they scale.
+- **AI trust.** Reuse the existing fail-safe null + cache pattern; never show an
+  ungrounded number. Narrate only facts computed deterministically.
+- **Lingui gate.** All new copy goes through `<Trans>`/`t` or CI fails.
+
+## 9. Success metrics & definition of done
+
+Measure the plan by owner behaviour, not by feature count. The demo data is thin, so
+use the pilot cafés (Kalala) as the first signal. Set numeric targets only after real
+IVA and cost data exist (§8).
+
+**Product signals (owner):**
+
+- The owner opens Ventas at least one time each trading day (the "did I sell more?"
+  ritual).
+- The owner reads the AI narrative before the KPI tiles. Measure the narrative view
+  rate and the time to the first answer on the phone (target: an answer above the fold
+  in less than 2 s).
+- Reembolsos anomaly flags cause at least one owner action each week (the theft job).
+
+**Quality gates (every phase):**
+
+- No ungrounded number. The narrative repeats only facts that the code computes.
+  A failed LLM call shows the fail-safe null state, not a guess.
+- Honest "needs data" states for missing IVA, COGS, or channel. Never render `$0` for
+  data that does not exist.
+- All new copy passes the Lingui gate (`<Trans>` / `t`) and the CI lint gate.
+
+**Definition of done, per phase:**
+
+- **Phase 1 — done when:** the narrative is live on staging with a DeepSeek key; the
+  channel row shows real channels (not the "coming" state) for at least one café; and
+  the compare-to-prior control and the freshness label are on every existing report.
+- **Phase 2 — done when:** Ventas shows the IVA breakdown and net-of-refunds from real
+  product tax data; Reembolsos shows a period aggregate with per-cashier anomaly flags;
+  the contador can export a month-end fiscal file; and multi-sucursal owners can roll up
+  across locations.
+- **Phase 3 — done when:** the Menú quadrant ranks items by popularity × retention; the
+  delivery-consolidation view shows the margin after aggregator commission; and true
+  prime cost is available after the inventory cost dimension exists.

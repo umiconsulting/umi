@@ -110,6 +110,19 @@ export const ReportsSalesSummary = z
   .strict();
 export type ReportsSalesSummary = z.infer<typeof ReportsSalesSummary>;
 
+// A short, plain-Spanish narrative over the sales summary — "here's what changed and
+// what to do", written by the configured LLM (LLM_COMPLETION). Grounded only in the
+// summary figures; never invents. `generated` is false when it came from cache or the
+// model was skipped/failed, so the UI can render silently and hide on null (fail-safe).
+export const ReportsSalesInsight = z
+  .object({
+    narrative: z.string().max(600).nullable(),
+    generated: z.boolean(),
+    capturedAt: IsoTimestamp,
+  })
+  .strict();
+export type ReportsSalesInsight = z.infer<typeof ReportsSalesInsight>;
+
 // ── Cash shift detail — the reconciliation drill-down the "Caja y turnos" view needs.
 // All of it already exists in the schema (cash_shift, cash_ledger_entry, cash_count_attempt,
 // cash_variance_resolution, cash_shift_custody_event); this read model just exposes it.
@@ -205,6 +218,7 @@ export const reportsModels = {
   ReportsSeriesPoint,
   ReportsChannelSlice,
   ReportsSalesSummary,
+  ReportsSalesInsight,
   CashRole,
   CashDenomination,
   CashLedgerLine,
