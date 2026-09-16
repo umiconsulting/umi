@@ -65,9 +65,10 @@ export class PosCartRepository {
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO merchant.pos_cart
          (merchant_id,location_id,operator_session_id,original_operator_session_id,
-          original_operator_user_id,operator_user_id)
-       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id
-       FROM merchant.location b
+          original_operator_user_id,operator_user_id,business_date)
+       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id,
+         (now() at time zone COALESCE(b.timezone,business.timezone))::date
+       FROM merchant.location b JOIN merchant.merchant business ON business.id=b.merchant_id
        JOIN runtime.operator_session os ON os.id=$3::uuid
        WHERE b.id=$2::uuid AND b.merchant_id=$1::uuid AND b.status='active'
          AND os.merchant_id=$1::uuid AND os.location_id=$2::uuid
@@ -75,6 +76,10 @@ export class PosCartRepository {
          ('building_cart','ready_for_checkout','recovered')
        DO UPDATE SET operator_session_id=excluded.operator_session_id,
                      lifecycle_state='recovered',
+                     -- A cart picked up the next morning is today's cart. Leaving
+                     -- yesterday's stamp here is what sent stale dates downstream,
+                     -- where the cash ledger refuses them outright.
+                     business_date=excluded.business_date,
                      updated_at=now()
        RETURNING id::text`,
       [merchantId, locationId, operatorSessionId],
