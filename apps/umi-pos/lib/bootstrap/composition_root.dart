@@ -18,6 +18,7 @@ import '../core/storage/storage.dart';
 import '../core/update/desktop_updater.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_repository.dart';
+import '../features/cart/incoming_orders_controller.dart';
 import '../features/cash/cash_controller.dart';
 import '../features/cash/cash_recovery_store.dart';
 import '../features/cash/cash_repository.dart';
@@ -67,6 +68,7 @@ final class AppCompositionRoot {
     required this.exceptions,
     required this.catalog,
     required this.cart,
+    required this.incomingOrders,
     required this.cash,
     required this.checkout,
     required this.sales,
@@ -209,8 +211,13 @@ final class AppCompositionRoot {
         );
       },
     );
+    final cartRepository = ApiCartRepository(apiClient);
     final cart = CartController(
-      repository: ApiCartRepository(apiClient),
+      repository: cartRepository,
+      telemetry: telemetry,
+    );
+    final incomingOrders = IncomingOrdersController(
+      repository: cartRepository,
       telemetry: telemetry,
     );
     return AppCompositionRoot(
@@ -260,6 +267,7 @@ final class AppCompositionRoot {
         telemetry: telemetry,
       ),
       cart: cart,
+      incomingOrders: incomingOrders,
       cash: cash,
       sales: SaleLifecycleController(
         repository: ApiSaleRepository(apiClient),
@@ -356,6 +364,7 @@ final class AppCompositionRoot {
   final SaleExceptionController exceptions;
   final CatalogController catalog;
   final CartController cart;
+  final IncomingOrdersController incomingOrders;
   final CashController cash;
   final CheckoutController checkout;
   final SaleLifecycleController sales;

@@ -724,6 +724,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get saleHistoryTitle => 'Ventas';
 
   @override
+  String get incomingOrdersTitle => 'Pedidos entrantes';
+
+  @override
+  String get incomingOrdersEmpty => 'No hay pedidos entrantes.';
+
+  @override
+  String get incomingOrdersError => 'No se pudieron cargar los pedidos.';
+
+  @override
+  String get incomingOrdersTake => 'Atender';
+
+  @override
   String get currentSaleLabel => 'Venta actual';
 
   @override

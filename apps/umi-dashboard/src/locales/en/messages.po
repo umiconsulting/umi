@@ -1323,7 +1323,7 @@ msgstr "open"
 
 #: src/screens/customers.jsx
 msgid "Volver a la lista"
-msgstr "Back to list"
+msgstr "Back to the list"
 
 #: src/screens/customers.jsx
 msgid "Elige un cliente"
@@ -5023,6 +5023,22 @@ msgid "30 días"
 msgstr "30 days"
 
 #: src/screens/ventas-report.jsx
+msgid "Mostrador"
+msgstr "Counter"
+
+#: src/screens/ventas-report.jsx
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+#: src/screens/ventas-report.jsx
+msgid "Web"
+msgstr "Web"
+
+#: src/screens/ventas-report.jsx
+msgid "Reparto"
+msgstr "Delivery"
+
+#: src/screens/ventas-report.jsx
 msgid "Venta por hora"
 msgstr "Sales by hour"
 
@@ -5037,6 +5053,14 @@ msgstr "Sales series for the period"
 #: src/screens/ventas-report.jsx
 msgid "Método de pago"
 msgstr "Payment method"
+
+#: src/screens/ventas-report.jsx
+msgid "Canal de venta"
+msgstr "Sales channel"
+
+#: src/screens/ventas-report.jsx
+msgid "La atribución por canal se activa cuando el punto de venta enlaza los pedidos de WhatsApp. Mientras tanto, las ventas cuentan como mostrador."
+msgstr "Channel attribution turns on when the point of sale links WhatsApp orders. Until then, sales count as counter."
 
 #: src/screens/ventas-report.jsx
 msgid "Hora"
