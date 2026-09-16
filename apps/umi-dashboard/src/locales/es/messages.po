@@ -5241,6 +5241,22 @@ msgid "30 días"
 msgstr "30 días"
 
 #: src/screens/ventas-report.jsx
+msgid "Mostrador"
+msgstr "Mostrador"
+
+#: src/screens/ventas-report.jsx
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+#: src/screens/ventas-report.jsx
+msgid "Web"
+msgstr "Web"
+
+#: src/screens/ventas-report.jsx
+msgid "Reparto"
+msgstr "Reparto"
+
+#: src/screens/ventas-report.jsx
 msgid "Venta por hora"
 msgstr "Venta por hora"
 
@@ -5255,6 +5271,14 @@ msgstr "Serie de ventas del periodo"
 #: src/screens/ventas-report.jsx
 msgid "Método de pago"
 msgstr "Método de pago"
+
+#: src/screens/ventas-report.jsx
+msgid "Canal de venta"
+msgstr "Canal de venta"
+
+#: src/screens/ventas-report.jsx
+msgid "La atribución por canal se activa cuando el punto de venta enlaza los pedidos de WhatsApp. Mientras tanto, las ventas cuentan como mostrador."
+msgstr "La atribución por canal se activa cuando el punto de venta enlaza los pedidos de WhatsApp. Mientras tanto, las ventas cuentan como mostrador."
 
 #: src/screens/ventas-report.jsx
 msgid "Hora"

@@ -11,6 +11,7 @@ import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/storage/storage.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
+import 'package:umi_pos/features/cart/incoming_orders_controller.dart';
 import 'package:umi_pos/features/cash/cash_controller.dart';
 import 'package:umi_pos/features/cash/cash_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
@@ -144,8 +145,13 @@ AppCompositionRoot testRoot({
   );
   final credentials = CredentialVault(secureStorage);
   final api = TestApiClient();
+  final cartRepository = ApiCartRepository(api);
   final cart = CartController(
-    repository: ApiCartRepository(api),
+    repository: cartRepository,
+    telemetry: telemetry,
+  );
+  final incomingOrders = IncomingOrdersController(
+    repository: cartRepository,
     telemetry: telemetry,
   );
   return AppCompositionRoot(
@@ -180,6 +186,7 @@ AppCompositionRoot testRoot({
       telemetry: telemetry,
     ),
     cart: cart,
+    incomingOrders: incomingOrders,
     cash: CashController(repository: ApiCashRepository(api)),
     sales: SaleLifecycleController(
       repository: ApiSaleRepository(api),

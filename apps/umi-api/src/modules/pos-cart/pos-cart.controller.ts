@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  BindCartOriginRequest,
   CartLineInput,
   CartQuery,
   ClearCartRequest,
@@ -95,5 +96,23 @@ export class PosCartController {
     @Body(new ZodValidationPipe(ClearCartRequest)) dto: ClearCartRequest,
   ) {
     return this.cart.clear(user, merchantId, dto);
+  }
+
+  @Get('incoming-orders')
+  incomingOrders(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(CartQuery)) query: CartQuery,
+  ) {
+    return this.cart.incomingOrders(user, merchantId, query.locationId, query.operatorSessionId);
+  }
+
+  @Post('origin')
+  bindOrigin(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(BindCartOriginRequest)) dto: BindCartOriginRequest,
+  ) {
+    return this.cart.bindOrigin(user, merchantId, dto);
   }
 }

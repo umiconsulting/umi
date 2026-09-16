@@ -12,7 +12,7 @@ One column on the phone, inverted pyramid — the answer, then the evidence:
 
 1. Filter + compare bar (sticky)
 2. **Hero metric** — one number (28–40px), period label, delta chip
-3. **One-line AI narrative** (Spanish, ≤140 chars): *"Ayer vendiste $4,820, 12% más que el martes."*
+3. **One-line AI narrative** (Spanish, ≤140 chars): _"Ayer vendiste $4,820, 12% más que el martes."_
 4. KPI tile row (2×2, max 4)
 5. Primary chart (trend)
 6. Secondary breakdown (payment / **channel** mix)
@@ -36,14 +36,14 @@ Label (11–13px, muted) → value (20–28px bold, tabular) → **delta chip** 
 
 ## 3. Chart selection
 
-| Question | Chart |
-|---|---|
-| Trend over time (ventas por día/hora) | Line; area only for one cumulative series |
-| Composition (mix de pago, **canal**) | Stacked horizontal bar; donut only ≤4 slices, direct-labelled |
-| Ranking (top productos, por barista) | Horizontal bar, sorted desc |
-| Day × hour intensity (horas pico) | Heatmap (lightness ramp) |
-| P&L build-up (bruto → descuentos → reembolsos → neto) | **Waterfall** |
-| One value vs. target | Bullet / progress, not a gauge |
+| Question                                              | Chart                                                         |
+| ----------------------------------------------------- | ------------------------------------------------------------- |
+| Trend over time (ventas por día/hora)                 | Line; area only for one cumulative series                     |
+| Composition (mix de pago, **canal**)                  | Stacked horizontal bar; donut only ≤4 slices, direct-labelled |
+| Ranking (top productos, por barista)                  | Horizontal bar, sorted desc                                   |
+| Day × hour intensity (horas pico)                     | Heatmap (lightness ramp)                                      |
+| P&L build-up (bruto → descuentos → reembolsos → neto) | **Waterfall**                                                 |
+| One value vs. target                                  | Bullet / progress, not a gauge                                |
 
 Color: ≤5–6 categorical hues; colorblind-safe (blue+orange is safest); vary lightness
 not only hue; **encode nothing by color alone** (add order/labels/sign). Sequential
@@ -81,14 +81,14 @@ Sticky bar shows the selection as chips; tap opens a bottom sheet.
 input (we cannot compute it).** Never render `taxTotal = 0` as "IVA: $0" — in the Kalala
 data that is fiction (no IVA/COGS/tips/channel tags exist yet).
 
-| State | Show | Spanish (ETS) |
-|---|---|---|
-| **Empty / real zero** | metric + context, not a blank | "No hubo ventas en este periodo. Prueba con otro rango." · "No abriste ningún turno en estas fechas." |
-| **First-run / not configured** | one line + one primary action | "Aún no registras ventas. Cuando cobres en el POS, aquí verás tu resumen." |
-| **Needs data (input missing)** | the report frame + a labelled prompt, never a zero | IVA: "Falta configurar el IVA de tus productos." → "Configurar IVA" · Margen: "Para ver tu margen, agrega el costo de tus productos." · Canal: "Estamos etiquetando el canal de tus pedidos; disponible pronto." |
-| **Loading** | skeleton mirroring the final layout for >1s; reserve space (no layout shift); spinner only for small in-place refresh | — |
-| **Error** | keep the page frame; inline error card in the failed region only | "No pudimos cargar este reporte." → "Reintentar" |
-| **Partial** | render what loaded; mark each missing block inline; one failed aggregate never blanks the answer | "No pudimos cargar el mix de pagos. Reintentar" |
+| State                          | Show                                                                                                                  | Spanish (ETS)                                                                                                                                                                                                    |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Empty / real zero**          | metric + context, not a blank                                                                                         | "No hubo ventas en este periodo. Prueba con otro rango." · "No abriste ningún turno en estas fechas."                                                                                                            |
+| **First-run / not configured** | one line + one primary action                                                                                         | "Aún no registras ventas. Cuando cobres en el POS, aquí verás tu resumen."                                                                                                                                       |
+| **Needs data (input missing)** | the report frame + a labelled prompt, never a zero                                                                    | IVA: "Falta configurar el IVA de tus productos." → "Configurar IVA" · Margen: "Para ver tu margen, agrega el costo de tus productos." · Canal: "Estamos etiquetando el canal de tus pedidos; disponible pronto." |
+| **Loading**                    | skeleton mirroring the final layout for >1s; reserve space (no layout shift); spinner only for small in-place refresh | —                                                                                                                                                                                                                |
+| **Error**                      | keep the page frame; inline error card in the failed region only                                                      | "No pudimos cargar este reporte." → "Reintentar"                                                                                                                                                                 |
+| **Partial**                    | render what loaded; mark each missing block inline; one failed aggregate never blanks the answer                      | "No pudimos cargar el mix de pagos. Reintentar"                                                                                                                                                                  |
 
 The **AI narrative** is special: on failure, hide the card silently (fail-safe null —
 the existing `describe()` pattern). Never show a broken or ungrounded sentence.

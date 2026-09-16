@@ -182,7 +182,7 @@ export class DashboardOperationsService {
       });
       text = completion?.text?.trim() || null;
     } catch {
-      text = null; // fail-safe: the narrative never breaks the report
+      // fail-safe: the narrative is optional; `text` stays null so the card hides
     }
     if (text) {
       this.insightCache.set(key, { text, expires: now + INSIGHT_TTL_MS });

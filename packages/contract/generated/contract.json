@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "a2db316316364a3b95fc4a6376fef6b2a8cc4981864cbf5bc19a81ef489ccd79",
+  "contentHash": "60b937731eb171d66e2f41ba4c01319ff4b690c1e685c39188f3cfe38073cd6b",
   "contractVersion": "2.19.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -2195,6 +2195,51 @@
         "replaySessionId",
         "cursor",
         "policy"
+      ],
+      "type": "object"
+    },
+    "BindCartOriginRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "cartId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "originOrderId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cartId",
+        "locationId",
+        "operatorSessionId",
+        "originOrderId",
+        "expectedVersion",
+        "idempotencyKey"
       ],
       "type": "object"
     },
@@ -52981,6 +53026,173 @@
       ],
       "type": "object"
     },
+    "PosIncomingOrder": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "enum": [
+            "whatsapp",
+            "web",
+            "aggregator"
+          ],
+          "type": "string"
+        },
+        "customerName": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "itemCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "orderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "placedAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "placed",
+            "preparing",
+            "ready"
+          ],
+          "type": "string"
+        },
+        "totalMinorUnits": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "orderId",
+        "channel",
+        "status",
+        "reference",
+        "customerName",
+        "itemCount",
+        "totalMinorUnits",
+        "placedAt"
+      ],
+      "type": "object"
+    },
+    "PosIncomingOrders": {
+      "additionalProperties": false,
+      "properties": {
+        "orders": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "channel": {
+                "enum": [
+                  "whatsapp",
+                  "web",
+                  "aggregator"
+                ],
+                "type": "string"
+              },
+              "customerName": {
+                "anyOf": [
+                  {
+                    "maxLength": 240,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "itemCount": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "orderId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "placedAt": {
+                "anyOf": [
+                  {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reference": {
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "enum": [
+                  "placed",
+                  "preparing",
+                  "ready"
+                ],
+                "type": "string"
+              },
+              "totalMinorUnits": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "orderId",
+              "channel",
+              "status",
+              "reference",
+              "customerName",
+              "itemCount",
+              "totalMinorUnits",
+              "placedAt"
+            ],
+            "type": "object"
+          },
+          "maxItems": 100,
+          "type": "array"
+        }
+      },
+      "required": [
+        "orders"
+      ],
+      "type": "object"
+    },
     "PosKitchenOrderQuery": {
       "additionalProperties": false,
       "properties": {
@@ -76944,6 +77156,21 @@
       "request": "CartQuery",
       "response": "Cart"
     },
+    "GET /api/v1/pos/merchants/:merchantId/cart/incoming-orders": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "CartQuery",
+      "response": "PosIncomingOrders"
+    },
     "GET /api/v1/pos/merchants/:merchantId/cash": {
       "approval": false,
       "auth": "operator-session",
@@ -78167,6 +78394,23 @@
       "permission": "cart.write",
       "pin": false,
       "request": "CartLineInput",
+      "response": "Cart"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/cart/origin": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "IDEMPOTENCY_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cart.write",
+      "pin": false,
+      "request": "BindCartOriginRequest",
       "response": "Cart"
     },
     "POST /api/v1/pos/merchants/:merchantId/cart/prepare": {

@@ -128,6 +128,37 @@ export const PrepareSaleRequest = z
   .strict();
 export const CartQuery = z.object({ locationId: Uuid, operatorSessionId: Uuid }).strict();
 
+// Channel attribution (ADR 2026-09-13-pos-channel-attribution). Bind the active cart to the
+// upstream commercial order it settles, so the committed sale freezes the channel and the linked
+// order is closed at checkout. originOrderId=null detaches the cart (a plain walk_in sale).
+export const BindCartOriginRequest = z
+  .object({
+    cartId: Uuid,
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    originOrderId: Uuid.nullable(),
+    expectedVersion: z.number().int().positive(),
+    idempotencyKey: Idempotency,
+  })
+  .strict();
+
+// One incoming commercial order a till can pick up: a customer channel (never 'pos', never staff
+// 'dashboard' entry) that has not reached a terminal status. A compact card for the POS
+// incoming-orders surface; the operator rings the items, so lines are not auto-loaded.
+export const PosIncomingOrder = z
+  .object({
+    orderId: Uuid,
+    channel: z.enum(['whatsapp', 'web', 'aggregator']),
+    status: z.enum(['placed', 'preparing', 'ready']),
+    reference: z.string().max(160).nullable(),
+    customerName: z.string().max(240).nullable(),
+    itemCount: z.number().int().nonnegative(),
+    totalMinorUnits: z.number().int().nonnegative(),
+    placedAt: Timestamp.nullable(),
+  })
+  .strict();
+export const PosIncomingOrders = z.object({ orders: z.array(PosIncomingOrder).max(100) }).strict();
+
 export type Cart = z.infer<typeof Cart>;
 export type CartItem = z.infer<typeof CartItem>;
 export type CartLineInput = z.infer<typeof CartLineInput>;
@@ -136,6 +167,9 @@ export type RemoveCartLineRequest = z.infer<typeof RemoveCartLineRequest>;
 export type ClearCartRequest = z.infer<typeof ClearCartRequest>;
 export type PrepareSaleRequest = z.infer<typeof PrepareSaleRequest>;
 export type CartQuery = z.infer<typeof CartQuery>;
+export type BindCartOriginRequest = z.infer<typeof BindCartOriginRequest>;
+export type PosIncomingOrder = z.infer<typeof PosIncomingOrder>;
+export type PosIncomingOrders = z.infer<typeof PosIncomingOrders>;
 export const posCartModels = {
   VariantSelection,
   ModifierSelection,
@@ -150,4 +184,7 @@ export const posCartModels = {
   ClearCartRequest,
   PrepareSaleRequest,
   CartQuery,
+  BindCartOriginRequest,
+  PosIncomingOrder,
+  PosIncomingOrders,
 };

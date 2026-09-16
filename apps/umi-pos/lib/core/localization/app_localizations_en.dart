@@ -719,6 +719,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saleHistoryTitle => 'Sales';
 
   @override
+  String get incomingOrdersTitle => 'Incoming orders';
+
+  @override
+  String get incomingOrdersEmpty => 'No incoming orders.';
+
+  @override
+  String get incomingOrdersError => 'Could not load the orders.';
+
+  @override
+  String get incomingOrdersTake => 'Take';
+
+  @override
   String get currentSaleLabel => 'Current sale';
 
   @override

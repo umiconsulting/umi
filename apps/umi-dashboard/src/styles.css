@@ -229,7 +229,17 @@ table th {
 
 /* Sidebar */
 .side {
-  position: relative;
+  /* A viewport-tall rail pinned to the top: it stays in view while the page
+     scrolls, so the account foot and café switcher never fall below the fold, and
+     `.side-nav` inside it becomes the one scroll region when the menu is taller
+     than the screen. Without a bounded height the rail stretches to the full page
+     height (matching `.main`), which defeats `.side-nav`'s own overflow and buries
+     the foot. `align-self: start` keeps the grid item from stretching past 100vh.
+     The ≤1080px drawer overrides this to `position: fixed` (see the media query). */
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
   background: var(--sidebar-bg);
   background-image:
     radial-gradient(120% 60% at 0% 0%, rgba(118, 146, 203, 0.18), transparent 60%),
@@ -287,6 +297,27 @@ table th {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  /* Thin, quiet scrollbar that appears only when the menu overflows — the visible
+     bar is the affordance that more nav sits below. The default browser bar is too
+     heavy for a rail, and the panel-scrollbar tokens (`--line-strong`) are tuned
+     for light cards and vanish on this dark ground. The `--side-text-*` tokens read
+     on the rail and invert with the theme, so a light sidebar gets a dark thumb.
+     Firefox uses these two properties; WebKit uses the pseudo-elements below. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--side-text-3) transparent;
+}
+.side-nav::-webkit-scrollbar {
+  width: 8px;
+}
+.side-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.side-nav::-webkit-scrollbar-thumb {
+  background: var(--side-text-3);
+  border-radius: 4px;
+}
+.side-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--side-text-2);
 }
 .side-section {
   font-size: 10px;
@@ -3946,6 +3977,9 @@ time,
   .side {
     position: fixed;
     inset: 0 auto 0 0;
+    /* Drop the desktop rail's fixed 100vh: `inset` (top:0/bottom:0) sizes the
+       drawer to the real viewport, which tracks mobile browser chrome better. */
+    height: auto;
     width: 268px;
     z-index: 60;
     transform: translateX(-100%);

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
-import type { Cart, CartLineInput } from '@umi/contract';
+import type { Cart, CartLineInput, PosIncomingOrder } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 
 export interface PricedSelection {
@@ -349,6 +349,103 @@ export class PosCartRepository {
       [merchantId, cartId],
     );
     return true;
+  }
+
+  // Channel attribution (ADR 2026-09-13-pos-channel-attribution). Bind the active cart to the
+  // upstream commercial order it settles. The channel is resolved from that order's source and
+  // FROZEN onto the cart, so it survives even if the order later changes; the commit copies it
+  // onto pos_committed_sale. originOrderId=null detaches the cart back to a walk_in sale.
+  async bindOrigin(
+    client: PoolClient,
+    merchantId: string,
+    cartId: string,
+    expectedVersion: number,
+    operatorSessionId: string,
+    originOrderId: string | null,
+  ): Promise<boolean> {
+    let channel: string | null = null;
+    if (originOrderId) {
+      // Only a real, still-open customer-channel order can be picked up. 'pos' is the till's own
+      // order and 'dashboard' is staff entry — neither is an incoming order to fulfil.
+      const order = await client.query<{ source: string }>(
+        `SELECT source FROM merchant.customer_order
+          WHERE id=$1::uuid AND merchant_id=$2::uuid
+            AND source NOT IN ('pos','dashboard')
+            AND status IN ('placed','preparing','ready')`,
+        [originOrderId, merchantId],
+      );
+      if (!order.rows[0]) return false;
+      channel = order.rows[0].source;
+    }
+    const { rowCount } = await client.query(
+      `UPDATE merchant.pos_cart
+          SET origin_order_id=$5::uuid,origin_channel=$6,
+              version=version+1,updated_at=now()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid AND version=$3
+          AND operator_session_id=$4::uuid
+          AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+          AND status IN ('draft','prepared')`,
+      [merchantId, cartId, expectedVersion, operatorSessionId, originOrderId, channel],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  // The incoming commercial orders a till can pick up: customer-channel orders (not 'pos', not
+  // staff 'dashboard' entry) still open. RLS-scoped; location-narrowed, but legacy migrated
+  // orders carry location_id=NULL and are always visible so they can still be settled.
+  async listIncomingOrders(
+    merchantId: string,
+    locationId: string,
+    userId: string,
+  ): Promise<PosIncomingOrder[]> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows } = await client.query<{
+          orderId: string;
+          channel: PosIncomingOrder['channel'];
+          status: PosIncomingOrder['status'];
+          reference: string | null;
+          customerName: string | null;
+          itemCount: string;
+          totalMinorUnits: string;
+          placedAt: Date | null;
+        }>(
+          `SELECT o.id::text AS "orderId",o.source AS channel,o.status,
+                  coalesce(o.external_ref,o.id::text) AS reference,
+                  c.name AS "customerName",
+                  coalesce(cnt.n,0)::bigint AS "itemCount",
+                  coalesce(ot.total,0)::bigint AS "totalMinorUnits",
+                  o.placed_at AS "placedAt"
+           FROM merchant.customer_order o
+           LEFT JOIN merchant.customer c ON c.id=o.customer_id AND c.merchant_id=o.merchant_id
+           LEFT JOIN merchant.order_total ot ON ot.order_id=o.id
+           LEFT JOIN LATERAL (
+             SELECT count(*) AS n FROM merchant.order_item i
+             WHERE i.order_id=o.id AND i.voided_at IS NULL
+           ) cnt ON true
+           WHERE o.merchant_id=$1::uuid
+             AND o.source NOT IN ('pos','dashboard')
+             AND o.status IN ('placed','preparing','ready')
+             AND (o.location_id=$2::uuid OR o.location_id IS NULL)
+           ORDER BY coalesce(o.placed_at,o.created_at) DESC
+           LIMIT 100`,
+          [merchantId, locationId],
+        );
+        return rows.map((r) => ({
+          orderId: r.orderId,
+          channel: r.channel,
+          status: r.status,
+          reference: r.reference,
+          customerName: r.customerName,
+          itemCount: Number(r.itemCount),
+          totalMinorUnits: Number(r.totalMinorUnits),
+          placedAt: r.placedAt ? new Date(r.placedAt).toISOString() : null,
+        }));
+      },
+      locationId,
+    );
   }
 
   private async bump(

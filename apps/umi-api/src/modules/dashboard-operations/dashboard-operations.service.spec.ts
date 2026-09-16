@@ -86,7 +86,13 @@ describe('DashboardOperationsService.salesInsight', () => {
     },
     paymentMix: [{ method: 'cash' as const, amountMinorUnits: 48200 }],
     productMix: [
-      { productId: null, productName: 'Americano', category: 'Cafe', units: 31, netMinorUnits: 168100 },
+      {
+        productId: null,
+        productName: 'Americano',
+        category: 'Cafe',
+        units: 31,
+        netMinorUnits: 168100,
+      },
     ],
     byOperator: [],
     byHour: [],
@@ -102,11 +108,17 @@ describe('DashboardOperationsService.salesInsight', () => {
     );
     const result = await service.salesInsight(user, salesAccess, insightQuery);
     expect(result).toMatchObject({ narrative: null, generated: false });
-    expect((llm as { createCompletion: ReturnType<typeof vi.fn> }).createCompletion).not.toHaveBeenCalled();
+    expect(
+      (llm as { createCompletion: ReturnType<typeof vi.fn> }).createCompletion,
+    ).not.toHaveBeenCalled();
   });
 
   it('generates a narrative once and serves the repeat from cache', async () => {
-    const llm = stubLlm(() => ({ text: '  Vendiste $482 hoy, 12% más. ', inputTokens: 5, outputTokens: 8 }));
+    const llm = stubLlm(() => ({
+      text: '  Vendiste $482 hoy, 12% más. ',
+      inputTokens: 5,
+      outputTokens: 8,
+    }));
     const service = new DashboardOperationsService(
       { salesSummary: vi.fn().mockResolvedValue(summary(7)) } as never,
       llm,
@@ -133,10 +145,7 @@ describe('DashboardOperationsService.salesInsight', () => {
   });
 
   it('denies without the sales permission', async () => {
-    const service = new DashboardOperationsService(
-      { salesSummary: vi.fn() } as never,
-      stubLlm(),
-    );
+    const service = new DashboardOperationsService({ salesSummary: vi.fn() } as never, stubLlm());
     await expect(service.salesInsight(user, access, insightQuery)).rejects.toBeInstanceOf(
       ForbiddenException,
     );

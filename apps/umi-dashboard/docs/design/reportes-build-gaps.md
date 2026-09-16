@@ -47,17 +47,32 @@ AI pattern `apps/umi-api/src/modules/customers/customers.service.ts`; dashboard 
 
 ## Channel split (POS · WhatsApp · Delivery) — Phase 1 — MEDIUM (the wedge)
 
+> **⚠️ CORRECTED & SHIPPED 2026-09-13 (PR #166).** The scoping below was **wrong**. This
+> is NOT a reporting-layer `UNION`. The POS mints its own `source='pos'` order at checkout
+> and never links the WhatsApp order it settles, and WhatsApp orders capture no money
+> (`payment` is POS-only) — so a `UNION` of `receipt_snapshot` + `order_total` would report
+> uncommitted **quotes** as revenue, which `ORDER_MODEL.md` §4 forbids. The real fix is
+> **upstream**: the POS links the committed sale to its origin order at checkout
+> (`origin_order_id` / `origin_channel`, frozen on `pos_committed_sale`), and `salesSummary`
+> groups the frozen `receipt_snapshot.grand_total` by that channel. Approach "link, don't
+> merge"; full order-unification deferred. Authoritative record:
+> [ADR 2026-09-13-pos-channel-attribution](../../../../docs/architecture/2026-09-13-pos-channel-attribution-adr.md).
+> Below is kept as the original (superseded) analysis.
+
 - **Exists:** `customer_order.source` is tagged; `salesSummary` is POS-only
   (`repository.ts:417`).
-- **New SQL (the lift):** a **unified revenue aggregate** grouped by channel. Decide
+- ~~**New SQL (the lift):** a **unified revenue aggregate** grouped by channel. Decide
   the canonical revenue source per channel — POS via `pos_committed_sale.receipt_snapshot.grand_total`;
   non-POS (WhatsApp/web) via `customer_order` + `merchant.order_total`/`payment`. Either
-  a `UNION ALL` in the query or a new unified `merchant`-schema view.
-- **Data:** backfill/exclude legacy migrated `customer_order` rows with `location_id IS NULL`.
-- **Contract/frontend:** add `channelMix` to `ReportsSalesSummary`; channel row in
-  `ventas-report.jsx` (reuse `PaymentMix` stacked-bar shape).
-- **Delivery** sub-channel (Rappi/UberEats/DiDi): confirm whether those land as a
-  `customer_order.source` value or a separate path → likely Phase 3.
+  a `UNION ALL` in the query or a new unified `merchant`-schema view.~~ **Superseded** — see
+  the banner above; `order_total` is a working/owed quote and must not be summed as revenue.
+- **Data:** legacy migrated `customer_order` rows with `location_id IS NULL` are treated as
+  `walk_in` (no origin link ever existed); history is not retroactively attributed.
+- **Contract/frontend:** `channelMix` added to `ReportsSalesSummary`; channel row in
+  `ventas-report.jsx` reuses the `PaymentMix` stacked-bar shape and renders an honest
+  "coming" state while every sale is `walk_in`.
+- **Delivery** sub-channel (Rappi/UberEats/DiDi): confirmed Phase 3 (own ingestion +
+  commission fields).
 
 ## IVA / impuestos breakdown — Phase 2 — SMALL SQL
 

@@ -18,7 +18,7 @@ function make() {
   const merchants = { loadProducts: vi.fn(), loadSegmentThresholds: vi.fn().mockResolvedValue({}) };
   const anthropic = { createCompletion: vi.fn() };
   return {
-    svc: new CustomersService(repo as never, merchants as never, anthropic as never),
+    svc: new CustomersService(repo as never, merchants as never, anthropic),
     repo,
     merchants,
     anthropic,

@@ -169,6 +169,7 @@ final class _GuardedSurface extends StatelessWidget {
         entry: root.entry,
         catalog: root.catalog,
         cart: root.cart,
+        incomingOrders: root.incomingOrders,
         cash: root.cash,
         checkout: root.checkout,
         sales: root.sales,

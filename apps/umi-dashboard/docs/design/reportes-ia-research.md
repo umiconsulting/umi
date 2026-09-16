@@ -15,8 +15,8 @@ it (US giants, then LatAm cohort). Every claim below is flagged **[C]** confirme
 
 An LLM writing a Reportes IA from priors produces a fluent, generic blend of
 Toast and Square with Spanish labels — plausible and subtly wrong for a Mexican,
-cash-heavy, WhatsApp-first café POS. To avoid that, the design is *assembled from
-evidence*, not authored from memory:
+cash-heavy, WhatsApp-first café POS. To avoid that, the design is _assembled from
+evidence_, not authored from memory:
 
 - **External research** where the model is weakest — the LatAm competitor set and
   Mexican fiscal (CFDI) norms, not the well-documented US giants.
@@ -51,25 +51,25 @@ Overview, Lightspeed Home, Square Home, PoloTab Inicio, Wansoft App Reporteadora
 
 ### US giants (round 1)
 
-| Product | Reports nav | Grouping | Report page shape | Export | AI |
-|---|---|---|---|---|---|
-| **Toast** | Left-nav peer → Weekly Overview; arrow expands 9 categories / 40+ reports | Document type (Sales, Labor, Menu, Payments, Cash & Loss, Accounting, Kitchen, Marketing) | Charts on top → reorderable KPI cards (gear) → drill-down carets; filters + right-side "More filters"; data-freshness labels | CSV/XLS | **Toast IQ** (GA Oct 2025): NL Q&A, "For you" feed, daily briefings |
-| **Square** | Reporting hub → Reports page (2025 nav consolidation drew complaints) | Domain (Sales & transactions, Team, Restaurant, Retail, Custom) | KPI/balance-sheet summary → interactive chart → detail table; date+location top; drill-down | CSV only; "summary emails" | **Square AI**: conversational assistant, auto-updating "AI widgets", external context |
-| **Lightspeed** | Two tiers: basic **Reports** + separate **Advanced Insights/Analytics** (Looker) | Basic = document type; Analytics = by job (Sales & Inventory, Marketing, Employee) | Filters + visualizations + data table; Home + KPI donut gauges | CSV/XLS; **real scheduled email** | **Lightspeed AI** + benchmarking; **Magic Menu Quadrant** |
-| **Odoo** | No hub — a Reporting menu **inside each app** (POS ▸ Reporting ▸ Orders) | Per-app analysis views | Graph/Pivot/List switcher, measures selector, group-by in search bar | XLSX; "insert in spreadsheet" | none in std |
+| Product        | Reports nav                                                                      | Grouping                                                                                  | Report page shape                                                                                                            | Export                            | AI                                                                                    |
+| -------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------- |
+| **Toast**      | Left-nav peer → Weekly Overview; arrow expands 9 categories / 40+ reports        | Document type (Sales, Labor, Menu, Payments, Cash & Loss, Accounting, Kitchen, Marketing) | Charts on top → reorderable KPI cards (gear) → drill-down carets; filters + right-side "More filters"; data-freshness labels | CSV/XLS                           | **Toast IQ** (GA Oct 2025): NL Q&A, "For you" feed, daily briefings                   |
+| **Square**     | Reporting hub → Reports page (2025 nav consolidation drew complaints)            | Domain (Sales & transactions, Team, Restaurant, Retail, Custom)                           | KPI/balance-sheet summary → interactive chart → detail table; date+location top; drill-down                                  | CSV only; "summary emails"        | **Square AI**: conversational assistant, auto-updating "AI widgets", external context |
+| **Lightspeed** | Two tiers: basic **Reports** + separate **Advanced Insights/Analytics** (Looker) | Basic = document type; Analytics = by job (Sales & Inventory, Marketing, Employee)        | Filters + visualizations + data table; Home + KPI donut gauges                                                               | CSV/XLS; **real scheduled email** | **Lightspeed AI** + benchmarking; **Magic Menu Quadrant**                             |
+| **Odoo**       | No hub — a Reporting menu **inside each app** (POS ▸ Reporting ▸ Orders)         | Per-app analysis views                                                                    | Graph/Pivot/List switcher, measures selector, group-by in search bar                                                         | XLSX; "insert in spreadsheet"     | none in std                                                                           |
 
 ### LatAm cohort (round 2 — the real competitive set)
 
-| Product | Reports nav | Distinctive | AI | CFDI |
-|---|---|---|---|---|
-| **Fudo** *(strongest analytics+AI rival)* | Top-menu **Indicadores** (ventas/productos/mesas, balance, gastos, stock, multisucursal) | **arqueo ciego**, **mapa de calor de mesas**, emailed multi-sucursal reports | **Radar de Precios, WhatsApp-agent analytics, 30-day cash-flow projection** | native |
-| **Parrot** *(cleanest hub)* | Left-rail Reportes catalog | tabs **Gráficas/Resumen/Desglose**, filter by **Canal** (Mostrador/Domicilio/Delivery), native **Costos y márgenes (CMV)**, Rappi/UberEats/DiDi in same reports | **"Pregunta a Parrot AI"** on every report | separate module |
-| **Soft Restaurant** *(breadth leader)* | Back-office (50+ reports) + free **Analytics** BI catalog | **corte de caja por correo/WhatsApp** (declaración de cajero, faltantes/sobrantes), recipe costing, metas, antifraude | — | native + autofactura |
-| **Clip / Wansoft by Clip** | Payments Panel + acquired Wansoft back-office ("+50 reportes", App Reporteadora) | up to 1,000 role users; propinas/corte by cajero; sucursal-vs-sucursal | — | native, multi-sucursal traceability |
-| **NCR Aloha (MX)** | Back Office ▸ Results (Sales/Operations/My Store) | deep but dated: **tables only, no KPI tiles/charts** (SSRS); strong cash/shift; multi-site | Aloha Insight (add-on) | **not native** (3rd party) |
-| **Rappi POS** | Aliados portal only | delivery reconciliation "Relación de ventas" spreadsheet; no corte/CFDI/inventory | — | no |
-| **Loyverse** | Back Office ▸ Reports + mobile Dashboard | free-tier baseline; clean but shallow | — | 3rd party |
-| **Bewe** | — | out of scope (beauty/wellness, not hospitality) | "Linda" | no |
+| Product                                   | Reports nav                                                                              | Distinctive                                                                                                                                                     | AI                                                                          | CFDI                                |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------- |
+| **Fudo** _(strongest analytics+AI rival)_ | Top-menu **Indicadores** (ventas/productos/mesas, balance, gastos, stock, multisucursal) | **arqueo ciego**, **mapa de calor de mesas**, emailed multi-sucursal reports                                                                                    | **Radar de Precios, WhatsApp-agent analytics, 30-day cash-flow projection** | native                              |
+| **Parrot** _(cleanest hub)_               | Left-rail Reportes catalog                                                               | tabs **Gráficas/Resumen/Desglose**, filter by **Canal** (Mostrador/Domicilio/Delivery), native **Costos y márgenes (CMV)**, Rappi/UberEats/DiDi in same reports | **"Pregunta a Parrot AI"** on every report                                  | separate module                     |
+| **Soft Restaurant** _(breadth leader)_    | Back-office (50+ reports) + free **Analytics** BI catalog                                | **corte de caja por correo/WhatsApp** (declaración de cajero, faltantes/sobrantes), recipe costing, metas, antifraude                                           | —                                                                           | native + autofactura                |
+| **Clip / Wansoft by Clip**                | Payments Panel + acquired Wansoft back-office ("+50 reportes", App Reporteadora)         | up to 1,000 role users; propinas/corte by cajero; sucursal-vs-sucursal                                                                                          | —                                                                           | native, multi-sucursal traceability |
+| **NCR Aloha (MX)**                        | Back Office ▸ Results (Sales/Operations/My Store)                                        | deep but dated: **tables only, no KPI tiles/charts** (SSRS); strong cash/shift; multi-site                                                                      | Aloha Insight (add-on)                                                      | **not native** (3rd party)          |
+| **Rappi POS**                             | Aliados portal only                                                                      | delivery reconciliation "Relación de ventas" spreadsheet; no corte/CFDI/inventory                                                                               | —                                                                           | no                                  |
+| **Loyverse**                              | Back Office ▸ Reports + mobile Dashboard                                                 | free-tier baseline; clean but shallow                                                                                                                           | —                                                                           | 3rd party                           |
+| **Bewe**                                  | —                                                                                        | out of scope (beauty/wellness, not hospitality)                                                                                                                 | "Linda"                                                                     | no                                  |
 
 ### What the LatAm cohort does that the US giants do not [C]
 
@@ -108,7 +108,7 @@ The reporting surface (not issuance) must expose:
 - **A month-end contador export** (CFDI emitidos/recibidos, global, IVA, DIOT-ready).
 
 **Boundary [I]:** issuance/timbrado (CSD, XML, REP, cancellation flow, auto-invoice
-QR) is a **separate backend track**; Reportes *consumes* its outputs and reconciles.
+QR) is a **separate backend track**; Reportes _consumes_ its outputs and reconciles.
 
 ---
 
@@ -142,7 +142,7 @@ loss-prevention per cashier.
 ## 6. Menu engineering — Gap 3 [C]
 
 Classic **Kasavana–Smith** matrix: popularity (menu-mix %) × **contribution margin
-(dollars, not food-cost %)**; midpoints are *this café's* averages (avg CM; popularity
+(dollars, not food-cost %)**; midpoints are _this café's_ averages (avg CM; popularity
 cutoff = (1/items)×0.70). Quadrants Star / Plowhorse / Puzzle / Dog with standard
 actions. **Lightspeed's Magic Menu Quadrant swaps profitability for a retention
 axis** (popularity × reorder rate) — which Umi can match via Customer 360 and which
@@ -164,12 +164,12 @@ dashboard shell.
 ## 8. The wedge — Gap 11 [C]
 
 - **AI-in-reporting is table stakes** (Toast IQ, Square AI, Lightspeed AI, Parrot
-  "Pregunta a Parrot AI", Fudo). An AI narrative *alone* is parity, not a wedge.
+  "Pregunta a Parrot AI", Fudo). An AI narrative _alone_ is parity, not a wedge.
 - **The structural wedge is WhatsApp-driven sales analytics** — reporting revenue by
   channel with the WhatsApp bot as a first-class channel and a conversational funnel
   (messages → cart → confirmed order). **Contested by Fudo's WhatsApp-agent
   analytics**, so it must be sharpened: native conversational commerce + Customer 360,
-  not a bolt-on ordering agent. Umi's bot already *writes* orders (`add_to_cart`,
+  not a bolt-on ordering agent. Umi's bot already _writes_ orders (`add_to_cart`,
   `confirm_order`).
 - **Second wedge surfaced by Gap 1: delivery-aggregator consolidation** — one report
   unifying in-store + WhatsApp + Rappi/UberEats/DiDi with margin-after-commission.
@@ -191,20 +191,20 @@ UPDATE/DELETE) and **never touch** the original sale/receipt — so Reembolsos r
 separate source. There are **two un-unified refund ledgers** (`pos_sale_exception` +
 `merchant.refund`).
 
-| Metric | Status | Evidence |
-|---|---|---|
-| Gross sales (POS) | ✅ now | `receipt_snapshot.grand_total` |
-| Net of refunds | ⚠️ SQL-now (derivable) | subtract `pos_sale_exception` |
-| Discounts / comps | ✅ / ⚠️ split | `order_discount.kind` |
-| Voids | ✅ | `order_item.voided_at` / `pos_sale_exception` |
-| Refunds | ✅ (separate source) | `pos_sale_exception`, `merchant.refund` |
-| Tips | ✅ | `snapshot.tip` |
-| **Tax / IVA** | ⚠️ **SQL-now** (stored, not surfaced) | `snapshot.tax`, `pos_cart_line.tax_rate_basis_points` |
-| Item / category mix | ✅ | `pos_cart_line` + `product_category` |
-| Payment-method mix | ✅ | `pos_tender_fact` + wallet allocation |
-| **Channel (POS/WA/web)** | ⚠️ **SQL-now** (POS-only today) | `customer_order.source` unused by summary |
-| Cashier/employee | ⚠️ shift-level only | `cash_shift.responsible_operator_id` |
-| **COGS / margin** | ❌ **schema gap** | no cost columns; inventory tracks quantities only |
+| Metric                   | Status                                | Evidence                                              |
+| ------------------------ | ------------------------------------- | ----------------------------------------------------- |
+| Gross sales (POS)        | ✅ now                                | `receipt_snapshot.grand_total`                        |
+| Net of refunds           | ⚠️ SQL-now (derivable)                | subtract `pos_sale_exception`                         |
+| Discounts / comps        | ✅ / ⚠️ split                         | `order_discount.kind`                                 |
+| Voids                    | ✅                                    | `order_item.voided_at` / `pos_sale_exception`         |
+| Refunds                  | ✅ (separate source)                  | `pos_sale_exception`, `merchant.refund`               |
+| Tips                     | ✅                                    | `snapshot.tip`                                        |
+| **Tax / IVA**            | ⚠️ **SQL-now** (stored, not surfaced) | `snapshot.tax`, `pos_cart_line.tax_rate_basis_points` |
+| Item / category mix      | ✅                                    | `pos_cart_line` + `product_category`                  |
+| Payment-method mix       | ✅                                    | `pos_tender_fact` + wallet allocation                 |
+| **Channel (POS/WA/web)** | ⚠️ **SQL-now** (POS-only today)       | `customer_order.source` unused by summary             |
+| Cashier/employee         | ⚠️ shift-level only                   | `cash_shift.responsible_operator_id`                  |
+| **COGS / margin**        | ❌ **schema gap**                     | no cost columns; inventory tracks quantities only     |
 
 Three tiers: **reportable now**, **SQL-reachable now** (net-of-refund, IVA breakdown,
 channel split — data exists, queries don't), and **schema gap** (COGS/margin needs a
@@ -255,7 +255,7 @@ only **10 POS sales (Sep 2–5)** are fully paid + receipt-backed. Reality check
 
 - **100% cash, 0 card. No tips, no discounts.**
 - **No IVA anywhere** — `tax_rate_basis_points = 0` on all 136 products; every
-  receipt `taxTotal = 0`. A "desglose de IVA" report has no real numbers *yet*.
+  receipt `taxTotal = 0`. A "desglose de IVA" report has no real numbers _yet_.
 - **No COGS** — `merchant.product` has only `price`; inventory/recipe tables empty.
 - Refunds only in `pos_sale_exception` (2 full, 1 partial, 1 void).
 - A **balanced cash-shift reconciliation** exists (expected $598 = counted $598).
