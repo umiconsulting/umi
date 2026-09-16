@@ -24,7 +24,6 @@
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
     "@tanstack/react-query": "^5.102.8",
-    "@umi/contract": "workspace:*",
     "konva": "^10.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

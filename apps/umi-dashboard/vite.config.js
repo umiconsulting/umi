@@ -26,6 +26,10 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     resolve: {
+      // The contract is transpiled from source, so its imports resolve from
+      // packages/contract, not from this app. `zod` is the one dependency in
+      // that graph. Resolve it here, because this app is what declares it.
+      dedupe: ['zod'],
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
         // Committed design tokens, resolved at build time (no workspace/npm
