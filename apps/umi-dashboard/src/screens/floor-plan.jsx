@@ -1,31 +1,125 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { Stage, Layer, Group, Rect, Circle, Text, Transformer, Line } from 'react-konva';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { FloorPlanDocument, FloorPlanState } from '@umi/contract/floor-plan';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { fetchFloorPlan, changeFloorPlan } from '@/data.jsx';
+import { resolveTheme, subscribeTheme } from '@/lib/theme.js';
 import {
+  areaTableCount,
   createLayout,
   duplicateElement,
+  elementLabelFontSize,
   fitElement,
   layoutHistory,
   nextTableLabel,
+  seatDotLayout,
+  tableShowsDetail,
 } from './floor-plan-model';
 import './floor-plan.css';
 
-const COLORS = {
-  table: '#dcebe4',
-  wall: '#64748b',
-  counter: '#e8ddc9',
-  door: '#bfd7e5',
-  label: '#f1f5f9',
+/**
+ * Floor surfaces, in the same palette the POS draws the published plan with: a
+ * pale neutral canvas, white card shapes with a hairline edge, a 1px divider
+ * across the middle, and seat dots below it. Konva paints onto a canvas and
+ * cannot read CSS custom properties, so the surface colors live here in one
+ * place; floor-plan.css only resolves the console accent for the tab strip.
+ */
+const FLOOR_BASE = {
+  light: {
+    canvas: '#ededf2',
+    grid: '#e2e2ea',
+    table: '#ffffff',
+    tableEdge: '#dfdfe7',
+    divider: '#e6e6ec',
+    seat: '#9ba1ab',
+    ink: '#131f44',
+    inkMuted: '#5c678f',
+    wall: '#64748b',
+    wallEdge: '#526075',
+    counter: '#e8ddc9',
+    counterEdge: '#cbbda2',
+    door: '#bfd7e5',
+    doorEdge: '#9dbece',
+    shadow: 'rgba(16, 24, 40, 0.32)',
+    // Mirrors the console accent floor-plan.css resolves for the tab strip:
+    // --merchant-brand on the light theme, --umi-blue on the dark ones.
+    select: '#25634d',
+  },
+  dark: {
+    canvas: '#15161a',
+    grid: '#23252c',
+    table: '#25272e',
+    tableEdge: '#3b3e47',
+    divider: '#3b3e47',
+    seat: '#a7adb8',
+    ink: '#edf1f8',
+    inkMuted: '#99a2b5',
+    wall: '#5a6577',
+    wallEdge: '#76829a',
+    counter: '#4a4231',
+    counterEdge: '#5e5440',
+    door: '#2e4557',
+    doorEdge: '#3d5a70',
+    shadow: null,
+    select: '#7692cb',
+  },
 };
+
+/** Resolve the floor palette for a console theme name. */
+function floorPalette(theme) {
+  const dark = theme !== 'umi';
+  const base = dark ? FLOOR_BASE.dark : FLOOR_BASE.light;
+  return {
+    ...base,
+    fill: {
+      table: base.table,
+      wall: base.wall,
+      counter: base.counter,
+      door: base.door,
+      label: 'transparent',
+    },
+    edge: {
+      table: base.tableEdge,
+      wall: base.wallEdge,
+      counter: base.counterEdge,
+      door: base.doorEdge,
+      label: 'transparent',
+    },
+    ink: {
+      table: base.ink,
+      wall: '#ffffff',
+      counter: base.ink,
+      door: base.ink,
+      label: base.inkMuted,
+    },
+  };
+}
+
+function useThemeName() {
+  return useSyncExternalStore(subscribeTheme, resolveTheme, () => 'umi');
+}
+
+/** Theme-aware floor palette, refreshed when the console theme flips. */
+function useFloorPalette() {
+  const theme = useThemeName();
+  return useMemo(() => floorPalette(theme), [theme]);
+}
 
 function PlanElement({
   element,
   selected,
   disabled,
   interacting,
+  palette,
   onInteractionStart,
   onInteractionEnd,
   onSelect,
@@ -66,6 +160,46 @@ function PlanElement({
       rotation: ((Math.round(node.rotation()) % 360) + 360) % 360,
     });
   };
+  const round = element.shape === 'round';
+  const detailed = tableShowsDetail(element);
+  const bandHeight = detailed ? element.height / 2 : element.height;
+  // A round table's lower band narrows toward the bottom, so the seat dots lay
+  // out in a narrower band; the inset below keeps that band centered under the
+  // label instead of hugging the left edge of the circle.
+  const seatBandWidth = round ? element.width * 0.72 : element.width;
+  const seatInset = (element.width - seatBandWidth) / 2;
+  const seats = detailed
+    ? seatDotLayout(element.capacity, { width: seatBandWidth, height: bandHeight })
+    : null;
+  const fill = palette.fill[element.kind] ?? palette.fill.table;
+  const edge = selected ? palette.select : (palette.edge[element.kind] ?? palette.edge.table);
+  const isText = element.kind === 'label';
+  const shadow = element.kind === 'table' ? palette.shadow : null;
+  const body = {
+    fill,
+    stroke: edge,
+    strokeWidth: selected ? (isText ? 2 : 3) : isText ? 0 : 1,
+    dash: selected && isText ? [8, 6] : undefined,
+    shadowColor: shadow ?? undefined,
+    shadowBlur: shadow ? 6 : 0,
+    shadowOffsetY: shadow ? 2 : 0,
+    shadowForStrokeEnabled: false,
+  };
+  const label = {
+    x: -element.width / 2,
+    y: -element.height / 2,
+    width: element.width,
+    height: bandHeight,
+    text: element.label,
+    fontSize: elementLabelFontSize(element),
+    fontStyle: 'bold',
+    align: 'center',
+    verticalAlign: 'middle',
+    wrap: 'none',
+    ellipsis: true,
+    fill: palette.ink[element.kind] ?? palette.ink.table,
+    listening: false,
+  };
   return (
     <>
       <Group
@@ -85,13 +219,8 @@ function PlanElement({
         onTransformStart={() => onInteractionStart(element.id)}
         onTransformEnd={endTransform}
       >
-        {element.shape === 'round' ? (
-          <Circle
-            radius={element.width / 2}
-            fill={COLORS[element.kind]}
-            stroke={selected ? '#25634d' : '#879b92'}
-            strokeWidth={selected ? 3 : 1}
-          />
+        {round ? (
+          <Circle radius={element.width / 2} {...body} />
         ) : (
           <Rect
             x={-element.width / 2}
@@ -99,32 +228,36 @@ function PlanElement({
             width={element.width}
             height={element.height}
             cornerRadius={element.kind === 'table' ? 8 : 2}
-            fill={COLORS[element.kind]}
-            stroke={selected ? '#25634d' : '#879b92'}
-            strokeWidth={selected ? 3 : 1}
+            {...body}
           />
         )}
-        <Text
-          x={-element.width / 2}
-          y={-8}
-          width={element.width}
-          text={element.label}
-          fontSize={14}
-          align="center"
-          fill="#172b22"
-          listening={false}
-        />
-        {element.kind === 'table' && element.height >= 60 && (
-          <Text
-            x={-element.width / 2}
-            y={12}
-            width={element.width}
-            text={String(element.capacity)}
-            fontSize={11}
-            align="center"
-            fill="#4b6659"
-            listening={false}
-          />
+        <Text {...label} />
+        {detailed && (
+          <>
+            <Line
+              points={[
+                -element.width / 2,
+                -element.height / 2 + bandHeight,
+                element.width / 2,
+                -element.height / 2 + bandHeight,
+              ]}
+              stroke={palette.divider}
+              strokeWidth={1}
+              // One device-independent hairline, whatever the canvas zoom is.
+              strokeScaleEnabled={false}
+              listening={false}
+            />
+            {seats.dots.map((dot, index) => (
+              <Circle
+                key={`seat-${index}`}
+                x={-element.width / 2 + seatInset + dot.x}
+                y={-element.height / 2 + bandHeight + dot.y}
+                radius={dot.radius}
+                fill={palette.seat}
+                listening={false}
+              />
+            ))}
+          </>
         )}
       </Group>
       {selected && !disabled && (
@@ -142,8 +275,71 @@ function PlanElement({
   );
 }
 
+/**
+ * The area strip is the editor's area navigation: one scrolling row of tabs, each
+ * carrying the area name and its table count, with the active area marked by a
+ * strong underline. It is a real tablist, so arrow keys move between areas and no
+ * second control has to duplicate the choice.
+ */
+function AreaTabs({ areas, selectedId, panelId, disabled, onSelect, onAddArea, canAdd }) {
+  const { t } = useLingui();
+  const list = useRef(null);
+  const move = (event, index) => {
+    const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    const last = areas.length - 1;
+    if (!step && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? last
+          : (index + step + last + 1) % (last + 1);
+    onSelect(areas[next].id);
+    list.current?.querySelectorAll('[role="tab"]')[next]?.focus();
+  };
+  return (
+    <div className="fp-areas card">
+      <div className="fp-tabs" role="tablist" aria-label={t`Áreas`} ref={list}>
+        {areas.map((item, index) => {
+          const active = item.id === selectedId;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              id={`fp-area-tab-${item.id}`}
+              aria-selected={active}
+              aria-controls={panelId}
+              tabIndex={active ? 0 : -1}
+              className={active ? 'fp-tab fp-tab-active' : 'fp-tab'}
+              onClick={() => onSelect(item.id)}
+              onKeyDown={(event) => move(event, index)}
+            >
+              <span className="fp-tab-name">{item.name}</span>
+              <span className="fp-tab-count">
+                <Plural value={areaTableCount(item)} one="# mesa" other="# mesas" />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        className="btn btn-sm fp-add-area"
+        disabled={disabled || !canAdd}
+        onClick={onAddArea}
+      >
+        <span aria-hidden="true">+</span>
+        <Trans>Agregar área</Trans>
+      </button>
+    </div>
+  );
+}
+
 export function FloorPlanEditor({ merchantId, locationId }) {
   const { t } = useLingui();
+  const palette = useFloorPalette();
   const [remote, setRemote] = useState(null);
   const [history, dispatch] = useReducer(layoutHistory, { past: [], present: null, future: [] });
   const [saved, setSaved] = useState('');
@@ -338,8 +534,25 @@ export function FloorPlanEditor({ merchantId, locationId }) {
     editArea({ elements: [...area.elements, next] });
     setSelected(next.id);
   };
+  const addArea = () => {
+    if (controlsDisabled || history.present.areas.length >= 20) return;
+    const next = createLayout(`${t`Área`} ${history.present.areas.length + 1}`).areas[0];
+    dispatch({
+      type: 'edit',
+      document: { ...history.present, areas: [...history.present.areas, next] },
+    });
+    setSelectedArea(next.id);
+    setSelected(null);
+  };
   const keyboard = (event) => {
-    if (controlsDisabled || !element || /INPUT|SELECT|TEXTAREA/.test(event.target.tagName)) return;
+    if (
+      controlsDisabled ||
+      !element ||
+      /INPUT|SELECT|TEXTAREA/.test(event.target.tagName) ||
+      // Arrow keys belong to the area tablist while a tab holds focus.
+      event.target.closest?.('[role="tab"]')
+    )
+      return;
     const offsets = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (!offsets[event.key]) return;
     event.preventDefault();
@@ -442,76 +655,60 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           </Trans>
         </p>
       )}
+      <AreaTabs
+        areas={document?.areas ?? []}
+        selectedId={area?.id}
+        panelId="fp-area-panel"
+        disabled={controlsDisabled}
+        canAdd={history.present.areas.length < 20}
+        onSelect={(id) => {
+          setSelectedArea(id);
+          setSelected(null);
+        }}
+        onAddArea={addArea}
+      />
       <div className="fp-controls">
-        <label>
-          <Trans>Área</Trans>
-          <select
-            disabled={interactionId !== null}
-            value={area?.id ?? ''}
-            onChange={(event) => {
-              setSelectedArea(event.target.value);
-              setSelected(null);
-            }}
+        <div className="fp-control-group" role="group" aria-label={t`Historial`}>
+          <button
+            className="btn btn-sm"
+            disabled={controlsDisabled || !history.past.length}
+            onClick={() => dispatch({ type: 'undo' })}
           >
-            {document?.areas.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          className="btn"
-          disabled={controlsDisabled || history.present.areas.length >= 20}
-          onClick={() => {
-            const next = createLayout(`${t`Área`} ${history.present.areas.length + 1}`).areas[0];
-            dispatch({
-              type: 'edit',
-              document: { ...history.present, areas: [...history.present.areas, next] },
-            });
-            setSelectedArea(next.id);
-            setSelected(null);
-          }}
-        >
-          <Trans>Agregar área</Trans>
-        </button>
-        <button
-          className="btn"
-          disabled={controlsDisabled || !history.past.length}
-          onClick={() => dispatch({ type: 'undo' })}
-        >
-          <Trans>Deshacer</Trans>
-        </button>
-        <button
-          className="btn"
-          disabled={controlsDisabled || !history.future.length}
-          onClick={() => dispatch({ type: 'redo' })}
-        >
-          <Trans>Rehacer</Trans>
-        </button>
-        <label className="fp-check">
-          <input
-            type="checkbox"
-            disabled={controlsDisabled}
-            checked={snap}
-            onChange={(event) => setSnap(event.target.checked)}
-          />
-          <Trans>Ajustar a cuadrícula</Trans>
-        </label>
-        <label>
-          <Trans>Zoom</Trans>
-          <select
-            disabled={interactionId !== null}
-            value={zoom}
-            onChange={(event) => setZoom(Number(event.target.value))}
+            <Trans>Deshacer</Trans>
+          </button>
+          <button
+            className="btn btn-sm"
+            disabled={controlsDisabled || !history.future.length}
+            onClick={() => dispatch({ type: 'redo' })}
           >
-            {[0.5, 1, 1.5, 2].map((value) => (
-              <option key={value} value={value}>
-                {value * 100}%
-              </option>
-            ))}
-          </select>
-        </label>
+            <Trans>Rehacer</Trans>
+          </button>
+        </div>
+        <div className="fp-control-group" role="group" aria-label={t`Cuadrícula y zoom`}>
+          <label className="fp-check">
+            <input
+              type="checkbox"
+              disabled={controlsDisabled}
+              checked={snap}
+              onChange={(event) => setSnap(event.target.checked)}
+            />
+            <Trans>Ajustar a cuadrícula</Trans>
+          </label>
+          <label className="fp-zoom">
+            <Trans>Zoom</Trans>
+            <select
+              disabled={interactionId !== null}
+              value={zoom}
+              onChange={(event) => setZoom(Number(event.target.value))}
+            >
+              {[0.5, 1, 1.5, 2].map((value) => (
+                <option key={value} value={value}>
+                  {value * 100}%
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
       <div className="fp-workspace">
         <aside className="card fp-palette">
@@ -568,8 +765,12 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </aside>
         <div
           ref={canvas}
+          id="fp-area-panel"
+          role="tabpanel"
+          aria-labelledby={area ? `fp-area-tab-${area.id}` : undefined}
           className="fp-canvas card"
           tabIndex={0}
+          style={{ background: palette.canvas }}
           aria-label={t`Plano. Selecciona un elemento de la lista para editarlo con el teclado.`}
         >
           {area && (
@@ -582,30 +783,36 @@ export function FloorPlanEditor({ merchantId, locationId }) {
                 if (event.target === event.target.getStage()) setSelected(null);
               }}
             >
-              <Layer listening={false}>
-                {Array.from(
-                  { length: Math.floor(Math.max(200, Math.min(5000, area.width)) / 20) + 1 },
-                  (_, index) => (
-                    <Line
-                      key={`x${index}`}
-                      points={[index * 20, 0, index * 20, area.height]}
-                      stroke="#e4eae6"
-                      strokeWidth={1}
-                    />
-                  ),
-                )}
-                {Array.from(
-                  { length: Math.floor(Math.max(200, Math.min(5000, area.height)) / 20) + 1 },
-                  (_, index) => (
-                    <Line
-                      key={`y${index}`}
-                      points={[0, index * 20, area.width, index * 20]}
-                      stroke="#e4eae6"
-                      strokeWidth={1}
-                    />
-                  ),
-                )}
-              </Layer>
+              {/* The authoring grid belongs to the editor; the published preview
+                  shows the POS surface as the POS draws it. */}
+              {!preview && (
+                <Layer listening={false}>
+                  {Array.from(
+                    { length: Math.floor(Math.max(200, Math.min(5000, area.width)) / 20) + 1 },
+                    (_, index) => (
+                      <Line
+                        key={`x${index}`}
+                        points={[index * 20, 0, index * 20, area.height]}
+                        stroke={palette.grid}
+                        strokeWidth={1}
+                        strokeScaleEnabled={false}
+                      />
+                    ),
+                  )}
+                  {Array.from(
+                    { length: Math.floor(Math.max(200, Math.min(5000, area.height)) / 20) + 1 },
+                    (_, index) => (
+                      <Line
+                        key={`y${index}`}
+                        points={[0, index * 20, area.width, index * 20]}
+                        stroke={palette.grid}
+                        strokeWidth={1}
+                        strokeScaleEnabled={false}
+                      />
+                    ),
+                  )}
+                </Layer>
+              )}
               <Layer>
                 {area.elements.map((item) => (
                   <PlanElement
@@ -614,6 +821,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
                     selected={selected === item.id}
                     disabled={disabled || (interactionId !== null && interactionId !== item.id)}
                     interacting={interactionId === item.id}
+                    palette={palette}
                     onInteractionStart={startInteraction}
                     onInteractionEnd={endInteraction}
                     onSelect={() => setSelected(item.id)}

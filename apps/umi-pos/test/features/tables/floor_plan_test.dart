@@ -61,6 +61,75 @@ PosFloorPlanQuery query(String location) => PosFloorPlanQuery.fromJson({
   'operatorSessionId': 'operator',
 });
 
+FloorPlanArea areaFixture(
+  String id,
+  String name,
+  List<Map<String, Object?>> elements,
+) => FloorPlanArea.fromJson({
+  'id': id,
+  'name': name,
+  'width': 1200,
+  'height': 800,
+  'elements': elements,
+});
+
+Map<String, Object?> tableElement({
+  required String id,
+  required String label,
+  required int capacity,
+  String kind = 'table',
+  String shape = 'square',
+  num x = 600,
+  num y = 400,
+  num width = 200,
+  num height = 200,
+  num rotation = 0,
+}) => {
+  'id': id,
+  'kind': kind,
+  'shape': shape,
+  'label': label,
+  'capacity': capacity,
+  'x': x,
+  'y': y,
+  'width': width,
+  'height': height,
+  'rotation': rotation,
+};
+
+Future<EntryController> readyEntryController() async {
+  final entry = EntryController(
+    gateway: SessionGateway(),
+    vault: CredentialVault(MemorySecureStorage()),
+    telemetry: SafeTelemetry(
+      enabled: false,
+      context: TelemetryContext.current(testConfig),
+      exporter: RecordingExporter(),
+    ),
+    idleTimeout: const Duration(seconds: 30),
+  );
+  await entry.selectTenant(
+    EntryMerchant.fromJson({
+      'id': 'merchant',
+      'name': 'Test café',
+      'roles': [],
+      'permissions': [],
+      'entitlements': [],
+      'locations': [
+        {
+          'id': 'location',
+          'merchantId': 'merchant',
+          'name': 'Test location',
+          'status': 'active',
+          'deviceAllowed': true,
+          'operatorAllowed': true,
+        },
+      ],
+    }),
+  );
+  return entry;
+}
+
 void main() {
   testWidgets(
     'idle lock closes the map and its table dialog and clears the layout',
@@ -290,4 +359,213 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('area selector lists each area with its table count', (
+    tester,
+  ) async {
+    final areas = [
+      areaFixture('dining', 'Dining room', [
+        tableElement(id: 'a', label: '1', capacity: 4),
+        tableElement(id: 'b', label: '2', capacity: 2, shape: 'round'),
+      ]),
+      areaFixture('terrace', 'Terrace', [
+        tableElement(id: 'c', label: '3', capacity: 6),
+        tableElement(
+          id: 'bar',
+          label: 'Bar',
+          capacity: 0,
+          kind: 'counter',
+          shape: 'rectangle',
+        ),
+      ]),
+    ];
+    String? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FloorPlanAreaSelector(
+            areas: areas,
+            selectedAreaId: 'dining',
+            onSelect: (id) => selected = id,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Dining room'), findsOneWidget);
+    expect(find.text('2 tables'), findsOneWidget);
+    expect(find.text('Terrace'), findsOneWidget);
+    // A counter is not a table.
+    expect(find.text('1 table'), findsOneWidget);
+    await tester.tap(find.text('Terrace'));
+    expect(selected, 'terrace');
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('area selector counts follow the active locale', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Localizations.override(
+              context: context,
+              locale: const Locale('es'),
+              child: FloorPlanAreaSelector(
+                areas: [
+                  areaFixture('dining', 'Salón', [
+                    tableElement(id: 'a', label: '1', capacity: 4),
+                    tableElement(id: 'b', label: '2', capacity: 2),
+                  ]),
+                ],
+                selectedAreaId: 'dining',
+                onSelect: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Salón'), findsOneWidget);
+    expect(find.text('2 mesas'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('tables render a bold label, a divider, and seat dots', (
+    tester,
+  ) async {
+    final area = areaFixture('dining', 'Dining room', [
+      tableElement(
+        id: 'big',
+        label: 'T1',
+        capacity: 4,
+        shape: 'round',
+        x: 300,
+        width: 200,
+        height: 200,
+      ),
+      // 40 px at this scale stays below the detail threshold.
+      tableElement(
+        id: 'tiny',
+        label: 'T2',
+        capacity: 2,
+        x: 900,
+        width: 40,
+        height: 40,
+      ),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: FloorPlanMap(area: area, onTableTap: (_) {}),
+        ),
+      ),
+    );
+    expect(find.text('T1'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('T1')).style?.fontWeight,
+      FontWeight.w700,
+    );
+    expect(
+      find.byKey(const ValueKey('floor-plan-divider-big')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('floor-plan-seats-big')), findsOneWidget);
+    expect(
+      tester.widget<FloorPlanSeatDots>(find.byType(FloorPlanSeatDots)).count,
+      4,
+    );
+    expect(
+      tester
+          .widget<Material>(
+            find.byKey(const ValueKey('floor-plan-element-big')),
+          )
+          .shape,
+      isA<CircleBorder>(),
+    );
+    expect(
+      tester
+          .widget<Material>(
+            find.byKey(const ValueKey('floor-plan-element-big')),
+          )
+          .color,
+      Colors.white,
+    );
+    expect(find.text('T2'), findsOneWidget);
+    expect(find.byKey(const ValueKey('floor-plan-divider-tiny')), findsNothing);
+    expect(find.byKey(const ValueKey('floor-plan-seats-tiny')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('surface shows area tabs and switches the rendered area', (
+    tester,
+  ) async {
+    final entry = await readyEntryController();
+    expect(entry.state.phase, EntryPhase.ready);
+    final repository = Repository();
+    final controller = FloorPlanController(repository);
+    late BuildContext entryContext;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            entryContext = context;
+            return const Scaffold(body: Text('Catalog'));
+          },
+        ),
+      ),
+    );
+    unawaited(
+      showFloorPlan(entryContext, controller: controller, entry: entry),
+    );
+    await tester.pump();
+    repository.requests.single.complete(
+      PublishedFloorPlan.fromJson({
+        'locationId': 'location',
+        'publishedVersion': 1,
+        'publishedAt': '2026-09-13T00:00:00Z',
+        'published': {
+          'schemaVersion': 1,
+          'areas': [
+            {
+              'id': 'dining',
+              'name': 'Dining room',
+              'width': 1200,
+              'height': 800,
+              'elements': [
+                tableElement(id: 'a', label: 'T1', capacity: 4),
+                tableElement(
+                  id: 'b',
+                  label: 'T2',
+                  capacity: 2,
+                  shape: 'round',
+                  x: 300,
+                  width: 200,
+                  height: 200,
+                ),
+              ],
+            },
+            {
+              'id': 'terrace',
+              'name': 'Terrace',
+              'width': 1200,
+              'height': 800,
+              'elements': [tableElement(id: 'c', label: 'T9', capacity: 6)],
+            },
+          ],
+        },
+      }),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    expect(find.byType(FloorPlanAreaSelector), findsOneWidget);
+    expect(find.text('Dining room'), findsOneWidget);
+    expect(find.text('2 tables'), findsOneWidget);
+    expect(find.text('Terrace'), findsOneWidget);
+    expect(find.text('1 table'), findsOneWidget);
+    expect(find.text('T1'), findsOneWidget);
+    expect(find.text('T9'), findsNothing);
+    await tester.tap(find.text('Terrace'));
+    await tester.pumpAndSettle();
+    expect(find.text('T9'), findsOneWidget);
+    expect(find.text('T1'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    entry.dispose();
+  });
 }

@@ -104,6 +104,98 @@ async function assertSaved(page, server, label) {
   return saved;
 }
 
+// Reads the scene graph of one placed element so the assertions describe the
+// POS structure (label band, divider, seat dots) instead of pixels.
+async function tableParts(page, label) {
+  return page.evaluate((label) => {
+    const stage = window.Konva.stages[0];
+    const group = stage.find('Group').find((node) => node.findOne('Text')?.text() === label);
+    const children = group.getChildren();
+    const labelNode = children.find((node) => node.className === 'Text');
+    const divider = children.find((node) => node.className === 'Line');
+    const circles = children.filter((node) => node.className === 'Circle');
+    const body = circles.find((node) => node.listening());
+    const seats = circles.filter((node) => !node.listening());
+    return {
+      classes: children.map((node) => node.className),
+      labelFontStyle: labelNode.fontStyle(),
+      labelBand: labelNode.height(),
+      dividerCount: children.filter((node) => node.className === 'Line').length,
+      dividerWidth: divider ? divider.strokeWidth() : null,
+      bodyClass: body ? body.className : null,
+      seatCount: seats.length,
+      // Seat dots have to sit inside the table shape, not just near it.
+      seatsOutside: body
+        ? seats.filter(
+            (node) => Math.hypot(node.x(), node.y()) + node.radius() > body.radius() + 0.5,
+          ).length
+        : 0,
+    };
+  }, label);
+}
+
+async function areaTabs(page) {
+  return page.locator('.fp-tabs [role="tab"]').evaluateAll((tabs) =>
+    tabs.map((tab) => ({
+      name: tab.querySelector('.fp-tab-name').textContent,
+      count: tab.querySelector('.fp-tab-count').textContent,
+      selected: tab.getAttribute('aria-selected') === 'true',
+      underlined: getComputedStyle(tab).borderBottomColor !== 'rgba(0, 0, 0, 0)',
+    })),
+  );
+}
+
+test('area tabs navigate by name and count, and tables carry the POS structure', async ({
+  page,
+}) => {
+  const { server, errors } = await openEditor(page);
+  const first = await areaTabs(page);
+  expect(first).toHaveLength(1);
+  expect(first[0]).toMatchObject({ count: '0 tables', selected: true, underlined: true });
+
+  await page.getByRole('button', { name: 'Round table', exact: true }).click();
+  await assertSaved(page, server, 'T1');
+  // The count follows the areas as tables are placed, in singular and plural.
+  await expect(page.getByRole('tab', { name: /1 table$/ })).toBeVisible();
+  const table = await tableParts(page, 'T1');
+  expect(table).toMatchObject({
+    labelFontStyle: 'bold',
+    labelBand: 50,
+    dividerCount: 1,
+    dividerWidth: 1,
+    bodyClass: 'Circle',
+    seatCount: 4,
+    seatsOutside: 0,
+  });
+
+  // A table too small for the detail bands keeps only its centered label.
+  await page.getByLabel('Width', { exact: true }).fill('24');
+  await assertSaved(page, server, 'T1');
+  expect((await tableParts(page, 'T1')).classes).toEqual(['Circle', 'Text']);
+
+  await page.getByRole('button', { name: 'Add area', exact: true }).click();
+  const tabs = await areaTabs(page);
+  expect(tabs).toHaveLength(2);
+  expect(tabs[0]).toMatchObject({ count: '1 table', selected: false, underlined: false });
+  expect(tabs[0].name).toBe(server.state.draft.areas[0].name);
+  expect(tabs[1]).toMatchObject({ count: '0 tables', selected: true, underlined: true });
+  expect(tabs[1].name.trim().endsWith('2')).toBe(true);
+
+  await page.getByRole('tab', { name: /1 table$/ }).click();
+  await expect(page.getByRole('button', { name: 'T1 · 4', exact: true })).toBeVisible();
+  expect((await areaTabs(page))[0].selected).toBe(true);
+
+  // The authoring grid belongs to the editor, not to the POS surface, and the
+  // published preview still navigates by area tab.
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'View published', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'View published', exact: true }).click();
+  expect(await page.evaluate(() => window.Konva.stages[0].getLayers().length)).toBe(1);
+  await page.getByRole('tab', { name: /0 tables$/ }).click();
+  await expect(page.getByRole('button', { name: 'T1 · 4', exact: true })).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('rotation and consecutive drags keep one geometry through zoom and publication', async ({
   page,
 }) => {

@@ -1941,6 +1941,19 @@ msgid "Auditoría"
 msgstr "Audit"
 
 #: src/screens/floor-plan.jsx
+msgid "Áreas"
+msgstr "Areas"
+
+#. placeholder {0}: areaTableCount(item)
+#: src/screens/floor-plan.jsx
+msgid "{0, plural, one {# mesa} other {# mesas}}"
+msgstr "{0, plural, one {# table} other {# tables}}"
+
+#: src/screens/floor-plan.jsx
+msgid "Agregar área"
+msgstr "Add area"
+
+#: src/screens/floor-plan.jsx
 msgid "Salón"
 msgstr "Dining room"
 
@@ -1959,6 +1972,10 @@ msgstr "Door"
 #: src/screens/floor-plan.jsx
 msgid "Texto"
 msgstr "Text"
+
+#: src/screens/floor-plan.jsx
+msgid "Área"
+msgstr "Area"
 
 #: src/screens/floor-plan.jsx
 msgid "No se pudo cargar el plano."
@@ -2022,12 +2039,8 @@ msgid "Revisa nombres únicos, capacidad y dimensiones. Los elementos deben qued
 msgstr "Check unique names, capacity, and dimensions. Elements must fit inside the area."
 
 #: src/screens/floor-plan.jsx
-msgid "Área"
-msgstr "Area"
-
-#: src/screens/floor-plan.jsx
-msgid "Agregar área"
-msgstr "Add area"
+msgid "Historial"
+msgstr "History"
 
 #: src/screens/floor-plan.jsx
 msgid "Deshacer"
@@ -2036,6 +2049,10 @@ msgstr "Undo"
 #: src/screens/floor-plan.jsx
 msgid "Rehacer"
 msgstr "Redo"
+
+#: src/screens/floor-plan.jsx
+msgid "Cuadrícula y zoom"
+msgstr "Grid and zoom"
 
 #: src/screens/floor-plan.jsx
 msgid "Ajustar a cuadrícula"
