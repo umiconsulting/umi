@@ -6,11 +6,11 @@
 
 **Complete editors offer another route.** tldraw, Excalidraw, and GoJS supply more editor behavior than a drawing surface alone. Their product scope and license terms differ.
 
-| Option | Documented capabilities | Umi-specific inference |
-| --- | --- | --- |
-| tldraw | React SDK; custom shapes; geometry controls; snapping; JSON snapshots | Strong candidate when a complete editor and commercial support justify the license expense |
-| Excalidraw | React whiteboard; reusable shape collections; undo/redo; JSON and image export | Useful for a fast layout concept; requires careful restriction for operational table records |
-| GoJS | Diagram library; React integration; floor-planner sample; data model and custom tools | Useful if detailed walls, rooms, doors, and measurements become product requirements |
+| Option     | Documented capabilities                                                               | Umi-specific inference                                                                       |
+| ---------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| tldraw     | React SDK; custom shapes; geometry controls; snapping; JSON snapshots                 | Strong candidate when a complete editor and commercial support justify the license expense   |
+| Excalidraw | React whiteboard; reusable shape collections; undo/redo; JSON and image export        | Useful for a fast layout concept; requires careful restriction for operational table records |
+| GoJS       | Diagram library; React integration; floor-planner sample; data model and custom tools | Useful if detailed walls, rooms, doors, and measurements become product requirements         |
 
 **tldraw — documented facts.** A custom `ShapeUtil` defines a shape's appearance, geometry, and interaction behavior. Shape records have position, rotation, custom `props`, and JSON `meta`. These extension points can represent a restaurant table and its stable identifier. Bounds and gap snapping provide alignment and consistent spacing. The input system supports mouse, touch, pen, and pinch gestures. [Shape documentation](https://tldraw.dev/docs/shapes), [snapping](https://tldraw.dev/sdk-features/snapping), [input handling](https://tldraw.dev/sdk-features/input-handling)
 
@@ -32,10 +32,10 @@ The listed Team license costs USD 6,990 for up to three developers. It includes 
 
 **React compatibility — dated package facts.** Published package metadata reports these peer ranges. A compatible range is a preliminary check; it is not an integration test. [tldraw metadata](https://registry.npmjs.org/tldraw/5.4.2), [Excalidraw metadata](https://registry.npmjs.org/@excalidraw/excalidraw/0.18.1)
 
-| Package | Version checked | React and React DOM peers |
-| --- | --- | --- |
-| tldraw | 5.4.2 | `^18.2.0 || ^19.2.1` |
-| Excalidraw | 0.18.1 | `^17.0.2 || ^18.2.0 || ^19.0.0` |
+| Package    | Version checked | React and React DOM peers |
+| ---------- | --------------- | ------------------------- |
+| tldraw     | 5.4.2           | `^18.2.0                  |     | ^19.2.1` |
+| Excalidraw | 0.18.1          | `^17.0.2                  |     | ^18.2.0  |     | ^19.0.0` |
 
 **Common boundary — Umi inference.** Each option needs an adapter to a versioned Umi layout contract. Export table ID, shape, dimensions, position, rotation, and area membership. Save operational orders separately. Editor JSON supports draft recovery; it does not replace the shared contract. Validate stable IDs after duplication and import. Test touch gestures, keyboard operation, save/reload, and Flutter output with representative restaurant layouts before selection.
 
@@ -61,25 +61,25 @@ PixiJS provides a graphics renderer. It becomes relevant if measured rendering r
 
 **Release snapshot — documented facts.** Registry queries on 2026-09-13 returned the following versions. These are observations, not installation instructions. [Fabric metadata](https://registry.npmjs.org/fabric), [Moveable metadata](https://registry.npmjs.org/react-moveable), [Selecto metadata](https://registry.npmjs.org/react-selecto), [tldraw metadata](https://registry.npmjs.org/tldraw/5.4.2)
 
-| Package | Latest version returned | Publication date | Integration note |
-| --- | --- | --- | --- |
-| `fabric` | 7.4.0 | 2026-05-18 | Node requirement is at least 20; React adapter remains application code. |
-| `react-moveable` | 0.56.0 | 2023-12-03 | No React peer range was declared in the returned metadata. Test the integration. |
-| `react-selecto` | 1.26.3 | 2023-12-03 | No React peer range was declared in the returned metadata. Test the integration. |
-| `tldraw` | 5.4.2 | 2026-09-10 | Requires Node 22.12.0 or later. Verify the exact build runtime. |
+| Package          | Latest version returned | Publication date | Integration note                                                                 |
+| ---------------- | ----------------------- | ---------------- | -------------------------------------------------------------------------------- |
+| `fabric`         | 7.4.0                   | 2026-05-18       | Node requirement is at least 20; React adapter remains application code.         |
+| `react-moveable` | 0.56.0                  | 2023-12-03       | No React peer range was declared in the returned metadata. Test the integration. |
+| `react-selecto`  | 1.26.3                  | 2023-12-03       | No React peer range was declared in the returned metadata. Test the integration. |
+| `tldraw`         | 5.4.2                   | 2026-09-10       | Requires Node 22.12.0 or later. Verify the exact build runtime.                  |
 
 Umi currently declares React 18.3.1 and Node 22.x. Those declarations support further evaluation, but the Node major alone does not satisfy tldraw's minimum minor version. [Dashboard package](../../apps/umi-dashboard/package.json)
 
 **Selection matrix — Umi inference.** The effort column describes remaining categories of work. It is not a delivery estimate or measured comparison.
 
-| Candidate | Best fit | Remaining editor work | Business condition |
-| --- | --- | --- | --- |
-| Fabric.js | Custom table editor with object controls | React adapter, snapping rules, history, forms, accessibility | Umi accepts responsibility for editor maintenance. |
-| tldraw | Full editor behavior with custom table shapes | Restricted tools, table rules, UI adaptation, contract adapter | Commercial license and upgrade costs fit the feature's value. |
-| SVG + Moveable + Selecto | Precise custom markup and interaction | Viewport, history, domain tools, integration maintenance | The prototype and maintenance review pass. |
-| Excalidraw | Flexible plans and reusable drawing presets | Stronger table identity rules and restricted editing | Free-form drawing is a major requirement. |
-| GoJS | Detailed rooms, walls, measurements, and furniture | React adaptation and restaurant-specific behavior | Architectural detail justifies license and integration costs. |
-| React Flow | Table cards within a larger node-based product | Geometry behavior and restaurant editor controls | Umi also needs the node-and-edge features. |
+| Candidate                | Best fit                                           | Remaining editor work                                          | Business condition                                            |
+| ------------------------ | -------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------- |
+| Fabric.js                | Custom table editor with object controls           | React adapter, snapping rules, history, forms, accessibility   | Umi accepts responsibility for editor maintenance.            |
+| tldraw                   | Full editor behavior with custom table shapes      | Restricted tools, table rules, UI adaptation, contract adapter | Commercial license and upgrade costs fit the feature's value. |
+| SVG + Moveable + Selecto | Precise custom markup and interaction              | Viewport, history, domain tools, integration maintenance       | The prototype and maintenance review pass.                    |
+| Excalidraw               | Flexible plans and reusable drawing presets        | Stronger table identity rules and restricted editing           | Free-form drawing is a major requirement.                     |
+| GoJS                     | Detailed rooms, walls, measurements, and furniture | React adaptation and restaurant-specific behavior              | Architectural detail justifies license and integration costs. |
+| React Flow               | Table cards within a larger node-based product     | Geometry behavior and restaurant editor controls               | Umi also needs the node-and-edge features.                    |
 
 All candidates still require table IDs, tenant permissions, occupancy checks, draft publication, and Flutter conversion. A complete editor reduces generic interaction work; it does not supply restaurant business rules.
 

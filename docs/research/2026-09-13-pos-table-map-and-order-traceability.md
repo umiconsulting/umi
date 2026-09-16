@@ -6,13 +6,13 @@
 
 **Documented market workflows.** Sources below describe product behavior. They establish useful design references; they do not establish Umi customer demand.
 
-| Product | Documented fact | Implication for Umi |
-| --- | --- | --- |
-| Square | A guest count makes a table occupied before staff add items. Floor plans support sections and table geometry. [Square floor plans](https://squareup.com/help/us/en/article/6427-building-your-floor-plan) | A visit must exist before the first order. |
-| Toast | Staff can transfer a check to an occupied table and either merge it or retain separate checks. Permissions control transfers and server changes. [Toast table management](https://support.toasttab.com/en/article/New-POS-Managing-Tables) | Table assignment, check identity, and server assignment need separate actions. |
+| Product             | Documented fact                                                                                                                                                                                                                                               | Implication for Umi                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Square              | A guest count makes a table occupied before staff add items. Floor plans support sections and table geometry. [Square floor plans](https://squareup.com/help/us/en/article/6427-building-your-floor-plan)                                                     | A visit must exist before the first order.                                           |
+| Toast               | Staff can transfer a check to an occupied table and either merge it or retain separate checks. Permissions control transfers and server changes. [Toast table management](https://support.toasttab.com/en/article/New-POS-Managing-Tables)                    | Table assignment, check identity, and server assignment need separate actions.       |
 | Lightspeed K-Series | Floor plans support table position, shape, capacity, guest counts, and temporary table removal from the POS. [Lightspeed floor plans](https://k-series-support.lightspeedhq.com/hc/en-us/articles/1260804656709-Creating-and-managing-floor-plans-and-tables) | Use stable table identities, simple geometry, capacity, and an availability control. |
-| Odoo 19 | Preparation stages are configurable. Cards show tables, guest counts, item progress, elapsed time, and alerts. [Odoo preparation display](https://www.odoo.com/documentation/19.0/applications/sales/point_of_sale/extra/preparation.html) | Show partial readiness and elapsed time from the existing kitchen workflow. |
-| PoloTab | Staff configure tables by area and identifier, then manage open checks for each table in the POS. [PoloTab tables](https://www.polotab.com/soporte/crear-mesas) | Area names and short table identifiers provide a useful initial structure. |
+| Odoo 19             | Preparation stages are configurable. Cards show tables, guest counts, item progress, elapsed time, and alerts. [Odoo preparation display](https://www.odoo.com/documentation/19.0/applications/sales/point_of_sale/extra/preparation.html)                    | Show partial readiness and elapsed time from the existing kitchen workflow.          |
+| PoloTab             | Staff configure tables by area and identifier, then manage open checks for each table in the POS. [PoloTab tables](https://www.polotab.com/soporte/crear-mesas)                                                                                               | Area names and short table identifiers provide a useful initial structure.           |
 
 **Separate service events — documented fact and Umi inference.** Toast distinguishes kitchen fulfillment, readiness for collection, and completion after payment and collection or delivery. That source concerns takeout and delivery. [Toast Orders Hub](https://support.toasttab.com/en/article/Orders-Hub-Status-Breakdown) For Umi dine-in service, record an explicit Served action after kitchen readiness. A paid order can still require preparation or delivery to the table. A fully served order can still have an unpaid balance. Record table clearance separately because payment does not prove that guests have left.
 
@@ -22,14 +22,14 @@
 
 **MVP — Umi inference.** The target café workflow supports payment before or after food preparation. Confirm that requirement with the pilot merchant. A service order that exists before payment is a prerequisite for the full workflow. The software assessment below must establish this capability before implementation. A smaller pilot can attach paid orders to occupied tables, if that matches the merchant's service.
 
-| Capability | Initial scope | Business purpose |
-| --- | --- | --- |
-| Map | Areas; named tables; position, shape, and capacity; map and list views | Staff identify a table quickly. |
-| Visit | Seat guests, record guest count, assign a server, add orders, move to a free table, record departure and clearance | Occupancy follows the guests throughout service. |
-| Table summary | Occupancy label, elapsed visit time, server, balance, and counts of ready and unserved items | Staff see which table needs action. |
-| Order detail | Linked orders, item readiness, Served action, and checkout adapted for an existing open order | Staff complete the service from the table. |
-| History | Order creation, kitchen acceptance, readiness, service, payment, cancellation, and assignment changes | Staff answer service questions and managers investigate corrections. |
-| Controls | Server permissions; manager controls for corrections and layout changes; visible connection state | Staff know which actions they can complete reliably. |
+| Capability    | Initial scope                                                                                                      | Business purpose                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Map           | Areas; named tables; position, shape, and capacity; map and list views                                             | Staff identify a table quickly.                                      |
+| Visit         | Seat guests, record guest count, assign a server, add orders, move to a free table, record departure and clearance | Occupancy follows the guests throughout service.                     |
+| Table summary | Occupancy label, elapsed visit time, server, balance, and counts of ready and unserved items                       | Staff see which table needs action.                                  |
+| Order detail  | Linked orders, item readiness, Served action, and checkout adapted for an existing open order                      | Staff complete the service from the table.                           |
+| History       | Order creation, kitchen acceptance, readiness, service, payment, cancellation, and assignment changes              | Staff answer service questions and managers investigate corrections. |
+| Controls      | Server permissions; manager controls for corrections and layout changes; visible connection state                  | Staff know which actions they can complete reliably.                 |
 
 Allow the model to link several orders to a visit. Start the pilot with one open order per visit and several submission rounds within that order. Additional rounds need explicit kitchen updates that preserve prior item progress. Distinguish several tenders in one checkout from partial settlement across separate checkout sessions. The latter requires additional backend work. Treat check splits, paid-check merges, and transfers to occupied tables as separate releases with financial validation. Also defer reservations, seat-level item allocation, course pacing, and automatic seating recommendations until pilot evidence supports them.
 
@@ -37,15 +37,15 @@ Allow the model to link several orders to a visit. Start the pilot with one open
 
 **Business pilot — Umi inference.** Pilot one area across comparable busy shifts, after a baseline observation period. Train staff with a complete visit, an additional round, a table move, a cancellation, and a connection interruption. Estimate setup time, staff training, support, and maintenance costs from this pilot. Package the feature initially with dine-in service; test willingness to pay before a separate price decision.
 
-| Measure | Definition | Use |
-| --- | --- | --- |
-| Time to first submission | First submitted order time minus seated time | Find delays before the kitchen receives work. |
-| Time from ready to served | Served time minus ready time, per item or recorded batch | Find delays between kitchen and table. |
-| Table occupancy duration | Departure time minus seated time | Understand visit duration by area and service period. |
-| Clearance delay | Available time minus departure time | Find delays before reuse. |
-| Unpaid departed visits | Departed visits with a positive balance | Identify payment exceptions. |
-| History completeness | Visits with all applicable required events divided by eligible visits | Check whether the measures are reliable. |
-| Corrections | Wrong-table deliveries and order corrections per 100 dine-in orders | Test service quality alongside speed. |
+| Measure                   | Definition                                                            | Use                                                   |
+| ------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------- |
+| Time to first submission  | First submitted order time minus seated time                          | Find delays before the kitchen receives work.         |
+| Time from ready to served | Served time minus ready time, per item or recorded batch              | Find delays between kitchen and table.                |
+| Table occupancy duration  | Departure time minus seated time                                      | Understand visit duration by area and service period. |
+| Clearance delay           | Available time minus departure time                                   | Find delays before reuse.                             |
+| Unpaid departed visits    | Departed visits with a positive balance                               | Identify payment exceptions.                          |
+| History completeness      | Visits with all applicable required events divided by eligible visits | Check whether the measures are reliable.              |
+| Corrections               | Wrong-table deliveries and order corrections per 100 dine-in orders   | Test service quality alongside speed.                 |
 
 Report medians and the 90th percentile for durations. Report missing timestamps separately. Compare similar service periods and guest counts. Validate results with staff observation because missed Served actions can distort the measures. Agree on success thresholds after the baseline; this research establishes no universal target or ROI.
 
@@ -53,17 +53,17 @@ Report medians and the 90th percentile for durations. Report missing timestamps 
 
 **Current Umi implementation — source facts.** This audit inspected the working tree at commit `ff69e02` on 2026-09-13. It did not inspect production state.
 
-| Area | Evidence | Consequence |
-| --- | --- | --- |
-| Navigation | `_primaryNav` includes Order, Cash, Sales, Kitchen, and Settings. [Catalog surface](../../apps/umi-pos/lib/features/catalog/catalog_surface.dart) | Add Tables here. Check six destinations on the smallest supported display. |
-| Kitchen view | The POS board uses an eight-second timer and snapshot reads. [Board surface](../../apps/umi-pos/lib/features/kitchen/kitchen_board_surface.dart), [controller](../../apps/umi-pos/lib/features/kitchen/kitchen_board_controller.dart) | Reuse this presentation pattern. It does not provide POS commands for kitchen staff. |
-| Order creation | Checkout `commit` calls `writeOrder` with `fulfillmentType: 'dine_in'`. [Checkout repository](../../apps/umi-api/src/modules/pos-checkout/pos-checkout.repository.ts) | Table service needs submission before payment. Persist the selected fulfillment type. |
-| Saved sales | `SaleSnapshot` supports suspended carts. Source order references come through the committed sale. [Contract](../../packages/contract/src/pos-sale.ts), [repository](../../apps/umi-api/src/modules/pos-sale/pos-sale.repository.ts) | A suspended cart does not establish a submitted kitchen order. |
-| Initial projection | `writeOrder` writes order facts and calls `projectKitchenOrder` in its caller's transaction. [Order writer](../../apps/umi-api/src/shared/orders/order-writer.ts) | Keep commercial writes and preparation projections under the API owner. |
-| Later rounds | `projectKitchenOrder` returns immediately when a projection exists. [Kitchen projector](../../apps/umi-api/src/modules/kds/kitchen-projector.ts) | Repeated calls cannot project later additions. Add an amendment path. |
-| Kitchen identity | Contracts include source order IDs, item IDs, versions, events, and partial readiness. They lack table and visit fields. [Kitchen contract](../../packages/contract/src/pos-kitchen.ts) | Reuse identities and add typed table context across clients. |
-| History | The schema defines order events and audit records. The dashboard exposes some order history. [Schema](../migration/build-v3/20_merchant.sql), [orders service](../../apps/umi-api/src/modules/orders/orders.service.ts) | Combine existing facts with new seating, service, and assignment events. |
-| Offline | The native journal accepts `operational.ack` and `pos.checkout.cash`. [Journal](../../apps/umi-pos/lib/features/offline/offline_journal.dart) | Current offline support does not establish safe table assignment or open-order amendments. |
+| Area               | Evidence                                                                                                                                                                                                                              | Consequence                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Navigation         | `_primaryNav` includes Order, Cash, Sales, Kitchen, and Settings. [Catalog surface](../../apps/umi-pos/lib/features/catalog/catalog_surface.dart)                                                                                     | Add Tables here. Check six destinations on the smallest supported display.                 |
+| Kitchen view       | The POS board uses an eight-second timer and snapshot reads. [Board surface](../../apps/umi-pos/lib/features/kitchen/kitchen_board_surface.dart), [controller](../../apps/umi-pos/lib/features/kitchen/kitchen_board_controller.dart) | Reuse this presentation pattern. It does not provide POS commands for kitchen staff.       |
+| Order creation     | Checkout `commit` calls `writeOrder` with `fulfillmentType: 'dine_in'`. [Checkout repository](../../apps/umi-api/src/modules/pos-checkout/pos-checkout.repository.ts)                                                                 | Table service needs submission before payment. Persist the selected fulfillment type.      |
+| Saved sales        | `SaleSnapshot` supports suspended carts. Source order references come through the committed sale. [Contract](../../packages/contract/src/pos-sale.ts), [repository](../../apps/umi-api/src/modules/pos-sale/pos-sale.repository.ts)   | A suspended cart does not establish a submitted kitchen order.                             |
+| Initial projection | `writeOrder` writes order facts and calls `projectKitchenOrder` in its caller's transaction. [Order writer](../../apps/umi-api/src/shared/orders/order-writer.ts)                                                                     | Keep commercial writes and preparation projections under the API owner.                    |
+| Later rounds       | `projectKitchenOrder` returns immediately when a projection exists. [Kitchen projector](../../apps/umi-api/src/modules/kds/kitchen-projector.ts)                                                                                      | Repeated calls cannot project later additions. Add an amendment path.                      |
+| Kitchen identity   | Contracts include source order IDs, item IDs, versions, events, and partial readiness. They lack table and visit fields. [Kitchen contract](../../packages/contract/src/pos-kitchen.ts)                                               | Reuse identities and add typed table context across clients.                               |
+| History            | The schema defines order events and audit records. The dashboard exposes some order history. [Schema](../migration/build-v3/20_merchant.sql), [orders service](../../apps/umi-api/src/modules/orders/orders.service.ts)               | Combine existing facts with new seating, service, and assignment events.                   |
+| Offline            | The native journal accepts `operational.ack` and `pos.checkout.cash`. [Journal](../../apps/umi-pos/lib/features/offline/offline_journal.dart)                                                                                         | Current offline support does not establish safe table assignment or open-order amendments. |
 
 Targeted searches found no table-map or visit model in the inspected API, POS, contract, and build-v3 SQL paths. Source files establish implementation behavior; they do not establish deployed database state.
 
@@ -88,26 +88,26 @@ flowchart LR
 
 The following records are proposals, not existing tables.
 
-| Record | Main fields and rule |
-| --- | --- |
-| `dining_area` | Merchant, location, name, display order, layout version. |
-| `dining_table` | Stable ID, area, label, capacity, shape, geometry, availability, version. Archive tables to preserve history. |
-| `dining_visit` | Location, guest count, assigned staff, opened time, departed time, closed time, version. Customer identity is optional. |
-| `dining_assignment` | Visit, table, assigned time, released time. Preserve each transfer as assignment history. |
-| Order-to-visit link | Stable order and visit IDs with matching merchant and location. Start with one open order per visit. |
-| Submission round | Order, round ID, immutable line references, submitted time, actor, command ID. Send only new lines. |
-| `dining_event` | Visit, event ID, visit sequence, actor, device, server time, event type, reason, referenced entities. |
+| Record              | Main fields and rule                                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `dining_area`       | Merchant, location, name, display order, layout version.                                                                |
+| `dining_table`      | Stable ID, area, label, capacity, shape, geometry, availability, version. Archive tables to preserve history.           |
+| `dining_visit`      | Location, guest count, assigned staff, opened time, departed time, closed time, version. Customer identity is optional. |
+| `dining_assignment` | Visit, table, assigned time, released time. Preserve each transfer as assignment history.                               |
+| Order-to-visit link | Stable order and visit IDs with matching merchant and location. Start with one open order per visit.                    |
+| Submission round    | Order, round ID, immutable line references, submitted time, actor, command ID. Send only new lines.                     |
+| `dining_event`      | Visit, event ID, visit sequence, actor, device, server time, event type, reason, referenced entities.                   |
 
 Use `dining_event` for seating, table changes, departure, clearance, and service. Reference existing order, kitchen, payment, and audit facts in the timeline. Avoid a second financial ledger. The current `order_event` accepts only status changes and order amendments. Retain that purpose. [Merchant schema](../migration/build-v3/20_merchant.sql)
 
 **State rules — Umi proposal.** Compute table summaries from separate dimensions.
 
-| Dimension | States or measures | Authority |
-| --- | --- | --- |
-| Physical table | Available, occupied, needs clearance, blocked | Assignment, departure, and clearance actions |
-| Preparation | Queued, preparing, partly ready, ready, exception | Existing kitchen facts |
-| Service | Unserved quantity, partly served, fully served | Explicit service records by item or batch |
-| Payment | Unpaid, partly paid, paid; refund exceptions | Authoritative order amounts and allocated payments |
+| Dimension      | States or measures                                | Authority                                          |
+| -------------- | ------------------------------------------------- | -------------------------------------------------- |
+| Physical table | Available, occupied, needs clearance, blocked     | Assignment, departure, and clearance actions       |
+| Preparation    | Queued, preparing, partly ready, ready, exception | Existing kitchen facts                             |
+| Service        | Unserved quantity, partly served, fully served    | Explicit service records by item or batch          |
+| Payment        | Unpaid, partly paid, paid; refund exceptions      | Authoritative order amounts and allocated payments |
 
 Only expose partial settlement after its command path exists. Derive readiness across all relevant stations. Give items without preparation a service path. Kitchen completion must not assert delivery to a table. Payment must not release the table. A departed visit with an unpaid balance remains an exception after staff clear and reuse the table.
 
@@ -157,11 +157,11 @@ Use simple manager-controlled geometry first, through the dashboard editor descr
 
 **Delivery sequence — Umi inference.** The largest effort lies in open orders, amendments, and settlement. The map is a smaller interface task. Calendar estimates need agreement on financial and offline scope.
 
-| Stage | Deliverable | Exit condition |
-| --- | --- | --- |
+| Stage                 | Deliverable                                                                                                    | Exit condition                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | 1. Service foundation | Visits, table records, submission before payment, later rounds, kitchen amendments, settlement, service events | Complete a visit without duplicate orders, preparation, payments, or stock effects. |
-| 2. Operational pilot | Tables tab, simple editor, map/list views, history, permissions, stale state, moves to free tables | Staff complete the main workflows on two devices during representative shifts. |
-| 3. Expansion | Table groups, several checks, item splits, partial settlement, faster notifications, optional offline service | Each addition has merchant demand and passes financial or concurrency checks. |
+| 2. Operational pilot  | Tables tab, simple editor, map/list views, history, permissions, stale state, moves to free tables             | Staff complete the main workflows on two devices during representative shifts.      |
+| 3. Expansion          | Table groups, several checks, item splits, partial settlement, faster notifications, optional offline service  | Each addition has merchant demand and passes financial or concurrency checks.       |
 
 A narrower pay-first map can precede Stage 1 for a merchant with counter payment. Describe that scope explicitly. It cannot validate service with payment at the end.
 
@@ -184,15 +184,15 @@ A narrower pay-first map can precede Stage 1 for a merchant with counter payment
 
 **Follow-up: editor placement and GUI tools — 2026-09-13.** Put permanent table creation and floor-plan design in the dashboard. Keep seating, service, table availability, and visit transfers in the POS. The API owns both sets of records. This refines the earlier editor proposal.
 
-| Action | Recommended surface | Reason |
-| --- | --- | --- |
-| Create areas and permanent tables | Dashboard | Managers configure the location and review its capacity. |
-| Set shapes, furniture positions, labels, and capacity | Dashboard | A larger work area and property controls support precise edits. |
-| Preview and publish a layout | Dashboard | Managers review changes before staff receive them. |
-| Seat guests, open orders, serve, and clear | POS | Staff perform these actions during service. |
-| Move a visit or temporarily block a table | POS | These actions concern current service. |
-| Join tables for a party | POS, later release | Keep physical table IDs and separate check decisions. |
-| Add a temporary table during service | Later manager-only POS action, if needed | Merchant evidence should justify this additional creation path. |
+| Action                                                | Recommended surface                      | Reason                                                          |
+| ----------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------- |
+| Create areas and permanent tables                     | Dashboard                                | Managers configure the location and review its capacity.        |
+| Set shapes, furniture positions, labels, and capacity | Dashboard                                | A larger work area and property controls support precise edits. |
+| Preview and publish a layout                          | Dashboard                                | Managers review changes before staff receive them.              |
+| Seat guests, open orders, serve, and clear            | POS                                      | Staff perform these actions during service.                     |
+| Move a visit or temporarily block a table             | POS                                      | These actions concern current service.                          |
+| Join tables for a party                               | POS, later release                       | Keep physical table IDs and separate check decisions.           |
+| Add a temporary table during service                  | Later manager-only POS action, if needed | Merchant evidence should justify this additional creation path. |
 
 This division has a documented precedent. Square creates and designs floor plans in its dashboard and supports table combinations during POS service. [Square floor plans](https://squareup.com/help/us/en/article/6427-building-your-floor-plan) Umi should first offer one full editor that also works in a tablet browser. A merchant who regularly changes furniture during service may justify additional POS editing later. A visit transfer changes guest assignment; a furniture move changes layout geometry. Give those actions distinct names.
 
@@ -200,11 +200,11 @@ This division has a documented precedent. Square creates and designs floor plans
 
 Konva supplies shapes, event handling, and a Transformer for resize and rotation. Its React examples handle both clicks and taps. Umi must implement snapping, alignment rules, property forms, and publication controls. Undo and redo can use application state history. These are integration tasks, not a complete editor supplied by the library. [Transformer](https://konvajs.org/docs/react/Transformer.html), [undo and redo](https://konvajs.org/docs/react/Undo-Redo.html)
 
-| Option | Assessment for Umi |
-| --- | --- |
-| React Konva | Selected for the custom editor with drag, resize, rotate, and structured table properties. |
-| React with SVG | A reasonable simpler alternative if the scope stays at basic placement. Umi would implement selection and transform controls. |
-| Fabric.js | Provides an object model, interaction, and serialization. Viable, but the existing React stack favors React Konva's declarative bindings. [Fabric documentation](https://www.fabricjs.com/docs/) |
+| Option         | Assessment for Umi                                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| React Konva    | Selected for the custom editor with drag, resize, rotate, and structured table properties.                                                                                                       |
+| React with SVG | A reasonable simpler alternative if the scope stays at basic placement. Umi would implement selection and transform controls.                                                                    |
+| Fabric.js      | Provides an object model, interaction, and serialization. Viable, but the existing React stack favors React Konva's declarative bindings. [Fabric documentation](https://www.fabricjs.com/docs/) |
 
 The recommendation is based on integration fit and the requested controls. It is not a measured performance comparison. Prototype touch behavior and representative layouts before selecting exact package versions. Konva uses the MIT license. [Konva license](https://github.com/konvajs/konva/blob/master/LICENSE)
 
