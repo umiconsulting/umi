@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { msg } from '@lingui/core/macro';
@@ -40,6 +40,8 @@ import CatalogInventoryScreen from '@/screens/catalog-inventory.jsx';
 import DiagnosticsScreen from '@/screens/diagnostics.jsx';
 import CocinaScreen from '@/screens/cocina.jsx';
 import ProfileScreen from '@/screens/profile.jsx';
+
+const FloorPlanScreen = lazy(() => import('@/screens/floor-plan.jsx'));
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy' };
 
@@ -222,7 +224,9 @@ function DashboardLayout() {
           merchantName={merchantName}
           locations={merchantState?.capabilities?.locations || []}
           canSwitchLocations={merchantState?.capabilities?.canSwitchLocations === true}
-          selectedLocationId={merchantState?.selectedLocationId}
+          selectedLocationId={
+            merchantState?.selectedLocationId || merchantState?.capabilities?.selectedLocation?.id
+          }
           onLocationChange={merchantState?.setSelectedLocationId}
           connection={connection}
           onProfile={() => nav('profile')}
@@ -313,6 +317,16 @@ function DashboardLayout() {
               element={
                 <GuardedScreen moduleKey="orders">
                   <OrdersScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="floor-plan"
+              element={
+                <GuardedScreen moduleKey="floor-plan">
+                  <Suspense fallback={<div role="status">…</div>}>
+                    <FloorPlanScreen />
+                  </Suspense>
                 </GuardedScreen>
               }
             />

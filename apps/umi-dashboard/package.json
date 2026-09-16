@@ -16,6 +16,7 @@
     "lint:fix": "eslint . --fix",
     "pretest": "lingui compile",
     "test": "vitest run",
+    "test:browser": "playwright test --config playwright.config.js",
     "i18n:extract": "lingui extract",
     "i18n:compile": "lingui compile --strict"
   },
@@ -23,11 +24,14 @@
     "@lingui/core": "^6.6.0",
     "@lingui/react": "^6.6.0",
     "@tanstack/react-query": "^5.102.8",
+    "konva": "^10.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-konva": "^18.2.16",
     "react-router-dom": "^6.26.2",
     "react-virtuoso": "^4.18.13",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

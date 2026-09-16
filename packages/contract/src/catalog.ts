@@ -18,6 +18,7 @@ import { posExceptionModels } from './pos-exception';
 import { posInventoryModels } from './pos-inventory';
 import { posCustomerValueModels } from './pos-customer-value';
 import { posHardwareModels } from './pos-hardware';
+import { floorPlanModels } from './floor-plan';
 import { posKitchenModels } from './pos-kitchen';
 import { dashboardOperationsModels } from './dashboard-operations';
 import { realtimeModels } from './realtime';
@@ -80,6 +81,7 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...posCustomerValueModels,
   ...posHardwareModels,
   ...posKitchenModels,
+  ...floorPlanModels,
   ...dashboardOperationsModels,
   ...realtimeModels,
 };

@@ -1,3 +1,4 @@
+import { buildPath } from '@umi/contract/route-table';
 import { t } from '@lingui/core/macro';
 import {
   useState as useStateD,
@@ -1639,3 +1640,16 @@ export {
   updateCatalogCategory,
   _LIVE as DATA_IS_LIVE,
 };
+
+// Capture the location at the call site so a switch cannot redirect a pending save.
+export function fetchFloorPlan(merchantId, locationId) {
+  return _apiFetch(
+    `${buildPath('floorPlan.read', { merchantId })}?locationId=${encodeURIComponent(locationId)}`,
+  );
+}
+export function changeFloorPlan(merchantId, payload, publish = false) {
+  return _apiFetch(buildPath(publish ? 'floorPlan.publish' : 'floorPlan.save', { merchantId }), {
+    method: publish ? 'POST' : 'PUT',
+    body: JSON.stringify(payload),
+  });
+}

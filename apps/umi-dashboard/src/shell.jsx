@@ -169,6 +169,7 @@ const SECTION_LABELS = {
 
 /** Screen titles for the masthead. Resolved at render, so they follow the locale. */
 const SCREEN_TITLES = {
+  'floor-plan': msg`Plano de mesas`,
   overview: msg`Panorama`,
   operations: msg`Centro operativo`,
   reportes: msg`Reportes`,
@@ -448,9 +449,12 @@ const Topbar = ({
     'cash-shifts',
     'catalog-inventory',
     'kitchen',
+    'floor-plan',
   ].includes(screen);
   const activeLocations = locations.filter((l) => l.status === 'active');
-  const showLocationSelect = locationScoped && canSwitchLocations && activeLocations.length > 1;
+  const canChooseLocation = canSwitchLocations && activeLocations.length > 1;
+  const showLocationSelect =
+    locationScoped && activeLocations.length > 0 && (screen === 'floor-plan' || canChooseLocation);
   const branchName =
     activeLocations.find((l) => l.id === selectedLocationId)?.name ||
     (activeLocations.length === 1 ? activeLocations[0].name : null);
@@ -508,6 +512,7 @@ const Topbar = ({
               <Select
                 className="select topbar-select"
                 value={selectedLocationId || ''}
+                disabled={!canChooseLocation}
                 onChange={(e) => onLocationChange?.(e.target.value)}
                 aria-label={t`Sucursal`}
               >

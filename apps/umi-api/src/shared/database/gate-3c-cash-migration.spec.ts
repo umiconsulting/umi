@@ -131,9 +131,14 @@ describe('Gate 3C cash persistence', () => {
     expect(checkoutSource).toContain("prior->>'status'='confirmed_success'");
   });
 
-  it('re-dates a cart the moment it is resumed', () => {
+  it('keeps the cart creation date when it is resumed', () => {
+    // 90_rls.sql seals merchant.pos_cart.business_date: the request-path role has
+    // no UPDATE privilege on that column, because the date decides which day's
+    // revenue and cash-up the sale lands in. So a resume restores the lifecycle
+    // state and nothing else. Re-dating needs a controlled function, not an
+    // upsert that the database refuses.
     expect(cart).toContain("lifecycle_state='recovered'");
-    expect(cart).toContain('business_date=excluded.business_date');
+    expect(cart).not.toContain('business_date=excluded.business_date');
   });
 
   it('closes with the selected count before it makes the shift terminal', () => {

@@ -34,6 +34,8 @@ import '../offline/recovery_center.dart';
 import '../offline/replay_engine.dart';
 import '../sale/sale_lifecycle_controller.dart';
 import '../sale/sale_surface.dart';
+import '../tables/floor_plan_controller.dart';
+import '../tables/floor_plan_surface.dart';
 import 'catalog_controller.dart';
 import 'catalog_repository.dart';
 import 'frequent_products.dart';
@@ -49,6 +51,7 @@ final class CatalogSurface extends StatefulWidget {
     required this.sales,
     this.kitchenStatus,
     this.kitchenBoard,
+    this.floorPlan,
     this.customerValue,
     required this.exceptions,
     required this.connectivity,
@@ -68,6 +71,7 @@ final class CatalogSurface extends StatefulWidget {
   final SaleLifecycleController sales;
   final KitchenStatusRepository? kitchenStatus;
   final KitchenBoardController? kitchenBoard;
+  final FloorPlanController? floorPlan;
   final CustomerValueController? customerValue;
   final SaleExceptionController exceptions;
   final ConnectivityController connectivity;
@@ -600,7 +604,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       ),
       // The primary navigation, PoloTab-style: the order screen is home, with the
       // cash centre, the sales history, the kitchen board and settings a tap away.
-      bottomNavigationBar: _primaryNav(context, l, spanish, access, permissions),
+      bottomNavigationBar: _primaryNav(
+        context,
+        l,
+        spanish,
+        access,
+        permissions,
+      ),
     );
   }
 
@@ -647,6 +657,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 ? () => _openSaleCenter(context, permissions)
                 : null,
           ),
+          if (widget.floorPlan != null)
+            (
+              destination: NavigationDestination(
+                icon: const Icon(Icons.table_restaurant_outlined),
+                label: spanish ? 'Mesas' : 'Tables',
+              ),
+              onTap: () => showFloorPlan(
+                context,
+                controller: widget.floorPlan!,
+                entry: widget.entry,
+              ),
+            ),
           if (widget.kitchenBoard != null)
             (
               destination: NavigationDestination(

@@ -136,6 +136,12 @@ msgid "Código incorrecto o vencido."
 msgstr "Incorrect or expired code."
 
 #: src/lib/module-registry.js
+#: src/screens/floor-plan.jsx
+#: src/shell.jsx
+msgid "Plano de mesas"
+msgstr "Floor plan"
+
+#: src/lib/module-registry.js
 #: src/screens/customers.jsx
 #: src/screens/ventas-report.jsx
 msgid "Resumen"
@@ -682,6 +688,7 @@ msgid "Nueva categoría"
 msgstr "New category"
 
 #: src/screens/categories-workspace.jsx
+#: src/screens/floor-plan.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/profile.jsx
@@ -1196,6 +1203,7 @@ msgid "Recargar ${pesos}"
 msgstr "Top up ${pesos}"
 
 #: src/screens/customers.jsx
+#: src/screens/floor-plan.jsx
 msgid "Recargar"
 msgstr "Top up"
 
@@ -1931,6 +1939,220 @@ msgstr "Recovery"
 #: src/screens/operations-workspace.jsx
 msgid "Auditoría"
 msgstr "Audit"
+
+#: src/screens/floor-plan.jsx
+msgid "Áreas"
+msgstr "Areas"
+
+#. placeholder {0}: areaTableCount(item)
+#: src/screens/floor-plan.jsx
+msgid "{0, plural, one {# mesa} other {# mesas}}"
+msgstr "{0, plural, one {# table} other {# tables}}"
+
+#: src/screens/floor-plan.jsx
+msgid "Agregar área"
+msgstr "Add area"
+
+#: src/screens/floor-plan.jsx
+msgid "Salón"
+msgstr "Dining room"
+
+#: src/screens/floor-plan.jsx
+msgid "Muro"
+msgstr "Wall"
+
+#: src/screens/floor-plan.jsx
+msgid "Barra"
+msgstr "Counter"
+
+#: src/screens/floor-plan.jsx
+msgid "Puerta"
+msgstr "Door"
+
+#: src/screens/floor-plan.jsx
+msgid "Texto"
+msgstr "Text"
+
+#: src/screens/floor-plan.jsx
+msgid "Área"
+msgstr "Area"
+
+#: src/screens/floor-plan.jsx
+msgid "No se pudo cargar el plano."
+msgstr "Could not load the floor plan."
+
+#: src/screens/floor-plan.jsx
+#: src/screens/settings.jsx
+msgid "Reintentar"
+msgstr "Retry"
+
+#: src/screens/floor-plan.jsx
+msgid "Carga del plano…"
+msgstr "Loading floor plan…"
+
+#: src/screens/floor-plan.jsx
+msgid "Diseña tu espacio y publica el plano en el punto de venta."
+msgstr "Design your space and publish the floor plan to the POS."
+
+#: src/screens/floor-plan.jsx
+msgid "Guardado en curso…"
+msgstr "Saving…"
+
+#: src/screens/floor-plan.jsx
+msgid "Cambios pendientes"
+msgstr "Unsaved changes"
+
+#: src/screens/floor-plan.jsx
+msgid "Borrador guardado"
+msgstr "Draft saved"
+
+#: src/screens/floor-plan.jsx
+msgid "Nuevo borrador"
+msgstr "New draft"
+
+#: src/screens/floor-plan.jsx
+msgid "Volver al borrador"
+msgstr "Back to draft"
+
+#: src/screens/floor-plan.jsx
+msgid "Ver publicado"
+msgstr "View published"
+
+#: src/screens/floor-plan.jsx
+msgid "Publicar"
+msgstr "Publish"
+
+#: src/screens/floor-plan.jsx
+msgid "Otro usuario cambió el plano. Recarga para obtener la versión actual."
+msgstr "Another user changed the floor plan. Reload to get the current version."
+
+#: src/screens/floor-plan.jsx
+msgid "No se confirmó el guardado. Reintenta antes de continuar."
+msgstr "Save was not confirmed. Retry before you continue."
+
+#: src/screens/floor-plan.jsx
+msgid "Se descartarán los cambios locales. ¿Recargar el plano?"
+msgstr "Local changes will be discarded. Reload the floor plan?"
+
+#: src/screens/floor-plan.jsx
+msgid "Revisa nombres únicos, capacidad y dimensiones. Los elementos deben quedar dentro del área."
+msgstr "Check unique names, capacity, and dimensions. Elements must fit inside the area."
+
+#: src/screens/floor-plan.jsx
+msgid "Historial"
+msgstr "History"
+
+#: src/screens/floor-plan.jsx
+msgid "Deshacer"
+msgstr "Undo"
+
+#: src/screens/floor-plan.jsx
+msgid "Rehacer"
+msgstr "Redo"
+
+#: src/screens/floor-plan.jsx
+msgid "Cuadrícula y zoom"
+msgstr "Grid and zoom"
+
+#: src/screens/floor-plan.jsx
+msgid "Ajustar a cuadrícula"
+msgstr "Snap to grid"
+
+#: src/screens/floor-plan.jsx
+msgid "Zoom"
+msgstr "Zoom"
+
+#: src/screens/floor-plan.jsx
+msgid "Elementos"
+msgstr "Elements"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa redonda"
+msgstr "Round table"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa cuadrada"
+msgstr "Square table"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa rectangular"
+msgstr "Rectangular table"
+
+#: src/screens/floor-plan.jsx
+msgid "Lista de elementos"
+msgstr "Element list"
+
+#: src/screens/floor-plan.jsx
+msgid "Plano. Selecciona un elemento de la lista para editarlo con el teclado."
+msgstr "Floor plan. Select an element from the list to edit it with the keyboard."
+
+#: src/screens/floor-plan.jsx
+msgid "Propiedades"
+msgstr "Properties"
+
+#: src/screens/floor-plan.jsx
+msgid "Forma"
+msgstr "Shape"
+
+#: src/screens/floor-plan.jsx
+msgid "Rectangular"
+msgstr "Rectangular"
+
+#: src/screens/floor-plan.jsx
+msgid "Redonda"
+msgstr "Round"
+
+#: src/screens/floor-plan.jsx
+msgid "Cuadrada"
+msgstr "Square"
+
+#: src/screens/floor-plan.jsx
+msgid "Capacidad"
+msgstr "Capacity"
+
+#: src/screens/floor-plan.jsx
+msgid "Ancho"
+msgstr "Width"
+
+#: src/screens/floor-plan.jsx
+msgid "Alto"
+msgstr "Height"
+
+#: src/screens/floor-plan.jsx
+msgid "Posición X"
+msgstr "X position"
+
+#: src/screens/floor-plan.jsx
+msgid "Posición Y"
+msgstr "Y position"
+
+#: src/screens/floor-plan.jsx
+msgid "Rotación"
+msgstr "Rotation"
+
+#: src/screens/floor-plan.jsx
+msgid "Duplicar"
+msgstr "Duplicate"
+
+#: src/screens/floor-plan.jsx
+msgid "Eliminar elemento"
+msgstr "Delete element"
+
+#: src/screens/floor-plan.jsx
+msgid "Editar área"
+msgstr "Edit area"
+
+#: src/screens/floor-plan.jsx
+msgid "Esta es la versión publicada en el punto de venta."
+msgstr "This is the version published to the POS."
+
+#: src/screens/floor-plan.jsx
+msgid "El borrador se guarda automáticamente. Publica para actualizar el punto de venta."
+msgstr "The draft saves automatically. Publish to update the POS."
+
+#: src/screens/floor-plan.jsx
+msgid "Selecciona una sucursal para editar su plano."
+msgstr "Select a location to edit its floor plan."
 
 #: src/screens/gift-cards.jsx
 msgid "No se pudo canjear la tarjeta."
@@ -4707,10 +4929,6 @@ msgstr "Unsaved"
 #: src/screens/settings.jsx
 msgid "✓ Guardado"
 msgstr "✓ Saved"
-
-#: src/screens/settings.jsx
-msgid "Reintentar"
-msgstr "Retry"
 
 #: src/screens/settings.jsx
 msgid "Apodos (cómo la llaman los clientes)"
