@@ -106,21 +106,21 @@
       "budgetSource": "assumption — group open plus child is two taps; needs owner confirmation"
     },
     {
-      "id": "catalog-switch-inventory-tab",
-      "label": "Catálogo e inventario: cambiar a la pestaña Inventario",
+      "id": "products-to-inventory",
+      "label": "Productos: ir a Inventario",
       "surface": "umi-dashboard",
       "status": "instrumented",
-      "start": "/catalog-inventory",
+      "start": "/products",
       "steps": [
         {
           "click": {
-            "selector": "button.hub-tab",
+            "selector": ".side-item",
             "text": "Inventory"
           }
         },
         {
           "expectAttr": {
-            "selector": "button.hub-tab",
+            "selector": ".side-item",
             "text": "Inventory",
             "attribute": "class",
             "contains": "active"
@@ -131,14 +131,14 @@
         "taps": 1,
         "ms": 2500
       },
-      "budgetSource": "assumption — a tab inside the screen should not cost a navigation; needs owner confirmation"
+      "budgetSource": "assumption — the move between two hubs costs one navigation; needs owner confirmation"
     },
     {
       "id": "catalog-open-create-product",
       "label": "Catálogo e inventario: abrir el formulario de producto nuevo",
       "surface": "umi-dashboard",
       "status": "instrumented",
-      "start": "/catalog-inventory",
+      "start": "/products",
       "steps": [
         {
           "click": {

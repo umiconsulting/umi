@@ -36,7 +36,7 @@ function arg(flag, fallback = null) {
 }
 
 const OUT = arg('--out', '/tmp/ux/perf.json');
-const ROUTES = (arg('--routes') || '/,/operations,/reportes,/catalog-inventory,/kitchen')
+const ROUTES = (arg('--routes') || '/,/operations,/reportes,/products,/inventory,/kitchen')
   .split(',')
   .map((r) => r.trim())
   .filter(Boolean);
