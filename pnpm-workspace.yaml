@@ -1,5 +1,5 @@
 # Workspace members: umi-dashboard, umi-landing-page, umi-api, and shared packages/*.
-# Directories without a package.json (umi-kds Swift app) are skipped by pnpm.
+# Directories without a package.json (umi-pos, a Flutter app) are skipped by pnpm.
 #
 # umi-api joined the workspace with its Docker→pnpm migration so it can consume
 # packages/contract. Its image is now built from the repo root with pnpm (multi-stage

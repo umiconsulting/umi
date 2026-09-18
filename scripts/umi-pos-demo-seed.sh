@@ -707,7 +707,14 @@ from merchant.product
 where merchant_id=:'merchant_id'::uuid
   and external_ref like 'demo-%';
 
-select 1 / case when count(*)=575 then 1 else 0 end
+-- The pinned grant count, and the reason a fresh machine could not be seeded:
+-- this number moves whenever the RBAC matrix moves (`pnpm
+-- umi-pos:generate-pilot-rbac`), and it sat at 575 while the matrix had grown to
+-- 577, so the assertion failed on every clean database and nothing else did. It
+-- is 577 as of the grants added for `location.switch`. When you change the
+-- matrix, change this line in the same commit — or run the seed and read the
+-- count it prints before the division.
+select 1 / case when count(*)=577 then 1 else 0 end
 from umi.role_permission rp
 join umi.role r on r.id=rp.role_id
 join umi.permission p on p.id=rp.permission_id

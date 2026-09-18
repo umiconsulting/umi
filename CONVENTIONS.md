@@ -15,7 +15,6 @@ Keep these consistent so tooling stays predictable and the repo stays legible.
     keeps `-page` because the prefix is load-bearing (see below).
   - `apps/umi-cash` keeps the unscoped `umi-cash` — it's **frozen** and excluded
     from the workspace; it gets renamed at its cutover, not before.
-  - `apps/umi-kds` is a native Swift app with no `package.json`.
 
 ## Directory naming — the `umi-` prefix stays
 

@@ -11,7 +11,8 @@ Use this note after classifying the task and inspecting the current tree.
 
 ## Preferred owners
 - root `CLAUDE.md` and `docs/`: organization rules, cross-product architecture, migration state, program plans.
-- `apps/umi-kds`: native KDS UI, app data clients, device session handling, KDS-specific UX.
+- `apps/umi-pos/lib/features/kitchen/`: the KDS board, which lives inside the POS app as a
+  device-role mode. The separate `apps/umi-kds` client was retired on 2026-09-16.
 - `apps/umi-conversaflow`: normalization, write-model ownership, Supabase SQL, projections, jobs, realtime/backend contracts.
 - `apps/umi-logs`: ConversaFlow ops/logs UI.
 - `apps/umi-dashboard`: static Umi owner dashboard prototype.

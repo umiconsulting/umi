@@ -1,0 +1,346 @@
+{
+  "version": 1,
+  "surface": "umi-dashboard",
+  "note": "Tap and time budgets. `flows` are driven by tools/ux-sweep/flow-budget.mjs over the dashboard's DOM. `nativeFlows` are driven by tools/ux-sweep/pos-native-flows.mjs with real pointer events on the native Linux POS — the two drivers are separate because the clients are, and a flow marked `not-yet-instrumented` is reported as such rather than passing silently. The plan (§4) fixes exactly one number: the money path holds at three taps or fewer after the cart. Every other number here is an ASSUMPTION written down so it can be argued with — see `assumptions` below.",
+  "referenceHardware": {
+    "tablet": {
+      "width": 1024,
+      "height": 768,
+      "note": "café tablet, plan §4"
+    },
+    "terminal": {
+      "width": 1280,
+      "height": 720,
+      "note": "counter terminal, plan §4"
+    }
+  },
+  "assumptions": [
+    "Only `money-path-pos-charge` has an owner-agreed number (three taps after the cart, plan §4). Its millisecond budget is an assumption.",
+    "Every navigation flow is budgeted at its minimum possible tap count, so the budget is a regression guard, not a comfort target: one tap for a flat nav item, two for a group plus a child.",
+    "The millisecond budgets are assumptions taken from the plan's 'every screen loads in less than 1 second' bar (§4) plus room for a dev-server fetch. They need the owner's confirmation against the reference hardware.",
+    "Budgets cover the dashboard's own surfaces; the POS flows in `nativeFlows` are measured natively (see docs/architecture/2026-09-16-pos-is-a-native-app.md). patrol has no Linux platform, so the POS driver is tools/ux-sweep/pos-native-driver.mjs over the Dart VM service plus real X11 clicks."
+  ],
+  "flows": [
+    {
+      "id": "shell-open-orders",
+      "label": "Abrir Pedidos desde el Resumen",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/",
+      "steps": [
+        {
+          "click": {
+            "selector": "button.side-item",
+            "text": "Orders"
+          }
+        },
+        {
+          "expectUrl": "/orders"
+        },
+        {
+          "expectVisible": "h1, h2"
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 3000
+      },
+      "budgetSource": "assumption — one tap is the floor for a flat nav item; needs owner confirmation"
+    },
+    {
+      "id": "reportes-open-refunds",
+      "label": "Abrir Reportes → Reembolsos y anulaciones",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/",
+      "steps": [
+        {
+          "click": {
+            "selector": "button.side-item",
+            "text": "Reports"
+          }
+        },
+        {
+          "click": {
+            "selector": "button.side-item.side-subitem",
+            "text": "Refunds"
+          }
+        },
+        {
+          "expectUrl": "/reportes/reembolsos"
+        }
+      ],
+      "budget": {
+        "taps": 2,
+        "ms": 4000
+      },
+      "budgetSource": "assumption — group open plus child is two taps; needs owner confirmation"
+    },
+    {
+      "id": "cash-open-registers",
+      "label": "Abrir Caja y turnos → Registros",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/",
+      "steps": [
+        {
+          "click": {
+            "selector": "button.side-item",
+            "text": "Cash and shifts"
+          }
+        },
+        {
+          "click": {
+            "selector": "button.side-item.side-subitem",
+            "text": "Registers"
+          }
+        },
+        {
+          "expectUrl": "/cash-shifts/registros"
+        }
+      ],
+      "budget": {
+        "taps": 2,
+        "ms": 4000
+      },
+      "budgetSource": "assumption — group open plus child is two taps; needs owner confirmation"
+    },
+    {
+      "id": "catalog-switch-inventory-tab",
+      "label": "Catálogo e inventario: cambiar a la pestaña Inventario",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/catalog-inventory",
+      "steps": [
+        {
+          "click": {
+            "selector": "button.hub-tab",
+            "text": "Inventory"
+          }
+        },
+        {
+          "expectAttr": {
+            "selector": "button.hub-tab",
+            "text": "Inventory",
+            "attribute": "class",
+            "contains": "active"
+          }
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 2500
+      },
+      "budgetSource": "assumption — a tab inside the screen should not cost a navigation; needs owner confirmation"
+    },
+    {
+      "id": "catalog-open-create-product",
+      "label": "Catálogo e inventario: abrir el formulario de producto nuevo",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/catalog-inventory",
+      "steps": [
+        {
+          "click": {
+            "selector": "button",
+            "text": "Create product"
+          }
+        },
+        {
+          "expectVisible": "[role=dialog], .modal, form"
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 2500
+      },
+      "budgetSource": "assumption — opening a form is one action; needs owner confirmation"
+    },
+    {
+      "id": "orders-filter-in-preparation",
+      "label": "Pedidos: filtrar por En preparación",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/orders",
+      "steps": [
+        {
+          "click": {
+            "selector": "button",
+            "text": "IN PREPARATION"
+          }
+        },
+        {
+          "expectAttr": {
+            "selector": "button",
+            "text": "IN PREPARATION",
+            "attribute": "aria-pressed",
+            "equals": "true"
+          }
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 2500
+      },
+      "budgetSource": "assumption — a status filter is a single tap on the screen you are already on; needs owner confirmation"
+    },
+    {
+      "id": "orders-switch-channel",
+      "label": "Pedidos: cambiar el origen a POS",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/orders",
+      "steps": [
+        {
+          "click": {
+            "selector": ".seg button",
+            "text": "POS"
+          }
+        },
+        {
+          "expectAttr": {
+            "selector": ".seg button",
+            "text": "POS",
+            "attribute": "class",
+            "contains": "on"
+          }
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 2500
+      },
+      "budgetSource": "assumption — segmented control, one tap; needs owner confirmation"
+    },
+    {
+      "id": "customers-search",
+      "label": "Clientes: buscar por nombre",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/customers",
+      "steps": [
+        {
+          "type": {
+            "selector": "input[placeholder]",
+            "value": "Karina"
+          }
+        },
+        {
+          "wait": 600
+        },
+        {
+          "expectAttr": {
+            "selector": "input[placeholder]",
+            "attribute": "value",
+            "equals": "Karina"
+          }
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 3000
+      },
+      "budgetSource": "assumption — typing into the list's own search box is one action; needs owner confirmation"
+    },
+    {
+      "id": "customers-open-profile",
+      "label": "Clientes: abrir el perfil de un cliente",
+      "surface": "umi-dashboard",
+      "status": "instrumented",
+      "start": "/customers",
+      "steps": [
+        {
+          "click": {
+            "selector": "button.customer-row",
+            "index": 0
+          }
+        },
+        {
+          "expectVisible": "[aria-label='Volver a la lista'], .profile-back, [role=dialog], .profile-panel"
+        }
+      ],
+      "budget": {
+        "taps": 1,
+        "ms": 3000
+      },
+      "budgetSource": "assumption — a list row is the list's primary action; needs owner confirmation"
+    }
+  ],
+  "nativeFlows": [
+    {
+      "id": "pos-tables-merge-split",
+      "label": "Combinar dos mesas en una fiesta y volver a dividirla",
+      "surface": "umi-pos-native",
+      "status": "instrumented",
+      "driver": "tools/ux-sweep/pos-native-flows.mjs",
+      "budget": {
+        "taps": 9,
+        "ms": 45000
+      },
+      "budgetSource": "assumption — §8D step 4 asks for merge and split as one gesture each: nav, two picks, Combinar, Confirmar, then Dividir and its Confirmar. The taps that restore the floor are reported apart. Needs owner confirmation against the reference hardware."
+    },
+    {
+      "id": "money-path-pos-charge",
+      "label": "Cobrar una venta en el POS, después del carrito",
+      "surface": "umi-pos-native",
+      "status": "instrumented",
+      "driver": "tools/ux-sweep/pos-native-flows.mjs — real X11 pointer events on the Flutter Linux build",
+      "measuredTaps": ["Cobrar", "Importe exacto", "Cobrar · MXN"],
+      "budget": {
+        "taps": 3,
+        "ms": 12000
+      },
+      "budgetSource": "plan §4 — 'the money path holds at three taps or fewer after the cart' (taps agreed; milliseconds an assumption). The milliseconds were first assumed at 8000 and measured 7.9-8.1 s across runs on this workstation, i.e. straddling the line; 12 s is a regression guard with headroom, not a target, and still needs the owner's confirmation.",
+      "precondition": "the operator session must hold an open cash shift; the flow opens one at Caja when the register is free. A shift belongs to the session that opened it, so a shift left open by an earlier session is recovered by the till itself on load (resume when this device holds it, reclaim when its terminal is gone); a charge that still finds no shift is refused with a typed 409 CASH_SHIFT_REQUIRED that names the register and its hold."
+    },
+    {
+      "id": "tender-keypad-follows-cash",
+      "label": "El teclado numérico se va con el efectivo y vuelve con él",
+      "surface": "umi-pos-native",
+      "status": "instrumented",
+      "driver": "tools/ux-sweep/pos-native-flows.mjs — real X11 pointer events on the Flutter Linux build",
+      "measuredTaps": ["Cobrar", "Terminal manual", "Efectivo"],
+      "budget": null,
+      "budgetSource": "deliberately NONE. This flow is a surface check, not a cost: it asserts that the keypad publishes ten digit keys on cash, zero on the card terminal, and ten again on the way back. Its cost is dominated by the shared prelude (a cash shift, a cleared cart, five taps to build one), so any tap or millisecond ceiling here would measure the prelude and pass or fail for reasons that have nothing to do with the tender surface. pos-native-flows.mjs reports a flow with no budget as measured and skips the budget gate rather than inventing a number.",
+      "precondition": "the location's checkout policy must offer the manual terminal, and it must forbid mixed tender — with mixed tender allowed, selecting the terminal keeps the cash leg and therefore keeps the keypad, which is correct and is not what this flow checks."
+    },
+    {
+      "id": "pos-sign-in",
+      "label": "Entrar al POS con el PIN del operador",
+      "surface": "umi-pos-native",
+      "status": "instrumented",
+      "driver": "tools/ux-sweep/pos-native-flows.mjs",
+      "budget": {
+        "taps": 5,
+        "ms": 25000
+      },
+      "budgetSource": "assumption — four PIN digits plus Continuar is the minimum a keypad sign-in can cost. The time budget covers the operator change it includes: the flow locks the till, and when the app finishes restoring a stored session mid-entry it locks and runs the sign-in again, which measured 14.5-16.0 s on this workstation."
+    },
+    {
+      "id": "pos-tables-open",
+      "label": "Abrir Mesas y consultar una mesa",
+      "surface": "umi-pos-native",
+      "status": "instrumented",
+      "driver": "tools/ux-sweep/pos-native-flows.mjs",
+      "budget": {
+        "taps": 4,
+        "ms": 15000
+      },
+      "budgetSource": "assumption — destination, table, close the detail, and back: four taps is the floor for a full-screen destination"
+    },
+    {
+      "id": "pos-restart-recovery",
+      "label": "Reiniciar el POS a mitad del turno y cobrar sin retipear nada",
+      "surface": "umi-pos-native",
+      "status": "instrumented",
+      "driver": "tools/ux-sweep/pos-native-flows.mjs — kills the running app and relaunches tools/ux-sweep/pos-native-launch.sh mid-flow",
+      "measuredTaps": ["Cobrar", "Importe exacto", "Cobrar · MXN"],
+      "budget": {
+        "taps": 3,
+        "ms": 12000
+      },
+      "budgetSource": "plan §4 fixes the taps (three or fewer after the cart, and a restart must not add one). The milliseconds are an ASSUMPTION: the charge immediately after a restart measured 8.3 s on this workstation (the same charge in the warm money-path flow measures 7.9 s) because the just-restarted app re-fetches everything, so 12 s is a regression guard rather than a target. Needs the owner's confirmation.",
+      "precondition": "an open shift owned by the current session. The flow kills the app, relaunches it, signs in, and requires the Caja screen to show the shift as open by itself before it charges — a recovery the operator did not tap for. Without the recovery the charge answers CASH_SHIFT_REQUIRED, which is the defect this flow exists to catch."
+    }
+  ]
+}

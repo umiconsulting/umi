@@ -23,8 +23,8 @@ docs
 backups
 artifacts
 
-# Other apps are not needed to build umi-api (umi-cash is workspace-excluded;
-# umi-kds is a native app). Their package.json isn't a workspace member, so
-# dropping them entirely keeps the context lean.
+# Other apps are not needed to build umi-api (umi-cash is workspace-excluded).
+# Their package.json isn't a workspace member, so dropping them entirely keeps the
+# context lean. `apps/umi-kds` was retired on 2026-09-16 — see
+# docs/architecture/2026-09-16-pos-is-a-native-app.md — so it is no longer listed.
 apps/umi-cash
-apps/umi-kds

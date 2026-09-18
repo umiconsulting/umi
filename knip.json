@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "apps/umi-dashboard": {
+      "entry": [
+        "index.html",
+        "src/main.jsx",
+        "vite.config.js",
+        "lingui.config.js",
+        "public/_worker.js"
+      ],
+      "project": ["src/**/*.{js,jsx}"],
+      "paths": {
+        "@/*": ["src/*"],
+        "@umi/contract": ["../../packages/contract/src/index.ts"],
+        "@umi/tokens": ["../../packages/tokens/dist/index.js"]
+      }
+    }
+  }
+}

@@ -16,7 +16,6 @@ This file defines product boundaries, ownership, architecture rules, and the res
 | ----------------------- | ------------------------------------------------------------------------------------------------------- |
 | `apps/umi-api`          | Canonical backend for auth, cash, KDS, conversations, leads, passes, sales, inventory, and stored value |
 | `apps/umi-pos`          | Flutter UmiPOS client for operator access, sales, checkout, shifts, hardware, and offline replay        |
-| `apps/umi-kds`          | Native iPad Kitchen Display System client                                                               |
 | `apps/umi-cash`         | Cash compatibility client and Cash-specific Prisma. It forwards the frozen wallet-pass URL to `umi-api` |
 | `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                              |
 | `apps/umi-landing-page` | Public landing and lead capture                                                                         |
@@ -55,6 +54,31 @@ it materially improves confidence. Record the decision basis explicitly:
 Do not cargo-cult common patterns. Choose the design that best fits measured constraints,
 operational simplicity, and source-backed tradeoffs. If a recommendation adds a new repo,
 service, or infrastructure boundary, justify it against simpler options with explicit criteria.
+
+### Tool selection and research, for every task
+
+Find the best available tool before you build anything by hand. This applies to every task,
+including a routine check. Research the approach, not only the fact.
+
+Be persistent. When a source blocks, try another route and record what failed. Use the
+research ladder: vendor documentation, changelog, the source repository, practitioner
+writing, communities, social, then primary research.
+
+Record the tool, its version, and the source in the task output. A hand-rolled solution
+needs a written reason.
+
+The full rule is in `docs/agents/tool-and-research-doctrine.md`. Load the `research` skill
+for a research task.
+
+**Verifying a change is its own skill.** How to start the local stack, which command proves
+which claim, how to drive the native POS with real clicks, and the traps that have already cost
+time are in `docs/development/LOCAL_VERIFICATION_PLAYBOOK.md`. Read it before sweeping or
+reporting a measurement, and before concluding that a check cannot run here.
+
+**The dashboard is verified the same way the POS is: in a real browser, with real clicks.**
+Use the Chromium that Playwright drives over CDP (`./scripts/ux-browser.sh`), click the actual
+workflow, and read the result — a component test or a reading of the JSX is not evidence about
+what the operator sees. The playbook's section 2 has the commands and the cost.
 
 ## Writing standard — ASD-STE100
 

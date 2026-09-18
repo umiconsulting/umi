@@ -14,7 +14,6 @@ secrets; everything else is a thin client. This is a pnpm + Turborepo monorepo.
 | `apps/umi-landing-page` | `@umi/landing`   | Marketing site (Next.js).                                                                                                                | Vercel                                  |
 | `apps/umi-cash`         | `umi-cash`       | Cash compatibility client. Its public wallet URLs stay frozen. It uses a separate npm lockfile.                                          | Vercel                                  |
 | `apps/umi-pos`          | —                | Flutter UmiPOS client for sales, cash, inventory, customer value, hardware, and recovery.                                                | Pilot device bundle                     |
-| `apps/umi-kds`          | —                | Kitchen Display System — a native iPad app (Swift). Not a JS workspace member.                                                           | App Store                               |
 
 ### `packages/` — shared code
 
