@@ -17,6 +17,25 @@ export const InventoryItemType = z.enum([
   'bundle_component',
   'operational_supply',
 ]);
+/** The inferred type of the one `item_type` list, shared with the authoring surface. */
+export type InventoryItemType = z.infer<typeof InventoryItemType>;
+
+/**
+ * An allergen as a READER sees it: the code a client keys on and the label a person
+ * reads. The EDITABLE record is `InventoryAllergen` in `recipes.ts`, which the
+ * console authors. A kitchen ticket and a guest menu carry this pair, because they
+ * consume the list and never author it.
+ *
+ * The list itself is DERIVED by exploding a recipe (plan D8). Nothing here is a
+ * stored product-level fact.
+ */
+export const InventoryAllergenRef = z
+  .object({
+    code: z.string().regex(/^[a-z][a-z0-9_]{1,39}$/),
+    label: z.string().min(1).max(80),
+  })
+  .strict();
+export type InventoryAllergenRef = z.infer<typeof InventoryAllergenRef>;
 export const StockTrackingPolicy = z.enum(['not_tracked', 'tracked', 'reservation_required']);
 export const InventoryLocationType = z.enum([
   'business_location',
@@ -36,6 +55,9 @@ export const UnitOfMeasure = z.enum([
   'package',
   'box',
 ]);
+/** The inferred type of the one base-unit list. Exported so `recipes.ts` imports it
+ * instead of declaring a second copy that can drift. */
+export type UnitOfMeasure = z.infer<typeof UnitOfMeasure>;
 export const InventoryState = z.enum([
   'on_hand',
   'available',
@@ -64,6 +86,14 @@ export const StockLedgerEntryType = z.enum([
   'count_correction',
   'transfer_out_foundation',
   'transfer_in_foundation',
+  // Purchasing, workstream E step 3 (build-v3-69). The database's
+  // `stock_ledger_entry_entry_type_check` carries the same three, and the two must
+  // move together: a value the contract cannot name is a ledger entry a client
+  // would render as unknown, and a value the database cannot store is a promise the
+  // API could not keep.
+  'purchase_ordered',
+  'purchase_received',
+  'purchase_order_cancelled',
 ]);
 export const StockReservationStatus = z.enum([
   'draft',
@@ -494,6 +524,127 @@ export const RestockCommand = z
   })
   .strict();
 
+/**
+ * PRODUCTION (plan §8.1). The cook says what was made; the SERVER says what it
+ * consumed.
+ *
+ * The request names one output item and the quantity the cook actually produced.
+ * It never names the inputs: the server explodes the item's recipe at every level
+ * and consumes what the recipe says, from the stock location the request names.
+ * A client that could name its own inputs could post a batch that consumes nothing.
+ *
+ * `declaredQuantity` is not sent either. It is the recipe's own yield, and the
+ * difference between it and `quantity` is the shortfall the server writes as
+ * `production_yield_loss` (plan D4).
+ */
+export const ProductionRecord = z
+  .object({
+    ...commandShape,
+    outputItemId: Uuid,
+    quantity: PositiveScaledQuantity,
+    /**
+     * The batch code, and the expiry the label prints. Omitted: the server mints a
+     * code and takes the shelf life from the recipe, or from the item when the
+     * recipe does not override it.
+     */
+    lotCode: z
+      .string()
+      .regex(/^[A-Za-z0-9._:-]{1,80}$/)
+      .nullable()
+      .default(null),
+    expiresOn: MerchantDate.nullable().default(null),
+    note: z.string().max(240).nullable().default(null),
+  })
+  .strict();
+
+/** One input the server consumed, with what it cost, so the batch is explainable. */
+export const ProductionConsumedLine = z
+  .object({
+    inventoryItemId: Uuid,
+    publicReference: z.string().min(1).max(80),
+    displayName: z.string().min(1).max(160),
+    quantity: ScaledQuantity,
+    unitCostMinor: z.number().int().min(0).safe().nullable(),
+    lineCostMinor: z.number().int().min(0).safe().nullable(),
+  })
+  .strict();
+
+export const ProductionResult = z
+  .object({
+    commandId: Uuid,
+    lotId: Uuid,
+    lotReference: z.string().min(1).max(80),
+    outputItemId: Uuid,
+    /** What the recipe says the batch yields, at the output item's scale. */
+    declaredQuantity: ScaledQuantity,
+    /** What the cook said came out. */
+    producedQuantity: ScaledQuantity,
+    /** The shortfall, at the output item's scale. ZERO when the batch made its yield. */
+    yieldLossQuantity: NonNegativeScaledQuantity,
+    /** Minor units per whole base unit of the OUTPUT, rolled up from the inputs. */
+    unitCostMinor: z.number().int().min(0).safe().nullable(),
+    totalCostMinor: z.number().int().min(0).safe().nullable(),
+    expiresOn: MerchantDate.nullable(),
+    consumed: z.array(ProductionConsumedLine).max(200),
+    /**
+     * True when the inputs cost less than the ledger says the batch is worth. The
+     * batch is still posted; the number is stated so nobody has to infer it.
+     */
+    incompleteCost: z.boolean(),
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+/**
+ * RECALL (plan §8.3 and D9). "Which sales consumed this lot?"
+ *
+ * THE BASIS IS STATED, NOT IMPLIED. Stock moves as quantity, and only the batch a
+ * production wrote carries a lot. A sale of a produced item does not name the lot
+ * it took, so this answer names the sales of the LOT'S ITEM inside the lot's own
+ * life window, and it says so in `basis`. Lot-attributed consumption needs a lot
+ * layer in the ledger, which v1 does not have.
+ */
+export const LotRecallBasis = z.enum(['item_and_window']);
+export type LotRecallBasis = z.infer<typeof LotRecallBasis>;
+
+export const LotRecallQuery = z
+  .object({
+    lotId: Uuid,
+  })
+  .strict();
+
+export const LotRecallSale = z
+  .object({
+    saleId: Uuid,
+    publicReference: z.string().max(160).nullable(),
+    productName: z.string().min(1).max(240),
+    quantity: ScaledQuantity,
+    occurredAt: IsoTimestamp,
+    businessDate: MerchantDate,
+  })
+  .strict();
+
+export const LotRecall = z
+  .object({
+    lotId: Uuid,
+    lotReference: z.string().min(1).max(80),
+    inventoryItemId: Uuid,
+    inventoryItemName: z.string().min(1).max(160),
+    locationId: Uuid,
+    inventoryLocationId: Uuid,
+    origin: z.enum(['production', 'receipt', 'opening_balance', 'transfer']),
+    producedAt: IsoTimestamp.nullable(),
+    receivedAt: IsoTimestamp.nullable(),
+    expiresOn: MerchantDate.nullable(),
+    basis: LotRecallBasis,
+    windowFrom: IsoTimestamp,
+    windowTo: IsoTimestamp,
+    sales: z.array(LotRecallSale).max(1000),
+    saleCount: z.number().int().min(0),
+    correlationId: CorrelationId,
+  })
+  .strict();
+
 export const InventoryCountLine = z
   .object({
     inventoryItemId: Uuid,
@@ -653,6 +804,7 @@ export type SubmitInventoryCountRequest = z.infer<typeof SubmitInventoryCountReq
 
 export const posInventoryModels = {
   InventoryItemType,
+  InventoryAllergenRef,
   StockTrackingPolicy,
   InventoryLocationType,
   UnitOfMeasure,
@@ -691,6 +843,13 @@ export const posInventoryModels = {
   QuarantineRecord,
   InventoryMutationResult,
   RestockCommand,
+  ProductionRecord,
+  ProductionConsumedLine,
+  ProductionResult,
+  LotRecallBasis,
+  LotRecallQuery,
+  LotRecallSale,
+  LotRecall,
   InventoryCountLine,
   InventoryCount,
   CreateInventoryCountRequest,

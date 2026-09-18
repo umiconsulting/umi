@@ -12,6 +12,8 @@ export {
   DASHBOARD_EVENT_DEVICES_CHANGED,
   DASHBOARD_EVENT_CONVERSATION_MESSAGE,
   dashboardRoom,
+  deviceRoom,
+  REALTIME_EVENT_TENDER_ATTEMPT_CHANGED,
 } from './realtime-channels';
 
 export const DevicePairingRealtimeEvent = z
@@ -41,8 +43,25 @@ export const DashboardConversationMessageEvent = z
   .strict();
 export type DashboardConversationMessageEvent = z.infer<typeof DashboardConversationMessageEvent>;
 
+/**
+ * A tender attempt resolved at the terminal. Ids only, by the same rule as its
+ * neighbours: the till re-reads the attempt over REST (`pos.tenderAttempt`) with the
+ * command identity it captured under, so the socket is a wake-up rather than a second
+ * source of truth about money.
+ */
+export const TenderAttemptChangedEvent = z
+  .object({
+    merchantId: Uuid,
+    attemptId: Uuid,
+    commandIdentity: Uuid.nullable(),
+    cartId: Uuid,
+  })
+  .strict();
+export type TenderAttemptChangedEvent = z.infer<typeof TenderAttemptChangedEvent>;
+
 export const realtimeModels = {
   DevicePairingRealtimeEvent,
   DashboardDevicesChangedEvent,
   DashboardConversationMessageEvent,
+  TenderAttemptChangedEvent,
 } as const;

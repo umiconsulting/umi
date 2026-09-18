@@ -146,6 +146,51 @@ export const RegisterAssignment = z
     assignedAt: IsoTimestamp.nullable(),
   })
   .strict();
+
+/**
+ * WHO IS HOLDING THIS DRAWER, AND MAY THE TERMINAL IN FRONT OF ME TAKE IT.
+ *
+ * `status` and `currentShiftId` on the register already say a drawer is taken;
+ * they do not say by whom, or whether that terminal can ever come back. The
+ * till needs the second half: a shifted register is either held by a till
+ * somebody is standing at — recoverable only by a manager counting the drawer —
+ * or held by a terminal that is gone, which nobody is coming back for.
+ *
+ * The four states are exhaustive on purpose (`free`, and the three ways a
+ * register can be held). The distinction is proven SERVER-SIDE from
+ * `merchant.device`: a client never asserts that a terminal is gone.
+ */
+export const RegisterHoldState = z.enum([
+  'free',
+  // Held by the terminal asking, which is the caller's own shift.
+  'held_by_this_device',
+  // Held by a terminal that is active. A live till: the drawer must be counted.
+  'held_by_active_till',
+  // Held by a terminal that is revoked, replaced, retired, or no longer there.
+  'held_by_orphaned_till',
+]);
+
+export const RegisterHold = z
+  .object({
+    state: RegisterHoldState,
+    /** The holding shift, when there is one. */
+    shiftId: Uuid.nullable(),
+    shiftStatus: CashShiftStatus.nullable(),
+    openedAt: IsoTimestamp.nullable(),
+    /** The terminal that last spoke for the shift, and what became of it. */
+    deviceId: Uuid.nullable(),
+    deviceName: z.string().min(1).max(120).nullable(),
+    deviceStatus: z.string().min(1).max(40).nullable(),
+    operatorSessionId: Uuid.nullable(),
+    /**
+     * True only for `held_by_orphaned_till`: the register can be freed by
+     * `POST /cash/registers/:registerId/reclaim` without a drawer count. False
+     * everywhere else, including `free` — nothing to reclaim.
+     */
+    reclaimable: z.boolean(),
+  })
+  .strict();
+
 export const PhysicalRegister = z
   .object({
     id: Uuid,
@@ -158,6 +203,12 @@ export const PhysicalRegister = z
     assignmentPolicy: z.enum(['device_required', 'operator_selects']),
     assignment: RegisterAssignment,
     currentShiftId: Uuid.nullable(),
+    /**
+     * Always resolved, never null: a register read by the till has to say
+     * whether the drawer is takeable, and "we did not look" is the answer that
+     * let a till show "Turno abierto" over a register it could not open.
+     */
+    hold: RegisterHold,
     status: RegisterStatus,
     version: z.number().int().positive(),
     createdAt: IsoTimestamp,
@@ -554,7 +605,16 @@ export const ShiftCloseResult = z
   })
   .strict();
 
-export const CashShiftCustodyEventType = z.enum(['device_adoption', 'manager_recovery']);
+export const CashShiftCustodyEventType = z.enum([
+  'device_adoption',
+  'manager_recovery',
+  // The holding terminal is gone for good, so the register is freed and the
+  // shift is blocked. Nobody counted the drawer — see `RecoverCashShiftRequest`
+  // for the operation that DOES count it, and `ReclaimCashRegisterRequest` for
+  // this one. The constraint `cash_custody_shape` in build-v3-68 enforces the
+  // difference: an `orphan_reclaim` carries no count and no expectation.
+  'orphan_reclaim',
+]);
 
 /**
  * One rebinding of a cash shift onto a different terminal, or onto a manager who is
@@ -638,6 +698,54 @@ export const RecoverCashShiftResult = z
   })
   .strict();
 
+/**
+ * FREE A REGISTER WHOSE HOLDING TERMINAL IS NEVER COMING BACK.
+ *
+ * The till can be standing in front of a drawer it cannot open — the shift that
+ * holds the register was opened on a terminal that has since been revoked,
+ * replaced or retired, and nothing in the product ever closed it. The operator
+ * who may open a register may also clear that hold, but only when the API itself
+ * proves the holding terminal is unusable: there is nothing here the client can
+ * assert. `expectedRegisterVersion` is the register row the caller was looking
+ * at, so a register that moved under them is refused rather than reclaimed.
+ *
+ * WHAT IT IS NOT. It is not `recover`: no approval, no count, no variance, and
+ * no money movement of any kind. The shift lands on `blocked` (a terminal status
+ * with no way out) and the ledger is untouched, because the cash in that drawer
+ * is still in that drawer. `blocked` and not `closed` or `recovered` because
+ * neither of those two may ever describe a drawer nobody counted.
+ */
+export const ReclaimCashRegisterRequest = z
+  .object({
+    ...CommandContext,
+    registerId: Uuid,
+    expectedRegisterVersion: z.number().int().positive(),
+    reasonCode: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9_.-]+$/),
+  })
+  .strict();
+
+export const ReclaimCashRegisterResult = z
+  .object({
+    register: PhysicalRegister,
+    /**
+     * The shift that was holding the register and has now been blocked. NULL
+     * when there was nothing left to reclaim — the register was already free,
+     * or its holding shift had already reached a terminal status. That is a
+     * success, not an error: the caller asked for the drawer and the drawer is
+     * free.
+     */
+    shift: CashShift.nullable(),
+    custody: CashShiftCustodyEvent.nullable(),
+    reclaimedAt: IsoTimestamp,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
 export const CashCenterQuery = z
   .object({
     locationId: Uuid,
@@ -706,6 +814,8 @@ export const SafeCashDiagnostic = z
 
 export type CashShiftPolicy = z.infer<typeof CashShiftPolicy>;
 export type RegisterStatus = z.infer<typeof RegisterStatus>;
+export type RegisterHoldState = z.infer<typeof RegisterHoldState>;
+export type RegisterHold = z.infer<typeof RegisterHold>;
 export type CashShiftStatus = z.infer<typeof CashShiftStatus>;
 export type CashMovementType = z.infer<typeof CashMovementType>;
 export type CashLedgerEntryType = z.infer<typeof CashLedgerEntryType>;
@@ -744,9 +854,13 @@ export type AdoptCashShiftRequest = z.infer<typeof AdoptCashShiftRequest>;
 export type AdoptCashShiftResult = z.infer<typeof AdoptCashShiftResult>;
 export type RecoverCashShiftRequest = z.infer<typeof RecoverCashShiftRequest>;
 export type RecoverCashShiftResult = z.infer<typeof RecoverCashShiftResult>;
+export type ReclaimCashRegisterRequest = z.infer<typeof ReclaimCashRegisterRequest>;
+export type ReclaimCashRegisterResult = z.infer<typeof ReclaimCashRegisterResult>;
 
 export const posCashModels = {
   RegisterStatus,
+  RegisterHoldState,
+  RegisterHold,
   RegisterAssignment,
   PhysicalRegister,
   CashShiftStatus,
@@ -791,6 +905,8 @@ export const posCashModels = {
   AdoptCashShiftResult,
   RecoverCashShiftRequest,
   RecoverCashShiftResult,
+  ReclaimCashRegisterRequest,
+  ReclaimCashRegisterResult,
   CashRecoveryState,
   CashCenterQuery,
   CashCommandRecoveryQuery,

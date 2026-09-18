@@ -48,3 +48,33 @@ export const DASHBOARD_EVENT_CONVERSATION_MESSAGE = 'dashboard.conversation.mess
 export function dashboardRoom(merchantId: string): string {
   return `dashboard:${merchantId}`;
 }
+
+/**
+ * A tender attempt at a card terminal moved. It carries IDS ONLY — the amount, the
+ * provider's own status and the proof are read from the attempt over REST, so the
+ * socket can never disagree with the row. The till follows the attempt by
+ * `commandIdentity`, which is the identity its own capture used (plan D5 and §4
+ * Phase 3 step 3), and the dashboard room is the room a merchant's surfaces already
+ * join. The terminal's answer arrives in its own time, up to forty seconds after the
+ * customer was asked, which is the whole reason a nudge exists here.
+ *
+ * IT GOES TO TWO ROOMS, AND THE SECOND ONE IS THE TILL'S. `dashboardRoom` is where a
+ * merchant's browser surfaces listen; `deviceRoom` is where the paired tills listen, and
+ * until that room existed the till learned the terminal's answer only by asking at
+ * `queryAfterSeconds` — the vendor's own forty-second window, which is why §5's "under 2 s
+ * after the notification" budget measured nothing (plan §11.4 item 2).
+ */
+export const REALTIME_EVENT_TENDER_ATTEMPT_CHANGED = 'tender.attempt.changed';
+
+/**
+ * Room name that scopes a nudge to ONE MERCHANT'S PAIRED DEVICES — the tills at the counter.
+ *
+ * WHY IT IS A ROOM OF ITS OWN rather than the dashboard's: a dashboard session and a paired
+ * register are different principals with different credentials, and a room both can join is a
+ * room whose membership says nothing. The device joins it by proving its DEVICE CREDENTIAL
+ * (`DevicesService.authenticate`, the same check its REST calls pass), and the room key is the
+ * merchant that credential resolved to — so a till cannot ask for another café's counter.
+ */
+export function deviceRoom(merchantId: string): string {
+  return `device:${merchantId}`;
+}

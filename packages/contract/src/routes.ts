@@ -240,11 +240,43 @@ export const routes = {
     kitchen: {
       order: (merchantId: string, sourceOrderId: string): string =>
         buildPath('pos.kitchenOrder', { merchantId, sourceOrderId }),
+      command: (merchantId: string): string => buildPath('pos.kitchenCommand', { merchantId }),
     },
   },
   kds: {
     board: routePath('kds.board'),
     command: routePath('kds.command'),
+  },
+  /**
+   * The console's recipes and inventory authoring surface (recipes module plan §6).
+   *
+   * READS ONLY, because plan D15 makes every write in this cluster an
+   * administrative command. The console posts those to
+   * `routes.merchants.administrativeCommands` with an operation name, so there is
+   * no path to build for them here.
+   */
+  inventory: {
+    items: (merchantId: string): string => buildPath('inventoryItem.list', { merchantId }),
+    unitConversions: (merchantId: string): string =>
+      buildPath('inventoryUnitConversion.list', { merchantId }),
+    allergens: (merchantId: string): string => buildPath('inventoryAllergen.list', { merchantId }),
+    recipes: (merchantId: string): string => buildPath('inventoryRecipe.list', { merchantId }),
+    recipeExplosion: (merchantId: string, recipeId: string): string =>
+      buildPath('inventoryRecipe.explode', { merchantId, recipeId }),
+    usageVariance: (merchantId: string): string =>
+      buildPath('inventoryCosting.usageVariance', { merchantId }),
+    recipeCosts: (merchantId: string): string =>
+      buildPath('inventoryCosting.recipeCosts', { merchantId }),
+    menuEngineering: (merchantId: string): string =>
+      buildPath('inventoryCosting.menuEngineering', { merchantId }),
+    prepList: (merchantId: string): string => buildPath('prepList.read', { merchantId }),
+    prepListLabels: (merchantId: string): string => buildPath('prepList.labels', { merchantId }),
+    lotRecall: (merchantId: string, lotId: string): string =>
+      buildPath('inventoryLot.recall', { merchantId, lotId }),
+  },
+  /** Supplier invoices: the inbox reads. Upload, match and commit are commands. */
+  supplierInvoices: {
+    list: (merchantId: string): string => buildPath('supplierInvoice.list', { merchantId }),
   },
 } as const;
 

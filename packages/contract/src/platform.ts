@@ -473,12 +473,88 @@ export const API_ERROR_CODES = [
   'RESERVATION_CONFLICT',
   'RESERVATION_EXPIRED',
   'RESERVATION_VERSION_CHANGED',
+  // Table map, workstream D steps 3 to 5: the live state of a table. These are
+  // refusals an operator triggers by tapping a table, so each one names the exact
+  // thing that was wrong — "conflict" would leave the floor staff guessing which
+  // of the two tables moved under them.
+  'TABLE_NOT_IN_PLAN',
+  'TABLE_ALREADY_OCCUPIED',
+  'TABLE_NOT_OCCUPIED',
+  'TABLE_NOT_GROUPED',
+  'TABLE_CAPACITY_EXCEEDED',
+  // The floor plan has no published version, so there is no room to operate on.
+  'FLOOR_PLAN_NOT_PUBLISHED',
+  // Publishing a layout that removes or moves a table a party is sitting at.
+  'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+  // Table-order intake, §8I step 2 (build-v3-75). Two refusals that a GUEST reads,
+  // so each one has to be actionable on its own:
+  //   · the QR's token is unknown, revoked, or names a table that is gone. One code
+  //     for all three on purpose — a guest cannot act on the difference, and saying
+  //     "revoked" where a token was merely mistyped tells an attacker the token was
+  //     once real.
+  //   · the owner is issuing a code for a table that already has a live one, which
+  //     would leave a QR the owner believes is dead still ordering. Rotation is
+  //     revoke-then-issue, so the refusal names the operation that is missing.
+  //
+  // A table with no party on it is refused with `TABLE_NOT_OCCUPIED` above, not with
+  // a code of its own: it is the same fact the serve transition refuses, decided by
+  // the same predicate (`table_state.seated_at is not null`).
+  'TABLE_ORDER_CREDENTIAL_INVALID',
+  'TABLE_ORDER_CREDENTIAL_ALREADY_LIVE',
+  // Cash shifts, build-v3-68. A register the till cannot open because a shift
+  // still holds it is a CONFLICT, not a server fault: the drawer exists, the
+  // cash exists, and the operator needs to be told which terminal has it. The
+  // refusal carries the facts in `details` (see `ApiError`).
+  'REGISTER_NOT_AVAILABLE',
+  // The register is held by a terminal that is still usable, so nobody may take
+  // its drawer without counting it. The refusal points at manager recovery.
+  'REGISTER_HELD_BY_ACTIVE_TILL',
+  // A cash sale arrived with no cash shift on the request, so there is no drawer
+  // to book the money against. This is the ordinary shape of a till whose
+  // operator session was replaced by a restart: the shift is still open, still
+  // held by this very device, and only its `operator_session_id` points at the
+  // session that is gone. The refusal carries the register and its `hold` in
+  // `details` (see `RegisterHold`), which is what tells the client whether to
+  // resume its own shift, reclaim an orphaned one, or ask a manager to count the
+  // drawer out. It stays a CONFLICT, never a server fault.
+  'CASH_SHIFT_REQUIRED',
   'RECIPE_CHANGED',
   'RESTOCK_INTENT_NOT_ELIGIBLE',
   'RESTOCK_EXCEEDS_ORIGINAL_CONSUMPTION',
   'STALE_INVENTORY_COUNT',
   'INVENTORY_COUNT_NOT_FOUND',
   'INVENTORY_COUNT_SCOPE_MISMATCH',
+  // Purchasing, workstream E step 3 (build-v3-69). Buying stock is back-of-house
+  // work with two refusals that must not be confused: an order that cannot be
+  // received (OVER_RECEIPT — the quantity is the problem, and the message names
+  // the line), and an order that is not in a state to be touched at all
+  // (NOT_SENT / CLOSED — the order is the problem). "Conflict" for both would
+  // leave the person at the counter guessing which one they are looking at.
+  'SUPPLIER_NOT_FOUND',
+  'SUPPLIER_REFERENCE_TAKEN',
+  'SUPPLIER_ARCHIVED',
+  'PURCHASE_ORDER_NOT_FOUND',
+  'PURCHASE_ORDER_REFERENCE_TAKEN',
+  'PURCHASE_ORDER_NOT_DRAFT',
+  'PURCHASE_ORDER_NOT_SENT',
+  'PURCHASE_ORDER_CLOSED',
+  'PURCHASE_ORDER_OVER_RECEIPT',
+  'PURCHASE_ORDER_LINE_NOT_FOUND',
+  'PURCHASE_ORDER_LINE_TOTAL_MISMATCH',
+  // Kitchen commands, §8H step 3 (defect D33). A POS device works the whole
+  // location's board, so the ways a ticket can be out of its reach must not all
+  // read the same: it is gone, it belongs to another location, or nothing on it
+  // is routed to a station of this location — which is why it is not on the board
+  // the operator is looking at. "Ticket not found" for all three leaves the cook
+  // tapping a card that will never answer.
+  'KITCHEN_ORDER_NOT_FOUND',
+  'KITCHEN_ORDER_OUT_OF_SCOPE',
+  'KITCHEN_ORDER_NOT_ROUTED',
+  // The operator holds a live kitchen session but not this command's permission:
+  // `mark_item_ready` needs kitchen.ready, `complete` needs kitchen.complete,
+  // `recall` needs kitchen.recall. The refusal names the one that is missing,
+  // because a bare PERMISSION_DENIED leaves the cook staring at a dead button.
+  'KITCHEN_PERMISSION_REQUIRED',
   'APPROVAL_REQUIRED',
   'APPROVAL_FINGERPRINT_MISMATCH',
   'APPROVAL_INVALID',
@@ -505,6 +581,41 @@ export const API_ERROR_CODES = [
   'HARDWARE_CONFIGURATION_STALE',
   'EXECUTION_DEVICE_UNAVAILABLE',
   'INTERNAL_ERROR',
+  // Recipes and inventory authoring (plan of record §11, phase 0). Each code names
+  // the one thing that was wrong, because the console renders a different action for
+  // each: a missing item, a reference already in use, a conversion that loses a unit.
+  'INVENTORY_ITEM_NOT_FOUND',
+  'INVENTORY_ITEM_REFERENCE_TAKEN',
+  'INVENTORY_UNIT_CONVERSION_INVALID',
+  'INVENTORY_RECIPE_NOT_FOUND',
+  // A recipe chain that revisits an item, and one deeper than the runaway stop of 12.
+  'INVENTORY_RECIPE_CYCLE',
+  'INVENTORY_RECIPE_TOO_DEEP',
+  // The target is not exactly one of a product, a variant or an inventory item.
+  'INVENTORY_RECIPE_TARGET_INVALID',
+  // Production. The output item has no active recipe, so there is nothing to
+  // explode and nothing the server could consume; and an expiry that lands before
+  // the batch was made is a label nobody can trust.
+  'INVENTORY_RECIPE_REQUIRED',
+  'INVENTORY_LOT_EXPIRY_INVALID',
+  'INVENTORY_ALLERGEN_NOT_FOUND',
+  // Invoice capture: the upload is idempotent on the CFDI UUID, a commit is refused
+  // while a line has no match, and a file that does not parse names itself.
+  'SUPPLIER_INVOICE_NOT_FOUND',
+  'SUPPLIER_INVOICE_DUPLICATE',
+  'SUPPLIER_INVOICE_UNMATCHED_LINES',
+  'SUPPLIER_INVOICE_PARSE_FAILED',
+  // The rest of the invoice refusals. A code that is not in this list is REPLACED on
+  // the wire by the generic code for its status, so an operator who needed to read
+  // "this line has no match" would have been shown "conflict" instead.
+  'SUPPLIER_INVOICE_ALREADY_COMMITTED',
+  'SUPPLIER_INVOICE_ARTIFACT_TOO_LARGE',
+  'SUPPLIER_INVOICE_ARTIFACT_UNSUPPORTED',
+  'SUPPLIER_INVOICE_HAS_NO_LINES',
+  'SUPPLIER_INVOICE_LINE_NOT_FOUND',
+  'SUPPLIER_INVOICE_LOT_UNSUPPORTED',
+  'SUPPLIER_INVOICE_UPLOAD_CONFLICT',
+  'PREP_LIST_ITEM_NOT_FOUND',
 ] as const;
 
 export const ApiError = z
@@ -514,6 +625,19 @@ export const ApiError = z
     retryable: z.boolean(),
     correlationId: CorrelationId,
     fieldErrors: z.record(z.array(z.string().max(300)).max(20)).optional(),
+    /**
+     * The facts a refusal needs in order to be actionable, when the CODE alone
+     * would leave the operator guessing. Plan §4: "Every failure shows a typed
+     * message with a recovery action." A `REGISTER_NOT_AVAILABLE` that does not
+     * say which shift holds the register, since when, and on which terminal, is
+     * a typed code the person at the counter still cannot act on.
+     *
+     * Flat, scalar and short by construction: this travels on the error path of
+     * every client, so it carries identifiers, statuses and timestamps only —
+     * never a nested object, a list, or a customer's data. It is emitted only for
+     * 4xx; a 5xx response never carries it (see `all-exceptions.filter.ts`).
+     */
+    details: z.record(z.union([z.string().max(200), z.number(), z.boolean(), z.null()])).optional(),
   })
   .strict();
 export type ApiError = z.infer<typeof ApiError>;
