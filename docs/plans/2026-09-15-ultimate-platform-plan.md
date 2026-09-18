@@ -1632,6 +1632,39 @@ that for one surface (Mesas) and the entry surfaces; the remaining surfaces need
 that walks them, which is the next piece of work — `patrol` has no Linux platform, so it is
 `integration_test` driving the Linux app, or this xdotool-plus-VM-service pairing.
 
+### The branch merge, resolved and green — 2026-09-18
+
+**PR #169 is `CLEAN`.** It sat `CONFLICTING`/`DIRTY` long enough that no `pull_request` workflow
+had ever run on it — Actions were enabled, the branch simply never produced a run. It is now
+merged, pushed and green: `lint`, `contract`, `build-and-test`, `gate`, `tokens` and `deploy` all
+pass, and the security scan reports no leaks.
+
+**Both branches built the floor plan, and the shipping one is this branch's.** The remote's
+PR #168 landed a working map-plus-details cut; this branch landed the interactive one. Every
+add/add file is almost entirely _deletions_ going the other way — **939 more lines** of POS
+surface (merge, split, elapsed time, the group boundary) and **71 more lines** of contract tests —
+so the resolution keeps this branch's implementation and folds in the remote's small additions
+(seat rendering, the sales-insight hook the incoming `ventas-report.jsx` imports). That is what
+pass six's "steps 3, 4, 5 and 7 exist nowhere" described: the state of the _remote's_ copy, not of
+the branch. With this merge the ten `pos.tableState*` routes, the six-state room, the turn timer
+and merge/split are the ones in `build-v3`.
+
+**The migration ordering question had a real answer, and it was not the remote's.** The remote
+moved `62_floor_plan` ahead of `90_rls` so the RLS sweep would see the new tables. This branch had
+already solved it the other way: `90_rls` carries an explicit `post_90` exclusion list naming
+`floor_plan` and the other seventeen tables that eleven later files create, because each of those
+files owns its own `<table>_scope` policy and the sweep's uniform pair would make a re-applied
+database differ from a fresh one. Both work; this one covers all eleven files instead of one.
+Settled by measurement rather than argument: a pristine apply reaches `build-v3 verify: OK`, and the
+re-apply rule holds at **319 → 319 policies**.
+
+**Two defects were red before the merge and are fixed here**, neither of them caused by it:
+`gate-5a-administrative-command-migration.spec.ts` still asserted the `case t = 'cash_shift'` shape
+that `90_rls`'s guarded cash_shift policy replaced, and the incoming `e2e/floor-plan.pw.js`
+expected a table button named exactly `T1 · 4` where this branch's list, being the room in words
+for a screen reader, reads `T1 · 4 · Libre`. The techniques and the two traps that cost time here
+are written up in `docs/development/LOCAL_VERIFICATION_PLAYBOOK.md` §4.
+
 ## 14. Where the plan stands
 
 A per-workstream audit, written 2026-09-16. Each row names the workstream's own acceptance line

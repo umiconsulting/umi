@@ -615,6 +615,73 @@ nothing bound either to a route, so nothing tested whether the API agreed. `role
 fails on exactly that, by name, and the fix is to add the row rather than an exemption. When you add
 a screen that a role cannot reach, add the surface; the gate then fails if either side drifts.
 
+**A small conflict hunk does NOT mean a small difference — compare the whole file before picking a
+side.** `pos-cash.repository.ts` conflicted on one line: `ORDER BY sequence`, which sorts the
+cast-to-text output column, so `'10'` lands before `'2'`. Both sides had qualified the column, so
+"take theirs" looked like accepting the remote's one-line fix. It is not a one-line operation:
+`git checkout --theirs -- <file>` replaces the **entire file**. It silently discarded the ~500
+lines the branch had added to that same file (`reclaimRegister`, the register `hold`) and
+`pnpm --filter @umi/api typecheck` named them as six errors afterwards. For every conflicted file,
+diff **base→ours** against **base→theirs** (`git diff :1:$f :2:$f --stat` vs `:3:`) and compare the
+sizes before choosing: where ours is the superset, take ours and hand-apply the remote's real
+change. Then prove the resolution — extract every line the remote added
+(`git diff <base>:$f origin/build-v3:$f | grep '^+'`) and `grep -F` each one against the resolved
+file. That check found a dropped feature no conflict marker named: the incoming
+`ventas-report.jsx` imports `useSalesInsight` from `data.jsx`, and taking ours for `data.jsx` had
+removed it. Lint and the unit suite did not notice; the Vite build would have.
+
+**Run the schema instruments BEFORE the re-apply step, or you will measure a database that no build
+produces.** The CI gate's step order looks arbitrary and the re-apply step is tempting to do first.
+It is not interchangeable. `90_rls.sql` **revokes** insert/update/delete on `merchant.kitchen_order`
+from `api`, and `47_checkout_kitchen_projection.sql` **grants** insert and update back; `47` sorts
+after `90` in `00_run.sh`, so a fresh build ends with the grant in place. The re-apply step replays
+`90_rls.sql` **alone**, without `47`, so it revokes again and nothing restores it. Running
+`test:integration:schema` after that produced six `permission denied for table kitchen_order`
+failures in `table-order.integration.ts` that do not exist against a pristine database. The real
+order is: apply from scratch → seed RBAC → harness roles → role provisioning → **schema
+instruments** → realtime → DDL freeze → re-apply → security gate. Reproduce it in that order in a
+scratch database (`createdb umi_merge_gate2`; superuser as
+`docker exec umi-buildv3-local-postgres-1 psql -U postgres`), and drop the scratch database when
+you are done. `test:integration:schema` is also the only place a suite listed in
+`package.json` runs, so a new integration suite that is not in that list runs nowhere.
+
+**`gitleaks` is not installed here, and CI redacts what it finds.** The `lint` workflow's last step
+scans **every ref** (`--log-opts="--all"`), so a clean working tree is not a clean scan, and the log
+prints only `leaks found: 1` — the finding itself is redacted on purpose. Install the exact version
+the workflow pins, verifying it against that workflow's `GITLEAKS_SHA256`, then reproduce:
+
+```bash
+curl -sSLo /tmp/gitleaks.tar.gz \
+  https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+echo "<GITLEAKS_SHA256 from the workflow>  /tmp/gitleaks.tar.gz" | sha256sum -c -
+tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks && install -m 0755 /tmp/gitleaks ~/.local/bin/
+gitleaks git --no-banner --report-format json --report-path /tmp/gl.json --log-opts="--all"
+```
+
+The JSON report gives `RuleID`, `File`, `Commit` and `Fingerprint` without printing the value. The
+one finding here was `generic-api-key` on a harness `JWT_SECRET` in `point-refund.integration.ts`, a
+fixed and deliberately fake literal. Allowlist a false positive **by exact value, not by path** —
+that file's own rule: a path allowlist blinds the scanner to a real credential pasted into the same
+file later.
+
+**A hard-coded `webServer` port is not a reason to stop somebody else's server.** The dashboard's
+`playwright.config.js` pins `4011` in both `command` and `url`, and this box usually has another
+session's process sitting there — on the day of the merge, a day-old `node /tmp/probe/proxy.mjs`.
+The config sets `reuseExistingServer: false`, so the run dies before a browser opens. Do not kill
+the other session's process; copy the config to `playwright.merge.config.js` with a free port and a
+different `outputDir`, run `npx playwright test --config playwright.merge.config.js`, then delete
+the copy. That is how all five floor-plan e2e assertions were run against the merged dashboard with
+real Chromium clicks and drags.
+
+**An incoming test can encode the other implementation's details.** The floor-plan e2e that arrived
+with the remote expected a table button named exactly `T1 · 4`. This branch's list button reads
+`T1 · 4 · Libre`, because the board is a canvas and that list is the room in words for a screen
+reader — the live state has to exist as text somewhere. Two of five tests failed on the difference
+and neither failure said anything about a defect. When an incoming test fails against your
+implementation, decide which artifact is stale before editing either: the label is the feature, so
+the test changed to match the label-and-capacity prefix and left the state suffix to the tests that
+assert on state.
+
 ## 5. How to treat a number
 
 - **Quote the artifact, not just the number.** "290 MB" is meaningless; "the native POS debug
