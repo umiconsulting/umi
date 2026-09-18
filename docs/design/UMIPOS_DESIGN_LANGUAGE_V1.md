@@ -60,9 +60,19 @@ Cada estado vacío debe explicar la causa y una acción útil. Un estado vacío 
 - Muestra `Total`, `Asignado` y `Restante` juntos.
 - Muestra cada tender y su importe.
 - Explica que la terminal externa es una declaración del operador.
+- El teclado numérico pertenece al efectivo: aparece con él y se retira con él.
 - Muestra el cambio después del commit.
 - Separa el fallo de la impresora del éxito financiero.
 - No muestres una acción para repetir un resultado financiero desconocido.
+- Un segundo método de pago **reemplaza** al primero. Solo una acción explícita
+  (`Dividir el pago`) suma una segunda parte: una combinación imposible nunca se
+  arma con un toque distraído.
+- Nombra cada parte de un cobro dividido en el orden en que se cobra, con el
+  efectivo primero, porque el cambio se calcula sobre esa parte.
+- Si las partes no cubren el total, di cuánto falta o cuánto sobra antes de
+  ofrecer el cobro; un botón muerto sin explicación es una contradicción.
+- Una opción que esta sucursal no permite se dice en voz alta; no se deja como
+  una ausencia que el operador tiene que interpretar.
 
 ## Aprobaciones y acciones destructivas
 
@@ -102,5 +112,6 @@ Cada estado vacío debe explicar la causa y una acción útil. Un estado vacío 
 - Usa movimiento Material local y corto.
 - Usa 120 ms para la respuesta de un control.
 - Usa hasta 220 ms para una transición de superficie.
+- Una transición de superficie puede decir de qué lado vive un control; no es decorativa.
 - Anima solo opacidad o transformación cuando sea posible.
 - No uses movimiento decorativo en un pago.

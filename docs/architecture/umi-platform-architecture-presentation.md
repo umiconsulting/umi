@@ -85,18 +85,17 @@ They consume one API and one data model. The POS and KDS also have a local resil
 
 ## 2. Product ownership
 
-| Product or package      | Owns                                                                     | Does not own                                      | Main communication                               |
-| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------ |
-| `apps/umi-api`          | Business rules, writes, authorization, queues, adapters, and projections | Product UI and device hardware                    | HTTPS, PostgreSQL, BullMQ, provider APIs         |
-| `apps/umi-dashboard`    | Owner and manager workflows                                              | Merchant data or financial rules                  | Cookie-authenticated API calls                   |
-| Umi Cash experience     | Customer registration, QR, loyalty display, and wallet delivery          | Loyalty balance truth or ledger rules             | Public and authenticated API calls               |
-| `apps/umi-landing-page` | Marketing, lead capture, and diagnostics                                 | Prospect storage and email workflow state         | Public API calls                                 |
-| `apps/umi-pos`          | Terminal UI, hardware ports, encrypted local state, and offline journal  | Authoritative prices, money, orders, or loyalty   | Versioned API and paired-KDS LAN                 |
-| `apps/umi-kds`          | Kitchen board, ticket actions, and local ticket journal                  | Order truth, payment truth, or customer messaging | Versioned API, event cursor, and POS LAN         |
-| Operations UI           | Trace search, health, incidents, and reconciliation                      | Merchant facts                                    | OpenTelemetry, Sentry, and read-only diagnostics |
-| `packages/contract`     | Routes, payload schemas, errors, versions, and product keys              | Business logic                                    | TypeScript package and neutral JSON artifact     |
-| `packages/tokens`       | Shared brand primitives and generated app tokens                         | Product layout decisions                          | Generated CSS, JavaScript, and JSON              |
-| root `supabase/`        | Ordered database migrations                                              | Runtime business logic                            | Supabase CLI and PostgreSQL                      |
+| Product or package      | Owns                                                                     | Does not own                                    | Main communication                               |
+| ----------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- | ------------------------------------------------ |
+| `apps/umi-api`          | Business rules, writes, authorization, queues, adapters, and projections | Product UI and device hardware                  | HTTPS, PostgreSQL, BullMQ, provider APIs         |
+| `apps/umi-dashboard`    | Owner and manager workflows                                              | Merchant data or financial rules                | Cookie-authenticated API calls                   |
+| Umi Cash experience     | Customer registration, QR, loyalty display, and wallet delivery          | Loyalty balance truth or ledger rules           | Public and authenticated API calls               |
+| `apps/umi-landing-page` | Marketing, lead capture, and diagnostics                                 | Prospect storage and email workflow state       | Public API calls                                 |
+| `apps/umi-pos`          | Terminal UI, hardware ports, encrypted local state, and offline journal  | Authoritative prices, money, orders, or loyalty | Versioned API and paired-KDS LAN                 |
+| Operations UI           | Trace search, health, incidents, and reconciliation                      | Merchant facts                                  | OpenTelemetry, Sentry, and read-only diagnostics |
+| `packages/contract`     | Routes, payload schemas, errors, versions, and product keys              | Business logic                                  | TypeScript package and neutral JSON artifact     |
+| `packages/tokens`       | Shared brand primitives and generated app tokens                         | Product layout decisions                        | Generated CSS, JavaScript, and JSON              |
+| root `supabase/`        | Ordered database migrations                                              | Runtime business logic                          | Supabase CLI and PostgreSQL                      |
 
 The Umi Cash capability can change its repository shape. Its business owner stays `umi-api`.
 The public wallet URL must remain stable because printed QR codes depend on it.
@@ -135,8 +134,7 @@ Umi/
 │   ├── umi-api/              # sole backend and financial writer
 │   ├── umi-dashboard/        # owner and manager web console
 │   ├── umi-landing-page/     # public marketing and lead capture
-│   ├── umi-pos/              # Flutter Android point of sale
-│   └── umi-kds/              # Flutter kitchen display client
+│   └── umi-pos/              # Flutter Android point of sale
 ├── packages/
 │   ├── contract/             # sole API contract source
 │   └── tokens/               # shared design values and generated outputs

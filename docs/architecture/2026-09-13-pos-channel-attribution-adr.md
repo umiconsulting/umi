@@ -214,3 +214,47 @@ attributed in one go — no interim `walk_in`-only view is put in front of owner
 3. **`origin_channel` fallback → `walk_in`** for an unlinked POS sale. An explicit
    counter/phone distinction is not modelled now; it can be added as a `CHECK` value later
    without migration cost.
+
+---
+
+## 9. Resolved 2026-09-17 — the table-order channel lands as INTAKE, payment stays at the counter
+
+§8I step 2 ("Add QR order and pay for a seated table") was deferred because **pay-on-page versus
+pay-at-counter would change the design**. That is true of the _payment_, and it is not a reason to
+hold the _order_. Re-read, the workstream's acceptance is:
+
+> _"A QR order appears in the POS cart and on the kitchen board with no manual step."_
+
+It says nothing about where the money is taken. So the deferral is split rather than answered
+wholesale.
+
+**The decision.** The table channel ships as **order intake**. A seated guest orders from the table;
+the order is written through the one order writer with the channel identity `web` and linked to that
+table ONLY when a party is present; the POS picks it up from the incoming-orders surface it already
+has; the kitchen receives it because `writeOrder` itself projects the kitchen ticket. **Payment stays at the counter**
+until the Conekta online gateway lands, at which point pay-on-page is an additional step on the SAME
+order — the order's identity does not change, so nothing built now is thrown away.
+
+**"A party is present" is `seated_at IS NOT NULL`, and NOT `state = 'open'`.** This ADR said "linked
+to that table's open state" and that phrasing is a trap: `merchant.table_state.state` has a value
+named `open` that means **the table is free** — `open` and `dirty` are the unoccupied states, and
+`table_state_party_presence` is the constraint that ties occupancy to `seated_at`. A first
+implementation reading the sentence literally would refuse every seated guest and admit exactly the
+empty tables. The intake test makes the inversion executable: a table whose state is literally `open`
+is refused, and a seated one orders.
+
+**Why in this order.** It makes the acceptance true with machinery that exists and is already proved
+(one writer, channel identity, `link`-not-`merge`, the projector inside the writer). It does not
+invent a payment path the platform cannot honour: there is no Conekta client, so a "pay now" button
+would be a promise the API cannot keep. And it keeps §8.3's `walk_in` fallback intact — a table order
+that is later settled at the till links to the POS sale exactly as a WhatsApp order does.
+
+**What this obliges the channel to say about itself.** The guest-facing surface must state that the
+order is placed at the table and **paid at the counter**, and must not offer a payment step. A screen
+that looks like it takes money and does not is the same class of defect as a terminal tile that
+fails after the customer decides.
+
+**What is explicitly NOT decided here.** Rappi/DiDi ingestion stays Phase 3 (§7) and its own
+sub-channel; a customer-visible order status beyond what the counter tells them is not modelled; and
+QR credentials for a table are an intake concern that must be revocable without reprinting every
+table's code.

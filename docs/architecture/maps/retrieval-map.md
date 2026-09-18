@@ -17,7 +17,7 @@ This file defines how agents should load Umi context without turning the workspa
 
 - Backend, jobs, prompts, traces, WhatsApp, outbox, passes, projections, and business writes: `apps/umi-api`.
 - UmiPOS client, checkout, device hardware, offline replay, and shifts: `apps/umi-pos`.
-- Native iPad KDS UI, Swift client behavior, KDS board interactions: `apps/umi-kds`.
+- Kitchen board (KDS) mode, kitchen board interactions, and station behavior: `apps/umi-pos`.
 - Cash compatibility site, Prisma behavior, and Cash Vercel jobs: `apps/umi-cash`.
 - Owner dashboard live-data UI behavior: `apps/umi-dashboard`.
 - Public marketing pages and lead capture: `apps/umi-landing-page`.

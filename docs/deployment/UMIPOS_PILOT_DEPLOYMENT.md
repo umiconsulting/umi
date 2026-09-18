@@ -47,7 +47,7 @@ When enabled, inject S3-compatible credentials only into server services.
 - Keep five GiB of free disk by default.
 
 Xcode is not available on the Linux runner.
-Perform iPad signing and physical KDS tests on a supported Apple build host.
+Perform iPad signing and physical kitchen board tests on a supported Apple build host.
 
 ## Configuration classes
 
@@ -58,7 +58,6 @@ Perform iPad signing and physical KDS tests on a supported Apple build host.
 - release version, commit, and timestamp
 - contract version
 - public feature flags
-- KDS API URL and environment
 
 Public client configuration contains no server credential.
 
@@ -298,28 +297,14 @@ Device enrollment then reports stale or revoked device state.
 The hardware runtime reports adapter failures through its safe state model.
 The application does not display a stack trace or secret.
 
-## KDS pilot runtime
+## Kitchen board pilot runtime
 
-Keep the existing KDS application.
-Build its Release configuration with explicit values:
-
-```sh
-xcodebuild -project apps/umi-kds/375.xcodeproj \
-  -scheme UmiKDS -configuration Release \
-  KDS_ENVIRONMENT=pilot \
-  KDS_BACKEND_URL=https://pilot.example.com \
-  KDS_RELEASE_VERSION=<version> \
-  KDS_RELEASE_GIT_COMMIT=<commit> \
-  KDS_RELEASE_BUILD_TIMESTAMP=<timestamp> \
-  KDS_CONTRACT_VERSION=2.12.0 archive
-```
-
-Leave the business and station build values empty for pilot pairing.
+The kitchen board is a mode inside the POS. It ships in the POS bundle.
+Install that artifact as in "Linux POS installation".
+Open the "Cocina" destination in the POS bottom navigation.
 Approve pairing in the Dashboard.
 The API assigns the merchant, location, station, and device.
-The KDS sends a heartbeat every five seconds.
-The current client polls every three seconds and supports manual reconnect.
-The Settings view shows connection and release data.
+See `docs/architecture/2026-09-16-pos-is-a-native-app.md`.
 
 ## Support bundle
 

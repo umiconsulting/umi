@@ -39,6 +39,22 @@ The route precedence is:
 The API saves the selected route in the kitchen order snapshot.
 A later route change does not move existing work.
 
+## Courses and staging
+
+A line carries a `course_number` (1..20, default 1) and the ticket carries a
+`fired_through_course` watermark. An item is **fired** when its course is at or below the
+watermark, and **held** when it is above it. A held item is still returned by the board
+read; the client draws it as held rather than having it hidden.
+
+The watermark only moves forward. `fire_course` writes the greater of the current value
+and the requested course, so a late or repeated command is a no-op that answers with the
+current state instead of rewinding a ticket that has already fired past it. Firing a
+course does not change the ticket's status and does not touch item rows.
+
+The course is set on the till's cart line and copied onto `order_item` at commit and onto
+`kitchen_order_item` by the projector. `fired` is never stored: it is derived from the
+line's course and the ticket's watermark, so the two cannot disagree.
+
 ## Stations
 
 A station belongs to one merchant and one location.
