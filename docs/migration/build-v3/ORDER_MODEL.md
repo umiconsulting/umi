@@ -21,12 +21,13 @@ with the café-specific parts quarantined to one seam. Genericity lives in the
 
 Three separable facts, each at the grain where it is actually true:
 
-| fact                        | entity                    | grain     | why this grain                                                                                                 |
-| --------------------------- | ------------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| the commercial agreement    | `merchant.customer_order` | order     | one agreement to buy                                                                                           |
-| what was bought             | `merchant.order_item`     | line      | a line is one product at one price                                                                             |
-| where each item is prepared | `order_item.station_id`   | **line**  | a station is a _preparation locus_; a latte is made at the bar, a panini at the grill — two loci for one order |
-| how far along the ticket is | `merchant.order_event`    | **order** | the ticket advances as a unit (see §3)                                                                         |
+| fact                        | entity                     | grain     | why this grain                                                                                                                                                                                                           |
+| --------------------------- | -------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| the commercial agreement    | `merchant.customer_order`  | order     | one agreement to buy                                                                                                                                                                                                     |
+| what was bought             | `merchant.order_item`      | line      | a line is one product at one price                                                                                                                                                                                       |
+| where each item is prepared | `order_item.station_id`    | **line**  | a station is a _preparation locus_; a latte is made at the bar, a panini at the grill — two loci for one order                                                                                                           |
+| which course an item is in  | `order_item.course_number` | **line**  | the same drink is a first course on one ticket and a dessert on another, so the course belongs to the line and not to the product; the ticket's watermark (`kitchen_order.fired_through_course`) is the order-grain half |
+| how far along the ticket is | `merchant.order_event`     | **order** | the ticket advances as a unit (see §3)                                                                                                                                                                                   |
 
 The KDS is a **projection** over this — it groups lines by order, tags each line's
 station, and advances through `order_event`. It is **not the owner** of the order.

@@ -6,8 +6,43 @@
 begin;
 
 -- A clean build-v3 has no legacy backfill. Seed the reviewed business permissions used here.
-insert into umi.permission(key,description)
-values
+--
+-- THIS FILE RUNS IN TWO POSITIONS, SO THE INSERT IS GUARDED.
+--
+-- At position 35 (00_run.sh, i.e. every fresh machine and CI) umi.permission
+-- has only key and description. Re-applied later — which is what the local
+-- seeds do — 49_merchant_roles.sql has already added product_key, group_key,
+-- status, delegable and risk_level and made the first two NOT NULL, and the
+-- two-column insert this file used to emit fails there. That is how a fresh
+-- database stopped being seedable: the chain was fine and the SECOND runner was
+-- not. 49_merchant_roles.sql seeds the same four platform permissions first for
+-- exactly this reason, and the CASE expressions in the branch below are that
+-- file's own derivation — keep the two in step.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_schema='umi' and table_name='permission' and column_name='product_key'
+  ) then
+    insert into umi.permission(key,description,product_key,group_key,status,delegable,risk_level)
+    select
+      v.key,
+      v.description,
+      case
+        when split_part(v.key,'.',1)='kitchen' then 'kds'
+        when split_part(v.key,'.',1) in ('loyalty','wallet','gift_card','stored_value') then 'cash'
+        when split_part(v.key,'.',1) in ('audit','insights','merchant','tenant') then 'dashboard'
+        else 'pos'
+      end,
+      split_part(v.key,'.',1),
+      'active',
+      true,
+      case
+        when v.key like '%.approve' or v.key like '%.manage' or v.key like '%.refund%' then 'high'
+        when v.key like '%.write' or v.key like '%.create' or v.key like '%.adjust%' then 'medium'
+        else 'low'
+      end
+    from (values
   ('insights.read','Read merchant operational insights'),
   ('merchant.manage','Manage one merchant business profile'),
   ('cash.drawer.no_sale.approve','Approve a No Sale drawer command for a separate operator'),
@@ -98,7 +133,107 @@ values
   ('wallet.redeem','UmiPOS Gate 3F permission wallet.redeem'),
   ('wallet.refund','UmiPOS Gate 3F permission wallet.refund'),
   ('wallet.release','UmiPOS Gate 3F permission wallet.release')
-on conflict(key) do update set description=excluded.description;
+    ) as v(key,description)
+    on conflict(key) do update set
+      description=excluded.description,
+      product_key=excluded.product_key,
+      group_key=excluded.group_key;
+  else
+    insert into umi.permission(key,description)
+    values
+  ('insights.read','Read merchant operational insights'),
+  ('merchant.manage','Manage one merchant business profile'),
+  ('cash.drawer.no_sale.approve','Approve a No Sale drawer command for a separate operator'),
+  ('cash.movement.paid_in.approve','Approve a Paid In movement above the active policy threshold'),
+  ('cash.movement.paid_out.approve','Approve a Paid Out movement above the active policy threshold'),
+  ('cash.movement.safe_drop.approve','Approve a Safe Drop movement above the active policy threshold'),
+  ('cash.shift.close.approve','Approve a shift close above the active policy threshold'),
+  ('customer.attach','UmiPOS Gate 3F permission customer.attach'),
+  ('customer.contact.read','UmiPOS Gate 3F permission customer.contact.read'),
+  ('customer.create','UmiPOS Gate 3F permission customer.create'),
+  ('customer.detach','UmiPOS Gate 3F permission customer.detach'),
+  ('customer.history.admin','Read restricted customer administration history'),
+  ('customer.history.global','Read approved merchant-global customer history'),
+  ('customer.history.read','UmiPOS Gate 3F permission customer.history.read'),
+  ('customer.merge','UmiPOS Gate 3F permission customer.merge'),
+  ('customer.merge.approve','UmiPOS Gate 3F permission customer.merge.approve'),
+  ('customer.read','UmiPOS Gate 3F permission customer.read'),
+  ('customer.search','UmiPOS Gate 3F permission customer.search'),
+  ('gift_card.activate','UmiPOS Gate 3F permission gift_card.activate'),
+  ('gift_card.activate.approve','UmiPOS Gate 3F permission gift_card.activate.approve'),
+  ('gift_card.authorize','UmiPOS Gate 3F permission gift_card.authorize'),
+  ('gift_card.issue','Issue a protected merchant gift card'),
+  ('gift_card.issue.approve','Approve a protected gift-card issue command'),
+  ('gift_card.lookup','UmiPOS Gate 3F permission gift_card.lookup'),
+  ('gift_card.read','UmiPOS Gate 3F permission gift_card.read'),
+  ('gift_card.redeem','UmiPOS Gate 3F permission gift_card.redeem'),
+  ('gift_card.refund','UmiPOS Gate 3F permission gift_card.refund'),
+  ('gift_card.release','UmiPOS Gate 3F permission gift_card.release'),
+  ('hardware.assign','UmiPOS permission hardware.assign'),
+  ('hardware.command.execute','UmiPOS permission hardware.command.execute'),
+  ('hardware.customer_display.test','UmiPOS permission hardware.customer_display.test'),
+  ('hardware.customer_display.use','UmiPOS permission hardware.customer_display.use'),
+  ('hardware.diagnostics','UmiPOS permission hardware.diagnostics'),
+  ('hardware.drawer.open','UmiPOS permission hardware.drawer.open'),
+  ('hardware.drawer.test','UmiPOS permission hardware.drawer.test'),
+  ('hardware.manage','UmiPOS permission hardware.manage'),
+  ('hardware.printer.print','UmiPOS permission hardware.printer.print'),
+  ('hardware.printer.reprint','UmiPOS permission hardware.printer.reprint'),
+  ('hardware.printer.test','UmiPOS permission hardware.printer.test'),
+  ('hardware.read','UmiPOS permission hardware.read'),
+  ('hardware.scanner.test','UmiPOS permission hardware.scanner.test'),
+  ('hardware.scanner.use','UmiPOS permission hardware.scanner.use'),
+  ('inventory.adjust.approve','UmiPOS permission inventory.adjust.approve'),
+  ('inventory.adjust.decrease','UmiPOS permission inventory.adjust.decrease'),
+  ('inventory.adjust.increase','UmiPOS permission inventory.adjust.increase'),
+  ('inventory.count.approve','UmiPOS permission inventory.count.approve'),
+  ('inventory.count.create','UmiPOS permission inventory.count.create'),
+  ('inventory.count.reconcile','UmiPOS permission inventory.count.reconcile'),
+  ('inventory.count.submit','UmiPOS permission inventory.count.submit'),
+  ('inventory.damage.approve','UmiPOS permission inventory.damage.approve'),
+  ('inventory.damage.create','UmiPOS permission inventory.damage.create'),
+  ('inventory.history.read','UmiPOS permission inventory.history.read'),
+  ('inventory.negative_stock.override','UmiPOS permission inventory.negative_stock.override'),
+  ('inventory.policy.manage','UmiPOS permission inventory.policy.manage'),
+  ('inventory.policy.read','UmiPOS permission inventory.policy.read'),
+  ('inventory.quarantine.approve','UmiPOS permission inventory.quarantine.approve'),
+  ('inventory.quarantine.enter','UmiPOS permission inventory.quarantine.enter'),
+  ('inventory.quarantine.release','UmiPOS permission inventory.quarantine.release'),
+  ('inventory.read','UmiPOS permission inventory.read'),
+  ('inventory.restock.approve','UmiPOS permission inventory.restock.approve'),
+  ('inventory.restock.resolve','UmiPOS permission inventory.restock.resolve'),
+  ('inventory.waste.approve','UmiPOS permission inventory.waste.approve'),
+  ('inventory.waste.create','UmiPOS permission inventory.waste.create'),
+  ('kitchen.cancel_ack','UmiPOS permission kitchen.cancel_ack'),
+  ('kitchen.complete','UmiPOS permission kitchen.complete'),
+  ('kitchen.diagnostics','UmiPOS permission kitchen.diagnostics'),
+  ('kitchen.merchant.read','UmiPOS permission kitchen.merchant.read'),
+  ('kitchen.prepare','UmiPOS permission kitchen.prepare'),
+  ('kitchen.priority','UmiPOS permission kitchen.priority'),
+  ('kitchen.read','UmiPOS permission kitchen.read'),
+  ('kitchen.ready','UmiPOS permission kitchen.ready'),
+  ('kitchen.recall','UmiPOS permission kitchen.recall'),
+  ('kitchen.station.manage','UmiPOS permission kitchen.station.manage'),
+  ('kitchen.station.read','UmiPOS permission kitchen.station.read'),
+  ('location.switch','Select another merchant location for dashboard work'),
+  ('loyalty.adjust','UmiPOS Gate 3F permission loyalty.adjust'),
+  ('loyalty.adjust.approve','UmiPOS Gate 3F permission loyalty.adjust.approve'),
+  ('loyalty.policy.manage','UmiPOS Gate 3F permission loyalty.policy.manage'),
+  ('loyalty.read','UmiPOS Gate 3F permission loyalty.read'),
+  ('loyalty.reward.approve','Approve one exact reward preview'),
+  ('loyalty.reward.authorize','UmiPOS Gate 3F permission loyalty.reward.authorize'),
+  ('loyalty.reward.redeem','UmiPOS Gate 3F permission loyalty.reward.redeem'),
+  ('loyalty.reward.release','UmiPOS Gate 3F permission loyalty.reward.release'),
+  ('stored_value.approve','UmiPOS Gate 3F permission stored_value.approve'),
+  ('stored_value.reconcile','UmiPOS Gate 3F permission stored_value.reconcile'),
+  ('wallet.authorize','UmiPOS Gate 3F permission wallet.authorize'),
+  ('wallet.read','UmiPOS Gate 3F permission wallet.read'),
+  ('wallet.redeem','UmiPOS Gate 3F permission wallet.redeem'),
+  ('wallet.refund','UmiPOS Gate 3F permission wallet.refund'),
+  ('wallet.release','UmiPOS Gate 3F permission wallet.release')
+    on conflict(key) do update set description=excluded.description;
+  end if;
+end $$;
 
 insert into umi.role(key,name,description,is_platform)
 values

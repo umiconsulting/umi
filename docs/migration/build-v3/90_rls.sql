@@ -64,6 +64,30 @@ revoke select on umi.audit_log from readonly;                       -- sealed Um
 revoke select on runtime.session, runtime.otp, runtime.password_reset_token,
                  runtime.pairing from readonly;   -- auth substrate
 
+-- ---- The same narrowing, re-asserted for a table a LATER file creates. ----
+--
+-- 72_mp_point creates `merchant.mp_point_credential` and takes the blanket read away from
+-- `readonly`, giving back only the identity and health columns — the precedent this file
+-- already sets for `umi.user` and `merchant.loyalty_wallet_pass`. The grant THREE lines
+-- above re-arms it on every apply of this file, so on a RE-APPLY 72's revoke is undone and
+-- the diagnostic role can read the OAuth cipher again. `99_verify` asserts the narrowing
+-- per column, which is how this was found: "readonly can select the OAuth cipher columns".
+--
+-- The block is guarded because on a FRESH build this file runs before 72 (90 < 72 in
+-- `00_run.sh`), so the table does not exist yet and an unguarded revoke would abort the
+-- chain. The column list is 72's, deliberately copied rather than paraphrased: the two
+-- must name the same columns, and 99_verify is what holds them together.
+do $$
+begin
+  if exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+              where n.nspname = 'merchant' and c.relname = 'mp_point_credential') then
+    revoke select on merchant.mp_point_credential from readonly;
+    grant select (merchant_id, mp_user_id, access_token_expires_at, refresh_failed_at,
+                  refresh_attempts, created_at, updated_at)
+      on merchant.mp_point_credential to readonly;
+  end if;
+end $$;
+
 -- api (the café REQUEST-PATH role): full DML on merchant (RLS-bound); umi limited to
 -- global catalogs + per-café tables (RLS-scoped); minimal, scoped runtime.
 grant select, insert, update, delete on all tables in schema merchant to api;
@@ -275,6 +299,32 @@ create policy merchant_isolation on merchant.merchant
 -- Tables carrying merchant_id directly: one uniform policy + FORCE.
 do $$
 declare r record;
+  -- TABLES CREATED AFTER THIS FILE, WHICH THIS SWEEP MUST NOT TOUCH.
+  --
+  -- The sweep exists to catch a merchant table that forgot to declare its scope. It walks
+  -- the LIVE catalog, so on a re-apply it also finds every table a LATER migration created
+  -- (62, 65, 67, 69, 70, 72, 74, 75, 76 — eleven files, eighteen tables). Each of those
+  -- already made the decision in its own file, under the `<table>_scope` convention. Adding
+  -- the uniform pair beside it is not a second restriction — permissive policies are
+  -- OR-ed, and the uniform one is WEAKER (merchant-only where theirs is merchant AND
+  -- location) — it is a duplicate that makes a RE-APPLIED database differ from a freshly
+  -- built one: the policy count grew from 319 to 347, which is what the CI re-apply step
+  -- measures.
+  --
+  -- It cannot be detected statelessly. `<table>_scope` is also the convention 36–41 use for
+  -- tables created BEFORE this file, and skipping those would silently DROP their location
+  -- narrowing — their `_scope` policy is merchant-only, and it is this sweep that adds the
+  -- location predicate. Matching on the expression has the same problem. So the list is
+  -- explicit, which is also how the location sweep below already excludes `staff` and
+  -- `loyalty_visit`. ADD A NEW POST-90 TABLE HERE, and to the identical list below, or the
+  -- re-apply gate will fail the next time it runs.
+  post_90 constant text[] := array[
+    'device_point_terminal', 'fiscal_document', 'floor_plan', 'inventory_allergen',
+    'inventory_item_allergen', 'mp_point_credential', 'purchase_order',
+    'purchase_order_line', 'purchase_order_receipt', 'purchase_order_receipt_line',
+    'stock_lot', 'supplier', 'supplier_invoice', 'supplier_invoice_line',
+    'table_order', 'table_order_credential', 'table_reservation', 'table_state'
+  ]::text[];
 begin
   for r in
     select c.table_name
@@ -283,6 +333,7 @@ begin
       on t.table_schema=c.table_schema and t.table_name=c.table_name
     where c.table_schema='merchant' and c.column_name='merchant_id'
       and t.table_type='BASE TABLE'
+      and not (c.table_name = any(post_90))
   loop
     execute format('alter table merchant.%I enable row level security', r.table_name);
     execute format('alter table merchant.%I force  row level security', r.table_name);
@@ -480,13 +531,23 @@ create policy merchant_isolation on runtime.conversation_turn
 do $$
 declare
   t record;
-  skip constant text[] := array['staff', 'loyalty_visit'];
+  -- `staff` and `loyalty_visit` are excluded for the same reason as the post-90 list in the
+  -- merchant sweep above: their own migration owns the decision. The post-90 names are
+  -- identical to that list and must be kept in step with it.
+  skip constant text[] := array[
+    'staff', 'loyalty_visit',
+    'device_point_terminal', 'fiscal_document', 'floor_plan', 'inventory_allergen',
+    'inventory_item_allergen', 'mp_point_credential', 'purchase_order',
+    'purchase_order_line', 'purchase_order_receipt', 'purchase_order_receipt_line',
+    'stock_lot', 'supplier', 'supplier_invoice', 'supplier_invoice_line',
+    'table_order', 'table_order_credential', 'table_reservation', 'table_state'
+  ];
 begin
   for t in
     select c.relname
       from pg_class c
       join pg_namespace n on n.oid = c.relnamespace
-     where n.nspname = 'merchant' and c.relkind = 'r'          -- base tables only; a view has no policies
+    where n.nspname = 'merchant' and c.relkind = 'r'          -- base tables only; a view has no policies
        and exists (select 1 from information_schema.columns col
                     where col.table_schema = 'merchant' and col.table_name = c.relname
                       and col.column_name = 'location_id')
@@ -521,7 +582,7 @@ begin
   foreach t in array array[
     'device_replay_cursor', 'offline_replay_command', 'offline_reconciliation',
     'offline_replay_conflict', 'offline_provisional_mapping',
-    'pos_checkout_draft', 'cash_shift',
+    'pos_checkout_draft',
     'pos_exception_preview', 'pos_sale_exception',
     'inventory_count'
   ] loop
@@ -540,24 +601,6 @@ begin
                     or ac.location_id = umi.current_location())
           ))
         )$p$, t)
-      when t = 'cash_shift' then
-        $p$(
-          (umi.current_device() is not null and cash_shift.device_id = umi.current_device())
-          or
-          (nullif(current_setting('app.administrative_command_id', true), '') is not null
-            and exists (
-              select 1
-                from merchant.administrative_command ac
-               where ac.id = nullif(
-                       current_setting('app.administrative_command_id', true), ''
-                     )::uuid
-                 and ac.merchant_id = (select umi.current_merchant())
-                 and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
-                 and ac.location_id = umi.current_location()
-                 and ac.operation in ('refund.preview', 'refund.commit')
-                 and ac.status = 'pending'
-            ))
-        )$p$
       else
         '(umi.current_device() is not null and device_id = umi.current_device())'
     end;
@@ -570,8 +613,14 @@ begin
   end loop;
 end $$;
 
--- ---- cash_shift: device scoping on WRITES ONLY (refines the sweep above). ----
--- The loop just scoped cash_shift FOR ALL, which also hides the row on SELECT from
+-- ---- cash_shift: device scoping on WRITES ONLY, and it OWNS the policy. ----
+-- cash_shift is deliberately NOT in the sweep above. It is the one table whose policy a
+-- LATER file refines (68 adds the orphan-reclaim clause), so the sweep must not recreate
+-- it on a re-apply — that is how the clause was being lost, and `99_verify` caught it
+-- with "cash_shift.device_scoping has no orphan-reclaim clause". This block is guarded
+-- for the same reason; between the two, a re-apply is now a no-op for this policy.
+--
+-- The sweep used to scope cash_shift FOR ALL, which also hides the row on SELECT from
 -- any session that cannot prove a device — i.e. the owner/admin Dashboard, which
 -- authenticates a USER, not a terminal. That silently blanked
 -- "Caja y turnos → Turnos de caja" for every owner, even though the shift's own
@@ -591,24 +640,53 @@ end $$;
 -- pending refund administrative command. cash_shift is never DELETEd (closed shifts
 -- are frozen by tg_closed_cash_shift_immutable and no repository issues a delete), so
 -- the open USING carries no delete exposure.
-drop policy if exists device_scoping on merchant.cash_shift;
-create policy device_scoping on merchant.cash_shift as restrictive
-  using (true)
-  with check (
-    (umi.current_device() is not null and cash_shift.device_id = umi.current_device())
-    or
-    (nullif(current_setting('app.administrative_command_id', true), '') is not null
-      and exists (
-        select 1
-          from merchant.administrative_command ac
-         where ac.id = nullif(current_setting('app.administrative_command_id', true), '')::uuid
-           and ac.merchant_id = (select umi.current_merchant())
-           and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
-           and ac.location_id = umi.current_location()
-           and ac.operation in ('refund.preview', 'refund.commit')
-           and ac.status = 'pending'
-      ))
-  );
+-- A LATER FILE REFINES THIS POLICY, AND A RE-APPLY MUST NOT UNDO IT.
+--
+-- 68_cash_shift_orphan_reclaim adds a THIRD `with check` clause — a shift may become
+-- `blocked` when the terminal holding it can no longer authenticate — and `99_verify`
+-- asserts that clause is present. Re-creating the policy from THIS file would drop it,
+-- and the chain would then fail its own verify on the second apply. It is not
+-- hypothetical: it failed exactly there, which is how this guard was found.
+--
+-- The test is the DEFINITION, not a version number or a flag somebody has to remember
+-- to set — the same shape `74_kitchen_courses` uses for its widened constraint (`read
+-- the enforced expression, correct it only if it is missing`). On a fresh build this
+-- file runs first, finds no policy, and creates the two-clause form; 68 then refines it.
+-- On any later apply it finds the refinement and leaves it alone.
+do $$
+declare
+  v_def text;
+begin
+  select pg_get_expr(p.polwithcheck, p.polrelid) into v_def
+    from pg_policy p
+    join pg_class c on c.oid = p.polrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'merchant' and c.relname = 'cash_shift'
+     and p.polname = 'device_scoping';
+
+  if v_def is null or v_def not like '%device_is_usable%' then
+    execute 'drop policy if exists device_scoping on merchant.cash_shift';
+    execute $policy$
+      create policy device_scoping on merchant.cash_shift as restrictive
+        using (true)
+        with check (
+          (umi.current_device() is not null and cash_shift.device_id = umi.current_device())
+          or
+          (nullif(current_setting('app.administrative_command_id', true), '') is not null
+            and exists (
+              select 1
+                from merchant.administrative_command ac
+               where ac.id = nullif(current_setting('app.administrative_command_id', true), '')::uuid
+                 and ac.merchant_id = (select umi.current_merchant())
+                 and ac.actor_user_id = nullif(current_setting('app.user_id', true), '')::uuid
+                 and ac.location_id = umi.current_location()
+                 and ac.operation in ('refund.preview', 'refund.commit')
+                 and ac.status = 'pending'
+            ))
+        )
+    $policy$;
+  end if;
+end $$;
 
 -- ---- pos_sale_exception: device scoping on WRITES ONLY (refines the sweep). ----
 -- Same shape, same reason as cash_shift above. The loop scoped pos_sale_exception
@@ -661,7 +739,17 @@ declare
     -- These rows record a target device or command actor. The column is provenance.
     -- Merchant, location, permission, and station checks control access.
     'kitchen_command',
-    'kitchen_device_station'
+    'kitchen_device_station',
+    -- THE BINDING IS ADMINISTRATIVE STATE, NOT DEVICE PROVENANCE — a decision made
+    -- here because 72_mp_point creates this table AFTER this sweep, so the guard
+    -- below only ever sees it on a RE-APPLY. Its only writer is the owner console
+    -- (`PUT /mp-point/terminals/:id`, gated on the dashboard product and
+    -- `merchant.manage`), which authenticates a user and carries no device context:
+    -- a `device_scoping` WITH CHECK pinning the row to `umi.current_device()` would
+    -- refuse the one caller that is allowed to write it. The row is narrowed by
+    -- merchant and by location, and `device_id` names the register that owns the
+    -- terminal rather than asserting who may write it.
+    'device_point_terminal'
   ]::text[];
 begin
   select array_agg(c.relname order by c.relname) into undecided

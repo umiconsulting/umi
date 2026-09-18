@@ -23,7 +23,11 @@ set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 STAMP="$DIR/FROZEN.sha256"
 FILES=(00_foundation.sql 10_umi.sql 20_merchant.sql 30_runtime.sql
-       50_cross_schema_fk.sql 60_triggers.sql 90_rls.sql 99_verify.sql 00_run.sh)
+       50_cross_schema_fk.sql 60_triggers.sql 90_rls.sql 62_floor_plan.sql
+       65_table_reservation.sql 66_pos_cart_recovery_rollback.sql 67_table_state.sql
+       68_cash_shift_orphan_reclaim.sql 69_procurement.sql 70_tender.sql
+       74_kitchen_courses.sql 75_table_order_credential.sql
+       99_verify.sql 00_run.sh)
 
 hashes() {
   # Sorted, so the stamp does not depend on the order of the array above.
