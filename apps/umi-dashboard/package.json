@@ -16,6 +16,7 @@
     "lint:fix": "eslint . --fix",
     "pretest": "lingui compile",
     "test": "vitest run",
+    "test:browser": "playwright test --config playwright.config.js",
     "i18n:extract": "lingui extract",
     "i18n:compile": "lingui compile --strict"
   },

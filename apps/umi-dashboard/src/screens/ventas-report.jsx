@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useSalesSummary } from '@/data.jsx';
+import { useSalesSummary, useSalesInsight } from '@/data.jsx';
 import { formatOperationMoney } from './operations-format.js';
 import Recibos from './recibos.jsx';
 
@@ -555,6 +555,8 @@ export default function VentasReport() {
   const [range, setRange] = useState('today');
   const [view, setView] = useState('resumen');
   const { data, loading, loaded, error } = useSalesSummary(range, 0);
+  // Optional AI narrative over the same range. Fail-safe: hidden until it returns text.
+  const insight = useSalesInsight(range, 0);
 
   const totals = data?.totals;
   const currency = data?.currency || 'MXN';
@@ -648,6 +650,30 @@ export default function VentasReport() {
         />
       ) : (
         <>
+          {/* Answer-first: a one-line plain-Spanish read of the period, above the tiles.
+              Fail-safe — it renders only when the model returned a grounded sentence. */}
+          {insight.data?.narrative ? (
+            <div
+              className="card"
+              style={{
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                padding: '14px 16px',
+                borderColor: 'var(--line-soft)',
+              }}
+            >
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 4 }}>
+                  <Trans>Resumen del periodo</Trans>
+                </div>
+                <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'var(--ink-1)' }}>
+                  {insight.data.narrative}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           <div
             style={{
               display: 'grid',

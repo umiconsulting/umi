@@ -59,7 +59,11 @@ describe('Gate 5A administrative command migration', () => {
     );
     expect(rlsSql).toContain('ac.actor_user_id');
     expect(rlsSql).toContain("current_setting('app.user_id', true)");
-    expect(rlsSql).toContain("t = 'cash_shift'");
+    // cash_shift used to ride the `case t = 'cash_shift'` branch of the device sweep.
+    // It now owns a dedicated, guarded policy — 68_cash_shift_orphan_reclaim refines
+    // that same policy on a later apply, so the sweep must not recreate it. The table
+    // is therefore named by its own clause rather than by the case expression.
+    expect(rlsSql).toContain('cash_shift.device_id = umi.current_device()');
     expect(rlsSql).toContain("ac.operation in ('refund.preview', 'refund.commit')");
     expect(rlsSql).toContain("current_setting('app.administrative_command_id', true)");
   });

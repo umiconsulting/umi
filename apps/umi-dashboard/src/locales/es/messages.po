@@ -7090,6 +7090,10 @@ msgid "Cargando ventas…"
 msgstr "Cargando ventas…"
 
 #: src/screens/ventas-report.jsx
+msgid "Resumen del periodo"
+msgstr "Resumen del periodo"
+
+#: src/screens/ventas-report.jsx
 msgid "Ventas netas"
 msgstr "Ventas netas"
 
