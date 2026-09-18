@@ -1,930 +1,122 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
-import { Select } from '@/components/select.jsx';
+import { Menu } from '@/components/menu.jsx';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
 import { hasRequiredPermission } from '@/lib/module-registry.js';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { useInventoryAllergens, useInventoryItems, useInventoryUnitConversions } from '@/data.jsx';
 import {
-  activeConversionFor,
-  allergenCodeValid,
-  conversionRatio,
-  conversionSummary,
-  filterItems,
-  formatScaled,
-  mergeConversions,
-  onHandDisplay,
-  optionalText,
+  PAGE_SIZE,
+  VIEW_KEYS,
+  attentionQueue,
+  filterByView,
+  itemSignals,
+  paginate,
+  rowActionFor,
   sortItems,
+  sortByUrgency,
+  viewCounts,
 } from './inventory-model.js';
+import {
+  ITEM_ERROR_COPY,
+  ITEM_TYPE_LABEL,
+  MANAGE_GATE,
+  TRACKING_LABEL,
+  UNIT_LABEL,
+  errorText,
+} from './inventory-copy.js';
+import {
+  AllergenLabelsPanel,
+  ItemEditor,
+  NoPermissionNotice,
+  SinCosto,
+} from './inventory-item-editor.jsx';
+import InventoryAdjustSheet from './inventory-adjust.jsx';
+import InventoryCount from './inventory-count.jsx';
+import InventoryFilters from './inventory-filters.jsx';
+import InventoryItemPanel from './inventory-item-panel.jsx';
 
 /**
- * Inventario — the console's authoring surface for items, their unit conversions
- * and their allergens (recipes module plan §7, §11 Phase 1).
+ * Inventario — the console's workbench for stock (redesign plan, 2026-09-18).
+ *
+ * The screen this replaces was an eight-column table with one action on each row.
+ * A person could not use it. Polaris states the rule the old screen broke: a data
+ * table "is not to be used for an actionable list of items that link to details
+ * pages", and "If your use case is more about finding and taking action on
+ * objects, use a resource list."
+ *
+ * The workbench holds three bands, in this order.
+ *   1. The task rail — the three jobs a person starts on purpose.
+ *   2. The attention queue — the questions the data is asking, each with a verb.
+ *   3. The resource list — items, one line each, with the action the row needs.
  *
  * The tab is reachable with `catalog.read` or `inventory.read`, but every read and
  * write behind it is gated on `merchant.manage`. A screen that fired the reads
  * anyway would answer with three 403s for a cashier, so the permission is checked
  * first and the tab says what the operator cannot do instead.
  */
-const MANAGE_GATE = { permissions: ['merchant.manage'] };
 
-const HEAD = {
-  textAlign: 'left',
-  padding: '8px 10px',
-  fontWeight: 600,
-  color: 'var(--ink-3)',
-  fontSize: 11.5,
-  letterSpacing: 0,
-  whiteSpace: 'nowrap',
+const VIEW_LABEL = {
+  all: msg`Todo`,
+  low_stock: msg`Bajo stock`,
+  no_cost: msg`Sin costo`,
+  no_balance: msg`Sin existencia`,
+  archived: msg`Archivados`,
 };
-const CELL = { padding: '10px', verticalAlign: 'top' };
 
-const UNIT_LABEL = {
-  unit: msg`pza`,
-  gram: msg`g`,
-  kilogram: msg`kg`,
-  milliliter: msg`ml`,
-  liter: msg`L`,
-  portion: msg`porción`,
-  package: msg`paquete`,
-  box: msg`caja`,
+/** The label and the icon of each need, in the one place both the list and the menu read. */
+const NEED_COPY = {
+  count: I.ClipboardList,
+  review_stock: I.AlertTriangle,
+  set_cost: I.CircleDollarSign,
+  enable_tracking: I.ToggleRight,
 };
-const ITEM_TYPE_LABEL = {
-  physical_product: msg`Producto físico`,
-  variant_stock: msg`Existencia por variante`,
-  ingredient: msg`Ingrediente`,
-  packaging: msg`Empaque`,
-  composite_component: msg`Componente compuesto`,
-  bundle_component: msg`Componente de paquete`,
-  operational_supply: msg`Insumo operativo`,
+
+const NEED_LABEL = {
+  count: msg`Contar`,
+  review_stock: msg`Revisar`,
+  set_cost: msg`Poner costo`,
+  enable_tracking: msg`Activar conteo`,
 };
-const TRACKING_LABEL = {
+
+/** The state word that follows the dot. A colour alone is not a signal. */
+const STATE_COPY = {
+  ok: msg`En nivel`,
+  low: msg`Bajo`,
+  out: msg`Agotado`,
+  unknown: msg`Sin existencia`,
   not_tracked: msg`No se cuenta`,
-  tracked: msg`Se cuenta`,
-  reservation_required: msg`Requiere reserva`,
+  archived: msg`Archivado`,
 };
-const NEGATIVE_LABEL = {
-  block: msg`Bloquear`,
-  manager_override: msg`Con autorización`,
-  allow_and_flag: msg`Permitir y marcar`,
-  backorder: msg`Pedido pendiente`,
-  not_applicable: msg`No aplica`,
-};
-const ROUNDING_LABEL = {
-  exact: msg`Exacta`,
-  floor: msg`Hacia abajo`,
-  ceiling: msg`Hacia arriba`,
-  half_up: msg`Al más cercano`,
-};
-
-const UNIT_ORDER = ['unit', 'gram', 'kilogram', 'milliliter', 'liter', 'portion', 'package', 'box'];
-const ITEM_TYPE_ORDER = [
-  'ingredient',
-  'physical_product',
-  'variant_stock',
-  'packaging',
-  'composite_component',
-  'bundle_component',
-  'operational_supply',
-];
-const TRACKING_ORDER = ['tracked', 'reservation_required', 'not_tracked'];
-const NEGATIVE_ORDER = [
-  'block',
-  'manager_override',
-  'allow_and_flag',
-  'backorder',
-  'not_applicable',
-];
-const ROUNDING_ORDER = ['exact', 'floor', 'ceiling', 'half_up'];
-
-const ITEM_ERROR_COPY = {
-  INVENTORY_ITEM_REFERENCE_TAKEN: msg`Ya existe un artículo con esa referencia. Escribe otra.`,
-  INVENTORY_ITEM_NOT_FOUND: msg`El artículo ya no existe. Actualiza la lista.`,
-  OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Cierra el editor y vuelve a abrirlo.`,
-  PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
-  VALIDATION_FAILED: msg`Revisa los datos. La API no aceptó la operación.`,
-  SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
-};
-const CONVERSION_ERROR_COPY = {
-  INVENTORY_UNIT_CONVERSION_INVALID: msg`Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano.`,
-  INVENTORY_ITEM_NOT_FOUND: msg`El artículo ya no existe. Actualiza la lista.`,
-  OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Cierra el editor y vuelve a abrirlo.`,
-  PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
-  SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
-};
-const ALLERGEN_ERROR_COPY = {
-  INVENTORY_ALLERGEN_NOT_FOUND: msg`La etiqueta ya no existe. Actualiza la lista.`,
-  INVENTORY_ITEM_NOT_FOUND: msg`El artículo ya no existe. Actualiza la lista.`,
-  OPTIMISTIC_VERSION_CONFLICT: msg`Los datos cambiaron. Cierra el editor y vuelve a abrirlo.`,
-  PERMISSION_DENIED: msg`No tienes permiso para administrar el inventario.`,
-  VALIDATION_FAILED: msg`Revisa los datos. La API no aceptó la operación.`,
-  SERVICE_UNAVAILABLE: msg`El servicio no está disponible. Intenta de nuevo después.`,
-};
-
-function errorText(i18n, copy, error) {
-  if (!error) return null;
-  const known = copy[error.code];
-  return known ? i18n._(known) : error.message;
-}
-
-function CommandNotice({ command, copy, suppress = false }) {
-  const { i18n } = useLingui();
-  if (suppress || !command.error) return null;
-  return (
-    <p style={{ color: 'var(--danger)', margin: 0, fontSize: 12.5 }}>
-      {errorText(i18n, copy, command.error)}
-    </p>
-  );
-}
-
-/** The house `.switch` class with the ARIA role a toggle needs. */
-function Toggle({ checked, label, onChange }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        className={`switch${checked ? ' on' : ''}`}
-        onClick={() => onChange(!checked)}
-      />
-      <span className="muted">{label}</span>
-    </span>
-  );
-}
-
-function SinCosto() {
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '2px 9px',
-        borderRadius: 'var(--r-pill)',
-        background: 'var(--warning-soft)',
-        color: 'var(--warning)',
-        fontSize: 11,
-        fontWeight: 600,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <Trans>Sin costo</Trans>
-    </span>
-  );
-}
-
-function NoPermissionNotice() {
-  return (
-    <div className="card" style={{ padding: 18 }}>
-      <p style={{ margin: 0, color: 'var(--ink-2)' }}>
-        <Trans>No puedes administrar el inventario.</Trans>
-      </p>
-      <p className="muted" style={{ margin: '6px 0 0', fontSize: 12.5 }}>
-        <Trans>
-          Pide a la persona propietaria que te dé el permiso para administrar el negocio.
-        </Trans>
-      </p>
-    </div>
-  );
-}
-
-/**
- * The merchant's own allergen labels. This panel is separate from the item editor
- * because a label outlives any one item, and a rename here changes every item that
- * carries it.
- */
-function AllergenLabelsPanel({ allergens, onSaved }) {
-  const { t } = useLingui();
-  const command = useAdministrativeCommand();
-  const [code, setCode] = useState('');
-  const [label, setLabel] = useState('');
-  const valid = allergenCodeValid(code);
-
-  async function create() {
-    const wanted = code.trim();
-    // THE MERCHANT'S OWN CODE IS THE KEY, so setting a code that already exists is an
-    // AMEND and not a create. The server refuses a null version on a row that exists,
-    // and that refusal is correct: send the version this list is showing. Without the
-    // lookup, retyping a known code to fix its label always answered
-    // OPTIMISTIC_VERSION_CONFLICT.
-    const existing = allergens.find((entry) => entry.code === wanted) || null;
-    await command.execute('inventory.allergen.set', existing ? existing.id : crypto.randomUUID(), {
-      targetVersion: existing ? existing.version : null,
-      parameters: { code: wanted, label: label.trim(), active: true },
-    });
-    setCode('');
-    setLabel('');
-    await onSaved();
-  }
-
-  return (
-    <section className="card" style={{ display: 'grid', gap: 12 }}>
-      <div>
-        <h3 style={{ margin: 0 }}>
-          <Trans>Etiquetas de alérgenos</Trans>
-        </h3>
-        <p className="muted" style={{ margin: '4px 0 0', fontSize: 12.5 }}>
-          <Trans>
-            Cada artículo toma etiquetas de esta lista. Usa minúsculas y guion bajo en el código.
-          </Trans>
-        </p>
-      </div>
-      {allergens.length === 0 ? (
-        <p className="muted" style={{ margin: 0 }}>
-          <Trans>Aún no hay etiquetas.</Trans>
-        </p>
-      ) : (
-        <div style={{ display: 'grid', gap: 8 }}>
-          {allergens.map((allergen) => (
-            <AllergenLabelRow key={allergen.id} allergen={allergen} onSaved={onSaved} />
-          ))}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          className="input"
-          style={{ flex: '0 1 160px' }}
-          value={code}
-          maxLength={40}
-          placeholder={t`Código`}
-          aria-label={t`Código de la etiqueta`}
-          onChange={(event) => setCode(event.target.value)}
-        />
-        <input
-          className="input"
-          style={{ flex: '1 1 200px' }}
-          value={label}
-          maxLength={80}
-          placeholder={t`Etiqueta`}
-          aria-label={t`Nombre de la etiqueta`}
-          onChange={(event) => setLabel(event.target.value)}
-        />
-        <button
-          className="btn btn-primary"
-          type="button"
-          disabled={command.pending || !valid || label.trim().length === 0}
-          onClick={create}
-        >
-          <Trans>Crear etiqueta</Trans>
-        </button>
-      </div>
-      {code.length > 0 && !valid ? (
-        <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-          <Trans>El código empieza con una letra y sigue con letras, números o guion bajo.</Trans>
-        </p>
-      ) : null}
-      <CommandNotice command={command} copy={ALLERGEN_ERROR_COPY} />
-    </section>
-  );
-}
-
-function AllergenLabelRow({ allergen, onSaved }) {
-  const { t, i18n } = useLingui();
-  const command = useAdministrativeCommand();
-  const [label, setLabel] = useState(allergen.label);
-  const [active, setActive] = useState(allergen.active !== false);
-  const dirty = label.trim() !== allergen.label || active !== (allergen.active !== false);
-
-  async function save() {
-    await command.execute('inventory.allergen.set', allergen.id, {
-      targetVersion: allergen.version,
-      parameters: { code: allergen.code, label: label.trim(), active },
-    });
-    await onSaved();
-  }
-
-  return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      <code style={{ fontSize: 12, minWidth: 90 }}>{allergen.code}</code>
-      <input
-        className="input"
-        style={{ flex: '1 1 200px' }}
-        value={label}
-        maxLength={80}
-        aria-label={t`Etiqueta de ${allergen.code}`}
-        onChange={(event) => setLabel(event.target.value)}
-      />
-      <Toggle checked={active} label={t`Activa`} onChange={setActive} />
-      <button
-        className="btn btn-secondary btn-sm"
-        type="button"
-        disabled={command.pending || !dirty || label.trim().length === 0}
-        onClick={save}
-      >
-        <Trans>Guardar</Trans>
-      </button>
-      {command.error ? (
-        <span style={{ color: 'var(--danger)', fontSize: 12 }}>
-          {errorText(i18n, ALLERGEN_ERROR_COPY, command.error)}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-/**
- * Unit conversions for one item. The write is an upsert on `fromUnit -> toUnit`,
- * so the form edits the existing active conversion for the pair and its version
- * becomes `targetVersion`. The first set for a pair carries null.
- */
-function ConversionsEditor({ item, flatConversions, onSaved }) {
-  const { t, i18n } = useLingui();
-  const command = useAdministrativeCommand();
-  const unitOf = (unit) => (UNIT_LABEL[unit] ? i18n._(UNIT_LABEL[unit]) : unit);
-  const conversions = useMemo(
-    () => mergeConversions(item, flatConversions),
-    [item, flatConversions],
-  );
-  const [fromUnit, setFromUnit] = useState(
-    () => UNIT_ORDER.find((unit) => unit !== item.baseUnit) || 'unit',
-  );
-  const [toUnit, setToUnit] = useState(item.baseUnit);
-  const [numerator, setNumerator] = useState('1');
-  const [denominator, setDenominator] = useState('1');
-  const [roundingPolicy, setRoundingPolicy] = useState('exact');
-
-  const draft = {
-    fromUnit,
-    toUnit,
-    numerator,
-    denominator,
-    targetScale: item.quantityScale,
-    roundingPolicy,
-  };
-  const ratio = conversionRatio(draft);
-  const preview = conversionSummary(draft, unitOf);
-  const blocked = !ratio || (!ratio.divides && roundingPolicy === 'exact');
-
-  function edit(conversion) {
-    setFromUnit(conversion.fromUnit);
-    setToUnit(conversion.toUnit);
-    setNumerator(String(conversion.numerator));
-    setDenominator(String(conversion.denominator));
-    setRoundingPolicy(conversion.roundingPolicy || 'exact');
-  }
-
-  async function save() {
-    const existing = activeConversionFor(conversions, fromUnit, toUnit);
-    await command.execute('inventory.conversion.set', item.id, {
-      targetVersion: existing?.version ?? null,
-      parameters: {
-        fromUnit,
-        toUnit,
-        numerator: Number(numerator),
-        denominator: Number(denominator),
-        targetScale: item.quantityScale,
-        roundingPolicy,
-      },
-    });
-    await onSaved();
-  }
-
-  return (
-    <section style={{ display: 'grid', gap: 10 }}>
-      <h4 style={{ margin: 0 }}>
-        <Trans>Conversiones de unidad</Trans>
-      </h4>
-      <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-        <Trans>
-          Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se
-          escribe 1 y 1000, con escala 3.
-        </Trans>
-      </p>
-      {conversions.length === 0 ? (
-        <p className="muted" style={{ margin: 0 }}>
-          <Trans>Sin conversiones.</Trans>
-        </p>
-      ) : (
-        <div style={{ display: 'grid', gap: 6 }}>
-          {conversions.map((conversion) => (
-            <div
-              key={conversion.id}
-              style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
-            >
-              <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                {conversionSummary(conversion, unitOf) || conversion.id}
-              </span>
-              <span className="sub-pill">{i18n._(ROUNDING_LABEL[conversion.roundingPolicy])}</span>
-              <button
-                className="btn-icon"
-                type="button"
-                aria-label={t`Editar la conversión de ${unitOf(conversion.fromUnit)} a ${unitOf(conversion.toUnit)}`}
-                onClick={() => edit(conversion)}
-              >
-                <I.Edit size={15} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-          <Trans>Unidad origen</Trans>
-          <Select value={fromUnit} onChange={(event) => setFromUnit(event.target.value)}>
-            {UNIT_ORDER.map((unit) => (
-              <option key={unit} value={unit}>
-                {unitOf(unit)}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-          <Trans>Unidad destino</Trans>
-          <Select value={toUnit} onChange={(event) => setToUnit(event.target.value)}>
-            {UNIT_ORDER.map((unit) => (
-              <option key={unit} value={unit}>
-                {unitOf(unit)}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12, width: 110 }}>
-          <Trans>Numerador</Trans>
-          <input
-            className="input"
-            inputMode="numeric"
-            value={numerator}
-            onChange={(event) => setNumerator(event.target.value)}
-          />
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12, width: 110 }}>
-          <Trans>Denominador</Trans>
-          <input
-            className="input"
-            inputMode="numeric"
-            value={denominator}
-            onChange={(event) => setDenominator(event.target.value)}
-          />
-        </label>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-          <Trans>Redondeo</Trans>
-          <Select
-            value={roundingPolicy}
-            onChange={(event) => setRoundingPolicy(event.target.value)}
-          >
-            {ROUNDING_ORDER.map((policy) => (
-              <option key={policy} value={policy}>
-                {i18n._(ROUNDING_LABEL[policy])}
-              </option>
-            ))}
-          </Select>
-        </label>
-      </div>
-      <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-        <Trans>Escala del artículo: {item.quantityScale} decimales.</Trans>
-      </p>
-      {preview ? (
-        <p style={{ margin: 0, fontSize: 12.5 }}>{preview}</p>
-      ) : (
-        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--danger)' }}>
-          <Trans>Escribe el numerador y el denominador como enteros positivos.</Trans>
-        </p>
-      )}
-      {ratio ? (
-        <p
-          style={{
-            margin: 0,
-            fontSize: 12.5,
-            color: ratio.divides ? 'var(--ink-2)' : 'var(--warning)',
-          }}
-        >
-          {ratio.divides ? (
-            <Trans>La conversión da unidades completas a esta escala.</Trans>
-          ) : (
-            <Trans>
-              Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo,
-              hacia arriba o al más cercano.
-            </Trans>
-          )}
-        </p>
-      ) : null}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          disabled={command.pending || blocked}
-          onClick={save}
-        >
-          <Trans>Guardar conversión</Trans>
-        </button>
-        {blocked && ratio ? (
-          <span className="muted" style={{ fontSize: 12 }}>
-            <Trans>Elige una política de redondeo para guardar.</Trans>
-          </span>
-        ) : null}
-      </div>
-      <CommandNotice command={command} copy={CONVERSION_ERROR_COPY} />
-    </section>
-  );
-}
-
-/** The labels on one item, written as a whole set: an empty set clears it. */
-function ItemAllergensEditor({ item, allergens, onSaved }) {
-  const command = useAdministrativeCommand();
-  const known = new Map();
-  for (const allergen of allergens) known.set(allergen.id, allergen);
-  for (const allergen of item.allergens || []) {
-    if (!known.has(allergen.id)) known.set(allergen.id, allergen);
-  }
-  const options = [...known.values()].filter(
-    (allergen) =>
-      allergen.active !== false || (item.allergens || []).some((a) => a.id === allergen.id),
-  );
-  const [selected, setSelected] = useState(() => new Set((item.allergens || []).map((a) => a.id)));
-  const [touched, setTouched] = useState(false);
-
-  function toggle(allergenId) {
-    setSelected((previous) => {
-      const next = new Set(previous);
-      if (next.has(allergenId)) next.delete(allergenId);
-      else next.add(allergenId);
-      return next;
-    });
-    setTouched(true);
-  }
-
-  async function save() {
-    await command.execute('inventory.item_allergen.set', item.id, {
-      targetVersion: item.version,
-      parameters: { allergenIds: [...selected] },
-    });
-    await onSaved();
-  }
-
-  return (
-    <section style={{ display: 'grid', gap: 10 }}>
-      <h4 style={{ margin: 0 }}>
-        <Trans>Alérgenos</Trans>
-      </h4>
-      <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-        <Trans>El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos.</Trans>
-      </p>
-      {options.length === 0 ? (
-        <p className="muted" style={{ margin: 0 }}>
-          <Trans>Crea primero una etiqueta de alérgeno en la lista.</Trans>
-        </p>
-      ) : (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {options.map((allergen) => (
-            <label key={allergen.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input
-                type="checkbox"
-                checked={selected.has(allergen.id)}
-                onChange={() => toggle(allergen.id)}
-              />
-              <span>{allergen.label}</span>
-            </label>
-          ))}
-        </div>
-      )}
-      <div>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          disabled={
-            command.pending || (!touched && selected.size === (item.allergens || []).length)
-          }
-          onClick={save}
-        >
-          <Trans>Guardar alérgenos</Trans>
-        </button>
-      </div>
-      <CommandNotice command={command} copy={ALLERGEN_ERROR_COPY} />
-    </section>
-  );
-}
-
-/**
- * The item editor, following the product editor in operations-workspace.jsx: one
- * modal, the id decided once at open, and `command.execute` for every write.
- */
-function ItemEditor({ item, itemId, flatConversions, allergens, onClose, onSaved }) {
-  const { t, i18n } = useLingui();
-  const command = useAdministrativeCommand();
-  const editing = Boolean(item);
-  const [publicReference, setPublicReference] = useState(item?.publicReference || '');
-  const [displayName, setDisplayName] = useState(item?.displayName || '');
-  const [itemType, setItemType] = useState(item?.itemType || 'ingredient');
-  const [baseUnit, setBaseUnit] = useState(item?.baseUnit || 'unit');
-  const [quantityScale, setQuantityScale] = useState(String(item?.quantityScale ?? 0));
-  const [trackingPolicy, setTrackingPolicy] = useState(item?.trackingPolicy || 'tracked');
-  const [negativeStockPolicy, setNegativeStockPolicy] = useState(
-    item?.negativeStockPolicy || 'block',
-  );
-  const [lowStockThreshold, setLowStockThreshold] = useState(
-    item?.lowStockThreshold == null ? '' : String(item.lowStockThreshold),
-  );
-  const [shelfLifeDays, setShelfLifeDays] = useState(
-    item?.shelfLifeDays == null ? '' : String(item.shelfLifeDays),
-  );
-  // PAR is what the kitchen wants on hand. It is not the low-stock threshold: that one
-  // is a purchase alarm, this one is what the prep list subtracts from (§8.4).
-  const [parQuantity, setParQuantity] = useState(
-    item?.parQuantity == null ? '' : String(item.parQuantity),
-  );
-  const [referenceError, setReferenceError] = useState(null);
-  const [confirmArchive, setConfirmArchive] = useState(false);
-
-  const unitOf = (unit) => (UNIT_LABEL[unit] ? i18n._(UNIT_LABEL[unit]) : unit);
-  const referenceValid = /^[A-Za-z0-9._:-]{1,80}$/.test(publicReference.trim());
-
-  async function save() {
-    setReferenceError(null);
-    const optionalThreshold = lowStockThreshold === '' ? null : Number(lowStockThreshold);
-    const optionalShelfLife = shelfLifeDays === '' ? null : Number(shelfLifeDays);
-    const optionalPar = parQuantity === '' ? null : Number(parQuantity);
-    const parameters = editing
-      ? {
-          displayName: displayName.trim(),
-          lowStockThreshold: optionalThreshold,
-          shelfLifeDays: optionalShelfLife,
-          parQuantity: optionalPar,
-          trackingPolicy,
-          negativeStockPolicy,
-        }
-      : {
-          publicReference: publicReference.trim(),
-          displayName: displayName.trim(),
-          itemType,
-          baseUnit,
-          quantityScale: Number(quantityScale),
-          trackingPolicy,
-          negativeStockPolicy,
-          lowStockThreshold: optionalThreshold,
-          shelfLifeDays: optionalShelfLife,
-          parQuantity: optionalPar,
-        };
-    try {
-      await command.execute(editing ? 'inventory.item.update' : 'inventory.item.create', itemId, {
-        targetVersion: editing ? item.version : null,
-        parameters,
-      });
-      await onSaved();
-    } catch (error) {
-      if (error?.code === 'INVENTORY_ITEM_REFERENCE_TAKEN') {
-        setReferenceError(i18n._(ITEM_ERROR_COPY.INVENTORY_ITEM_REFERENCE_TAKEN));
-      }
-    }
-  }
-
-  async function archive() {
-    await command.execute('inventory.item.archive', itemId, {
-      targetVersion: item.version,
-      parameters: {},
-    });
-    await onSaved();
-  }
-
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <section
-        className="card modal-card"
-        role="dialog"
-        aria-modal="true"
-        aria-label={editing ? t`Editar artículo` : t`Nuevo artículo`}
-        style={{
-          width: 'min(720px, 94vw)',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'grid',
-          gap: 16,
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <h3 style={{ margin: 0 }}>
-            {editing ? <Trans>Editar artículo</Trans> : <Trans>Nuevo artículo</Trans>}
-          </h3>
-          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
-            <I.X size={16} />
-          </button>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-            gap: 12,
-          }}
-        >
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Referencia</Trans>
-            <input
-              className="input"
-              value={publicReference}
-              maxLength={80}
-              disabled={editing}
-              onChange={(event) => {
-                setPublicReference(event.target.value);
-                if (referenceError) setReferenceError(null);
-              }}
-            />
-            {!editing ? (
-              <span className="muted" style={{ fontSize: 11.5 }}>
-                <Trans>La API rechaza una referencia repetida.</Trans>
-              </span>
-            ) : null}
-            {referenceError ? (
-              <span style={{ color: 'var(--danger)', fontSize: 11.5 }}>{referenceError}</span>
-            ) : null}
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Nombre</Trans>
-            <input
-              className="input"
-              value={displayName}
-              maxLength={160}
-              onChange={(event) => setDisplayName(event.target.value)}
-            />
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Tipo</Trans>
-            <Select
-              value={itemType}
-              disabled={editing}
-              onChange={(event) => setItemType(event.target.value)}
-            >
-              {ITEM_TYPE_ORDER.map((type) => (
-                <option key={type} value={type}>
-                  {i18n._(ITEM_TYPE_LABEL[type])}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Unidad base</Trans>
-            <Select
-              value={baseUnit}
-              disabled={editing}
-              onChange={(event) => setBaseUnit(event.target.value)}
-            >
-              {UNIT_ORDER.map((unit) => (
-                <option key={unit} value={unit}>
-                  {unitOf(unit)}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Decimales de cantidad</Trans>
-            <Select
-              value={quantityScale}
-              disabled={editing}
-              onChange={(event) => setQuantityScale(event.target.value)}
-            >
-              {[0, 1, 2, 3, 4, 5, 6].map((value) => (
-                <option key={value} value={String(value)}>
-                  {value}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Política de inventario</Trans>
-            <Select
-              value={trackingPolicy}
-              onChange={(event) => setTrackingPolicy(event.target.value)}
-            >
-              {TRACKING_ORDER.map((policy) => (
-                <option key={policy} value={policy}>
-                  {i18n._(TRACKING_LABEL[policy])}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Existencia negativa</Trans>
-            <Select
-              value={negativeStockPolicy}
-              onChange={(event) => setNegativeStockPolicy(event.target.value)}
-            >
-              {NEGATIVE_ORDER.map((policy) => (
-                <option key={policy} value={policy}>
-                  {i18n._(NEGATIVE_LABEL[policy])}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Umbral de stock bajo</Trans>
-            <input
-              className="input"
-              inputMode="numeric"
-              value={lowStockThreshold}
-              placeholder={t`Sin umbral`}
-              onChange={(event) => setLowStockThreshold(event.target.value)}
-            />
-            <span className="muted" style={{ fontSize: 11.5 }}>
-              <Trans>En la escala del artículo. 0 se guarda como un umbral real.</Trans>
-            </span>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Vida útil en días</Trans>
-            <input
-              className="input"
-              inputMode="numeric"
-              value={shelfLifeDays}
-              placeholder={t`Sin vida útil`}
-              onChange={(event) => setShelfLifeDays(event.target.value)}
-            />
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <Trans>Par de preparación</Trans>
-            <input
-              className="input"
-              inputMode="numeric"
-              value={parQuantity}
-              placeholder={t`Sin par`}
-              onChange={(event) => setParQuantity(event.target.value)}
-            />
-            <span className="muted" style={{ fontSize: 11.5 }}>
-              <Trans>En la escala del artículo. La lista de preparación lo resta.</Trans>
-            </span>
-          </label>
-        </div>
-
-        {editing ? (
-          <>
-            <ConversionsEditor item={item} flatConversions={flatConversions} onSaved={onSaved} />
-            <ItemAllergensEditor item={item} allergens={allergens} onSaved={onSaved} />
-          </>
-        ) : (
-          <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
-            <Trans>Guarda el artículo para agregar conversiones y alérgenos.</Trans>
-          </p>
-        )}
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button
-            className="btn btn-primary"
-            type="button"
-            disabled={
-              command.pending || displayName.trim().length === 0 || (!editing && !referenceValid)
-            }
-            onClick={save}
-          >
-            <Trans>Guardar</Trans>
-          </button>
-          {editing && item.active !== false ? (
-            confirmArchive ? (
-              <>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={command.pending}
-                  onClick={archive}
-                >
-                  <Trans>Confirmar archivo</Trans>
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  onClick={() => setConfirmArchive(false)}
-                >
-                  <Trans>Cancelar</Trans>
-                </button>
-              </>
-            ) : (
-              <button
-                className="btn btn-secondary"
-                type="button"
-                disabled={command.pending}
-                onClick={() => setConfirmArchive(true)}
-              >
-                <Trans>Archivar</Trans>
-              </button>
-            )
-          ) : null}
-          <span className="muted" style={{ fontSize: 11.5 }}>
-            <Trans>La vida útil y el umbral se guardan en la escala del artículo.</Trans>
-          </span>
-        </div>
-
-        <CommandNotice
-          command={command}
-          copy={ITEM_ERROR_COPY}
-          suppress={Boolean(referenceError)}
-        />
-      </section>
-    </div>
-  );
-}
 
 export default function InventoryWorkspace() {
   const { t, i18n } = useLingui();
   const merchant = useMerchant();
+  const command = useAdministrativeCommand();
   const capabilities = merchant?.capabilities || null;
   const canManage = hasRequiredPermission(MANAGE_GATE, capabilities);
-  const [refresh, setRefresh] = useState(0);
-  const [showArchived, setShowArchived] = useState(false);
-  const [onlyCosted, setOnlyCosted] = useState(false);
-  const [query, setQuery] = useState('');
-  const [editor, setEditor] = useState(null);
 
-  const itemsState = useInventoryItems({ includeArchived: showArchived }, refresh);
+  const [refresh, setRefresh] = useState(0);
+  const [view, setView] = useState('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [selection, setSelection] = useState(() => new Set());
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const [panelItem, setPanelItem] = useState(null);
+  const [editor, setEditor] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [adjustItem, setAdjustItem] = useState(null);
+  const [countOpen, setCountOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [filters, setFilters] = useState({ type: '', tracking: '' });
+  const [notice, setNotice] = useState('');
+
+  const searchRef = useRef(null);
+  const rowRefs = useRef([]);
+
+  const itemsState = useInventoryItems({ includeArchived: view === 'archived' }, refresh);
   const conversionsState = useInventoryUnitConversions(refresh);
   const allergensState = useInventoryAllergens(refresh);
 
@@ -938,24 +130,206 @@ export default function InventoryWorkspace() {
     () => new Set(itemsState.data.costedIds || []),
     [itemsState.data.costedIds],
   );
-  const items = useMemo(() => {
-    const filtered = filterItems(itemsState.data.items, {
-      query,
-      includeArchived: showArchived,
+
+  const items = useMemo(
+    () => (Array.isArray(itemsState.data.items) ? itemsState.data.items : []),
+    [itemsState.data.items],
+  );
+
+  /** One pass for the chip counts. The chips and the rows must agree, so both read this. */
+  const counts = useMemo(
+    () => viewCounts(items, locationId, costedIds),
+    [items, locationId, costedIds],
+  );
+
+  const attention = useMemo(
+    () => attentionQueue(counts).map((entry) => ({ ...entry, count: entry.count })),
+    [counts],
+  );
+
+  const allSignals = useMemo(() => {
+    const map = new Map();
+    for (const item of items) map.set(item.id, itemSignals(item, locationId, costedIds));
+    return map;
+  }, [items, locationId, costedIds]);
+
+  const viewRows = useMemo(() => {
+    const rows = filterByView(items, view, locationId, costedIds, { query });
+    const typed = rows.filter((item) => {
+      if (filters.type && item.itemType !== filters.type) return false;
+      if (filters.tracking && item.trackingPolicy !== filters.tracking) return false;
+      return true;
     });
-    return sortItems(onlyCosted ? filtered.filter((item) => costedIds.has(item.id)) : filtered);
-  }, [itemsState.data.items, query, showArchived, onlyCosted, costedIds]);
+    return sortItems(typed);
+  }, [items, view, locationId, costedIds, query, filters]);
 
-  async function reload() {
+  /** The attention views read worst-first. The default list keeps the name order. */
+  const orderedRows = useMemo(() => {
+    if (view === 'low_stock' || view === 'no_balance') {
+      return sortByUrgency(viewRows, locationId, costedIds);
+    }
+    return viewRows;
+  }, [viewRows, view, locationId, costedIds]);
+
+  const slice = useMemo(() => paginate(orderedRows, page, PAGE_SIZE), [orderedRows, page]);
+
+  /**
+   * A change of view or of filter starts the list again at the first page, and the
+   * selection does not survive it: a person who selects rows and then narrows the
+   * view must not archive a row that is no longer on screen. The reset lives in the
+   * handlers rather than in an effect, so the screen never renders the stale page
+   * first.
+   */
+  const restartList = useCallback(() => {
+    setPage(0);
+    setSelection(new Set());
+    setFocusIndex(-1);
+  }, []);
+
+  const changeView = useCallback(
+    (next) => {
+      setView(next);
+      restartList();
+    },
+    [restartList],
+  );
+
+  const activeFilterCount = Number(Boolean(filters.type)) + Number(Boolean(filters.tracking));
+
+  const reload = useCallback(async () => {
+    setPanelItem(null);
     setEditor(null);
+    setAdjustItem(null);
     setRefresh((value) => value + 1);
-  }
+  }, []);
 
-  // The allergens panel saves the label set without closing anything, so it keeps
-  // this workspace mounted and just re-reads.
-  async function reloadAllergens() {
-    setRefresh((value) => value + 1);
-  }
+  const openPanel = useCallback((item) => {
+    setPanelItem(item);
+  }, []);
+
+  /** The row's own verb. Each need opens the smallest surface that answers it. */
+  const runNeed = useCallback(
+    (need, item) => {
+      if (need === 'set_cost') window.location.assign('/inventory/costos');
+      else if (need === 'count') setCountOpen(true);
+      else if (need === 'enable_tracking') setEditor({ item, id: item.id });
+      else openPanel(item);
+    },
+    [openPanel],
+  );
+
+  const toggleSelect = useCallback((id) => {
+    setSelection((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelection(new Set()), []);
+
+  /**
+   * A bulk write runs one command per item, because `inventory.item.update` takes an
+   * aggregate id and its own expected version. The loop reports how many landed.
+   */
+  const runBulkUpdate = useCallback(
+    async (parameters, doneMessage) => {
+      const chosen = items.filter((item) => selection.has(item.id));
+      let done = 0;
+      for (const item of chosen) {
+        try {
+          await command.execute('inventory.item.update', item.id, {
+            targetVersion: item.version,
+            parameters,
+          });
+          done += 1;
+        } catch {
+          // One refusal must not stop the rest. The notice names the split.
+        }
+      }
+      setNotice(doneMessage(done, chosen.length));
+      clearSelection();
+      await reload();
+    },
+    [items, selection, command, clearSelection, reload],
+  );
+
+  // Keyboard: the workspace answers the keys a dense tool must answer (plan D12).
+  useEffect(() => {
+    if (!canManage) return undefined;
+    function onKey(event) {
+      const target = event.target;
+      const typing =
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      /**
+       * Escape closes the TOP layer, in the order the layers stack. Without the
+       * order, Escape on the palette would clear a selection behind the backdrop
+       * and leave the panel open — which is what the browser run caught. This
+       * branch sits ABOVE the typing guard on purpose: the palette autofocuses its
+       * own input, so the guard would swallow the key the palette needs.
+       */
+      if (event.key === 'Escape') {
+        if (paletteOpen) {
+          setPaletteOpen(false);
+          return;
+        }
+        if (filtersOpen) {
+          setFiltersOpen(false);
+          return;
+        }
+        if (adjustItem) {
+          setAdjustItem(null);
+          return;
+        }
+        if (countOpen) {
+          setCountOpen(false);
+          return;
+        }
+        if (editor) {
+          setEditor(null);
+          return;
+        }
+        clearSelection();
+        return;
+      }
+      if (typing) return;
+      if (event.key === '/') {
+        event.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      setFocusIndex((current) => {
+        const size = slice.rows.length;
+        if (size === 0) return -1;
+        const next =
+          event.key === 'ArrowDown'
+            ? Math.min(size - 1, current + 1)
+            : Math.max(0, current <= 0 ? 0 : current - 1);
+        rowRefs.current[next]?.focus();
+        return next;
+      });
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [
+    canManage,
+    slice.rows.length,
+    clearSelection,
+    paletteOpen,
+    filtersOpen,
+    adjustItem,
+    countOpen,
+    editor,
+  ]);
 
   if (merchant?.loading && !capabilities) {
     return (
@@ -966,177 +340,482 @@ export default function InventoryWorkspace() {
   }
   if (!canManage) return <NoPermissionNotice />;
 
+  const loading = itemsState.loading && !itemsState.loaded;
+  const failed = Boolean(itemsState.error);
+  const filteredEmpty =
+    !loading &&
+    !failed &&
+    orderedRows.length === 0 &&
+    (query || activeFilterCount > 0 || view !== 'all');
+  const empty = !loading && !failed && orderedRows.length === 0 && !filteredEmpty;
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div
-        style={{
-          display: 'flex',
-          gap: 12,
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            className="input"
-            style={{ flex: '0 1 220px' }}
-            value={query}
-            placeholder={t`Buscar artículo`}
-            aria-label={t`Buscar artículo`}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <Toggle checked={showArchived} label={t`Mostrar archivados`} onChange={setShowArchived} />
-          <Toggle checked={onlyCosted} label={t`Solo con costo`} onChange={setOnlyCosted} />
-        </div>
-        <button
-          className="btn btn-primary"
-          type="button"
-          onClick={() => setEditor({ item: null, id: crypto.randomUUID() })}
-        >
-          <I.Plus size={16} />
-          <Trans>Nuevo artículo</Trans>
+      {/* ---------- 1. the task rail ---------- */}
+      <div className="inv-tiles">
+        <button type="button" className="inv-tile" onClick={() => setCountOpen(true)}>
+          <span className="inv-tile-icon">
+            <I.ClipboardList size={18} />
+          </span>
+          <span>
+            <span className="inv-tile-title">
+              <Trans>Contar stock</Trans>
+            </span>
+            <span className="inv-tile-note">
+              <Trans>Elige las áreas y cuenta artículo por artículo</Trans>
+            </span>
+          </span>
         </button>
+        <button type="button" className="inv-tile" onClick={() => changeView('no_balance')}>
+          <span className="inv-tile-icon">
+            <I.PackagePlus size={18} />
+          </span>
+          <span>
+            <span className="inv-tile-title">
+              <Trans>Revisar existencia</Trans>
+            </span>
+            <span className="inv-tile-note">
+              {t`${counts.no_balance} artículos sin existencia en ${locationName}`}
+            </span>
+          </span>
+        </button>
+        {/*
+          The rail holds the two JOBS and nothing else. "New item" is the list's own
+          primary, and a second copy here would be two identical primary actions on
+          one screen — the browser run showed both at once. A rail of two also
+          stretches to the full width, which reads as the band it is.
+        */}
       </div>
 
-      {itemsState.loading && !itemsState.loaded ? (
-        <p className="muted">
-          <Trans>Cargando el inventario…</Trans>
-        </p>
-      ) : itemsState.error ? (
-        <p style={{ color: 'var(--danger)' }}>
-          {errorText(i18n, ITEM_ERROR_COPY, {
-            code: itemsState.errorCode,
-            message: itemsState.error,
-          })}
-        </p>
-      ) : items.length === 0 ? (
-        <p className="muted">
-          <Trans>Aún no hay artículos. Crea el primero.</Trans>
-        </p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                <th scope="col" style={HEAD}>
-                  <Trans>Artículo</Trans>
-                </th>
-                <th scope="col" style={HEAD}>
-                  <Trans>Tipo</Trans>
-                </th>
-                <th scope="col" style={HEAD}>
-                  <Trans>Unidad base</Trans>
-                </th>
-                <th scope="col" style={HEAD}>
-                  <Trans>Inventario</Trans>
-                </th>
-                <th scope="col" style={{ ...HEAD, textAlign: 'right' }}>
-                  {i18n._(msg`Existencia · ${locationName}`)}
-                </th>
-                <th scope="col" style={HEAD}>
-                  <Trans>Vida útil</Trans>
-                </th>
-                <th scope="col" style={HEAD}>
-                  <Trans>Umbral bajo</Trans>
-                </th>
-                <th scope="col" style={HEAD}>
-                  <Trans>Acciones</Trans>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const onHand = onHandDisplay(item, locationId);
-                return (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--line)' }}>
-                    <td style={CELL}>
-                      <div style={{ display: 'grid', gap: 3 }}>
-                        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <strong style={{ fontWeight: 600 }}>{item.displayName}</strong>
-                          {item.active === false ? (
-                            <span className="sub-pill">
-                              <Trans>Archivado</Trans>
-                            </span>
-                          ) : null}
-                          {!costedIds.has(item.id) ? <SinCosto /> : null}
-                        </span>
-                        <span className="muted" style={{ fontSize: 11.5 }}>
-                          {item.publicReference}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={CELL}>
-                      {ITEM_TYPE_LABEL[item.itemType]
-                        ? i18n._(ITEM_TYPE_LABEL[item.itemType])
-                        : item.itemType}
-                    </td>
-                    <td style={CELL}>
-                      {UNIT_LABEL[item.baseUnit]
-                        ? i18n._(UNIT_LABEL[item.baseUnit])
-                        : item.baseUnit}
-                    </td>
-                    <td style={CELL}>
-                      {TRACKING_LABEL[item.trackingPolicy]
-                        ? i18n._(TRACKING_LABEL[item.trackingPolicy])
-                        : item.trackingPolicy}
-                    </td>
-                    <td style={{ ...CELL, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {onHand.state === 'empty' ? (
-                        <span className="muted">
-                          <Trans>Sin registro</Trans>
-                        </span>
-                      ) : onHand.state === 'not_tracked' ? (
-                        <span className="muted">
-                          <Trans>No se cuenta</Trans>
-                        </span>
-                      ) : (
-                        <>
-                          {onHand.text}{' '}
-                          {UNIT_LABEL[item.baseUnit]
-                            ? i18n._(UNIT_LABEL[item.baseUnit])
-                            : item.baseUnit}
-                        </>
-                      )}
-                    </td>
-                    <td style={CELL}>
-                      {optionalText(
-                        item.shelfLifeDays,
-                        (value) => t`${value} días`,
-                        t`Sin vida útil`,
-                      )}
-                    </td>
-                    <td style={CELL}>
-                      {optionalText(
-                        item.lowStockThreshold,
-                        (value) =>
-                          `${formatScaled(value, item.quantityScale)} ${
-                            UNIT_LABEL[item.baseUnit]
-                              ? i18n._(UNIT_LABEL[item.baseUnit])
-                              : item.baseUnit
-                          }`,
-                        t`Sin umbral`,
-                      )}
-                    </td>
-                    <td style={CELL}>
-                      <button
-                        className="btn-icon"
-                        type="button"
-                        aria-label={t`Editar ${item.displayName}`}
-                        onClick={() => setEditor({ item, id: item.id })}
-                      >
-                        <I.Edit size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      {/* ---------- 2. the attention queue ---------- */}
+      {attention.length > 0 ? (
+        <div style={{ display: 'grid', gap: 8 }}>
+          <span className="inv-band-title">
+            <Trans>Necesita tu atención</Trans>
+          </span>
+          <div className="inv-attention">
+            {attention.map((entry) => (
+              <div key={entry.key} className="inv-attention-row">
+                <span className="inv-attention-text">
+                  <span
+                    className="inv-dot"
+                    data-state={
+                      entry.key === 'no_cost'
+                        ? 'unknown'
+                        : entry.key === 'low_stock'
+                          ? 'low'
+                          : 'unknown'
+                    }
+                    aria-hidden="true"
+                  />
+                  {entry.key === 'no_balance' ? (
+                    <Trans>{entry.count} artículos sin existencia registrada</Trans>
+                  ) : entry.key === 'low_stock' ? (
+                    <Trans>{entry.count} artículos en o bajo el umbral</Trans>
+                  ) : (
+                    <Trans>{entry.count} artículos sin costo</Trans>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => changeView(entry.view)}
+                >
+                  {entry.key === 'no_cost' ? (
+                    <Trans>Ver sin costo</Trans>
+                  ) : entry.key === 'low_stock' ? (
+                    <Trans>Ver bajo stock</Trans>
+                  ) : (
+                    <Trans>Ver sin existencia</Trans>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      ) : null}
 
-      <AllergenLabelsPanel allergens={allergensState.data.allergens} onSaved={reloadAllergens} />
+      {/* ---------- 3. the resource list ---------- */}
+      <div className="inv-split" data-panel={panelItem ? 'open' : 'closed'}>
+        <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div className="inv-views" role="tablist" aria-label={t`Vistas de inventario`}>
+              {VIEW_KEYS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === key}
+                  className="inv-view"
+                  onClick={() => changeView(key)}
+                >
+                  {i18n._(VIEW_LABEL[key])}
+                  <span className="inv-view-count">{counts[key]}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                ref={searchRef}
+                className="input"
+                style={{ width: 220 }}
+                value={query}
+                placeholder={t`Buscar artículo`}
+                aria-label={t`Buscar artículo`}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  restartList();
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setFiltersOpen(true)}
+              >
+                <I.Filter size={16} />
+                <Trans>Filtros</Trans>
+                {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setPaletteOpen(true)}
+                aria-label={t`Abrir comandos`}
+                title={t`Comandos (Ctrl+K)`}
+              >
+                <I.Command size={16} />
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setEditor({ item: null, id: crypto.randomUUID() })}
+              >
+                <I.Plus size={16} />
+                <Trans>Nuevo artículo</Trans>
+              </button>
+            </div>
+          </div>
+
+          {notice ? (
+            <p className="muted" style={{ margin: 0 }}>
+              {notice}
+            </p>
+          ) : null}
+
+          {selection.size > 0 ? (
+            <div className="inv-bulkbar">
+              <span className="inv-bulkbar-count">
+                <Trans>{selection.size} seleccionados</Trans>
+              </span>
+              <span className="inv-bulkbar-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() =>
+                    runBulkUpdate(
+                      { trackingPolicy: 'tracked' },
+                      (done, total) => t`${done} de ${total} artículos ahora se cuentan`,
+                    )
+                  }
+                >
+                  <Trans>Activar conteo</Trans>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() =>
+                    runBulkUpdate(
+                      { negativeStockPolicy: 'block' },
+                      (done, total) => t`${done} de ${total} artículos ya no permiten negativos`,
+                    )
+                  }
+                >
+                  <Trans>Bloquear negativos</Trans>
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={clearSelection}>
+                  <Trans>Limpiar</Trans>
+                </button>
+              </span>
+            </div>
+          ) : null}
+
+          {loading ? (
+            <div className="inv-skeleton" aria-busy="true" aria-label={t`Cargando el inventario`}>
+              {Array.from({ length: 8 }, (unused, index) => (
+                <div key={index} className="inv-skeleton-row" />
+              ))}
+            </div>
+          ) : failed ? (
+            <div className="inv-state">
+              <I.AlertTriangle size={22} />
+              <span className="inv-state-title">
+                <Trans>No se pudo leer el inventario</Trans>
+              </span>
+              <span className="inv-state-note">
+                {errorText(i18n, ITEM_ERROR_COPY, {
+                  code: itemsState.errorCode,
+                  message: itemsState.error,
+                })}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setRefresh((value) => value + 1)}
+              >
+                <Trans>Reintentar</Trans>
+              </button>
+            </div>
+          ) : empty ? (
+            <div className="inv-state">
+              <I.Package size={22} />
+              <span className="inv-state-title">
+                <Trans>Aún no hay artículos</Trans>
+              </span>
+              <span className="inv-state-note">
+                <Trans>Crea el primer insumo para empezar a controlar la existencia.</Trans>
+              </span>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setEditor({ item: null, id: crypto.randomUUID() })}
+              >
+                <I.Plus size={16} />
+                <Trans>Crear artículo</Trans>
+              </button>
+            </div>
+          ) : filteredEmpty ? (
+            <div className="inv-state">
+              <I.Search size={22} />
+              <span className="inv-state-title">
+                <Trans>Ningún artículo coincide</Trans>
+              </span>
+              <span className="inv-state-note">
+                <Trans>Cambia la vista o quita la búsqueda para ver más artículos.</Trans>
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setQuery('');
+                  setFilters({ type: '', tracking: '' });
+                  setView('all');
+                  restartList();
+                }}
+              >
+                <Trans>Limpiar filtros</Trans>
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="inv-list">
+                {slice.rows.map((item, index) => {
+                  const signals = allSignals.get(item.id);
+                  const need = rowActionFor(signals);
+                  const onHand = signals.onHand;
+                  const unit = UNIT_LABEL[item.baseUnit]
+                    ? i18n._(UNIT_LABEL[item.baseUnit])
+                    : item.baseUnit;
+                  const selected = selection.has(item.id);
+                  const menuItems = [
+                    {
+                      key: 'select',
+                      label: t`Seleccionar`,
+                      icon: I.Check,
+                      onSelect: () => toggleSelect(item.id),
+                    },
+                    {
+                      key: 'open',
+                      label: t`Ver detalle`,
+                      icon: I.Eye,
+                      onSelect: () => openPanel(item),
+                    },
+                    {
+                      key: 'adjust',
+                      label: t`Ajustar existencia`,
+                      icon: I.SlidersHorizontal,
+                      onSelect: () => setAdjustItem(item),
+                    },
+                    {
+                      key: 'edit',
+                      label: t`Editar artículo`,
+                      icon: I.Edit,
+                      onSelect: () => setEditor({ item, id: item.id }),
+                    },
+                    {
+                      key: 'archive',
+                      label: t`Archivar`,
+                      icon: I.Archive,
+                      danger: true,
+                      onSelect: () => setPanelItem(item),
+                    },
+                  ];
+                  return (
+                    <div
+                      key={item.id}
+                      className="inv-row"
+                      data-selected={selected}
+                      data-needs={Boolean(need)}
+                      role="row"
+                      /**
+                       * A roving tabindex needs exactly ONE row in the tab order.
+                       * `focusIndex` starts at -1, so the first row takes the 0 and
+                       * the arrow keys move it from there. Without the fallback no
+                       * row is reachable by Tab at all — which the browser run
+                       * caught.
+                       */
+                      tabIndex={index === (focusIndex === -1 ? 0 : focusIndex) ? 0 : -1}
+                      ref={(node) => {
+                        rowRefs.current[index] = node;
+                      }}
+                      onClick={(event) => {
+                        if (event.target.closest('button')) return;
+                        // Once a selection is open, the whole row is a checkbox. The
+                        // person is in a batch, and a row click must not open a panel
+                        // over the work.
+                        if (selection.size > 0) {
+                          toggleSelect(item.id);
+                          return;
+                        }
+                        openPanel(item);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          if (selection.size > 0) toggleSelect(item.id);
+                          else openPanel(item);
+                        }
+                        if (event.key === 'x' || event.key === 'X') toggleSelect(item.id);
+                      }}
+                    >
+                      <span
+                        className="inv-dot"
+                        data-state={signals.stockState}
+                        aria-hidden="true"
+                      />
+                      <span className="inv-row-main">
+                        <span className="inv-row-name">{item.displayName}</span>
+                        <span className="inv-row-meta">
+                          {item.publicReference}
+                          <span>·</span>
+                          {ITEM_TYPE_LABEL[item.itemType]
+                            ? i18n._(ITEM_TYPE_LABEL[item.itemType])
+                            : item.itemType}
+                          <span>·</span>
+                          {TRACKING_LABEL[item.trackingPolicy]
+                            ? i18n._(TRACKING_LABEL[item.trackingPolicy])
+                            : item.trackingPolicy}
+                          {!signals.hasCost ? <SinCosto /> : null}
+                        </span>
+                      </span>
+                      <span className="inv-row-value">
+                        <span className="inv-row-figure">
+                          {onHand.state === 'empty' ? '—' : onHand.text}
+                          {onHand.state === 'empty' ? null : ` ${unit}`}
+                        </span>
+                        <span className="inv-row-note">
+                          {i18n._(STATE_COPY[signals.stockState])}
+                          {signals.threshold != null ? ` · ${t`umbral`} ${signals.threshold}` : ''}
+                        </span>
+                      </span>
+                      <span className="inv-row-action" style={{ display: 'flex', gap: 4 }}>
+                        {/*
+                          The batch rule, from Carbon: once a row is selected, the
+                          row's own controls step aside for the batch action bar, so
+                          the person acts on the SET and not on one row by mistake.
+                        */}
+                        {selection.size > 0 ? null : need ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => runNeed(need, item)}
+                          >
+                            {(() => {
+                              const Glyph = NEED_COPY[need] || I.Eye;
+                              return <Glyph size={15} />;
+                            })()}
+                            {NEED_LABEL[need] ? i18n._(NEED_LABEL[need]) : need}
+                          </button>
+                        ) : null}
+                        {selection.size > 0 ? null : (
+                          <Menu
+                            align="end"
+                            label={t`Acciones de ${item.displayName}`}
+                            items={menuItems}
+                            renderTrigger={({ ref, props }) => (
+                              <button
+                                type="button"
+                                ref={ref}
+                                className="btn btn-ghost btn-sm"
+                                aria-label={t`Acciones de ${item.displayName}`}
+                                {...props}
+                              >
+                                <I.MoreH size={16} />
+                              </button>
+                            )}
+                          />
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="inv-foot">
+                <span>{t`${slice.from}–${slice.to} de ${slice.total}`}</span>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={slice.page === 0}
+                    onClick={() => setPage(slice.page - 1)}
+                  >
+                    <Trans>Anterior</Trans>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={slice.page >= slice.pages - 1}
+                    onClick={() => setPage(slice.page + 1)}
+                  >
+                    <Trans>Siguiente</Trans>
+                  </button>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {panelItem ? (
+          <InventoryItemPanel
+            item={panelItem}
+            signals={allSignals.get(panelItem.id) || itemSignals(panelItem, locationId, costedIds)}
+            unit={
+              UNIT_LABEL[panelItem.baseUnit]
+                ? i18n._(UNIT_LABEL[panelItem.baseUnit])
+                : panelItem.baseUnit
+            }
+            conversions={conversionsState.data.items}
+            allergens={allergensState.data.allergens}
+            onClose={() => setPanelItem(null)}
+            onEdit={() => setEditor({ item: panelItem, id: panelItem.id })}
+            onAdjust={() => setAdjustItem(panelItem)}
+            onCount={() => setCountOpen(true)}
+            onArchived={async () => {
+              setNotice(t`Artículo archivado`);
+              await reload();
+            }}
+          />
+        ) : null}
+      </div>
+
+      <AllergenLabelsPanel allergens={allergensState.data.allergens} onSaved={reload} />
 
       {editor ? (
         <ItemEditor
@@ -1148,6 +827,172 @@ export default function InventoryWorkspace() {
           onSaved={reload}
         />
       ) : null}
+
+      {adjustItem ? (
+        <InventoryAdjustSheet
+          item={adjustItem}
+          locationId={locationId}
+          onClose={() => setAdjustItem(null)}
+          onDone={reload}
+        />
+      ) : null}
+
+      {countOpen ? (
+        <InventoryCount
+          locationId={locationId}
+          onClose={() => setCountOpen(false)}
+          onDone={reload}
+        />
+      ) : null}
+
+      {filtersOpen ? (
+        <InventoryFilters
+          value={filters}
+          onApply={(next) => {
+            setFilters(next);
+            restartList();
+            setFiltersOpen(false);
+          }}
+          onClose={() => setFiltersOpen(false)}
+        />
+      ) : null}
+
+      {paletteOpen ? (
+        <CommandPalette
+          rows={orderedRows.slice(0, 40)}
+          onClose={() => setPaletteOpen(false)}
+          onOpenItem={(item) => {
+            setPaletteOpen(false);
+            openPanel(item);
+          }}
+          onCommand={(key) => {
+            setPaletteOpen(false);
+            if (key === 'count') setCountOpen(true);
+            else if (key === 'new') setEditor({ item: null, id: crypto.randomUUID() });
+            else if (key === 'low') changeView('low_stock');
+            else if (key === 'nocost') changeView('no_cost');
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The command palette. It answers one question: "take me to the thing". It lists
+ * the three tasks and the items in the current view, and it filters on the name.
+ */
+function CommandPalette({ rows, onClose, onOpenItem, onCommand }) {
+  const { t } = useLingui();
+  const [term, setTerm] = useState('');
+  const [index, setIndex] = useState(0);
+  const needle = term.trim().toLowerCase();
+  const matches = rows.filter(
+    (item) =>
+      !needle ||
+      String(item.displayName || '')
+        .toLowerCase()
+        .includes(needle) ||
+      String(item.publicReference || '')
+        .toLowerCase()
+        .includes(needle),
+  );
+  const commands = [
+    { key: 'count', label: t`Contar stock` },
+    { key: 'new', label: t`Nuevo artículo` },
+    { key: 'low', label: t`Ver bajo stock` },
+    { key: 'nocost', label: t`Ver sin costo` },
+  ].filter((entry) => !needle || entry.label.toLowerCase().includes(needle));
+  const total = commands.length + matches.length;
+
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Comandos`}
+        style={{
+          width: 'min(520px, 94vw)',
+          maxHeight: '70vh',
+          overflow: 'hidden',
+          display: 'grid',
+          gap: 0,
+          padding: 0,
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div style={{ padding: 12, borderBottom: '1px solid var(--line)' }}>
+          <input
+            autoFocus
+            className="input"
+            style={{ width: '100%' }}
+            value={term}
+            placeholder={t`Escribe un comando o un artículo`}
+            aria-label={t`Escribe un comando o un artículo`}
+            onChange={(event) => {
+              setTerm(event.target.value);
+              setIndex(0);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setIndex((value) => Math.min(total - 1, value + 1));
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setIndex((value) => Math.max(0, value - 1));
+              } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (index >= commands.length) {
+                  const item = matches[index - commands.length];
+                  if (item) onOpenItem(item);
+                } else {
+                  const command = commands[index];
+                  if (command) onCommand(command.key);
+                }
+              }
+            }}
+          />
+        </div>
+        <div style={{ overflowY: 'auto', padding: 6 }}>
+          {total === 0 ? (
+            <p className="muted" style={{ padding: 12, margin: 0 }}>
+              <Trans>Sin resultados</Trans>
+            </p>
+          ) : null}
+          {commands.map((entry, position) => (
+            <button
+              key={entry.key}
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                background: index === position ? 'var(--canvas-2)' : 'transparent',
+              }}
+              onClick={() => onCommand(entry.key)}
+            >
+              {entry.label}
+            </button>
+          ))}
+          {matches.map((item, position) => (
+            <button
+              key={item.id}
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                background:
+                  index === commands.length + position ? 'var(--canvas-2)' : 'transparent',
+              }}
+              onClick={() => onOpenItem(item)}
+            >
+              {item.displayName}
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

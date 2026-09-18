@@ -1982,7 +1982,7 @@ export function useInventoryCosting(rangeDays) {
 //
 // The three reads behind `Catálogo e inventario → Inventario` (recipes module plan
 // §7 and §11 Phase 1). They are gated by `merchant.manage` on the server, and the
-// `catalog-inventory` module is opened by `catalog.read` OR `inventory.read`, so a
+// The catalog read is opened by `catalog.read` OR `inventory.read`, so a
 // cashier can reach the tab. A loader that fired anyway would answer with a 403 on
 // every pass, so `_canManageInventory` keeps the request off the wire and the
 // screen renders its own notice.

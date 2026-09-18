@@ -312,11 +312,11 @@
     },
     {
       "id": "operations.catalog",
-      "module": "catalog-inventory",
+      "module": "products",
       "client": {
         "gate": ["catalog.read", "inventory.read"],
         "gateMode": "any",
-        "source": "apps/umi-dashboard/src/data.jsx:530, domain=catalog (screens/catalog-inventory.jsx)"
+        "source": "apps/umi-dashboard/src/data.jsx:530, domain=catalog (screens/products-hub.jsx)"
       },
       "request": {
         "method": "GET",

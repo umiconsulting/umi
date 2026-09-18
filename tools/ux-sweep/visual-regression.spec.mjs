@@ -12,7 +12,7 @@
  *   /                   the owner's first screen and the hero metrics
  *   /operations         the operational bridge, densest form surface
  *   /reportes           the reporting surface
- *   /catalog-inventory  the longest lists, the most repeated row markup
+ *   /products           the longest lists, the most repeated row markup
  *   /floor-plan         a canvas the shell does not otherwise draw, and the one
  *                       lazy route — its chunk, its toolbar and its palette
  *   /login              the unauthenticated surface, no shell at all
@@ -33,7 +33,8 @@ const ROUTES = [
   { name: 'overview', path: '/' },
   { name: 'operations', path: '/operations' },
   { name: 'reportes', path: '/reportes' },
-  { name: 'catalog-inventory', path: '/catalog-inventory' },
+  { name: 'products', path: '/products' },
+  { name: 'inventory', path: '/inventory' },
   { name: 'floor-plan', path: '/floor-plan' },
   { name: 'login', path: '/login' },
 ];

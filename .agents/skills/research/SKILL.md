@@ -25,3 +25,8 @@ Its job:
 
 Read `docs/agents/tool-and-research-doctrine.md` for the full rule, and
 `docs/research/2026-09-16-research-channels-playbook.md` for the tested channel list.
+
+**When the question has a market angle, use the `market-research` skill instead.**
+That skill owns the competitor frame, the screen-capture obligation, the
+route-failure log, and the 18-step run order. Use this one for a question with no
+market angle.

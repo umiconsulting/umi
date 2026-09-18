@@ -181,31 +181,57 @@ export const MODULES = {
       { id: 'cash-shifts/registros', label: msg`Registros` },
     ],
   },
-  'catalog-inventory': {
-    id: 'catalog-inventory',
-    label: msg`Catálogo e inventario`,
+  /*
+   * The old single hub, `catalog-inventory`, held six tabs: what the shop sells,
+   * what it names it, what it holds, how the kitchen makes it, when it prepares
+   * it, and what it buys. That is three objects wearing one name — a product is
+   * sold, an inventory item is held, and a recipe transforms one into the other.
+   * The design audit of 2026-09-18 measured 72 controls on that one screen, the
+   * highest in the dashboard, and it split the inventory domain across two
+   * top-level entries at the same time.
+   *
+   * The cut is now by object, and the count of destinations in BUSINESS is
+   * unchanged: `catalog-inventory` + `inventory-costing` become `products` +
+   * `inventory`, and costing moves in as a tab of the thing it reads.
+   *
+   * Sources: Square names one help topic "Items and inventory"; Shopify nests
+   * inventory under Products; Lightspeed, Loyverse, Fudo, and PoloTab keep them
+   * apart because their product and stock records are separate tables, as Umi's
+   * are. Both vendors in Umi's own market that document recipes file them under
+   * STOCK, not under the menu. See
+   * docs/research/2026-09-18-catalog-vs-inventory-ia.md.
+   */
+  products: {
+    id: 'products',
+    label: msg`Productos`,
     icon: 'Package',
     section: 'BUSINESS',
     product: 'dashboard',
-    permissions: ['catalog.read', 'inventory.read'],
+    permissions: ['catalog.read'],
     locationScoped: true,
+    children: [
+      { id: 'products', label: msg`Productos` },
+      { id: 'products/categorias', label: msg`Categorías` },
+    ],
   },
-  'inventory-costing': {
-    id: 'inventory-costing',
-    label: msg`Costos y márgenes`,
-    // TrendUp, beside Reportes' own use of it: the two screens answer the same shape of
-    // question (what did the business keep) from opposite ends — a costing screen is
-    // about the cost half of that.
-    icon: 'TrendUp',
+  inventory: {
+    id: 'inventory',
+    label: msg`Inventario`,
+    icon: 'PackagePlus',
     section: 'BUSINESS',
     product: 'dashboard',
-    // The four reads behind this screen are gated by `merchant.manage`, not by an
-    // `inventory.*` key: reading what a plate costs and what a day made is a manager's
-    // question about money, and an `inventory.*` key is carried only by POS operator
-    // sessions, which would make the screen unreachable from the console. The module
-    // carries exactly the permission its routes enforce.
-    permissions: ['merchant.manage'],
+    // `inventory.read` opens the hub. Each tab carries its own gate: the item list
+    // and the recipes read it, and the costing tab needs `merchant.manage` because
+    // its four reads do. The hub is the door; the tabs are the rooms.
+    permissions: ['inventory.read'],
     locationScoped: true,
+    children: [
+      { id: 'inventory', label: msg`Artículos` },
+      { id: 'inventory/recetas', label: msg`Recetas` },
+      { id: 'inventory/preparacion', label: msg`Preparación` },
+      { id: 'inventory/costos', label: msg`Costos y márgenes` },
+      { id: 'inventory/compras', label: msg`Compras` },
+    ],
   },
   diagnostics: {
     id: 'diagnostics',
@@ -257,8 +283,8 @@ export const MODULE_ORDER = [
   'triage',
   'loyalty-value',
   // BUSINESS — the assets and people behind the shop.
-  'catalog-inventory',
-  'inventory-costing',
+  'products',
+  'inventory',
   'floor-plan',
   'devices',
   'staff',

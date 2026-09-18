@@ -219,3 +219,171 @@ export function sortItems(items) {
 export function allergenCodeValid(code) {
   return /^[a-z][a-z0-9_]{1,39}$/.test(String(code || ''));
 }
+
+/* ============================================================
+   THE WORKBENCH RULES (redesign plan §3, §5)
+
+   These functions decide the state of one item and the shape of the list. They
+   hold every rule the screen would otherwise spread through JSX, so the rules are
+   testable without a browser.
+
+   The model returns KEYS, never sentences. The screen owns the words, because the
+   words are translated and the arithmetic is not.
+   ============================================================ */
+
+/** The saved views, in the order the chip row renders them. */
+export const VIEW_KEYS = ['all', 'low_stock', 'no_cost', 'no_balance', 'archived'];
+
+/**
+ * Polaris states the page size twice — once for the index table and once for the
+ * resource list. Fifty is the number it states.
+ */
+export const PAGE_SIZE = 50;
+
+/** The attention queue caps at five. A sixth entry would become a second list. */
+export const ATTENTION_CAP = 5;
+
+/**
+ * The state of one item, as facts. No sentence, no colour, no element.
+ *
+ * `stockState` is the one ordered vocabulary in this file:
+ *   `archived`   — the item is retired
+ *   `not_tracked`— the item is not counted, by policy
+ *   `unknown`    — the read returned no balance row for this branch. NOT zero.
+ *   `out`        — the balance is exactly zero
+ *   `low`        — the balance is at or below the item's own threshold
+ *   `ok`         — the balance is above the threshold, or no threshold is set
+ */
+export function itemSignals(item, locationId, costedIds) {
+  const onHand = onHandDisplay(item, locationId);
+  const threshold = item?.lowStockThreshold == null ? null : Number(item.lowStockThreshold);
+  const value = onHand.value == null ? null : Number(onHand.value);
+  const hasCost = costedIds instanceof Set ? costedIds.has(item?.id) : false;
+  let stockState = 'ok';
+  if (item?.active === false) stockState = 'archived';
+  else if (item?.trackingPolicy === 'not_tracked') stockState = 'not_tracked';
+  else if (onHand.state === 'empty') stockState = 'unknown';
+  else if (value === 0) stockState = 'out';
+  else if (threshold != null && value != null && value <= threshold) stockState = 'low';
+  return { onHand, value, threshold, stockState, hasCost, unit: item?.baseUnit ?? null };
+}
+
+/**
+ * What the item needs, most important first. The screen renders the first need as
+ * the row action and the rest in the row menu, which is why the order is fixed
+ * here rather than at the call site.
+ */
+export function itemNeeds(signals) {
+  const needs = [];
+  if (signals.stockState === 'archived') return ['activate'];
+  if (signals.stockState === 'unknown') needs.push('count');
+  if (signals.stockState === 'out' || signals.stockState === 'low') needs.push('review_stock');
+  if (!signals.hasCost) needs.push('set_cost');
+  if (signals.stockState === 'not_tracked') needs.push('enable_tracking');
+  return needs;
+}
+
+/**
+ * The single action a row shows at rest, or `null` when the row is healthy.
+ *
+ * Decision D4: a healthy row shows no button until the pointer or the focus
+ * arrives. A row that needs something shows its verb at rest. Fifty competing
+ * buttons would stop the eye from reading the list.
+ */
+export function rowActionFor(signals) {
+  const needs = itemNeeds(signals);
+  return needs.length === 0 ? null : needs[0];
+}
+
+/** Does the item belong to the view? `all` is the archive-off default. */
+export function matchesView(signals, view) {
+  switch (view) {
+    case 'low_stock':
+      return signals.stockState === 'low' || signals.stockState === 'out';
+    case 'no_cost':
+      return !signals.hasCost && signals.stockState !== 'archived';
+    case 'no_balance':
+      return signals.stockState === 'unknown';
+    case 'archived':
+      return signals.stockState === 'archived';
+    default:
+      return signals.stockState !== 'archived';
+  }
+}
+
+/**
+ * One count per view, over one pass of the list. The chip row renders the count
+ * beside the name, and the two must agree with the rows the view returns, so both
+ * come from this function.
+ */
+export function viewCounts(items, locationId, costedIds) {
+  const counts = Object.fromEntries(VIEW_KEYS.map((key) => [key, 0]));
+  for (const item of Array.isArray(items) ? items : []) {
+    const signals = itemSignals(item, locationId, costedIds);
+    for (const key of VIEW_KEYS) {
+      if (matchesView(signals, key)) counts[key] += 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * The attention queue. One entry per real question, each with the count and the
+ * view that answers it. The order is the order of harm: a missing cost breaks the
+ * margin report, an unknown balance breaks the sale.
+ */
+const ATTENTION_ORDER = [
+  { key: 'no_balance', view: 'no_balance', action: 'count' },
+  { key: 'low_stock', view: 'low_stock', action: 'review_stock' },
+  { key: 'no_cost', view: 'no_cost', action: 'set_cost' },
+];
+
+export function attentionQueue(counts, cap = ATTENTION_CAP) {
+  return ATTENTION_ORDER.filter((entry) => Number(counts?.[entry.key] || 0) > 0)
+    .map((entry) => ({ ...entry, count: Number(counts[entry.key]) }))
+    .slice(0, cap);
+}
+
+/** The list query: the view, then the search, then the archive rule. */
+export function filterByView(items, view, locationId, costedIds, options = {}) {
+  const includeArchived = view === 'archived';
+  const searched = filterItems(items, { query: options.query, includeArchived });
+  return searched.filter((item) => matchesView(itemSignals(item, locationId, costedIds), view));
+}
+
+/** A stable page slice, plus the range the footer prints. */
+export function paginate(list, page, size = PAGE_SIZE) {
+  const rows = Array.isArray(list) ? list : [];
+  const total = rows.length;
+  const pages = Math.max(1, Math.ceil(total / size));
+  const current = Math.min(Math.max(0, Number(page) || 0), pages - 1);
+  const from = current * size;
+  const slice = rows.slice(from, from + size);
+  return {
+    rows: slice,
+    page: current,
+    pages,
+    total,
+    from: total === 0 ? 0 : from + 1,
+    to: from + slice.length,
+  };
+}
+
+/**
+ * Urgency order for the attention views: the worst stock state first, then the
+ * name. The default list keeps the name order, because a re-read must not
+ * reshuffle the list under the pointer.
+ */
+const URGENCY_RANK = { out: 0, low: 1, unknown: 2, ok: 3, not_tracked: 4, archived: 5 };
+
+export function sortByUrgency(items, locationId, costedIds) {
+  return [...(Array.isArray(items) ? items : [])].sort((a, b) => {
+    const left = itemSignals(a, locationId, costedIds);
+    const right = itemSignals(b, locationId, costedIds);
+    const rank = URGENCY_RANK[left.stockState] - URGENCY_RANK[right.stockState];
+    if (rank !== 0) return rank;
+    const cost = Number(left.hasCost) - Number(right.hasCost);
+    if (cost !== 0) return cost;
+    return String(a?.displayName || '').localeCompare(String(b?.displayName || ''));
+  });
+}

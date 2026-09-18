@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Select } from '@/components/select.jsx';
+import { Segmented } from '@/components/segmented.jsx';
+import { PageHead } from '@/components/page-head.jsx';
 import { useNavigate } from 'react-router-dom';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -55,6 +57,23 @@ const DOMAIN_LABELS = {
   diagnostics: msg`Diagnóstico`,
 };
 
+/**
+ * The verb one row offers, by domain. A list row carries one main action. The
+ * action names the thing a person does to that row. The audit of 2026-09-18
+ * measured the catalog printing three raw enum names instead: `REVIEW`, `EDIT
+ * PRODUCT`, and `ARCHIVE`, each as a green pill.
+ */
+const ROW_ACTION_LABEL = {
+  catalog: msg`Editar`,
+  inventory: msg`Operar`,
+  receipts: msg`Reimprimir`,
+  loyalty: msg`Ajustar`,
+  gift_cards: msg`Emitir`,
+  registers: msg`Configurar`,
+  recovery: msg`Recuperar`,
+  sales: msg`Reembolsar`,
+};
+
 /** The owner-facing sentence for an API error code, or the raw message when none maps. */
 function errorCopy(i18n, error) {
   if (!error) return null;
@@ -68,10 +87,66 @@ function CommandError({ command }) {
   return <p style={{ color: 'var(--danger)' }}>{errorCopy(i18n, command.error)}</p>;
 }
 
+/**
+ * The colour language for a record state.
+ *
+ * The audit of 2026-09-18 found this slot printing a green `ACTIVE` pill on every
+ * row of the catalog: a column where every value is equal, in the strongest
+ * colour on the screen. So an ordinary state is a quiet word. Only a state that
+ * asks a person to act takes a colour. `status-plain` and `inv-state-pill` own
+ * the look.
+ */
+const STATE_TONE = {
+  needs_review: 'low',
+  warning: 'low',
+  pending: 'low',
+  queued: 'low',
+  printing: 'low',
+  counting: 'low',
+  closing: 'low',
+  reconciliation_required: 'low',
+  rotation: 'low',
+  low: 'low',
+  failed: 'out',
+  blocked: 'out',
+  error: 'out',
+  expired: 'out',
+  short: 'out',
+};
+
+/** The owner-facing word for a record state. The key is the API enum. */
+const STATE_LABEL = {
+  active: msg`Activo`,
+  inactive: msg`Inactivo`,
+  archived: msg`Archivado`,
+  pending: msg`Pendiente`,
+  needs_review: msg`Necesita revisión`,
+  blocked: msg`Bloqueado`,
+  failed: msg`Falló`,
+  available: msg`Disponible`,
+  in_use: msg`En uso`,
+  printed: msg`Impreso`,
+  not_printed: msg`Sin imprimir`,
+  queued: msg`En cola`,
+  printing: msg`Imprimiendo`,
+  reconciliation_required: msg`Conciliación`,
+};
+
 function Status({ value }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
+  const key = String(value || '').toLowerCase();
+  const raw = value
+    ? STATE_LABEL[key]
+      ? i18n._(STATE_LABEL[key])
+      : String(value).replaceAll('_', ' ')
+    : t`desconocido`;
+  const tone = STATE_TONE[key];
+  if (!tone) return <span className="status-plain">{raw}</span>;
   return (
-    <span className="sub-pill">{value ? String(value).replaceAll('_', ' ') : t`desconocido`}</span>
+    <span className="inv-state-pill">
+      <span className="inv-dot" data-state={tone} aria-hidden="true" />
+      {raw}
+    </span>
   );
 }
 
@@ -101,9 +176,25 @@ async function waitForHardwareResult(command, commandId) {
   return { command: { commandId, status: 'pending' } };
 }
 
+/**
+ * A dialog answers Escape. The audit of 2026-09-18 measured a completed dialog
+ * with no keyboard exit. `busy` blocks the key while a command is in flight, so a
+ * person cannot abandon a write by accident.
+ */
+function useEscapeToClose(onClose, busy) {
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key === 'Escape' && !busy) onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, busy]);
+}
+
 function RefundDialog({ sale, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [eligibility, setEligibility] = useState(null);
   const [preview, setPreview] = useState(null);
   const [exceptionType, setExceptionType] = useState('partial_refund');
@@ -315,6 +406,7 @@ function RefundDialog({ sale, onClose, onComplete }) {
 function InventoryDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [overview, setOverview] = useState(null);
   const [operation, setOperation] = useState('inventory.adjustment');
   const [quantity, setQuantity] = useState(1);
@@ -635,6 +727,7 @@ function InventoryDialog({ row, onClose, onComplete }) {
 export function ReceiptReprintDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -693,6 +786,7 @@ export function ReceiptReprintDialog({ row, onClose, onComplete }) {
 function LoyaltyDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [direction, setDirection] = useState('increase');
   const [points, setPoints] = useState(10);
   const [managerPin, setManagerPin] = useState('');
@@ -810,6 +904,7 @@ function LoyaltyDialog({ row, onClose, onComplete }) {
 function GiftCardIssueDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [amount, setAmount] = useState(10000);
   const [managerPin, setManagerPin] = useState('');
   const [planned, setPlanned] = useState(null);
@@ -937,6 +1032,7 @@ function GiftCardIssueDialog({ row, onClose, onComplete }) {
 function CatalogDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [name, setName] = useState(row?.title || '');
   const [price, setPrice] = useState(row?.amountMinorUnits ?? 0);
   const [sku, setSku] = useState(
@@ -1098,6 +1194,7 @@ function CatalogDialog({ row, onClose, onComplete }) {
 function RegisterDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [displayName, setDisplayName] = useState(row.title);
   const [assignmentPolicy, setAssignmentPolicy] = useState('device_required');
   const [assignedDeviceId, setAssignedDeviceId] = useState('');
@@ -1178,6 +1275,7 @@ function RegisterDialog({ row, onClose, onComplete }) {
 function KitchenRouteDialog({ onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [stationId, setStationId] = useState('');
   const [routeType, setRouteType] = useState('default');
   const [routeTargetId, setRouteTargetId] = useState('');
@@ -1266,6 +1364,7 @@ function KitchenRouteDialog({ onClose, onComplete }) {
 function RecoveryDialog({ row, onClose }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
+  useEscapeToClose(onClose, command.pending);
   const [result, setResult] = useState(null);
   async function query() {
     const response = await command.recover(row.id);
@@ -1799,6 +1898,7 @@ function SaleTotalRow({ label, value, strong, tone }) {
 function SaleReceiptSheet({ sale, onClose }) {
   const { t } = useLingui();
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  useEscapeToClose(onClose, state.loading);
   // Keyed by sale.id at the call site, so each open mounts fresh at loading:true —
   // no synchronous setState in the effect (react-hooks/set-state-in-effect).
   useEffect(() => {
@@ -2355,25 +2455,44 @@ export function DomainWorkspace({ domain }) {
     window.setTimeout(() => setCopied(''), 1200);
   }
 
-  const scopeToggle = canUseMerchantScope ? (
-    <button
-      className="btn btn-secondary btn-sm"
-      type="button"
-      aria-pressed={merchantWide}
-      onClick={() => {
-        setMerchantWide((value) => !value);
+  /**
+   * The scope switch. The audit of 2026-09-18 found a button that said `Todo el
+   * negocio` with no context: a person could not tell if it named the current
+   * scope or the next one. A segmented control shows both options and marks the
+   * active one, so the control says what it does.
+   */
+  const scopeControl = canUseMerchantScope ? (
+    <Segmented
+      label={t`Alcance`}
+      value={merchantWide ? 'all' : 'location'}
+      onChange={(next) => {
+        setMerchantWide(next === 'all');
         setCursor(0);
       }}
-    >
-      {merchantWide ? <Trans>Ubicación</Trans> : <Trans>Todo el negocio</Trans>}
-    </button>
+      options={[
+        { id: 'location', label: t`Ubicación` },
+        { id: 'all', label: t`Todo el negocio` },
+      ]}
+    />
   ) : null;
+
+  /** Open the smallest authorized surface for one row of this domain. */
+  function openDomainRow(item) {
+    if (domain === 'catalog') setCatalogRow(item);
+    else if (domain === 'inventory') setInventoryRow(item);
+    else if (domain === 'receipts') setReceiptRow(item);
+    else if (domain === 'loyalty') setLoyaltyRow(item);
+    else if (domain === 'gift_cards') setGiftCardRow(item);
+    else if (domain === 'registers') setRegisterRow(item);
+    else if (domain === 'recovery') setRecoveryRow(item);
+    else if (domain === 'sales') setRefundSale(item);
+  }
   return (
     <>
       {MONEY_HUB.has(domain) ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }} aria-live="polite">
-          {scopeToggle ? (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>{scopeToggle}</div>
+          {scopeControl ? (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>{scopeControl}</div>
           ) : null}
           {selected && !selected.available ? (
             <div className="card" style={{ padding: 28, color: 'var(--ink-3)' }}>
@@ -2431,295 +2550,255 @@ export function DomainWorkspace({ domain }) {
           )}
         </div>
       ) : (
-        <section className="card" style={{ minWidth: 0 }} aria-live="polite">
-          <div style={{ padding: 20, borderBottom: '1px solid var(--line)' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                alignItems: 'center',
-              }}
-            >
-              <div>
-                <h3 style={{ margin: 0 }}>
-                  {DOMAIN_LABELS[domain]
-                    ? i18n._(DOMAIN_LABELS[domain])
-                    : selected?.label || t`Operación`}
-                </h3>
-                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5 }}>
-                  <Trans>Permiso: {selected?.requiredPermissions?.join(t` o `) || '—'}</Trans>
+        <div style={{ display: 'grid', gap: 16 }} aria-live="polite">
+          <section
+            className="surface"
+            /* The name is still here for a screen reader. It is not printed again,
+               because the masthead and the hub tab already say it. */
+            aria-label={
+              DOMAIN_LABELS[domain] ? i18n._(DOMAIN_LABELS[domain]) : selected?.label || undefined
+            }
+            style={{ minWidth: 0, overflow: 'hidden' }}
+          >
+            {/*
+              The opening band. The masthead owns the page name, so this band never
+              prints it: the audit of 2026-09-18 found `Catálogo` in the masthead,
+              in the hub tab, and again as a card heading. The band holds one count
+              and one primary action. The scope switch and the refresh are
+              controls, not actions, so they stay quiet.
+            */}
+            <div style={{ padding: '12px 16px' }}>
+              <PageHead
+                count={
+                  state.data?.items?.length && domain === 'catalog' ? (
+                    <Trans>{state.data.items.length} productos</Trans>
+                  ) : undefined
+                }
+                actions={
+                  <>
+                    {scopeControl}
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      disabled={state.loading}
+                      onClick={() => setRefresh((value) => value + 1)}
+                    >
+                      {state.loading ? <Trans>Actualizando…</Trans> : <Trans>Actualizar</Trans>}
+                    </button>
+                    {domain === 'catalog' && state.data?.items?.length ? (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        type="button"
+                        onClick={() => setCatalogRow(null)}
+                      >
+                        <Trans>Crear producto</Trans>
+                      </button>
+                    ) : null}
+                    {domain === 'gift_cards' ? (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        type="button"
+                        onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
+                      >
+                        <Trans>Emitir tarjeta</Trans>
+                      </button>
+                    ) : null}
+                    {domain === 'kitchen' ? (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        type="button"
+                        onClick={() => setKitchenRouteOpen(true)}
+                      >
+                        <Trans>Configurar ruta</Trans>
+                      </button>
+                    ) : null}
+                    {ACTION_ROUTES[domain] ? (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        type="button"
+                        onClick={() => navigate(ACTION_ROUTES[domain])}
+                      >
+                        <Trans>Administrar</Trans>
+                      </button>
+                    ) : null}
+                  </>
+                }
+              />
+            </div>
+
+            <div className="surface-divide">
+              {selected && !selected.available ? (
+                <div className="inv-state">
+                  <span className="inv-state-title">
+                    <Trans>
+                      Requiere permiso: {selected.requiredPermissions?.join(t` o `) || '—'}
+                    </Trans>
+                  </span>
+                </div>
+              ) : state.error ? (
+                <div className="inv-state">
+                  <span className="inv-state-title">
+                    <Trans>No fue posible cargar esta operación.</Trans>
+                  </span>
+                  <span className="inv-state-note">
+                    {ERROR_COPY[state.errorCode] ? i18n._(ERROR_COPY[state.errorCode]) : null}
+                  </span>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    onClick={() => setRefresh((value) => value + 1)}
+                  >
+                    <Trans>Reintentar</Trans>
+                  </button>
+                </div>
+              ) : state.loading && !state.data?.items?.length ? (
+                <div className="inv-state">
+                  <span className="inv-state-note">
+                    <Trans>Cargando datos autorizados…</Trans>
+                  </span>
+                </div>
+              ) : !state.data?.items?.length ? (
+                <div className="inv-state">
+                  <span className="inv-state-title">
+                    {domain === 'catalog' ? (
+                      <Trans>Aún no hay productos</Trans>
+                    ) : (
+                      <Trans>No hay datos para este alcance.</Trans>
+                    )}
+                  </span>
+                  {domain === 'catalog' ? (
+                    <>
+                      <span className="inv-state-note">
+                        <Trans>Crea el primer producto de la carta.</Trans>
+                      </span>
+                      {/* The band hides its own primary action while the set is
+                      empty, so the screen holds exactly one. */}
+                      <button
+                        className="btn btn-primary"
+                        type="button"
+                        onClick={() => setCatalogRow(null)}
+                      >
+                        <Trans>Crear producto</Trans>
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : DomainView ? (
+                <DomainView
+                  items={state.data.items}
+                  ctx={{
+                    copy,
+                    copied,
+                    onRefund: setRefundSale,
+                    onReprint: setReceiptRow,
+                    onConfigure: setRegisterRow,
+                    onSale: setSaleDetail,
+                  }}
+                />
+              ) : (
+                /*
+              A resource list, not a data table. The audit of 2026-09-18 counted
+              72 controls on this screen. It held a permission key, a raw UUID
+              under every name, a status pill on every row, and a button on every
+              row. A row here holds one name, one meta line, one figure, and one
+              verb.
+            */
+                <div>
+                  {state.data.items.map((item) => {
+                    const tone = STATE_TONE[String(item.status || '').toLowerCase()];
+                    const reference = item.correlationId || item.publicReference;
+                    const verbLabel = ROW_ACTION_LABEL[domain]
+                      ? i18n._(ROW_ACTION_LABEL[domain])
+                      : null;
+                    const verbAllowed =
+                      Boolean(verbLabel) &&
+                      !(domain === 'receipts' && item.status === 'not_printed');
+                    return (
+                      <div key={item.id} className="inv-row">
+                        {/* A neutral dot for an ordinary state, so a colour never
+                        repeats down the column. */}
+                        <span className="inv-dot" data-state={tone} aria-hidden="true" />
+                        <span className="inv-row-main">
+                          <span className="inv-row-name">
+                            {item.title || item.publicReference || '—'}
+                          </span>
+                          <span className="inv-row-meta">
+                            {item.detail || '—'}
+                            {item.occurredAt ? (
+                              <>
+                                <span>·</span>
+                                {formatOperationDate(item.occurredAt)}
+                              </>
+                            ) : null}
+                          </span>
+                        </span>
+                        <span className="inv-row-value">
+                          <span className="inv-row-figure">
+                            {item.amountMinorUnits == null
+                              ? ''
+                              : formatOperationMoney(item.amountMinorUnits, item.currency)}
+                          </span>
+                          <span className="inv-row-note">
+                            <Status value={item.status} />
+                          </span>
+                        </span>
+                        <span className="inv-row-action" style={{ display: 'flex', gap: 4 }}>
+                          {verbAllowed ? (
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              type="button"
+                              onClick={() => openDomainRow(item)}
+                            >
+                              {verbLabel}
+                            </button>
+                          ) : null}
+                          <button
+                            className="btn-icon"
+                            type="button"
+                            onClick={() => copy(reference)}
+                            aria-label={t`Copiar referencia ${item.publicReference}`}
+                          >
+                            {copied === reference ? '✓' : '⧉'}
+                          </button>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {state.data?.items?.length ? (
+              <div className="surface-divide" style={{ padding: '10px 16px' }}>
+                <div className="inv-foot">
+                  {/* The old footer printed the effective permission count. The
+                    audit of 2026-09-18 counted that as developer text. */}
+                  <span>
+                    <Trans>Página {Math.floor(cursor / 20) + 1}</Trans>
+                  </span>
+                  <span style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      disabled={cursor === 0 || state.loading}
+                      onClick={() => setCursor(Math.max(0, cursor - 20))}
+                    >
+                      <Trans>Anterior</Trans>
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      disabled={!state.data?.page?.hasMore || state.loading}
+                      onClick={() => setCursor(Number(state.data.page.nextCursor))}
+                    >
+                      <Trans>Siguiente</Trans>
+                    </button>
+                  </span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-                {domain === 'catalog' && (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={() => setCatalogRow(null)}
-                  >
-                    <Trans>Crear producto</Trans>
-                  </button>
-                )}
-                {domain === 'gift_cards' && (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={() => setGiftCardRow({ id: crypto.randomUUID(), currency: 'MXN' })}
-                  >
-                    <Trans>Emitir tarjeta</Trans>
-                  </button>
-                )}
-                {domain === 'kitchen' && (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={() => setKitchenRouteOpen(true)}
-                  >
-                    <Trans>Configurar ruta</Trans>
-                  </button>
-                )}
-                {ACTION_ROUTES[domain] && (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={() => navigate(ACTION_ROUTES[domain])}
-                  >
-                    <Trans>Administrar</Trans>
-                  </button>
-                )}
-                {canUseMerchantScope && (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    aria-pressed={merchantWide}
-                    onClick={() => {
-                      setMerchantWide((value) => !value);
-                      setCursor(0);
-                    }}
-                  >
-                    {merchantWide ? <Trans>Ubicación</Trans> : <Trans>Todo el negocio</Trans>}
-                  </button>
-                )}
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={state.loading}
-                  onClick={() => setRefresh((value) => value + 1)}
-                >
-                  {state.loading ? <Trans>Actualizando…</Trans> : <Trans>Actualizar</Trans>}
-                </button>
-              </div>
-            </div>
-            {selected?.allowedActions?.length ? (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
-                {selected.allowedActions.map((action) => (
-                  <span className="sub-pill" key={action}>
-                    {action.replaceAll('_', ' ')}
-                  </span>
-                ))}
-              </div>
             ) : null}
-          </div>
-
-          {selected && !selected.available ? (
-            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-              <Trans>Requiere permiso: {selected.requiredPermissions?.join(t` o `) || '—'}</Trans>
-            </div>
-          ) : state.error ? (
-            <div style={{ padding: 28, color: 'var(--danger)' }}>
-              {ERROR_COPY[state.errorCode]
-                ? i18n._(ERROR_COPY[state.errorCode])
-                : t`No fue posible cargar esta operación.`}
-            </div>
-          ) : state.loading && !state.data?.items?.length ? (
-            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-              <Trans>Cargando datos autorizados…</Trans>
-            </div>
-          ) : !state.data?.items?.length ? (
-            <div style={{ padding: 28, color: 'var(--ink-3)' }}>
-              <Trans>No hay datos para este alcance.</Trans>
-            </div>
-          ) : DomainView ? (
-            <DomainView
-              items={state.data.items}
-              ctx={{
-                copy,
-                copied,
-                onRefund: setRefundSale,
-                onReprint: setReceiptRow,
-                onConfigure: setRegisterRow,
-                onSale: setSaleDetail,
-              }}
-            />
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--ink-3)' }}>
-                    <th style={{ padding: '12px 16px' }}>
-                      <Trans>Referencia</Trans>
-                    </th>
-                    <th>
-                      {domain === 'catalog' ? <Trans>Categoría</Trans> : <Trans>Detalle</Trans>}
-                    </th>
-                    <th>
-                      <Trans>Estado</Trans>
-                    </th>
-                    <th>
-                      <Trans>Importe</Trans>
-                    </th>
-                    <th>
-                      <Trans>Fecha</Trans>
-                    </th>
-                    <th aria-label={t`Acciones`} />
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.data.items.map((item) => (
-                    <tr key={item.id} style={{ borderTop: '1px solid var(--line)' }}>
-                      <td style={{ padding: '14px 16px' }}>
-                        <strong>{item.title}</strong>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: 10,
-                            color: 'var(--ink-3)',
-                            marginTop: 4,
-                          }}
-                        >
-                          {item.publicReference}
-                        </div>
-                      </td>
-                      <td>{item.detail || '—'}</td>
-                      <td>
-                        <Status value={item.status} />
-                      </td>
-                      <td>{formatOperationMoney(item.amountMinorUnits, item.currency)}</td>
-                      <td>{formatOperationDate(item.occurredAt)}</td>
-                      <td style={{ paddingRight: 14 }}>
-                        {domain === 'sales' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setRefundSale(item)}
-                          >
-                            <Trans>Reembolsar</Trans>
-                          </button>
-                        )}
-                        {domain === 'inventory' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setInventoryRow(item)}
-                          >
-                            <Trans>Operar</Trans>
-                          </button>
-                        )}
-                        {domain === 'receipts' && item.status !== 'not_printed' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setReceiptRow(item)}
-                          >
-                            <Trans>Reimprimir</Trans>
-                          </button>
-                        )}
-                        {domain === 'loyalty' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setLoyaltyRow(item)}
-                          >
-                            <Trans>Ajustar</Trans>
-                          </button>
-                        )}
-                        {domain === 'gift_cards' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setGiftCardRow(item)}
-                          >
-                            <Trans>Emitir</Trans>
-                          </button>
-                        )}
-                        {domain === 'catalog' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setCatalogRow(item)}
-                          >
-                            <Trans>Editar</Trans>
-                          </button>
-                        )}
-                        {domain === 'registers' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setRegisterRow(item)}
-                          >
-                            <Trans>Configurar</Trans>
-                          </button>
-                        )}
-                        {domain === 'recovery' && (
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            onClick={() => setRecoveryRow(item)}
-                          >
-                            <Trans>Recuperar</Trans>
-                          </button>
-                        )}
-                        <button
-                          className="btn-icon"
-                          type="button"
-                          onClick={() => copy(item.correlationId || item.publicReference)}
-                          aria-label={t`Copiar referencia ${item.publicReference}`}
-                        >
-                          {copied === (item.correlationId || item.publicReference) ? '✓' : '⧉'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div
-            style={{
-              padding: 14,
-              display: 'flex',
-              justifyContent: 'space-between',
-              borderTop: '1px solid var(--line)',
-            }}
-          >
-            <button
-              className="btn btn-secondary"
-              type="button"
-              disabled={cursor === 0 || state.loading}
-              onClick={() => setCursor(Math.max(0, cursor - 20))}
-            >
-              <Trans>Anterior</Trans>
-            </button>
-            <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-              <Trans>Página {Math.floor(cursor / 20) + 1}</Trans> ·{' '}
-              <Plural
-                value={permissions.length}
-                one="# permiso efectivo"
-                other="# permisos efectivos"
-              />
-            </span>
-            <button
-              className="btn btn-secondary"
-              type="button"
-              disabled={!state.data?.page?.hasMore || state.loading}
-              onClick={() => setCursor(Number(state.data.page.nextCursor))}
-            >
-              <Trans>Siguiente</Trans>
-            </button>
-          </div>
-        </section>
+          </section>
+        </div>
       )}
       {refundSale && (
         <RefundDialog
