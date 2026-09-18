@@ -53,3 +53,18 @@ regexes = [
   '''38f9cfe6-4777-4e3c-b7bc-fe16522b3024''',
   '''b0f8e0a2-9a1e-4c3e-9c1a-0d7d7a5f7f11''',
 ]
+
+[[allowlists]]
+description = "Integration-test harness JWT secret"
+# `JWT_SECRET` stands up a ConfigService for the Mercado Pago Point refund suite
+# (apps/umi-api/src/modules/tender/point-refund.integration.ts). The value is a fixed,
+# obviously-fake literal that only has to clear the config schema's >= 16 character
+# floor; it authenticates nothing outside that suite's own process, and the suite
+# builds the vendor's refund against a disposable database. The word `SECRET` in the
+# variable name plus the length is what trips `generic-api-key`.
+#
+# Allowlisted by exact value, not by path, so a real credential pasted into that same
+# suite is still caught.
+regexes = [
+  '''point-refund-harness-secret-0000''',
+]
