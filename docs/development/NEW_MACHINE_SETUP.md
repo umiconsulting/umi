@@ -115,6 +115,36 @@ The Dashboard contract value is `2.13.0`. The generated contract hash is:
 
 `f4ca66cde5633f4deb0f9676263f42f48a6ef56e5a992eda4dd4d83b9b905e63`
 
+## Build the local database
+
+One command builds the database the API, the till and the gates all read. It is a
+**dry run by default**: run it once to see what it would drop, then again with
+`--yes` to do it.
+
+```sh
+pnpm db:reset              # prints the plan, changes nothing
+pnpm db:reset -- --yes     # drops, rebuilds, seeds, regenerates the contract
+```
+
+It reads the database from `DATABASE_URL_APP` in `apps/umi-api/.env`, applies
+`docs/migration/build-v3/00_run.sh`, seeds the demo merchant and catalogue, seeds
+the local operator roles and PINs, and regenerates the contract. It **refuses**
+while an API is listening on 4001 or 4014, because rebuilding a schema under a
+running server leaves a session that half-works; pass `--force` when you mean it.
+
+Use `--database NAME` to rebuild a scratch database instead of the one in
+`.env` — that is how the reset itself is tested without touching a shared
+database:
+
+```sh
+pnpm db:reset -- --database umi_probe --yes
+```
+
+The seeds in `scripts/` are assertions as much as inserts: they fail loudly when
+the data they expect is not there. If a reset stops inside one of them, read the
+message — it is usually a pinned number or a column that moved, not a broken
+script. Fix the seed in the same change that moved the thing it pins.
+
 ## Configure external access
 
 Authenticate GitHub with `gh auth login` and the configured SSH host alias.

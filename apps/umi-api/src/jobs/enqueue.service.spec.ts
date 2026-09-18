@@ -21,6 +21,7 @@ function serviceWithQueues(): { svc: EnqueueService; queues: Record<string, Queu
     queues[QUEUES.outbound],
     queues[QUEUES.integrations],
     queues[QUEUES.lifecycle],
+    queues[QUEUES.tender],
   );
   return { svc, queues };
 }

@@ -651,15 +651,14 @@ Gate 3G-B no requiere un SDK de fabricante o un proveedor de pagos.
 
 ## KDS operativo de Gate 4A
 
-Ejecuta la API y el KDS existente:
+Ejecuta la API y el POS:
 
 ```sh
 pnpm --filter @umi/api dev
-open apps/umi-kds/375.xcodeproj
+cd apps/umi-pos && flutter run -d linux
 ```
 
-Configura `KDSBackendURL` con la URL HTTPS de la UMI API.
-Usa `KDSLocalBaseURL` solamente para el desarrollo local.
+El tablero de cocina es el destino "Cocina" del POS.
 
 Crea una estación y una ruta con los endpoints protegidos del Dashboard:
 

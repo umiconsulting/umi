@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
-// The zero-dep entry, never the package root (the root pulls in zod, which this
-// app's build does not have) — same rule as device-realtime.js.
+// The zero-dep entry, never the package root (the root pulls in zod, which the
+// shell's eager bundle must not carry) — same rule as device-realtime.js.
 import {
   DASHBOARD_EVENT_CONVERSATION_MESSAGE,
   DASHBOARD_REALTIME_NAMESPACE,

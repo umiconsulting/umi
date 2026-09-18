@@ -1,23 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import type { ZodTypeAny } from 'zod';
 import {
   ExceptionCommandRecoveryQuery,
   CreateInventoryCountRequest,
   DamageRecord,
   GiftCardIssuanceRequest,
   GiftCardSecretRevealRequest,
+  InventoryAllergenSetRequest,
   InventoryAdjustment,
   InventoryQuery,
   InventoryReconciliation,
+  InventoryAuthoringItemAllergenSetRequest,
+  InventoryAuthoringItemArchiveRequest,
+  InventoryAuthoringItemCreateRequest,
+  InventoryAuthoringItemUpdateRequest,
+  InventoryRecipeCreateRequest,
+  InventoryRecipeRetireRequest,
+  InventoryRecipeUpdateRequest,
+  InventoryUnitConversionSetRequest,
   PointsAdjustmentRequest,
+  ProductionRecord,
   QuarantineRecord,
   RefundApprovalRequest,
   RefundPreviewRequest,
   SaleExceptionCommand,
   SubmitInventoryCountRequest,
+  SupplierInvoiceCommitRequest,
+  SupplierInvoiceMatchRequest,
+  SupplierInvoiceUploadRequest,
   WasteRecord,
   type DashboardAdministrativeCommandRequest,
 } from '@umi/contract';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
+import { ProcurementService } from '../procurement/procurement.service';
 import { PosEntryService } from '../pos-entry/pos-entry.service';
 import {
   exceptionCommandFingerprint,
@@ -28,6 +43,7 @@ import { PosHardwareService } from '../pos-hardware/pos-hardware.service';
 import { PosCustomerValueService } from '../pos-customer-value/pos-customer-value.service';
 import { KdsService } from '../kds/kds.service';
 import { PosCatalogService } from '../pos-catalog/pos-catalog.service';
+import { InventoryAuthoringService } from '../inventory-authoring/inventory-authoring.service';
 import { AdministrativeCommandContextService } from './administrative-command-context.service';
 import { AdministrativeCommandRepository } from './administrative-command.repository';
 
@@ -43,6 +59,14 @@ export class AdministrativeCommandExecutionService {
     private readonly repository: AdministrativeCommandRepository,
     private readonly kitchen: KdsService,
     private readonly catalog: PosCatalogService,
+    private readonly authoring: InventoryAuthoringService,
+    /**
+     * The supplier-invoice commands (recipes module plan §11, phase 5). Optional in
+     * the SIGNATURE only, so the focused specs that build this service with the
+     * dispatchers they need keep compiling; Nest resolves it from `ProcurementModule`,
+     * which exports it application-wide for exactly this door.
+     */
+    private readonly procurement?: ProcurementService,
   ) {}
 
   async execute(
@@ -83,6 +107,138 @@ export class AdministrativeCommandExecutionService {
             );
           case 'catalog.detail':
             return this.catalog.detailAdministrative(access, persisted ?? context);
+          // Recipes and inventory authoring (recipes module plan §11, phase 1). The
+          // item id and the version the caller read travel on the COMMAND, not in
+          // `parameters`, so each case injects them before the zod model parses —
+          // exactly as `loyalty.adjustment.preview` does above.
+          case 'inventory.item.create':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryAuthoringItemCreateRequest>(
+                InventoryAuthoringItemCreateRequest,
+                request,
+                {},
+              ),
+            );
+          case 'inventory.item.update':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryAuthoringItemUpdateRequest>(
+                InventoryAuthoringItemUpdateRequest,
+                request,
+                {
+                  inventoryItemId: request.targetAggregateId,
+                  expectedVersion: request.targetVersion,
+                },
+              ),
+            );
+          case 'inventory.item.archive':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryAuthoringItemArchiveRequest>(
+                InventoryAuthoringItemArchiveRequest,
+                request,
+                {
+                  inventoryItemId: request.targetAggregateId,
+                  expectedVersion: request.targetVersion,
+                },
+              ),
+            );
+          case 'inventory.conversion.set':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryUnitConversionSetRequest>(
+                InventoryUnitConversionSetRequest,
+                request,
+                {
+                  inventoryItemId: request.targetAggregateId,
+                  expectedVersion: request.targetVersion,
+                },
+              ),
+            );
+          case 'inventory.allergen.set':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryAllergenSetRequest>(InventoryAllergenSetRequest, request, {
+                expectedVersion: request.targetVersion,
+              }),
+            );
+          case 'inventory.item_allergen.set':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryAuthoringItemAllergenSetRequest>(
+                InventoryAuthoringItemAllergenSetRequest,
+                request,
+                {
+                  inventoryItemId: request.targetAggregateId,
+                  expectedVersion: request.targetVersion,
+                },
+              ),
+            );
+          // The recipe target and version travel on the COMMAND, not in `parameters`,
+          // for the same reason the item cases above do it: the console names the
+          // aggregate it read, and the server is the one that decides what it means.
+          // A create mints the id from the command, so nothing is injected at all.
+          case 'inventory.recipe.create':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryRecipeCreateRequest>(
+                InventoryRecipeCreateRequest,
+                request,
+                {},
+              ),
+            );
+          case 'inventory.recipe.update':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryRecipeUpdateRequest>(
+                InventoryRecipeUpdateRequest,
+                request,
+                {
+                  recipeId: request.targetAggregateId,
+                  expectedVersion: request.targetVersion,
+                },
+              ),
+            );
+          case 'inventory.recipe.retire':
+            return this.authoring.executeAdministrative(
+              user,
+              access,
+              persisted ?? context,
+              request.operation,
+              this.authoringDto<InventoryRecipeRetireRequest>(
+                InventoryRecipeRetireRequest,
+                request,
+                {
+                  recipeId: request.targetAggregateId,
+                  expectedVersion: request.targetVersion,
+                },
+              ),
+            );
           case 'kitchen.station.create':
             return this.kitchen.createStation(
               access.merchantId,
@@ -359,6 +515,66 @@ export class AdministrativeCommandExecutionService {
               InventoryReconciliation,
               { countId: request.targetAggregateId },
             );
+          // Production (plan §11, phase 3). The console names the output item; the
+          // server explodes the recipe. The command context has no operator session and
+          // no business date, so the merchant's own business date is read here and the
+          // policy fingerprint is the command's own — production verifies neither, it
+          // posts through the one ledger door.
+          case 'inventory.production.produce':
+            return this.executeInventory(
+              user,
+              access,
+              persisted ?? context,
+              request,
+              ProductionRecord,
+              {
+                outputItemId: request.targetAggregateId,
+                businessDate: await this.inventory.currentBusinessDate(access.merchantId),
+                expectedVersion: request.targetVersion ?? 1,
+                policyFingerprint: (persisted ?? context).fingerprint,
+              },
+            );
+          // Supplier invoices (plan §11, phase 5). The invoice commands carry their own
+          // `commandId`/`idempotencyKey` in `parameters`, the way the contract's
+          // `SupplierInvoice*Request` models define them, so the target aggregate and
+          // the version are injected from the COMMAND exactly as the authoring cases do.
+          case 'inventory.invoice.upload': {
+            const service = this.invoiceService();
+            return service.uploadSupplierInvoice(
+              user,
+              access,
+              persisted ?? context,
+              this.authoringDto<SupplierInvoiceUploadRequest>(
+                SupplierInvoiceUploadRequest,
+                request,
+                {},
+              ),
+            );
+          }
+          case 'inventory.invoice.match': {
+            const service = this.invoiceService();
+            return service.matchSupplierInvoice(
+              user,
+              access,
+              persisted ?? context,
+              this.authoringDto<SupplierInvoiceMatchRequest>(SupplierInvoiceMatchRequest, request, {
+                supplierInvoiceId: request.targetAggregateId,
+              }),
+            );
+          }
+          case 'inventory.invoice.commit': {
+            const service = this.invoiceService();
+            return service.commitSupplierInvoice(
+              user,
+              access,
+              persisted ?? context,
+              this.authoringDto<SupplierInvoiceCommitRequest>(
+                SupplierInvoiceCommitRequest,
+                request,
+                { supplierInvoiceId: request.targetAggregateId },
+              ),
+            );
+          }
           case 'refund.eligibility':
             return this.refunds.eligibilityAdministrative(
               user,
@@ -478,6 +694,50 @@ export class AdministrativeCommandExecutionService {
       idempotencyKey: request.idempotencyKey,
       approvalId: request.approvalId,
     });
+  }
+
+  /**
+   * The inventory-authoring parameters: the command's own parameters, plus the
+   * target id and version the console sent on the command rather than inside
+   * `parameters`.
+   *
+   * A shape the contract does not accept answers VALIDATION_FAILED rather than a
+   * bare zod error, because a console form that sends a bad label or a negative
+   * threshold is a caller mistake and has to be told so.
+   */
+  private authoringDto<T>(
+    schema: ZodTypeAny,
+    request: DashboardAdministrativeCommandRequest,
+    target: Record<string, unknown>,
+  ): T {
+    const parsed = schema.safeParse({
+      ...request.parameters,
+      ...target,
+      commandId: request.commandId,
+      idempotencyKey: request.idempotencyKey,
+    });
+    if (parsed.success) return parsed.data as T;
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.length > 0 ? issue.path.join('.') : '$';
+      const bucket = fieldErrors[path];
+      if (bucket) bucket.push(issue.message);
+      else fieldErrors[path] = [issue.message];
+    }
+    throw new BadRequestException({ code: 'VALIDATION_FAILED', fieldErrors });
+  }
+
+  /**
+   * The purchasing service, for the three supplier-invoice operations.
+   *
+   * A missing provider is a WIRING fault and not a caller mistake, so it is raised as a
+   * plain error: the command door records a failure and the process answers 500, which
+   * is what an operator should see when the module that owns these writes is not
+   * registered.
+   */
+  private invoiceService(): ProcurementService {
+    if (!this.procurement) throw new Error('supplier_invoice_service_unavailable');
+    return this.procurement;
   }
 
   private approveAdministrative(

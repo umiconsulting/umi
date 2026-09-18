@@ -3,6 +3,13 @@ import { test, expect } from '@playwright/test';
 const merchantId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
 
+// The element list is the room in words: the board itself is a canvas, so this list is
+// what a screen reader gets. Each table button therefore reads
+// "<label> · <capacity> · <live state>" ("T1 · 4 · Libre"), and the state suffix moves
+// as the floor is used. Match on the label-and-capacity prefix; the state is asserted
+// separately, by the tests that care about it.
+const tableItem = (page) => page.getByRole('button', { name: /^T1 · 4(?: ·|$)/ });
+
 async function openEditor(page) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -182,7 +189,7 @@ test('area tabs navigate by name and count, and tables carry the POS structure',
   expect(tabs[1].name.trim().endsWith('2')).toBe(true);
 
   await page.getByRole('tab', { name: /1 table$/ }).click();
-  await expect(page.getByRole('button', { name: 'T1 · 4', exact: true })).toBeVisible();
+  await expect(tableItem(page)).toBeVisible();
   expect((await areaTabs(page))[0].selected).toBe(true);
 
   // The authoring grid belongs to the editor, not to the POS surface, and the
@@ -192,7 +199,7 @@ test('area tabs navigate by name and count, and tables carry the POS structure',
   await page.getByRole('button', { name: 'View published', exact: true }).click();
   expect(await page.evaluate(() => window.Konva.stages[0].getLayers().length)).toBe(1);
   await page.getByRole('tab', { name: /0 tables$/ }).click();
-  await expect(page.getByRole('button', { name: 'T1 · 4', exact: true })).toHaveCount(0);
+  await expect(tableItem(page)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -271,7 +278,7 @@ test('a long drag pauses autosave and publishes the visible coordinates', async 
   await page.getByRole('button', { name: 'View published', exact: true }).click();
   expect(await geometry(page, 'T1')).toMatchObject({ x: saved.x, y: saved.y });
   await page.reload();
-  await expect(page.getByRole('button', { name: 'T1 · 4', exact: true })).toBeVisible();
+  await expect(tableItem(page)).toBeVisible();
   expect(await geometry(page, 'T1')).toMatchObject({ x: saved.x, y: saved.y });
   expect(errors).toEqual([]);
 });

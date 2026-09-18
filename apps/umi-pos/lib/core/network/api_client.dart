@@ -52,6 +52,7 @@ abstract interface class ApiClient {
     CancellationToken? cancellation,
     bool idempotent = false,
     bool authRefresh = true,
+    Map<String, String>? extraHeaders,
   });
   void dispose();
 }
@@ -101,6 +102,7 @@ final class BoundedApiClient implements ApiClient {
     CancellationToken? cancellation,
     bool idempotent = false,
     bool authRefresh = true,
+    Map<String, String>? extraHeaders,
   }) async {
     if (!path.startsWith('/')) {
       throw const AppException(
@@ -131,6 +133,7 @@ final class BoundedApiClient implements ApiClient {
           cancellation: cancellation,
           idempotent: idempotent,
           base: base,
+          extraHeaders: extraHeaders,
         );
       } on AppException catch (error) {
         if (!didRefresh &&
@@ -158,6 +161,7 @@ final class BoundedApiClient implements ApiClient {
     CancellationToken? cancellation,
     required bool idempotent,
     required Uri base,
+    Map<String, String>? extraHeaders,
   }) async {
     final safeRetry =
         method == ApiMethod.get || method == ApiMethod.head || idempotent;
@@ -183,6 +187,10 @@ final class BoundedApiClient implements ApiClient {
                 'x-umi-client': 'umi-pos',
                 'x-umi-app': 'pos',
                 ...deviceHeaders,
+                // A route whose contract names no credential of ours can still
+                // ask for one under its own header name. Applied last so the
+                // caller, not the transport, decides a name it knows about.
+                ...?extraHeaders,
               });
         if (token != null) request.headers['authorization'] = 'Bearer $token';
         if (body != null) {
@@ -263,12 +271,52 @@ final class BoundedApiClient implements ApiClient {
         // The server response is not a valid public error contract.
       }
     }
+    final legacyCode = _legacyErrorCode(response);
+    if (legacyCode != null) {
+      final message = response['message'];
+      return AppException.fromApi(
+        ApiError(
+          code: legacyCode,
+          message: message is String && message.isNotEmpty
+              ? message
+              : legacyCode,
+          retryable: false,
+          correlationId: fallbackCorrelationId,
+        ),
+      );
+    }
     return AppException(
       category: AppErrorCategory.server,
       code: 'INVALID_ERROR_RESPONSE',
       recoverable: false,
       correlationId: fallbackCorrelationId,
     );
+  }
+
+  /// A machine code from a refusal that did not use the public envelope.
+  ///
+  /// The kitchen device route (`POST /api/kds/command`) kept the legacy iPad
+  /// contract, so it answers refusals in two of its own shapes: a device
+  /// refusal is `{"error":"device_revoked"}` — a string where the envelope has
+  /// an object — and a version conflict is a 409 whose body is
+  /// `{"ok":true,"data":{"code":"KITCHEN_VERSION_CONFLICT"}}`. Reading both
+  /// here keeps one typed failure path for callers, which is what lets the
+  /// board tell "the ticket moved under you" (reload, then say so) apart from
+  /// "this device was removed" (pair again) instead of showing both as an
+  /// unreadable generic failure.
+  String? _legacyErrorCode(Map<String, Object?> response) {
+    final error = response['error'];
+    if (error is String && error.trim().isNotEmpty) {
+      return error.trim().toUpperCase();
+    }
+    final data = response['data'];
+    if (data is Map<String, Object?>) {
+      final code = data['code'];
+      if (code is String && code.trim().isNotEmpty) {
+        return code.trim().toUpperCase();
+      }
+    }
+    return null;
   }
 
   String _correlationId() {

@@ -25,12 +25,17 @@ export * from './pos-sale';
 export * from './pos-cash';
 export * from './pos-exception';
 export * from './pos-inventory';
+export * from './procurement';
+export * from './inventory-costing';
+export * from './recipes';
 export * from './pos-customer-value';
 export * from './pos-hardware';
 export * from './pos-kitchen';
 export * from './dashboard-operations';
 export * from './reports';
 export * from './fiscal';
+export * from './tender';
+export * from './mercado-pago';
 // Realtime transport vocabulary: the socket namespace, event names, and payloads.
 export * from './realtime';
 // The generated-artifact manifest: versions, error/route/model/invariant catalogues.
@@ -40,3 +45,5 @@ export * from './catalog';
 export * from './entitlements';
 
 export * from './floor-plan';
+export * from './table-state';
+export * from './table-order';

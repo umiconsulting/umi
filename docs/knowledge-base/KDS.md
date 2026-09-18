@@ -54,7 +54,7 @@ La prueba física del iPad y la red pertenece a Gate 13.
 
 ## Fuentes
 
-- Aplicación: `apps/umi-kds/Sources/`
-- Repositorio: `apps/umi-kds/Sources/Data/OrderRepository.swift`
+- Aplicación: `apps/umi-pos`, destino "Cocina".
+- Implementación: `apps/umi-pos/lib/features/kitchen/`
 - API: `apps/umi-api/src/modules/kds/`
 - Modelo operativo: `docs/product/UMIPOS_KDS_OPERATIONAL_MODEL.md`

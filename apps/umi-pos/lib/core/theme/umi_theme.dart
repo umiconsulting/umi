@@ -14,6 +14,8 @@ abstract final class UmiRadius {
 }
 
 abstract final class UmiTouchTarget {
+  /// The smallest hit box any pointer target may publish, on every platform.
+  /// Plan section 5.2: the floor is 44 px and this product's tap floor is 48.
   static const minimum = 48.0;
   static const primary = 52.0;
 }
@@ -60,6 +62,11 @@ abstract final class UmiTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: background,
       visualDensity: VisualDensity.standard,
+      // The till is a touch surface whatever platform the build runs on, and
+      // `ThemeData` picks `shrinkWrap` for linux/macos/windows — which is how a
+      // 38 px filter chip and a 40 px order-type segment reached the floor. One
+      // tap floor for the whole product: `UmiTouchTarget.minimum`.
+      materialTapTargetSize: MaterialTapTargetSize.padded,
       textTheme: textTheme.copyWith(
         headlineMedium: textTheme.headlineMedium?.copyWith(
           height: 1.15,
@@ -140,10 +147,14 @@ abstract final class UmiTheme {
         showDragHandle: true,
         constraints: BoxConstraints(maxWidth: 760),
       ),
-      snackBarTheme: SnackBarThemeData(
-        behavior: SnackBarBehavior.floating,
-        shape: controlShape,
-      ),
+      // NO `snackBarTheme`, and no floating bottom notification anywhere in the
+      // till. The owner's direction: those bars are distracting and are not this
+      // design. They covered the destination bar, they sat on top of whatever
+      // dialog was open, and a tap aimed at the dialog underneath dismissed the
+      // bar instead of reaching the button - the sale-complete dialog's "Nuevo
+      // pedido" was measurably stolen by the "listo para el siguiente cliente"
+      // bar sitting on it. A message belongs where the work is: `InlineNotice`
+      // in the surface that raised it, or the dialog that surface already uses.
       extensions: const <ThemeExtension<dynamic>>[UmiOperatorTokens()],
     );
   }

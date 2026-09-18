@@ -21,6 +21,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-09-14 - Launch the local database, API, and POS stack
+- task type: local runtime startup
+- request summary: Start the local Postgres, Redis, umi-api, and native Linux UmiPOS, then prove readiness.
+- filesystem slice inspected: `deploy/local/compose.yml`, `apps/umi-api/README.md`, `apps/umi-api/.env`, `apps/umi-pos/README.md`, `docs/development/RUNNING_UMIPOS.md`
+- chosen owner: root local runtime; no source edit
+- chosen path: reuse the running Docker database and Redis on ports 4003 and 4004; reuse the healthy API on port 4001; build and run the native Linux UmiPOS
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md` only
+- tools used: `docker exec`, `psql`, `curl`, `flutter build linux`, `setsid`, `pgrep`, `xwininfo`, `xwd`, `ffmpeg`
+- outcome: database and Redis healthy; API `/health` answers 200 with compatible schema `build-v3-62`; the native POS window runs and shows the till
+- reusable pattern observed: a background command from a tool shell stops without `setsid`; the POS needs the release identity dart-defines to pass its release gate
+- promotion follow-up: none; `deploy/local/compose.yml` and the UmiPOS runbook already state the steps
+
 ### 2026-09-01 - Device branch assignment and enrollment list stabilization
 - task type: dashboard and API bug fix for device registration
 - request summary: assign devices to a branch and stop the UmiPOS request count from decreasing after page load

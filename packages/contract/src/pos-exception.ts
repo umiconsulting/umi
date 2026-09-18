@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CorrelationId, IsoTimestamp, MerchantDate, Money, Uuid } from './platform';
+import { TenderProviderId } from './tender';
 
 const Fingerprint = z.string().regex(/^[a-f0-9]{64}$/);
 const NonNegativeMoney = Money.refine(
@@ -305,6 +306,19 @@ export const ManualTerminalRefundInstruction = z
     correlationReference: CorrelationId,
     queryOnly: z.boolean(),
     canRetryAsNew: z.boolean(),
+    /**
+     * TRUE WHEN THE MONEY CAME FROM A DEVICE WE INTEGRATED WITH (plan §4 Phase 4, §13.4).
+     *
+     * It exists so the till stops asking a question with no power. A person-operated terminal
+     * has no other witness, so the operator's declaration IS the record — that is what
+     * `false` means here. A terminal a PROVIDER took answers for itself: the refund is asked
+     * of the vendor when the exception is committed, and an operator's declaration is not
+     * accepted as a substitute for the vendor's answer. The till shows which of the two it
+     * is looking at, and asks for a declaration only where a person is the only witness.
+     */
+    providerBacked: z.boolean(),
+    /** The provider that will answer, when there is one. Never a credential. */
+    provider: TenderProviderId.nullable(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -375,6 +389,18 @@ export const SaleExceptionCommand = z
     commandId: Uuid,
     idempotencyKey: Uuid,
     offline: z.literal(false).default(false),
+    /**
+     * The SAT's cancellation motive (c_MotivoCancelacion) for the sale's CFDI, when this
+     * command voids a sale that was invoiced.
+     *
+     * It travels here rather than on its own fiscal route because the two facts are ONE
+     * act: §8G's acceptance requires that a cancelled sale cancels its fiscal document, and
+     * an operator must not be able to do half of it. `02` — "comprobante emitido con
+     * errores sin relación" — is the default because motive `01` needs the UUID of a
+     * related CFDI, which a counter sale cannot supply; the operator may choose any of the
+     * four, and the choice is recorded on the document.
+     */
+    fiscalMotive: z.enum(['01', '02', '03', '04']).default('02'),
   })
   .strict();
 

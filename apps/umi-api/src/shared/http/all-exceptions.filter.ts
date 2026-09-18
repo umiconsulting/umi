@@ -47,6 +47,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${status} request_failed correlationId=${correlationId} type=${errorType} detail=${detail}`,
         exception instanceof Error ? exception.stack : undefined,
       );
+    } else {
+      // A REFUSAL IS LOGGED TOO, AT `warn`. It used to be silent: the log recorded
+      // only 2xx, so a client that kept being told "no" left no trace, and the only
+      // way to find out why was to guess. The till's inventory surface failed this
+      // way for a whole afternoon on a missing policy lease, and the log said
+      // nothing at all. The code and the route are enough to find the caller.
+      const correlationId = getRequestContext()?.correlationId ?? 'unavailable';
+      const scope = getRequestContext();
+      const requestScope = scope
+        ? `merchant=${scope.merchantId ?? 'none'} location=${scope.locationId ?? 'none'}`
+        : 'unknown_scope';
+      this.logger.warn(
+        `${status} request_refused correlationId=${correlationId} ${requestScope} code=${publicError(status, payload, correlationId).code} detail=${describeRefusal(payload)}`,
+      );
     }
 
     const context = getRequestContext();
@@ -84,6 +98,17 @@ function publicError(status: number, payload: string | object, correlationId: st
     'fieldErrors' in source && typeof source.fieldErrors === 'object' && source.fieldErrors !== null
       ? (source.fieldErrors as Record<string, string[]>)
       : undefined;
+  // The facts a refusal needs in order to be actionable. Only for 4xx: a 5xx
+  // message is already replaced with "Internal server error", and a detail bag
+  // on a server fault would leak whatever the failing code happened to know —
+  // ids from another merchant, an internal path, a constraint name.
+  const details =
+    status < SERVER_ERROR_MIN &&
+    'details' in source &&
+    typeof source.details === 'object' &&
+    source.details !== null
+      ? (source.details as Record<string, string | number | boolean | null>)
+      : undefined;
 
   return {
     code,
@@ -91,6 +116,7 @@ function publicError(status: number, payload: string | object, correlationId: st
     retryable: status === 429 || status >= SERVER_ERROR_MIN,
     correlationId,
     ...(fieldErrors ? { fieldErrors } : {}),
+    ...(details ? { details } : {}),
   };
 }
 
@@ -102,4 +128,28 @@ function codeForStatus(status: number): ApiError['code'] {
   if (status === 409) return 'CONFLICT';
   if (status === 429) return 'RATE_LIMITED';
   return 'INTERNAL_ERROR';
+}
+
+/**
+ * A one-line summary of a refusal for the log. The operator still sees the same
+ * envelope; this exists so the person reading the server log can tell WHICH item and
+ * which rule refused, which the code alone does not say. Bounded, and it never
+ * carries a stack.
+ */
+function describeRefusal(payload: string | object): string {
+  if (typeof payload === 'string') return payload.slice(0, 300);
+  const source = payload as Record<string, unknown>;
+  const parts: string[] = [];
+  for (const key of ['code', 'message', 'inventoryItemId', 'inventoryLocationId', 'detail']) {
+    const value = source?.[key];
+    if (typeof value === 'string' && value.length > 0) parts.push(`${key}=${value.slice(0, 120)}`);
+  }
+  if (
+    'details' in (source ?? {}) &&
+    typeof source.details === 'object' &&
+    source.details !== null
+  ) {
+    parts.push(`details=${JSON.stringify(source.details).slice(0, 200)}`);
+  }
+  return parts.join(' ') || 'no_detail';
 }

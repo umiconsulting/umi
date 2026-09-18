@@ -32,6 +32,30 @@ static void my_application_activate(GApplication* application) {
   // in case the window manager does more exotic layout, e.g. tiling.
   // If running on Wayland assume the header bar will work (may need changing
   // if future cases occur).
+  //
+  // A fullscreen window asks for no title bar at all, so the header bar is
+  // skipped below when fullscreen is requested.
+  //
+  // WHY FULLSCREEN IS REQUESTED BEFORE THE WINDOW IS MAPPED, AND NOT AFTER.
+  //
+  // Asking a MAPPED window to go fullscreen KILLS this client on a GNOME/X11
+  // compositor. The request resizes the view to the display's full height, the
+  // compositor hands Flutter a shorter surface, and the GTK embedder gives up
+  // waiting for a frame of the size it asked for:
+  //
+  //   WARNING: Timed out waiting for OpenGL frame of size 1920x1080
+  //            (have 1920x1004)
+  //   Lost connection to device.
+  //
+  // Set UMIPOS_FULLSCREEN=1 (a counter terminal, and every test run) and the
+  // window IS fullscreen by the time it is mapped, which is a state the embedder
+  // reaches without a resize race. Unset, the window keeps its title bar and its
+  // controls, which is what a workstation wants.
+  const gchar* fullscreen_env = g_getenv("UMIPOS_FULLSCREEN");
+  const gboolean fullscreen =
+      fullscreen_env != nullptr &&
+      (g_strcmp0(fullscreen_env, "1") == 0 ||
+       g_ascii_strcasecmp(fullscreen_env, "true") == 0);
   gboolean use_header_bar = TRUE;
 #ifdef GDK_WINDOWING_X11
   GdkScreen* screen = gtk_window_get_screen(window);
@@ -42,7 +66,7 @@ static void my_application_activate(GApplication* application) {
     }
   }
 #endif
-  if (use_header_bar) {
+  if (use_header_bar && !fullscreen) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
     gtk_header_bar_set_title(header_bar, "UmiPOS");
@@ -53,6 +77,9 @@ static void my_application_activate(GApplication* application) {
   }
 
   gtk_window_set_default_size(window, 1280, 720);
+  if (fullscreen) {
+    gtk_window_fullscreen(window);
+  }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(

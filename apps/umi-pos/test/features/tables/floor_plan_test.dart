@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
+import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
@@ -169,6 +170,8 @@ void main() {
       late BuildContext entryContext;
       await tester.pumpWidget(
         MaterialApp(
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: Builder(
             builder: (context) {
               entryContext = context;
@@ -251,6 +254,8 @@ void main() {
     late BuildContext entryContext;
     await tester.pumpWidget(
       MaterialApp(
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Builder(
           builder: (context) {
             entryContext = context;
@@ -501,6 +506,8 @@ void main() {
     late BuildContext entryContext;
     await tester.pumpWidget(
       MaterialApp(
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Builder(
           builder: (context) {
             entryContext = context;

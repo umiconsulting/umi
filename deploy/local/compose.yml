@@ -15,7 +15,7 @@
 #   docker compose -f deploy/local/compose.yml down        # keep data
 #   docker compose -f deploy/local/compose.yml down -v     # drop data, reseed on next up
 
-name: umi-local
+name: umi-buildv3-local
 
 services:
   postgres:
@@ -40,7 +40,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./seed:/seed:ro
-      - ./postgres-init.sh:/docker-entrypoint-initdb.d/00-umi-local.sh:ro
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/00-umi-buildv3-local.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres -d umi_transition_rehearsal_20260901']
       interval: 5s

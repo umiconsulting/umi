@@ -15,12 +15,16 @@ import type {
 import type { CustomerValueCommitResult, CustomerValueSelection } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import { writeOrder } from '../../shared/orders/order-writer';
+import { CashRefusal } from '../pos-cash/cash-refusal';
+import { deviceRegisterHoldDetails, resolveDeviceRegisterHold } from './cash-shift-hold';
 
 export interface CheckoutLine {
   id: string;
   productId: string;
   variantId: string | null;
   quantity: number;
+  /** §8H step 4. The course this cart line is served in; 1 when never set. */
+  courseNumber: number;
   note: string | null;
   modifiers: Array<{ modifierId: string; quantity: number }>;
 }
@@ -437,8 +441,16 @@ export class PosCheckoutRepository {
         command.cashShiftId,
       ],
     );
-    if (!rows[0]) throw new Error('Checkout draft is immutable or belongs to another context.');
-    return rows[0];
+    // NOT an error: the upsert protects two facts on purpose (a settled draft is
+    // immutable, and a confirmed terminal payment cannot be dropped from the
+    // tenders), so "no row came back" is a REFUSAL the caller must report as one.
+    // Throwing produced a bare 500 - "Checkout draft is immutable or belongs to
+    // another context." - for the ordinary operator action of changing the
+    // tender after a terminal was marked confirmed, and a 500 tells the cashier
+    // nothing, invites a retry that cannot work, and leaves the cart unpayable
+    // until it is abandoned. `null` lets the service answer with the typed
+    // refusal the checkout already knows how to deliver.
+    return rows[0] ?? null;
   }
 
   async consumeApprovals(
@@ -589,7 +601,8 @@ export class PosCheckoutRepository {
     if (!cart.rows[0]) return null;
     const lines = await client.query<CheckoutLine>(
       `SELECT l.id::text,l.product_id::text AS "productId",
-              l.variant_id::text AS "variantId",l.quantity,l.note,
+              l.variant_id::text AS "variantId",l.quantity,l.course_number AS "courseNumber",
+              l.note,
               COALESCE(jsonb_agg(jsonb_build_object('modifierId',m.modifier_id::text,
                 'quantity',m.quantity) ORDER BY m.modifier_id)
                 FILTER(WHERE m.id IS NOT NULL),'[]') AS modifiers
@@ -882,6 +895,121 @@ export class PosCheckoutRepository {
             : tender.type === 'wallet'
               ? 'stored_value'
               : 'gift_card';
+      // ── The captured tender, linked and believed (workstream G) ────────────
+      //
+      // A tender draft that was CAPTURED through a provider adapter already has an
+      // attempt record, keyed by the draft's own id. Two things follow, and both are the
+      // acceptance's second sentence:
+      //
+      //   1. If that attempt is not `succeeded`, the commit REFUSES. A terminal that
+      //      timed out, or answered in a way we cannot read, must not become a paid sale
+      //      — not by a retry, not by a second tab, and not by an operator pressing
+      //      through the error.
+      //   2. If it IS `succeeded`, the commit LINKS it — the same row gets its
+      //      `tender_id` — instead of writing a second attempt for the same money. The
+      //      proof therefore stays the provider's own payment id, and the sale cannot
+      //      come to rest on a person's word.
+      //
+      // A tender with no captured attempt (anything the till does today: cash, a manual
+      // terminal, stored value) takes the existing path below and is unchanged. That is
+      // deliberate — the till has no card capture yet, and this guard must not change
+      // the behaviour of any flow it does not own.
+      const captured = await client.query<{
+        id: string;
+        status: string;
+        provider: string | null;
+        proofSource: string | null;
+        amountMinorUnits: string;
+        currency: string;
+      }>(
+        `SELECT id::text AS "id", status, provider, proof_source AS "proofSource",
+                amount_minor_units::text AS "amountMinorUnits", currency
+           FROM merchant.pos_payment_attempt
+          WHERE merchant_id=$1::uuid AND cart_id=$2::uuid AND tender_draft_id=$3::uuid
+          FOR UPDATE`,
+        [cart.merchantId, cart.id, tender.tenderId],
+      );
+      const capture = captured.rows[0];
+      if (capture) {
+        if (capture.status !== 'succeeded') {
+          // The refusal names the state and keeps the attempt id, so the till can send
+          // the operator to the query route rather than to the card reader again.
+          throw new ConflictException({
+            code: 'PAYMENT_UNKNOWN',
+            details: {
+              attemptId: capture.id,
+              attemptStatus: capture.status,
+              provider: capture.provider,
+            },
+          });
+        }
+        if (
+          capture.amountMinorUnits !== String(tender.applied.minorUnits) ||
+          capture.currency !== tender.applied.currency
+        ) {
+          throw new ConflictException({
+            code: 'TENDER_OVERALLOCATION',
+            details: {
+              attemptId: capture.id,
+              capturedAmountMinorUnits: capture.amountMinorUnits,
+              tenderAmountMinorUnits: tender.applied.minorUnits,
+            },
+          });
+        }
+        // Linked, not duplicated: the attempt that holds the provider's proof becomes the
+        // attempt this tender was paid by.
+        const linked = await client.query<{
+          id: string;
+          method: PaymentMethod;
+          amountMinorUnits: string;
+          currency: string;
+          status: PaymentOutcome['attempt']['status'];
+          queryOnly: boolean;
+          correlationId: string;
+          expiresAt: string | null;
+          createdAt: string;
+        }>(
+          `UPDATE merchant.pos_payment_attempt
+              SET tender_id=$4::uuid
+            WHERE merchant_id=$1::uuid AND cart_id=$2::uuid AND id=$3::uuid
+            RETURNING id::text,method,amount_minor_units::text AS "amountMinorUnits",
+                      currency,status,query_only AS "queryOnly",
+                      correlation_id AS "correlationId",expires_at::text AS "expiresAt",
+                      created_at::text AS "createdAt"`,
+          [cart.merchantId, cart.id, capture.id, tender.tenderId],
+        );
+        const attempt = linked.rows[0];
+        if (!attempt) {
+          throw new Error('Payment identity conflicts with another tender result.');
+        }
+        outcomes.push({
+          attempt: {
+            id: attempt.id,
+            method: attempt.method,
+            amount: {
+              minorUnits: Number(attempt.amountMinorUnits),
+              currency: attempt.currency,
+            },
+            status: attempt.status,
+            expiresAt: attempt.expiresAt,
+            correlationId: attempt.correlationId,
+            queryOnly: attempt.queryOnly,
+            createdAt: attempt.createdAt,
+          },
+          ambiguity: null,
+        });
+        continue;
+      }
+      // Every success names what proved it (`payment_attempt_success_provenance_ck`).
+      // The drawer proves cash; our own wallet transaction proves stored value; and a
+      // manual terminal is a PERSON's reading, which is named as such rather than passed
+      // off as a capture.
+      const proofSource =
+        tender.type === 'cash'
+          ? 'cash'
+          : tender.type === 'wallet' || tender.type === 'gift_card'
+            ? 'internal_ledger'
+            : 'operator_attested';
       const { rows } = await client.query<{
         id: string;
         method: PaymentMethod;
@@ -895,8 +1023,8 @@ export class PosCheckoutRepository {
       }>(
         `INSERT INTO merchant.pos_payment_attempt
            (merchant_id,location_id,cart_id,tender_id,method,amount_minor_units,currency,
-            status,query_only,correlation_id,resolved_at)
-         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,'succeeded',false,$8,now())
+            status,query_only,correlation_id,resolved_at,proof_source)
+         VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,'succeeded',false,$8,now(),$9)
          ON CONFLICT(merchant_id,cart_id,tender_id) DO UPDATE SET
            tender_id=excluded.tender_id
          WHERE merchant.pos_payment_attempt.location_id=excluded.location_id
@@ -918,6 +1046,7 @@ export class PosCheckoutRepository {
           tender.applied.minorUnits,
           tender.applied.currency,
           correlationId,
+          proofSource,
         ],
       );
       const attempt = rows[0];
@@ -1066,7 +1195,24 @@ export class PosCheckoutRepository {
   }> {
     const cashTenders = paymentSummary.tenders.filter((tender) => tender.type === 'cash');
     if (cashTenders.length > 0 && cashShiftId === null) {
-      throw new Error('CASH_SHIFT_REQUIRED');
+      // A cash sale that reached the money path with no shift on the request is a
+      // CONFLICT with facts attached, not a server fault. The code keeps its name
+      // (`CASH_SHIFT_REQUIRED`) and the register and its hold travel in `details`,
+      // so the till can resume its own shift, reclaim an orphaned one, or ask for
+      // a count instead of retrying the same broken payload. See
+      // `resolveDeviceRegisterHold` for why this is the ordinary shape of a
+      // restart rather than a cashier who forgot to open a drawer.
+      throw new CashRefusal(
+        'CASH_SHIFT_REQUIRED',
+        409,
+        deviceRegisterHoldDetails(
+          await resolveDeviceRegisterHold(client, {
+            merchantId: cart.merchantId,
+            locationId: cart.locationId,
+            deviceId: authorization.deviceId,
+          }),
+        ),
+      );
     }
     if (cashTenders.length > 1) {
       throw new Error('MULTIPLE_CASH_TENDERS_NOT_ALLOWED');
@@ -1113,6 +1259,9 @@ export class PosCheckoutRepository {
         name: line.description,
         variantName: line.variantName ?? null,
         quantity: line.quantity,
+        // §8H step 4. The receipt line and the cart line are index-aligned here; the
+        // course travels onto order_item so the kitchen projection can hold it back.
+        courseNumber: cart.lines[index]?.courseNumber ?? 1,
         unitPriceCents: line.unitPrice.minorUnits,
         notes: line.note ?? null,
         modifiers: (line.modifiers ?? []).map((name) => ({ name, priceDeltaCents: 0 })),
@@ -1462,6 +1611,76 @@ export class PosCheckoutRepository {
     );
   }
 
+  /**
+   * Withdraw ONE terminal claim from a draft, and put the draft back to work.
+   *
+   * The guards this undoes are deliberate: a draft holding a `manual_terminal`
+   * tender that says money moved (or might have) cannot be cancelled, and a later
+   * tender set cannot drop that claim, because erasing a claim that money changed
+   * hands is what those guards exist to prevent. What was missing is the other
+   * half — the operator who reads the terminal and finds it did NOT charge. Their
+   * cart was unpayable and their screen inescapable.
+   *
+   * So this is narrow on purpose. It names the tender it withdraws, it insists the
+   * claim is a `manual_terminal` in one of the two unresolved states, and it does
+   * three things in one transaction: drops that tender from the draft, deletes its
+   * uncommitted fact (a tender fact is only financial at commit — `cancelDraft`
+   * already removes non-committed facts), and returns the draft to
+   * `selecting_tender` with no command fingerprint, because the fingerprint
+   * belonged to the tender that just left. The audit event written by the caller
+   * is what remains of the claim, and it names who decided.
+   *
+   * Returns null when there is no such draft, or when it holds no claim under that
+   * id: this route can never clear tenders the caller did not name.
+   */
+  async recoverTerminalClaim(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    operatorSessionId: string,
+    cartId: string,
+    tenderDraftId: string,
+  ): Promise<{ id: string; remaining: number } | null> {
+    const { rows } = await client.query<{
+      id: string;
+      tenderDrafts: CheckoutRecoverySnapshot['tenderDrafts'];
+    }>(
+      `SELECT id::text,tender_drafts AS "tenderDrafts"
+         FROM merchant.pos_checkout_draft
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+          AND operator_session_id=$3::uuid AND cart_id=$4::uuid
+        FOR UPDATE`,
+      [merchantId, locationId, operatorSessionId, cartId],
+    );
+    const draft = rows[0];
+    if (!draft) return null;
+    const claimed = draft.tenderDrafts.some(
+      (tender) =>
+        tender.id === tenderDraftId &&
+        tender.type === 'manual_terminal' &&
+        (tender.status === 'confirmed_success' || tender.status === 'outcome_unknown'),
+    );
+    if (!claimed) return null;
+    const remaining = draft.tenderDrafts.filter((tender) => tender.id !== tenderDraftId);
+    await client.query(
+      `UPDATE merchant.pos_checkout_draft
+          SET tender_drafts=$2::jsonb,
+              state='selecting_tender',
+              recovery_state='none',
+              command_fingerprint=null,
+              version=version+1,
+              updated_at=now()
+        WHERE id=$1::uuid`,
+      [draft.id, JSON.stringify(remaining)],
+    );
+    await client.query(
+      `DELETE FROM merchant.pos_tender_fact
+        WHERE checkout_id=$1::uuid AND id=$2::uuid AND status <> 'committed'`,
+      [draft.id, tenderDraftId],
+    );
+    return { id: draft.id, remaining: remaining.length };
+  }
+
   async cancelDraft(
     client: PoolClient,
     merchantId: string,
@@ -1515,6 +1734,25 @@ export class PosCheckoutRepository {
       [cartId],
     );
     return { id: draft.id, blocked: false };
+  }
+
+  /**
+   * The effective policy for a location, for a caller that is NOT inside a
+   * checkout.
+   *
+   * `policy` takes the live client of an integrity transaction; this opens its
+   * own so the tender screen can ask what it is allowed to offer before anything
+   * is charged. A missing row reads as default-deny, which is a fact the till
+   * needs rather than an error.
+   */
+  async policyForLocation(
+    merchantId: string,
+    locationId: string,
+    currency: string,
+  ): Promise<CheckoutPolicy> {
+    return this.pg.runWithMerchant(merchantId, null, (client) =>
+      this.policy(client, merchantId, locationId, currency),
+    );
   }
 
   async paymentStatus(

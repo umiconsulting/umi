@@ -4,6 +4,7 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/inline_notice.dart';
 import 'cash_controller.dart';
 import 'denomination_counter.dart';
 import 'money_input.dart';
@@ -41,6 +42,11 @@ final class CashCenter extends StatefulWidget {
 }
 
 final class _CashCenterState extends State<CashCenter> {
+  /// The last failed cash operation, shown inline. It used to be a bar that
+  /// slid up from the bottom, which in this screen landed over the denomination
+  /// keypad the operator is mid-way through counting.
+  String? _notice;
+
   @override
   void initState() {
     super.initState();
@@ -58,13 +64,9 @@ final class _CashCenterState extends State<CashCenter> {
     setState(() {});
     final error = widget.controller.state.errorCode;
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context).cashOperationFailedMessage,
-          ),
-        ),
-      );
+      _notice = AppLocalizations.of(context).cashOperationFailedMessage;
+    } else {
+      _notice = null;
     }
   }
 
@@ -92,72 +94,114 @@ final class _CashCenterState extends State<CashCenter> {
         ],
       ),
       body: SafeArea(
-        child: snapshot == null
-            ? const Center(child: CircularProgressIndicator())
-            : Semantics(
-                liveRegion: true,
-                label: _statusLabel(
-                  l,
-                  snapshot.currentShift?['status'] as String?,
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) => SingleChildScrollView(
-                    padding: const EdgeInsets.all(UmiSpacing.lg),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1040),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _StatusCard(
-                              title: snapshot.currentShift == null
-                                  ? l.shiftRequiredMessage
-                                  : _statusLabel(
-                                      l,
-                                      snapshot.currentShift!['status']
-                                          as String?,
-                                    ),
-                              register: _registerName(snapshot),
-                              businessDate: snapshot.businessDate,
-                              openedAt:
-                                  snapshot.currentShift?['openedAt'] as String?,
-                            ),
-                            const SizedBox(height: UmiSpacing.lg),
-                            if (snapshot.summary != null) ...[
-                              _ClosedSummaryCard(summary: snapshot.summary!),
-                              const SizedBox(height: UmiSpacing.lg),
-                            ],
-                            if (snapshot.adoptableShift != null)
-                              _AdoptShiftSection(
-                                controller: widget.controller,
-                                permissions: widget.permissions,
-                              )
-                            else if (snapshot.currentShift == null)
-                              _OpenShiftSection(
-                                controller: widget.controller,
-                                permissions: widget.permissions,
-                                registers: snapshot.registers,
-                              )
-                            else
-                              _ActiveShiftSection(
-                                controller: widget.controller,
-                                permissions: widget.permissions,
-                                onHandoffCompleted: widget.onHandoffCompleted,
-                              ),
-                            if (state.busy) ...[
-                              const SizedBox(height: UmiSpacing.md),
-                              const LinearProgressIndicator(),
-                            ],
-                          ],
+        child: Padding(
+          padding: const EdgeInsets.all(UmiSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_notice != null) ...[
+                InlineNotice(message: _notice!),
+                const SizedBox(height: UmiSpacing.md),
+              ],
+              if (state.busy) ...[
+                const LinearProgressIndicator(),
+                const SizedBox(height: UmiSpacing.md),
+              ],
+              Expanded(
+                child: snapshot == null
+                    ? (state.busy
+                          ? const Center(child: CircularProgressIndicator())
+                          : _CashUnavailable(onRetry: widget.controller.load))
+                    : Semantics(
+                        liveRegion: true,
+                        label: _statusLabel(
+                          l,
+                          snapshot.currentShift?['status'] as String?,
                         ),
+                        child: _ready(context, l, snapshot),
                       ),
-                    ),
-                  ),
-                ),
               ),
+            ],
+          ),
+        ),
       ),
     );
   }
+
+  /// The whole screen in one viewport, with no page-level scroll view.
+  ///
+  /// The reference viewport for the till is 1280 x 720 logical, and this screen
+  /// used to be a single centred 1040-wide column of stacked cards that ran past
+  /// it: on a counter terminal the operator had to scroll a *cash* screen to
+  /// reach "close the shift". The width was what the layout was wasting. The
+  /// same content fits side by side, and the drawer state, the movements and the
+  /// close path are all visible at once without anything moving under the hand.
+  Widget _ready(
+    BuildContext context,
+    AppLocalizations l,
+    CashCenterSnapshot snapshot,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _StatusCard(
+        title: snapshot.currentShift == null
+            ? l.shiftRequiredMessage
+            : _statusLabel(l, snapshot.currentShift!['status'] as String?),
+        register: _registerName(snapshot),
+        businessDate: snapshot.businessDate,
+        openedAt: snapshot.currentShift?['openedAt'] as String?,
+      ),
+      if (snapshot.summary != null) ...[
+        const SizedBox(height: UmiSpacing.md),
+        _ClosedSummaryCard(summary: snapshot.summary!),
+      ],
+      if (widget.controller.reclaimableRegisters.isNotEmpty) ...[
+        const SizedBox(height: UmiSpacing.md),
+        _ReclaimRegisterSection(
+          controller: widget.controller,
+          permissions: widget.permissions,
+        ),
+      ],
+      const SizedBox(height: UmiSpacing.md),
+      Expanded(child: _main(snapshot)),
+    ],
+  );
+
+  Widget _main(CashCenterSnapshot snapshot) {
+    if (snapshot.adoptableShift != null) {
+      return _centred(
+        _AdoptShiftSection(
+          controller: widget.controller,
+          permissions: widget.permissions,
+        ),
+      );
+    }
+    if (snapshot.currentShift == null) {
+      return _centred(
+        _OpenShiftSection(
+          controller: widget.controller,
+          permissions: widget.permissions,
+          registers: snapshot.registers,
+        ),
+      );
+    }
+    return _ActiveShiftSection(
+      controller: widget.controller,
+      permissions: widget.permissions,
+      onHandoffCompleted: widget.onHandoffCompleted,
+    );
+  }
+
+  /// A short section reads as a panel, not as a band stretched across a 1920
+  /// screen: the open and adopt forms keep a comfortable width in the middle.
+  /// The scroll view here is a guard for the denomination counter only, which
+  /// grows with the policy's coin list; nothing else on this screen needs it.
+  Widget _centred(Widget child) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 720),
+      child: SingleChildScrollView(child: child),
+    ),
+  );
 
   String _registerName(CashCenterSnapshot snapshot) {
     final shift = snapshot.currentShift;
@@ -179,6 +223,57 @@ final class _CashCenterState extends State<CashCenter> {
     'closed' => l.cashStatusClosed,
     _ => l.registerAvailableLabel,
   };
+}
+
+/// The Caja screen's own failure surface.
+///
+/// Shown when the first load never produced a snapshot. Before this existed the
+/// screen rendered a bare `CircularProgressIndicator` for that state, so a
+/// failed load was indistinguishable from a slow one and an operator had nothing
+/// to press — the plan's §4 bar requires a typed message with a recovery action,
+/// and the refresh icon in the app bar was the only way out (and is disabled
+/// while the controller is busy). Found by driving the real app against a
+/// failing API (defect D26); the strings are the two that already existed, so
+/// nothing new needed translating.
+final class _CashUnavailable extends StatelessWidget {
+  const _CashUnavailable({required this.onRetry});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(UmiSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 32,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: UmiSpacing.md),
+            Text(
+              l.cashOperationFailedMessage,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: UmiSpacing.md),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: Text(l.retryAction),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, UmiTouchTarget.minimum),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 final class _ClosedSummaryCard extends StatelessWidget {
@@ -326,6 +421,58 @@ final class _AdoptShiftSection extends StatelessWidget {
                   : () => controller.adoptShift(),
               child: Text(l.adoptShiftAction),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A register whose holding terminal is gone for good: nobody is coming back to
+/// count it, so the operator who may open a register may also free it. There is
+/// no count and no approval here on purpose — the cash stays in the drawer and
+/// the server proves the terminal is unusable.
+final class _ReclaimRegisterSection extends StatelessWidget {
+  const _ReclaimRegisterSection({
+    required this.controller,
+    required this.permissions,
+  });
+
+  final CashController controller;
+  final OperatorPermissions permissions;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final state = controller.state;
+    final canReclaim =
+        permissions.allows('cash.shift.open') && state.snapshot != null;
+    final registers = controller.reclaimableRegisters;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(UmiSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l.reclaimRegisterTitle,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: UmiSpacing.sm),
+            Text(l.reclaimRegisterMessage),
+            const SizedBox(height: UmiSpacing.lg),
+            for (final register in registers) ...[
+              FilledButton.tonal(
+                onPressed: state.busy || !canReclaim
+                    ? null
+                    : () =>
+                          controller.reclaimRegister(register['id']! as String),
+                child: Text(
+                  '${l.reclaimRegisterAction} · ${register['displayName'] ?? ''}',
+                ),
+              ),
+              const SizedBox(height: UmiSpacing.sm),
+            ],
           ],
         ),
       ),
@@ -552,127 +699,41 @@ final class _ActiveShiftSection extends StatelessWidget {
         permissions.allows('cash.shift.close');
     final showCloseFlow = canCount || countDone || reconcileDone;
 
-    return Column(
+    final drawer = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (snapshot.expectedCash != null)
+        if (snapshot.expectedCash != null) ...[
           _MoneyCard(
             label: l.expectedCashLabel,
             money:
                 snapshot.expectedCash!['expectedDrawerCash']
                     as Map<String, Object?>,
           ),
-        if (count != null) ...[
           const SizedBox(height: UmiSpacing.md),
+        ],
+        if (count != null) ...[
           _VarianceCard(variance: variance!, count: count.count),
+          const SizedBox(height: UmiSpacing.md),
         ],
         if (operations.isNotEmpty) ...[
-          const SizedBox(height: UmiSpacing.lg),
           Text(
             spanish ? 'Movimientos de caja' : 'Cash movements',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: UmiSpacing.sm),
-          Wrap(
-            spacing: UmiSpacing.sm,
-            runSpacing: UmiSpacing.sm,
-            children: operations,
-          ),
+          _ActionGrid(actions: operations),
         ],
         if (lifecycle.isNotEmpty) ...[
-          const SizedBox(height: UmiSpacing.lg),
+          if (operations.isNotEmpty) const SizedBox(height: UmiSpacing.md),
           Text(
             spanish ? 'Turno' : 'Shift',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: UmiSpacing.sm),
-          Wrap(
-            spacing: UmiSpacing.sm,
-            runSpacing: UmiSpacing.sm,
-            children: lifecycle,
-          ),
-        ],
-        if (showCloseFlow) ...[
-          const SizedBox(height: UmiSpacing.lg),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(UmiSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    spanish ? 'Cierre de turno' : 'Shift close',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: UmiSpacing.md),
-                  _CloseStep(
-                    number: 1,
-                    label: spanish ? 'Contar la caja' : 'Count the drawer',
-                    done: countDone,
-                    current: !countDone,
-                    action: canCount && !countDone
-                        ? _StepAction(
-                            label: l.blindCountAction,
-                            onPressed: () => _count(context, controller),
-                          )
-                        : null,
-                    secondary: countDone && canCount
-                        ? _StepAction(
-                            label: l.recountAction,
-                            onPressed: () => _count(context, controller),
-                          )
-                        : null,
-                  ),
-                  _CloseStep(
-                    number: 2,
-                    label: spanish
-                        ? 'Registrar la diferencia'
-                        : 'Record the variance',
-                    done: resolveDone,
-                    current: countDone && !resolveDone,
-                    skipped: countDone && varianceZero,
-                    skippedLabel: spanish ? 'Sin diferencia' : 'No variance',
-                    action: canResolve && resolveNeeded
-                        ? _StepAction(
-                            label: l.varianceReasonLabel,
-                            onPressed: () => _resolve(context, controller),
-                          )
-                        : null,
-                  ),
-                  _CloseStep(
-                    number: 3,
-                    label: spanish
-                        ? 'Conciliar el turno'
-                        : 'Reconcile the shift',
-                    done: reconcileDone,
-                    current: resolveDone && !reconcileDone,
-                    action: canReconcile
-                        ? _StepAction(
-                            label: l.reconcileShiftAction,
-                            onPressed: controller.reconcile,
-                          )
-                        : null,
-                  ),
-                  _CloseStep(
-                    number: 4,
-                    label: l.closeShiftAction,
-                    done: closed,
-                    current: reconcileDone && !closed,
-                    action: canClose
-                        ? _StepAction(
-                            label: l.closeShiftAction,
-                            primary: true,
-                            onPressed: () => _close(context, controller),
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _ActionGrid(actions: lifecycle),
         ],
         if (state.closeResult != null) ...[
-          const SizedBox(height: UmiSpacing.lg),
+          const SizedBox(height: UmiSpacing.md),
           Semantics(
             liveRegion: true,
             child: Text(
@@ -682,6 +743,121 @@ final class _ActiveShiftSection extends StatelessWidget {
           ),
         ],
       ],
+    );
+
+    // Nothing to close yet: the drawer panel is the whole screen, held to a
+    // readable width rather than stretching two tiles across the full span.
+    if (!showCloseFlow) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: SingleChildScrollView(child: drawer),
+        ),
+      );
+    }
+
+    final close = Card(
+      child: Padding(
+        padding: const EdgeInsets.all(UmiSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              spanish ? 'Cierre de turno' : 'Shift close',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: UmiSpacing.md),
+            _CloseStep(
+              number: 1,
+              label: spanish ? 'Contar la caja' : 'Count the drawer',
+              done: countDone,
+              current: !countDone,
+              action: canCount && !countDone
+                  ? _StepAction(
+                      label: l.blindCountAction,
+                      onPressed: () => _count(context, controller),
+                    )
+                  : null,
+              secondary: countDone && canCount
+                  ? _StepAction(
+                      label: l.recountAction,
+                      onPressed: () => _count(context, controller),
+                    )
+                  : null,
+            ),
+            _CloseStep(
+              number: 2,
+              label: spanish
+                  ? 'Registrar la diferencia'
+                  : 'Record the variance',
+              done: resolveDone,
+              current: countDone && !resolveDone,
+              skipped: countDone && varianceZero,
+              skippedLabel: spanish ? 'Sin diferencia' : 'No variance',
+              action: canResolve && resolveNeeded
+                  ? _StepAction(
+                      label: l.varianceReasonLabel,
+                      onPressed: () => _resolve(context, controller),
+                    )
+                  : null,
+            ),
+            _CloseStep(
+              number: 3,
+              label: spanish ? 'Conciliar el turno' : 'Reconcile the shift',
+              done: reconcileDone,
+              current: resolveDone && !reconcileDone,
+              action: canReconcile
+                  ? _StepAction(
+                      label: l.reconcileShiftAction,
+                      onPressed: controller.reconcile,
+                    )
+                  : null,
+            ),
+            _CloseStep(
+              number: 4,
+              label: l.closeShiftAction,
+              done: closed,
+              current: reconcileDone && !closed,
+              action: canClose
+                  ? _StepAction(
+                      label: l.closeShiftAction,
+                      primary: true,
+                      onPressed: () => _close(context, controller),
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // Two panels side by side when there is room for both, one column when
+    // there is not. Below this width the two columns are narrower than the
+    // controls they hold - at 800 px the action tiles ran past their own labels
+    // - and a single scrolling column is the honest answer rather than a
+    // squeezed one. The counter terminal this was designed for is 1280 wide,
+    // where the panels fit with room to spare.
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth >= 1000
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: SingleChildScrollView(child: drawer)),
+                const SizedBox(width: UmiSpacing.lg),
+                Expanded(child: SingleChildScrollView(child: close)),
+              ],
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  drawer,
+                  const SizedBox(height: UmiSpacing.lg),
+                  close,
+                ],
+              ),
+            ),
     );
   }
 }
@@ -787,6 +963,33 @@ final class _CloseStep extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The action tiles laid out as a grid instead of a ragged wrap.
+///
+/// A `Wrap` of label-sized buttons leaves a different width on every row, and
+/// that is what made this half of the screen read as a pile of unrelated
+/// controls. Two equal columns let the eye scan them as a set, and the width
+/// comes from the panel rather than from the longest label on it.
+final class _ActionGrid extends StatelessWidget {
+  const _ActionGrid({required this.actions});
+
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const gap = UmiSpacing.sm;
+      final width = (constraints.maxWidth - gap) / 2;
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: [
+          for (final action in actions) SizedBox(width: width, child: action),
+        ],
+      );
+    },
+  );
 }
 
 final class _Action extends StatelessWidget {
@@ -909,9 +1112,8 @@ Future<void> _noSale(BuildContext context, CashController controller) async {
     approvalFingerprint: approval.fingerprint,
   );
   if (context.mounted) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l.drawerRequestRecordedMessage)));
+    // No confirmation bar: the request shows up in the drawer's own list, which
+    // is where the operator is already looking.
   }
 }
 
@@ -1090,14 +1292,16 @@ Future<void> _count(BuildContext context, CashController controller) async {
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
         title: Text(l.blindCountAction),
+        // Wide enough for the counter's two columns, so the whole drawer and its
+        // total are on one screen with nothing to scroll. It used to be a
+        // 420-wide box with a scroll view, which cut the small coins and the
+        // running total off the bottom of the count.
         content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: DenominationCounter(
-              currency: currency,
-              denominations: denominationsFromPolicy(snapshot?.policy),
-              onChanged: (value) => setState(() => tally = value),
-            ),
+          width: 660,
+          child: DenominationCounter(
+            currency: currency,
+            denominations: denominationsFromPolicy(snapshot?.policy),
+            onChanged: (value) => setState(() => tally = value),
           ),
         ),
         actions: [

@@ -6,10 +6,15 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { PosKitchenOrderQuery } from '@umi/contract';
+import type {
+  PosKitchenAllDayQuery,
+  PosKitchenCommandRequest,
+  PosKitchenOrderQuery,
+} from '@umi/contract';
 import type { AuthUser } from '../auth/auth.types';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { DashboardRealtimeEvents } from '../realtime/dashboard-realtime.events';
+import { KitchenBoardEvents } from '../realtime/kitchen-board.events';
 import {
   KdsRepository,
   type OrderScopeRow,
@@ -43,6 +48,19 @@ import {
 const PAIR_RATE_MAX = 10;
 const PAIR_RATE_WINDOW_MS = 60_000;
 
+/**
+ * How long a board watch is held before it answers `changed: false`.
+ *
+ * The number is bounded from above by a fact in the client: the till's `ApiClient.requestTimeout` is
+ * **15 seconds** (`lib/core/network/api_client.dart`), and a hold that outlives the client's own
+ * timeout would turn every idle watch into an error the till then retries. Twelve leaves three
+ * seconds of margin for a slow link. A nudge releases the hold immediately, so twelve seconds is
+ * the worst case a cook sees rather than the usual one — and it is still less traffic than the
+ * eight-second poll this replaces, with a change arriving in milliseconds instead of up to eight
+ * seconds later.
+ */
+const BOARD_WATCH_HOLD_MS = 12_000;
+
 /** Serve the iPad KDS contract and the dashboard operations. */
 @Injectable()
 export class KdsService {
@@ -50,6 +68,7 @@ export class KdsService {
     private readonly repo: KdsRepository,
     private readonly rateLimit: RateLimitService,
     private readonly realtime: DashboardRealtimeEvents,
+    private readonly kitchenBoard: KitchenBoardEvents,
   ) {}
 
   // ════════════════════════════ Device auth ════════════════════════════════
@@ -380,6 +399,7 @@ export class KdsService {
       'recall',
       'cancel_ack',
       'change_priority',
+      'fire_course',
     ] as const;
     const commandType = allowedCommandTypes.includes(commandTypeValue as never)
       ? (commandTypeValue as
@@ -389,7 +409,8 @@ export class KdsService {
           | 'complete'
           | 'recall'
           | 'cancel_ack'
-          | 'change_priority')
+          | 'change_priority'
+          | 'fire_course')
       : null;
     const identity = kitchenCommandIdentity(body);
     if (!kitchenOrderId || !commandType || !identity) {
@@ -419,12 +440,27 @@ export class KdsService {
       : null;
     const reasonCode = optText(body.reasonCode);
     const reasonNote = optText(body.reasonNote);
+    // The iPad body is not zod-validated (it is the frozen native client's shape), so the
+    // course arrives as whatever JSON held. The `typeof` guard is the contract's own
+    // `z.number()`: a string "2" is a client bug, not a course, and coercing it here would
+    // make the two transports disagree about the same request.
+    const courseValue = body.courseNumber ?? body.course_number;
+    const courseNumber =
+      typeof courseValue === 'number' &&
+      Number.isInteger(courseValue) &&
+      courseValue >= 1 &&
+      courseValue <= 20
+        ? courseValue
+        : null;
     if (
-      (commandType === 'mark_item_ready' && itemIds.length === 0) ||
-      (commandType === 'change_priority' && priority === null) ||
-      (commandType === 'recall' && !reasonCode) ||
-      (reasonCode?.length ?? 0) > 100 ||
-      (reasonNote?.length ?? 0) > 500
+      kitchenCommandInvalidReason({
+        commandType,
+        itemIds,
+        priority,
+        reasonCode,
+        reasonNote,
+        courseNumber,
+      })
     ) {
       return { status: 400, body: { error: 'invalid_kitchen_command' } };
     }
@@ -435,6 +471,7 @@ export class KdsService {
       reasonCode,
       reasonNote,
       priority,
+      ...(courseNumber === null ? {} : { courseNumber }),
       expectedVersion: identity.expectedVersion,
     };
     const result = await this.repo.executeKitchenCommand({
@@ -450,6 +487,7 @@ export class KdsService {
       reasonCode: fingerprintInput.reasonCode,
       reasonNote: fingerprintInput.reasonNote,
       priority,
+      courseNumber,
       payloadFingerprint: sha256Hex(JSON.stringify(fingerprintInput)),
     });
     return {
@@ -491,7 +529,7 @@ export class KdsService {
     query: PosKitchenOrderQuery,
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    const allowed = await this.repo.authorizePos(
+    const { allowed } = await this.repo.authorizePos(
       user.id,
       user.sessionId,
       user.deviceId,
@@ -511,7 +549,7 @@ export class KdsService {
    * `KitchenOrderProjection` shape. Read-only — commands stay on the device path. */
   async boardForPos(user: AuthUser, merchantId: string, query: PosKitchenOrderQuery) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    const allowed = await this.repo.authorizePos(
+    const { allowed } = await this.repo.authorizePos(
       user.id,
       user.sessionId,
       user.deviceId,
@@ -525,6 +563,211 @@ export class KdsService {
     if (stationIds.length === 0) return { ok: true as const, data: [] };
     const rows = await this.repo.boardSnapshot(merchantId, query.locationId, stationIds);
     return { ok: true as const, data: rows.map(toSnapshotRow) };
+  }
+
+  /**
+   * The board's wake-up (§8H step 8).
+   *
+   * A HELD request: it answers when a kitchen ticket for this location moves, or when the hold
+   * expires with `changed: false`. That second answer is the 8-second poll kept as the floor, so the
+   * till needs no special case for "nothing to tell me" — it re-reads when told to and re-asks
+   * either way.
+   *
+   * Authorised exactly as the board READ is, through the same `authorizePos` gate: a watch is a read
+   * with a longer life, not a different privilege. The hold is bounded so a slept laptop, a proxy or
+   * a dead client cannot pin a request for ever; the till's own HTTP timeout is set above it.
+   */
+  async watchBoardForPos(user: AuthUser, merchantId: string, query: PosKitchenOrderQuery) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    const { allowed } = await this.repo.authorizePos(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+    );
+    if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const started = Date.now();
+    const changed = await this.kitchenBoard.waitForChange(
+      merchantId,
+      query.locationId,
+      BOARD_WATCH_HOLD_MS,
+    );
+    return { ok: true as const, changed, waitedMs: Date.now() - started };
+  }
+
+  /**
+   * The all-day count for the till's board (§8H step 6).
+   *
+   * Authorised exactly as the board read is — `locationId` + `operatorSessionId`,
+   * because a POS device has no station — and scoped to the merchant and
+   * location, so one café's till cannot count another's day. The DAY comes back
+   * from the server rather than from the request: a till whose clock has drifted
+   * would otherwise ask for the wrong trading day, and the repository derives it
+   * the same way the tables do.
+   */
+  async allDayForPos(user: AuthUser, merchantId: string, query: PosKitchenAllDayQuery) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    const { allowed } = await this.repo.authorizePos(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+    );
+    if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const businessDate = await this.repo.allDayBusinessDate(
+      merchantId,
+      query.locationId,
+      query.businessDate ?? null,
+    );
+    // Only reachable if the merchant row itself is missing, which an authorised
+    // call cannot be. Answering a date the database did not give would be a lie
+    // the contract would then propagate, so this refuses instead.
+    if (!businessDate) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+    const data = await this.repo.allDayCounts(merchantId, query.locationId, businessDate);
+    return { ok: true as const, businessDate, data };
+  }
+
+  /**
+   * The write half of the board above (§8H step 3, defect D33).
+   *
+   * The iPad's `POST /api/kds/command` cannot serve a till. It authorises through the
+   * paired device's station, and a POS device has none: `merchant.kitchen_device_station`
+   * is empty for it and every POS session resolves to `station_id = null`, so
+   * `ticketBelongsToDevice` refuses a ticket the same device is looking at on the board.
+   * This route authorises the PERSON at the till instead — `locationId` +
+   * `operatorSessionId`, the pair the board read already uses — and scopes the command to
+   * the stations of the ticket that belong to that location, which is the set the board
+   * read shows it.
+   *
+   * The execution path is not forked. The command goes through the same
+   * `executeKitchenCommand` the iPad uses, so the journal row, the idempotency key, the
+   * optimistic version and the event spine behave identically — and a replay of the same
+   * command identity is a replay, not a second bump.
+   */
+  async commandForPos(user: AuthUser, merchantId: string, dto: PosKitchenCommandRequest) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    const access = await this.repo.authorizePos(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+    );
+    if (!access.allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+
+    // The route declares the base `kitchen.prepare`; the command's own permission is
+    // checked here, because only here is the command type known. A refusal NAMES the
+    // permission, so a cook whose role lacks `kitchen.recall` is told that, rather than
+    // being shown a button that silently never works.
+    const permission = kitchenPermission(dto.commandType);
+    if (!access.permissions.includes('*') && !access.permissions.includes(permission)) {
+      throw new ForbiddenException({
+        code: 'KITCHEN_PERMISSION_REQUIRED',
+        message: `This kitchen command needs the ${permission} permission.`,
+        details: { requiredPermission: permission, commandType: dto.commandType },
+      });
+    }
+
+    const itemIds = [...new Set(dto.itemIds)];
+    // §8H step 4. The POS transport IS zod-validated, so a course outside 1..20 never
+    // reaches here; the normalisation only turns the schema's `default(null)` into the
+    // explicit null the repository expects, so the two transports journal one shape.
+    const courseNumber = dto.courseNumber ?? null;
+    const missing = kitchenCommandInvalidReason({
+      commandType: dto.commandType,
+      itemIds,
+      priority: dto.priority,
+      reasonCode: dto.reasonCode,
+      reasonNote: dto.reasonNote,
+      courseNumber,
+    });
+    if (missing) {
+      throw new BadRequestException({
+        code: 'VALIDATION_FAILED',
+        message: `A ${dto.commandType} command needs a valid ${missing}.`,
+      });
+    }
+
+    const order = await this.repo.loadOrderForScope(
+      merchantId,
+      dto.kitchenOrderId,
+      dto.kitchenOrderId,
+    );
+    if (!order) throw new NotFoundException({ code: 'KITCHEN_ORDER_NOT_FOUND' });
+    // A ticket at another location is NOT "not found": the operator asked about a real
+    // ticket, and the difference decides whether they retry, refresh the board, or call
+    // someone. The same body for both was the other half of D33.
+    if (order.location_id !== dto.locationId) {
+      throw new NotFoundException({
+        code: 'KITCHEN_ORDER_OUT_OF_SCOPE',
+        message: 'This ticket belongs to another location.',
+        details: { locationId: order.location_id },
+      });
+    }
+
+    // Scoped exactly as the board read is scoped: the ACTIVE stations of this location.
+    // A station-less POS device may therefore command every ticket the board shows it,
+    // and nothing it cannot see — a ticket routed to an archived station, or to a
+    // merchant-wide station the location board does not list, is not workable here.
+    const stations = await this.repo.listStations(merchantId, dto.locationId);
+    const active = new Set(stations.map((station) => station.id));
+    const stationScope = [...new Set(order.station_ids ?? [])]
+      .filter((stationId) => active.has(stationId))
+      .sort();
+    if (stationScope.length === 0) {
+      throw new NotFoundException({
+        code: 'KITCHEN_ORDER_NOT_ROUTED',
+        message: 'No part of this ticket is routed to a station of this location.',
+      });
+    }
+
+    // Same key order as the device path, so the same logical command carries the same
+    // fingerprint on either transport and the journal can recognise a replay across them.
+    const fingerprint = {
+      kitchenOrderId: dto.kitchenOrderId,
+      commandType: dto.commandType,
+      itemIds: [...itemIds].sort(),
+      reasonCode: dto.reasonCode,
+      reasonNote: dto.reasonNote,
+      priority: dto.priority,
+      ...(courseNumber === null ? {} : { courseNumber }),
+      expectedVersion: dto.expectedVersion,
+    };
+    const result = await this.repo.executeKitchenCommand({
+      session: {
+        // The person is the actor, not the box: `kitchen_command` records exactly one of
+        // device_id / actor_user_id (see its CHECK), and a till command is attributable
+        // to the operator session that authorised it.
+        deviceId: null,
+        merchantId,
+        locationId: dto.locationId,
+        stationId: null,
+        deviceName: null,
+        permissions: [permission],
+      },
+      actorUserId: user.id,
+      order,
+      stationScope,
+      commandId: dto.commandId,
+      idempotencyKey: dto.idempotencyKey,
+      correlationId: dto.correlationId,
+      expectedVersion: dto.expectedVersion,
+      commandType: dto.commandType,
+      targetStatus: null,
+      itemIds,
+      reasonCode: fingerprint.reasonCode,
+      reasonNote: fingerprint.reasonNote,
+      priority: dto.priority,
+      courseNumber,
+      payloadFingerprint: sha256Hex(JSON.stringify(fingerprint)),
+    });
+    if (result.status === 'conflict') throw new ConflictException(result.result);
+    return { ok: true as const, data: result.result };
   }
 
   async listDevicesForDashboard(
@@ -995,6 +1238,40 @@ function kitchenPermission(commandType: string): string {
   return 'kitchen.prepare';
 }
 
+/**
+ * The requirements that belong to the COMMAND TYPE rather than to the transport.
+ *
+ * Two routes send these commands — the iPad's device body and the POS DTO (defect D33) —
+ * and a rule that lived in only one of them would let the till send a `recall` with no
+ * reason and discover it as a version conflict, which names the wrong problem. Returns
+ * the field that is missing or out of range, or null when the command is complete.
+ */
+function kitchenCommandInvalidReason(input: {
+  commandType: string;
+  itemIds: string[];
+  priority: 'normal' | 'high' | 'urgent' | null;
+  reasonCode: string | null;
+  reasonNote: string | null;
+  courseNumber?: number | null;
+}): string | null {
+  if (input.commandType === 'mark_item_ready' && input.itemIds.length === 0) return 'itemIds';
+  if (input.commandType === 'change_priority' && input.priority === null) return 'priority';
+  if (input.commandType === 'recall' && !input.reasonCode) return 'reasonCode';
+  // §8H step 4. The bound lives here as well as in the contract and the CHECK, because
+  // this is where a bad value becomes a 400 that NAMES the field; without it the same
+  // value would reach the database and surface as a constraint violation (or, worse for
+  // the iPad's unvalidated body, as a silent no-op forever).
+  if (input.commandType === 'fire_course') {
+    const course = input.courseNumber ?? null;
+    if (course === null || !Number.isInteger(course) || course < 1 || course > 20) {
+      return 'courseNumber';
+    }
+  }
+  if ((input.reasonCode?.length ?? 0) > 100) return 'reasonCode';
+  if ((input.reasonNote?.length ?? 0) > 500) return 'reasonNote';
+  return null;
+}
+
 function canonicalKitchenStatus(
   status: KitchenStatus,
 ): 'queued' | 'in_preparation' | 'ready' | 'completed' | 'cancelled' {
@@ -1062,16 +1339,28 @@ function remapItems(items: unknown): unknown[] {
   if (!Array.isArray(items)) return [];
   return items.map((raw) => {
     const i = (raw ?? {}) as Record<string, unknown>;
+    // §8H step 4. Postgres returns the course's SMALLINT as a number, but the bigint
+    // next to it comes back as a string, so the coercion is not symmetrical and is
+    // spelled out. `fired` is the reader's derived flag (course <= the ticket's
+    // watermark), carried through as a boolean and never recomputed here.
+    const courseNumber = Number(i.courseNumber ?? i.course_number ?? 1);
     return {
       id: i.ticket_item_id ?? i.id,
       productName: i.name ?? i.productName,
       quantity: i.quantity,
       variantName: i.variant_name ?? i.variantName ?? null,
+      // §8.5. Derived from the product's recipe on the way IN (the repository SQL), never
+      // stored on the line. Carried through here because `KitchenOrderItem.allergens` is
+      // required: a projection that dropped it would fail the strict parse.
+      allergens: i.allergens ?? [],
       preparationNote: i.notes ?? i.preparationNote ?? null,
       modifiers: i.modifiers ?? [],
       status: i.status ?? 'queued',
       displayOrder: i.display_order ?? i.displayOrder,
       targetSeconds: i.targetSeconds ?? null,
+      courseNumber,
+      // A reader that predates courses fired everything, which is what course 1 means.
+      fired: Boolean(i.fired ?? courseNumber <= 1),
       // Postgres returns bigint as a string; the contract types version as a
       // number, so coerce (as with lastEventSequence below).
       version: Number(i.version ?? 1),
@@ -1091,14 +1380,33 @@ function toSnapshotRow(t: TicketRow) {
     priority: (t as TicketRow & { priority?: string }).priority ?? 'normal',
     stationId: t.station_id,
     businessDate: (t as TicketRow & { business_date?: string }).business_date,
-    queuedAt: t.created_at,
-    preparationStartedAt:
-      (t as TicketRow & { preparation_started_at?: string }).preparation_started_at ?? null,
-    updatedAt: t.updated_at,
+    // The strict projection types these as ISO instants. JSON.stringify would render a
+    // Date correctly on the wire, but the object in hand would not be an instance of what
+    // the contract says it is, and a reader that parses the projection itself would see
+    // `Expected string, received date`. So the boundary converts, not the serializer.
+    queuedAt: isoInstant(t.created_at),
+    preparationStartedAt: isoInstantOrNull(
+      (t as TicketRow & { preparation_started_at?: string | null }).preparation_started_at,
+    ),
+    updatedAt: isoInstant(t.updated_at),
     version: Number((t as TicketRow & { version?: number }).version ?? 1),
     lastEventSequence: Number(t.last_event_sequence),
+    // The view's trailing column, a SMALLINT: coerce rather than assume, so the row
+    // satisfies `KitchenOrderProjection.firedThroughCourse` whatever the driver chose.
+    firedThroughCourse: Number(
+      (t as TicketRow & { fired_through_course?: number | string }).fired_through_course ?? 1,
+    ),
     items: remapItems(t.items),
   };
+}
+
+/** A timestamptz as the contract's ISO instant: pg hands it back as a Date, not a string. */
+function isoInstant(value: unknown): string {
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function isoInstantOrNull(value: unknown): string | null {
+  return value === null || value === undefined ? null : isoInstant(value);
 }
 
 function toEventRow(e: EventRow) {

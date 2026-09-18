@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import type { z } from 'zod';
 import {
   AvailabilityQuery,
   CreateInventoryCountRequest,
@@ -7,6 +8,8 @@ import {
   InventoryQuery,
   InventoryReconciliation,
   InventoryRecoveryQuery,
+  PosPrepListQuery,
+  ProductionRecord,
   QuarantineRecord,
   RestockCommand,
   SubmitInventoryCountRequest,
@@ -20,6 +23,9 @@ import { EntitlementGuard } from '../auth/entitlement.guard';
 import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import { PosInventoryService } from './pos-inventory.service';
+
+/** The request model is a zod schema, so its shape is read from the schema itself. */
+type ProduceRequest = z.infer<typeof ProductionRecord>;
 
 @RequireProduct('pos')
 @UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard)
@@ -52,6 +58,16 @@ export class PosInventoryController {
     @Query(new ZodValidationPipe(InventoryQuery)) query: InventoryQuery,
   ) {
     return this.inventory.history(user, merchantId, query);
+  }
+
+  /** The prep list, for the kitchen board's own tab (§8.4). */
+  @Get('prep-list')
+  prepList(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(PosPrepListQuery)) query: PosPrepListQuery,
+  ) {
+    return this.inventory.prepList(user, merchantId, query);
   }
 
   @Post('adjustments')
@@ -97,6 +113,20 @@ export class PosInventoryController {
     @Body(new ZodValidationPipe(RestockCommand)) dto: RestockCommand,
   ) {
     return this.inventory.restock(user, merchantId, dto);
+  }
+
+  /**
+   * Produce a prep from its active recipe (plan §8.1). The cook sends the output item
+   * and what came out; the server explodes the recipe, consumes the inputs, writes the
+   * lot and the rolled-up cost, and names any yield shortfall as a loss.
+   */
+  @Post('production')
+  production(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(ProductionRecord)) dto: ProduceRequest,
+  ) {
+    return this.inventory.production(user, merchantId, dto);
   }
 
   @Post('counts')

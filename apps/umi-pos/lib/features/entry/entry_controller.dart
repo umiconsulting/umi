@@ -11,6 +11,7 @@ import 'entry_gateway.dart';
 
 enum EntryPhase {
   checkingDevice,
+  restoringSession,
   enrollmentRequired,
   enrollmentPending,
   pinRequired,
@@ -79,6 +80,10 @@ final class EntryController extends ChangeNotifier {
   /// The realtime nudge subscription for the current pairing attempt. It is
   /// keyed to `_pairingGeneration`, exactly like the poll loop, so one counter
   /// cancels both.
+  ///
+  /// Cancelled through `_cancelPairingWatch`, which hands the handle to a local
+  /// before it awaits: the lint only reads the one method that creates it.
+  // ignore: cancel_subscriptions
   StreamSubscription<void>? _pairingWatch;
 
   /// Guards against a burst of nudges producing a burst of polls.
@@ -105,7 +110,8 @@ final class EntryController extends ChangeNotifier {
     EntryPhase.operatorRequired ||
     EntryPhase.startingOperator => TrustedEntryStage.operator,
     EntryPhase.ready => TrustedEntryStage.ready,
-    EntryPhase.checkingDevice => TrustedEntryStage.authentication,
+    EntryPhase.checkingDevice ||
+    EntryPhase.restoringSession => TrustedEntryStage.authentication,
     _ => TrustedEntryStage.blocked,
   };
 
@@ -151,11 +157,25 @@ final class EntryController extends ChangeNotifier {
       // or an OS relaunch. Within a short grace window the POS restores the
       // operator session silently; past it, or with no saved session, it falls
       // back to the personal PIN. An explicit lock always requires the PIN.
-      _set(EntryState(EntryPhase.pinRequired, device: device));
+      //
+      // The decision is made BEFORE the keypad is published, and that ordering
+      // is the point rather than a detail. This used to publish `pinRequired`
+      // first and ask second, so a cold till drew a live keypad for the whole
+      // beat it spent deciding. An operator who began typing had the screen
+      // taken away mid-PIN: the digits were discarded with no rejection and no
+      // log line, and the till landed in the previous operator's catalog. From
+      // the operator's side it looks like a sign-in that silently did not
+      // happen. A real keypad sign-in measured two of its four digits landing
+      // in exactly that window. A spinner while the till decides is the honest
+      // screen; `pinRequired` is published only once there is nothing left to
+      // decide, and `restoreSession` publishes it itself when the restore is
+      // refused or fails.
+      _set(EntryState(EntryPhase.restoringSession, device: device));
       if (await _canRestoreSession()) {
         await restoreSession();
         return;
       }
+      _set(EntryState(EntryPhase.pinRequired, device: device));
       await _vault.clearSession();
     } on AppException catch (error) {
       if (error.code == 'DEVICE_REVOKED' ||
@@ -236,8 +256,14 @@ final class EntryController extends ChangeNotifier {
   }
 
   Future<void> _cancelPairingWatch() async {
-    await _pairingWatch?.cancel();
+    // Take the handle and clear the field *before* awaiting the cancel.
+    // `_watchPairing` cancels and then immediately installs the next watch, so
+    // an `await` between those two steps let this continuation land afterwards
+    // and null out the subscription that replaced it — which orphaned a live
+    // listener on the realtime channel for the rest of the shift.
+    final previous = _pairingWatch;
     _pairingWatch = null;
+    await previous?.cancel();
   }
 
   /// A nudge says the state moved; it never carries the credential. So the

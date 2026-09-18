@@ -90,7 +90,7 @@ describe('opening a café on a platform built from scratch', () => {
   });
 
   it('the owner can be authenticated with the password she was given', async () => {
-    const cred = await auth.findCredentialByEmail(EMAIL);
+    const cred = await auth.findSignInCredentialByEmail(EMAIL);
     expect(cred).not.toBeNull();
     expect(
       passwords.verify(

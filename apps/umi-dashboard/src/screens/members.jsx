@@ -214,7 +214,7 @@ const MembersScreen = () => {
             <Select
               aria-label={t`Ordenar clientes`}
               className="select"
-              style={{ height: 38, fontSize: 13, padding: '0 32px 0 12px' }}
+              style={{ height: 'var(--control-min)', fontSize: 13, padding: '0 32px 0 12px' }}
               value={sort}
               onChange={(e) => {
                 setSort(e.target.value);
@@ -257,7 +257,7 @@ const MembersScreen = () => {
           />
           <input
             className="input"
-            style={{ height: 40, paddingLeft: 36, fontSize: 13 }}
+            style={{ height: 'var(--control-min)', paddingLeft: 36, fontSize: 13 }}
             placeholder={t`Buscar por nombre, teléfono o tarjeta…`}
             value={search}
             onChange={(e) => {
@@ -486,7 +486,14 @@ const MemberRow = ({ customer: c, fmtBalance, fmtDate, fmtAgo, onDetail, isSelec
             {c.pendingRewards} 🎁
           </span>
         ) : (
-          <span className="no-value" style={{ fontSize: 12 }} aria-label={t`Sin dato`} />
+          // A generic <span> may not carry an aria-label (axe:
+          // `aria-prohibited-attr`): the name has to be in the DOM. The em dash
+          // stays the visible value and is hidden from the reader, which hears
+          // the word for it instead of a cell that reads as nothing at all.
+          <span className="no-value" style={{ fontSize: 12 }}>
+            <span aria-hidden="true">—</span>
+            <span className="sr-only">{t`Sin dato`}</span>
+          </span>
         )}
       </td>
       {/* Last visit */}

@@ -382,6 +382,29 @@ void main() {
     },
   );
 
+  test('a new sale abandons a cart in progress only when it is asked to', () async {
+    final sales = _Sales()..currentSale = sale(state: 'building_cart');
+    final lifecycle = _controller(sales);
+    await lifecycle.open(merchantId, locationId, operatorId);
+
+    // The old behaviour, kept for the case nobody confirmed: a cart on screen is
+    // not thrown away by a button press that did not mean it.
+    await lifecycle.newSale();
+    expect(sales.cancels, 0);
+    expect(sales.starts, 0);
+    expect(lifecycle.state.phase, SalePhase.buildingCart);
+
+    // Asked for, it abandons the sale on screen and starts a fresh one. This is the
+    // escape from a cart whose checkout draft carries a payment claim: that cart
+    // can be neither paid nor cancelled, and the button used to do nothing at all
+    // while a sale was in progress (the plan's own D36 defect).
+    await lifecycle.newSale(abandonCurrent: true);
+    expect(sales.cancels, 1);
+    expect(sales.starts, 1);
+    expect(lifecycle.state.phase, SalePhase.buildingCart);
+    expect(lifecycle.state.sale?.id, '00000000-0000-4000-8000-000000000010');
+  });
+
   test('rapid new sale actions create one editable sale', () async {
     final sales = _Sales()..currentSale = sale(state: 'cancelled');
     final lifecycle = _controller(sales);

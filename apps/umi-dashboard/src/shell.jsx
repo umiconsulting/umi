@@ -175,6 +175,7 @@ const SCREEN_TITLES = {
   reportes: msg`Reportes`,
   'cash-shifts': msg`Caja y turnos`,
   'catalog-inventory': msg`Catálogo e inventario`,
+  'inventory-costing': msg`Costos y márgenes`,
   'loyalty-value': msg`Lealtad y valor`,
   kitchen: msg`Cocina`,
   orders: msg`Pedidos`,
@@ -201,6 +202,9 @@ const SCREEN_TITLES = {
 const LocaleSelect = ({ variant = 'panel' }) => {
   const { t, i18n } = useLingui();
   const topbar = variant === 'topbar';
+  // The login variant keeps the small type and the tight radius, but not a small
+  // height: the box comes from the `.select` rule (--control-min). A language
+  // control the operator taps is a pointer target like any other, on every screen.
   return (
     <Select
       className={'select locale-select' + (topbar ? ' topbar-select' : '')}
@@ -209,7 +213,7 @@ const LocaleSelect = ({ variant = 'panel' }) => {
       hideCheck
       aria-label={t`Idioma`}
       title={t`Idioma`}
-      style={topbar ? undefined : { width: '100%', height: 34, borderRadius: 8, fontSize: 12 }}
+      style={topbar ? undefined : { width: '100%', borderRadius: 8, fontSize: 12 }}
     >
       {LOCALES.map((l) => (
         <option key={l.tag} value={l.tag}>
@@ -448,10 +452,16 @@ const Topbar = ({
     'hours',
     'cash-shifts',
     'catalog-inventory',
+    'inventory-costing',
     'kitchen',
     'floor-plan',
   ].includes(screen);
   const activeLocations = locations.filter((l) => l.status === 'active');
+  // The floor plan is the one screen where the branch is part of the content:
+  // the editor draws THAT branch's dining room and publishes it to THAT branch's
+  // tills. So it always names the location — read-only when the operator cannot
+  // switch — where every other screen shows the picker only when there is a
+  // choice to make.
   const canChooseLocation = canSwitchLocations && activeLocations.length > 1;
   const showLocationSelect =
     locationScoped && activeLocations.length > 0 && (screen === 'floor-plan' || canChooseLocation);

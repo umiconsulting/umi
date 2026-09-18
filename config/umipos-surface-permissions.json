@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "name": "Dashboard surface → API permission contract",
+  "purpose": "Workstream C step 4 of docs/plans/2026-09-15-ultimate-platform-plan.md: the client hides, the API decides. Every row names the Dashboard module that gates a screen, the permission that module declares, the HTTP call the screen actually makes, and which roles must be refused or allowed. scripts/umipos-role-surface-gate.mjs logs in as each role and asserts the measured status against this file.",
+  "clientGateSource": "apps/umi-dashboard/src/lib/module-registry.js",
+  "merchant": {
+    "ref": "kalalacafe",
+    "id": "1860305f-e864-d745-29e6-fb8830926cc6",
+    "locationId": "7cb0a615-45e2-7e8e-b756-f95b295ec356"
+  },
+  "roles": [
+    {
+      "role": "cashier",
+      "username": "barista@kalalacafe.mx",
+      "source": "seeded rehearsal login; 51 effective permissions measured via GET /api/merchants/:id/capabilities"
+    },
+    {
+      "role": "manager",
+      "username": "ux-sweep@kalalacafe.mx",
+      "source": "merchant.staff row created by the UX sweep with merchant.role `manager`; requires umi.user.status='active' and a password hash before it can sign in — see the gate's --roles help and the run report",
+      "optional": true
+    },
+    { "role": "admin", "username": "admin@kalalacafe.mx", "source": "seeded rehearsal login" },
+    { "role": "owner", "username": "hola@umiconsulting.co", "source": "seeded rehearsal login" }
+  ],
+  "surfaces": [
+    {
+      "id": "settings.read",
+      "module": "settings",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:378 (_loadMerchant → GET /api/{merchantRef}/admin/settings)"
+      },
+      "request": { "method": "GET", "path": "/api/{ref}/admin/settings" },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "settings.write",
+      "module": "settings",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:607 (saveMerchantSettings → PATCH /api/merchants/{merchantId}/settings is the merchant twin; the branding half is PATCH /api/{merchantRef}/admin/settings)"
+      },
+      "request": { "method": "PATCH", "path": "/api/{ref}/admin/settings", "body": {} },
+      "note": "Body `{}` is a deliberate no-op: CashReadService.updateSettings writes only the keys present. The guard runs before the handler, so a refused role is refused for the guard and an allowed role is proven to still reach the write path.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "reward-config.read",
+      "module": "settings",
+      "client": {
+        "gate": ["loyalty.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:383 (_loadMerchant → GET /api/merchants/{merchantId}/cash/reward-config)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/reward-config" },
+      "note": "DELIBERATELY WEAKER THAN ITS MODULE. The `settings` screen is `merchant.manage` and hidden from a cashier, but this read is not only the Settings screen's: the shared merchant model (`data.jsx` `_loadMerchant`, mounted on every screen) fills the `loyalty-value` hub from it, and umi-cash's till home draws its \"Recompensa activa\" panel from the reference-addressed twin. Gating the read on `merchant.manage` refused a cashier a value her own screens display, so the controller enforces `loyalty.read` and the route answers 200 to a cashier. Measured, not assumed: `node scripts/umipos-role-surface-gate.mjs` reports 200 for cashier and manager on both twins. The write keeps the manager gate.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "reward-config.write",
+      "module": "settings",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:618 (saveRewardConfig → PATCH /api/merchants/{merchantId}/cash/reward-config)"
+      },
+      "request": {
+        "method": "PATCH",
+        "path": "/api/merchants/{merchantId}/cash/reward-config",
+        "bodyFrom": "reward-config.read"
+      },
+      "note": "Body is the configuration already stored, read back through the same route as an allowed role, so the write is idempotent: it proves an allowed role can still save the manager screen without changing café data.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "reward-config.read.byRef",
+      "module": "settings",
+      "client": {
+        "gate": ["loyalty.read"],
+        "gateMode": "any",
+        "source": "apps/umi-api/src/modules/cash/cash.controller.ts (CashController, base api/:merchantRef/admin) — the reference-addressed twin of reward-config.read, reached by umi-cash through next.config.mjs REGISTER_ROUTES"
+      },
+      "request": { "method": "GET", "path": "/api/{ref}/admin/reward-config" },
+      "note": "See `reward-config.read`: the same split, reached by umi-cash's till home. `loyalty.read` on purpose, and 200 to a cashier when measured.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "staff.list",
+      "module": "staff",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:497 (_loadStaff → routes.staff.list = GET /api/merchants/{merchantId}/staff)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/staff" },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "staff.list.byRef",
+      "module": "staff",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-api/src/modules/staff/staff.controller.ts (base api/:merchantRef/admin/staff) — the reference-addressed twin of staff.list"
+      },
+      "request": { "method": "GET", "path": "/api/{ref}/admin/staff" },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "hours.read",
+      "module": "hours",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:597 (_loadBusinessHours → GET /api/merchants/{merchantId}/conversaflow/hours)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/conversaflow/hours" },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "hours.write",
+      "module": "hours",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:632 (saveBusinessHours → PATCH /api/merchants/{merchantId}/conversaflow/hours)"
+      },
+      "request": {
+        "method": "PATCH",
+        "path": "/api/merchants/{merchantId}/conversaflow/hours",
+        "body": {}
+      },
+      "note": "Body `{}` is a deliberate no-op: BusinessHoursService.updateAll skips hours, timezone and ordering when they are absent.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "hours.read.byRef",
+      "module": "hours",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-api/src/modules/business-hours/business-hours.controller.ts (base api/:merchantRef/admin/hours) — the reference-addressed twin of hours.read"
+      },
+      "request": { "method": "GET", "path": "/api/{ref}/admin/hours" },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "hours.write.byRef",
+      "module": "hours",
+      "client": {
+        "gate": ["merchant.manage"],
+        "gateMode": "any",
+        "source": "apps/umi-api/src/modules/business-hours/business-hours.controller.ts (base api/:merchantRef/admin/hours) — the reference-addressed twin of hours.write"
+      },
+      "request": { "method": "PATCH", "path": "/api/{ref}/admin/hours", "body": {} },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "devices.list",
+      "module": "devices",
+      "client": {
+        "gate": ["device.enroll"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:808 (getPosDevices → routes.devices.list = GET /api/v1/merchants/{merchantId}/devices)",
+        "knownDivergence": "The same screen also reads the KDS device list (data.jsx:335 → GET /api/merchants/{merchantId}/kds/devices), which the server gates on `kitchen.diagnostics` (kds-dashboard.controller.ts), not on this module's `device.enroll`. A `manager` holds kitchen.diagnostics and no device.enroll, so it can read that one list while the client hides the screen that shows it. Left as found: kds/** is outside this change, and the acceptance line (a cashier cannot reach it) holds — the cashier is refused on both routes. Reported, not silently accepted."
+      },
+      "request": { "method": "GET", "path": "/api/v1/merchants/{merchantId}/devices" },
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "operations.diagnostics",
+      "module": "diagnostics",
+      "client": {
+        "gate": ["audit.read", "hardware.diagnostics"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:530 (_loadOperations → GET /api/merchants/{merchantId}/operations?domain=…); the tab is operations-workspace.jsx, reached from screens/diagnostics.jsx"
+      },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/operations?domain=diagnostics&limit=1"
+      },
+      "note": "Enforced in the service against dashboard-operations.policy.ts, one permission set per domain — the same `some()` semantics the client's hasRequiredPermission uses.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "operations.audit",
+      "module": "diagnostics",
+      "client": {
+        "gate": ["audit.read", "hardware.diagnostics"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:530, domain=audit (the `audit` tab of screens/diagnostics.jsx)"
+      },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/operations?domain=audit&limit=1"
+      },
+      "note": "The module's gate is the `some()` of two permissions; the domain policy narrows the SAME request to `audit.read`, which is the stricter and therefore safe direction. A manager holds hardware.diagnostics and not audit.read, so this row is refused for the manager and allowed for the admin — the clearest proof that the refusal is permission-shaped, not role-shaped.",
+      "expect": {
+        "cashier": "refused",
+        "manager": "refused",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "operations.sales",
+      "module": "reportes",
+      "client": {
+        "gate": ["sale.lifecycle", "sale.exception.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:551 (_loadSalesSummary → GET /api/merchants/{merchantId}/operations/reports/sales)"
+      },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/operations/reports/sales?range=last_30_days"
+      },
+      "note": "Cashier-keeps row: reportes is a module the client SHOWS to a cashier, so the server must keep serving it. Guards against over-tightening.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "operations.cash_shifts",
+      "module": "cash-shifts",
+      "client": {
+        "gate": ["cash.shift.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:530, domain=cash_shifts (screens/cash-shifts.jsx)"
+      },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/operations?domain=cash_shifts&limit=1"
+      },
+      "note": "Cashier-keeps row.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "operations.catalog",
+      "module": "catalog-inventory",
+      "client": {
+        "gate": ["catalog.read", "inventory.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:530, domain=catalog (screens/catalog-inventory.jsx)"
+      },
+      "request": {
+        "method": "GET",
+        "path": "/api/merchants/{merchantId}/operations?domain=catalog&limit=1"
+      },
+      "note": "Cashier-keeps row.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "cash.customers",
+      "module": "loyalty-value",
+      "client": {
+        "gate": ["loyalty.read", "gift_card.read", "wallet.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:451 (_loadCustomers → GET /api/merchants/{merchantId}/cash/customers)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/cash/customers?limit=1" },
+      "note": "Cashier-keeps row: the same cash read surface this change tightened elsewhere, on the routes a cashier's own screens use.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "merchant.settings-shell",
+      "module": "overview",
+      "client": {
+        "gate": [],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:373 (_loadMerchant → GET /api/merchants/{merchantId}/settings); the module registry gates `overview` on the product alone"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/settings" },
+      "note": "Cashier-keeps row, and the deliberate contrast with settings.read: this is the shared café model every visible screen reads (name, locations, segments), while settings.read is the manager's branding and promo copy. Only the second one is gated.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "orders.list",
+      "module": "orders",
+      "client": {
+        "gate": ["kitchen.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:427 (_loadOrders → GET /api/merchants/{merchantId}/orders)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/orders?filter=all" },
+      "note": "Cashier-keeps row.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "customers.list",
+      "module": "customers",
+      "client": {
+        "gate": ["customer.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:484 (_loadCustomers → GET /api/merchants/{merchantId}/customers)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/customers" },
+      "note": "Cashier-keeps row, and the module's own gate: `customer.read` is held by every café role (§8C grants it to cashier, staff, supervisor, manager, admin and owner), so the screen is offered and the read answers — which is the point of binding it. The route said so already (`customers.controller.ts#list` mirrors `module-registry.js`); nothing in this file did.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    },
+    {
+      "id": "triage.list",
+      "module": "triage",
+      "client": {
+        "gate": ["customer.read"],
+        "gateMode": "any",
+        "source": "apps/umi-dashboard/src/data.jsx:554 (_loadTriage → GET /api/merchants/{merchantId}/insights/triage)"
+      },
+      "request": { "method": "GET", "path": "/api/merchants/{merchantId}/insights/triage" },
+      "note": "The `triage` module (`Atención`) gates on `customer.read` and so does the route (`customers.controller.ts#triage`), which says in its own comment that it mirrors the module. Bound here so the module's gate is a measured API decision rather than a permission nothing checks.",
+      "expect": {
+        "cashier": "allowed",
+        "manager": "allowed",
+        "admin": "allowed",
+        "owner": "allowed"
+      }
+    }
+  ],
+  "knownDivergences": [
+    {
+      "what": "umi-cash's till home reads GET /api/{slug}/admin/reward-config, and that page is shown to `STAFF` (apps/umi-cash/src/app/[slug]/(admin)/admin/page.tsx:28, layout.tsx:99-106).",
+      "effect": "Resolved rather than tolerated. The route used to require `merchant.manage`, which refused a till STAFF login the value its own page displays; `reward-config.read.byRef` and its merchant-scoped twin now enforce `loyalty.read`, which every role that reaches those screens holds, and the route measures 200 for a cashier. The WRITE still requires `merchant.manage`, so nothing about who may change the reward changed.",
+      "decision": "The read is deliberately weaker than the `settings` module that gates the screen around it: the row cites `loyalty.read` while module `settings` declares `merchant.manage`. Recorded here because that pair is the one thing a reader would otherwise read as a mistake."
+    }
+  ]
+}

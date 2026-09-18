@@ -71,6 +71,7 @@ describe('Gate 5A operational command walkthrough', () => {
     const repository = domain(['configureRegister', 'queryOriginalCommand']);
     const kitchen = domain(['createStation', 'createRoute', 'updateDevice']);
     const catalog = domain(['detailAdministrative', 'executeAdministrative']);
+    const authoring = domain(['executeAdministrative']);
     const service = new AdministrativeCommandExecutionService(
       contexts as never,
       refunds as never,
@@ -81,6 +82,7 @@ describe('Gate 5A operational command walkthrough', () => {
       repository as never,
       kitchen as never,
       catalog as never,
+      authoring as never,
     );
     let sequence = 100;
     const execute = (

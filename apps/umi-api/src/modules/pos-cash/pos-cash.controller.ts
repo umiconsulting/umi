@@ -8,6 +8,7 @@ import {
   ReconcileCashShiftRequest,
   RecountRequest,
   RecoverCashShiftRequest,
+  ReclaimCashRegisterRequest,
   NoSaleDrawerRequest,
   ResolveCashVarianceRequest,
   ShiftCloseRequest,
@@ -176,5 +177,20 @@ export class PosCashController {
     @Body(new ZodValidationPipe(NoSaleDrawerRequest)) dto: NoSaleDrawerRequest,
   ) {
     return this.cash.noSale(user, merchantId, shiftId, dto);
+  }
+
+  // Addressed by REGISTER, unlike every other operation on this controller,
+  // because the operator stuck at a drawer knows which register they are
+  // standing at and cannot read the shift that is holding it. Resolving the
+  // holding shift from the register is the server's job, and so is proving the
+  // terminal that holds it is gone.
+  @Post('registers/:registerId/reclaim')
+  reclaimRegister(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('registerId') registerId: string,
+    @Body(new ZodValidationPipe(ReclaimCashRegisterRequest)) dto: ReclaimCashRegisterRequest,
+  ) {
+    return this.cash.reclaimRegister(user, merchantId, registerId, dto);
   }
 }

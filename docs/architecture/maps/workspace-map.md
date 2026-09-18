@@ -23,13 +23,6 @@ It does not replace code, migrations, tests, or local contracts.
 - Schemas: consumes API contracts. It does not own business truth.
 - Load first: `README.md`, `pubspec.yaml`, relevant `lib/` code, and tests.
 
-## `apps/umi-kds`
-
-- Purpose: native SwiftUI iPad KDS client.
-- Runtime surfaces: `Sources/`, KDS API client, repository state, SwiftUI views, local app docs.
-- Schemas: consumes `kds` projections; does not own operational order truth.
-- Load first: `AGENTS.md`, `REPO_CONTEXT.md`, `Sources/Docs/KDSArchitecture.md`, relevant Swift source.
-
 ## `apps/umi-cash`
 
 - Purpose: Cash compatibility client, tenant sessions, Vercel jobs, and Cash-specific Prisma behavior.

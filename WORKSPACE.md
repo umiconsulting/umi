@@ -17,7 +17,6 @@ Runtime ownership stays inside the narrowest existing app.
 
 - `apps/umi-api` owns canonical business writes, workflows, normalization, and backend contracts.
 - `apps/umi-pos` owns the Flutter UmiPOS client and native device workflows.
-- `apps/umi-kds` owns the native iPad Kitchen Display System client.
 - `apps/umi-cash` owns the Cash compatibility client and Cash-specific Prisma behavior.
 - `apps/umi-dashboard` owns the owner dashboard shell and live-data UI.
 - `apps/umi-landing-page` owns the public landing site and lead capture.

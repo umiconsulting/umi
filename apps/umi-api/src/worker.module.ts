@@ -22,8 +22,13 @@ import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
 import { CustomerValueExpiryScheduler } from './jobs/customer-value-expiry.scheduler';
+import { MercadoPagoPointProcessor } from './jobs/mercado-pago-point.processor';
+import { PointCredentialRenewalScheduler } from './jobs/mp-point-credential.scheduler';
+import { PointAttemptHealthScheduler } from './jobs/mp-point-attempt-health.scheduler';
+import { MercadoPagoPointModule } from './modules/mercado-pago/mercadopago-point.module';
 import { ReleaseModule } from './shared/release/release.module';
 import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
+import { TenderModule } from './modules/tender/tender.module';
 
 /**
  * Root module for the WORKER process. Same shared infrastructure as the web
@@ -48,6 +53,13 @@ import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
     LifecycleModule,
     LeadsModule,
     PosCustomerValueModule,
+    // The Point notification job resolves a tender attempt, so the worker needs the
+    // tender path itself — the same module the web process uses, not a second copy of it.
+    TenderModule,
+    // The D8 renewal sweep is a job, so the worker is the process that holds it. Imported
+    // directly as well as through `TenderModule`, because the service it calls is this module's
+    // own provider and its other half — the OAuth credential — is what the sweep renews.
+    MercadoPagoPointModule,
   ],
   // Worker-only consumers: BullMQ processors, the dead-letter sink they route
   // terminal failures to, and the transactional-outbox relay (inert until
@@ -66,6 +78,9 @@ import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
     LifecycleScheduler,
     LeadsScheduler,
     CustomerValueExpiryScheduler,
+    PointCredentialRenewalScheduler,
+    PointAttemptHealthScheduler,
+    MercadoPagoPointProcessor,
   ],
 })
 export class WorkerModule {}

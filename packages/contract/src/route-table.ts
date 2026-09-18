@@ -160,6 +160,775 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     params: ['merchantId'],
     dart: null,
   },
+  // ── Table map: the live state of a table (workstream D, steps 3 to 5) ───────
+  // The layout routes above say which tables exist; these say what is happening
+  // on them. The POS reads and writes them under an operator session; the console
+  // reads the same state because the plan screen is where a manager looks when a
+  // table looks wrong. Each operation is its own route rather than one
+  // polymorphic verb, so a refusal names the operation that was refused.
+  posMerchantRoute({
+    id: 'pos.tableState',
+    method: 'GET',
+    suffix: '/table-state',
+    dart: 'posTableState',
+    request: 'PosTableStateQuery',
+    response: 'TableStateMap',
+    permission: 'sale.lifecycle',
+    idempotent: false,
+    errors: ['PERMISSION_DENIED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateSeat',
+    method: 'POST',
+    suffix: '/table-state/seat',
+    dart: 'posTableStateSeat',
+    request: 'SeatTableRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_ALREADY_OCCUPIED',
+      'TABLE_CAPACITY_EXCEEDED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateMove',
+    method: 'POST',
+    suffix: '/table-state/move',
+    dart: 'posTableStateMove',
+    request: 'MovePartyRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_NOT_OCCUPIED',
+      'TABLE_ALREADY_OCCUPIED',
+      'TABLE_CAPACITY_EXCEEDED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateMerge',
+    method: 'POST',
+    suffix: '/table-state/merge',
+    dart: 'posTableStateMerge',
+    request: 'MergeTablesRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_ALREADY_OCCUPIED',
+      'TABLE_CAPACITY_EXCEEDED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateSplit',
+    method: 'POST',
+    suffix: '/table-state/split',
+    dart: 'posTableStateSplit',
+    request: 'SplitPartyRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_NOT_OCCUPIED',
+      'TABLE_NOT_GROUPED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateClear',
+    method: 'POST',
+    suffix: '/table-state/clear',
+    dart: 'posTableStateClear',
+    request: 'ClearTableRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_NOT_OCCUPIED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateOpen',
+    method: 'POST',
+    suffix: '/table-state/open',
+    dart: 'posTableStateOpen',
+    request: 'OpenTableRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_ALREADY_OCCUPIED',
+    ],
+  }),
+  // The three service transitions: a party is already on the table and the front
+  // of house says where it is. No imposed order between them (a table orders again
+  // after being served; a drinks-only table asks for the bill from `seated`), so
+  // the only refusal they add is a table with no party on it. Each is its own
+  // route for the same reason the siblings are: the refusal names the operation.
+  posMerchantRoute({
+    id: 'pos.tableStateOrdered',
+    method: 'POST',
+    suffix: '/table-state/ordered',
+    dart: 'posTableStateOrdered',
+    request: 'MarkTableOrderedRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_NOT_OCCUPIED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateServed',
+    method: 'POST',
+    suffix: '/table-state/served',
+    dart: 'posTableStateServed',
+    request: 'MarkTableServedRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_NOT_OCCUPIED',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tableStateAwaitingPayment',
+    method: 'POST',
+    suffix: '/table-state/awaiting-payment',
+    dart: 'posTableStateAwaitingPayment',
+    request: 'MarkTableAwaitingPaymentRequest',
+    response: 'TableStateChangeResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'VALIDATION_FAILED',
+      'TABLE_NOT_IN_PLAN',
+      'TABLE_NOT_OCCUPIED',
+    ],
+  }),
+  {
+    id: 'tableState.read',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/table-state',
+    params: ['merchantId'],
+    dart: null,
+  },
+  // ── Purchasing: suppliers, purchase orders, receiving (workstream E step 3) ──
+  // The CONSOLE's surface, and deliberately not the till's. Ordering stock is
+  // back-of-house work: a cashier at the counter has no supplier, no invoice and
+  // no reason to put goods in transit, so these routes are gated by
+  // `merchant.manage` like the floor plan rather than by an `inventory.*` key
+  // that only a POS operator session carries. The till keeps reading stock
+  // through `/api/v1/pos/merchants/:merchantId/inventory`, which is unchanged.
+  //
+  // Send, receive and cancel are separate routes rather than one "update": each
+  // one moves stock differently or refuses for a different reason, and a single
+  // polymorphic verb would have to publish one error set for three operations.
+  {
+    id: 'procurement.supplierList',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/suppliers',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'SupplierQuery',
+      response: 'SupplierList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'procurement.supplierCreate',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/suppliers',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'CreateSupplierRequest',
+      response: 'SupplierResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'IDEMPOTENCY_CONFLICT',
+        'SUPPLIER_REFERENCE_TAKEN',
+        'VALIDATION_FAILED',
+      ],
+    },
+  },
+  {
+    id: 'procurement.supplierUpdate',
+    method: 'PUT',
+    path: '/api/merchants/:merchantId/suppliers/:supplierId',
+    params: ['merchantId', 'supplierId'],
+    dart: null,
+    contract: {
+      request: 'UpdateSupplierRequest',
+      response: 'SupplierResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'IDEMPOTENCY_CONFLICT',
+        'OPTIMISTIC_VERSION_CONFLICT',
+        'SUPPLIER_NOT_FOUND',
+        'VALIDATION_FAILED',
+      ],
+    },
+  },
+  {
+    id: 'procurement.purchaseOrderList',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/purchase-orders',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PurchaseOrderQuery',
+      response: 'PurchaseOrderList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'procurement.purchaseOrderGet',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/purchase-orders/:purchaseOrderId',
+    params: ['merchantId', 'purchaseOrderId'],
+    dart: null,
+    contract: {
+      request: 'PurchaseOrderScopeQuery',
+      response: 'PurchaseOrder',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'PURCHASE_ORDER_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'procurement.purchaseOrderCreate',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/purchase-orders',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'CreatePurchaseOrderRequest',
+      response: 'PurchaseOrderResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'IDEMPOTENCY_CONFLICT',
+        'PURCHASE_ORDER_LINE_TOTAL_MISMATCH',
+        'PURCHASE_ORDER_REFERENCE_TAKEN',
+        'SUPPLIER_ARCHIVED',
+        'SUPPLIER_NOT_FOUND',
+        'VALIDATION_FAILED',
+      ],
+    },
+  },
+  {
+    id: 'procurement.purchaseOrderSend',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/purchase-orders/:purchaseOrderId/send',
+    params: ['merchantId', 'purchaseOrderId'],
+    dart: null,
+    contract: {
+      request: 'SendPurchaseOrderRequest',
+      response: 'PurchaseOrderResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'IDEMPOTENCY_CONFLICT',
+        'OPTIMISTIC_VERSION_CONFLICT',
+        'PURCHASE_ORDER_CLOSED',
+        'PURCHASE_ORDER_NOT_DRAFT',
+        'PURCHASE_ORDER_NOT_FOUND',
+      ],
+    },
+  },
+  {
+    id: 'procurement.purchaseOrderReceive',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/purchase-orders/:purchaseOrderId/receipts',
+    params: ['merchantId', 'purchaseOrderId'],
+    dart: null,
+    contract: {
+      request: 'ReceivePurchaseOrderRequest',
+      response: 'PurchaseOrderResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'IDEMPOTENCY_CONFLICT',
+        'OPTIMISTIC_VERSION_CONFLICT',
+        'PURCHASE_ORDER_CLOSED',
+        'PURCHASE_ORDER_LINE_NOT_FOUND',
+        'PURCHASE_ORDER_LINE_TOTAL_MISMATCH',
+        'PURCHASE_ORDER_NOT_FOUND',
+        'PURCHASE_ORDER_NOT_SENT',
+        'PURCHASE_ORDER_OVER_RECEIPT',
+      ],
+    },
+  },
+  {
+    id: 'procurement.purchaseOrderCancel',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/purchase-orders/:purchaseOrderId/cancel',
+    params: ['merchantId', 'purchaseOrderId'],
+    dart: null,
+    contract: {
+      request: 'CancelPurchaseOrderRequest',
+      response: 'PurchaseOrderResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'IDEMPOTENCY_CONFLICT',
+        'OPTIMISTIC_VERSION_CONFLICT',
+        'PURCHASE_ORDER_CLOSED',
+        'PURCHASE_ORDER_NOT_FOUND',
+      ],
+    },
+  },
+  // ── Inventory costing (workstream E steps 5 and 6) ─────────────────────────
+  // The console's cost surface, and the same gate as purchasing: reading what a
+  // plate costs and what a day made is a manager's question about money, and an
+  // `inventory.*` key is carried only by POS operator sessions, which would make
+  // these routes unreachable from the surface that needs them.
+  //
+  // Reads only — there is no write here, deliberately. A cost is not something a
+  // person types; it is what a supplier charged, and it arrives through receiving.
+  {
+    id: 'inventoryCosting.costBasis',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/cost-basis',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryCostBasisQuery',
+      response: 'InventoryCostBasisList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'inventoryCosting.plates',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/plates',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryPlateQuery',
+      response: 'InventoryPlateList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  {
+    id: 'inventoryCosting.days',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/days',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryCostingDayQuery',
+      response: 'InventoryCostingDays',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  {
+    id: 'inventoryCosting.lowStock',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/low-stock',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'LowStockForecastQuery',
+      response: 'LowStockForecast',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  // ── Recipes and inventory authoring (plan of record §6 and §11, phase 0) ────
+  // The CONSOLE's READS of the stock model. The till keeps its own versioned routes
+  // and gains production later.
+  //
+  // THESE ARE THE READS ONLY, AND THE ABSENCE OF WRITES IS THE DESIGN. Plan D15 says
+  // every write in this cluster is an ADMINISTRATIVE COMMAND: it is versioned, it is
+  // fingerprinted, it is idempotent, and it leaves an audit trail. The platform
+  // already has one door for that work (`/api/merchants/:merchantId/administrative-commands`,
+  // the route `merchants.administrativeCommands`), and the console catalogue writes
+  // already use it. Twelve dedicated write routes would each re-implement the claim,
+  // the fingerprint and the approval machinery, which is exactly what D15 forbids.
+  //
+  // So a write here is an OPERATION, not a path: `inventory.item.create`,
+  // `inventory.recipe.update`, `inventory.invoice.commit` and their neighbours join
+  // `ADMINISTRATIVE_COMMAND_POLICIES` and the execution service, carrying the
+  // `inventory.*` permissions of plan §6.3. The request models below are still the
+  // parameters those commands take.
+  //
+  // READS stay on `merchant.manage`: reading a cost is a manager's question about
+  // money, and an `inventory.*` key is carried only by POS operator sessions, which
+  // would put these paths out of reach of the surface that needs them.
+  {
+    id: 'inventoryItem.list',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/items',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryAuthoringItemQuery',
+      response: 'InventoryAuthoringItemList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
+    id: 'inventoryUnitConversion.list',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/unit-conversions',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryAuthoringItemQuery',
+      response: 'InventoryUnitConversionList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
+    id: 'inventoryAllergen.list',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/allergens',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryAllergenQuery',
+      response: 'InventoryAllergenList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
+    id: 'inventoryRecipe.list',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/recipes',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryRecipeQuery',
+      response: 'InventoryRecipeList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
+    id: 'inventoryRecipe.explode',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/recipes/:recipeId/explosion',
+    params: ['merchantId', 'recipeId'],
+    dart: null,
+    contract: {
+      request: 'InventoryRecipeQuery',
+      response: 'InventoryRecipeExplosion',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  {
+    id: 'supplierInvoice.list',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/supplier-invoices',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'SupplierInvoiceQuery',
+      response: 'SupplierInvoiceList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+
+  {
+    id: 'inventoryCosting.usageVariance',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/usage-variance',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryUsageVarianceQuery',
+      response: 'InventoryUsageVariance',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  {
+    id: 'inventoryCosting.recipeCosts',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/recipe-costs',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'InventoryRecipeCostQuery',
+      response: 'InventoryRecipeCostHistory',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  {
+    id: 'inventoryCosting.menuEngineering',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/inventory-costing/menu-engineering',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'MenuEngineeringQuery',
+      response: 'MenuEngineering',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  {
+    id: 'prepList.read',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/prep-list',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PrepListQuery',
+      response: 'PrepList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  // The label sheet (§8.3 and D14). The SERVER renders it, and the café prints it on
+  // the printer it already owns: no new printer integration in v1. The response is a
+  // PNG, so it names no model.
+  {
+    id: 'prepList.labels',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/prep-list/labels',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PrepListQuery',
+      response: null,
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED'],
+    },
+  },
+  // Recall (§8.3). "Which sales consumed this lot?" The basis is in the answer.
+  {
+    id: 'inventoryLot.recall',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/stock-lots/:lotId/recall',
+    params: ['merchantId', 'lotId'],
+    dart: null,
+    contract: {
+      request: 'LotRecallQuery',
+      response: 'LotRecall',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'VALIDATION_FAILED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
   // ── Local authentication (dashboard, umi-cash) ─────────────────────────────
   {
     id: 'auth.login',
@@ -1710,6 +2479,26 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       errors: ['PERMISSION_DENIED'],
     },
   },
+  // The till's read of the policy BEFORE it charges anything (§8G).
+  //
+  // Which payment methods the tender screen may offer is decided by this policy,
+  // and the only place it used to be sent was the checkout response — the call
+  // that takes the money. Since the first press of `Cobrar` is a one-tap sale
+  // when the server reprices to the same total, a cashier could never reach the
+  // method tiles: the card terminal existed in the code, the engine and the
+  // policy, and was unreachable from the screen. This route is the read that
+  // makes the choice possible, and it takes the same operator authorisation the
+  // charge does.
+  posMerchantRoute({
+    id: 'pos.checkoutPolicy',
+    method: 'GET',
+    suffix: '/checkout/policy',
+    dart: 'posCheckoutPolicy',
+    request: 'PosCheckoutPolicyQuery',
+    response: 'PosCheckoutPolicyResult',
+    permission: 'checkout.commit',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
   posMerchantRoute({
     id: 'pos.checkoutRecovery',
     method: 'GET',
@@ -1734,6 +2523,23 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     request: 'ClearCartRequest',
     response: 'Cart',
     permission: 'cart.write',
+  }),
+  // The operator says the terminal did NOT charge (§8G step 4's last piece).
+  //
+  // A draft holding a `manual_terminal` claim cannot be cancelled and cannot have
+  // that claim dropped by a later tender — the guards are right, and this is the
+  // sentence they were missing. Named, single-purpose, audited; see the model's
+  // own comment in `pos-checkout.ts` for why it is not a general "clear tenders".
+  posMerchantRoute({
+    id: 'pos.checkoutTerminalRecovery',
+    method: 'POST',
+    suffix: '/checkout/carts/:cartId/terminal-recovery',
+    params: ['cartId'],
+    dart: 'posCheckoutTerminalRecovery',
+    request: 'CheckoutTerminalRecoveryRequest',
+    response: 'CheckoutTerminalRecoveryResult',
+    permission: 'checkout.terminal.confirm',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND', 'TENDER_NOT_RECOVERABLE'],
   }),
   posMerchantRoute({
     id: 'pos.checkoutCancel',
@@ -1913,6 +2719,36 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     errors: ['PERMISSION_DENIED', 'RATE_LIMITED', 'OPTIMISTIC_VERSION_CONFLICT'],
   }),
   posMerchantRoute({
+    id: 'pos.cashRegisterReclaim',
+    method: 'POST',
+    suffix: '/cash/registers/:registerId/reclaim',
+    params: ['registerId'],
+    dart: 'posCashRegisterReclaim',
+    request: 'ReclaimCashRegisterRequest',
+    response: 'ReclaimCashRegisterResult',
+    // Addressed by REGISTER, not by shift, and that is the deliberate part. Every
+    // neighbour in this group acts on a shift the caller already knows about (they
+    // have its id on screen). The operator stuck at a drawer has the opposite view:
+    // they know which register they are standing at and they cannot read the shift
+    // that holds it. Making the shift the path parameter would force the client to
+    // name the very row it cannot see, and would let a caller point this operation
+    // at a shift of its choosing; the register is what the till has, and resolving
+    // the holding shift from it is the server's job.
+    //
+    // The authority to open a register is the authority to clear a hold on it —
+    // `cash.shift.open` already means "may take this drawer into service", which is
+    // exactly what the operator is trying to do. No new permission was invented, and
+    // it is deliberately NOT the variance authority: no count is taken here.
+    permission: 'cash.shift.open',
+    errors: [
+      'PERMISSION_DENIED',
+      'IDEMPOTENCY_CONFLICT',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'REGISTER_NOT_AVAILABLE',
+      'REGISTER_HELD_BY_ACTIVE_TILL',
+    ],
+  }),
+  posMerchantRoute({
     id: 'pos.cashNoSale',
     method: 'POST',
     suffix: '/cash/shifts/:shiftId/no-sale',
@@ -1977,6 +2813,10 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       'IDEMPOTENCY_CONFLICT',
       'OPTIMISTIC_VERSION_CONFLICT',
       'PAYMENT_OUTCOME_UNKNOWN',
+      // A card tender's refund is asked of the terminal (plan §4 Phase 4): the vendor's own
+      // refusal, and the case where the console is the one asking.
+      'TERMINAL_REFUND_REFUSED',
+      'TERMINAL_REFUND_REQUIRES_TILL',
     ],
   }),
   posMerchantRoute({
@@ -2101,6 +2941,33 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     response: 'InventoryMutationResult',
     permission: 'inventory.restock.resolve',
     approval: true,
+  }),
+  // Production (§8.1). The cook makes the prep and says how much came out; the
+  // server explodes the recipe and moves every input through the one ledger door.
+  // No approval: it is the work the kitchen was asked to do, not a correction of an
+  // earlier decision. `inventory.production.produce` is the permission.
+  posMerchantRoute({
+    id: 'pos.inventoryProduction',
+    method: 'POST',
+    suffix: '/inventory/production',
+    dart: 'posInventoryProduction',
+    request: 'ProductionRecord',
+    response: 'ProductionResult',
+    permission: 'inventory.production.produce',
+  }),
+  // THE PREP LIST, ON THE KITCHEN BOARD (§8.4). The console has its own read behind
+  // `merchant.manage`, and a POS operator does not hold that key: it is carried only
+  // by a browser session. The kitchen's own tab therefore reads through the till's
+  // surface, with the permission the rest of the inventory screen already uses.
+  posMerchantRoute({
+    id: 'pos.inventoryPrepList',
+    method: 'GET',
+    suffix: '/inventory/prep-list',
+    dart: 'posInventoryPrepList',
+    request: 'PosPrepListQuery',
+    response: 'PrepList',
+    permission: 'inventory.read',
+    idempotent: false,
   }),
   posMerchantRoute({
     id: 'pos.inventoryCountCreate',
@@ -2603,6 +3470,55 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND', 'OPTIMISTIC_VERSION_CONFLICT'],
     },
   },
+  // The whole-location board a POS-role device reads in its unified KDS mode.
+  //
+  // This route existed in the API (`KdsPosController.board`) and in the till,
+  // and in neither the contract nor this table: the client hardcoded the path,
+  // so the one thing the generated bindings exist for — a single declaration of
+  // the surface — was missing for the screen a cook works a service on. It is
+  // declared here so the path has one home, the permission sits where a reviewer
+  // looks for it (`kitchen.read`, which is what `authorizePos` enforces), and
+  // `config/umipos-surface-permissions.json` can name the route it checks.
+  posMerchantRoute({
+    id: 'pos.kitchenBoard',
+    method: 'GET',
+    suffix: '/kitchen/board',
+    dart: 'posKitchenBoard',
+    request: 'PosKitchenOrderQuery',
+    response: 'KitchenBoardResponse',
+    permission: 'kitchen.read',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
+  // The all-day count (§8H step 6). A sibling of the board rather than a field
+  // on it: the board is polled every few seconds and answers "what is on the
+  // rail NOW", while this is one aggregate per trading day that changes only when
+  // an order arrives. Folding it into the board response would make the poll pay
+  // for it on every tick, and the count is the one number a cook reads first.
+  // The board's wake-up (§8H step 8), and the reason H's acceptance can hold: with
+  // the till polling every 8 seconds a ticket could take 8 seconds to reach the
+  // station, which "in under a second" does not survive. This is a HELD request —
+  // the answer arrives when a kitchen ticket moves, or when the hold expires with
+  // `changed: false`, which is the poll kept as the floor.
+  posMerchantRoute({
+    id: 'pos.kitchenBoardWatch',
+    method: 'GET',
+    suffix: '/kitchen/board/watch',
+    dart: 'posKitchenBoardWatch',
+    request: 'PosKitchenOrderQuery',
+    response: 'KitchenBoardWatchResponse',
+    permission: 'kitchen.read',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
+  posMerchantRoute({
+    id: 'pos.kitchenAllDay',
+    method: 'GET',
+    suffix: '/kitchen/all-day',
+    dart: 'posKitchenAllDay',
+    request: 'PosKitchenAllDayQuery',
+    response: 'KitchenAllDayResponse',
+    permission: 'kitchen.read',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
   posMerchantRoute({
     id: 'pos.kitchenOrder',
     method: 'GET',
@@ -2614,6 +3530,380 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     permission: 'kitchen.read',
     errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
   }),
+  // The write half of the same board (§8H step 3, defect D33). It shares the
+  // command journal, idempotency key and optimistic version with `kds.command`,
+  // and differs only in how the caller is authorised: a POS device has no
+  // station, so the person at the till is authorised by `locationId` +
+  // `operatorSessionId` instead. The declared permission is the base
+  // `kitchen.prepare`, as on `kds.command`; the per-command permission
+  // (kitchen.ready / kitchen.complete / kitchen.recall) is enforced by the
+  // service, which is where the command type is known.
+  posMerchantRoute({
+    id: 'pos.kitchenCommand',
+    method: 'POST',
+    suffix: '/kitchen/command',
+    dart: 'posKitchenCommand',
+    request: 'PosKitchenCommandRequest',
+    response: 'KitchenCommandResponse',
+    permission: 'kitchen.prepare',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+
+  // ── POS tenders: the attempt record and its three outcomes (workstream G) ──
+  //
+  // `capture` is where money is actually asked for, and it is deliberately NOT a
+  // route that can say "paid". It creates an attempt keyed by command identity,
+  // persists it BEFORE the provider is called, and returns one of three answers.
+  // The till then commits with `pos.checkout` as it always has.
+  //
+  // `attempt` is the second half of §8G step 3's sentence: an unknown outcome must
+  // be queryable by the same command identity that started it. The identity is the
+  // path parameter, so there is no way to ask about an attempt by guessing a
+  // different key — the whole point of the rule is that the query is the SAME
+  // identity as the attempt.
+  //
+  // `assertion` exists because an operator WILL be told "it went through" while the
+  // terminal is silent. It records that as evidence and changes nothing: the attempt
+  // stays unknown. A customer's word is not a capture, and the response says so.
+  posMerchantRoute({
+    id: 'pos.tenderCapture',
+    method: 'POST',
+    suffix: '/tenders/capture',
+    dart: 'posTenderCapture',
+    request: 'TenderCaptureRequest',
+    response: 'TenderCaptureResult',
+    permission: 'checkout.commit',
+    errors: [
+      'PERMISSION_DENIED',
+      'RESOURCE_NOT_FOUND',
+      'PAYMENT_UNKNOWN',
+      'TENDER_PROVIDER_UNAVAILABLE',
+      'IDEMPOTENCY_CONFLICT',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tenderAttempt',
+    method: 'GET',
+    suffix: '/tenders/:commandIdentity',
+    params: ['commandIdentity'],
+    dart: 'posTenderAttempt',
+    request: 'TenderAttemptQuery',
+    response: 'TenderAttemptResult',
+    permission: 'checkout.commit',
+    errors: ['PERMISSION_DENIED', 'TENDER_ATTEMPT_NOT_FOUND'],
+  }),
+  posMerchantRoute({
+    id: 'pos.tenderAssert',
+    method: 'POST',
+    suffix: '/tenders/:commandIdentity/assertion',
+    params: ['commandIdentity'],
+    dart: 'posTenderAssert',
+    request: 'TenderAssertionRequest',
+    response: 'TenderAssertionResult',
+    permission: 'checkout.commit',
+    errors: ['PERMISSION_DENIED', 'TENDER_ATTEMPT_NOT_FOUND', 'IDEMPOTENCY_CONFLICT'],
+  }),
+  // The route that turns an operator's word into a FINAL state, and the one that
+  // was missing (workstream G's step 4 remainder, found by walking a cart into a
+  // dead end in the rehearsal). `assertion` above deliberately changes nothing;
+  // this changes the attempt and declares `operator_attested` as what changed it,
+  // because a manual terminal has no adapter to ask and the person standing there
+  // is the only witness there will ever be. Without it an unresolved attempt can
+  // never be closed, its tender can never leave the draft, and the cart can be
+  // neither paid nor cancelled.
+  posMerchantRoute({
+    id: 'pos.tenderSettle',
+    method: 'POST',
+    suffix: '/tenders/:commandIdentity/settlement',
+    params: ['commandIdentity'],
+    dart: 'posTenderSettle',
+    request: 'TenderSettlementRequest',
+    response: 'TenderSettlementResult',
+    permission: 'checkout.terminal.confirm',
+    errors: [
+      'PERMISSION_DENIED',
+      'TENDER_ATTEMPT_NOT_FOUND',
+      'TENDER_ALREADY_SETTLED',
+      'IDEMPOTENCY_CONFLICT',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.tenderProviders',
+    method: 'GET',
+    suffix: '/tender-providers',
+    dart: 'posTenderProviders',
+    request: 'TenderProviderQuery',
+    response: 'TenderProviderList',
+    permission: 'checkout.commit',
+    errors: ['PERMISSION_DENIED'],
+  }),
+  // GIVING THE MONEY BACK, which is a different act from taking it.
+  //
+  // `sale.refund.manual_terminal` and not `checkout.commit`: a card tender is
+  // `manual_terminal` on the wire, so this is exactly the permission the platform
+  // already demands before anyone refunds a terminal tender through the exception
+  // flow — an operator may take money and still not be allowed to give it back.
+  //
+  // `TENDER_REFUND_UNSUPPORTED` is a first-class refusal rather than a crash: a
+  // provider that cannot refund (the drawer, a terminal a person reads) says so, and
+  // the caller is left with the operator-attested path it already had. `PAID_AMOUNT_EXCEEDED`
+  // is the tip case — the terminal can add one, so the refund's ceiling is what the
+  // customer actually PAID, not what we asked for.
+  posMerchantRoute({
+    id: 'pos.tenderRefund',
+    method: 'POST',
+    suffix: '/tenders/:attemptId/refund',
+    params: ['attemptId'],
+    dart: 'posTenderRefund',
+    request: 'TenderRefundRequest',
+    response: 'TenderRefundResult',
+    permission: 'sale.refund.manual_terminal',
+    errors: [
+      'PERMISSION_DENIED',
+      'TENDER_ATTEMPT_NOT_FOUND',
+      'TENDER_REFUND_NOT_REFUNDABLE',
+      'TENDER_REFUND_UNSUPPORTED',
+      'PAID_AMOUNT_EXCEEDED',
+      'IDEMPOTENCY_CONFLICT',
+    ],
+  }),
+
+  // ── The fiscal record: stamping and the deadline (workstream G step 5) ──
+  //
+  // The console's surface, not the till's. Invoicing is back-office work with a
+  // contador's review behind it, so these are gated by `merchant.manage` like the
+  // floor plan and purchasing rather than by a POS operator session. A till that
+  // could stamp its own CFDI with a customer's RFC typed at the counter is a
+  // liability, not a feature.
+  //
+  // NEITHER OF THESE CANCELS ANYTHING. Cancellation is not a fiscal route of its
+  // own on purpose: §8G's acceptance requires that cancelling a SALE cancels its
+  // document in the same command, so the cancellation lives inside
+  // `pos.saleCancel` where the sale is, and not in a second place an operator
+  // could half-do.
+  // ── The merchant's link to Mercado Pago (Phase 5) ──────────────────────────
+  //
+  // `merchant.manage` and not a POS operator session: this is the café's RELATIONSHIP with the
+  // payment processor — which account receives its money — and that is an owner's decision
+  // rather than something a cashier does at the counter. It is the same gate the fiscal
+  // documents and the floor plan already use.
+  //
+  // NEITHER ROUTE EVER RETURNS A TOKEN. The authorization route answers with a URL to send the
+  // seller to; the status route answers with the account and the token's HEALTH, which is all
+  // a screen needs to say "connected, and renews in 90 days".
+  {
+    id: 'mpPoint.authorize',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/mp-point/authorization',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PointMerchantQuery',
+      response: 'PointAuthorization',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'MP_POINT_OAUTH_UNAVAILABLE'],
+    },
+  },
+  {
+    id: 'mpPoint.status',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/mp-point',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PointMerchantQuery',
+      response: 'PointCredentialStatus',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  // Unlinking, as the owner's own act. The response is the status AFTER the change, so a
+  // console renders the state it is in rather than assuming one, and the route is
+  // IDEMPOTENT: unlinking a café that never linked erases nothing and answers the same way.
+  //
+  // IT IS A DELETE AND IT DELETES NOTHING. `merchant.mp_point_credential` is granted no
+  // DELETE on purpose — its only delete path is the merchant's own cascade — so unlinking
+  // is an update that erases the TOKEN MATERIAL and leaves the row. The verb is the
+  // caller's intent (stop charging this account); the storage decision is the database's,
+  // and the two are allowed to differ when the SQL says why.
+  {
+    id: 'mpPoint.disconnect',
+    method: 'DELETE',
+    path: '/api/merchants/:merchantId/mp-point',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PointMerchantQuery',
+      response: 'PointCredentialStatus',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED'],
+    },
+  },
+  // ── Which register owns which terminal (Phase 5 steps 3 and 4) ──────────────
+  //
+  // The screen these serve is `/devices`, and the gate is the same `merchant.manage` pair the
+  // two routes above use: which register takes money at which counter is the owner's decision,
+  // and the terminal list is read WITH THE CAFÉ'S OWN TOKEN, so it is the café's account being
+  // described rather than this deployment's.
+  //
+  // THE LIST IS THE VENDOR'S, ENRICHED BY OURS. `GET /terminals/v1/list` answers with the
+  // terminals of whoever's token asked, so a terminal that was unpaired at the vendor leaves the
+  // screen rather than lingering as a row we once wrote. What our database adds is the binding:
+  // which register and location own it, and the store/point-of-sale ids the order needs.
+  //
+  // THE STORE IS CREATED ONCE PER ACCOUNT, AND IT IS WHY THIS GROUP EXISTS. The vendor requires
+  // the store to exist before a point of sale can, and it validates the address against a closed
+  // catalogue of city names, so the address is the one thing here that a PERSON types. Our id for
+  // it is derived from the merchant rather than randomized, which is what makes a retry a refusal
+  // instead of a second store with a second fiscal address.
+  {
+    id: 'mpPoint.storeCreate',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/mp-point/store',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PointStoreCreateRequest',
+      response: 'PointStore',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'MP_POINT_CREDENTIAL_ABSENT', 'MP_POINT_STORE_REFUSED'],
+    },
+  },
+  {
+    id: 'mpPoint.terminalList',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/mp-point/terminals',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'PointMerchantQuery',
+      response: 'PointTerminalList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'MP_POINT_CREDENTIAL_ABSENT'],
+    },
+  },
+  {
+    id: 'mpPoint.terminalBind',
+    method: 'PUT',
+    path: '/api/merchants/:merchantId/mp-point/terminals/:terminalId',
+    params: ['merchantId', 'terminalId'],
+    dart: null,
+    contract: {
+      request: 'PointTerminalBindRequest',
+      response: 'PointTerminal',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'LOCATION_REQUIRED', 'MP_POINT_TERMINAL_UNKNOWN'],
+    },
+  },
+  {
+    id: 'mpPoint.terminalUnbind',
+    method: 'DELETE',
+    path: '/api/merchants/:merchantId/mp-point/terminals/:terminalId',
+    params: ['merchantId', 'terminalId'],
+    dart: null,
+    contract: {
+      request: 'PointTerminalQuery',
+      response: 'PointTerminal',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'MP_POINT_TERMINAL_UNKNOWN'],
+    },
+  },
+  {
+    id: 'fiscal.documentList',
+    method: 'GET',
+    path: '/api/merchants/:merchantId/fiscal/documents',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'FiscalDocumentQuery',
+      response: 'FiscalDocumentList',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'LOCATION_REQUIRED'],
+    },
+  },
+  {
+    id: 'fiscal.stampSale',
+    method: 'POST',
+    path: '/api/merchants/:merchantId/fiscal/documents',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'FiscalStampSaleRequest',
+      response: 'FiscalStampSaleResult',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'FISCAL_SALE_NOT_COMMITTED',
+        'FISCAL_STAMP_REFUSED',
+        'IDEMPOTENCY_CONFLICT',
+        'VALIDATION_FAILED',
+      ],
+    },
+  },
 ];
 
 /** Route ids, for lookups that must fail at compile time when an id is wrong. */

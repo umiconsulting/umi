@@ -202,6 +202,18 @@ const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: stri
     // so no static rebuild produces the statement the database will see.
     why: 'true run-time clause; accepted 2026-09-05',
   },
+  {
+    file: 'modules/fiscal/fiscal.repository.ts',
+    count: 1,
+    // ACCEPTED. `updateJoined` takes its SET and WHERE as one composed fragment
+    // (`${setAndWhere}`) built by the caller — `markStamped`, `markError`,
+    // `cancelLocal` — because each is a different write over the same joined
+    // read. Same class as the entries above: the statement the database sees is
+    // chosen at run time, so no static rebuild can produce it. The writes
+    // themselves are exercised against the real schema by
+    // `modules/fiscal/fiscal.integration.ts`.
+    why: 'true run-time clause; accepted 2026-09-17',
+  },
 ];
 
 describe('build-v3 SQL preflight · every backend statement parses against the real schema', () => {

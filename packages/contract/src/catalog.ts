@@ -16,11 +16,18 @@ import { posSaleModels } from './pos-sale';
 import { posCashModels } from './pos-cash';
 import { posExceptionModels } from './pos-exception';
 import { posInventoryModels } from './pos-inventory';
+import { procurementModels } from './procurement';
+import { inventoryCostingModels } from './inventory-costing';
+import { recipesModels } from './recipes';
 import { posCustomerValueModels } from './pos-customer-value';
 import { posHardwareModels } from './pos-hardware';
 import { floorPlanModels } from './floor-plan';
+import { tableStateModels } from './table-state';
+import { tableOrderModels } from './table-order';
 import { posKitchenModels } from './pos-kitchen';
 import { dashboardOperationsModels } from './dashboard-operations';
+import { tenderModels } from './tender';
+import { mercadoPagoModels } from './mercado-pago';
 import { realtimeModels } from './realtime';
 import { ROUTE_TABLE, type RouteContract } from './route-table';
 import type { ZodTypeAny } from 'zod';
@@ -35,7 +42,31 @@ import type { ZodTypeAny } from 'zod';
  * breaking change to the described paths, so the artifact major moves, even though
  * no client is pinned in the field yet and the URL major is unchanged at 1.
  */
-export const CONTRACT_VERSION = '2.19.0';
+/**
+ * 2.20.0 — the POS kitchen command route (`pos.kitchenCommand`) and its request
+ * shape, plus the four kitchen refusal codes a station-less till needs to tell
+ * one refusal from another (§8H step 3, defect D33). Additive to the artifact:
+ * no described path changed meaning, so the URL major stays at 1.
+ */
+/**
+ * 2.21.0 — the console's inventory costing reads (`inventoryCosting.*`, workstream E
+ * steps 5 and 6): per-item cost basis, per-plate cost and margin, per-day revenue
+ * and cost of goods, and the low-stock forecast. Additive to the artifact: no
+ * described path changed meaning, so the URL major stays at 1.
+ */
+/**
+ * 2.22.0 — table-order intake (§8I step 2, ADR 2026-09-13 §9): the guest menu, the
+ * place-an-order body and its answer, and the issue/revoke shapes for a table's
+ * revocable QR credential. Additive to the artifact: the described path is public and
+ * new, so nothing existing changed meaning and the URL major stays at 1.
+ */
+/**
+ * 2.23.0 — the recipes and inventory authoring surface (recipes module plan §6): the
+ * item, unit-conversion, allergen, recipe and supplier-invoice writes, and the
+ * usage-variance, recipe-cost, menu-engineering and prep-list reads. Additive to the
+ * artifact: no described path changed meaning, so the URL major stays at 1.
+ */
+export const CONTRACT_VERSION = '2.23.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;
@@ -78,11 +109,24 @@ export const modelCatalog: Readonly<Record<string, ZodTypeAny>> = {
   ...posCashModels,
   ...posExceptionModels,
   ...posInventoryModels,
+  ...procurementModels,
+  ...inventoryCostingModels,
+  // Recipes and inventory authoring (workstream E step 4, build-v3-76). No name
+  // here is also named by `posInventoryModels`: the console's item is
+  // `InventoryAuthoringItem`, so the POS stock view keeps the plain `InventoryItem`
+  // and the barrel has no ambiguity to resolve.
+  ...recipesModels,
   ...posCustomerValueModels,
   ...posHardwareModels,
   ...posKitchenModels,
   ...floorPlanModels,
+  ...tableStateModels,
+  ...tableOrderModels,
   ...dashboardOperationsModels,
+  // The tender path and the fiscal record (workstream G): the attempt model with its
+  // three outcomes, and the CFDI state machine with its deadline.
+  ...tenderModels,
+  ...mercadoPagoModels,
   ...realtimeModels,
 };
 

@@ -695,7 +695,7 @@ No modifiques una venta o un pago confirmado.
 Estado actual:
 
 - UMI conserva la autoridad de pedidos.
-- `apps/umi-kds` existe como cliente separado.
+- El tablero de cocina vive dentro del POS; el cliente KDS nativo se retiró el 2026-09-16.
 - UmiPOS todavía no implementa el flujo completo hacia cocina.
 
 Falta:

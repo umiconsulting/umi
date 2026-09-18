@@ -40,6 +40,10 @@ void main() {
     expect(actions.showCashCenter, isTrue);
     expect(actions.showSaleActions, isTrue);
     expect(actions.showRecovery, isTrue);
+    // The till this cashier is standing at may well be running the board, and
+    // that is exactly the case this guards: the tab follows the OPERATOR's
+    // permission, not the device's controller.
+    expect(actions.showKitchenBoard, isFalse);
     expect(permissions.allows('sale.refund.approve'), isFalse);
   });
 
@@ -56,6 +60,22 @@ void main() {
     expect(actions.showSaleHistory, isFalse);
     expect(actions.showSaleActions, isFalse);
     expect(actions.showRecovery, isFalse);
+    expect(actions.showKitchenBoard, isFalse);
+  });
+
+  test('the kitchen board opens for a cook, on either kitchen permission', () {
+    for (final granted in const [
+      ['kitchen.read'],
+      ['kitchen.prepare'],
+      ['kitchen.read', 'kitchen.prepare'],
+    ]) {
+      final actions = OperatorActionAccess(OperatorPermissions(granted));
+      expect(
+        actions.showKitchenBoard,
+        isTrue,
+        reason: 'granted ${granted.join(' + ')}',
+      );
+    }
   });
 
   test('Cash Center actions require their exact effective permission', () {

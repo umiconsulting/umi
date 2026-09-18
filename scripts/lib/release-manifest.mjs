@@ -32,10 +32,6 @@ export async function generateReleaseManifest({ root, outputDirectory, posArtifa
     execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', image], {
       encoding: 'utf8',
     }).trim();
-  const kdsTree = execFileSync('git', ['rev-parse', `${values.RELEASE_GIT_COMMIT}:apps/umi-kds`], {
-    cwd: root,
-    encoding: 'utf8',
-  }).trim();
 
   const manifest = {
     schemaVersion: 1,
@@ -62,7 +58,6 @@ export async function generateReleaseManifest({ root, outputDirectory, posArtifa
         bytes: artifactStat.size,
         sha256: await sha256File(posArtifact),
       },
-      kds: { reference: `git-tree:${kdsTree}`, version: values.RELEASE_VERSION },
     },
     compatibility: {
       minimumPosVersion: values.MINIMUM_POS_VERSION,

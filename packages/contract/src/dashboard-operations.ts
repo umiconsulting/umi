@@ -131,6 +131,32 @@ export const DashboardAdministrativeOperation = z.enum([
   'catalog.detail',
   'catalog.update',
   'catalog.archive',
+  // Recipes and inventory authoring (recipes module plan §11, phase 1). The console
+  // AUTHORS items, their unit conversions and their allergen labels; the till
+  // operates. Every one of these is an administrative command, never a write route,
+  // because it must be idempotent and audited (plan D15).
+  'inventory.item.create',
+  'inventory.item.update',
+  'inventory.item.archive',
+  'inventory.conversion.set',
+  'inventory.allergen.set',
+  'inventory.item_allergen.set',
+  // Recipes (plan §11, phase 2). An edit is a NEW IMMUTABLE VERSION: `update` retires
+  // the row the caller read and writes the next version, and `retire` ends the life of
+  // the version without deleting it (plan D3).
+  'inventory.recipe.create',
+  'inventory.recipe.update',
+  'inventory.recipe.retire',
+  // Production (plan §8.1 and §11, phase 3). The console posts the same batch the
+  // till does, through the same door, so a batch is never authored twice.
+  'inventory.production.produce',
+  // Supplier invoices (plan §10 and §11, phase 5). CAPTURE AND APPROVAL ARE TWO KEYS:
+  // migration 76 grants `inventory.invoice.approve` to owner and admin alone, so the
+  // person who uploads a supplier's document is not necessarily the person who accepts
+  // the price it sets.
+  'inventory.invoice.upload',
+  'inventory.invoice.match',
+  'inventory.invoice.commit',
   'recovery.query_original',
 ]);
 

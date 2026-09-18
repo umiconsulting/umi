@@ -41,8 +41,12 @@ export interface CashLoginResult {
 /**
  * The register's own login.
  *
- * IT READS THE SAME ACCOUNTS AS THE DASHBOARD. `umi.user` is one table, so a café
- * owner signs in here with the credential she uses there. What differs is the
+ * IT READS THE SAME ACCOUNTS AS THE DASHBOARD, THROUGH THE SAME GATE. `umi.user`
+ * is one table, so a café owner signs in here with the credential she uses there,
+ * and the read is the dashboard's own (`findSignInCredentialByEmail`,
+ * `PASSWORD_SIGN_IN_STATUSES`): suspending a login closes the panel and the
+ * register with ONE statement against `umi.user.status`. `merchant.staff.status`
+ * is the employment and does not move with it. What differs is the
  * SHAPE of the session: the dashboard issues a cookie pair on `JWT_SECRET`, and
  * the register holds a Bearer access token plus a refresh cookie on
  * `JWT_ACCESS_SECRET`/`JWT_REFRESH_SECRET`, because that is what the frozen
@@ -89,7 +93,10 @@ export class CashAuthService {
 
   async login(merchantId: string, input: CashLoginInput): Promise<CashLoginResult> {
     const email = input.identifier.trim().toLowerCase();
-    const credential = await this.repo.findCredentialByEmail(email);
+    // GATED READ. A suspended login is not found, exactly like an address nobody
+    // registered — which is the answer this register wants twice over, because
+    // the decoy below then spends the same scrypt work on it.
+    const credential = await this.repo.findSignInCredentialByEmail(email);
 
     // HASH EVEN WHEN THERE IS NO ACCOUNT. scrypt is deliberately slow, so
     // returning early on an unknown address makes "no such account" measurably

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/operator_error_message.dart';
@@ -99,14 +100,24 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: SearchBar(
+              // A `TextField` on the shared `inputDecorationTheme`, the same
+              // field the catalog searches with. `SearchBar` publishes a 24 px
+              // `<input>` inside its 48 px pill, so the editable region — the
+              // node a screen reader and the sweep both measure — was under
+              // the touch floor while the pill looked fine.
+              child: TextField(
                 controller: _search,
-                hintText: _copy(
-                  'Busca por nombre, teléfono o correo',
-                  'Search by name, phone, or email',
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: _copy(
+                    'Busca por nombre, teléfono o correo',
+                    'Search by name, phone, or email',
+                  ),
                 ),
-                leading: const Icon(Icons.search),
                 onChanged: (value) =>
+                    widget.controller.search(widget.scope, value),
+                onSubmitted: (value) =>
                     widget.controller.search(widget.scope, value),
               ),
             ),
@@ -158,6 +169,11 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
     }
     return ListView.builder(
       itemCount: state.customers.length,
+      // Every row is 72 px and the first page is short, so cache the whole
+      // result rather than letting the scrollable clip the last row's
+      // published rect to its 250 px cache window — a 10 px tall button in the
+      // accessibility tree for a full-height row.
+      scrollCacheExtent: const ScrollCacheExtent.viewport(2),
       itemBuilder: (_, index) {
         final customer = state.customers[index];
         final contact = customer.contacts.isEmpty
@@ -520,11 +536,10 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
       approvalFingerprint: approvalId == null ? null : preview.fingerprint,
     );
     if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_copy('Ajuste registrado.', 'Adjustment recorded.')),
-        ),
-      );
+      // No confirmation bar. `select` below re-reads the account, so the
+      // adjustment is on screen the moment it lands; a bar that slides up to
+      // announce it covers the bottom of the screen to repeat what the ledger
+      // row already says.
       await widget.controller.select(
         widget.scope,
         widget.controller.state.selected!,

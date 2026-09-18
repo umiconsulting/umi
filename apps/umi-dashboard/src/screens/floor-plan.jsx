@@ -7,24 +7,59 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { Stage, Layer, Group, Rect, Circle, Text, Transformer, Line } from 'react-konva';
+import { Stage, Layer, Group, Rect, Circle, Path, Text, Transformer, Line } from 'react-konva';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { FloorPlanDocument, FloorPlanState } from '@umi/contract/floor-plan';
 import { useMerchant } from '@/lib/merchant-context.jsx';
-import { fetchFloorPlan, changeFloorPlan } from '@/data.jsx';
+import { fetchFloorPlan, changeFloorPlan, fetchTableState } from '@/data.jsx';
 import { resolveTheme, subscribeTheme } from '@/lib/theme.js';
 import {
   areaTableCount,
   createLayout,
   duplicateElement,
-  elementLabelFontSize,
   fitElement,
+  formatTableTurn,
+  groupRegions,
   layoutHistory,
   nextTableLabel,
+  readTableRoom,
   seatDotLayout,
+  serverNowMs,
+  TABLE_STATE_POLL_MS,
+  tableBandFonts,
+  tableEntry,
+  tableGroupSize,
+  tablePartyPresent,
   tableShowsDetail,
+  tableStateVisual,
+  tableTurnMs,
+  tintFill,
 } from './floor-plan-model';
 import './floor-plan.css';
+
+/**
+ * Is this tab hidden? A named helper rather than a bare `document` read, so the
+ * polling effect asks a function instead of depending on a global it cannot
+ * subscribe to — and so the rule that a hidden tab asks nothing of the API is
+ * stated in one place.
+ */
+function tabHidden() {
+  return document.visibilityState === 'hidden';
+}
+
+/**
+ * Subscribe to this tab going hidden or visible, at MODULE scope on purpose.
+ *
+ * `FloorPlanEditor` holds a local named `document` — the floor plan being edited
+ * — so a `document.addEventListener` written inside that component reaches the
+ * plan, not the page, and throws on the first render before the plan has loaded.
+ * Here, outside it, `document` means the browser. The returned function detaches
+ * the listener again.
+ */
+function onTabVisibility(listener) {
+  document.addEventListener('visibilitychange', listener);
+  return () => document.removeEventListener('visibilitychange', listener);
+}
 
 /**
  * Floor surfaces, in the same palette the POS draws the published plan with: a
@@ -50,6 +85,9 @@ const FLOOR_BASE = {
     door: '#bfd7e5',
     doorEdge: '#9dbece',
     shadow: 'rgba(16, 24, 40, 0.32)',
+    // The merged group's outline, at the transparency the till draws it with.
+    groupFill: 'rgba(27, 127, 75, 0.08)',
+    groupBorder: '#1b7f4b',
     // Mirrors the console accent floor-plan.css resolves for the tab strip:
     // --merchant-brand on the light theme, --umi-blue on the dark ones.
     select: '#25634d',
@@ -70,6 +108,8 @@ const FLOOR_BASE = {
     door: '#2e4557',
     doorEdge: '#3d5a70',
     shadow: null,
+    groupFill: 'rgba(127, 208, 166, 0.16)',
+    groupBorder: '#7fd0a6',
     select: '#7692cb',
   },
 };
@@ -120,6 +160,8 @@ function PlanElement({
   disabled,
   interacting,
   palette,
+  visual,
+  turn,
   onInteractionStart,
   onInteractionEnd,
   onSelect,
@@ -163,6 +205,9 @@ function PlanElement({
   const round = element.shape === 'round';
   const detailed = tableShowsDetail(element);
   const bandHeight = detailed ? element.height / 2 : element.height;
+  const accent = visual?.accent ?? null;
+  const present = visual?.present === true;
+  const fonts = tableBandFonts(element, turn !== null);
   // A round table's lower band narrows toward the bottom, so the seat dots lay
   // out in a narrower band; the inset below keeps that band centered under the
   // label instead of hugging the left edge of the circle.
@@ -171,14 +216,19 @@ function PlanElement({
   const seats = detailed
     ? seatDotLayout(element.capacity, { width: seatBandWidth, height: bandHeight })
     : null;
-  const fill = palette.fill[element.kind] ?? palette.fill.table;
-  const edge = selected ? palette.select : (palette.edge[element.kind] ?? palette.edge.table);
+  const baseFill = palette.fill[element.kind] ?? palette.fill.table;
+  const fill = accent && visual ? tintFill(baseFill, visual.tint, visual.tintAlpha) : baseFill;
+  const edge = selected
+    ? palette.select
+    : (accent ?? palette.edge[element.kind] ?? palette.edge.table);
   const isText = element.kind === 'label';
   const shadow = element.kind === 'table' ? palette.shadow : null;
   const body = {
     fill,
     stroke: edge,
-    strokeWidth: selected ? (isText ? 2 : 3) : isText ? 0 : 1,
+    // A state thickens the border as well as colouring it: the width is the part
+    // that survives a screenshot printed in grey.
+    strokeWidth: selected ? (isText ? 2 : 3) : isText ? 0 : accent ? 2 : 1,
     dash: selected && isText ? [8, 6] : undefined,
     shadowColor: shadow ?? undefined,
     shadowBlur: shadow ? 6 : 0,
@@ -189,9 +239,9 @@ function PlanElement({
     x: -element.width / 2,
     y: -element.height / 2,
     width: element.width,
-    height: bandHeight,
+    height: turn === null ? bandHeight : bandHeight * 0.64,
     text: element.label,
-    fontSize: elementLabelFontSize(element),
+    fontSize: fonts.label,
     fontStyle: 'bold',
     align: 'center',
     verticalAlign: 'middle',
@@ -200,6 +250,48 @@ function PlanElement({
     fill: palette.ink[element.kind] ?? palette.ink.table,
     listening: false,
   };
+  const turnLabel = {
+    x: -element.width / 2,
+    y: -element.height / 2 + bandHeight * 0.6,
+    width: element.width,
+    height: bandHeight * 0.4,
+    text: turn ?? '',
+    fontSize: fonts.turn,
+    align: 'center',
+    verticalAlign: 'middle',
+    wrap: 'none',
+    ellipsis: true,
+    fill: accent ?? palette.inkMuted,
+    listening: false,
+  };
+  // The badge marks the state at the top-right corner, where the till draws it.
+  // Below 20px on the short side there is no room for a mark a person can name,
+  // so the accent, the seat band and the turn timer carry the state alone.
+  const badgeSize = Math.min(element.width, element.height) * 0.26;
+  const showBadge = !!visual?.glyph && Math.min(element.width, element.height) >= 20;
+  const seatTop = -element.height / 2 + bandHeight;
+  // Diagonal marks across the seat band: the till's sign for a table that must be
+  // wiped. Clipped to the band, so a big table does not grow a bigger hatch.
+  const hatchStride = 7;
+  const hatch = visual?.hatched
+    ? Array.from(
+        {
+          length: Math.floor((seatBandWidth + bandHeight) / hatchStride) + 1,
+        },
+        (_, index) => {
+          const x = -seatBandWidth + index * hatchStride;
+          return (
+            <Line
+              key={`hatch-${index}`}
+              points={[x, 0, x + bandHeight, bandHeight]}
+              stroke={accent}
+              strokeWidth={1.2}
+              listening={false}
+            />
+          );
+        },
+      )
+    : null;
   return (
     <>
       <Group
@@ -232,6 +324,7 @@ function PlanElement({
           />
         )}
         <Text {...label} />
+        {detailed && turn !== null && <Text {...turnLabel} />}
         {detailed && (
           <>
             <Line
@@ -247,17 +340,59 @@ function PlanElement({
               strokeScaleEnabled={false}
               listening={false}
             />
-            {seats.dots.map((dot, index) => (
-              <Circle
-                key={`seat-${index}`}
-                x={-element.width / 2 + seatInset + dot.x}
-                y={-element.height / 2 + bandHeight + dot.y}
-                radius={dot.radius}
-                fill={palette.seat}
-                listening={false}
-              />
-            ))}
+            {accent ? (
+              // A seated party fills the seat markers, a free table leaves them
+              // hollow: the shape says "occupied" before any colour does.
+              <Group
+                clipX={-seatBandWidth / 2 + seatInset}
+                clipY={seatTop}
+                clipWidth={seatBandWidth}
+                clipHeight={bandHeight}
+              >
+                {hatch ??
+                  seats.dots.map((dot, index) => (
+                    <Circle
+                      key={`seat-${index}`}
+                      x={-element.width / 2 + seatInset + dot.x}
+                      y={seatTop + dot.y}
+                      radius={dot.radius}
+                      fill={present ? accent : undefined}
+                      stroke={palette.seat}
+                      strokeWidth={1.2}
+                      listening={false}
+                    />
+                  ))}
+              </Group>
+            ) : (
+              seats.dots.map((dot, index) => (
+                <Circle
+                  key={`seat-${index}`}
+                  x={-element.width / 2 + seatInset + dot.x}
+                  y={seatTop + dot.y}
+                  radius={dot.radius}
+                  fill={palette.seat}
+                  listening={false}
+                />
+              ))
+            )}
           </>
+        )}
+        {showBadge && (
+          <Group
+            x={element.width / 2 - badgeSize - 2}
+            y={-element.height / 2 + 2}
+            scaleX={badgeSize / 24}
+            scaleY={badgeSize / 24}
+            listening={false}
+          >
+            <Path
+              data={visual.glyph}
+              stroke={accent}
+              strokeWidth={2.4}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </Group>
         )}
       </Group>
       {selected && !disabled && (
@@ -340,8 +475,12 @@ function AreaTabs({ areas, selectedId, panelId, disabled, onSelect, onAddArea, c
 export function FloorPlanEditor({ merchantId, locationId }) {
   const { t } = useLingui();
   const palette = useFloorPalette();
+  const dark = useThemeName() !== 'umi';
   const [remote, setRemote] = useState(null);
   const [history, dispatch] = useReducer(layoutHistory, { past: [], present: null, future: [] });
+  const [room, setRoom] = useState(null);
+  const [roomFailed, setRoomFailed] = useState(false);
+  const [nowMs, setNowMs] = useState(null);
   const [saved, setSaved] = useState('');
   const [selectedArea, setSelectedArea] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -360,6 +499,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const interaction = useRef(null);
   const saveTimer = useRef(null);
   const saving = useRef(false);
+  const roomReadAt = useRef(0);
 
   const document = preview ? remote?.published : history.present;
   const area = document?.areas.find((item) => item.id === selectedArea) ?? document?.areas[0];
@@ -367,6 +507,20 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const serialized = JSON.stringify(history.present);
   const dirty = !!history.present && serialized !== saved;
   const valid = FloorPlanDocument.safeParse(history.present).success;
+  // The six words the till uses for the six states, so one room is named one way
+  // on both screens. A table the room has no row for is `Libre`.
+  const stateWords = useMemo(
+    () => ({
+      open: t`Libre`,
+      seated: t`Ocupada`,
+      ordered: t`Pedido tomado`,
+      served: t`Servido`,
+      awaiting_payment: t`Por cobrar`,
+      dirty: t`Por limpiar`,
+    }),
+    // Rebuilt when the locale changes, which is the only thing that moves these.
+    [t],
+  );
   const elementCount =
     history.present?.areas.reduce((count, item) => count + item.elements.length, 0) ?? 0;
   const disabled = preview || busy || !!pendingCommand || error === 'conflict';
@@ -421,6 +575,74 @@ export function FloorPlanEditor({ merchantId, locationId }) {
     observer.observe(canvas.current);
     return () => observer.disconnect();
   }, [remote]);
+
+  // ── The room ───────────────────────────────────────────────────────────────
+  //
+  // The live state of the tables is a SECOND read with a second lifetime: the
+  // layout is edited for months, a seating lasts ninety minutes. So it polls on
+  // its own beat and it deliberately does not touch `error`.
+  //
+  // That separation is the whole reason this effect exists. A manager who cannot
+  // read the room must still be able to edit the floor, so a failed read leaves
+  // the last room drawn and the editor untouched — a read that cannot be
+  // answered must never wedge the thing the screen is for.
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+    const read = async () => {
+      try {
+        const payload = await fetchTableState(merchantId, locationId);
+        if (cancelled) return;
+        const receivedAt = Date.now();
+        const next = readTableRoom(payload);
+        roomReadAt.current = receivedAt;
+        setRoom(next);
+        setNowMs(serverNowMs(next, receivedAt, receivedAt));
+        setRoomFailed(false);
+      } catch {
+        if (!cancelled) setRoomFailed(true);
+      }
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      // `cancelled` has to be checked HERE and not only at the top of the read.
+      // The read is already in flight when the effect is torn down, and its
+      // `.finally(schedule)` runs after that: without this line the dead loop
+      // arms a fresh timer, and every remount leaves one more of them polling
+      // the room for ever. Two loops is not a slow screen, it is twice the
+      // traffic and a monitor that never stops.
+      if (cancelled) return;
+      // A hidden tab has nobody looking at it and a room that will be re-read
+      // the moment it comes back, so it asks nothing of the API.
+      if (tabHidden()) return;
+      timer = setTimeout(() => {
+        read().finally(schedule);
+      }, TABLE_STATE_POLL_MS);
+    };
+    const onVisibility = () => {
+      if (tabHidden()) clearTimeout(timer);
+      else read().finally(schedule);
+    };
+    read().finally(schedule);
+    const detach = onTabVisibility(onVisibility);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      detach();
+    };
+  }, [merchantId, locationId]);
+
+  // A turn timer moves once a second, and only while somebody is sitting down:
+  // an empty room has nothing to count and a hidden tab has nobody watching.
+  const anyParty = !!room && [...room.byTable.values()].some(tablePartyPresent);
+  useEffect(() => {
+    if (!anyParty || !room) return undefined;
+    const id = setInterval(() => {
+      if (tabHidden()) return;
+      setNowMs(serverNowMs(room, roomReadAt.current, Date.now()));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [anyParty, room]);
 
   useEffect(() => {
     if (!dirty && !pendingCommand) return;
@@ -578,6 +800,15 @@ export function FloorPlanEditor({ merchantId, locationId }) {
       </div>
     );
   const scale = Math.min(1, viewportWidth / Math.max(200, area?.width ?? 1200)) * zoom;
+  // The merged parties, as outlines, and the room's own answer per table. Both
+  // are derived once per render from the one read, so the map cannot show two
+  // different rooms in one frame.
+  const regions = groupRegions(area, room);
+  const stateOf = (element) => {
+    const entry = tableEntry(room, element.id);
+    const turnMs = tableTurnMs(entry, nowMs);
+    return { entry, turn: turnMs === null ? null : formatTableTurn(turnMs) };
+  };
   return (
     <div className="floor-plan" onKeyDown={keyboard}>
       <div className="fp-toolbar card">
@@ -655,6 +886,11 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           </Trans>
         </p>
       )}
+      {roomFailed && (
+        <p role="status" className="fp-room-note">
+          <Trans>No se pudo leer el estado del salón. El plano se puede seguir editando.</Trans>
+        </p>
+      )}
       <AreaTabs
         areas={document?.areas ?? []}
         selectedId={area?.id}
@@ -711,10 +947,14 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </div>
       </div>
       <div className="fp-workspace">
-        <aside className="card fp-palette">
-          <h3>
+        {/* Named landmarks: an unnamed `<aside>` here would collide with the
+            shell's sidebar (also an unnamed `aside`) and axe reports the pair as
+            an ambiguous landmark. The heading moved from `h3` to `h2` for the
+            same reason — the masthead's `h1` has no `h2` under it otherwise. */}
+        <aside className="card fp-palette" aria-label={t`Elementos`}>
+          <h2>
             <Trans>Elementos</Trans>
-          </h3>
+          </h2>
           <fieldset
             disabled={
               controlsDisabled || !area || area.elements.length >= 500 || elementCount >= 1000
@@ -745,22 +985,33 @@ export function FloorPlanEditor({ merchantId, locationId }) {
               <Trans>Texto</Trans>
             </button>
           </fieldset>
-          <h3>
+          <h2>
             <Trans>Lista de elementos</Trans>
-          </h3>
+          </h2>
           <div className="fp-element-list">
-            {area?.elements.map((item) => (
-              <button
-                key={item.id}
-                className={'btn' + (selected === item.id ? ' active' : '')}
-                aria-pressed={selected === item.id}
-                disabled={interactionId !== null}
-                onClick={() => setSelected(item.id)}
-              >
-                {item.label}
-                {item.kind === 'table' ? ` · ${item.capacity}` : ''}
-              </button>
-            ))}
+            {area?.elements.map((item) => {
+              const { entry, turn } = stateOf(item);
+              const groupSize = tableGroupSize(room, entry);
+              return (
+                <button
+                  key={item.id}
+                  className={'btn' + (selected === item.id ? ' active' : '')}
+                  aria-pressed={selected === item.id}
+                  disabled={interactionId !== null}
+                  onClick={() => setSelected(item.id)}
+                >
+                  {/* The room in words. The canvas is not available to a screen
+                      reader, so the state has to exist as text somewhere, and
+                      this list is the screen's own list of what is on the plan. */}
+                  {item.label}
+                  {item.kind === 'table'
+                    ? ` · ${item.capacity} · ${stateWords[entry.state] ?? stateWords.open}` +
+                      (turn ? ` ${turn}` : '') +
+                      (groupSize > 1 ? ` · ${t`Grupo de ${groupSize} mesas`}` : '')
+                    : ''}
+                </button>
+              );
+            })}
           </div>
         </aside>
         <div
@@ -813,29 +1064,54 @@ export function FloorPlanEditor({ merchantId, locationId }) {
                   )}
                 </Layer>
               )}
+              {/* One outline per merged party, behind the tables it holds, so
+                  two tables caring for one party read as one thing. */}
+              {regions.length > 0 && (
+                <Layer listening={false}>
+                  {regions.map((region) => (
+                    <Rect
+                      key={region.groupId}
+                      x={region.x}
+                      y={region.y}
+                      width={region.width}
+                      height={region.height}
+                      cornerRadius={14}
+                      fill={palette.groupFill}
+                      stroke={palette.groupBorder}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </Layer>
+              )}
               <Layer>
-                {area.elements.map((item) => (
-                  <PlanElement
-                    key={item.id}
-                    element={item}
-                    selected={selected === item.id}
-                    disabled={disabled || (interactionId !== null && interactionId !== item.id)}
-                    interacting={interactionId === item.id}
-                    palette={palette}
-                    onInteractionStart={startInteraction}
-                    onInteractionEnd={endInteraction}
-                    onSelect={() => setSelected(item.id)}
-                    onChange={editElement}
-                    snap={snap}
-                    area={area}
-                  />
-                ))}
+                {area.elements.map((item) => {
+                  const { entry, turn } = stateOf(item);
+                  const isTable = item.kind === 'table';
+                  return (
+                    <PlanElement
+                      key={item.id}
+                      element={item}
+                      selected={selected === item.id}
+                      disabled={disabled || (interactionId !== null && interactionId !== item.id)}
+                      interacting={interactionId === item.id}
+                      palette={palette}
+                      visual={isTable ? tableStateVisual(entry, dark) : null}
+                      turn={isTable ? turn : null}
+                      onInteractionStart={startInteraction}
+                      onInteractionEnd={endInteraction}
+                      onSelect={() => setSelected(item.id)}
+                      onChange={editElement}
+                      snap={snap}
+                      area={area}
+                    />
+                  );
+                })}
               </Layer>
             </Stage>
           )}
         </div>
-        <aside className="card fp-properties">
-          <h3>{element ? t`Propiedades` : t`Área`}</h3>
+        <aside className="card fp-properties" aria-label={t`Propiedades`}>
+          <h2>{element ? t`Propiedades` : t`Área`}</h2>
           <fieldset disabled={controlsDisabled || !area}>
             <label>
               <Trans>Nombre</Trans>

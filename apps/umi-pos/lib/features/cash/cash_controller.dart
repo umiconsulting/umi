@@ -77,6 +77,40 @@ final class CashController extends ChangeNotifier {
     return shift?['status'] == 'open' ? shift!['registerId'] as String? : null;
   }
 
+  /// The register this till is standing at, with the hold the server resolved.
+  /// The hold is the only thing that can say whether a drawer the till cannot
+  /// open is its own to resume, an orphaned one to reclaim, or a live terminal's
+  /// that needs a manager to count it out.
+  Map<String, Object?>? get activeRegister {
+    final snapshot = _state.snapshot;
+    final registerId = activeRegisterId;
+    if (snapshot == null || registerId == null) return null;
+    for (final register in snapshot.registers) {
+      if (register['id'] == registerId) return register;
+    }
+    return null;
+  }
+
+  /// The hold state (`free | held_by_this_device | held_by_active_till |
+  /// held_by_orphaned_till`) for the register the till is standing at.
+  String? get activeRegisterHoldState {
+    final hold = activeRegister?['hold'];
+    return hold is Map<String, Object?> ? hold['state'] as String? : null;
+  }
+
+  /// Registers this till is offered whose holding terminal is gone for good, so
+  /// the drawer can be reclaimed without a count (`POST .../reclaim`).
+  List<Map<String, Object?>> get reclaimableRegisters {
+    final snapshot = _state.snapshot;
+    if (snapshot == null) return const [];
+    return snapshot.registers.where((register) {
+      final hold = register['hold'];
+      return hold is Map<String, Object?> &&
+          hold['state'] == 'held_by_orphaned_till' &&
+          hold['reclaimable'] == true;
+    }).toList();
+  }
+
   void setContext({
     required String merchantId,
     required String locationId,
@@ -105,13 +139,29 @@ final class CashController extends ChangeNotifier {
     _set(CashState(busy: true, snapshot: _state.snapshot));
     try {
       final recoveryCode = await _recoverPendingCommand();
-      final snapshot = await _repository.center(
-        _merchantId!,
-        CashCenterQuery(
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-        ),
-      );
+      var snapshot = await _center();
+      // THE RESTART PATH.
+      //
+      // Every app start mints a new operator session (crash, update, power
+      // cycle, handover) while the shift this very device opened keeps its old
+      // `operator_session_id`. The server reads that back as
+      // `recoveryState == 'operator_mismatch'` and a register hold of
+      // `held_by_this_device`: the drawer is still ours and no money moved, so
+      // the till takes its own shift back here instead of leaving the operator
+      // to retype nothing and hit CASH_SHIFT_REQUIRED on the charge. A drawer
+      // held by a *different* live terminal is never touched by this: that stays
+      // held_by_active_till, which the server keeps behind the manager path.
+      if (_shouldResumeOwnShift(snapshot)) {
+        try {
+          await _resumeOwnShift(snapshot.currentShift!);
+          snapshot = await _center();
+        } catch (_) {
+          // A resume that the server refuses (a role without cash.shift.resume,
+          // or a shift that moved) must not take the catalog down with it. The
+          // mismatch snapshot is kept, and the Caja screen still offers the
+          // explicit resume action.
+        }
+      }
       final restored = _restore(snapshot);
       _set(
         CashState(
@@ -124,7 +174,121 @@ final class CashController extends ChangeNotifier {
       );
     } on AppException catch (error) {
       _set(CashState(snapshot: _state.snapshot, errorCode: error.code));
+    } catch (_) {
+      // A load can fail for a reason the API did not describe: a socket that
+      // closed, a payload the parser refused, a bug in this file. Catching only
+      // `AppException` left `busy` true forever, so the screen showed a spinner
+      // with no message and no way out — the plan's §4 bar says every failure
+      // shows a typed message with a recovery action, and a spinner that never
+      // resolves is that sentence in the negative. Found by driving the real app
+      // against a failing API (defect D26).
+      _set(
+        CashState(
+          snapshot: _state.snapshot,
+          errorCode: unexpectedFailureCode,
+        ),
+      );
     }
+  }
+
+  /// The code used when the load failed for a reason the API did not name.
+  ///
+  /// Deliberately not an `AppException.code`: nothing in the contract describes
+  /// this, and pretending a server code would make the operator's message lie.
+  static const String unexpectedFailureCode = 'CASH_CENTER_UNAVAILABLE';
+
+  /// Take this till's own shift back so it can charge again, without a human
+  /// retyping anything. Returns the shift id in force afterwards, or null when
+  /// there is nothing of ours to resume (a live terminal's drawer, or no drawer
+  /// at all — those need the reclaim or open-shift paths instead).
+  Future<String?> recoverOwnShift() async {
+    if (!_hasContext) return null;
+    final snapshot = _state.snapshot;
+    if (snapshot == null) {
+      await load();
+      return activeShiftId;
+    }
+    if (_state.busy || !_shouldResumeOwnShift(snapshot)) return activeShiftId;
+    await _perform(() async {
+      await _resumeOwnShift(snapshot.currentShift!);
+      await _reload();
+    });
+    return activeShiftId;
+  }
+
+  /// Free a register whose holding terminal is never coming back. The server
+  /// proves the terminal is gone; the client only names the register it can see.
+  Future<void> reclaimRegister(String registerId) async {
+    final snapshot = _requireSnapshot();
+    final register = snapshot.registers.firstWhere(
+      (item) => item['id'] == registerId,
+    );
+    await _perform(() async {
+      final ids = await _commandIds('reclaim_register', registerId: registerId);
+      await _repository.reclaimRegister(
+        _merchantId!,
+        registerId,
+        ReclaimCashRegisterRequest(
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+          commandId: ids.commandId,
+          idempotencyKey: ids.idempotencyKey,
+          registerId: registerId,
+          expectedRegisterVersion: register['version']! as int,
+          reasonCode: 'holding_terminal_gone',
+        ),
+      );
+      await _completeCommand(ids);
+      await _reload();
+    });
+  }
+
+  /// True when the register hold is this device's own and the only thing wrong
+  /// is that the shift points at an operator session that is gone.
+  bool _shouldResumeOwnShift(CashCenterSnapshot snapshot) {
+    if (snapshot.recoveryState != 'operator_mismatch') return false;
+    if (!snapshot.allowedActions.contains('resume')) return false;
+    final shift = snapshot.currentShift;
+    if (shift == null || shift['status'] != 'open') return false;
+    if (shift['registerId'] == null) return false;
+    for (final register in snapshot.registers) {
+      if (register['id'] != shift['registerId']) continue;
+      final hold = register['hold'];
+      return hold is Map<String, Object?> && hold['state'] == 'held_by_this_device';
+    }
+    return false;
+  }
+
+  Future<CashCenterSnapshot> _center() => _repository.center(
+    _merchantId!,
+    CashCenterQuery(
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+    ),
+  );
+
+  /// `resume` (not `adopt`) is the operation that fits a shift held by THIS
+  /// device: `adopt` refuses a shift whose `holding_device_id` is already this
+  /// terminal (`SHIFT_ALREADY_HELD`), and only `resume` rewrites the shift's
+  /// `operator_session_id` onto the live session. Same operator, same drawer,
+  /// nothing about the money changes.
+  Future<void> _resumeOwnShift(Map<String, Object?> shift) async {
+    final ids = await _commandIds('resume_shift');
+    await _repository.transition(
+      _merchantId!,
+      shift['id']! as String,
+      ShiftTransitionRequest(
+        locationId: _locationId!,
+        operatorSessionId: _operatorSessionId!,
+        commandId: ids.commandId,
+        idempotencyKey: ids.idempotencyKey,
+        shiftId: shift['id']! as String,
+        expectedShiftVersion: shift['version']! as int,
+        reasonCode: 'operator_session_replaced',
+      ),
+      suspend: false,
+    );
+    await _completeCommand(ids);
   }
 
   Future<void> openShift({

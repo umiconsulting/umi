@@ -177,6 +177,11 @@
     "r-card": { "$type": "dimension", "$value": "20px" },
     "r-shell": { "$type": "dimension", "$value": "28px" }
   },
+  "size": {
+    "$description": "Pointer-target sizes. control-min is the floor every actionable control in the shell and the screens must clear; it resolves from core.json so the two clients cannot drift. Theme-invariant on purpose (a 44 px control is 44 px in every theme).",
+    "control-min": { "$type": "dimension", "$value": "{size.control-min}" },
+    "control-tap": { "$type": "dimension", "$value": "{size.control-tap}" }
+  },
   "shadow": {
     "$description": "Shadows",
     "shadow-card": {

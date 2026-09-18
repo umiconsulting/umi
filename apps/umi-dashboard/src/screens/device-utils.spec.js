@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import '@/test/i18n.jsx';
+import { i18n } from '@/test/i18n.jsx';
 import {
   fmtLastSeenEs,
   locationName,
   mobilityLabel,
+  mpPointStoreRefusalCode,
+  mpPointStoreRefusalMessage,
   platformLabel,
   posDeviceCard,
   posDeviceStatus,
@@ -109,5 +111,55 @@ describe('Tarjeta de caja UmiPOS', () => {
     expect(fmtLastSeenEs('2026-09-02T11:59:30.000Z', now)).toBe('hace un momento');
     expect(fmtLastSeenEs('2026-09-02T09:00:00.000Z', now)).toBe('hace 3 h');
     expect(fmtLastSeenEs('2026-08-31T12:00:00.000Z', now)).toBe('hace 2 d');
+  });
+});
+
+describe('El rechazo de la tienda de Mercado Pago', () => {
+  // The envelope the API filter actually sends: `_apiFetch` keeps the whole body on
+  // `err.details`, and the filter nests the thrown payload under `error`.
+  const refused = (vendorCode) => ({
+    code: 'MP_POINT_STORE_REFUSED',
+    status: 409,
+    details: {
+      statusCode: 409,
+      error: {
+        code: 'MP_POINT_STORE_REFUSED',
+        message: 'Request failed',
+        details: { vendorCode, status: 400 },
+      },
+    },
+  });
+
+  it('nombra CUÁL rechazo fue, que es lo que el operador necesita para corregirlo', () => {
+    // "invalid_city" and "invalid_street_number" are different fixes — a different city name
+    // against a different street — so the code travels beside the sentence, never instead.
+    expect(mpPointStoreRefusalCode(refused('invalid_city'))).toBe('invalid_city');
+    expect(mpPointStoreRefusalMessage(i18n, refused('invalid_city'))).toContain(
+      'Mercado Pago rechazó la dirección',
+    );
+    expect(mpPointStoreRefusalCode(refused('invalid_street_number'))).toBe('invalid_street_number');
+  });
+
+  it('no inventa un código cuando el sobre no trae uno', () => {
+    expect(mpPointStoreRefusalCode(null)).toBeNull();
+    expect(mpPointStoreRefusalCode({ code: 'MP_POINT_STORE_REFUSED' })).toBeNull();
+    expect(mpPointStoreRefusalCode({ details: { error: { details: {} } } })).toBeNull();
+    // A bag thrown at the top level, without the filter's `error` wrapper, still reads.
+    expect(mpPointStoreRefusalCode({ details: { details: { vendorCode: 'invalid_name' } } })).toBe(
+      'invalid_name',
+    );
+  });
+
+  it('dice lo que el operador puede hacer cuando la cuenta no está conectada', () => {
+    expect(mpPointStoreRefusalMessage(i18n, { code: 'MP_POINT_CREDENTIAL_ABSENT' })).toContain(
+      'Conecta la cuenta de Mercado Pago',
+    );
+    expect(mpPointStoreRefusalMessage(i18n, { code: 'PERMISSION_DENIED' })).toContain(
+      'Tu usuario no puede administrar',
+    );
+    // An unrecognised refusal is reported as unrecognised rather than dressed as a known one.
+    expect(mpPointStoreRefusalMessage(i18n, { code: 'SOMETHING_NEW' })).toBe(
+      'No se pudo crear la tienda. Intenta de nuevo.',
+    );
   });
 });

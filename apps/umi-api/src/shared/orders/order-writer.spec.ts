@@ -85,7 +85,11 @@ describe('writeOrder', () => {
       ],
     });
     const lines = sqlFor('INSERT INTO merchant.order_item\n');
-    expect(lines.map((l) => l.params[l.params.length - 1])).toEqual([0, 1, 2]);
+    // display_order is the NINTH bound parameter ($9), NOT the last one. This used to
+    // read `params[params.length - 1]`, which was the same thing only until
+    // `course_number` was appended as $10 — at which point the assertion silently
+    // started checking the course (always 1) and read as a display-order regression.
+    expect(lines.map((l) => l.params[8])).toEqual([0, 1, 2]);
   });
 
   it('carries station_id onto the line, not the order', async () => {

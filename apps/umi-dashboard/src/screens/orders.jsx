@@ -4,6 +4,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatMoneyUnits, formatDateTime } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
+import { Segmented } from '@/components/segmented.jsx';
 import { useOrdersData } from '@/data.jsx';
 
 // Screen 6 — Pedidos / Commercial Orders
@@ -157,6 +158,10 @@ const OrdersScreen = () => {
                   alignItems: 'center',
                   gap: 8,
                   padding: '7px 13px',
+                  // The status row is the first thing an operator taps on this
+                  // screen; the padding-sized box measured 33px, under the
+                  // pointer-target floor (--control-min = 44px, plan §5.2).
+                  minHeight: 'var(--control-min)',
                   borderRadius: 2,
                   background: on ? 'var(--canvas-2)' : 'transparent',
                   border: '1px solid ' + (on ? 'var(--line-strong)' : 'var(--line)'),
@@ -199,19 +204,14 @@ const OrdersScreen = () => {
         </div>
         {/* Channel filter (order origin) — top-right of the filter row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="seg" role="tablist" aria-label={t`Origen`}>
-            {CHANNEL_FILTERS.map(function (f) {
-              return (
-                <button
-                  key={f.id || 'all'}
-                  className={channel === f.id ? 'on' : ''}
-                  onClick={() => setChannel(f.id)}
-                >
-                  {text(i18n, f.label)}
-                </button>
-              );
+          <Segmented
+            label={t`Origen`}
+            value={channel}
+            onChange={setChannel}
+            options={CHANNEL_FILTERS.map(function (f) {
+              return { id: f.id, label: text(i18n, f.label) };
             })}
-          </div>
+          />
           {loading && (
             <span
               className="pulse"

@@ -3,6 +3,7 @@ import { Subject } from 'rxjs';
 import type {
   DashboardConversationMessageEvent,
   DashboardDevicesChangedEvent,
+  TenderAttemptChangedEvent,
 } from '@umi/contract';
 
 /**
@@ -33,5 +34,21 @@ export class DashboardRealtimeEvents {
 
   emitConversationMessage(event: DashboardConversationMessageEvent): void {
     this.conversationSubject.next(event);
+  }
+
+  /**
+   * A tender attempt resolved at a card terminal. Raised by the database, not by the
+   * resolving write: the attempt is settled in the WORKER process (a webhook arrives,
+   * a job re-reads the order and writes the outcome), and that process has no socket.
+   * `merchant.pos_payment_attempt` raises `umi_tender_attempt` and
+   * `TenderAttemptListener` turns it into this event, which is why the nudge reaches
+   * the till no matter which process did the writing.
+   */
+  private readonly tenderSubject = new Subject<TenderAttemptChangedEvent>();
+
+  readonly tenderAttemptChanged$ = this.tenderSubject.asObservable();
+
+  emitTenderAttemptChanged(event: TenderAttemptChangedEvent): void {
+    this.tenderSubject.next(event);
   }
 }

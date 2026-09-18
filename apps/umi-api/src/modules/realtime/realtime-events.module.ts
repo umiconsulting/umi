@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { DashboardRealtimeEvents } from './dashboard-realtime.events';
 import { DevicePairingEvents } from './device-pairing.events';
+import { KitchenBoardEvents } from './kitchen-board.events';
 
 /**
  * The event bus alone, with no dependency on the devices domain or on the
@@ -10,7 +11,7 @@ import { DevicePairingEvents } from './device-pairing.events';
  */
 @Global()
 @Module({
-  providers: [DevicePairingEvents, DashboardRealtimeEvents],
-  exports: [DevicePairingEvents, DashboardRealtimeEvents],
+  providers: [DevicePairingEvents, DashboardRealtimeEvents, KitchenBoardEvents],
+  exports: [DevicePairingEvents, DashboardRealtimeEvents, KitchenBoardEvents],
 })
 export class RealtimeEventsModule {}

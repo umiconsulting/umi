@@ -11,5 +11,18 @@
       "$value": "#7692CB",
       "$description": "Azul UMI — brand blue. dashboard --umi-blue / --info · landing umi-light-blue.DEFAULT / umi-blue.light"
     }
+  },
+  "size": {
+    "$description": "Pointer-target sizes, in px, shared by BOTH clients so the operator console and the marketing site agree on one floor. control-min is the hard minimum: every actionable control measures at least 44 x 44 px (plan 5.2, \"Minimum control 44 x 44 pt\", Apple HIG / WCAG 2.5.5). control-tap is the higher floor this product wants wherever a hand, not a cursor, drives the screen.",
+    "control-min": {
+      "$type": "dimension",
+      "$value": "44px",
+      "$description": "Minimum pointer target — 44 px on both axes; nothing actionable may measure below it."
+    },
+    "control-tap": {
+      "$type": "dimension",
+      "$value": "48px",
+      "$description": "Preferred tap floor for touch-driven surfaces (plan 5.2 tap floor)."
+    }
   }
 }

@@ -38,4 +38,16 @@ describe('POS cash center SQL regression', () => {
     expect(source).not.toContain('ledger_sequence AS "ledgerSequence"');
     expect(source).toContain('ledger_sequence::int AS "ledgerSequence"');
   });
+
+  it('orders the ledger by the integer sequence, not by the text projection of it', () => {
+    const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
+    // `expectedCash` projects `sequence::text`, and an output-column name shadows the
+    // table's own column, so an unqualified `ORDER BY sequence` sorts the STRING and
+    // returns 1, 10, 2, 3, … Verified on the rehearsal database at exactly ten entries.
+    // `calculateExpectedCash` requires a strictly increasing sequence, so from the tenth
+    // entry onwards the Caja screen answered 500 "Cash ledger order or amount is invalid."
+    // Qualify the table so the bigint column wins.
+    expect(source).not.toMatch(/ORDER BY sequence\b/);
+    expect(source).toContain('ORDER BY merchant.cash_ledger_entry.sequence');
+  });
 });

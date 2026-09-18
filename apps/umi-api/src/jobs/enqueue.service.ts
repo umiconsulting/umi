@@ -42,6 +42,7 @@ export class EnqueueService {
     @InjectQueue(QUEUES.outbound) outbound: Queue,
     @InjectQueue(QUEUES.integrations) integrations: Queue,
     @InjectQueue(QUEUES.lifecycle) lifecycle: Queue,
+    @InjectQueue(QUEUES.tender) tender: Queue,
   ) {
     this.queues = {
       system,
@@ -50,6 +51,7 @@ export class EnqueueService {
       outbound,
       integrations,
       lifecycle,
+      tender,
     };
   }
 

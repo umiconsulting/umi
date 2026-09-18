@@ -84,13 +84,13 @@ Organiza producto, operación, soporte, desarrollo, alcance y Gate 13.
 
 ## Current application instructions
 
-| Application     | Document                                                                          |
-| --------------- | --------------------------------------------------------------------------------- |
-| Flutter POS     | `apps/umi-pos/README.md`                                                          |
-| API             | `apps/umi-api/README.md`                                                          |
-| Dashboard       | `apps/umi-dashboard/REPO_CONTEXT.md` and `apps/umi-dashboard/docs/deployment.md`  |
-| KDS             | `apps/umi-kds/REPO_CONTEXT.md` and `apps/umi-kds/Sources/Docs/KDSArchitecture.md` |
-| Workspace setup | `WORKSPACE.md` and root `README.md`                                               |
+| Application     | Document                                                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Flutter POS     | `apps/umi-pos/README.md`                                                                                                 |
+| API             | `apps/umi-api/README.md`                                                                                                 |
+| Dashboard       | `apps/umi-dashboard/REPO_CONTEXT.md` and `apps/umi-dashboard/docs/deployment.md`                                         |
+| KDS             | `apps/umi-pos/lib/features/kitchen/kitchen_board_surface.dart` and `docs/architecture/2026-09-16-pos-is-a-native-app.md` |
+| Workspace setup | `WORKSPACE.md` and root `README.md`                                                                                      |
 
 ## Current certification evidence
 

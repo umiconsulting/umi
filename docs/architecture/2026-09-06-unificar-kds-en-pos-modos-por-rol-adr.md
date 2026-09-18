@@ -9,6 +9,10 @@
   replantea su justificación (el "una sola fuente de verdad" es un logro del backend, ya
   hecho, no un motivo para fundir el cliente) y se marca el riesgo de escalamiento de la
   Fase 1 como abierto.
+- Actualización 2026-09-16: el retiro se ejecutó. El plan lo ordena en su §8H paso 1 y
+  §10 punto 4, y `apps/umi-kds` se elimina en esa fecha. Las secciones de este ADR que
+  describen `umi-kds` como vivo son el registro histórico del 2026-09-06. Ver
+  `docs/architecture/2026-09-16-pos-is-a-native-app.md`.
 - Decisión: Rediseñar hacia una sola app cliente (Flutter `umi-pos`) con modos por rol de
   dispositivo (POS, KDS, Pantalla de cliente). El KDS es su propia superficie. Portar toda
   la funcionalidad del `umi-kds` nativo. Retirar `umi-kds` (SwiftUI) al alcanzar paridad.

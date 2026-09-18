@@ -107,7 +107,11 @@ const OverviewScreen = ({ onNavigate, ordersPaused, setOrdersPaused }) => {
               style={{ padding: '4px 10px', fontSize: 13 }}
             >
               {ov.memberDeltaPct != null ? `↑ ${ov.memberDeltaPct}%` : t`Sin cambio calculado`}
-              <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: 4 }}>
+              {/* No `opacity` on this half. At 70% the secondary line blended
+                  toward the pill's own tint and fell to 2.7:1 (axe:
+                  `color-contrast`, /) — the weight difference alone already
+                  reads it as the quieter half of the sentence. */}
+              <span style={{ fontWeight: 400, marginLeft: 4 }}>
                 · <Trans>28 días</Trans>
               </span>
             </span>

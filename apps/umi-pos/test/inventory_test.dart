@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
+import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
 import 'package:umi_pos/features/inventory/inventory_controller.dart';
 import 'package:umi_pos/features/inventory/inventory_repository.dart';
@@ -32,6 +33,24 @@ class _InventoryFake implements InventoryRepository {
   final bool withActiveCount;
   int historyCalls = 0;
   RestockCommand? restockCommand;
+  int prepListCalls = 0;
+  String? prepListMerchantId;
+  PosPrepListQuery? prepListQuery;
+
+  @override
+  Future<PrepList> prepList(String merchantId, PosPrepListQuery query) async {
+    prepListCalls += 1;
+    prepListMerchantId = merchantId;
+    prepListQuery = query;
+    return PrepList(
+      items: const [],
+      locationId: query.locationId,
+      from: '2026-09-01',
+      to: '2026-09-28',
+      asOf: '2026-09-18T10:00:00.000Z',
+      correlationId: 'prep-list-test',
+    );
+  }
 
   @override
   Future<InventoryOverview> overview(
@@ -206,6 +225,11 @@ class _InventoryFake implements InventoryRepository {
     WasteRecord command,
   ) => throw UnimplementedError();
   @override
+  Future<ProductionResult> produce(
+    String merchantId,
+    ProductionRecord command,
+  ) => throw UnimplementedError();
+  @override
   Future<InventoryCountResult> submitCount(
     String merchantId,
     SubmitInventoryCountRequest command,
@@ -332,6 +356,7 @@ Widget _app(Iterable<String> permissions, {_InventoryFake? fake}) =>
       locale: const Locale('es'),
       supportedLocales: const [Locale('es'), Locale('en')],
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -344,6 +369,19 @@ Widget _app(Iterable<String> permissions, {_InventoryFake? fake}) =>
     );
 
 void main() {
+  test('The prep list read uses the till own scope', () async {
+    final fake = _InventoryFake();
+    final controller = InventoryController(fake);
+
+    final list = await controller.loadPrepList(scope);
+
+    expect(fake.prepListCalls, 1);
+    expect(fake.prepListMerchantId, scope.merchantId);
+    expect(fake.prepListQuery?.locationId, scope.locationId);
+    expect(fake.prepListQuery?.includeAbovePar, isFalse);
+    expect(list.locationId, scope.locationId);
+  });
+
   test(
     'Controller loads history pages only after an explicit request',
     () async {

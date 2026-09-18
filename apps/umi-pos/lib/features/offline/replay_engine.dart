@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
@@ -260,18 +262,71 @@ final class OfflineRecoveryController extends ChangeNotifier {
     required ConnectivityController connectivity,
   }) : _journal = journal,
        _gateway = gateway,
-       _connectivity = connectivity;
+       _connectivity = connectivity {
+    _connectivity.addListener(_onConnectivityChanged);
+  }
   final EncryptedOfflineJournal _journal;
   final ReplayGateway _gateway;
   final ConnectivityController _connectivity;
+
+  /// The last scope the till handed this controller.
+  ///
+  /// The scope names the merchant, location, device, operator session and
+  /// credential version a replay is submitted under, and it is built by the
+  /// surface because that is where the session lives. Remembering it is what
+  /// lets a replay start from a connectivity change rather than from a tap.
+  ReplayScope? _scope;
   RecoveryStatus _status = const RecoveryStatus();
   bool _running = false;
   String? _reconciliationId;
   RecoveryStatus get status => _status;
   String? get reconciliationId => _reconciliationId;
 
+  /// Replay by itself when the connection comes back.
+  ///
+  /// This is the half the recovery centre could not do: `apiReachable` moves the
+  /// till through `offline → recovering → online` on its own, and until now
+  /// nothing listened for that. A cash sale taken in a dead spot sat in the
+  /// journal until an operator opened the recovery centre or the app was
+  /// restarted, which is exactly the "automatic ordered replay" gap §14 lists
+  /// against workstream K. The journal is checked first because a replay with
+  /// nothing to replay would still ask the server to begin a session on every
+  /// transition; and `recover` keeps its own `_running` guard, so an operator
+  /// pressing the button at the same moment cannot double-submit.
+  void _onConnectivityChanged() {
+    final scope = _scope;
+    if (scope == null) return;
+    final state = _connectivity.state;
+    if (state != PosConnectivity.online &&
+        state != PosConnectivity.recovering) {
+      return;
+    }
+    unawaited(_replayIfThereIsWork(scope));
+  }
+
+  Future<void> _replayIfThereIsWork(ReplayScope scope) async {
+    if (_running) return;
+    try {
+      final snapshot = await _journal.load();
+      if (snapshot.pendingCount == 0) return;
+    } on OfflineJournalException {
+      // Unreadable storage is `recover`'s to report, not a connectivity event's:
+      // it sets `blockedByStorage` with the category, which is the state an
+      // operator can act on. Swallowing it here keeps a listener from throwing.
+      return;
+    }
+    await recover(scope);
+  }
+
+  @override
+  void dispose() {
+    _connectivity.removeListener(_onConnectivityChanged);
+    super.dispose();
+  }
+
   Future<void> recover(ReplayScope scope) async {
     if (_running) return;
+    _scope = scope;
     _running = true;
     try {
       _set(const RecoveryStatus(phase: RecoveryPhase.inspectingStorage));

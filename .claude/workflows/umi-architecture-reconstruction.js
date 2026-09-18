@@ -41,8 +41,9 @@ Products (monorepo apps/*):
 - umi-cash: Next.js + Prisma — loyalty, points, gift cards, stored-value wallet,
   Apple/Google Wallet passes, OTP. Has its OWN production Supabase DB
   (rrkzhisnadfrgnhntkiz) that is the untouchable real money source of truth.
-- umi-kds: NATIVE iPad (Swift/Xcode) Kitchen Display System client. Reads a
-  backend-owned kitchen projection; must NOT be source of truth for orders.
+- umi-kds (RETIRED 2026-09-16): the Kitchen Display System is a mode inside the native
+  POS app, not a separate client. It reads a backend-owned kitchen projection; the
+  projection, never the client, is the source of truth for orders.
 - umi-dashboard: Vite + Express(server.js) + Prisma — owner cockpit / live-data
   admin UI, RBAC, customer-360.
 - umi-logs: Next.js — ConversaFlow operational logs & trace UI (observability).
@@ -168,9 +169,10 @@ IMPLEMENTED vs described only in the rewrite contract. Quote paths.`,
   },
   {
     label: 'ev:kds-device-kitchen',
-    prompt: `Extract KDS / DEVICE / KITCHEN evidence. Read apps/umi-kds (Swift
-Sources/** — networking layer, realtime/polling, models, auth/pairing, offline
-handling; Info.plist; docs/). Read the kitchen + device sections of
+    prompt: `Extract KDS / DEVICE / KITCHEN evidence. Read the kitchen board inside the
+POS app (apps/umi-pos/lib/features/kitchen/** — networking layer, realtime/polling,
+models, auth/pairing, offline handling). apps/umi-kds was retired 2026-09-16; git
+history holds it. Read the kitchen + device sections of
 platform-database-architecture.md, docs/architecture/2026-04-15-kds-schema-
 normalization-spec.md, 2026-05-22-kds-pin-pairing-plan.md, 2026-05-23-kds-device-
 revocation-implementation-plan.md, and the conversaflow kds-command/kds-board/

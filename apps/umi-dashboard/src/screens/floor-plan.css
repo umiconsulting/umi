@@ -114,7 +114,6 @@
 .fp-tab-count {
   font-size: 12px;
   color: inherit;
-  opacity: 0.8;
   white-space: nowrap;
 }
 .fp-tab-active {
@@ -142,7 +141,7 @@
 .fp-properties {
   padding: 16px;
 }
-.floor-plan h3 {
+.floor-plan h2 {
   font-size: 14px;
   margin: 0 0 14px;
 }
@@ -162,6 +161,10 @@
 }
 .floor-plan input:not([type='checkbox']),
 .floor-plan select {
+  /* One floor, every control: the properties inputs and the zoom select are
+     things a finger lands on (--control-min = 44px, plan §5.2). The type and the
+     padding are unchanged — only the box grew. */
+  min-height: var(--control-min);
   padding: 9px;
   border: 1px solid var(--line, #dce2de);
   border-radius: 8px;
@@ -174,13 +177,58 @@
   display: flex;
   align-items: center;
 }
+/* Ajustar a cuadrícula. `appearance: none` is what lets the input carry the
+   pointer-target floor at all: a native checkbox grown to 44px draws a 44px blue
+   square with a huge tick (measured in this browser), while the box the operator
+   reads should stay small. So the INPUT takes 44x44 and paints nothing, and the
+   18px rounded box below is drawn in the middle of it — same control, same
+   label, a target a thumb can find. */
+.floor-plan .fp-check input[type='checkbox'] {
+  appearance: none;
+  position: relative;
+  width: var(--control-min);
+  height: var(--control-min);
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.floor-plan .fp-check input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--control-min) - 18px) / 2);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.floor-plan .fp-check input[type='checkbox']:checked::before {
+  border-color: var(--umi-blue);
+  background: var(--umi-blue);
+}
+.floor-plan .fp-check input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--umi-white);
+  border-bottom: 2px solid var(--umi-white);
+  transform: translate(-50%, -60%) rotate(-45deg);
+}
+.floor-plan .fp-check input[type='checkbox']:disabled {
+  cursor: not-allowed;
+}
+.floor-plan .fp-check input[type='checkbox']:disabled::before {
+  opacity: 0.45;
+}
 .fp-palette .btn {
   justify-content: flex-start;
   gap: 10px;
   width: 100%;
   min-height: 40px;
 }
-.fp-palette h3:not(:first-child) {
+.fp-palette h2:not(:first-child) {
   margin-top: 24px;
 }
 .fp-element-list {
@@ -212,6 +260,18 @@
 }
 .fp-message {
   padding: 28px;
+}
+
+/* The room read failed. Muted, not alarming: the editor is unaffected and this
+   line only has to say that the map is showing an older room. */
+.fp-room-note {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--line-soft);
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 13px;
 }
 .floor-plan button:focus-visible,
 .floor-plan input:focus-visible,

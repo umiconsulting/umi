@@ -12,10 +12,10 @@ Use this map to decide what must pass before changes are considered safe.
 - Owner: schema owner from root `AGENTS.md` and local repo contract.
 - Required evidence: migration plan, rollback/forward strategy, local validation, and human review.
 
-## KDS client changes
+## Kitchen board changes
 
-- Owner: `apps/umi-kds`.
-- Required evidence: Swift tests or build validation plus manual review of backend contract assumptions.
+- Owner: `apps/umi-pos`.
+- Required evidence: Flutter tests or build validation plus manual review of backend contract assumptions.
 
 ## Cash changes
 

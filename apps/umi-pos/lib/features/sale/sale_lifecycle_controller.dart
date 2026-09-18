@@ -96,9 +96,36 @@ final class SaleLifecycleController extends ChangeNotifier {
     }
   }
 
-  Future<void> newSale() async {
-    if (_mutationActive || !_isTerminalOrMissing) return;
+  /// Start a fresh sale.
+  ///
+  /// [abandonCurrent] is the operator saying "discard what is on screen". Without
+  /// it this refuses while a sale is in progress, and refusing used to be silent:
+  /// pressing `Nueva venta` with a cart on screen did NOTHING AT ALL, which the
+  /// plan's own defect table records (`Nueva venta` does nothing with 180.00 in
+  /// the cart). That silence is more expensive than it looks, because this button
+  /// is the only way out of a checkout whose draft carries a payment claim — the
+  /// cart cannot be paid and cannot be cancelled, so a button that quietly does
+  /// nothing leaves the operator with no exit but killing the app.
+  ///
+  /// The confirmation belongs to the surface; abandoning belongs here. The old
+  /// sale is left behind rather than erased: `cancel` marks the cart abandoned and
+  /// its checkout draft, claim and all, stays for whoever reconciles it. A cancel
+  /// that does not take leaves the phase where it was, and starting anyway would
+  /// put a second editable sale beside the one that refused to go.
+  Future<bool> newSale({bool abandonCurrent = false}) async {
+    if (_mutationActive) return false;
+    if (!_isTerminalOrMissing) {
+      if (!abandonCurrent) return false;
+      final sale = _state.sale;
+      final cart = _cart.state.cart;
+      if (sale == null || cart == null || !_isEditable(_state.phase)) {
+        return false;
+      }
+      await cancel('operator_started_new_sale');
+      if (_state.phase != SalePhase.cancelled) return false;
+    }
     await _start(readyForNextCustomer: false);
+    return true;
   }
 
   Future<void> suspend(String? label) async {

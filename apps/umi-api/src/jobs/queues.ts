@@ -14,6 +14,18 @@ export const QUEUES = {
   outbound: 'outbound',
   integrations: 'integrations',
   lifecycle: 'lifecycle',
+  /**
+   * The terminal's own answers: one job per Mercado Pago Point notification.
+   *
+   * IT IS NOT `integrations` ON PURPOSE. A queue is a work stream, and BullMQ hands each
+   * job to whichever consumer takes it first — so a second `@Processor` on an existing
+   * queue does not add a handler, it COMPETES with the first one. The tender notification
+   * was briefly routed to `integrations` and the existing processor logged
+   * `unknown integrations job: tender.point.notification` and returned, dropping the
+   * resolution the till was waiting for. A tender that money depends on gets its own
+   * queue, its own retry policy and its own consumer.
+   */
+  tender: 'tender',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];

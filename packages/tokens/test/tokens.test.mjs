@@ -60,6 +60,8 @@ const EXPECTED_DASHBOARD = {
   'r-xl': '16px',
   'r-card': '20px',
   'r-shell': '28px',
+  'control-min': '44px',
+  'control-tap': '48px',
   'shadow-card': '0 1px 2px rgba(19, 31, 68, 0.04)',
   'shadow-pop': '0 24px 60px -24px rgba(19, 31, 68, 0.32), 0 2px 8px rgba(19, 31, 68, 0.06)',
   'shadow-inner': 'inset 0 0 0 1px rgba(19, 31, 68, 0.05)',
@@ -215,6 +217,21 @@ test('every dark override names a real Umi token (no orphan theme-only vars)', (
   for (const name of Object.keys(EXPECTED_DASHBOARD_MIDNIGHT)) {
     assert.ok(name in umi, `Midnight override --${name} has no :root base`);
   }
+});
+
+// The shell drives every pointer target off --control-min, so the floor itself is
+// the thing to guard: a token edit that quietly drops it below 44 px would let the
+// undersized-control defect back in without failing any other test here.
+test('the pointer-target floor token exists and is at least 44 px', () => {
+  const umi = parseCssVars(block(distText('dashboard.css'), ':root {'));
+  assert.ok('control-min' in umi, 'dashboard.css :root is missing --control-min');
+  const px = Number.parseFloat(umi['control-min']);
+  assert.equal(
+    umi['control-min'],
+    `${px}px`,
+    `--control-min is not a px length: ${umi['control-min']}`,
+  );
+  assert.ok(px >= 44, `--control-min is ${umi['control-min']}, below the 44 px floor`);
 });
 
 test('landing.cjs (require) matches tailwind.config.js theme.extend', () => {

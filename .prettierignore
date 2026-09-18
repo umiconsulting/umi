@@ -32,9 +32,6 @@ docs/migration/build-v3/schema_diagram.html
 **/.claude/settings.local.json
 .mcp.json
 
-# Native app (Swift toolchain owns its formatting)
-apps/umi-kds/
-
 # FROZEN app — do not reformat until the dashboard cutover
 apps/umi-cash/
 

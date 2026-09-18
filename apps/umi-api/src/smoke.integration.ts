@@ -94,13 +94,37 @@ const EXPECTED: readonly Expectation[] = [
   },
   {
     match: /\/api\/v1\/pos\/merchants\/|\/api\/v1\/merchants\/[^/]+\/devices\/enrollment-requests$/,
-    status: 403,
+    status: 400,
     why:
-      "POS routes are `@RequireProduct('pos')` (and device enrolment needs `device.enroll`). " +
-      'No rehearsal café holds the pos product — the snapshot predates UmiPOS — so the ' +
-      'EntitlementGuard answers 403 for every one of them, which is what it is for. ' +
-      'When a rehearsal café is entitled to pos, these entries stop matching and must be ' +
-      'retired in favour of real reads.',
+      'The POS surface, and this entry has MOVED once already: it used to expect 403 because ' +
+      'no rehearsal café held the `pos` product and the EntitlementGuard refused every route. ' +
+      'The café holds it now — `scripts/umi-pos-local-access-seed.sh` provisions exactly that ' +
+      'entitlement — so the guard passes and what refuses instead is the missing query ' +
+      'context: these routes want `?locationId=` and `?operatorSessionId=`, and this sweep ' +
+      'sends no query string. Same species as the location-scoped reads above, and the same ' +
+      'PIN: the day one answers without its context, this line says so. The POS surface ' +
+      'itself is exercised for real by `tools/ux-sweep/pos-native-flows.mjs` against the ' +
+      'native till, which is where a device session actually exists.',
+  },
+  {
+    match: /\/(floor-plan|table-state|fiscal\/documents|purchase-orders)(\/[^/]+)?$/,
+    status: 400,
+    why:
+      'Location-scoped reads, all four of them: `FloorPlanQuery` and its siblings require ' +
+      '`?locationId=` and this sweep sends no query string, so `location_required` is the ' +
+      'correct answer to the call being made. Same species as `/kds/routes` above, and the ' +
+      'same PIN — if one of these starts answering without the parameter, the requirement ' +
+      'was dropped and this line will say so.',
+  },
+  {
+    match:
+      /\/operations\/(sales|tender-attempts)\/[^/]+\/receipt$|\/operations\/cash-shifts\/[^/]+$/,
+    status: 404,
+    why:
+      'A read of ONE sale, shift or attempt. The matrix supplies a well-formed uuid that ' +
+      'names nothing, so `not found` is the route answering; no fixture for these exists in ' +
+      'the sweep, and inventing one would make this a fixture test rather than a route test. ' +
+      'The PIN: these answer 404 because the id names nothing, not because the route is gone.',
   },
 ];
 
@@ -300,6 +324,13 @@ describe('build-v3 smoke · every read endpoint', () => {
         .replace(/:state/g, '3-10.png')
         .replace(/:code/g, 'SMOKECODE')
         .replace(/:id\b/g, fx.customerId)
+        // Anything the list above did not name is still a path parameter, and a
+        // literal `:purchaseOrderId` in a URL is not a route refusal — it is a
+        // malformed uuid, so the sweep reported `400` about its own string
+        // substitution rather than about the endpoint. A well-formed id that
+        // names nothing lets each route answer for itself (a 404, or its own
+        // typed refusal), which is what this sweep is for.
+        .replace(/:[A-Za-z][A-Za-z0-9_]*/g, '00000000-0000-4000-8000-000000000000')
     );
   }
 

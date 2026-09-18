@@ -25,6 +25,7 @@ abstract interface class InventoryRepository {
     String merchantId,
     RestockCommand command,
   );
+  Future<ProductionResult> produce(String merchantId, ProductionRecord command);
   Future<InventoryRecoveryResult> recover(
     String merchantId,
     String commandId,
@@ -41,6 +42,41 @@ abstract interface class InventoryRepository {
   Future<InventoryCountResult> reconcileCount(
     String merchantId,
     InventoryReconciliation command,
+  );
+
+  /// The prep list: what the kitchen must make today (§8.4).
+  Future<PrepList> prepList(String merchantId, PosPrepListQuery query);
+}
+
+/// The one prep-list request, next to the route it reads.
+///
+/// The kitchen board and the inventory surface both need this read, so the
+/// request and its parse live once. The server coerces any query text to a
+/// boolean, so `includeAbovePar` is absent when it is false; its default is
+/// already false.
+Future<PrepList> requestPrepList(
+  ApiClient api,
+  String merchantId,
+  PosPrepListQuery query,
+) async {
+  // BOTH ARE REQUIRED AND BOTH TRAVEL. The POS guard resolves the operator session and
+  // the branch before it answers a stock read, so a prep request without them is
+  // refused with PERMISSION_DENIED rather than answered for the wrong scope.
+  final queryParameters = <String, String>{
+    'locationId': query.locationId,
+    'operatorSessionId': query.operatorSessionId,
+  };
+  // The server coerces any query text to a boolean, so a false flag stays out
+  // of the request: its default is already false.
+  if (query.includeAbovePar == true) queryParameters['includeAbovePar'] = 'true';
+  return PrepList.fromJson(
+    await api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posInventoryPrepList(merchantId),
+        queryParameters: queryParameters,
+      ).toString(),
+    ),
   );
 }
 
@@ -116,6 +152,18 @@ final class ApiInventoryRepository implements InventoryRepository {
   ) => _mutation(UmiRoutes.posInventoryRestock(merchantId), command.toJson());
 
   @override
+  Future<ProductionResult> produce(
+    String merchantId,
+    ProductionRecord command,
+  ) async => ProductionResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posInventoryProduction(merchantId),
+      body: command.toJson(),
+    ),
+  );
+
+  @override
   Future<InventoryRecoveryResult> recover(
     String merchantId,
     String commandId,
@@ -168,6 +216,10 @@ final class ApiInventoryRepository implements InventoryRepository {
       body: command.toJson(),
     ),
   );
+
+  @override
+  Future<PrepList> prepList(String merchantId, PosPrepListQuery query) =>
+      requestPrepList(_api, merchantId, query);
 
   Future<InventoryMutationResult> _mutation(
     String path,

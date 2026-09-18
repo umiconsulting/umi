@@ -97,7 +97,14 @@ final class FakeCatalogRepository implements CatalogRepository {
         'name': 'Tipo de leche',
         'modifiers': [
           {'id': 'oat', 'name': 'Leche de avena'},
-          {'id': 'whole', 'name': 'Leche entera'},
+          // One modifier carries a surcharge and the other does not, on purpose:
+          // the surcharge adds a second line to its tile, and that is the case
+          // that used to leave two tiles in one row at different heights.
+          {
+            'id': 'whole',
+            'name': 'Leche entera',
+            'priceDelta': {'minorUnits': 1000, 'currency': 'MXN'},
+          },
         ],
       },
     ],
@@ -251,6 +258,46 @@ void main() {
       final large = tester.getCenter(find.text('Grande'));
       expect(small.dy, medium.dy);
       expect(medium.dy, large.dy);
+
+      // Every option tile in a row is the same size, whether or not it carries a
+      // surcharge. The tile with a price used to be one line taller than the one
+      // without, which is the disproportion the owner reported from the till, and
+      // "Leche entera" above is the surcharge that reproduces it.
+      final plain = tester.getSize(
+        find.ancestor(
+          of: find.text('Leche de avena'),
+          matching: find.byType(SizedBox),
+        ).first,
+      );
+      final withPrice = tester.getSize(
+        find.ancestor(
+          of: find.text('Leche entera'),
+          matching: find.byType(SizedBox),
+        ).first,
+      );
+      expect(plain, withPrice);
+      expect(plain.width, 200);
+
+      // And it stays level when one of them is SELECTED: a selected tile draws a
+      // 2 px border where an unselected one draws 1 px, which used to be absorbed
+      // by a pinned tile height and painted a "BOTTOM OVERFLOWED" stripe in a
+      // debug build. Now the row grows by those 2 px and both tiles grow with it.
+      await tester.tap(find.text('Leche entera'));
+      await tester.pumpAndSettle();
+      final selectedPlain = tester.getSize(
+        find.ancestor(
+          of: find.text('Leche de avena'),
+          matching: find.byType(SizedBox),
+        ).first,
+      );
+      final selectedWithPrice = tester.getSize(
+        find.ancestor(
+          of: find.text('Leche entera'),
+          matching: find.byType(SizedBox),
+        ).first,
+      );
+      expect(selectedPlain, selectedWithPrice);
+      expect(selectedWithPrice.height, plain.height + 2);
 
       await tester.pumpWidget(const SizedBox());
       value.dispose();

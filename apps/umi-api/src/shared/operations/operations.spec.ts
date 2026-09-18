@@ -36,11 +36,16 @@ describe('operational foundations', () => {
     const metrics = new MetricsService();
     metrics.increment('http.requests', { route: '/health' });
     metrics.observe('http.duration_ms', 12, { route: '/health' });
+    metrics.gauge('tender.attempts_unresolved', 3);
+    // …and a gauge SETS rather than accumulates: the number is a level, so reporting it twice
+    // must not report twice the queue (plan §7 item 3).
+    metrics.gauge('tender.attempts_unresolved', 1);
     expect(metrics.snapshot()).toEqual({
       counters: { 'http.requests{route=/health}': 1 },
       durations: {
         'http.duration_ms{route=/health}': { count: 1, totalMs: 12, maxMs: 12 },
       },
+      gauges: { 'tender.attempts_unresolved': 1 },
     });
   });
 

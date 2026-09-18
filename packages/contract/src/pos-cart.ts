@@ -42,6 +42,14 @@ export const CartItem = z
     productName: z.string().min(1).max(240),
     saleAction: CatalogSaleAction,
     quantity: z.number().int().min(1).max(999),
+    /**
+     * §8H step 4. Which course this line is served in, 1-based. It is on the LINE and
+     * not on the product because the same drink is a first course on one ticket and a
+     * second on another — "coffee after the meal" is a fact about the order, not about
+     * the coffee. The till defaults it to 1, so a counter that never sets a course
+     * behaves exactly as it did before this field existed.
+     */
+    courseNumber: z.number().int().min(1).max(20),
     variant: VariantSelection.nullable(),
     modifiers: z.array(ModifierSelection).max(100),
     note: SafeNote.nullable(),
@@ -102,6 +110,12 @@ export const CartLineInput = z
       .max(100)
       .default([]),
     quantity: z.number().int().min(1).max(999),
+    /**
+     * Optional on WRITE and defaulted, so every existing client keeps working and the
+     * identity key is untouched: changing the course of a line updates that line rather
+     * than splitting it into a second one.
+     */
+    courseNumber: z.number().int().min(1).max(20).default(1),
     note: SafeNote.nullable().default(null),
     expectedVersion: z.number().int().positive(),
     idempotencyKey: Idempotency,

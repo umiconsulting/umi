@@ -7,14 +7,14 @@ SEED=/seed
 DB="${POSTGRES_DB}"
 
 if [ ! -s "$SEED/roles.sql" ] || [ ! -s "$SEED/$DB.dump" ]; then
-  echo "umi-local: seed files missing in $SEED (roles.sql, $DB.dump)" >&2
+  echo "umi-buildv3-local: seed files missing in $SEED (roles.sql, $DB.dump)" >&2
   exit 1
 fi
 
-echo "umi-local: restoring roles"
+echo "umi-buildv3-local: restoring roles"
 psql -v ON_ERROR_STOP=1 -U postgres -d postgres -f "$SEED/roles.sql"
 
-echo "umi-local: restoring $DB"
+echo "umi-buildv3-local: restoring $DB"
 pg_restore -U postgres -d "$DB" --exit-on-error --no-password "$SEED/$DB.dump"
 
-echo "umi-local: seed complete"
+echo "umi-buildv3-local: seed complete"

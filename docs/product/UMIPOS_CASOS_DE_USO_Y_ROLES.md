@@ -3086,7 +3086,7 @@ Estas capacidades permanecen pendientes o fuera del alcance actual. El roadmap n
 | -------------------------------------------- | ------------------------ | ------------------------------------------------------------------ |
 | Inventario sincronizado y stock ledger final | IMPLEMENTADO             | Gate 3E conserva un ledger inmutable por location.                 |
 | Consumo real de restock intent               | IMPLEMENTADO CON LÍMITES | Las recetas requieren una decisión de componente.                  |
-| KDS Flutter final                            | FUERA DE ALCANCE ACTUAL  | UmiPOS no implementa el cliente KDS final.                         |
+| KDS como aplicación separada                 | RETIRADO                 | UmiPOS incluye el tablero de cocina. KDS retirado el 2026-09-16.   |
 | Loyalty                                      | FOUNDATION               | Falta binding histórico, policy completa y expiry.                 |
 | Wallet                                       | IMPLEMENTADO CON LÍMITES | Gate 3F bloquea retiro, transferencia y funding no autorizado.     |
 | Gift cards                                   | FOUNDATION               | Falta rate limit, emisión y suspensión operativa.                  |

@@ -1,11 +1,13 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { deviceStatus, KdsService, stationKeyFromName, ticketBelongsToDevice } from './kds.service';
+import { KitchenBoardEvents } from '../realtime/kitchen-board.events';
 import {
   DEVICE_REVOKED_BODY,
   hashPin,
   KdsHttpError,
   type KdsDeviceSession,
+  sha256Hex,
   validateTransition,
 } from './dto/kds-contract';
 
@@ -35,6 +37,11 @@ function make() {
     deleteDevice: vi.fn().mockResolvedValue(undefined),
     boardSnapshot: vi.fn().mockResolvedValue([]),
     ticketEvents: vi.fn().mockResolvedValue([]),
+    authorizePos: vi.fn().mockResolvedValue({
+      allowed: true,
+      permissions: ['kitchen.read', 'kitchen.prepare', 'kitchen.ready', 'kitchen.complete'],
+    }),
+    listStations: vi.fn().mockResolvedValue([]),
     executeKitchenCommand: vi.fn().mockResolvedValue({
       status: 'succeeded',
       result: { kitchenOrderId: 'o1', status: 'in_preparation', version: 2, sequence: 5 },
@@ -47,7 +54,14 @@ function make() {
     hit: vi.fn().mockReturnValue({ allowed: true, remaining: 9, resetAt: 0 }),
   };
   const realtime = { emitDevicesChanged: vi.fn() };
-  const svc = new KdsService(repo as never, rateLimit as never, realtime as never);
+  // The board's wake-up bus (§8H step 8): a real instance, because `waitForChange` is a
+  // subject and a stub of it would be a stub of the thing under test.
+  const svc = new KdsService(
+    repo as never,
+    rateLimit as never,
+    realtime as never,
+    new KitchenBoardEvents(),
+  );
   return { svc, repo, rateLimit, realtime };
 }
 
@@ -470,6 +484,53 @@ describe('KdsService.command — canonical request', () => {
       expect.objectContaining({ commandType: 'start_preparation', expectedVersion: 1 }),
     );
   });
+
+  // §8H step 4. The iPad's body is the frozen native client's shape — it is not
+  // zod-validated — so the course has to be judged here. A value the CHECK would refuse
+  // must be a 400 that names the field, and the interesting refusals are the ones the
+  // contract's `z.number()` would refuse too: `'2'` coerces to a course without this
+  // guard, and 2.5 is not a course at all.
+  it('fires a course in 1..20 and refuses anything else with a 400', async () => {
+    const { svc, repo } = make();
+    const kitchenOrderId = '3f2504e0-4f89-41d3-9a0c-0305e82c3303';
+    repo.loadOrderForScope.mockResolvedValue({
+      id: kitchenOrderId,
+      merchant_id: 't1',
+      location_id: 'loc-1',
+      station_id: 'station-1',
+      station_ids: ['station-1'],
+      kitchen_status: 'new',
+      kitchen_order_status: 'queued',
+      version: 1,
+      person_id: null,
+      source_transaction_id: null,
+    });
+    const body = (courseNumber: unknown) => ({
+      action: 'command',
+      commandId: COMMAND.command_id,
+      idempotencyKey: COMMAND.idempotency_key,
+      correlationId: COMMAND.correlation_id,
+      expectedVersion: 1,
+      kitchenOrderId,
+      commandType: 'fire_course',
+      itemIds: [],
+      courseNumber,
+    });
+
+    expect((await svc.command(SESSION, body(2))).status).toBe(200);
+    expect(repo.executeKitchenCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ commandType: 'fire_course', courseNumber: 2 }),
+    );
+
+    for (const refused of [0, 21, '2', 2.5, null]) {
+      repo.executeKitchenCommand.mockClear();
+      expect(await svc.command(SESSION, body(refused))).toEqual({
+        status: 400,
+        body: { error: 'invalid_kitchen_command' },
+      });
+      expect(repo.executeKitchenCommand).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('KdsService unknown actions', () => {
@@ -650,6 +711,227 @@ describe('KdsService.heartbeat realtime wake-up', () => {
 // sibling of the recall-only `transitionFromDashboard`. It reuses the same deep
 // `executeKitchenCommand` path the device command uses, so start/ready/complete finally
 // have a permission-gated entry point that is NOT the device-token path.
+/**
+ * Defect D33, the client-facing half: the till works the board it can see.
+ *
+ * `boardForPos` already authorised a STATION-LESS POS device by location + operator
+ * session. The command route must authorise and scope the same way, or the board is a
+ * view with no verbs — which is exactly what the sweep found: every ticket on the board
+ * was unclosable because `ticketBelongsToDevice` needs a station the till does not have.
+ */
+describe('KdsService.commandForPos', () => {
+  const POS_USER = {
+    id: '44444444-4444-4444-8444-444444444444',
+    email: null,
+    sessionId: '55555555-5555-4555-8555-555555555555',
+    deviceId: '66666666-6666-4666-8666-666666666666',
+  };
+  const LOCATION = 'a1000000-0000-4000-8000-000000000001';
+  const OTHER_LOCATION = 'a1000000-0000-4000-8000-000000000002';
+  const ST1 = 'a2000000-0000-4000-8000-000000000001';
+  const ST2 = 'a2000000-0000-4000-8000-000000000002';
+  const OPERATOR = '77777777-7777-4777-8777-777777777777';
+  const ORDER = {
+    id: 'a4000000-0000-4000-8000-000000000001',
+    merchant_id: 't1',
+    location_id: LOCATION,
+    station_id: ST1,
+    station_ids: [ST1, ST2],
+    kitchen_status: 'new' as const,
+    kitchen_order_status: 'queued' as const,
+    version: 1,
+    person_id: null,
+    source_transaction_id: 'a4000000-0000-4000-8000-000000000002',
+  };
+  const ITEM = 'a5000000-0000-4000-8000-000000000001';
+
+  const dto = (input: {
+    commandType:
+      | 'start_preparation'
+      | 'mark_item_ready'
+      | 'mark_order_ready'
+      | 'complete'
+      | 'recall'
+      | 'change_priority'
+      | 'fire_course';
+    itemIds?: string[];
+    reasonCode?: string | null;
+    priority?: 'normal' | 'high' | 'urgent' | null;
+    expectedVersion?: number;
+    courseNumber?: number | null;
+  }) => ({
+    action: 'command' as const,
+    commandId: '88888888-8888-4888-8888-888888888888',
+    idempotencyKey: 'pos-kitchen-command-1',
+    correlationId: 'pos-kitchen-correlation-1',
+    expectedVersion: input.expectedVersion ?? 1,
+    kitchenOrderId: ORDER.id,
+    commandType: input.commandType,
+    itemIds: input.itemIds ?? [],
+    reasonCode: input.reasonCode ?? null,
+    reasonNote: null,
+    priority: input.priority ?? null,
+    // §8H step 4: required by the strict contract, null for every command but fire_course.
+    courseNumber: input.courseNumber ?? null,
+    locationId: LOCATION,
+    operatorSessionId: OPERATOR,
+  });
+
+  it('scopes a station-less session to the stations of its own location', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    repo.listStations.mockResolvedValue([{ id: ST1 }, { id: ST2 }]);
+
+    const result = await svc.commandForPos(
+      POS_USER,
+      't1',
+      dto({ commandType: 'start_preparation' }),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(repo.authorizePos).toHaveBeenCalledWith(
+      POS_USER.id,
+      POS_USER.sessionId,
+      POS_USER.deviceId,
+      't1',
+      LOCATION,
+      OPERATOR,
+    );
+    const arg = repo.executeKitchenCommand.mock.calls[0][0];
+    expect(arg.commandType).toBe('start_preparation');
+    expect(arg.actorUserId).toBe(POS_USER.id);
+    // The person is the actor and the session names no station: `kitchen_command`
+    // permits exactly one of device_id / actor_user_id.
+    expect(arg.session).toMatchObject({
+      deviceId: null,
+      stationId: null,
+      merchantId: 't1',
+      locationId: LOCATION,
+    });
+    expect(arg.stationScope).toEqual([ST1, ST2]);
+    // The fingerprint uses the device path's own key order, so the same logical
+    // command carries ONE identity across both transports and a replay is a replay.
+    expect(arg.payloadFingerprint).toBe(
+      sha256Hex(
+        JSON.stringify({
+          kitchenOrderId: ORDER.id,
+          commandType: 'start_preparation',
+          itemIds: [],
+          reasonCode: null,
+          reasonNote: null,
+          priority: null,
+          expectedVersion: 1,
+        }),
+      ),
+    );
+  });
+
+  it('refuses a ticket no active station of the location holds', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue({ ...ORDER, station_ids: ['archived-station'] });
+    repo.listStations.mockResolvedValue([{ id: ST1 }]);
+
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'start_preparation' })),
+    ).rejects.toMatchObject({ response: { code: 'KITCHEN_ORDER_NOT_ROUTED' } });
+    expect(repo.executeKitchenCommand).not.toHaveBeenCalled();
+  });
+
+  it('tells a gone ticket apart from one at another location', async () => {
+    const { svc, repo } = make();
+    repo.loadOrderForScope.mockResolvedValue(null);
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'start_preparation' })),
+    ).rejects.toMatchObject({ response: { code: 'KITCHEN_ORDER_NOT_FOUND' } });
+
+    repo.loadOrderForScope.mockResolvedValue({ ...ORDER, location_id: OTHER_LOCATION });
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'start_preparation' })),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'KITCHEN_ORDER_OUT_OF_SCOPE',
+        details: { locationId: OTHER_LOCATION },
+      },
+    });
+  });
+
+  it('names the permission a command type needs', async () => {
+    const { svc, repo } = make();
+    repo.authorizePos.mockResolvedValue({
+      allowed: true,
+      permissions: ['kitchen.read', 'kitchen.prepare'],
+    });
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    repo.listStations.mockResolvedValue([{ id: ST1 }]);
+
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'mark_item_ready', itemIds: [ITEM] })),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'KITCHEN_PERMISSION_REQUIRED',
+        details: { requiredPermission: 'kitchen.ready', commandType: 'mark_item_ready' },
+      },
+    });
+    expect(repo.executeKitchenCommand).not.toHaveBeenCalled();
+  });
+
+  it('lets recall through with kitchen.recall, and demands its reason', async () => {
+    const { svc, repo } = make();
+    repo.authorizePos.mockResolvedValue({
+      allowed: true,
+      permissions: ['kitchen.read', 'kitchen.recall'],
+    });
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    repo.listStations.mockResolvedValue([{ id: ST1 }]);
+
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'recall' })),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const recalled = await svc.commandForPos(
+      POS_USER,
+      't1',
+      dto({ commandType: 'recall', reasonCode: 'too_early' }),
+    );
+    expect(recalled.ok).toBe(true);
+    expect(repo.executeKitchenCommand.mock.calls[0][0].reasonCode).toBe('too_early');
+  });
+
+  it('refuses a session that is not authorised at all', async () => {
+    const { svc, repo } = make();
+    repo.authorizePos.mockResolvedValue({ allowed: false, permissions: [] });
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'start_preparation' })),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+  });
+
+  it('refuses a session with no enrolled device', async () => {
+    const { svc } = make();
+    await expect(
+      svc.commandForPos({ ...POS_USER, deviceId: null }, 't1', dto({ commandType: 'complete' })),
+    ).rejects.toMatchObject({ response: { code: 'DEVICE_NOT_ENROLLED' } });
+  });
+
+  it('turns a journal conflict into a 409 carrying the repo result', async () => {
+    const { svc, repo } = make();
+    repo.authorizePos.mockResolvedValue({
+      allowed: true,
+      permissions: ['kitchen.read', 'kitchen.complete'],
+    });
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    repo.listStations.mockResolvedValue([{ id: ST1 }]);
+    repo.executeKitchenCommand.mockResolvedValue({
+      status: 'conflict',
+      result: { code: 'KITCHEN_VERSION_CONFLICT', expectedVersion: 1, currentVersion: 2 },
+    });
+
+    await expect(
+      svc.commandForPos(POS_USER, 't1', dto({ commandType: 'complete' })),
+    ).rejects.toMatchObject({
+      response: { code: 'KITCHEN_VERSION_CONFLICT', currentVersion: 2 },
+    });
+  });
+});
+
 describe('KdsService.advanceFromDashboard', () => {
   const ACTOR = '33333333-3333-4333-8333-333333333333';
   const ST1 = '11111111-1111-4111-8111-111111111111';
@@ -748,5 +1030,58 @@ describe('KdsService.advanceFromDashboard', () => {
     await expect(
       svc.advanceFromDashboard('t1', ACTOR, 'o1', 'start_preparation', { ...COMMAND }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+/**
+ * §8H step 2, the API half: the board is refused to an operator who may not read
+ * it.
+ *
+ * The client now hides the `Cocina` destination without `kitchen.read`, and
+ * hiding is not enforcement — `authorizePos` is what actually keeps a cashier
+ * out. These pin the refusal as the typed one the till turns into a permission
+ * message, and pin the empty case as an empty BOARD rather than a refusal: a
+ * location with no stations has no kitchen to show, which is not the same
+ * statement as "you may not look".
+ */
+describe('KdsService.boardForPos', () => {
+  const POS_USER = {
+    id: '44444444-4444-4444-8444-444444444444',
+    email: null,
+    sessionId: '55555555-5555-4555-8555-555555555555',
+    deviceId: '66666666-6666-4666-8666-666666666666',
+  };
+  const QUERY = {
+    locationId: 'a1000000-0000-4000-8000-000000000001',
+    operatorSessionId: '77777777-7777-4777-8777-777777777777',
+  };
+
+  it('refuses an operator whose session holds no kitchen.read', async () => {
+    const { svc, repo } = make();
+    repo.authorizePos.mockResolvedValue({ allowed: false, permissions: [] });
+
+    await expect(svc.boardForPos(POS_USER, 't1', QUERY)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
+
+  it('refuses a caller with no enrolled device', async () => {
+    const { svc } = make();
+
+    await expect(
+      svc.boardForPos({ ...POS_USER, deviceId: null }, 't1', QUERY),
+    ).rejects.toMatchObject({ response: { code: 'DEVICE_NOT_ENROLLED' } });
+  });
+
+  it('answers an empty board for a location with no stations', async () => {
+    const { svc, repo } = make();
+    repo.listStations.mockResolvedValue([]);
+
+    await expect(svc.boardForPos(POS_USER, 't1', QUERY)).resolves.toMatchObject({
+      ok: true,
+      data: [],
+    });
+    // Nothing to fill a board with, so the snapshot is never read.
+    expect(repo.boardSnapshot).not.toHaveBeenCalled();
   });
 });

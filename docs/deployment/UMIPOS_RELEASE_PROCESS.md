@@ -3,14 +3,14 @@
 ## Release identity
 
 Each release has one version, commit, timestamp, contract version, and schema version.
-The API, worker, Dashboard, POS, and KDS expose this identity.
+The API, worker, Dashboard, and POS expose this identity.
 An artifact identity does not change after the build.
 Do not use `latest` as the only pilot identity.
 
 ## Release manifest
 
 The generated manifest uses `deploy/pilot/release-manifest.schema.json`.
-It records Docker image IDs, the POS checksum, the KDS Git tree, and the migration checksum.
+It records Docker image IDs, the POS checksum, and the migration checksum.
 It contains no secret.
 
 Verify a manifest with this command:
@@ -74,7 +74,6 @@ The pilot compares these versions:
 - contract version
 - POS version
 - Dashboard version
-- KDS version
 - database schema version
 
 The POS returns one of these states:

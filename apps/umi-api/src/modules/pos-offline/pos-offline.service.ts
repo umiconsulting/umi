@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,6 +8,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import type {
   BeginReplayRequest,
+  ConflictClassification,
   OfficialCommitResult,
   OfflineCashPolicy,
   OfflinePolicy,
@@ -254,12 +256,31 @@ export class PosOfflineService {
           stopped = true;
           break;
         }
-        const preview = await this.checkout.checkout(user, merchantId, {
-          ...snapshot.checkoutCommand,
-          commandId: randomUUID(),
-          totalsFingerprint: null,
-          idempotencyKey: randomUUID(),
-        });
+        /*
+         * THE PREVIEW IS WHERE A STALE CART SURFACES, and it is a normal offline outcome
+         * rather than an exception: the till was away, the cart moved on, and this queued
+         * sale can never land. `checkout()` reports it as a typed `ConflictException`, and
+         * letting that escape left `batchLocked` as an unhandled 409 with NO
+         * `offline_replay_conflict` row — so the recovery centre, the one place an
+         * operator is told what happened to a queued sale, showed nothing at all. It is
+         * journalled like every other refusal now. Anything that is not a typed checkout
+         * refusal still escapes: a bug here must not be recorded as the operator's fault.
+         */
+        let preview;
+        try {
+          preview = await this.checkout.checkout(user, merchantId, {
+            ...snapshot.checkoutCommand,
+            commandId: randomUUID(),
+            totalsFingerprint: null,
+            idempotencyKey: randomUUID(),
+          });
+        } catch (error) {
+          const classification = this.checkoutRefusalClassification(error);
+          if (!classification) throw error;
+          results.push(await this.repo.recordConflict(command, classification, true));
+          stopped = true;
+          break;
+        }
         const authoritativeAmount = preview.confirmation.totals.grandTotal.minorUnits;
         const authoritativeCurrency = preview.confirmation.totals.grandTotal.currency;
         batchCashMinorUnits += authoritativeAmount;
@@ -277,11 +298,33 @@ export class PosOfflineService {
           stopped = true;
           break;
         }
-        const checkout = await this.checkout.checkout(
-          user,
-          merchantId,
-          parsed.data.snapshot.checkoutCommand,
-        );
+        /*
+         * A cart that moved under a queued sale is a NORMAL offline outcome, not an
+         * exception: the till was away, the cart advanced, and this command can never
+         * land. `checkout()` reports it as a typed `ConflictException`, and letting that
+         * escape used to leave `batchLocked` as an unhandled 409 with NO
+         * `offline_replay_conflict` row — so the recovery centre, which is the one place
+         * an operator is told what happened to a queued sale, showed nothing at all.
+         * It is journalled like every other refusal now. Anything that is not a typed
+         * checkout refusal is still allowed to escape: a bug here must not be recorded
+         * as an operator's problem.
+         */
+        let checkout;
+        try {
+          checkout = await this.checkout.checkout(
+            user,
+            merchantId,
+            parsed.data.snapshot.checkoutCommand,
+          );
+        } catch (error) {
+          // The commit can refuse for the same reasons the preview can; the same rule
+          // applies, and anything that is not a typed refusal still escapes.
+          const classification = this.checkoutRefusalClassification(error);
+          if (!classification) throw error;
+          results.push(await this.repo.recordConflict(command, classification, true));
+          stopped = true;
+          break;
+        }
         if (
           checkout.status !== 'completed' ||
           !checkout.sale ||
@@ -323,7 +366,16 @@ export class PosOfflineService {
       .filter((r) => r.status === 'accepted' || r.status === 'duplicate')
       .reduce(
         (value, result) => Math.max(value, result.deviceSequence),
-        sorted[0].deviceSequence - 1,
+        /*
+         * The seed is the cursor that was in force when the batch STARTED, not
+         * `sorted[0].deviceSequence - 1`. Those differ whenever the batch's first command
+         * is refused: with an empty cursor and a refused sequence 3, the old seed reported
+         * `2`, i.e. "the server has accepted 1 and 2" — so a client that read this field
+         * as "accepted up to here" would drop two commands it had never sent. The till
+         * does not read it (`replay_engine.dart` applies each result to its journal and
+         * re-reads the cursor endpoint for the truth), which is why this was latent.
+         */
+        expectedSequence - 1,
       );
     return {
       replaySessionId: batch.replaySessionId,
@@ -473,6 +525,25 @@ export class PosOfflineService {
       query.credentialVersion,
     );
     return { items: await this.repo.conflicts(merchantId, query.locationId, user.deviceId!) };
+  }
+
+  /**
+   * How a typed checkout refusal becomes a conflict classification, or `null` when the
+   * error is not one — in which case the caller must let it escape rather than record it
+   * as an operator's problem.
+   *
+   * `OPTIMISTIC_VERSION_CONFLICT` is the stale-cart case and has an exact name in the
+   * vocabulary: the aggregate the command was built against moved. Everything else the
+   * checkout refuses over is a validation failure from the till's point of view.
+   */
+  private checkoutRefusalClassification(error: unknown): ConflictClassification | null {
+    if (!(error instanceof ConflictException)) return null;
+    const body: unknown = error.getResponse();
+    const code =
+      typeof body === 'object' && body !== null && 'code' in body ? String(body.code) : '';
+    return code === 'OPTIMISTIC_VERSION_CONFLICT'
+      ? 'aggregate_version_conflict'
+      : 'server_validation_failed';
   }
 
   private async authorize(

@@ -197,6 +197,86 @@ export const CheckoutPolicy = z
   })
   .strict();
 export const ReceiptDestination = z.enum(['display', 'print_later', 'digital', 'none']);
+/**
+ * The till's read of the effective checkout policy for a location.
+ *
+ * The policy decides which payment methods the screen may offer, and it used to
+ * arrive only on the CHECKOUT response — the same call that takes the money. An
+ * operator therefore could not choose a card terminal, because the tile that
+ * offers it is drawn from a policy the server had not sent yet, and the first
+ * press of `Cobrar` is a one-tap sale when the total is unchanged. This is the
+ * same policy object the checkout carries, readable before anything is charged.
+ */
+/**
+ * WITHDRAWING A TERMINAL CLAIM — the checkout-side twin of `TenderSettlement`,
+ * and the last piece of §8G step 4.
+ *
+ * A draft can hold a `manual_terminal` tender whose status says money moved
+ * (`confirmed_success`) or might have (`outcome_unknown`). The guards around that
+ * are right and stay: a checkout with such a claim cannot be cancelled, and a
+ * later tender set that would DROP the claim is refused, because erasing a claim
+ * that money changed hands is exactly what those guards are for. What was missing
+ * is the other half — the operator who reads the terminal and finds it did NOT
+ * charge had no way to say so. Their cart was unpayable and their screen
+ * inescapable, and the only way out was to kill the app and abandon the sale.
+ *
+ * This route is that sentence. It is explicitly NOT a general "clear the
+ * tenders": it names the tender it withdraws, it exists only for a terminal, and
+ * it records who decided and what they saw. After it, the tender is gone from the
+ * draft's tenders (so the sale can be paid another way) and its uncommitted fact
+ * is removed (a fact only becomes financial at commit); the audit event is what
+ * remains of the claim, and it names the operator.
+ */
+export const CheckoutTerminalRecoveryEvidence = z.enum([
+  'terminal_screen_shows_declined',
+  'customer_reports_declined',
+  'terminal_never_used',
+]);
+export type CheckoutTerminalRecoveryEvidence = z.infer<typeof CheckoutTerminalRecoveryEvidence>;
+
+export const CheckoutTerminalRecoveryRequest = z
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    /** The tender draft being withdrawn. Named, never "whatever is there". */
+    tenderDraftId: Uuid,
+    evidence: CheckoutTerminalRecoveryEvidence,
+    note: z.string().trim().max(500).nullable().default(null),
+    idempotencyKey: Uuid,
+  })
+  .strict();
+export type CheckoutTerminalRecoveryRequest = z.infer<typeof CheckoutTerminalRecoveryRequest>;
+
+export const CheckoutTerminalRecoveryResult = z
+  .object({
+    ok: z.literal(true),
+    data: z
+      .object({
+        draftId: Uuid,
+        /** The tender that left the draft, so the caller can prove which one. */
+        withdrawnTenderDraftId: Uuid,
+        /** How many tenders the draft holds now. Zero means: ready to re-tender. */
+        remainingTenderDrafts: z.number().int().min(0).max(8),
+        recoveredAt: IsoTimestamp,
+        correlationId: CorrelationId,
+      })
+      .strict(),
+  })
+  .strict();
+export type CheckoutTerminalRecoveryResult = z.infer<typeof CheckoutTerminalRecoveryResult>;
+
+export const PosCheckoutPolicyQuery = z
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    // A policy is issued per location AND currency, so the read has to name the
+    // currency it is asking about — the same key the checkout itself uses.
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  })
+  .strict();
+export const PosCheckoutPolicyResult = z
+  .object({ ok: z.literal(true), data: CheckoutPolicy })
+  .strict();
 export const ReceiptDeliveryIntent = z
   .object({
     destination: ReceiptDestination,
@@ -511,7 +591,14 @@ export const PaymentStatusQuery = z
 export type CheckoutCommand = z.infer<typeof CheckoutCommand>;
 export type CheckoutResult = z.infer<typeof CheckoutResult>;
 export type PaymentStatusQuery = z.infer<typeof PaymentStatusQuery>;
+export type PosCheckoutPolicyQuery = z.infer<typeof PosCheckoutPolicyQuery>;
+export type PosCheckoutPolicyResult = z.infer<typeof PosCheckoutPolicyResult>;
 export type PaymentMethod = z.infer<typeof PaymentMethod>;
+// The tender model needs this shape as a TYPE, not only as a validator: an attempt's
+// stored state is read back and compared, and a schema that is used as a type compiles
+// into `typeof` errors at the first consumer. `PaymentMethod` has carried its type export
+// since the beginning; this one was missing it.
+export type PaymentState = z.infer<typeof PaymentState>;
 export type CheckoutState = z.infer<typeof CheckoutState>;
 export type TenderType = z.infer<typeof TenderType>;
 export type TenderDraft = z.infer<typeof TenderDraft>;
@@ -553,6 +640,11 @@ export const posCheckoutModels = {
   DiscountPolicy,
   DiscountDraft,
   CheckoutPolicy,
+  PosCheckoutPolicyQuery,
+  PosCheckoutPolicyResult,
+  CheckoutTerminalRecoveryEvidence,
+  CheckoutTerminalRecoveryRequest,
+  CheckoutTerminalRecoveryResult,
   ReceiptDestination,
   ReceiptDeliveryIntent,
   CheckoutConfirmation,

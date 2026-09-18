@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { msg } from '@lingui/core/macro';
@@ -7,6 +7,7 @@ import { applyMerchantLocale, activateLocale } from '@/lib/i18n.js';
 import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
 import { MODULES } from '@/lib/module-registry.js';
+import { landingRouteFor } from '@/lib/role-landing.js';
 import { I } from '@/icons.jsx';
 import {
   useTweaks,
@@ -37,10 +38,15 @@ import OperationsScreen from '@/screens/operations.jsx';
 import CashShiftsScreen from '@/screens/cash-shifts.jsx';
 import ReportesScreen from '@/screens/reportes.jsx';
 import CatalogInventoryScreen from '@/screens/catalog-inventory.jsx';
+import InventoryCostingScreen from '@/screens/inventory-costing.jsx';
 import DiagnosticsScreen from '@/screens/diagnostics.jsx';
 import CocinaScreen from '@/screens/cocina.jsx';
 import ProfileScreen from '@/screens/profile.jsx';
 
+// The floor-plan editor is the one screen the shell loads lazily, and the only
+// one that pulls zod (through `@umi/contract/floor-plan`'s document schema) into
+// the browser. Keeping it a separate chunk is what keeps the console's own
+// bundle zod-free — see the node in `lib/module-registry.js`.
 const FloorPlanScreen = lazy(() => import('@/screens/floor-plan.jsx'));
 
 const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy' };
@@ -169,6 +175,39 @@ function DashboardLayout() {
       tweaks.density === 'cozy' ? '0.92' : '1',
     );
   }, [tweaks.density]);
+
+  // -------------------------------------------------------------------------
+  // ROLE LANDING — plan §8C: "Every role opens the screen that role needs, not
+  // the owner screen with fewer buttons". `role-landing.js` decides which screen.
+  //
+  // WHERE A SESSION BEGINS, both ways in: the login screen navigates to `/`, and
+  // a cold load of an already-signed-in shell starts here. Both land through
+  // this effect, so there is one implementation and no second copy in login.jsx.
+  //
+  // LAND ONCE. The ref flips on the first render that has a resolved merchant,
+  // whether or not it navigated, and it is never cleared. An operator who then
+  // clicks `Resumen` lands on `/` and STAYS there: the shell does not fight the
+  // person it is showing. For the same reason an explicit destination is left
+  // alone — a deep link or a bookmark (`/orders`, `/settings`) is a request, and
+  // only the root path is treated as "no destination chosen yet".
+  //
+  // The resolver asks THIS context (`canShowModule`, the registry gate that
+  // already reads permissions, product entitlement and the platform grant), so a
+  // landing can never name a screen `GuardedScreen` would refuse.
+  // -------------------------------------------------------------------------
+  const landedRef = useRef(false);
+  const capabilities = merchantState?.capabilities;
+  useEffect(() => {
+    if (landedRef.current || !capabilities) return;
+    landedRef.current = true;
+    if (location.pathname !== '/') return;
+    const route = landingRouteFor({
+      roleKey: capabilities.membership?.role,
+      permissions: capabilities.membership?.permissions,
+      canShow: (moduleKey) => merchantState.canShowModule(moduleKey),
+    });
+    if (route && route !== location.pathname) navigate(route, { replace: true });
+  }, [capabilities, location.pathname, merchantState, navigate]);
 
   const nav = (id) => {
     setNavOpen(false);
@@ -301,6 +340,14 @@ function DashboardLayout() {
               element={
                 <GuardedScreen moduleKey="catalog-inventory">
                   <CatalogInventoryScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="inventory-costing"
+              element={
+                <GuardedScreen moduleKey="inventory-costing">
+                  <InventoryCostingScreen />
                 </GuardedScreen>
               }
             />

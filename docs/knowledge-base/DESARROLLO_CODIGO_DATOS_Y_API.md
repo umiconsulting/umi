@@ -27,27 +27,27 @@ Consulta `WORKSPACE.md`, cada `REPO_CONTEXT.md` y los archivos `AGENTS.md` antes
 
 ## Mapa práctico
 
-| Tema               | Ruta principal                                    |
-| ------------------ | ------------------------------------------------- |
-| Auth y sesiones    | `apps/umi-api/src/modules/auth/`                  |
-| Identidad          | `apps/umi-api/src/modules/identity/`              |
-| Personal           | `apps/umi-api/src/modules/staff/`                 |
-| Comercios          | `apps/umi-api/src/modules/merchants/`             |
-| Dispositivos       | `apps/umi-api/src/modules/devices/`               |
-| Catálogo POS       | `apps/umi-api/src/modules/pos-catalog/`           |
-| Ventas             | `apps/umi-api/src/modules/pos-sale/`              |
-| Checkout           | `apps/umi-api/src/modules/pos-checkout/`          |
-| Inventario         | `apps/umi-api/src/modules/pos-inventory/`         |
-| Caja               | `apps/umi-api/src/modules/pos-cash/` y `cash/`    |
-| Refunds y recovery | `apps/umi-api/src/modules/pos-exception/`         |
-| Customer value     | `apps/umi-api/src/modules/pos-customer-value/`    |
-| KDS                | `apps/umi-api/src/modules/kds/` y `apps/umi-kds/` |
-| Worker             | `apps/umi-api/src/jobs/` y `worker.module.ts`     |
-| Dashboard          | `apps/umi-dashboard/src/`                         |
-| Flutter POS        | `apps/umi-pos/lib/features/`                      |
-| Contratos          | `packages/contract/`                              |
-| Migraciones        | `docs/migration/`                                 |
-| Release            | `scripts/` y `docs/deployment/`                   |
+| Tema               | Ruta principal                                 |
+| ------------------ | ---------------------------------------------- |
+| Auth y sesiones    | `apps/umi-api/src/modules/auth/`               |
+| Identidad          | `apps/umi-api/src/modules/identity/`           |
+| Personal           | `apps/umi-api/src/modules/staff/`              |
+| Comercios          | `apps/umi-api/src/modules/merchants/`          |
+| Dispositivos       | `apps/umi-api/src/modules/devices/`            |
+| Catálogo POS       | `apps/umi-api/src/modules/pos-catalog/`        |
+| Ventas             | `apps/umi-api/src/modules/pos-sale/`           |
+| Checkout           | `apps/umi-api/src/modules/pos-checkout/`       |
+| Inventario         | `apps/umi-api/src/modules/pos-inventory/`      |
+| Caja               | `apps/umi-api/src/modules/pos-cash/` y `cash/` |
+| Refunds y recovery | `apps/umi-api/src/modules/pos-exception/`      |
+| Customer value     | `apps/umi-api/src/modules/pos-customer-value/` |
+| KDS                | `apps/umi-api/src/modules/kds/`                |
+| Worker             | `apps/umi-api/src/jobs/` y `worker.module.ts`  |
+| Dashboard          | `apps/umi-dashboard/src/`                      |
+| Flutter POS        | `apps/umi-pos/lib/features/`                   |
+| Contratos          | `packages/contract/`                           |
+| Migraciones        | `docs/migration/`                              |
+| Release            | `scripts/` y `docs/deployment/`                |
 
 ## Modelo de datos
 

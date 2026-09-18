@@ -67,6 +67,54 @@ void main() {
     },
   );
 
+  test('the queue replays by itself when the connection comes back', () async {
+    final journal = EncryptedOfflineJournal(_Store(), web: false);
+    await journal.append(
+      commandId: _id(1),
+      deviceId: _id(2),
+      credentialVersion: 1,
+      merchantId: _id(3),
+      locationId: _id(4),
+      operatorSessionId: _id(5),
+      idempotencyKey: _id(6),
+      provisionalId: _id(7),
+      commandType: 'pos.checkout.cash',
+      payload: const {'checkoutIdentity': 'automatic-replay'},
+      deduplicationKey: 'automatic-replay',
+      maxPendingCashCount: 3,
+      maxPendingCashMinorUnits: 30000,
+      cashAmountMinorUnits: 5000,
+    );
+    final connectivity = ConnectivityController()..apiFailure();
+    final gateway = _Gateway(acceptSubmit: true);
+    final controller = OfflineRecoveryController(
+      journal: journal,
+      gateway: gateway,
+      connectivity: connectivity,
+    );
+    addTearDown(controller.dispose);
+
+    // Sign-in, in a dead spot: the till learns its scope and can do nothing else.
+    await controller.recover(_scope());
+    expect(controller.status.phase, RecoveryPhase.waitingForConnectivity);
+    expect(gateway.submissions, 0);
+
+    // The connection comes back. Two authoritative successes are what
+    // `apiReachable` requires before it calls the till online again, and the
+    // replay has to start from that — not from an operator opening the recovery
+    // centre, and not from the next restart.
+    connectivity.apiReachable(authorityValid: true);
+    connectivity.apiReachable(authorityValid: true);
+    await pumpEventQueue();
+
+    expect(gateway.submissions, 1);
+    expect(
+      (await journal.load()).entries.single.status,
+      JournalStatus.accepted,
+    );
+    expect(controller.status.phase, RecoveryPhase.completed);
+  });
+
   for (final code in ['DEVICE_REVOKED', 'DEVICE_CREDENTIAL_ROTATED']) {
     test('$code blocks recovery before replay', () async {
       final journal = EncryptedOfflineJournal(_Store(), web: false);
@@ -133,11 +181,16 @@ final class _Gateway implements ReplayGateway {
     this.recoveredResult,
     this.serverSequence = 0,
     this.authorityError,
+    this.acceptSubmit = false,
   });
   final bool loseSubmitResponse;
   final ReplayResult? recoveredResult;
   final int serverSequence;
   final String? authorityError;
+
+  /// Accept whatever arrives, as the server does on a happy replay. Off by
+  /// default so a test that did not expect a replay still fails loudly.
+  final bool acceptSubmit;
   int submissions = 0;
   int resultQueries = 0;
 
@@ -210,7 +263,32 @@ final class _Gateway implements ReplayGateway {
         recoverable: true,
       );
     }
-    throw StateError('no replay expected');
+    if (!acceptSubmit) throw StateError('no replay expected');
+    final results = batch.commands.map((encoded) {
+      final command = OfflineCommand.fromJson(encoded);
+      return ReplayResult(
+        commandId: command.commandId,
+        deviceSequence: command.deviceSequence,
+        status: 'accepted',
+        officialId: _id(8),
+        officialCommit: const {'receipt': 'safe-reference'},
+        serverConflictReference: null,
+        failure: null,
+      );
+    }).toList();
+    final first = OfflineCommand.fromJson(batch.commands.first);
+    return ReplayBatchResult(
+      replaySessionId: batch.replaySessionId,
+      results: results.map((result) => result.toJson()).toList(),
+      cursor: ReplayCursor(
+        deviceId: first.deviceId,
+        credentialVersion: first.deviceCredentialVersion,
+        lastAcceptedSequence: results.last.deviceSequence,
+        reconciliationRequired: false,
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+      ).toJson(),
+      stopped: false,
+    );
   }
 
   @override

@@ -17,6 +17,8 @@ interface ProjectionLineRow {
   productName: string;
   variantName: string | null;
   quantity: number;
+  /** §8H step 4. Which course the line is served in. `fired` is NOT stored here. */
+  courseNumber: number;
   preparationNote: string | null;
   displayOrder: number;
   targetSeconds: number | null;
@@ -54,6 +56,7 @@ export async function projectKitchenOrder(
             p.category_id::text AS "categoryId",
             COALESCE(p.requires_preparation,false) AS "requiresPreparation",
             i.name AS "productName",i.variant_name AS "variantName",i.quantity,
+            i.course_number AS "courseNumber",
             i.notes AS "preparationNote",i.display_order AS "displayOrder",
             p.preparation_target_seconds AS "targetSeconds",
             COALESCE(mods.names,'{}'::text[]) AS modifiers
@@ -139,9 +142,9 @@ export async function projectKitchenOrder(
       `INSERT INTO merchant.kitchen_order_item
          (merchant_id,location_id,kitchen_order_id,source_order_id,source_order_item_id,
           station_id,status,product_id,product_name,variant_name,modifiers,quantity,
-          preparation_note,display_order,route_reason,target_seconds)
+          course_number,preparation_note,display_order,route_reason,target_seconds)
        VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid,$9,$10,
-               $11::jsonb,$12,$13,$14,$15,$16)
+               $11::jsonb,$12,$13,$14,$15,$16,$17)
        ON CONFLICT (merchant_id,source_order_item_id) DO NOTHING`,
       [
         merchantId,
@@ -156,6 +159,7 @@ export async function projectKitchenOrder(
         line.variantName,
         JSON.stringify(line.modifiers),
         line.quantity,
+        line.courseNumber,
         line.preparationNote,
         line.displayOrder,
         assignment.routeId ? 'configured_route' : 'missing_route',
@@ -184,5 +188,23 @@ export async function projectKitchenOrder(
       `kitchen:create:${sourceOrderId}`,
     ],
   );
+
+  // THE WAKE-UP, RAISED WHERE THE WRITE IS.
+  //
+  // `pg_notify` is transactional: Postgres delivers it at COMMIT, so a board watcher cannot be
+  // woken before this ticket is visible, and a checkout that fails after projection wakes nobody.
+  // That property is the whole reason the notification is a database call and not an in-process
+  // emit — an emit here would be inside the caller's transaction with no commit to hang it on.
+  //
+  // It carries IDS ONLY. The till's board re-reads over RLS REST and renders what the database
+  // says, so a nudge can never show a cook a ticket that is not there.
+  await client.query(`SELECT pg_notify('umi_kitchen_board', $1::text)`, [
+    JSON.stringify({
+      merchant_id: merchantId,
+      location_id: first.locationId,
+      kitchen_order_id: kitchenOrderId,
+    }),
+  ]);
+
   return { kitchenOrderId, created: true };
 }

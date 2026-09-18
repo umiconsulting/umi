@@ -1,5 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { ProductionConsumedLine, ProductionRecord, ProductionResult } from '@umi/contract';
 import type {
   AvailabilityResult,
   InventoryAdjustment,
@@ -16,9 +18,25 @@ import type {
   DamageRecord,
   CreateInventoryCountRequest,
 } from '@umi/contract';
+import type { z } from 'zod';
 import { PgService } from '../../shared/database/pg.service';
 import { commandFingerprint } from '../integrity/canonical-json';
+import {
+  divideRoundHalfUp,
+  plateCostMinor,
+  pow10,
+  quantityCostMinor,
+  toSafeNumber,
+} from '../inventory-costing/inventory-costing-domain';
 import { inventoryOperationFingerprint } from './inventory-errors';
+
+/**
+ * Production is published as zod schemas only, so its shapes are read from the schemas
+ * themselves rather than restated in a second interface that can drift.
+ */
+type ProduceRequest = z.infer<typeof ProductionRecord>;
+type ProduceResult = z.infer<typeof ProductionResult>;
+type ConsumedLine = z.infer<typeof ProductionConsumedLine>;
 
 export interface InventoryAuthorization {
   commandContextType: 'pos_device' | 'dashboard_administrative';
@@ -61,6 +79,47 @@ interface LedgerRow {
   businessDate: string;
   correlationId: string;
   occurredAt: string;
+}
+
+/**
+ * The output item of a production batch, as the ledger will value it. The scale and the
+ * unit are the item's own, which is the grid every answer uses.
+ */
+interface ProductionOutputRow {
+  baseUnit: string;
+  quantityScale: number;
+  shelfLifeDays: number | null;
+  active: boolean;
+}
+
+/** The active recipe of the output item. Its yield is the batch the cook produced. */
+interface ProductionRecipeRow {
+  id: string;
+  yieldQuantity: string;
+  yieldScale: number;
+  yieldUnit: string;
+  shelfLifeDays: number | null;
+}
+
+/** One row of `merchant.explode_inventory_recipe`, with the item's own display facts. */
+interface ProductionExplosionRow {
+  inventoryItemId: string;
+  numerator: string;
+  denominator: string;
+  hasRecipe: boolean;
+  publicReference: string;
+  displayName: string;
+  baseUnit: string;
+  quantityScale: number;
+}
+
+/** One LEAF input of the batch, with the quantity this batch consumes at its own scale. */
+interface ProductionInput {
+  inventoryItemId: string;
+  publicReference: string;
+  displayName: string;
+  quantity: { value: number; scale: number; unit: string };
+  unitCostMinor: bigint | null;
 }
 
 const hasPermission = (authorization: InventoryAuthorization, permission: string) =>
@@ -1290,6 +1349,332 @@ export class PosInventoryRepository {
     return this.countResult(client, merchantId, dto.locationId, dto.countId, correlationId);
   }
 
+  /**
+   * PRODUCE (plan §8.1, §8.2 and D4, D5, D9). One batch, one transaction, one command.
+   *
+   * THE COOK SAYS WHAT CAME OUT; THE SERVER SAYS WHAT WENT IN. The request names the
+   * output item and the quantity that was actually produced. The server explodes the
+   * item's ACTIVE recipe through `merchant.explode_inventory_recipe` — the same walk
+   * the recipe editor and the sale path use — and consumes one row per leaf input item.
+   *
+   * THE DECLARED YIELD IS THE BATCH, NOT THE PRODUCED QUANTITY. A recipe declares what
+   * its full batch yields, so the inputs are consumed for that declared yield while the
+   * stock entry credits what really came out. The difference is the named
+   * `production_yield_loss` of D4, posted on the output item. A batch that meets or beats
+   * its yield writes no loss row, and the ledger's own negative-stock guard decides
+   * whether a shortfall is allowed to land.
+   *
+   * THE COST IS THE PHASE 2 ARITHMETIC, REUSED. The weighted-average receipt basis is the
+   * one `InventoryCostingService` reads, and the money is summed through
+   * `plateCostMinor`, so a prep's cost and the recipe editor's cost cannot disagree.
+   */
+  async produce(
+    client: PoolClient,
+    merchantId: string,
+    authorization: InventoryAuthorization,
+    dto: ProduceRequest,
+    unitCosts: Map<string, bigint>,
+    correlationId: string,
+  ): Promise<ProduceResult> {
+    const fingerprint = this.operationFingerprint('pos.inventory.production', dto);
+    const itemResult = await client.query<ProductionOutputRow>(
+      `SELECT base_unit AS "baseUnit",quantity_scale AS "quantityScale",
+              shelf_life_days AS "shelfLifeDays",active
+         FROM merchant.inventory_item
+        WHERE merchant_id=$1::uuid AND id=$2::uuid FOR SHARE`,
+      [merchantId, dto.outputItemId],
+    );
+    const outputItem = itemResult.rows[0];
+    if (!outputItem || !outputItem.active) {
+      throw new ConflictException({ code: 'INVENTORY_ITEM_ARCHIVED' });
+    }
+    // The produced quantity is normalized onto the item's own scale, so a client that
+    // sends another unit divides exactly here or is refused, exactly as a sale is.
+    const produced = await this.normalizeQuantity(
+      client,
+      merchantId,
+      dto.outputItemId,
+      dto.quantity,
+    );
+    if (dto.expiresOn !== null && dto.expiresOn < dto.businessDate) {
+      throw new ConflictException({ code: 'INVENTORY_LOT_EXPIRY_INVALID' });
+    }
+
+    const recipeResult = await client.query<ProductionRecipeRow>(
+      `SELECT id::text AS id,yield_quantity::text AS "yieldQuantity",yield_scale AS "yieldScale",
+              yield_unit AS "yieldUnit",shelf_life_days AS "shelfLifeDays"
+         FROM merchant.inventory_recipe
+        WHERE merchant_id=$1::uuid AND target_item_id=$2::uuid AND active
+        FOR SHARE`,
+      [merchantId, dto.outputItemId],
+    );
+    const recipe = recipeResult.rows[0];
+    if (!recipe) throw new ConflictException({ code: 'INVENTORY_RECIPE_REQUIRED' });
+    // The declared yield, on the output item's own scale. A recipe whose yield does not
+    // divide there cannot be produced, and says so with the sale path's own code.
+    const declared = await this.normalizeQuantity(client, merchantId, dto.outputItemId, {
+      value: Number(recipe.yieldQuantity),
+      scale: recipe.yieldScale,
+      unit: recipe.yieldUnit,
+    });
+
+    const explosion = await client.query<ProductionExplosionRow>(
+      `SELECT e.inventory_item_id::text AS "inventoryItemId",
+              e.numerator::text AS numerator,e.denominator::text AS denominator,
+              e.has_recipe AS "hasRecipe",i.public_reference AS "publicReference",
+              i.display_name AS "displayName",i.base_unit AS "baseUnit",
+              i.quantity_scale AS "quantityScale"
+         FROM merchant.explode_inventory_recipe($1::uuid,$2::uuid) e
+         JOIN merchant.inventory_item i
+           ON i.merchant_id=$1::uuid AND i.id=e.inventory_item_id
+        ORDER BY e.depth,e.path`,
+      [merchantId, recipe.id],
+    );
+    const inputs = productionInputs(explosion.rows, declared.value, produced.scale, unitCosts);
+
+    // The lot is written FIRST, because the ledger's one door refuses a lot that does
+    // not exist or that belongs to another item or stock location.
+    const shelfLifeDays = recipe.shelfLifeDays ?? outputItem.shelfLifeDays;
+    const lotResult = await client.query<{
+      lotId: string;
+      lotReference: string;
+      expiresOn: string | null;
+      producedAt: string;
+    }>(
+      `INSERT INTO merchant.stock_lot
+         (merchant_id,location_id,inventory_location_id,inventory_item_id,public_reference,
+          origin,recipe_id,produced_at,expires_on,shelf_life_days,command_id,idempotency_key,
+          command_fingerprint,created_by)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,'production',$6::uuid,clock_timestamp(),
+               coalesce($7::date, CASE WHEN $8::integer IS NULL THEN NULL ELSE
+                 coalesce($8::integer,0) + ((clock_timestamp() AT TIME ZONE
+                   (SELECT m.timezone FROM merchant.merchant m WHERE m.id=$1::uuid))::date)
+               END),
+               $8,$9::uuid,$10::uuid,$11::text,$12::uuid)
+       RETURNING id::text AS "lotId",public_reference AS "lotReference",
+                 expires_on::text AS "expiresOn",produced_at::text AS "producedAt"`,
+      [
+        merchantId,
+        dto.locationId,
+        dto.inventoryLocationId,
+        dto.outputItemId,
+        dto.lotCode ?? mintedLotCode(dto.businessDate),
+        recipe.id,
+        dto.expiresOn,
+        shelfLifeDays,
+        dto.commandId,
+        dto.idempotencyKey,
+        fingerprint,
+        authorization.operatorId,
+      ],
+    );
+    const lot = lotResult.rows[0];
+
+    for (const input of inputs) {
+      await this.appendProductionEntry(client, merchantId, authorization, dto, fingerprint, {
+        correlationId,
+        batchId: lot.lotId,
+        inventoryItemId: input.inventoryItemId,
+        entryType: 'production_consumed',
+        quantity: input.quantity.value,
+        publicData: {
+          productionBatchId: lot.lotId,
+          outputItemId: dto.outputItemId,
+          unitCostMinor: input.unitCostMinor === null ? null : toSafeNumber(input.unitCostMinor),
+        },
+        lotId: null,
+      });
+    }
+
+    // The money of the batch: the cost of the inputs the recipe consumed. One input with
+    // no receipt makes the whole cost UNKNOWN rather than zero, and the batch still posts
+    // with `incompleteCost` stated.
+    const incompleteCost =
+      inputs.length === 0 || inputs.some((input) => input.unitCostMinor === null);
+    const batchCostMinor = incompleteCost
+      ? null
+      : plateCostMinor(
+          inputs.map((input) => ({
+            quantity: BigInt(input.quantity.value),
+            scale: input.quantity.scale,
+            unitCostMinor: input.unitCostMinor as bigint,
+          })),
+        );
+    // Minor units per WHOLE base unit of the output. `declared.value` is at the output
+    // item's scale, so the scale factor moves the batch cost onto one whole unit.
+    const unitCostMinor =
+      batchCostMinor === null
+        ? null
+        : divideRoundHalfUp(batchCostMinor * pow10(produced.scale), BigInt(declared.value));
+    const totalCostMinor =
+      unitCostMinor === null
+        ? null
+        : quantityCostMinor(
+            { value: BigInt(produced.value), scale: produced.scale },
+            unitCostMinor,
+          );
+
+    await this.appendProductionEntry(client, merchantId, authorization, dto, fingerprint, {
+      correlationId,
+      batchId: lot.lotId,
+      inventoryItemId: dto.outputItemId,
+      entryType: 'production_produced',
+      // THE DECLARED BATCH IS CREDITED, NOT THE REPORTED ONE, and the shortfall is
+      // written off below. The ledger then holds TWO real movements whose net is what
+      // the cook actually got, which is the only shape a variance report can decompose:
+      // `actual = opening + produced - closing` and the difference is the yield loss.
+      // Crediting the reported quantity instead would leave the loss as a fact with no
+      // stock effect, and the decomposition could not name it. The declared credit must
+      // come FIRST, or the write-off would drive a fresh prep's balance below zero.
+      quantity: declared.value,
+      publicData: {
+        productionBatchId: lot.lotId,
+        unitCostMinor: unitCostMinor === null ? null : toSafeNumber(unitCostMinor),
+        incompleteCost,
+      },
+      lotId: lot.lotId,
+    });
+
+    const shortfall = BigInt(declared.value) - BigInt(produced.value);
+    if (shortfall > 0n) {
+      await this.appendProductionEntry(client, merchantId, authorization, dto, fingerprint, {
+        correlationId,
+        batchId: lot.lotId,
+        inventoryItemId: dto.outputItemId,
+        entryType: 'production_yield_loss',
+        quantity: toSafeNumber(shortfall),
+        publicData: {
+          productionBatchId: lot.lotId,
+          declaredQuantity: declared.value,
+          producedQuantity: produced.value,
+        },
+        // The write-off belongs to the batch's own lot: the gross credit and this loss
+        // leave the lot holding exactly what came out.
+        lotId: lot.lotId,
+      });
+    }
+
+    const consumed: ConsumedLine[] = inputs.map((input) => {
+      const lineCost =
+        input.unitCostMinor === null
+          ? null
+          : quantityCostMinor(
+              { value: BigInt(input.quantity.value), scale: input.quantity.scale },
+              input.unitCostMinor,
+            );
+      return {
+        inventoryItemId: input.inventoryItemId,
+        publicReference: input.publicReference,
+        displayName: input.displayName,
+        quantity: {
+          value: input.quantity.value,
+          scale: input.quantity.scale,
+          unit: input.quantity.unit as ConsumedLine['quantity']['unit'],
+        },
+        unitCostMinor: input.unitCostMinor === null ? null : toSafeNumber(input.unitCostMinor),
+        lineCostMinor: lineCost === null ? null : toSafeNumber(lineCost),
+      };
+    });
+
+    return {
+      commandId: dto.commandId,
+      lotId: lot.lotId,
+      lotReference: lot.lotReference,
+      outputItemId: dto.outputItemId,
+      declaredQuantity: {
+        value: declared.value,
+        scale: declared.scale,
+        unit: declared.unit as ConsumedLine['quantity']['unit'],
+      },
+      producedQuantity: {
+        value: produced.value,
+        scale: produced.scale,
+        unit: produced.unit as ConsumedLine['quantity']['unit'],
+      },
+      yieldLossQuantity: {
+        value: shortfall > 0n ? toSafeNumber(shortfall) : 0,
+        scale: produced.scale,
+        unit: produced.unit as ConsumedLine['quantity']['unit'],
+      },
+      unitCostMinor: unitCostMinor === null ? null : toSafeNumber(unitCostMinor),
+      totalCostMinor: totalCostMinor === null ? null : toSafeNumber(totalCostMinor),
+      expiresOn: lot.expiresOn,
+      consumed,
+      incompleteCost,
+      correlationId,
+    };
+  }
+
+  /**
+   * The merchant's current business date. The console's production command has no
+   * operator session to carry it, and the ledger stamps every entry with the date the
+   * business calls "today" rather than the browser's clock.
+   */
+  async currentBusinessDate(merchantId: string): Promise<string> {
+    const { rows } = await this.pg.runWithMerchant(merchantId, null, (client) =>
+      client.query<{ businessDate: string }>(
+        `SELECT ((now() AT TIME ZONE m.timezone) - m.business_day_start::interval)::date::text
+                AS "businessDate"
+           FROM merchant.merchant m WHERE m.id=$1::uuid`,
+        [merchantId],
+      ),
+    );
+    const businessDate = rows[0]?.businessDate;
+    if (!businessDate) throw new Error(`currentBusinessDate: no merchant ${merchantId}`);
+    return businessDate;
+  }
+
+  /**
+   * One ledger entry of a production batch, through the ledger's ONE door.
+   *
+   * THE BATCH ID IS THE OUTPUT LOT ID, and every entry of the batch names it as its
+   * source aggregate (plan §8.1). Only the produced entry carries `p_lot_id`: a lot
+   * belongs to one item, and the ledger refuses a lot attached to another item's movement.
+   */
+  private async appendProductionEntry(
+    client: PoolClient,
+    merchantId: string,
+    authorization: InventoryAuthorization,
+    dto: ProduceRequest,
+    fingerprint: string,
+    entry: {
+      correlationId: string;
+      batchId: string;
+      inventoryItemId: string;
+      entryType: string;
+      quantity: number;
+      publicData: Record<string, unknown>;
+      lotId: string | null;
+    },
+  ): Promise<LedgerRow> {
+    const { rows } = await client.query<LedgerRow>(
+      `SELECT (merchant.append_stock_ledger(
+        $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::uuid,$8::uuid,$9,
+        'production_batch',$10::uuid,$11::uuid,$12::uuid,$13,$14::date,$15,
+        null,null,null,null,$16::jsonb,$17::uuid)).*`,
+      [
+        merchantId,
+        dto.locationId,
+        dto.inventoryLocationId,
+        entry.inventoryItemId,
+        entry.entryType,
+        entry.quantity,
+        dto.commandId,
+        dto.idempotencyKey,
+        fingerprint,
+        entry.batchId,
+        authorization.operatorId,
+        authorization.deviceId,
+        authorization.credentialVersion,
+        dto.businessDate,
+        entry.correlationId,
+        JSON.stringify(entry.publicData),
+        entry.lotId,
+      ],
+    );
+    return rows[0];
+  }
+
   private mutationEntry(dto: InventoryAdjustment | WasteRecord | DamageRecord | QuarantineRecord) {
     if ('direction' in dto) {
       return {
@@ -1749,4 +2134,108 @@ export class PosInventoryRepository {
     }
     return { value: Number(converted), scale: item.targetScale, unit: item.baseUnit };
   }
+}
+
+/**
+ * The LEAF inputs of one production batch, one entry per input ITEM.
+ *
+ * The explosion answers an EXACT RATIONAL per row, and several rows can name the same
+ * item when two sub-recipes share an ingredient. The rationals are summed exactly and
+ * divided ONCE at the item's own scale. A division with a remainder is
+ * `INVENTORY_QUANTITY_NOT_EXACT` — the same refusal a sale makes — because a consumed
+ * quantity nobody can hold at the item's scale cannot be posted to the ledger.
+ *
+ * `declaredValue` is the recipe's full yield at the OUTPUT item's scale, and each
+ * explosion row is the quantity for ONE yield unit, so the product is the batch.
+ */
+function productionInputs(
+  rows: readonly ProductionExplosionRow[],
+  declaredValue: number,
+  outputScale: number,
+  unitCosts: Map<string, bigint>,
+): ProductionInput[] {
+  const leaves = new Map<string, { row: ProductionExplosionRow; num: bigint; den: bigint }>();
+  for (const row of rows) {
+    if (row.hasRecipe) continue;
+    const num = productionInteger(row.numerator);
+    const den = productionInteger(row.denominator);
+    if (den <= 0n)
+      throw new Error(`productionInputs: a non-positive denominator: ${row.denominator}`);
+    const existing = leaves.get(row.inventoryItemId);
+    if (!existing) {
+      leaves.set(row.inventoryItemId, { row, num, den });
+      continue;
+    }
+    const numSum = existing.num * den + num * existing.den;
+    const denSum = existing.den * den;
+    const divisor = greatestCommonDivisor(numSum, denSum);
+    existing.num = numSum / divisor;
+    existing.den = denSum / divisor;
+  }
+
+  const inputs: ProductionInput[] = [];
+  for (const entry of leaves.values()) {
+    const numerator = entry.num * BigInt(declaredValue) * pow10(entry.row.quantityScale);
+    const denominator = entry.den * pow10(outputScale);
+    if (numerator % denominator !== 0n) {
+      throw new ConflictException({ code: 'INVENTORY_QUANTITY_NOT_EXACT' });
+    }
+    const value = numerator / denominator;
+    if (value <= 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new ConflictException({ code: 'INVENTORY_QUANTITY_OUT_OF_RANGE' });
+    }
+    inputs.push({
+      inventoryItemId: entry.row.inventoryItemId,
+      publicReference: entry.row.publicReference,
+      displayName: entry.row.displayName,
+      quantity: {
+        value: Number(value),
+        scale: entry.row.quantityScale,
+        unit: entry.row.baseUnit,
+      },
+      unitCostMinor: unitCosts.get(entry.row.inventoryItemId) ?? null,
+    });
+  }
+  // One row per input item, in a stable order, so two reads of one batch agree.
+  inputs.sort((left, right) => left.publicReference.localeCompare(right.publicReference));
+  return inputs;
+}
+
+/**
+ * The batch code a lot gets when the request names none.
+ *
+ * It carries the business date the batch belongs to and a random suffix, because the
+ * code has to be unique per item within one day and legible on a printed label.
+ */
+function mintedLotCode(businessDate: string): string {
+  return `PROD-${businessDate.replace(/-/g, '')}-${randomUUID()
+    .replace(/-/g, '')
+    .slice(0, 8)
+    .toUpperCase()}`;
+}
+
+/**
+ * The explosion's `numeric` factor as an EXACT integer. The factors are whole numbers
+ * by construction, so a fractional part is a defect in the function rather than an
+ * input to round. `inventory-authoring.service.ts` reads the same value the same way for
+ * the editor's cost.
+ */
+function productionInteger(value: string): bigint {
+  const match = /^(-?\d+)(?:\.(\d+))?$/.exec(value.trim());
+  if (!match || (match[2] !== undefined && /[1-9]/.test(match[2]))) {
+    throw new Error(`productionInteger: not an integer: ${value}`);
+  }
+  return BigInt(match[1]);
+}
+
+/** Euclid, on magnitudes: the reducer for two summed explosion rationals. */
+function greatestCommonDivisor(left: bigint, right: bigint): bigint {
+  let a = left < 0n ? -left : left;
+  let b = right < 0n ? -right : right;
+  while (b !== 0n) {
+    const remainder = a % b;
+    a = b;
+    b = remainder;
+  }
+  return a === 0n ? 1n : a;
 }

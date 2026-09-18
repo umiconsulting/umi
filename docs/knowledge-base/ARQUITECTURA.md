@@ -80,6 +80,6 @@ KDS obtiene una instantánea y recibe cambios. Cada comando usa el estado permit
 - API: `apps/umi-api/src/modules/`
 - Worker: `apps/umi-api/src/worker.module.ts` y `apps/umi-api/src/jobs/`
 - POS: `apps/umi-pos/lib/features/`
-- KDS: `apps/umi-kds/Sources/`
+- KDS: `apps/umi-pos/lib/features/kitchen/`
 - Contratos: `packages/contract/`
 - Migraciones: `docs/migration/`

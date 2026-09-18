@@ -1,14 +1,19 @@
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Segmented } from '@/components/segmented.jsx';
 import { Select } from '@/components/select.jsx';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
-import { formatTime } from '@/lib/format.js';
+import { formatDate, formatNumber, formatTime } from '@/lib/format.js';
+import { hasRequiredPermission } from '@/lib/module-registry.js';
 import { RegionHead, XSep } from '@/shell.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { REALTIME_STATE, useDevicesRealtime } from '@/lib/device-realtime.js';
 import {
   locationName,
+  mpPointStoreRefusalCode,
+  mpPointStoreRefusalMessage,
   mobilityLabel,
   platformLabel,
   posDeviceCard,
@@ -17,22 +22,28 @@ import {
 import {
   approvePosEnrollmentRequest,
   approveDevicePairing,
+  bindMpPointTerminal,
+  createMpPointStore,
   createPosEnrollmentRequest,
   createKdsStation,
   deleteKdsStation,
   denyDevicePairing,
   denyPosEnrollmentRequest,
+  disconnectMpPointAccount,
   generateDevicePairingPin,
+  getMpPointAuthorization,
   getPosDevices,
   getPosEnrollmentRequests,
   revokeDevice,
   revokePosDevice,
+  unbindMpPointTerminal,
   updatePosDevice,
   updateDevice,
   updateKdsStation,
   useDevicePairings,
   useDevicesData,
   useKdsStations,
+  useMpPointData,
 } from '@/data.jsx';
 
 // Screen 3 — Devices (KDS)
@@ -42,14 +53,20 @@ import {
 const DEVICE_LIVE_MS = 10_000;
 const DEVICE_OFFLINE_MS = 20_000;
 
-// Derive human-readable last-seen from last_used_at timestamp
-function fmtLastSeen(t, lastUsedAt) {
-  if (!lastUsedAt) return t`nunca`;
+// Derive human-readable last-seen from last_used_at timestamp.
+//
+// ⚠️ `i18n._(msg…)`, not the `t` a component destructures. The `t` macro belongs to the scope
+// that destructures `useLingui()`, so a helper that RECEIVES one gets an untransformed
+// template call, and the runtime answers it with an empty string — every KDS card read
+// "Visto" with nothing after it. The catalog is the proof: none of these five messages was
+// ever extracted from this file, while `data.jsx`/`device-utils.js` carry all of them.
+function fmtLastSeen(i18n, lastUsedAt) {
+  if (!lastUsedAt) return i18n._(msg`nunca`);
   var ms = Date.now() - new Date(lastUsedAt).getTime();
-  if (ms < 10000) return t`hace un momento`;
-  if (ms < 60000) return t`hace ${Math.floor(ms / 1000)} s`;
-  if (ms < 3600000) return t`hace ${Math.floor(ms / 60000)} min`;
-  return t`hace ${Math.floor(ms / 3600000)} h`;
+  if (ms < 10000) return i18n._(msg`hace un momento`);
+  if (ms < 60000) return i18n._(msg`hace ${Math.floor(ms / 1000)} s`);
+  if (ms < 3600000) return i18n._(msg`hace ${Math.floor(ms / 60000)} min`);
+  return i18n._(msg`hace ${Math.floor(ms / 3600000)} h`);
 }
 
 function deriveStatus(lastUsedAt) {
@@ -65,7 +82,7 @@ const POLL_INTERVAL = 10; // seconds — REST fallback and offline detection. Th
 // primary freshness source.
 
 const DevicesScreen = () => {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [refresh, setRefresh] = useState(0);
   const [stationOpen, setStationOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -75,6 +92,15 @@ const DevicesScreen = () => {
   const [posRequests, setPosRequests] = useState([]);
   const [posRequestError, setPosRequestError] = useState(null);
   const [posDevices, setPosDevices] = useState([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The Mercado Pago OAuth callback lands back HERE, with the outcome on the query string.
+  // It is read ONCE, on mount, into this state and then dropped from the URL by the effect
+  // below: a one-shot answer is announced once, a reload does not re-announce a flow that
+  // already finished, and a copied URL carries no verdict from someone else's attempt.
+  const [mpPointResult, setMpPointResult] = useState(function () {
+    const outcome = searchParams.get('mpPoint');
+    return outcome ? { outcome: outcome, code: searchParams.get('code') || null } : null;
+  });
   const {
     capabilities,
     isProductActive,
@@ -89,6 +115,15 @@ const DevicesScreen = () => {
     selectedLocationId || capabilities?.selectedLocation?.id || locations[0]?.id || '';
   const kdsProductEnabled = isProductActive('kds');
   const posProductEnabled = isProductActive('pos');
+  // Which account receives the café's card money is an owner's decision, and the Phase 5
+  // routes are gated on `merchant.manage`. The Devices module's own gate is `device.enroll`,
+  // so a cashier reaches this screen without the permission the Mercado Pago surface needs —
+  // asking anyway would be one 403 per load for a control they cannot use. Same rule, and
+  // same reason, as `_canReadCashSettings` in data.jsx.
+  const canManagePayments = hasRequiredPermission(
+    { permissions: ['merchant.manage'] },
+    capabilities,
+  );
   const deviceProducts = {
     kds: kdsProductEnabled,
     pos: posProductEnabled,
@@ -109,6 +144,17 @@ const DevicesScreen = () => {
       clearInterval(tickId);
     };
   }, []);
+
+  useEffect(
+    function () {
+      if (!searchParams.has('mpPoint') && !searchParams.has('code')) return;
+      const next = new URLSearchParams(searchParams);
+      next.delete('mpPoint');
+      next.delete('code');
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const { data: rawDevices, loaded } = useDevicesData(refresh);
   // `loading` is true on EVERY background poll (8-s), not only on the first load, so the
@@ -177,8 +223,8 @@ const DevicesScreen = () => {
       hasHeartbeat: !!hbStatus,
       open: d.open || 0,
       last: hbSeenMs
-        ? fmtLastSeen(t, new Date(hbSeenMs).toISOString())
-        : fmtLastSeen(t, d.last_used_at),
+        ? fmtLastSeen(i18n, new Date(hbSeenMs).toISOString())
+        : fmtLastSeen(i18n, d.last_used_at),
       pin: d.pin || '• • • • • •',
       model: d.model || 'iPad',
       ip: d.ip || '—',
@@ -239,6 +285,10 @@ const DevicesScreen = () => {
           </>
         }
       />
+
+      {mpPointResult && (
+        <MpPointCallbackNotice result={mpPointResult} onDismiss={() => setMpPointResult(null)} />
+      )}
 
       {/* Devices grid */}
       <div className="grid grid-2" style={{ gap: 12 }}>
@@ -417,6 +467,16 @@ const DevicesScreen = () => {
           locations={locations}
           branchId={effectiveLocationId}
           onChanged={() => setRefresh((r) => r + 1)}
+        />
+      )}
+
+      {posProductEnabled && canManagePayments && (
+        <MercadoPagoPointCard
+          refresh={refresh}
+          onChanged={() => setRefresh((r) => r + 1)}
+          registers={posCards}
+          locations={locations}
+          branchId={effectiveLocationId}
         />
       )}
 
@@ -967,7 +1027,15 @@ const PairingRequestsCard = ({ pairings, stations, currentTime, onChanged }) => 
       style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}
     >
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          // Two icon+text buttons beside a title: on a narrow console the row wraps rather
+          // than pushing them past the card's edge.
+          flexWrap: 'wrap',
+        }}
       >
         <div>
           <div className="eyebrow">
@@ -2224,6 +2292,1153 @@ const PosEnrollmentRequestsCard = ({ requests, error, locations, branchId, onCha
           })}
         </div>
       )}
+    </section>
+  );
+};
+
+/**
+ * The vendor's own outcome vocabulary, as the callback spells it. An outcome that is not
+ * in this table is reported as unknown rather than guessed at, and `code` (the vendor's
+ * refusal code) rides BESIDE the sentence: the sentence is what a seller can act on, the
+ * code is what a support conversation quotes.
+ */
+const MP_POINT_CALLBACK_OUTCOMES = {
+  connected: { tone: 'success', message: msg`Cuenta de Mercado Pago conectada.` },
+  failed: { tone: 'danger', message: msg`Mercado Pago rechazó la conexión.` },
+  invalid_state: {
+    tone: 'warning',
+    message: msg`La invitación ya no era válida. Inicia la conexión otra vez.`,
+  },
+  missing_code: {
+    tone: 'warning',
+    message: msg`Mercado Pago no devolvió el código de autorización.`,
+  },
+  unavailable: {
+    tone: 'warning',
+    message: msg`Este servidor no está configurado para conectar cuentas de Mercado Pago.`,
+  },
+};
+
+const MP_POINT_NOTICE_TONES = {
+  success: { fg: 'var(--success)', bg: 'var(--success-soft)', Icon: I.Check },
+  warning: { fg: 'var(--warning)', bg: 'var(--warning-soft)', Icon: I.AlertTriangle },
+  danger: { fg: 'var(--danger)', bg: 'var(--danger-soft)', Icon: I.AlertTriangle },
+};
+
+/**
+ * One line about the flow that just finished, and a way to dismiss it. It is a `status`
+ * rather than an `alert` because it arrives with the page, not during it.
+ */
+export const MpPointCallbackNotice = ({ result, onDismiss }) => {
+  const { t, i18n } = useLingui();
+  if (!result) return null;
+  const known = MP_POINT_CALLBACK_OUTCOMES[result.outcome];
+  const tone = MP_POINT_NOTICE_TONES[known ? known.tone : 'warning'];
+  const Icon = tone.Icon;
+  return (
+    <div
+      role="status"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        color: tone.fg,
+        background: tone.bg,
+        borderRadius: 12,
+        padding: '10px 12px',
+      }}
+    >
+      <Icon size={15} />
+      <span style={{ fontSize: 13, fontWeight: 550 }}>
+        {known
+          ? i18n._(known.message)
+          : i18n._(msg`No se pudo confirmar la conexión con Mercado Pago.`)}
+      </span>
+      {result.code ? (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, opacity: 0.75 }}>
+          {result.code}
+        </span>
+      ) : null}
+      <button
+        className="btn-icon focusable"
+        style={{ marginLeft: 'auto' }}
+        onClick={onDismiss}
+        aria-label={t`Cerrar`}
+      >
+        <I.X size={14} />
+      </button>
+    </div>
+  );
+};
+
+/**
+ * D8's renewal margin: the job starts renewing a token 14 days before it expires, and the
+ * owner alert of §7 item 4 watches the same window. The console paints that window so a
+ * café does not discover the lapse at the counter.
+ *
+ * The DAYS are never computed here: `daysUntilExpiry` is the server's, floored by the
+ * server, so this card and the alert cannot disagree about what "12 days" means.
+ */
+const MP_POINT_RENEWAL_WINDOW_DAYS = 14;
+
+const MP_POINT_MODE_LABELS = {
+  PDV: msg`PDV`,
+  STANDALONE: msg`Autónomo`,
+};
+
+const MP_POINT_ERROR_MESSAGES = {
+  MP_POINT_CREDENTIAL_ABSENT: msg`Conecta la cuenta de Mercado Pago antes de configurar terminales.`,
+  MP_POINT_TERMINAL_UNKNOWN: msg`Ese terminal ya no está en la cuenta. Actualiza la lista.`,
+  MP_POINT_OAUTH_UNAVAILABLE: msg`Este servidor no está configurado para conectar cuentas de Mercado Pago.`,
+  LOCATION_REQUIRED: msg`Elige una sucursal antes de asignar el terminal.`,
+  PERMISSION_DENIED: msg`Tu usuario no puede administrar los pagos de este negocio.`,
+};
+
+function mpPointErrorMessage(i18n, err) {
+  const known = MP_POINT_ERROR_MESSAGES[err && err.code];
+  return known ? i18n._(known) : i18n._(msg`No se pudo completar la acción. Intenta de nuevo.`);
+}
+
+/**
+ * The token's life, in the words of the seller rather than of the OAuth spec.
+ *
+ * These two take `i18n` and a `msg` descriptor rather than the `t` a component destructures:
+ * the `t` macro is bound to the scope that destructures `useLingui()`, so a module-level
+ * helper that RECEIVES a `t` gets a runtime call with no message behind it. `i18n._(msg…)`
+ * is the form this module already uses for its out-of-component copy (see
+ * `pairingErrorMessage`).
+ */
+function mpPointExpiryLine(i18n, status) {
+  const days = status.daysUntilExpiry;
+  if (days === null) {
+    return status.expiresAt
+      ? i18n._(msg`El acceso vence el ${formatDate(status.expiresAt)}`)
+      : null;
+  }
+  const date = formatDate(status.expiresAt);
+  if (days < 0) return i18n._(msg`El acceso venció el ${date}`);
+  if (days === 0) return i18n._(msg`El acceso vence hoy`);
+  if (days === 1) return i18n._(msg`El acceso vence en 1 día (${date})`);
+  return i18n._(msg`El acceso vence en ${formatNumber(days)} días (${date})`);
+}
+
+/** D8's failure trail, said with its count so an owner can tell one hiccup from a pattern. */
+function mpPointRefreshFailure(i18n, status) {
+  const date = formatDate(status.refreshFailedAt);
+  return status.refreshAttempts === 1
+    ? i18n._(msg`La última renovación falló el ${date} (1 intento).`)
+    : i18n._(
+        msg`La última renovación falló el ${date} (${formatNumber(status.refreshAttempts)} intentos).`,
+      );
+}
+
+/**
+ * ONE TERMINAL, AND THE TWO THINGS THAT DECIDE HOW IT TAKES MONEY.
+ *
+ * The mode switch and the register share a row because they share a write: the bind route
+ * takes the complete binding, so a mode switch that did not restate the register (or the
+ * reverse) would be a half-write. A terminal that is not bound to a register yet has
+ * nowhere to put a mode — the draft is held here and saved with the binding, which is what
+ * the row says out loud rather than pretending the switch already saved something.
+ */
+const MpPointTerminalRow = ({
+  terminal,
+  registers,
+  locations,
+  mode,
+  busy,
+  onModeChange,
+  onRegisterChange,
+  onDisconnect,
+}) => {
+  const { t, i18n } = useLingui();
+  const register = (registers || []).find((r) => r.id === terminal.deviceId) || null;
+  const bound = Boolean(terminal.deviceId);
+  // A terminal the vendor lists as bound to a register this branch's list does not hold is
+  // NOT an unbound terminal: it belongs to another register (a branch the operator is not
+  // looking at, or one that was renamed away). Saying "sin registro" for it would be a lie,
+  // and naming the branch is only worth a chip when we actually know the name.
+  const branch = (locations || []).find((l) => l.id === terminal.locationId) || null;
+  const registerLabel = register ? register.name : bound ? t`Otro registro` : t`Sin registro`;
+  const modeLabel = MP_POINT_MODE_LABELS[terminal.operatingMode];
+  return (
+    <div className="list-card admin" style={{ padding: '14px 16px 14px 0', alignItems: 'stretch' }}>
+      <div className="l-strip" />
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}
+        >
+          <span
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 9,
+              background: 'var(--canvas-2)',
+              color: 'var(--umi-navy)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <I.CreditCard size={15} />
+          </span>
+          <span
+            title={terminal.terminalId}
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12.5,
+              color: 'var(--ink-1)',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {terminal.terminalId}
+          </span>
+          <span
+            className="chip"
+            style={{
+              fontSize: 10,
+              height: 20,
+              flexShrink: 0,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+            }}
+          >
+            {modeLabel ? i18n._(modeLabel) : terminal.operatingMode}
+          </span>
+          <span
+            className="chip"
+            style={{
+              fontSize: 10,
+              height: 20,
+              flexShrink: 0,
+              color: register ? undefined : 'var(--ink-3)',
+            }}
+          >
+            {registerLabel}
+          </span>
+          {!register && branch ? (
+            <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
+              {branch.name}
+            </span>
+          ) : null}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <span className="field-label">
+              <Trans>Modo</Trans>
+            </span>
+            <Segmented
+              label={t`Modo de operación del terminal`}
+              value={mode}
+              options={[
+                { id: 'PDV', label: 'PDV' },
+                { id: 'STANDALONE', label: i18n._(MP_POINT_MODE_LABELS.STANDALONE) },
+              ]}
+              onChange={onModeChange}
+            />
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span className="field-label">
+              <Trans>Registro</Trans>
+            </span>
+            <Select
+              className="select"
+              style={{ height: 40, minWidth: 170 }}
+              value={terminal.deviceId || ''}
+              disabled={Boolean(busy)}
+              onChange={(event) => {
+                const deviceId = event.target.value;
+                if (deviceId && deviceId !== terminal.deviceId) onRegisterChange(deviceId);
+              }}
+            >
+              <option value="">{t`Elige un registro`}</option>
+              {terminal.deviceId && !register ? (
+                <option value={terminal.deviceId}>{t`Otro registro`}</option>
+              ) : null}
+              {(registers || []).map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </span>
+          {bound && (
+            <button
+              className="btn btn-ghost btn-sm focusable"
+              style={{ color: 'var(--danger)' }}
+              disabled={Boolean(busy)}
+              onClick={onDisconnect}
+            >
+              <I.Power size={14} />{' '}
+              {busy === 'unbind' ? (
+                <Trans>Quitando…</Trans>
+              ) : (
+                // NOT "Desconectar". That word belongs to the account above, and the two are
+                // different acts: this one takes a terminal off a register and leaves the
+                // café connected, and an operator who confuses them would unlink an account
+                // while meaning to move a device.
+                <Trans>Quitar del registro</Trans>
+              )}
+            </button>
+          )}
+          {busy ? (
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+              <Trans>Guardando…</Trans>
+            </span>
+          ) : !bound ? (
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+              <Trans>El modo se guarda al asignar un registro.</Trans>
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BLANK_MP_POINT_STORE = {
+  name: '',
+  streetName: '',
+  streetNumber: '',
+  cityName: '',
+  stateName: '',
+  latitude: '',
+  longitude: '',
+  reference: '',
+};
+
+/**
+ * THE ADDRESS THE VENDOR WILL NOT LET US GUESS — the one form on this screen a person fills.
+ *
+ * The vendor requires a store before it holds a point of sale, and it validates the address
+ * against its own catalogue: `location.city_name` is refused unless it matches a closed list
+ * of accented names (research note 01 §6.2, observed live — `Culiacan` refused, `Culiacán`
+ * accepted). So the city is FREE TEXT, our own code validates nothing about it, and the ONE
+ * thing that corrects a refusal is the vendor's own code coming back — `invalid_city` is a
+ * different fix from `invalid_street_number`, and the sheet must say which one it was.
+ *
+ * Every field except the landmark is required, because the alternative to a required address
+ * is a program inventing where a business is: the vendor states the stake itself, that
+ * incorrect location data "can cause errors in tax calculations".
+ */
+export const MpPointStoreSheet = ({ onClose, onCreated }) => {
+  const { t, i18n } = useLingui();
+  const uid = useId();
+  const [form, setForm] = useState(BLANK_MP_POINT_STORE);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const firstField = useRef(null);
+  const errorRef = useRef(null);
+
+  const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  useEffect(() => {
+    firstField.current?.focus();
+  }, []);
+
+  // A refusal lands BELOW the last field, which on a phone is below the fold — the operator
+  // who just pressed the button would be looking at an unchanged screen and conclude nothing
+  // happened. The alert is brought into view instead, and `nearest` scrolls only as far as it
+  // has to, so a desktop reader who can already see it is not moved.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [error]);
+
+  // Escape closes, unless a create is in flight — the one keyboard behaviour a panel like
+  // this owes the reader.
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, saving]);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await createMpPointStore({
+        name: form.name.trim(),
+        streetName: form.streetName.trim(),
+        streetNumber: form.streetNumber.trim(),
+        cityName: form.cityName.trim(),
+        stateName: form.stateName.trim(),
+        // A blank box is NOT 0,0 — that is a real point in the Gulf of Guinea, and the vendor
+        // would file it as the business's fiscal address. Blank becomes NaN, which the
+        // contract's numeric range refuses; the browser's own `required` is what keeps this
+        // from being reachable in the first place.
+        latitude: form.latitude.trim() === '' ? Number.NaN : Number(form.latitude),
+        longitude: form.longitude.trim() === '' ? Number.NaN : Number(form.longitude),
+        reference: form.reference.trim() || null,
+      });
+      // The card re-reads rather than assuming: what the vendor kept is what the terminal
+      // list reports, and the store id a person seeks is the vendor's, not ours.
+      onCreated();
+    } catch (failure) {
+      console.error('[mp-point] store creation failed', failure);
+      setError(failure);
+      setSaving(false);
+    }
+  }
+
+  const refusalCode = mpPointStoreRefusalCode(error);
+
+  return (
+    <>
+      <div className="sheet-backdrop" onClick={saving ? undefined : onClose} />
+      <form
+        className="sheet"
+        onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`${uid}-store-title`}
+      >
+        <div className="sheet-head">
+          <div className="titles">
+            <div className="eyebrow">{t`Mercado Pago Point`}</div>
+            <h2 id={`${uid}-store-title`} style={{ margin: '6px 0 0' }}>
+              <Trans>Tienda del negocio</Trans>
+            </h2>
+          </div>
+          <button
+            type="button"
+            className="btn-icon focusable"
+            onClick={onClose}
+            aria-label={t`Cerrar`}
+            disabled={saving}
+          >
+            <I.X size={18} />
+          </button>
+        </div>
+
+        <div className="sheet-body">
+          <div className="field">
+            <label htmlFor={`${uid}-store-name`}>
+              <Trans>Nombre del negocio</Trans>
+            </label>
+            <input
+              id={`${uid}-store-name`}
+              ref={firstField}
+              className="input"
+              value={form.name}
+              onChange={set('name')}
+              required
+              maxLength={120}
+            />
+          </div>
+
+          <div className="grid grid-2">
+            <div className="field">
+              <label htmlFor={`${uid}-store-street`}>
+                <Trans>Calle</Trans>
+              </label>
+              <input
+                id={`${uid}-store-street`}
+                className="input"
+                value={form.streetName}
+                onChange={set('streetName')}
+                required
+                maxLength={120}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor={`${uid}-store-number`}>
+                <Trans>Número</Trans>
+              </label>
+              {/* A string at the vendor, so it stays a string here: "12-B" is a street number. */}
+              <input
+                id={`${uid}-store-number`}
+                className="input"
+                value={form.streetNumber}
+                onChange={set('streetNumber')}
+                required
+                maxLength={20}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-2">
+            <div className="field">
+              <label htmlFor={`${uid}-store-city`}>
+                <Trans>Ciudad</Trans>
+              </label>
+              <input
+                id={`${uid}-store-city`}
+                className="input"
+                value={form.cityName}
+                onChange={set('cityName')}
+                required
+                maxLength={80}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor={`${uid}-store-state`}>
+                {/* NOT bare "Estado": every other screen in this app uses that word for
+                    status, and the shared catalog would hand an English reader "Status" for
+                    the vendor's `state_name`. */}
+                <Trans>Estado de la dirección</Trans>
+              </label>
+              <input
+                id={`${uid}-store-state`}
+                className="input"
+                value={form.stateName}
+                onChange={set('stateName')}
+                required
+                maxLength={80}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-2">
+            <div className="field">
+              <label htmlFor={`${uid}-store-latitude`}>
+                <Trans>Latitud</Trans>
+              </label>
+              <input
+                id={`${uid}-store-latitude`}
+                className="input"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min={-90}
+                max={90}
+                value={form.latitude}
+                onChange={set('latitude')}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor={`${uid}-store-longitude`}>
+                <Trans>Longitud</Trans>
+              </label>
+              <input
+                id={`${uid}-store-longitude`}
+                className="input"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                min={-180}
+                max={180}
+                value={form.longitude}
+                onChange={set('longitude')}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor={`${uid}-store-reference`}>
+              <Trans>Referencia · opcional</Trans>
+            </label>
+            <input
+              id={`${uid}-store-reference`}
+              className="input"
+              value={form.reference}
+              onChange={set('reference')}
+              maxLength={160}
+            />
+          </div>
+
+          {/* One honest line about the ONE validator in this path, and nothing about a
+              validation of ours that does not exist: the city is free text and stays as the
+              operator typed it, accents and all. */}
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--ink-3)' }}>
+            <Trans>
+              La dirección la valida Mercado Pago. Si rechaza la ciudad, usa el nombre exacto que
+              registra la cuenta.
+            </Trans>
+          </p>
+
+          {error && (
+            <div
+              ref={errorRef}
+              role="alert"
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 8,
+                flexWrap: 'wrap',
+                color: 'var(--danger)',
+                background: 'var(--danger-soft)',
+                borderRadius: 10,
+                padding: '10px 12px',
+              }}
+            >
+              <span style={{ fontSize: 12.5, fontWeight: 550 }}>
+                {mpPointStoreRefusalMessage(i18n, error)}
+              </span>
+              {refusalCode ? (
+                <span
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)' }}
+                >
+                  {refusalCode}
+                </span>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div className="sheet-foot">
+          <button
+            type="button"
+            className="btn btn-secondary focusable"
+            onClick={onClose}
+            disabled={saving}
+          >
+            <Trans>Cancelar</Trans>
+          </button>
+          <button type="submit" className="btn btn-primary focusable" disabled={saving}>
+            {saving ? <Trans>Creando…</Trans> : <Trans>Crear tienda</Trans>}
+          </button>
+        </div>
+      </form>
+    </>
+  );
+};
+
+/**
+ * THE CAFÉ'S STORE, AS THE ACCOUNT'S TERMINALS REPORT IT — and the command that opens one.
+ *
+ * IT IS DERIVED FROM THE TERMINALS ON PURPOSE. There is no route of ours that reads the
+ * vendor's store back, so a terminal reporting a store id is what proves the account has one;
+ * the id is shown VERBATIM, because the vendor's store has a name we were never told and
+ * inventing one would be a lie. A café with no such terminal is exactly the state the create
+ * command exists for.
+ *
+ * The command hides itself once the store exists: opening a second store with a second fiscal
+ * address is the one thing this section must never invite, and the sheet it opens says why the
+ * address is the operator's to type.
+ */
+export const MpPointStoreSection = ({ terminals, onChanged }) => {
+  const { t } = useLingui();
+  const [storeOpen, setStoreOpen] = useState(false);
+  const list = terminals || [];
+  const storedTerminals = list.filter((terminal) => Boolean(terminal.storeId));
+  const storeId = storedTerminals.length > 0 ? storedTerminals[0].storeId : null;
+
+  return (
+    <>
+      <div className="eyebrow" style={{ marginTop: 18 }}>
+        <Trans>Tienda</Trans>
+      </div>
+      {storeId ? (
+        <div
+          className="list-card registered"
+          style={{ padding: '14px 18px 14px 0', marginTop: 12, alignItems: 'stretch' }}
+        >
+          <div className="l-strip" />
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: 'var(--canvas-2)',
+                color: 'var(--umi-navy)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <I.Store size={18} />
+            </span>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  marginBottom: 3,
+                }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  <Trans>Tienda creada</Trans>
+                </span>
+                <span
+                  className="chip"
+                  title={t`Tienda de Mercado Pago`}
+                  style={{
+                    height: 20,
+                    fontSize: 10.5,
+                    fontFamily: 'var(--font-mono)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {storeId}
+                </span>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
+                <Plural
+                  value={storedTerminals.length}
+                  one="Este terminal está conciliado con esta tienda."
+                  other="Estos # terminales están conciliados con esta tienda."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="list-card admin"
+          style={{ padding: '14px 18px 14px 0', marginTop: 12, alignItems: 'stretch' }}
+        >
+          <div className="l-strip" />
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: 'var(--canvas-2)',
+                color: 'var(--umi-navy)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <I.Store size={18} />
+            </span>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)' }}>
+                <Trans>Sin tienda</Trans>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>
+                <Trans>
+                  Mercado Pago pide la dirección del negocio antes de dar de alta la tienda donde
+                  cobran los terminales.
+                </Trans>
+              </div>
+            </div>
+            <button className="btn btn-primary focusable" onClick={() => setStoreOpen(true)}>
+              <I.Plus size={16} /> <Trans>Crear tienda</Trans>
+            </button>
+          </div>
+        </div>
+      )}
+      {storeOpen && (
+        <MpPointStoreSheet
+          onClose={() => setStoreOpen(false)}
+          // Re-read rather than assume: the store id the operator looks for next is the
+          // VENDOR's, and it reaches this screen only through the terminal list.
+          onCreated={() => {
+            setStoreOpen(false);
+            onChanged && onChanged();
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+/**
+ * THE CAFÉ'S OWN MERCADO PAGO ACCOUNT, ITS STORE, AND THE TERMINALS IT LISTS — Phase 5.
+ *
+ * FOUR THINGS, IN ONE PLACE, IN THE ORDER THE OWNER NEEDS THEM: whether an account is
+ * connected (and how much life its token has), the connect/reconnect action that changes it,
+ * the store the vendor opens the point of sale inside (`MpPointStoreSection`, its own unit
+ * because it is a resource of the ACCOUNT rather than of a terminal), and the terminals of
+ * that account with the register each one belongs to. The connect action is what makes the
+ * rest true: the store and the terminal list are read WITH THE CAFÉ'S TOKEN, so an unconnected
+ * café is told to connect rather than being handed a vendor error it cannot act on.
+ */
+export const MercadoPagoPointCard = ({ refresh, onChanged, registers, locations, branchId }) => {
+  const { t, i18n } = useLingui();
+  const { data, loading, error, loaded } = useMpPointData(refresh);
+  const [busy, setBusy] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  // A mode chosen before a register exists, per terminal. It is a DRAFT and the row says
+  // so; it is written by the same call that writes the binding, and dropped once the
+  // server's answer is what the list reads from.
+  const [draftModes, setDraftModes] = useState({});
+
+  const status = data ? data.status : null;
+  const terminals = data ? data.terminals : null;
+  const connected = Boolean(status && status.connected);
+  const firstLoad = loading && !loaded;
+  const refreshFailed = Boolean(status && status.refreshFailedAt);
+  const expiryDays = status ? status.daysUntilExpiry : null;
+
+  async function connect() {
+    setBusy('connect');
+    setActionError(null);
+    try {
+      const authorization = await getMpPointAuthorization();
+      // A FULL navigation, not a fetch: the seller approves at the vendor, and the
+      // callback brings the browser back to /devices with the outcome on the query string.
+      window.location.assign(authorization.url);
+    } catch (failure) {
+      console.error('[mp-point] authorization failed', failure);
+      setActionError(mpPointErrorMessage(i18n, failure));
+      setBusy(null);
+    }
+  }
+
+  /**
+   * STOP CHARGING THIS ACCOUNT. Not `connect`'s inverse in the vendor's own terms — the
+   * authorization is revoked at Mercado Pago and the material is erased here — but it is the
+   * inverse for the seller, who wants the card method to stop being offered on this café.
+   *
+   * The server answers with the status AFTER the change, so the reload is not an assumption:
+   * `refresh` re-reads, and the screen draws the connect prompt because that is what the
+   * account now is.
+   */
+  async function unlinkAccount() {
+    setBusy('unlink');
+    setActionError(null);
+    try {
+      await disconnectMpPointAccount();
+      forgetDraftAll();
+      onChanged && onChanged();
+    } catch (failure) {
+      console.error('[mp-point] account unlink failed', failure);
+      setActionError(mpPointErrorMessage(i18n, failure));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** An unlinked account has no terminals, so every held draft describes nothing. */
+  function forgetDraftAll() {
+    setDraftModes({});
+  }
+
+  function forgetDraft(terminalId) {
+    setDraftModes((drafts) => {
+      if (!(terminalId in drafts)) return drafts;
+      const next = Object.assign({}, drafts);
+      delete next[terminalId];
+      return next;
+    });
+  }
+
+  async function bind(terminal, next) {
+    const deviceId = next.deviceId || terminal.deviceId;
+    const register = (registers || []).find((r) => r.id === deviceId) || null;
+    // The register's own location, then the terminal's, then the branch on screen: the
+    // route needs a location for the binding and none of the three is a guess about it.
+    const locationId = (register && register.locationId) || terminal.locationId || branchId;
+    const operatingMode =
+      next.operatingMode || draftModes[terminal.terminalId] || terminal.operatingMode;
+    if (!deviceId) {
+      setActionError(t`Elige un registro para guardar el terminal.`);
+      return;
+    }
+    if (!locationId) {
+      setActionError(i18n._(MP_POINT_ERROR_MESSAGES.LOCATION_REQUIRED));
+      return;
+    }
+    setBusy('bind:' + terminal.terminalId);
+    setActionError(null);
+    try {
+      await bindMpPointTerminal(terminal.terminalId, { deviceId, locationId, operatingMode });
+      forgetDraft(terminal.terminalId);
+      onChanged && onChanged();
+    } catch (failure) {
+      console.error('[mp-point] terminal bind failed', failure);
+      setActionError(mpPointErrorMessage(i18n, failure));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function disconnect(terminal) {
+    setBusy('unbind:' + terminal.terminalId);
+    setActionError(null);
+    try {
+      await unbindMpPointTerminal(terminal.terminalId);
+      forgetDraft(terminal.terminalId);
+      onChanged && onChanged();
+    } catch (failure) {
+      console.error('[mp-point] terminal unbind failed', failure);
+      setActionError(mpPointErrorMessage(i18n, failure));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const list = terminals || [];
+  const expiryLine = status ? mpPointExpiryLine(i18n, status) : null;
+  const expiryTone =
+    expiryDays === null
+      ? 'var(--ink-3)'
+      : expiryDays < 0
+        ? 'var(--danger)'
+        : expiryDays <= MP_POINT_RENEWAL_WINDOW_DAYS
+          ? 'var(--warning)'
+          : 'var(--ink-3)';
+
+  return (
+    <section className="card fade-up d3" style={{ padding: '18px 22px' }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}
+      >
+        <div>
+          <div className="eyebrow">{t`Mercado Pago Point`}</div>
+          <h2 className="h-section" style={{ marginTop: 4 }}>
+            <Trans>Cuenta y terminales</Trans>
+          </h2>
+        </div>
+        <button className="btn btn-ghost btn-sm focusable" onClick={onChanged}>
+          <I.Refresh size={14} /> <Trans>Actualizar</Trans>
+        </button>
+      </div>
+
+      {(error || actionError) && (
+        <div
+          role="alert"
+          style={{
+            marginTop: 12,
+            color: 'var(--danger)',
+            background: 'var(--danger-soft)',
+            borderRadius: 10,
+            padding: '9px 12px',
+          }}
+        >
+          {actionError || error}
+        </div>
+      )}
+
+      {firstLoad ? (
+        <p style={{ color: 'var(--ink-3)', margin: '12px 0 0' }}>
+          <Trans>Consultando la cuenta…</Trans>
+        </p>
+      ) : !status ? null : !connected ? (
+        <div
+          className="list-card"
+          style={{ padding: '14px 18px 14px 0', marginTop: 12, alignItems: 'stretch' }}
+        >
+          <div className="l-strip" />
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: 'var(--canvas-2)',
+                color: 'var(--umi-navy)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <I.Wallet size={18} />
+            </span>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)' }}>
+                <Trans>Sin conectar</Trans>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>
+                <Trans>
+                  Conecta la cuenta de Mercado Pago que recibe el dinero de este negocio.
+                </Trans>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary focusable"
+              disabled={busy === 'connect'}
+              style={{ opacity: busy === 'connect' ? 0.6 : 1 }}
+              onClick={connect}
+            >
+              <I.ArrowRight size={16} />{' '}
+              {busy === 'connect' ? <Trans>Abriendo…</Trans> : <Trans>Conectar cuenta</Trans>}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={'list-card ' + (refreshFailed ? 'rotation' : 'registered')}
+          style={{ padding: '14px 18px 14px 0', marginTop: 12, alignItems: 'stretch' }}
+        >
+          <div className="l-strip" />
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: 'var(--canvas-2)',
+                color: 'var(--umi-navy)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <I.Wallet size={18} />
+            </span>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  marginBottom: 3,
+                }}
+              >
+                <span className={'s-dot ' + (refreshFailed ? 'slow' : 'live')} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)' }}>
+                  {refreshFailed ? <Trans>Conectado, con avisos</Trans> : <Trans>Conectado</Trans>}
+                </span>
+                {status.mpUserId ? (
+                  <span
+                    className="chip"
+                    style={{
+                      height: 20,
+                      fontSize: 10.5,
+                      fontFamily: 'var(--font-mono)',
+                      flexShrink: 0,
+                    }}
+                    title={t`Cuenta de Mercado Pago`}
+                  >
+                    {status.mpUserId}
+                  </span>
+                ) : null}
+              </div>
+              <div style={{ fontSize: 12.5, color: expiryTone }}>
+                {expiryLine}
+                {refreshFailed ? (
+                  <span style={{ color: 'var(--danger)' }}>
+                    {expiryLine ? ' · ' : null}
+                    {mpPointRefreshFailure(i18n, status)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <button
+                className="btn btn-secondary focusable"
+                disabled={busy === 'connect'}
+                style={{ opacity: busy === 'connect' ? 0.6 : 1 }}
+                onClick={connect}
+              >
+                <I.Refresh size={14} />{' '}
+                {busy === 'connect' ? <Trans>Abriendo…</Trans> : <Trans>Reconectar</Trans>}
+              </button>
+              <button
+                className="btn btn-secondary focusable"
+                disabled={busy === 'unlink'}
+                style={{ opacity: busy === 'unlink' ? 0.6 : 1 }}
+                onClick={unlinkAccount}
+                title={t`Dejar de cobrar en la cuenta de este negocio`}
+              >
+                <I.X size={14} />{' '}
+                {busy === 'unlink' ? (
+                  <Trans>Desconectando…</Trans>
+                ) : (
+                  <Trans>Desconectar cuenta</Trans>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* THE STORE COMES BEFORE THE TERMINALS, in the order the work happens: the vendor
+          requires the store to exist before it holds a point of sale. */}
+      {status && connected ? <MpPointStoreSection terminals={list} onChanged={onChanged} /> : null}
+
+      {/* The list is the ACCOUNT's, so there is nothing honest to say about it until the
+          account has been read: a failed status call is not an empty terminal list. */}
+      {status ? (
+        <>
+          <div className="eyebrow" style={{ marginTop: 18 }}>
+            <Trans>Terminales</Trans>
+          </div>
+          {!connected ? (
+            <p style={{ color: 'var(--ink-3)', margin: '8px 0 0' }}>
+              <Trans>Conecta la cuenta para ver sus terminales.</Trans>
+            </p>
+          ) : list.length === 0 ? (
+            <p style={{ color: 'var(--ink-3)', margin: '8px 0 0' }}>
+              <Trans>Esta cuenta de Mercado Pago no tiene terminales.</Trans>
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              {list.map((terminal) => {
+                const rowBusy =
+                  busy === 'bind:' + terminal.terminalId
+                    ? 'bind'
+                    : busy === 'unbind:' + terminal.terminalId
+                      ? 'unbind'
+                      : null;
+                return (
+                  <MpPointTerminalRow
+                    key={terminal.terminalId}
+                    terminal={terminal}
+                    registers={registers}
+                    locations={locations}
+                    mode={draftModes[terminal.terminalId] || terminal.operatingMode}
+                    busy={rowBusy}
+                    onModeChange={(mode) => {
+                      if (!terminal.deviceId) {
+                        // No binding yet, so there is nowhere to write it: the draft is held
+                        // and the row says it will be saved with the register. Writing it
+                        // would need a register the seller has not chosen.
+                        setDraftModes((drafts) =>
+                          Object.assign({}, drafts, { [terminal.terminalId]: mode }),
+                        );
+                        return;
+                      }
+                      bind(terminal, { operatingMode: mode });
+                    }}
+                    onRegisterChange={(deviceId) => bind(terminal, { deviceId: deviceId })}
+                    onDisconnect={() => disconnect(terminal)}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : null}
     </section>
   );
 };

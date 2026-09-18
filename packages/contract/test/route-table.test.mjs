@@ -31,6 +31,19 @@ const PENDING = new Map([
   ['auth.globalLogout', 'Gate 2.3: auth.controller global logout'],
   // Gate 2.3 — the POS surface proper
   ...['pos.operatorLock', 'pos.operatorEnd'].map((id) => [id, 'Gate 2.3: modules/pos-*']),
+  // Recipes and inventory authoring (recipes module plan §11, phase 0): the contract,
+  // the route table and the error codes land first, and each handler lands with its
+  // own phase. None of these READS has a controller yet.
+  //
+  // The cluster's WRITES are not routes at all: plan D15 makes each one an
+  // administrative command on `merchants.administrativeCommands`. They join
+  // `ADMINISTRATIVE_COMMAND_POLICIES` with their services, which is why no path for
+  // them appears here.
+  //
+  // NOTHING FROM THAT CLUSTER IS PENDING ANY MORE. Phase 1 landed the three item reads,
+  // phase 2 landed both recipe reads, phase 3 landed production, the prep list, its
+  // labels and the recall, phase 4 landed the variance, the cost history and the menu
+  // classes, and phase 5 landed the supplier invoice inbox, so each left this list.
 ]);
 
 const METHOD_DECORATOR = /@(Get|Post|Patch|Put|Delete)\(([^)]*)\)/g;
