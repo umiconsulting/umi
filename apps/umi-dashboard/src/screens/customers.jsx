@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, Suspense } from 'react';
+import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
@@ -6,6 +6,7 @@ import { I } from '@/icons.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
 import { XSep } from '@/shell.jsx';
 import { Segmented } from '@/components/segmented.jsx';
+import { PageHead } from '@/components/page-head.jsx';
 import {
   creditLoyaltySeals,
   loyaltyScan,
@@ -84,6 +85,13 @@ function ProductChip({ product, icon, label }) {
   );
 }
 
+/**
+ * One customer in the list. The row carries the four facts a person picks a
+ * customer by: the initials, the name, the phone, and the value. The product
+ * icons, the last-touch date, and the data-quality flag moved to the profile
+ * pane, which already shows all three. The audit of 2026-09-18 measured six
+ * facts and two icons inside a 300-pixel column, which is too much to scan.
+ */
 function CustomerRow({ customer, selected, onOpen }) {
   const { t } = useLingui();
   return (
@@ -94,16 +102,11 @@ function CustomerRow({ customer, selected, onOpen }) {
         <span className="customer-meta">
           <I.Phone size={12} />
           {customer.normalizedPhone || customer.phone || '-'}
-          <XSep />
-          {fmtDate(customer.lastTouchAt)}
         </span>
       </span>
-      <span className="customer-products">
-        {customer.products?.whatsapp?.active && <I.WhatsApp size={15} />}
-        {customer.products?.cash?.active && <I.Wallet size={15} />}
-        {customer.dataQuality?.needsReview && <I.AlertTriangle size={15} />}
-      </span>
-      <span className="customer-value">
+      {/* The value spans the last two tracks. The row keeps the four-column
+          template, so the narrow layout below 900 pixels still hides it. */}
+      <span className="customer-value" style={{ gridColumn: '3 / -1' }}>
         <strong>{customer.value?.totalSpend || '$0.00'}</strong>
         <small>
           <Plural value={customer.value?.visits || 0} one="# visita" other="# visitas" />
@@ -113,8 +116,8 @@ function CustomerRow({ customer, selected, onOpen }) {
   );
 }
 
-function CustomersList({ selectedId }) {
-  const { t, i18n } = useLingui();
+function CustomersList({ selectedId, searchRef }) {
+  const { t } = useLingui();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(params.get('q') || '');
@@ -147,14 +150,6 @@ function CustomersList({ selectedId }) {
     filter,
   });
 
-  function changeFilter(id) {
-    const next = new URLSearchParams(params);
-    if (id) next.set('filter', id);
-    else next.delete('filter');
-    next.delete('page');
-    setParams(next);
-  }
-
   function openCustomer(id) {
     navigate(
       '/customers/' + encodeURIComponent(id) + (params.toString() ? '?' + params.toString() : ''),
@@ -167,19 +162,13 @@ function CustomersList({ selectedId }) {
         <div className="customer-search">
           <I.Search size={15} />
           <input
+            ref={searchRef}
             className="input"
             placeholder={t`Buscar clientes, teléfono, correo`}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <Segmented
-          className="customer-filter"
-          label={t`Filtros de clientes`}
-          value={filter}
-          onChange={changeFilter}
-          options={FILTERS.map((item) => ({ id: item.id, label: text(i18n, item.label) }))}
-        />
       </div>
 
       <div className="customer-list-head">
@@ -190,12 +179,11 @@ function CustomersList({ selectedId }) {
             <Plural value={customers.length} one="# cliente" other="# clientes" />
           )}
         </span>
-        {/* `source` is a human label; when the API hands back a raw
-            schema.table identifier (e.g. "merchant.customers") do not leak it
-            into the UI — fall back to the friendly label. */}
-        <span>
-          {source && !/^[a-z_]+\.[a-z_]+$/i.test(source) ? source : t`plataforma de clientes`}
-        </span>
+        {/* `source` is a human label. When the API hands back a raw schema.table
+            identifier (e.g. "merchant.customers"), print nothing: the old
+            fallback named the architecture, and the audit of 2026-09-18 counted
+            that as developer text on the owner's screen. */}
+        {source && !/^[a-z_]+\.[a-z_]+$/i.test(source) ? <span>{source}</span> : null}
       </div>
 
       {error && (
@@ -1062,7 +1050,7 @@ function EmptyState({ icon, title, detail }) {
   );
 }
 
-function CustomerProfile({ customerId }) {
+function CustomerProfile({ customerId, onSearch }) {
   const { t, i18n } = useLingui();
   const [params] = useSearchParams();
   const [tab, setTab] = useState('overview');
@@ -1084,7 +1072,7 @@ function CustomerProfile({ customerId }) {
   if (!customerId) {
     return (
       <section className="customer-profile placeholder">
-        <I.Users2 size={34} />
+        <I.Users2 size={28} />
         <strong>
           <Trans>Elige un cliente</Trans>
         </strong>
@@ -1094,6 +1082,12 @@ function CustomerProfile({ customerId }) {
             notas, todo junto.
           </Trans>
         </span>
+        {/* The pane earns its space with the one action a person takes from an
+            empty selection: find the customer. The audit of 2026-09-18 measured
+            this pane as a 60-percent empty card with no verb. */}
+        <button className="btn btn-primary btn-sm" type="button" onClick={onSearch}>
+          <Trans>Buscar</Trans>
+        </button>
       </section>
     );
   }
@@ -1219,43 +1213,65 @@ function CustomerProfile({ customerId }) {
 export default function CustomersScreen() {
   const params = useParams();
   const customerId = params['*'] ? decodeURIComponent(params['*']) : '';
-  const { data: insights } = useCustomerInsights();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t, i18n } = useLingui();
+  const { data: insights, loaded: insightsReady } = useCustomerInsights();
+  // The empty detail pane points at the search box. One action, and the pane
+  // stops being a dead card.
+  const searchRef = useRef(null);
   const metrics = insights?.metrics || {};
+  const filter = searchParams.get('filter') || '';
+  // The two figures that name work to do. They ride on the filter that acts on
+  // them, the way the inventory views carry their own counts.
+  const chipCount = { review: metrics.needsReview || 0, memory: metrics.memoryReady || 0 };
+
+  function changeFilter(id) {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set('filter', id);
+    else next.delete('filter');
+    next.delete('page');
+    setSearchParams(next);
+  }
 
   return (
-    <div className="customers-screen">
-      <div className="ed-head">
-        <div className="titles">
-          {' '}
-          <h2>
-            <Trans>Clientes</Trans>
-          </h2>
-          <div className="en">
-            <Trans>Un perfil por cliente: WhatsApp, pedidos, lealtad, monedero y notas.</Trans>
-          </div>
-        </div>
-        <div className="customer-head-stats">
-          <span>
-            <Trans>
-              <b>{formatNumber(metrics.totalCustomers || 0)}</b> en total
-            </Trans>
-          </span>
-          <span>
-            <Trans>
-              <b>{formatNumber(metrics.needsReview || 0)}</b> por revisar
-            </Trans>
-          </span>
-          <span>
-            <Trans>
-              <b>{formatNumber(metrics.memoryReady || 0)}</b> con memoria
-            </Trans>
-          </span>
-        </div>
+    <div className="customers-screen" style={{ gap: 16 }}>
+      {/* The masthead carries the page name. This band carries one fact and no
+          second heading: the audit of 2026-09-18 measured `Clientes` printed in
+          the masthead and again 100 pixels below it. */}
+      <PageHead
+        count={
+          insightsReady && metrics.totalCustomers ? (
+            <Plural value={Number(metrics.totalCustomers)} one="# cliente" other="# clientes" />
+          ) : undefined
+        }
+      />
+
+      {/* The filter strip left the 340-pixel list column. Five targets of 76
+          pixels do not fit there, and the browser drew a native scrollbar under
+          them. Across the page the strip has room, so the scrollbar is gone. */}
+      <div style={{ maxWidth: 640 }}>
+        <Segmented
+          className="customer-filter"
+          label={t`Filtros de clientes`}
+          value={filter}
+          onChange={changeFilter}
+          options={FILTERS.map((item) => ({
+            id: item.id,
+            label: chipCount[item.id] ? (
+              <>
+                {text(i18n, item.label)}{' '}
+                <span className="inv-view-count">{formatNumber(chipCount[item.id])}</span>
+              </>
+            ) : (
+              text(i18n, item.label)
+            ),
+          }))}
+        />
       </div>
 
       <div className={'customers-layout' + (customerId ? ' has-selection' : '')}>
-        <CustomersList selectedId={customerId} />
-        <CustomerProfile customerId={customerId} />
+        <CustomersList selectedId={customerId} searchRef={searchRef} />
+        <CustomerProfile customerId={customerId} onSearch={() => searchRef.current?.focus()} />
       </div>
     </div>
   );

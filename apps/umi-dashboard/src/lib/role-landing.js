@@ -122,7 +122,8 @@ export const ROLE_LANDING = {
  */
 export const FALLBACK_ORDER = [
   'customers', // customer.read — one customer record at a time
-  'catalog-inventory', // catalog.read / inventory.read — the catalogue and the stock
+  'products', // catalog.read — what the shop sells
+  'inventory', // inventory.read — what the shop holds
   'orders', // kitchen.read — the order list, read side
   'kitchen', // kitchen.read — the station board
   'loyalty-value', // loyalty.read / gift_card.read / wallet.read

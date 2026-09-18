@@ -112,9 +112,7 @@ describe('role landing', () => {
     expect(landingRouteFor({ roleKey: 'barista-kalala', permissions: ['kitchen.read'] })).toBe(
       '/orders',
     );
-    expect(landingRouteFor({ roleKey: null, permissions: ['catalog.read'] })).toBe(
-      '/catalog-inventory',
-    );
+    expect(landingRouteFor({ roleKey: null, permissions: ['catalog.read'] })).toBe('/products');
   });
 
   it('never parks the read-only role on the dashboard home', () => {

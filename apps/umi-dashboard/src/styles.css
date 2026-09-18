@@ -12,6 +12,19 @@
    Midnight is dark. List every dark theme here as it is added. */
 :root {
   color-scheme: light;
+  /* A dashboard-local token, added by the inventory redesign plan §4. The dense
+     work surfaces (rows, tiles, list controls) need a tighter corner than the
+     generated --r-card (20px) and --r-lg (12px). Eight keeps a control reading as
+     a control next to a 44px row, and it is the only new radius this change adds.
+     It stays local on purpose: packages/tokens owns the shared scale. */
+  --r-ctl: 8px;
+  /* The generated --r-card is 20px, which is a marketing corner. This is a tool:
+     every work surface in it is a panel, and a panel is 12px. The design audit of
+     2026-09-18 measured the same 20px corner on every card on every screen, with
+     cards inside cards, so the corner stopped meaning anything. The login screen
+     keeps its own look and is unaffected — it is the one surface a stranger sees
+     before any work starts. */
+  --r-card: var(--r-lg);
 }
 [data-theme='midnight'],
 [data-theme='dark'] {
@@ -2987,6 +3000,24 @@ time,
   width: 100%;
   overflow-x: auto;
 }
+/* A phone cannot hold five 76px targets in 390px, so the strip scrolls. The
+   browser then draws its own scrollbar INSIDE the pill, which reads as a broken
+   control rather than a scrollable one. The bar is hidden and the partly visible
+   last chip carries the affordance instead. This is the rule for every horizontal
+   chip strip in the console, so the fix lands on all of them at once. */
+.customer-filter,
+.seg,
+.hub-tabs,
+.inv-views {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.customer-filter::-webkit-scrollbar,
+.seg::-webkit-scrollbar,
+.hub-tabs::-webkit-scrollbar,
+.inv-views::-webkit-scrollbar {
+  display: none;
+}
 .customer-filter button {
   flex: 1 0 auto;
   min-width: 76px;
@@ -4645,4 +4676,651 @@ time,
     max-width: 100%;
     overflow-x: auto;
   }
+}
+
+/* ============================================================
+   INVENTORY WORKBENCH (redesign plan §4, §5)
+
+   The Inventario surface is a workbench: a task rail, an attention queue, and a
+   resource list. It is not a report and it is not a data table.
+
+   Three rules hold across every class below.
+   1. Colour is never the only signal. A state always carries a word.
+   2. The corner is --r-ctl (8px) on a dense control and never more than --r-lg
+      (12px) on a panel. The rounded marketing card is not used here.
+   3. Every number is right aligned and tabular, so a column of figures lines up
+      and a live update does not shift the text beside it.
+   ============================================================ */
+
+.inv-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ---------- the task rail ---------- */
+.inv-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.inv-tile {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+  transition:
+    border-color 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+.inv-tile:hover {
+  border-color: var(--line-strong);
+  background: var(--canvas-2);
+}
+.inv-tile:focus-visible {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: 2px;
+}
+.inv-tile-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-ctl);
+  background: var(--canvas-2);
+  color: var(--ink-2);
+}
+.inv-tile-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+.inv-tile-note {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+/* ---------- the attention queue ---------- */
+.inv-band-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.inv-attention {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  overflow: hidden;
+}
+.inv-attention-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.inv-attention-row:last-child {
+  border-bottom: 0;
+}
+.inv-attention-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink-1);
+}
+
+/* ---------- the view chips ---------- */
+.inv-views {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.inv-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  white-space: nowrap;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  background: var(--canvas-2);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.inv-view:hover {
+  color: var(--ink-1);
+}
+.inv-view[aria-selected='true'] {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink-1);
+  font-weight: 600;
+}
+.inv-view-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* ---------- the resource list ---------- */
+.inv-list {
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  overflow: hidden;
+}
+.inv-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  min-height: var(--control-min);
+  padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+}
+.inv-row:last-child {
+  border-bottom: 0;
+}
+.inv-row:hover {
+  background: var(--canvas-2);
+}
+.inv-row[data-selected='true'] {
+  background: var(--canvas-2);
+}
+.inv-row:focus-visible {
+  outline: 2px solid var(--umi-blue);
+  outline-offset: -2px;
+}
+.inv-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+}
+.inv-dot[data-state='ok'] {
+  background: var(--success);
+}
+.inv-dot[data-state='low'] {
+  background: var(--warning);
+}
+.inv-dot[data-state='out'] {
+  background: var(--danger);
+}
+.inv-dot[data-state='unknown'] {
+  background: var(--info);
+}
+.inv-state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.inv-row-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.inv-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inv-row-meta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inv-row-value {
+  display: grid;
+  justify-items: end;
+  /* The plan's D3 check reads `text-align` on the figure, and a grid that centres
+     its items would otherwise compute `start`. Both are set, so the figure lands
+     right whether the box is sized by the grid or by its own content. */
+  text-align: right;
+  gap: 2px;
+  min-width: 92px;
+}
+.inv-row-figure {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+.inv-row-note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+/* Decision D4: a healthy row keeps its verb out of sight until the pointer or the
+   keyboard arrives. A row that needs something shows its verb at rest. */
+.inv-row-action {
+  opacity: 0;
+  transition: opacity 0.16s var(--ease);
+}
+.inv-row:hover .inv-row-action,
+.inv-row:focus-within .inv-row-action,
+.inv-row[data-needs='true'] .inv-row-action {
+  opacity: 1;
+}
+@media (hover: none) {
+  .inv-row-action {
+    opacity: 1;
+  }
+}
+
+/* ---------- the batch action bar ---------- */
+.inv-bulkbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-ctl);
+  background: var(--canvas-2);
+}
+.inv-bulkbar-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+.inv-bulkbar-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---------- the states ---------- */
+.inv-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+}
+.inv-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+.inv-state-note {
+  font-size: 13px;
+  color: var(--ink-3);
+  max-width: 46ch;
+}
+.inv-skeleton {
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  overflow: hidden;
+}
+.inv-skeleton-row {
+  height: var(--control-min);
+  border-bottom: 1px solid var(--line-soft);
+  background: linear-gradient(90deg, transparent, rgba(118, 146, 203, 0.12), transparent);
+  background-size: 220px 100%;
+  background-repeat: no-repeat;
+  animation: inv-shimmer 1.2s var(--ease) infinite;
+}
+.inv-skeleton-row:last-child {
+  border-bottom: 0;
+}
+@keyframes inv-shimmer {
+  from {
+    background-position: -220px 0;
+  }
+  to {
+    background-position: calc(100% + 220px) 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inv-skeleton-row {
+    animation: none;
+  }
+}
+
+/* ---------- the footer ---------- */
+.inv-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* ---------- the item panel ---------- */
+.inv-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .inv-split[data-panel='open'] {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+  }
+}
+.inv-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+@media (max-width: 1023px) {
+  .inv-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    border-radius: 0;
+    border: 0;
+    overflow-y: auto;
+    animation: fade-in 0.2s var(--ease) forwards;
+  }
+  /* A phone cannot hold the name and three controls on one line. The name takes
+     the first line and the controls take the second, left-aligned, so nothing
+     wraps into a ragged middle. */
+  .inv-panel-head {
+    flex-wrap: wrap;
+  }
+  .inv-panel-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+.inv-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.inv-panel-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--ink-1);
+}
+.inv-panel-sub {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+.inv-panel-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.inv-section {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.inv-section:last-child {
+  border-bottom: 0;
+}
+.inv-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.inv-section-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.inv-kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 16px;
+  font-size: 13.5px;
+}
+.inv-kv dt {
+  color: var(--ink-3);
+}
+.inv-kv dd {
+  margin: 0;
+  color: var(--ink-1);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- the count session ---------- */
+.inv-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.inv-step[data-active='true'] {
+  color: var(--ink-1);
+  font-weight: 600;
+}
+.inv-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+.inv-area {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  cursor: pointer;
+}
+.inv-area:hover {
+  border-color: var(--line-strong);
+}
+.inv-area[aria-pressed='true'] {
+  border-color: var(--umi-navy);
+  box-shadow: var(--shadow-inner);
+}
+.inv-area-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-1);
+}
+.inv-area-note {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.inv-count-figure {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px 0 6px;
+}
+.inv-count-value {
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+.inv-count-unit {
+  font-size: 16px;
+  color: var(--ink-3);
+}
+.inv-levels {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.inv-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-width: 300px;
+  margin: 0 auto;
+}
+.inv-key {
+  height: 48px;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-1);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.inv-key:hover {
+  background: var(--canvas-2);
+}
+.inv-session-foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* ---------- the item wizard ---------- */
+.inv-wizard {
+  display: grid;
+  gap: 18px;
+}
+.inv-wizard-steps {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   THE PAGE HEAD CONTRACT (design audit 2026-09-18, fault F1 and F2)
+
+   The masthead owns the page name. A screen never repeats it. Below the masthead a
+   screen may hold ONE band, and the band holds one line: a purpose sentence, a
+   count, or a live state. Nothing else. `components/page-head.jsx` owns the rule;
+   these classes are how it looks.
+
+   The rule exists because the measurement found the page name printed twice on
+   most screens and three times on one, and because the same slot under the
+   masthead held a different kind of object on every screen — a banner on Ajustes, a
+   card on Catálogo, a stat row on Clientes, a full-width LIVE bar on Panorama. A
+   person cannot learn an app whose every screen opens differently.
+   ============================================================ */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 20px;
+  flex-wrap: wrap;
+  min-height: var(--control-min);
+}
+.page-head-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.page-head-note {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  max-width: 70ch;
+}
+.page-head-count {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* A status word. Colour is never the only signal, so the word always ships with
+   the dot. The plain variant is for a value that repeats down a whole column: at
+   that point it is not a status, it is a fact, and it stops taking colour. */
+.status-plain {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one surface a work screen sits on. `.card` keeps its own radius for the
+   surfaces that are not work: the login, the purchase flow. This is the work one. */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+/* A line, not a box. Used inside a surface to separate two groups without drawing
+   a second boundary — the audit counted card-inside-card as fault F5. */
+.surface-divide {
+  border-top: 1px solid var(--line-soft);
+}
+
+/* A quiet row: a label, a value, and nothing that competes with either. */
+.quiet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: var(--control-min);
+  padding: 6px 0;
+}
+.quiet-label {
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.quiet-value {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
 }

@@ -371,6 +371,68 @@ const I = {
       <line x1="12" y1="16" x2="12.01" y2="16" />
     </Icon>
   ),
+  /* Added by the inventory redesign plan §4. The set had no glyph for a count, a
+     delivery, a command palette, a cost, a toggle, a filter panel, or an archive,
+     and a workbench needs all seven. Same 20×20 grid and the same 1.5 stroke as
+     the rest of the file — Lucide geometry, not a second family. */
+  ClipboardList: (p) => (
+    <Icon {...p}>
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M12 11h4" />
+      <path d="M12 16h4" />
+      <path d="M8 11h.01" />
+      <path d="M8 16h.01" />
+    </Icon>
+  ),
+  PackagePlus: (p) => (
+    <Icon {...p}>
+      <path d="M16 16h6" />
+      <path d="M19 13v6" />
+      <path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0" />
+      <path d="m7.5 4.27 9 5.15" />
+      <path d="M3.29 7 12 12l8.71-5" />
+      <path d="M12 22V12" />
+    </Icon>
+  ),
+  Command: (p) => (
+    <Icon {...p}>
+      <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
+    </Icon>
+  ),
+  CircleDollarSign: (p) => (
+    <Icon {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" />
+      <path d="M12 18V6" />
+    </Icon>
+  ),
+  ToggleRight: (p) => (
+    <Icon {...p}>
+      <rect width="20" height="12" x="2" y="6" rx="6" ry="6" />
+      <circle cx="16" cy="12" r="2" />
+    </Icon>
+  ),
+  SlidersHorizontal: (p) => (
+    <Icon {...p}>
+      <line x1="21" x2="14" y1="4" y2="4" />
+      <line x1="10" x2="3" y1="4" y2="4" />
+      <line x1="21" x2="12" y1="12" y2="12" />
+      <line x1="8" x2="3" y1="12" y2="12" />
+      <line x1="21" x2="16" y1="20" y2="20" />
+      <line x1="12" x2="3" y1="20" y2="20" />
+      <line x1="14" x2="14" y1="2" y2="6" />
+      <line x1="8" x2="8" y1="10" y2="14" />
+      <line x1="16" x2="16" y1="18" y2="22" />
+    </Icon>
+  ),
+  Archive: (p) => (
+    <Icon {...p}>
+      <rect width="20" height="5" x="2" y="3" rx="1" />
+      <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+      <path d="M10 12h4" />
+    </Icon>
+  ),
 };
 
 // Umi "X" mark — derived from the brand glyph (two crossing diagonals forming "X")

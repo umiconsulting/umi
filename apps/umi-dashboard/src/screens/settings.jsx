@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useId } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
-import { XSep } from '@/shell.jsx';
+import { PageHead } from '@/components/page-head.jsx';
 import { Segmented } from '@/components/segmented.jsx';
 import {
   useMerchantData,
@@ -94,6 +94,126 @@ const SUBSCRIPTION_WORDS = {
   paused: msg`En pausa`,
 };
 
+/**
+ * One section of the settings panel.
+ *
+ * The name is a section title, not a page title: the masthead owns the page name,
+ * so this band repeats nothing. A section holds a title, one optional sentence,
+ * and its fields. The line between two sections is drawn by the section itself, so
+ * no boundary is nested inside another boundary.
+ */
+function SettingsSection({ title, note, actions }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 16,
+        flexWrap: 'wrap',
+        marginBottom: 16,
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <h2
+          style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: 16,
+            fontWeight: 600,
+            lineHeight: 1.25,
+            letterSpacing: 'normal',
+          }}
+        >
+          {title}
+        </h2>
+        {note ? (
+          <p
+            style={{
+              margin: '4px 0 0',
+              fontSize: 13.5,
+              color: 'var(--ink-2)',
+              maxWidth: '68ch',
+              lineHeight: 1.4,
+            }}
+          >
+            {note}
+          </p>
+        ) : null}
+      </div>
+      {actions}
+    </div>
+  );
+}
+
+/**
+ * A switch is a control, so it is a button. The old one was a `div` with a click
+ * handler, which a keyboard cannot reach and a screen reader cannot name.
+ */
+function Switch({ checked, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      className={'switch lg focusable' + (checked ? ' on' : '')}
+      style={{ border: 'none', padding: 0 }}
+      onClick={onChange}
+    />
+  );
+}
+
+/**
+ * The commit control of one section.
+ *
+ * The screen was built as one long form and the old save control sat in a banner
+ * above the first field, so the control was never with the thing it wrote. Every
+ * section now carries its own control, at its own end, and states whether that
+ * section holds a pending change. The command behind the control does not change:
+ * one PATCH still commits the page, so no edit is lost by saving from here.
+ */
+function SectionSave({ dirty, saved, saving, onSave }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 12,
+        marginTop: 16,
+      }}
+    >
+      <span
+        role="status"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontSize: 13.5,
+          color: saved ? 'var(--success)' : 'var(--ink-2)',
+        }}
+      >
+        {saved ? (
+          <>
+            <I.Check size={15} /> <Trans>Cambios guardados</Trans>
+          </>
+        ) : dirty ? (
+          <Trans>Sin guardar</Trans>
+        ) : null}
+      </span>
+      <button
+        className="btn btn-secondary btn-sm focusable"
+        onClick={onSave}
+        disabled={saving || !dirty}
+      >
+        {saving ? <Trans>Guardando…</Trans> : <Trans>Guardar</Trans>}
+      </button>
+    </div>
+  );
+}
+
 const SettingsScreen = () => {
   const { t, i18n } = useLingui();
   const uid = useId();
@@ -129,55 +249,64 @@ const SettingsScreen = () => {
   const [selfReg, setSelfReg] = useState(true);
   const [voice, setVoice] = useState(null);
   const [bizName, setBizName] = useState('');
+  /**
+   * WHAT THE SERVER HOLDS, as far as this screen knows.
+   *
+   * Every editable group is compared against this snapshot, so the save control
+   * can say whether the page holds a pending change. The snapshot is taken when
+   * the form is seeded and again after a save resolves — never from an assumption.
+   */
+  const [base, setBase] = useState(null);
+  const [voiceBase, setVoiceBase] = useState(null);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Which section's control produced the last successful save, so one section
+  // shows the receipt and the others stay quiet.
+  const [savedSection, setSavedSection] = useState(null);
 
   // Populate state from fetched merchant once it arrives
   useEffect(() => {
     if (!merchant) return;
-    setBiz({
+    const nextBiz = {
       name: merchant.name,
       city: merchant.city,
       handle: merchant.handle,
       cardPrefix: merchant.cardPrefix,
       subscription: merchant.subscriptionStatus,
       businessDayStart: merchant.businessDayStart || '00:00',
-    });
+    };
     // Effective cutoffs come merged from the API; show spend in pesos.
     const st = merchant.segmentThresholds || {};
-    setSeg({
+    const nextSeg = {
       vipMinPesos: String(Math.round(Number(st.vipMinSpendCents ?? 100000) / 100)),
       vipMinVisits: String(Number(st.vipMinVisits ?? 8)),
       regularMinVisits: String(Number(st.regularMinVisits ?? 3)),
       activeWindowDays: String(Number(st.activeWindowDays ?? 45)),
       lapsedDays: String(Number(st.lapsedDays ?? 180)),
-    });
-    setBrand({
+    };
+    const nextBrand = {
       primary: merchant.primaryColor || '#B5605A',
       secondary: merchant.secondaryColor || '#E8C9A3',
       logoUrl: merchant.logoUrl || '',
-    });
-    setSelfReg(merchant.selfRegistration !== false);
-    setBirthday({
+    };
+    const nextSelfReg = merchant.selfRegistration !== false;
+    const nextBirthday = {
       on: merchant.birthdayRewardEnabled !== false,
       rewardName: merchant.birthdayRewardName || t`Regalo de cumpleaños`,
-    });
+    };
     const visitsRequired = clampStampTarget(merchant.rewardConfig?.visitsRequired ?? 10);
-    setLoyalty(
-      merchant.rewardConfig
-        ? {
-            rewardName: (merchant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
-            visitsRequired,
-            rewardCost: Math.round(merchant.rewardConfig.rewardCostCentavos / 100),
-          }
-        : {
-            rewardName: t`Recompensa de temporada`,
-            visitsRequired,
-            rewardCost: 0,
-          },
-    );
-    setStamps((s) => Math.min(s, visitsRequired));
+    const nextLoyalty = merchant.rewardConfig
+      ? {
+          rewardName: (merchant.rewardConfig.rewardName || '').slice(0, MAX_REWARD_NAME_LENGTH),
+          visitsRequired,
+          rewardCost: Math.round(merchant.rewardConfig.rewardCostCentavos / 100),
+        }
+      : {
+          rewardName: t`Recompensa de temporada`,
+          visitsRequired,
+          rewardCost: 0,
+        };
     // Parse promoDays "2,3,4" → ['mar','mie','jue']
     const promoNumToId = Object.fromEntries(Object.entries(DOW_NUM).map(([id, n]) => [n, id]));
     const days = merchant.promoDays
@@ -186,11 +315,28 @@ const SettingsScreen = () => {
           .map((n) => promoNumToId[n.trim()])
           .filter(Boolean)
       : ['mar', 'mie', 'jue'];
-    setPromo({
+    const nextPromo = {
       message: merchant.promoMessage || '',
       from: merchant.promoStartsAt ? merchant.promoStartsAt.slice(0, 10) : '2026-05-15',
       to: merchant.promoEndsAt ? merchant.promoEndsAt.slice(0, 10) : '2026-06-30',
       days: days,
+    };
+    setBiz(nextBiz);
+    setSeg(nextSeg);
+    setBrand(nextBrand);
+    setSelfReg(nextSelfReg);
+    setBirthday(nextBirthday);
+    setLoyalty(nextLoyalty);
+    setStamps((s) => Math.min(s, visitsRequired));
+    setPromo(nextPromo);
+    setBase({
+      biz: nextBiz,
+      seg: nextSeg,
+      brand: nextBrand,
+      loyalty: nextLoyalty,
+      birthday: nextBirthday,
+      promo: nextPromo,
+      selfReg: nextSelfReg,
     });
   }, [merchant, t]);
 
@@ -198,12 +344,14 @@ const SettingsScreen = () => {
   // conversaflow-only merchant (e.g. Kalala, cashActive=false) still gets its chips.
   useEffect(() => {
     if (!voiceData?.voice) return;
-    setVoice({
+    const nextVoice = {
       tonePreset: voiceData.voice.tone_preset || 'friendly',
       assistantName: voiceData.voice.assistant_name || '',
       customTone: voiceData.voice.tone || '',
       styleNotes: (voiceData.voice.style_notes || []).join('\n'),
-    });
+    };
+    setVoice(nextVoice);
+    setVoiceBase(nextVoice);
     setBizName(voiceData.businessName || voiceData.defaults?.assistant_name || '');
   }, [voiceData]);
 
@@ -219,7 +367,7 @@ const SettingsScreen = () => {
     setStamps((s) => Math.min(s, visitsRequired));
   };
 
-  async function handleSave() {
+  async function handleSave(sectionKey) {
     if (!biz || !brand || !promo) return;
     setSaving(true);
     const promoDayNums = promo.days
@@ -291,16 +439,38 @@ const SettingsScreen = () => {
       return;
     }
     setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSavedSection(sectionKey || null);
+    // The server now holds this shape. Measure the next edit against it.
+    setBase({ biz, seg, brand, loyalty, birthday, promo, selfReg });
+    if (voice) setVoiceBase(voice);
+    setTimeout(() => {
+      setSaved(false);
+      setSavedSection(null);
+    }, 2500);
   }
+
+  // One comparison per section, so a save control states the truth about the work
+  // that belongs to it. A section with nothing pending keeps its control quiet,
+  // and a section with an edit says so next to the edit.
+  const asText = (value) => JSON.stringify(value ?? null);
+  const pending = {
+    biz: Boolean(base) && (asText(biz) !== asText(base.biz) || asText(seg) !== asText(base.seg)),
+    card:
+      Boolean(base) &&
+      (asText(brand) !== asText(base.brand) || asText(loyalty) !== asText(base.loyalty)),
+    voice: Boolean(voiceBase) && asText(voice) !== asText(voiceBase),
+    birthday: Boolean(base) && asText(birthday) !== asText(base.birthday),
+    promo: Boolean(base) && asText(promo) !== asText(base.promo),
+    selfreg: Boolean(base) && selfReg !== base.selfReg,
+  };
 
   // Guard — show skeleton until state is seeded
   if (!biz || !brand || !promo || !birthday || (cashActive && !loyalty)) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div
-          className="card"
-          style={{ padding: '40px 26px', textAlign: 'center', color: 'var(--ink-3)' }}
+          className="surface"
+          style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--ink-2)' }}
         >
           {loading ? <Trans>Cargando ajustes…</Trans> : <Trans>Sin datos de configuración.</Trans>}
         </div>
@@ -310,779 +480,724 @@ const SettingsScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Save bar */}
-      <div
-        className="card"
-        style={{
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-        }}
-      >
-        <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>
-          {saved ? (
-            <span style={{ color: 'var(--success)', fontWeight: 600 }}>
-              ✓ <Trans>Cambios guardados</Trans>
-            </span>
-          ) : cashActive ? (
-            <Trans>Los cambios de Cash se guardan solo porque Umi Cash está activo.</Trans>
-          ) : (
-            <Trans>Cash no está activo: solo se guardan ajustes de negocio y operación.</Trans>
-          )}
-        </div>
-        <button
-          className="btn btn-primary focusable"
-          onClick={handleSave}
-          disabled={saving}
-          style={{ opacity: saving ? 0.7 : 1, minWidth: 120 }}
-        >
-          {saving ? (
-            <Trans>Guardando…</Trans>
-          ) : saved ? (
-            <>
-              <I.Check size={15} /> <Trans>Guardado</Trans>
-            </>
-          ) : (
-            <Trans>Guardar cambios</Trans>
-          )}
-        </button>
-      </div>
+      {/* ONE band, and one shape in it: a sentence that orients the owner. */}
+      <PageHead note={<Trans>Configura el negocio, la lealtad y la voz del asistente.</Trans>} />
 
-      {/* Sucursales — location aliases/descriptor (multi-location, ConversaFlow only) */}
-      <LocationProfilesCard conversaflowActive={conversaflowActive} />
+      {/* ONE surface holds the whole form. Sections divide it with a line, so no
+          boundary sits inside another boundary. The save control docks to the
+          bottom of this panel, and the panel is exactly what it writes. */}
+      <section className="surface">
+        {/* Sucursales — location aliases/descriptor (multi-location, ConversaFlow only) */}
+        <LocationProfilesCard conversaflowActive={conversaflowActive} />
 
-      {/* Merchant info */}
-      <div className="card" style={{ padding: '24px 26px' }}>
-        <div className="ed-head" style={{ marginBottom: 18 }}>
-          <div className="titles">
-            {' '}
-            <h2>
-              <Trans>Información del negocio</Trans>
-            </h2>
-          </div>
-          <span className="sub-pill">
-            <span className="sd" />
-            {biz.subscription} <XSep /> UMI DASH
-          </span>
-        </div>
-        <div className="grid grid-3" style={{ gap: 18 }}>
-          <div className="field">
-            <label htmlFor={`${uid}-business-name`}>
-              <Trans>Nombre del negocio</Trans>
-            </label>
-            <input
-              id={`${uid}-business-name`}
-              className="input tall"
-              value={biz.name}
-              onChange={(e) => setBiz((b) => ({ ...b, name: e.target.value }))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={`${uid}-city`}>
-              <Trans>Ciudad</Trans>
-            </label>
-            <input
-              id={`${uid}-city`}
-              className="input tall"
-              value={biz.city || ''}
-              onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={`${uid}-business-day-start`}>
-              <Trans>Inicio del día operativo</Trans>
-            </label>
-            <input
-              id={`${uid}-business-day-start`}
-              type="time"
-              className="input tall"
-              value={biz.businessDayStart || '00:00'}
-              onChange={(e) => setBiz((b) => ({ ...b, businessDayStart: e.target.value }))}
-            />
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>
-              <Trans>
-                Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café nocturno usa
-                p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche que la abrió. No
-                cambia días ya cerrados.
-              </Trans>
+        {/* Merchant info */}
+        <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+          <SettingsSection title={<Trans>Información del negocio</Trans>} />
+          <div className="grid grid-3" style={{ gap: 16 }}>
+            <div className="field">
+              <label htmlFor={`${uid}-business-name`}>
+                <Trans>Nombre del negocio</Trans>
+              </label>
+              <input
+                id={`${uid}-business-name`}
+                className="input tall"
+                value={biz.name}
+                onChange={(e) => setBiz((b) => ({ ...b, name: e.target.value }))}
+              />
             </div>
-          </div>
-          {seg && (
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <span className="field-label">
-                <Trans>Segmentos de clientes</Trans>
-              </span>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', margin: '2px 0 10px' }}>
+            <div className="field">
+              <label htmlFor={`${uid}-city`}>
+                <Trans>Ciudad</Trans>
+              </label>
+              <input
+                id={`${uid}-city`}
+                className="input tall"
+                value={biz.city || ''}
+                onChange={(e) => setBiz((b) => ({ ...b, city: e.target.value }))}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor={`${uid}-business-day-start`}>
+                <Trans>Inicio del día operativo</Trans>
+              </label>
+              <input
+                id={`${uid}-business-day-start`}
+                type="time"
+                className="input tall"
+                value={biz.businessDayStart || '00:00'}
+                onChange={(e) => setBiz((b) => ({ ...b, businessDayStart: e.target.value }))}
+              />
+              <div style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 4 }}>
                 <Trans>
-                  Define cuándo un cliente es Frecuente, VIP, En riesgo o Inactivo. Se usa en el
-                  resumen del cliente. Deja los valores por defecto si no estás seguro.
+                  Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café nocturno
+                  usa p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche que la abrió.
+                  No cambia días ya cerrados.
                 </Trans>
               </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: 12,
-                }}
-              >
-                <div className="field">
-                  <label htmlFor={`${uid}-seg-vip-spend`}>
-                    <Trans>VIP: gasto mínimo (MXN)</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-seg-vip-spend`}
-                    type="number"
-                    min="0"
-                    className="input tall"
-                    value={seg.vipMinPesos}
-                    onChange={(e) => setSeg((s) => ({ ...s, vipMinPesos: e.target.value }))}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor={`${uid}-seg-vip-visits`}>
-                    <Trans>VIP: visitas mínimas</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-seg-vip-visits`}
-                    type="number"
-                    min="1"
-                    className="input tall"
-                    value={seg.vipMinVisits}
-                    onChange={(e) => setSeg((s) => ({ ...s, vipMinVisits: e.target.value }))}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor={`${uid}-seg-regular-visits`}>
-                    <Trans>Frecuente: visitas mínimas</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-seg-regular-visits`}
-                    type="number"
-                    min="1"
-                    className="input tall"
-                    value={seg.regularMinVisits}
-                    onChange={(e) => setSeg((s) => ({ ...s, regularMinVisits: e.target.value }))}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor={`${uid}-seg-active-days`}>
-                    <Trans>Activo: dentro de (días)</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-seg-active-days`}
-                    type="number"
-                    min="1"
-                    className="input tall"
-                    value={seg.activeWindowDays}
-                    onChange={(e) => setSeg((s) => ({ ...s, activeWindowDays: e.target.value }))}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor={`${uid}-seg-lapsed-days`}>
-                    <Trans>Inactivo: después de (días)</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-seg-lapsed-days`}
-                    type="number"
-                    min="1"
-                    className="input tall"
-                    value={seg.lapsedDays}
-                    onChange={(e) => setSeg((s) => ({ ...s, lapsedDays: e.target.value }))}
-                  />
-                </div>
-              </div>
             </div>
-          )}
-          <div className="field">
-            <span className="field-label">
-              <Trans>Estado de la cuenta</Trans>
-            </span>
-            <span
-              className="chip read"
-              style={{
-                height: 52,
-                fontSize: 13,
-                alignSelf: 'stretch',
-                justifyContent: 'flex-start',
-              }}
-            >
-              {i18n._(SUBSCRIPTION_WORDS[biz.subscription] || SUBSCRIPTION_WORDS.active)} ·{' '}
-              <Trans>Se administra en Productos y facturación</Trans>
-            </span>
-          </div>
-          <div className="field">
-            <span className="field-label">
-              <Trans>Dirección pública</Trans>
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span className="chip read" style={{ height: 44, fontSize: 13 }}>
-                {biz.handle ? `umi.app/${biz.handle}` : t`Sin dirección publicada`}
-              </span>
-              <button
-                className="btn-icon focusable"
-                aria-label={t`Copiar dirección`}
-                title={t`Copiar dirección`}
-                disabled={!biz.handle}
-                onClick={() => copyHandle(biz.handle)}
-              >
-                {copied ? <I.Check size={14} /> : <I.Receipt size={14} />}
-              </button>
-            </div>
-          </div>
-          <div className="field">
-            <span className="field-label">
-              <Trans>Prefijo de tarjeta</Trans>
-            </span>
-            <span className="chip read" style={{ height: 44, fontSize: 13 }}>
-              {cashActive ? `${biz.cardPrefix} · • • • •` : t`No disponible sin Umi Cash`}
-            </span>
-          </div>
-          <div className="field">
-            <span className="field-label">
-              <Trans>ID de cuenta</Trans>
-            </span>
-            <span
-              className="chip read"
-              style={{
-                height: 44,
-                fontSize: 12,
-                alignSelf: 'flex-start',
-                paddingLeft: 14,
-                paddingRight: 14,
-              }}
-            >
-              biz_8a2c4f9e1b6d
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Voice & tone — WhatsApp assistant (ConversaFlow) */}
-      {conversaflowActive && voice && (
-        <div className="card" style={{ padding: '24px 26px' }}>
-          <div className="ed-head" style={{ marginBottom: 18 }}>
-            <div className="titles">
-              {' '}
-              <h2>
-                <Trans>Voz y tono del asistente</Trans>
-              </h2>
-              <div className="en">
-                <Trans>Cómo saluda y responde el asistente en WhatsApp.</Trans>
-              </div>
-            </div>
-          </div>
-
-          {/* Tone chips — single select */}
-          <div className="field" style={{ marginBottom: 18 }}>
-            <span className="field-label">
-              <Trans>Tono · cómo le habla el asistente a tus clientes</Trans>
-            </span>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map((p) => (
-                <button
-                  key={p.key}
-                  className={'day-pill focusable' + (voice.tonePreset === p.key ? ' on' : '')}
-                  // Picking a chip clears any freeform override so the preset
-                  // actually takes effect — the engine gives freeform `tone`
-                  // precedence over `tone_preset`, so a stale custom tone would
-                  // otherwise make the chip inert.
-                  onClick={() => setVoice((v) => ({ ...v, tonePreset: p.key, customTone: '' }))}
+            {seg && (
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
+                <span className="field-label">
+                  <Trans>Segmentos de clientes</Trans>
+                </span>
+                <div style={{ fontSize: 13.5, color: 'var(--ink-3)', margin: '4px 0 12px' }}>
+                  <Trans>
+                    Define cuándo un cliente es Frecuente, VIP, En riesgo o Inactivo. Se usa en el
+                    resumen del cliente. Deja los valores por defecto si no estás seguro.
+                  </Trans>
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: 12,
+                  }}
                 >
-                  {presetLabel(i18n, p.label)}
-                </button>
-              ))}
-            </div>
-            {voice.customTone.trim() ? (
-              <div
-                style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8, fontStyle: 'italic' }}
-              >
-                <Trans>Usando tono personalizado — anula el chip seleccionado.</Trans>
-              </div>
-            ) : (
-              voiceData?.presets?.find((p) => p.key === voice.tonePreset)?.description && (
-                <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 8 }}>
-                  {voiceData.presets.find((p) => p.key === voice.tonePreset).description}
+                  <div className="field">
+                    <label htmlFor={`${uid}-seg-vip-spend`}>
+                      <Trans>VIP: gasto mínimo (MXN)</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-seg-vip-spend`}
+                      type="number"
+                      min="0"
+                      className="input tall"
+                      value={seg.vipMinPesos}
+                      onChange={(e) => setSeg((s) => ({ ...s, vipMinPesos: e.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-seg-vip-visits`}>
+                      <Trans>VIP: visitas mínimas</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-seg-vip-visits`}
+                      type="number"
+                      min="1"
+                      className="input tall"
+                      value={seg.vipMinVisits}
+                      onChange={(e) => setSeg((s) => ({ ...s, vipMinVisits: e.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-seg-regular-visits`}>
+                      <Trans>Frecuente: visitas mínimas</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-seg-regular-visits`}
+                      type="number"
+                      min="1"
+                      className="input tall"
+                      value={seg.regularMinVisits}
+                      onChange={(e) => setSeg((s) => ({ ...s, regularMinVisits: e.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-seg-active-days`}>
+                      <Trans>Activo: dentro de (días)</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-seg-active-days`}
+                      type="number"
+                      min="1"
+                      className="input tall"
+                      value={seg.activeWindowDays}
+                      onChange={(e) => setSeg((s) => ({ ...s, activeWindowDays: e.target.value }))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-seg-lapsed-days`}>
+                      <Trans>Inactivo: después de (días)</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-seg-lapsed-days`}
+                      type="number"
+                      min="1"
+                      className="input tall"
+                      value={seg.lapsedDays}
+                      onChange={(e) => setSeg((s) => ({ ...s, lapsedDays: e.target.value }))}
+                    />
+                  </div>
                 </div>
-              )
+              </div>
             )}
-          </div>
-
-          {/* Advanced */}
-          <div className="grid grid-2" style={{ gap: 14 }}>
             <div className="field">
-              <label htmlFor={`${uid}-nombre-del-asistente`}>
-                <Trans>Nombre del asistente · opcional</Trans>
-              </label>
-              <input
-                id={`${uid}-nombre-del-asistente`}
-                className="input tall"
-                value={voice.assistantName}
-                placeholder={bizName || t`Asistente`}
-                onChange={(e) =>
-                  setVoice((v) => ({ ...v, assistantName: e.target.value.slice(0, 60) }))
-                }
-              />
+              <span className="field-label">
+                <Trans>Estado de la cuenta</Trans>
+              </span>
+              {/* The subscription is a fact this screen does not own, so it reads as a
+                value with a consequence, not as a control. The old pill repeated the
+                same word next to a cross and said nothing about where to change it. */}
+              <div style={{ display: 'flex', alignItems: 'center', minHeight: 52 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>
+                  {i18n._(SUBSCRIPTION_WORDS[biz.subscription] || SUBSCRIPTION_WORDS.active)}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
+                <Trans>Se administra en Productos y facturación</Trans>
+              </div>
             </div>
             <div className="field">
-              <label htmlFor={`${uid}-tono-personalizado-opcional`}>
-                <Trans>Tono personalizado · opcional (anula el chip)</Trans>
-              </label>
-              <input
-                id={`${uid}-tono-personalizado-opcional`}
-                className="input tall"
-                value={voice.customTone}
-                placeholder={t`Ej. relajado, con modismos del norte`}
-                onChange={(e) =>
-                  setVoice((v) => ({ ...v, customTone: e.target.value.slice(0, 280) }))
-                }
-              />
+              <span className="field-label">
+                <Trans>Dirección pública</Trans>
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="chip read" style={{ height: 44, fontSize: 13.5 }}>
+                  {biz.handle ? `umi.app/${biz.handle}` : t`Sin dirección publicada`}
+                </span>
+                <button
+                  className="btn-icon focusable"
+                  aria-label={t`Copiar dirección`}
+                  title={t`Copiar dirección`}
+                  disabled={!biz.handle}
+                  onClick={() => copyHandle(biz.handle)}
+                >
+                  {copied ? <I.Check size={14} /> : <I.Receipt size={14} />}
+                </button>
+              </div>
             </div>
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label htmlFor={`${uid}-notas-de-estilo`}>
-                <Trans>Notas de estilo · una por línea (máx. 8)</Trans>
-              </label>
-              <textarea
-                id={`${uid}-notas-de-estilo`}
-                className="input"
-                value={voice.styleNotes}
-                onChange={(e) => setVoice((v) => ({ ...v, styleNotes: e.target.value }))}
-                style={{ minHeight: 80 }}
-              />
+            <div className="field">
+              <span className="field-label">
+                <Trans>Prefijo de tarjeta</Trans>
+              </span>
+              <span className="chip read" style={{ height: 44, fontSize: 13.5 }}>
+                {cashActive ? `${biz.cardPrefix} · • • • •` : t`No disponible sin Umi Cash`}
+              </span>
             </div>
           </div>
+          <SectionSave
+            dirty={pending.biz}
+            saved={saved && savedSection === 'biz'}
+            saving={saving}
+            onSave={() => handleSave('biz')}
+          />
         </div>
-      )}
 
-      {!cashActive && (
-        <div className="card" style={{ padding: '24px 26px' }}>
-          <div className="ed-head" style={{ marginBottom: 14 }}>
-            <div className="titles">
-              {' '}
-              <h2>
-                <Trans>Umi Cash no está activo</Trans>
-              </h2>
-              <div className="en">
+        {/* Voice & tone — WhatsApp assistant (ConversaFlow) */}
+        {conversaflowActive && voice && (
+          <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+            <SettingsSection
+              title={<Trans>Voz y tono del asistente</Trans>}
+              note={<Trans>Cómo saluda y responde el asistente en WhatsApp.</Trans>}
+            />
+
+            {/* Tone chips — single select */}
+            <div className="field" style={{ marginBottom: 16 }}>
+              <span className="field-label">
+                <Trans>Tono · cómo le habla el asistente a tus clientes</Trans>
+              </span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(voiceData?.presets?.length ? voiceData.presets : VOICE_PRESET_FALLBACK).map(
+                  (p) => (
+                    <button
+                      key={p.key}
+                      className={'day-pill focusable' + (voice.tonePreset === p.key ? ' on' : '')}
+                      // Picking a chip clears any freeform override so the preset
+                      // actually takes effect — the engine gives freeform `tone`
+                      // precedence over `tone_preset`, so a stale custom tone would
+                      // otherwise make the chip inert.
+                      onClick={() => setVoice((v) => ({ ...v, tonePreset: p.key, customTone: '' }))}
+                    >
+                      {presetLabel(i18n, p.label)}
+                    </button>
+                  ),
+                )}
+              </div>
+              {voice.customTone.trim() ? (
+                <div
+                  style={{
+                    fontSize: 13.5,
+                    color: 'var(--ink-3)',
+                    marginTop: 8,
+                    fontStyle: 'italic',
+                  }}
+                >
+                  <Trans>Usando tono personalizado — anula el chip seleccionado.</Trans>
+                </div>
+              ) : (
+                voiceData?.presets?.find((p) => p.key === voice.tonePreset)?.description && (
+                  <div style={{ fontSize: 13.5, color: 'var(--ink-3)', marginTop: 8 }}>
+                    {voiceData.presets.find((p) => p.key === voice.tonePreset).description}
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Advanced */}
+            <div className="grid grid-2" style={{ gap: 16 }}>
+              <div className="field">
+                <label htmlFor={`${uid}-nombre-del-asistente`}>
+                  <Trans>Nombre del asistente · opcional</Trans>
+                </label>
+                <input
+                  id={`${uid}-nombre-del-asistente`}
+                  className="input tall"
+                  value={voice.assistantName}
+                  placeholder={bizName || t`Asistente`}
+                  onChange={(e) =>
+                    setVoice((v) => ({ ...v, assistantName: e.target.value.slice(0, 60) }))
+                  }
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`${uid}-tono-personalizado-opcional`}>
+                  <Trans>Tono personalizado · opcional (anula el chip)</Trans>
+                </label>
+                <input
+                  id={`${uid}-tono-personalizado-opcional`}
+                  className="input tall"
+                  value={voice.customTone}
+                  placeholder={t`Ej. relajado, con modismos del norte`}
+                  onChange={(e) =>
+                    setVoice((v) => ({ ...v, customTone: e.target.value.slice(0, 280) }))
+                  }
+                />
+              </div>
+              <div className="field" style={{ gridColumn: '1 / -1' }}>
+                <label htmlFor={`${uid}-notas-de-estilo`}>
+                  <Trans>Notas de estilo · una por línea (máx. 8)</Trans>
+                </label>
+                <textarea
+                  id={`${uid}-notas-de-estilo`}
+                  className="input"
+                  value={voice.styleNotes}
+                  onChange={(e) => setVoice((v) => ({ ...v, styleNotes: e.target.value }))}
+                  style={{ minHeight: 80 }}
+                />
+              </div>
+            </div>
+            <SectionSave
+              dirty={pending.voice}
+              saved={saved && savedSection === 'voice'}
+              saving={saving}
+              onSave={() => handleSave('voice')}
+            />
+          </div>
+        )}
+
+        {!cashActive && (
+          <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+            <SettingsSection
+              title={<Trans>Umi Cash no está activo</Trans>}
+              note={
                 <Trans>
                   Sin Umi Cash no hay monedero, lealtad, tarjetas de regalo ni pase en Wallet.
                 </Trans>
-              </div>
-            </div>
-            <span className="sub-pill">
-              <span className="sd" /> <Trans>Sin activar</Trans>
-            </span>
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 760 }}>
-            <Trans>
-              La configuración de pase en Wallet, sellos, recompensas, miembros y tarjetas de regalo
-              queda oculta hasta activar Umi Cash.
-            </Trans>
-          </div>
-        </div>
-      )}
-
-      {/* Branding + wallet preview */}
-      {cashActive && (
-        <div className="split wide-gap">
-          <div className="card" style={{ padding: '24px 26px' }}>
-            <div className="ed-head" style={{ marginBottom: 18 }}>
-              <div className="titles">
-                {' '}
-                <h2>
-                  <Trans>Apariencia de la tarjeta</Trans>
-                </h2>
-                <div className="en">
-                  <Trans>Cómo se ve la tarjeta del cliente en Apple Wallet y Google Wallet.</Trans>
-                </div>
-              </div>
-            </div>
-
-            <div className="field" style={{ marginBottom: 18 }}>
-              <label htmlFor={`${uid}-primary-color-card`}>
-                <Trans>Color principal · fondo de la tarjeta</Trans>
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <input
-                  id={`${uid}-primary-color-card`}
-                  type="color"
-                  value={brand.primary}
-                  onChange={(e) => {
-                    setBrand((b) => ({ ...b, primary: e.target.value }));
-                    document.documentElement.style.setProperty('--merchant-brand', e.target.value);
-                  }}
-                />
-                <span
-                  className="chip read"
-                  style={{ height: 44, fontFamily: 'var(--font-mono)', fontSize: 13 }}
-                >
-                  {brand.primary.toUpperCase()}
-                </span>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {PRESET_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      className={
-                        'swatch focusable' +
-                        (brand.primary.toLowerCase() === c.toLowerCase() ? ' on' : '')
-                      }
-                      style={{ '--swatch': c }}
-                      onClick={() => {
-                        setBrand((b) => ({ ...b, primary: c }));
-                        document.documentElement.style.setProperty('--merchant-brand', c);
-                      }}
-                      aria-label={c}
-                    />
-                  ))}
-                </div>
-              </div>
-              {/* Says it; does not override it. The colour is the café's decision. */}
-              {(() => {
-                const c = contrastWithWhite(brand.primary);
-                if (c == null || c >= 4.5) return null;
-                return (
-                  <div
-                    className="field-warning"
-                    role="status"
-                    style={{ fontSize: 12.5, color: 'var(--warning)', marginTop: 2 }}
-                  >
-                    <Trans>
-                      El texto blanco de la tarjeta queda en {c.toFixed(1)}:1 sobre este color.
-                    </Trans>{' '}
-                    {c < 3 ? (
-                      <Trans>Tu cliente casi no podrá leer su saldo.</Trans>
-                    ) : (
-                      <Trans>Un color más oscuro se lee mejor en la mano.</Trans>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            <div className="field" style={{ marginBottom: 18 }}>
-              <label htmlFor={`${uid}-secondary-color-accents`}>
-                <Trans>Color secundario · acentos y detalles</Trans>
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <input
-                  id={`${uid}-secondary-color-accents`}
-                  type="color"
-                  value={brand.secondary}
-                  onChange={(e) => setBrand((b) => ({ ...b, secondary: e.target.value }))}
-                />
-                <span
-                  className="chip read"
-                  style={{ height: 44, fontFamily: 'var(--font-mono)', fontSize: 13 }}
-                >
-                  {brand.secondary.toUpperCase()}
-                </span>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {['#E8C9A3', '#FFFFFF', '#7692CB', '#FAF4EC', '#C4A882', '#1F1410'].map((c) => (
-                    <button
-                      key={c}
-                      className={
-                        'swatch focusable' +
-                        (brand.secondary.toLowerCase() === c.toLowerCase() ? ' on' : '')
-                      }
-                      style={{ '--swatch': c }}
-                      onClick={() => setBrand((b) => ({ ...b, secondary: c }))}
-                      aria-label={c}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid var(--line)', paddingTop: 18, marginTop: 4 }}>
-              {' '}
-              <div style={{ marginBottom: 14 }}>
-                <h3 style={{ margin: '0 0 4px', fontSize: 16, lineHeight: 1.1 }}>
-                  <Trans>Recompensas por sellos</Trans>
-                </h3>
-                <div
-                  className="en"
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: '0.18em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-3)',
-                    fontWeight: 600,
-                  }}
-                >
-                  <Trans>Premios por sellos</Trans>
-                </div>
-              </div>
-              <div className="grid grid-2" style={{ gap: 14 }}>
-                <div className="field" style={{ gridColumn: '1 / -1' }}>
-                  <label htmlFor={`${uid}-reward-name-shown`}>
-                    <Trans>Nombre del premio · lo ve el cliente</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-reward-name-shown`}
-                    className="input tall"
-                    value={loyalty.rewardName}
-                    maxLength={MAX_REWARD_NAME_LENGTH}
-                    onChange={(e) =>
-                      setLoyalty((l) => ({
-                        ...l,
-                        rewardName: e.target.value.slice(0, MAX_REWARD_NAME_LENGTH),
-                      }))
-                    }
-                  />
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'right' }}>
-                    {loyalty.rewardName.length} / {MAX_REWARD_NAME_LENGTH}
-                  </div>
-                </div>
-                <div className="field">
-                  <label htmlFor={`${uid}-visits-required`}>
-                    <Trans>Visitas necesarias</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-visits-required`}
-                    type="number"
-                    min={MIN_STAMP_TARGET}
-                    max={MAX_STAMP_TARGET}
-                    className="input tall"
-                    value={loyalty.visitsRequired}
-                    onChange={(e) => setStampTarget(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor={`${uid}-reward-cost-mxn`}>
-                    <Trans>Costo del premio · MXN</Trans>
-                  </label>
-                  <input
-                    id={`${uid}-reward-cost-mxn`}
-                    type="number"
-                    min={0}
-                    className="input tall"
-                    value={loyalty.rewardCost}
-                    onChange={(e) =>
-                      setLoyalty((l) => ({ ...l, rewardCost: parseInt(e.target.value) || 0 }))
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Wallet pass live preview */}
-          <div
-            className="card-warm"
-            style={{
-              padding: '26px 22px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 18,
-              position: 'relative',
-            }}
-          >
-            <div style={{ position: 'absolute', top: 18, left: 22 }}>
-              <div className="eyebrow on-warm">
-                <Trans>Vista previa</Trans>
-              </div>
-              <div
-                style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink-warm)', marginTop: 2 }}
-              >
-                <Trans>Pase de Apple Wallet</Trans>
-              </div>
-            </div>
-            <div style={{ paddingTop: 28 }} />
-            <WalletPass
-              brand={brand}
-              biz={biz}
-              stamps={stamps}
-              loyalty={loyalty}
-              birthday={birthday}
-              topupEnabled={merchant.topupEnabled !== false}
+              }
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--ink-warm-soft)' }}>
-                <Trans>Sellos máximos</Trans>
-              </span>
-              <input
-                type="range"
-                aria-label={t`Sellos máximos en la tarjeta`}
-                className="range-control"
-                min={MIN_STAMP_TARGET}
-                max={MAX_STAMP_TARGET}
-                step={1}
-                value={loyalty.visitsRequired}
-                onChange={(e) => setStampTarget(e.target.value)}
-                style={{ width: 140, accentColor: 'var(--umi-navy)' }}
-              />
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: 'var(--ink-warm)',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                {loyalty.visitsRequired} / {MAX_STAMP_TARGET}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Birthday config */}
-      {cashActive && (
-        <div className="card" style={{ padding: '24px 26px' }}>
-          <div className="ed-head" style={{ marginBottom: 18 }}>
-            <div className="titles">
-              {' '}
-              <h2>
-                <Trans>Boost de cumpleaños</Trans>
-              </h2>
-              <div className="en">
-                <Trans>Un premio que se emite solo el día del cumpleaños del cliente.</Trans>
-              </div>
-            </div>
-            <div
-              className={'switch lg ' + (birthday.on ? 'on' : '')}
-              onClick={() => setBirthday((b) => ({ ...b, on: !b.on }))}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor={`${uid}-reward-name-auto`}>
-              <Trans>Nombre del premio · se emite solo en el cumpleaños</Trans>
-            </label>
-            <input
-              id={`${uid}-reward-name-auto`}
-              className="input tall"
-              value={birthday.rewardName}
-              onChange={(e) => setBirthday((b) => ({ ...b, rewardName: e.target.value }))}
-              disabled={!birthday.on}
-            />
-          </div>
-          <p style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 10, marginBottom: 0 }}>
-            <Trans>
-              Se envía solo a las 09:00 (hora local) y vale 7 días. El cliente recibe un aviso por
-              WhatsApp.
-            </Trans>
-          </p>
-        </div>
-      )}
-
-      {/* Promotions */}
-      <div className="card" style={{ padding: '24px 26px' }}>
-        <div className="ed-head" style={{ marginBottom: 18 }}>
-          <div className="titles">
-            {' '}
-            <h2>
-              <Trans>Promoción del momento</Trans>
-            </h2>
-          </div>
-        </div>
-        <div className="split">
-          <div className="field">
-            <label htmlFor={`${uid}-message-sent-on`}>
-              <Trans>Mensaje · se envía por WhatsApp · máx. 200 caracteres</Trans>
-            </label>
-            <textarea
-              id={`${uid}-message-sent-on`}
-              className="input"
-              value={promo.message}
-              onChange={(e) => setPromo((p) => ({ ...p, message: e.target.value.slice(0, 200) }))}
-              style={{ minHeight: 100 }}
-              maxLength={200}
-            />
-            <div
-              style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'right', marginTop: 4 }}
-            >
-              {promo.message.length} / 200
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className="field">
-              <label htmlFor={`${uid}-active-range-business`}>
-                <Trans>Vigencia · desde / hasta</Trans>
-              </label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  id={`${uid}-active-range-business`}
-                  type="date"
-                  aria-label={t`Inicio de la vigencia`}
-                  className="input"
-                  style={{ flex: 1 }}
-                  value={promo.from}
-                  onChange={(e) => setPromo((p) => ({ ...p, from: e.target.value }))}
-                />
-                <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
-                  →
-                </span>
-                <input
-                  type="date"
-                  aria-label={t`Fin de la vigencia`}
-                  className="input"
-                  style={{ flex: 1 }}
-                  value={promo.to}
-                  onChange={(e) => setPromo((p) => ({ ...p, to: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="field">
-              <span className="field-label">
-                <Trans>Días de la semana</Trans>
-              </span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {DOW.map((d) => (
-                  <button
-                    key={d.id}
-                    className={'day-pill focusable' + (promo.days.includes(d.id) ? ' on' : '')}
-                    onClick={() => toggleDay(d.id)}
-                  >
-                    {i18n._(d.l)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Self-registration */}
-      {cashActive && (
-        <div
-          className="card"
-          style={{ padding: '22px 26px', display: 'flex', alignItems: 'center', gap: 20 }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 14,
-              background: 'var(--canvas-2)',
-              color: 'var(--umi-navy)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <I.Users size={20} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div className="eyebrow">
-              <Trans>Alta de clientes</Trans>
-            </div>
-            <div style={{ fontWeight: 600, fontSize: 16, marginTop: 4 }}>
-              <Trans>Autorregistro</Trans>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
+            <p style={{ margin: 0, fontSize: 13.5, color: 'var(--ink-2)', maxWidth: '68ch' }}>
               <Trans>
-                El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin
-                ayuda del personal.
+                La configuración de pase en Wallet, sellos, recompensas, miembros y tarjetas de
+                regalo queda oculta hasta activar Umi Cash.
               </Trans>
+            </p>
+          </div>
+        )}
+
+        {/* Branding + wallet preview */}
+        {cashActive && (
+          <div
+            className="split"
+            style={{ gap: 24, padding: 24, borderTop: '1px solid var(--line-soft)' }}
+          >
+            <div>
+              <SettingsSection
+                title={<Trans>Apariencia de la tarjeta</Trans>}
+                note={
+                  <Trans>Cómo se ve la tarjeta del cliente en Apple Wallet y Google Wallet.</Trans>
+                }
+              />
+
+              <div className="field" style={{ marginBottom: 16 }}>
+                <label htmlFor={`${uid}-primary-color-card`}>
+                  <Trans>Color principal · fondo de la tarjeta</Trans>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <input
+                    id={`${uid}-primary-color-card`}
+                    type="color"
+                    value={brand.primary}
+                    onChange={(e) => {
+                      setBrand((b) => ({ ...b, primary: e.target.value }));
+                      document.documentElement.style.setProperty(
+                        '--merchant-brand',
+                        e.target.value,
+                      );
+                    }}
+                  />
+                  <span
+                    className="chip read"
+                    style={{ height: 44, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                  >
+                    {brand.primary.toUpperCase()}
+                  </span>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {PRESET_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        className={
+                          'swatch focusable' +
+                          (brand.primary.toLowerCase() === c.toLowerCase() ? ' on' : '')
+                        }
+                        style={{ '--swatch': c }}
+                        onClick={() => {
+                          setBrand((b) => ({ ...b, primary: c }));
+                          document.documentElement.style.setProperty('--merchant-brand', c);
+                        }}
+                        aria-label={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {/* Says it; does not override it. The colour is the café's decision. */}
+                {(() => {
+                  const c = contrastWithWhite(brand.primary);
+                  if (c == null || c >= 4.5) return null;
+                  return (
+                    <div
+                      className="field-warning"
+                      role="status"
+                      style={{ fontSize: 13.5, color: 'var(--warning)', marginTop: 4 }}
+                    >
+                      <Trans>
+                        El texto blanco de la tarjeta queda en {c.toFixed(1)}:1 sobre este color.
+                      </Trans>{' '}
+                      {c < 3 ? (
+                        <Trans>Tu cliente casi no podrá leer su saldo.</Trans>
+                      ) : (
+                        <Trans>Un color más oscuro se lee mejor en la mano.</Trans>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="field" style={{ marginBottom: 16 }}>
+                <label htmlFor={`${uid}-secondary-color-accents`}>
+                  <Trans>Color secundario · acentos y detalles</Trans>
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <input
+                    id={`${uid}-secondary-color-accents`}
+                    type="color"
+                    value={brand.secondary}
+                    onChange={(e) => setBrand((b) => ({ ...b, secondary: e.target.value }))}
+                  />
+                  <span
+                    className="chip read"
+                    style={{ height: 44, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                  >
+                    {brand.secondary.toUpperCase()}
+                  </span>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {['#E8C9A3', '#FFFFFF', '#7692CB', '#FAF4EC', '#C4A882', '#1F1410'].map((c) => (
+                      <button
+                        key={c}
+                        className={
+                          'swatch focusable' +
+                          (brand.secondary.toLowerCase() === c.toLowerCase() ? ' on' : '')
+                        }
+                        style={{ '--swatch': c }}
+                        onClick={() => setBrand((b) => ({ ...b, secondary: c }))}
+                        aria-label={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 16, marginTop: 4 }}
+              >
+                <div style={{ marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 600, lineHeight: 1.3 }}>
+                    <Trans>Recompensas por sellos</Trans>
+                  </h3>
+                </div>
+                <div className="grid grid-2" style={{ gap: 16 }}>
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <label htmlFor={`${uid}-reward-name-shown`}>
+                      <Trans>Nombre del premio · lo ve el cliente</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-reward-name-shown`}
+                      className="input tall"
+                      value={loyalty.rewardName}
+                      maxLength={MAX_REWARD_NAME_LENGTH}
+                      onChange={(e) =>
+                        setLoyalty((l) => ({
+                          ...l,
+                          rewardName: e.target.value.slice(0, MAX_REWARD_NAME_LENGTH),
+                        }))
+                      }
+                    />
+                    <div style={{ fontSize: 11.5, color: 'var(--ink-3)', textAlign: 'right' }}>
+                      {loyalty.rewardName.length} / {MAX_REWARD_NAME_LENGTH}
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-visits-required`}>
+                      <Trans>Visitas necesarias</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-visits-required`}
+                      type="number"
+                      min={MIN_STAMP_TARGET}
+                      max={MAX_STAMP_TARGET}
+                      className="input tall"
+                      value={loyalty.visitsRequired}
+                      onChange={(e) => setStampTarget(e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`${uid}-reward-cost-mxn`}>
+                      <Trans>Costo del premio · MXN</Trans>
+                    </label>
+                    <input
+                      id={`${uid}-reward-cost-mxn`}
+                      type="number"
+                      min={0}
+                      className="input tall"
+                      value={loyalty.rewardCost}
+                      onChange={(e) =>
+                        setLoyalty((l) => ({ ...l, rewardCost: parseInt(e.target.value) || 0 }))
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+              <SectionSave
+                dirty={pending.card}
+                saved={saved && savedSection === 'card'}
+                saving={saving}
+                onSave={() => handleSave('card')}
+              />
+            </div>
+
+            {/* Wallet pass live preview */}
+            <div
+              style={{
+                padding: 24,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
+                position: 'relative',
+                // A tonal pane, not a second boundary: the warm field says "this is
+                // the card in the customer's hand". The warm hairline is part of that
+                // warm field, and it keeps the pane visible in the dark themes, where
+                // the warm surface and the panel share the same dark value.
+                background: 'var(--surface-warm)',
+                border: '1px solid var(--surface-warm-border)',
+                borderRadius: 'var(--r-lg)',
+              }}
+            >
+              <div style={{ alignSelf: 'flex-start' }}>
+                <div className="eyebrow on-warm">
+                  <Trans>Vista previa</Trans>
+                </div>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 13.5,
+                    color: 'var(--ink-warm)',
+                    marginTop: 2,
+                  }}
+                >
+                  <Trans>Pase de Apple Wallet</Trans>
+                </div>
+              </div>
+              <WalletPass
+                brand={brand}
+                biz={biz}
+                stamps={stamps}
+                loyalty={loyalty}
+                birthday={birthday}
+                topupEnabled={merchant.topupEnabled !== false}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 13.5, color: 'var(--ink-warm-soft)' }}>
+                  <Trans>Sellos máximos</Trans>
+                </span>
+                <input
+                  type="range"
+                  aria-label={t`Sellos máximos en la tarjeta`}
+                  className="range-control"
+                  min={MIN_STAMP_TARGET}
+                  max={MAX_STAMP_TARGET}
+                  step={1}
+                  value={loyalty.visitsRequired}
+                  onChange={(e) => setStampTarget(e.target.value)}
+                  style={{ width: 140, accentColor: 'var(--umi-navy)' }}
+                />
+                <span
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: 'var(--ink-warm)',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  {loyalty.visitsRequired} / {MAX_STAMP_TARGET}
+                </span>
+              </div>
             </div>
           </div>
-          <div
-            className={'switch lg ' + (selfReg ? 'on' : '')}
-            onClick={() => setSelfReg((s) => !s)}
+        )}
+
+        {/* Birthday config */}
+        {cashActive && (
+          <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+            <SettingsSection
+              title={<Trans>Boost de cumpleaños</Trans>}
+              note={<Trans>Un premio que se emite solo el día del cumpleaños del cliente.</Trans>}
+              actions={
+                <Switch
+                  checked={birthday.on}
+                  label={t`Regalo de cumpleaños`}
+                  onChange={() => setBirthday((b) => ({ ...b, on: !b.on }))}
+                />
+              }
+            />
+            <div className="field">
+              <label htmlFor={`${uid}-reward-name-auto`}>
+                <Trans>Nombre del premio · se emite solo en el cumpleaños</Trans>
+              </label>
+              <input
+                id={`${uid}-reward-name-auto`}
+                className="input tall"
+                value={birthday.rewardName}
+                onChange={(e) => setBirthday((b) => ({ ...b, rewardName: e.target.value }))}
+                disabled={!birthday.on}
+              />
+            </div>
+            <p style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 12, marginBottom: 0 }}>
+              <Trans>
+                Se envía solo a las 09:00 (hora local) y vale 7 días. El cliente recibe un aviso por
+                WhatsApp.
+              </Trans>
+            </p>
+            <SectionSave
+              dirty={pending.birthday}
+              saved={saved && savedSection === 'birthday'}
+              saving={saving}
+              onSave={() => handleSave('birthday')}
+            />
+          </div>
+        )}
+
+        {/* Promotions */}
+        <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+          <SettingsSection title={<Trans>Promoción del momento</Trans>} />
+          <div className="split">
+            <div className="field">
+              <label htmlFor={`${uid}-message-sent-on`}>
+                <Trans>Mensaje · se envía por WhatsApp · máx. 200 caracteres</Trans>
+              </label>
+              <textarea
+                id={`${uid}-message-sent-on`}
+                className="input"
+                value={promo.message}
+                onChange={(e) => setPromo((p) => ({ ...p, message: e.target.value.slice(0, 200) }))}
+                style={{ minHeight: 100 }}
+                maxLength={200}
+              />
+              {/* A counter at zero is noise. The label already carries the limit. */}
+              {promo.message.length > 0 ? (
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: 'var(--ink-3)',
+                    textAlign: 'right',
+                    marginTop: 4,
+                  }}
+                >
+                  {promo.message.length} / 200
+                </div>
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="field">
+                <label htmlFor={`${uid}-active-range-business`}>
+                  <Trans>Vigencia · desde / hasta</Trans>
+                </label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    id={`${uid}-active-range-business`}
+                    type="date"
+                    aria-label={t`Inicio de la vigencia`}
+                    className="input"
+                    style={{ flex: 1 }}
+                    value={promo.from}
+                    onChange={(e) => setPromo((p) => ({ ...p, from: e.target.value }))}
+                  />
+                  <span style={{ color: 'var(--ink-3)' }} aria-hidden="true">
+                    →
+                  </span>
+                  <input
+                    type="date"
+                    aria-label={t`Fin de la vigencia`}
+                    className="input"
+                    style={{ flex: 1 }}
+                    value={promo.to}
+                    onChange={(e) => setPromo((p) => ({ ...p, to: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <span className="field-label">
+                  <Trans>Días de la semana</Trans>
+                </span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {DOW.map((d) => (
+                    <button
+                      key={d.id}
+                      className={'day-pill focusable' + (promo.days.includes(d.id) ? ' on' : '')}
+                      onClick={() => toggleDay(d.id)}
+                    >
+                      {i18n._(d.l)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <SectionSave
+            dirty={pending.promo}
+            saved={saved && savedSection === 'promo'}
+            saving={saving}
+            onSave={() => handleSave('promo')}
           />
         </div>
-      )}
+
+        {/* Self-registration */}
+        {cashActive && (
+          <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+            <SettingsSection
+              title={<Trans>Autorregistro</Trans>}
+              note={
+                <Trans>
+                  El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin
+                  ayuda del personal.
+                </Trans>
+              }
+              actions={
+                <Switch
+                  checked={selfReg}
+                  label={t`Autorregistro`}
+                  onChange={() => setSelfReg((s) => !s)}
+                />
+              }
+            />
+            <SectionSave
+              dirty={pending.selfreg}
+              saved={saved && savedSection === 'selfreg'}
+              saving={saving}
+              onSave={() => handleSave('selfreg')}
+            />
+          </div>
+        )}
+      </section>
     </div>
   );
 };
@@ -1239,34 +1354,32 @@ function LocationProfilesCard({ conversaflowActive }) {
   const showAliases = conversaflowActive && profiles.length > 1;
 
   return (
-    // FRAGMENT, and the sheet is OUTSIDE the card on purpose. `.sheet` is
+    // FRAGMENT, and the sheet is OUTSIDE the section on purpose. `.sheet` is
     // `position: fixed`, and a transformed ancestor becomes the containing block
-    // for a fixed descendant — so a sheet rendered inside this card is laid out
-    // against the CARD instead of the viewport: a clipped panel a few hundred
+    // for a fixed descendant — so a sheet rendered inside this section is laid out
+    // against it instead of the viewport: a clipped panel a few hundred
     // pixels wide, with its own fields cut off. Staff and Cafés both mount their
     // sheet at screen level; this matches. (The screen's arrival animation is
     // opacity-only for the same reason — see `.screen-body` in styles.css.)
     <>
-      <div className="card" style={{ padding: '24px 26px' }}>
-        <div className="ed-head" style={{ marginBottom: 18 }}>
-          <div className="titles">
-            {' '}
-            <h2>
-              <Trans>Sucursales</Trans>
-            </h2>
-            <div className="en">
-              <Trans>Los locales de este café. Cada uno tiene su propio horario.</Trans>
-            </div>
-          </div>
-          <button className="btn btn-secondary btn-sm focusable" onClick={() => setAdding(true)}>
-            + {t`Agregar sucursal`}
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {profiles.map((p) => (
-            <LocationProfileRow key={p.id} profile={p} showAliases={showAliases} />
-          ))}
-        </div>
+      <div style={{ padding: 24 }}>
+        <SettingsSection
+          title={<Trans>Sucursales</Trans>}
+          note={<Trans>Los locales de este café. Cada uno tiene su propio horario.</Trans>}
+          actions={
+            <button className="btn btn-secondary btn-sm focusable" onClick={() => setAdding(true)}>
+              <I.Plus size={15} /> {t`Agregar sucursal`}
+            </button>
+          }
+        />
+        {profiles.map((profile, index) => (
+          <LocationProfileRow
+            key={profile.id}
+            profile={profile}
+            showAliases={showAliases}
+            first={index === 0}
+          />
+        ))}
       </div>
       {adding && (
         <NewLocationSheet
@@ -1415,7 +1528,7 @@ function AddressFields({ form, update, setForm, geo }) {
           </button>
         </div>
         {geo.message && (
-          <div style={{ fontSize: 12, color: 'var(--ink-3)' }} role="status">
+          <div style={{ fontSize: 13.5, color: 'var(--ink-2)' }} role="status">
             {geo.message}
           </div>
         )}
@@ -1538,7 +1651,7 @@ function coordProblem(t, form) {
  * reads an absent field as "leave it alone" and an explicit null as "clear it", so
  * a row that posted every field on every save would clear the ones it never showed.
  */
-function LocationProfileRow({ profile, showAliases }) {
+function LocationProfileRow({ profile, showAliases, first = false }) {
   const { t } = useLingui();
   const uid = useId();
   const [open, setOpen] = useState(false);
@@ -1632,12 +1745,13 @@ function LocationProfileRow({ profile, showAliases }) {
   return (
     <div
       style={{
-        border: '1px solid var(--line)',
-        borderRadius: 12,
-        padding: open ? 16 : '12px 16px',
+        // A branch is a row of the section, not a box inside it: the line belongs
+        // to the list, and the row stops drawing a second boundary around itself.
+        borderTop: first ? 'none' : '1px solid var(--line-soft)',
+        padding: '12px 0',
         display: 'flex',
         flexDirection: 'column',
-        gap: open ? 12 : 0,
+        gap: open ? 12 : 4,
       }}
     >
       {/* CLOSED BY DEFAULT, and that is the point. A branch is read far more often
@@ -1658,7 +1772,7 @@ function LocationProfileRow({ profile, showAliases }) {
             style={{ width: 240, height: 34, fontWeight: 600 }}
           />
         ) : (
-          <div style={{ fontWeight: 600, fontSize: 14, opacity: closed ? 0.6 : 1 }}>
+          <div style={{ fontWeight: 600, fontSize: 13.5, opacity: closed ? 0.6 : 1 }}>
             {form.name || profile.name}
           </div>
         )}
@@ -1682,7 +1796,7 @@ function LocationProfileRow({ profile, showAliases }) {
         <div
           style={{
             flex: 1,
-            fontSize: 12.5,
+            fontSize: 13.5,
             color: 'var(--ink-3)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -1692,12 +1806,12 @@ function LocationProfileRow({ profile, showAliases }) {
           {open ? '' : form.address || t`Sin dirección`}
         </div>
         {!open && dirty && (
-          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>
             <Trans>Sin guardar</Trans>
           </span>
         )}
         {open && error && (
-          <span role="alert" style={{ color: '#c0392b', fontSize: 12 }}>
+          <span role="alert" style={{ color: 'var(--danger)', fontSize: 13.5 }}>
             {error}
           </span>
         )}
@@ -1728,12 +1842,12 @@ function LocationProfileRow({ profile, showAliases }) {
                 <span className="field-label">
                   <Trans>Apodos (cómo la llaman los clientes)</Trans>
                 </span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                   {aliases.map((a, i) => (
                     <span
                       key={i}
                       className="chip"
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                     >
                       {a}
                       <button
@@ -1766,7 +1880,7 @@ function LocationProfileRow({ profile, showAliases }) {
                     onBlur={() => addAlias(draft)}
                     placeholder={t`+ apodo`}
                     maxLength={40}
-                    style={{ width: 150, height: 32, fontSize: 12.5 }}
+                    style={{ width: 160, height: 32, fontSize: 13.5 }}
                   />
                 </div>
               </div>

@@ -3,8 +3,10 @@ import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate } from '@/lib/format.js';
-import { RegionHead } from '@/shell.jsx';
+import { PageHead } from '@/components/page-head.jsx';
+import { Menu } from '@/components/menu.jsx';
 import { Segmented } from '@/components/segmented.jsx';
+import { Select } from '@/components/select.jsx';
 import {
   archiveMerchantRole,
   createMerchantRole,
@@ -18,6 +20,46 @@ import {
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
 const ROLE_LABELS = { ADMIN: msg`Admin`, STAFF: msg`Barista` };
+
+/**
+ * A permission group is an API key, not a word. The console shows the word.
+ *
+ * The old list printed the key itself — `cart`, `cash.drawer.no_sale` — in a mono
+ * font, to the owner. An unknown key falls back to one plain heading, so a key
+ * that this map does not hold can never print itself.
+ */
+const GROUP_LABELS = {
+  cart: msg`Carrito`,
+  cash: msg`Caja y turnos`,
+  catalog: msg`Catálogo`,
+  checkout: msg`Pago`,
+  customer: msg`Clientes`,
+  device: msg`Dispositivos`,
+  hardware: msg`Hardware`,
+  inventory: msg`Inventario`,
+  offline: msg`Sin conexión`,
+  orders: msg`Pedidos`,
+  register: msg`Caja registradora`,
+  sale: msg`Venta`,
+  audit: msg`Auditoría`,
+  insights: msg`Reportes`,
+  location: msg`Sucursal`,
+  merchant: msg`Negocio`,
+  'table order': msg`Mesas`,
+  tenant: msg`Cuenta`,
+  kitchen: msg`Cocina`,
+  'gift card': msg`Tarjetas de regalo`,
+  loyalty: msg`Lealtad`,
+  'stored value': msg`Saldo`,
+  wallet: msg`Wallet`,
+};
+const GROUP_LABELS_OTHER = msg`Otros permisos`;
+
+/**
+ * Only a risk above the default earns a mark. A chip on every row says nothing,
+ * and most permissions are low risk.
+ */
+const RISK_LABELS = { medium: msg`Medio`, high: msg`Alto` };
 
 function nameToHue(name) {
   let hue = 0;
@@ -35,6 +77,16 @@ function fmtRelative(t, iso) {
   if (ms < 86400000) return t`${Math.floor(ms / 3600000)} h`;
   if (ms < 7 * 86400000) return t`${Math.floor(ms / 86400000)} d`;
   return formatDate(iso);
+}
+
+/** The two initials the avatar prints, or a question mark when the name is absent. */
+function initialsOf(name) {
+  return (name || '?')
+    .split(' ')
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 }
 
 const StaffScreen = () => {
@@ -66,197 +118,227 @@ const StaffScreen = () => {
     setRefresh((value) => value + 1);
   };
 
+  async function disable(person) {
+    try {
+      setRosterError(null);
+      await deleteStaffMember(person.id);
+      reload();
+    } catch (error) {
+      setRosterError(error.message || t`No se pudo desactivar el acceso.`);
+    }
+  }
+
+  const people = section === 'people';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* ONE band. The masthead already says the page name, so this line carries the
+          set size and the one action of the open section. */}
+      <PageHead
+        count={
+          people ? (
+            <Plural value={activeStaff.length} one="# persona" other="# personas" />
+          ) : (
+            <Plural value={roles.length} one="# rol" other="# roles" />
+          )
+        }
+        actions={
+          people ? (
+            <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
+              <I.Plus size={16} /> <Trans>Añadir persona</Trans>
+            </button>
+          ) : null
+        }
+      />
+
       <Segmented
         label={t`Secciones de equipo y acceso`}
         value={section}
         onChange={setSection}
         options={[
           { id: 'people', label: <Trans>Personas</Trans> },
-          { id: 'roles', label: <Trans>Roles y permisos</Trans> },
+          { id: 'roles', label: <Trans>Roles</Trans> },
         ]}
       />
-      <RegionHead
-        title={section === 'people' ? t`Equipo y acceso al POS` : t`Roles y permisos`}
-        note={
-          section === 'people'
-            ? loading
-              ? t`Cargando…`
-              : t`${activeStaff.filter((person) => person.role === 'ADMIN').length} con rol Admin.`
-            : rolesLoading
-              ? t`Cargando…`
-              : t`Define lo que cada rol puede hacer en el POS y el Dashboard.`
-        }
-        count={
-          section === 'people'
-            ? { value: activeStaff.length, label: t`personas` }
-            : { value: roles.length, label: t`roles` }
-        }
-        actions={
-          section === 'people' ? (
-            <>
-              <Segmented
-                label={t`Filtrar el equipo por rol`}
-                value={filter}
-                onChange={setFilter}
-                options={[{ id: 'ALL', name: t`Todos` }, ...roles].map((role) => ({
-                  id: role.id,
-                  label: role.name,
-                }))}
-              />
-              <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
-                <I.Plus size={16} /> <Trans>Añadir persona</Trans>
-              </button>
-            </>
-          ) : null
-        }
-      />
 
-      {section === 'people' ? (
+      {people ? (
         <>
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="surface" style={{ overflow: 'hidden' }}>
+            {/* The view row. A role is one choice among nine, so it is a select and
+                not nine chips: fewer things to read, the same filter. */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                flexWrap: 'wrap',
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--line-soft)',
+              }}
+            >
+              <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>
+                <Trans>Rol</Trans>
+              </span>
+              <Select
+                className="select"
+                aria-label={t`Filtrar el equipo por rol`}
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                style={{ minWidth: 200 }}
+              >
+                <option value="ALL">{t`Todos`}</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
             {rosterError ? (
               <div
                 role="alert"
                 style={{
-                  padding: '12px 20px',
-                  fontSize: 12.5,
+                  padding: '12px 16px',
+                  fontSize: 13.5,
                   color: 'var(--danger)',
-                  borderBottom: '1px solid var(--line)',
+                  borderBottom: '1px solid var(--line-soft)',
                 }}
               >
                 {rosterError}
               </div>
             ) : null}
+
             {filtered.length === 0 && !loading ? (
-              <div style={{ padding: '48px 32px', textAlign: 'center', color: 'var(--ink-3)' }}>
-                {filter === 'ALL'
-                  ? t`No hay personas activas en el equipo.`
-                  : t`No hay personas con el rol ${roles.find((role) => role.id === filter)?.name || ''}.`}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '48px 24px',
+                  textAlign: 'center',
+                }}
+              >
+                <span style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>
+                  {filter === 'ALL'
+                    ? t`No hay personas activas en el equipo.`
+                    : t`No hay personas con ese rol.`}
+                </span>
+                <button
+                  className="btn btn-secondary btn-sm focusable"
+                  onClick={() => (filter === 'ALL' ? setInviteOpen(true) : setFilter('ALL'))}
+                >
+                  {filter === 'ALL' ? t`Añadir persona` : t`Limpiar`}
+                </button>
               </div>
             ) : (
-              <table className="matrix">
-                <thead>
-                  <tr>
-                    <th style={{ width: '32%' }}>
-                      <Trans>Persona</Trans>
-                    </th>
-                    <th>
-                      <Trans>Rol</Trans>
-                    </th>
-                    <th>
-                      <Trans>Acceso al POS</Trans>
-                    </th>
-                    <th>
-                      <Trans>Teléfono</Trans>
-                    </th>
-                    <th>
-                      <Trans>Desde</Trans>
-                    </th>
-                    <th style={{ width: 104 }}>
-                      <span className="sr-only">
-                        <Trans>Acciones</Trans>
-                      </span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((person) => {
-                    const hue = nameToHue(person.name || 'X');
-                    const initials = (person.name || '?')
-                      .split(' ')
-                      .map((part) => part[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase();
-                    return (
-                      <tr key={person.id}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div
-                              className="avatar-lg"
-                              style={{
-                                background: `oklch(0.78 0.08 ${hue})`,
-                                color: `oklch(0.28 0.08 ${hue})`,
-                              }}
-                            >
-                              {initials}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600, fontSize: 14 }}>{person.name}</div>
-                              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
-                                {person.email || t`Sin correo`}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${person.role === 'ADMIN' ? 'badge-admin' : 'badge-staff'}`}
-                          >
-                            {person.role === 'ADMIN' ? <I.Lock size={10} /> : null}
-                            {person.roleName ||
-                              (ROLE_LABELS[person.role] && i18n._(ROLE_LABELS[person.role])) ||
-                              person.role}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
-                            {person.hasOperatorPin ? t`PIN configurado` : t`Sin PIN`}
-                          </span>
-                        </td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
-                          {person.phone || '—'}
-                        </td>
-                        <td style={{ color: 'var(--ink-2)', fontSize: 13 }}>
-                          {fmtRelative(t, person.createdAt)}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <button
-                              className="btn-icon"
-                              aria-label={t`Administrar acceso de ${person.name}`}
-                              title={
-                                person.role === 'ADMIN' && !canAssignAdmin
-                                  ? t`Solo el propietario puede administrar un acceso Admin.`
-                                  : t`Administrar rol y PIN`
-                              }
-                              disabled={person.role === 'ADMIN' && !canAssignAdmin}
-                              onClick={() => setSelectedStaff(person)}
-                            >
-                              <I.Edit size={15} />
-                            </button>
-                            <button
-                              className="btn-icon"
-                              aria-label={t`Desactivar a ${person.name}`}
-                              title={
-                                person.role === 'ADMIN' && !canAssignAdmin
-                                  ? t`Solo el propietario puede administrar un acceso Admin.`
-                                  : t`Desactivar acceso`
-                              }
-                              disabled={person.role === 'ADMIN' && !canAssignAdmin}
-                              onClick={async () => {
-                                try {
-                                  setRosterError(null);
-                                  await deleteStaffMember(person.id);
-                                  reload();
-                                } catch (error) {
-                                  setRosterError(
-                                    error.message || t`No se pudo desactivar el acceso.`,
-                                  );
-                                }
-                              }}
-                            >
-                              <I.Trash size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              filtered.map((person) => {
+                const hue = nameToHue(person.name || 'X');
+                const isAdmin = person.role === 'ADMIN';
+                const locked = isAdmin && !canAssignAdmin;
+                const roleLabel =
+                  person.roleName ||
+                  (ROLE_LABELS[person.role] && i18n._(ROLE_LABELS[person.role])) ||
+                  person.role;
+                return (
+                  <div
+                    key={person.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      flexWrap: 'wrap',
+                      padding: '12px 16px',
+                      borderTop: '1px solid var(--line-soft)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        flex: 1,
+                        minWidth: 220,
+                      }}
+                    >
+                      <div
+                        className="avatar-lg"
+                        style={{
+                          background: `oklch(0.78 0.08 ${hue})`,
+                          color: `oklch(0.28 0.08 ${hue})`,
+                        }}
+                      >
+                        {initialsOf(person.name)}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600 }}>{person.name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+                          {person.email || t`Sin correo`}
+                          {person.phone ? ` · ${person.phone}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                    {/* A role is a fact, not a status, so it reads in ink. The lock
+                        marks the two roles that only an owner may hand out. */}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        minWidth: 132,
+                        fontSize: 13.5,
+                        color: 'var(--ink-2)',
+                      }}
+                    >
+                      {isAdmin ? <I.Lock size={12} /> : null}
+                      {roleLabel}
+                    </span>
+                    <span style={{ minWidth: 116, fontSize: 13.5, color: 'var(--ink-2)' }}>
+                      {person.hasOperatorPin ? t`PIN configurado` : t`Sin PIN`}
+                    </span>
+                    <Menu
+                      align="end"
+                      label={t`Acciones de ${person.name}`}
+                      items={[
+                        {
+                          key: 'access',
+                          label: t`Administrar acceso al POS`,
+                          icon: I.Edit,
+                          disabled: locked,
+                          onSelect: () => setSelectedStaff(person),
+                        },
+                        {
+                          key: 'disable',
+                          label: t`Desactivar acceso`,
+                          icon: I.Trash,
+                          danger: true,
+                          disabled: locked,
+                          onSelect: () => disable(person),
+                        },
+                      ]}
+                      renderTrigger={({ ref, props }) => (
+                        <button
+                          type="button"
+                          ref={ref}
+                          className="btn btn-ghost btn-sm"
+                          aria-label={t`Acciones de ${person.name}`}
+                          disabled={locked}
+                          title={
+                            locked
+                              ? t`Solo el propietario puede administrar un acceso Admin.`
+                              : t`Administrar rol y PIN`
+                          }
+                          {...props}
+                        >
+                          <I.MoreH size={16} />
+                        </button>
+                      )}
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
 
@@ -291,6 +373,7 @@ const StaffScreen = () => {
           roles={roles}
           permissions={permissions}
           canManage={canAssignAdmin}
+          loading={rolesLoading}
           onReload={reloadRoles}
         />
       )}
@@ -298,7 +381,7 @@ const StaffScreen = () => {
   );
 };
 
-function RolesWorkspace({ roles, permissions, canManage, onReload }) {
+function RolesWorkspace({ roles, permissions, canManage, loading, onReload }) {
   const { t } = useLingui();
   const [selectedId, setSelectedId] = useState(
     roles.find((role) => role.key === 'admin')?.id || roles[0]?.id || '',
@@ -328,13 +411,21 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
 
   return (
     <div className="roles-workspace">
-      <div className="card" style={{ padding: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 6px 12px' }}>
-          <strong>
+      <div className="surface" style={{ padding: 12 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '4px 8px 12px',
+          }}
+        >
+          <strong style={{ fontSize: 13.5 }}>
             <Trans>Roles del comercio</Trans>
           </strong>
           <button
-            className="btn-icon"
+            className="btn-icon focusable"
             aria-label={t`Crear un rol`}
             title={canManage ? t`Crear un rol` : t`Solo el propietario puede crear roles.`}
             disabled={!canManage || creating}
@@ -344,11 +435,11 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
           </button>
         </div>
         {error ? (
-          <div role="alert" style={{ color: 'var(--danger)', padding: 8 }}>
+          <div role="alert" style={{ color: 'var(--danger)', fontSize: 13.5, padding: 8 }}>
             {error}
           </div>
         ) : null}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {roles.map((role) => (
             <button
               key={role.id}
@@ -356,9 +447,15 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
               onClick={() => setSelectedId(role.id)}
             >
               <span
-                className={`badge ${role.key === 'owner' || role.key === 'admin' ? 'badge-admin' : 'badge-staff'}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                }}
               >
-                {role.key === 'owner' || role.key === 'admin' ? <I.Lock size={10} /> : null}
+                {role.key === 'owner' || role.key === 'admin' ? <I.Lock size={12} /> : null}
                 {role.name}
               </span>
               <span style={{ color: 'var(--ink-3)', fontSize: 11.5 }}>
@@ -367,6 +464,11 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
               </span>
             </button>
           ))}
+          {roles.length === 0 && !loading ? (
+            <span style={{ padding: 12, fontSize: 13.5, color: 'var(--ink-2)' }}>
+              <Trans>No hay roles disponibles.</Trans>
+            </span>
+          ) : null}
         </div>
       </div>
       {selected ? (
@@ -378,7 +480,7 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
           onReload={onReload}
         />
       ) : (
-        <div className="card" style={{ padding: 32, color: 'var(--ink-3)' }}>
+        <div className="surface" style={{ padding: 32, fontSize: 13.5, color: 'var(--ink-2)' }}>
           <Trans>No hay roles disponibles.</Trans>
         </div>
       )}
@@ -387,11 +489,12 @@ function RolesWorkspace({ roles, permissions, canManage, onReload }) {
 }
 
 function RoleEditor({ role, permissions, canManage, onReload }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description || '');
   const [selectedKeys, setSelectedKeys] = useState(new Set(role.permissionKeys));
   const [product, setProduct] = useState('pos');
+  const [openGroups, setOpenGroups] = useState(() => new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const locked = role.isSystem || !canManage;
@@ -414,6 +517,14 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
       return next;
     });
   };
+
+  const toggleGroup = (group) =>
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
 
   const save = async () => {
     if (!changed || locked || saving || !name.trim()) return;
@@ -448,10 +559,10 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
   };
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: 24, borderBottom: '1px solid var(--line)' }}>
+    <section className="surface" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: 24, borderBottom: '1px solid var(--line-soft)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <input
               className="sheet-title-input"
               aria-label={t`Nombre del rol`}
@@ -467,10 +578,10 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
               value={description}
               disabled={locked}
               onChange={(event) => setDescription(event.target.value)}
-              style={{ marginTop: 10 }}
+              style={{ marginTop: 12 }}
             />
           </div>
-          <div style={{ textAlign: 'right', color: 'var(--ink-3)', fontSize: 12 }}>
+          <div style={{ textAlign: 'right', color: 'var(--ink-3)', fontSize: 11.5 }}>
             <div>
               <Plural
                 value={role.assignedCount}
@@ -481,20 +592,16 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
             <div>
               <Trans>Revisión {role.revision}</Trans>
             </div>
-            {role.sourceTemplateKey ? (
-              <div>
-                <Trans>Plantilla {role.sourceTemplateKey}</Trans>
-              </div>
-            ) : null}
           </div>
         </div>
         {role.isSystem ? (
-          <div style={{ marginTop: 12, color: 'var(--ink-3)', fontSize: 12 }}>
+          <div style={{ marginTop: 12, color: 'var(--ink-2)', fontSize: 13.5 }}>
             <Trans>El rol Owner está protegido.</Trans>
           </div>
         ) : null}
       </div>
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)' }}>
+
+      <div style={{ padding: '12px 24px' }}>
         <Segmented
           label={t`Filtrar permisos por producto`}
           value={product}
@@ -505,55 +612,95 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
           }))}
         />
       </div>
-      <div style={{ maxHeight: 520, overflow: 'auto' }}>
-        {groups.map((group) => (
-          <div key={group}>
-            <div className="permission-group-title">{group.replaceAll('_', ' ')}</div>
-            {visible
-              .filter((permission) => permission.groupKey === group)
-              .map((permission) => (
-                <label key={permission.key} className="permission-row">
-                  <input
-                    type="checkbox"
-                    checked={selectedKeys.has(permission.key)}
-                    disabled={locked || !permission.delegable}
-                    onChange={() => toggle(permission.key)}
-                  />
-                  <span style={{ flex: 1 }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
-                      {permission.key}
-                    </span>
-                    {permission.description ? (
-                      <span style={{ display: 'block', color: 'var(--ink-3)', fontSize: 11.5 }}>
-                        {permission.description}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className={`risk-chip risk-${permission.riskLevel}`}>
-                    {permission.riskLevel}
-                  </span>
-                </label>
-              ))}
-          </div>
-        ))}
+
+      {/* PROGRESSIVE DISCLOSURE. The old body held one checkbox per permission —
+          94 controls on the POS filter alone — and the owner read the whole wall to
+          answer one question: what can this role do? A group answers that question
+          in one line. The checkboxes appear on request. */}
+      <div style={{ maxHeight: 520, overflow: 'auto', borderTop: '1px solid var(--line-soft)' }}>
+        {groups.map((group) => {
+          const rows = visible.filter((permission) => permission.groupKey === group);
+          const granted = rows.filter((permission) => selectedKeys.has(permission.key)).length;
+          const open = openGroups.has(group);
+          return (
+            <div key={group}>
+              <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => toggleGroup(group)}
+                className="focusable"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  width: '100%',
+                  minHeight: 48,
+                  padding: '12px 24px',
+                  border: 'none',
+                  borderTop: '1px solid var(--line-soft)',
+                  background: 'transparent',
+                  color: 'inherit',
+                  font: 'inherit',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <I.ChevronDown
+                  size={14}
+                  style={{
+                    transform: open ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 160ms var(--ease)',
+                  }}
+                />
+                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 600 }}>
+                  {i18n._(GROUP_LABELS[group] || GROUP_LABELS_OTHER)}
+                </span>
+                <span className="status-plain">
+                  {granted} / {rows.length}
+                </span>
+              </button>
+              {open
+                ? rows.map((permission) => (
+                    <label key={permission.key} className="permission-row">
+                      <input
+                        type="checkbox"
+                        checked={selectedKeys.has(permission.key)}
+                        disabled={locked || !permission.delegable}
+                        onChange={() => toggle(permission.key)}
+                      />
+                      <span style={{ flex: 1, fontSize: 13.5 }}>{permission.description}</span>
+                      {RISK_LABELS[permission.riskLevel] ? (
+                        <span className={`risk-chip risk-${permission.riskLevel}`}>
+                          {i18n._(RISK_LABELS[permission.riskLevel])}
+                        </span>
+                      ) : null}
+                    </label>
+                  ))
+                : null}
+            </div>
+          );
+        })}
       </div>
+
       <div
         style={{
           display: 'flex',
+          alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
-          padding: 20,
-          borderTop: '1px solid var(--line)',
+          flexWrap: 'wrap',
+          padding: '16px 24px',
+          borderTop: '1px solid var(--line-soft)',
         }}
       >
         <div>
           {error ? (
-            <span role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>
+            <span role="alert" style={{ color: 'var(--danger)', fontSize: 13.5 }}>
               {error}
             </span>
           ) : null}
           {!error && role.assignedCount ? (
-            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+            <span style={{ color: 'var(--ink-2)', fontSize: 13.5 }}>
               <Trans>Reasigna al equipo antes de archivar.</Trans>
             </span>
           ) : null}
@@ -567,7 +714,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
             <Trans>Archivar</Trans>
           </button>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary focusable"
             disabled={!changed || locked || saving || !name.trim()}
             onClick={save}
           >
@@ -575,7 +722,7 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -607,8 +754,8 @@ function RolePicker({ roles, roleId, setRoleId, canAssignAdmin, currentRoleId })
           );
         })}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-        {selected?.description || t`Los permisos del rol se administran en Roles y permisos.`}
+      <div style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>
+        {selected?.description || t`Los permisos del rol se administran en Roles.`}
       </div>
     </div>
   );
@@ -636,13 +783,10 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 5,
-                padding: '3px 8px',
-                borderRadius: 999,
+                gap: 4,
                 fontSize: 11.5,
                 fontWeight: 600,
                 color: hasExistingPin ? 'var(--success)' : 'var(--ink-3)',
-                background: hasExistingPin ? 'var(--success-soft)' : 'var(--line-soft)',
               }}
             >
               {hasExistingPin ? <I.Check size={12} /> : <I.X size={11} />}
@@ -676,7 +820,7 @@ function PinFields({ uid, pin, confirmation, setPin, setConfirmation, hasExistin
           value={confirmation}
           onChange={(event) => setConfirmation(event.target.value.replace(/\D/g, ''))}
         />
-        <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+        <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
           <Trans>El Dashboard nunca muestra un PIN guardado.</Trans>
         </div>
       </div>
@@ -847,6 +991,16 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
             <Trans>Quitar el PIN actual</Trans>
           </button>
         ) : null}
+        {/* The roster no longer spends a column on tenure. The fact belongs to the
+            record of the person, and this sheet is that record. */}
+        <div className="quiet-row">
+          <span className="quiet-label">
+            <Trans>Desde</Trans>
+          </span>
+          <span className="quiet-value">
+            {person.createdAt ? fmtRelative(t, person.createdAt) : '—'}
+          </span>
+        </div>
       </div>
       <SheetFooter
         error={
@@ -888,7 +1042,7 @@ function Sheet({ title, eyebrow, onClose, topContent, children }) {
           <div
             style={{
               padding: '0 24px 16px',
-              borderBottom: '1px solid var(--line)',
+              borderBottom: '1px solid var(--line-soft)',
             }}
           >
             {topContent}
@@ -904,7 +1058,7 @@ function SheetFooter({ error, saving, valid, onClose, onSave, saveLabel }) {
   return (
     <div className="sheet-foot">
       {error ? (
-        <span role="alert" style={{ flex: 1, fontSize: 12.5, color: 'var(--danger)' }}>
+        <span role="alert" style={{ flex: 1, fontSize: 13.5, color: 'var(--danger)' }}>
           {error}
         </span>
       ) : (

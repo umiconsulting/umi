@@ -77,3 +77,29 @@ deploy/pilot/pilot.env
 # Playwright CLI runtime artifacts (snapshots, console logs)
 .playwright-cli/
 .playwright/
+
+# ---- Bulk research harvests -------------------------------------------------
+# The competitor screenshot HARVESTS are not committed. Measured 2026-09-18: the
+# five folders below hold 193 images and 53 MB, which is 24x the 2.4 MB of research
+# images the repository already tracks, against a 91 MB .git.
+#
+# Every image in them is reproducible: the INDEX.md beside each folder records the
+# app id, the source URL, the device class, and what the screen shows, and the
+# video and ugc indexes record the exact timestamp for every frame. A reviewer
+# needs the index, not the binary.
+#
+# The curated evidence the reports actually reference IS committed: the eight
+# official Lightspeed screenshots at the root of this folder, and the before/after
+# screen sets under docs/research/2026-09-18-design-taste/assets/screens/.
+docs/research/2026-09-18-inventory-surface-placement/assets/store/*.png
+docs/research/2026-09-18-inventory-surface-placement/assets/store/*.jpg
+docs/research/2026-09-18-inventory-surface-placement/assets/store/*.jpeg
+docs/research/2026-09-18-inventory-surface-placement/assets/video/*.png
+docs/research/2026-09-18-inventory-surface-placement/assets/video/*.jpg
+docs/research/2026-09-18-inventory-surface-placement/assets/video/*.jpeg
+docs/research/2026-09-18-inventory-surface-placement/assets/ugc/**/*.png
+docs/research/2026-09-18-inventory-surface-placement/assets/ugc/**/*.jpg
+docs/research/2026-09-18-inventory-surface-placement/assets/ugc/**/*.jpeg
+docs/research/2026-09-18-inventory-surface-placement/assets/ugc/**/*.webp
+docs/research/2026-09-18-inventory-surface-placement/assets/independent/*.png
+docs/research/2026-09-18-inventory-surface-placement/assets/marketplace/*.png

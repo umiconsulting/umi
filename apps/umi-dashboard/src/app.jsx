@@ -37,8 +37,8 @@ import CafesScreen from '@/screens/cafes.jsx';
 import OperationsScreen from '@/screens/operations.jsx';
 import CashShiftsScreen from '@/screens/cash-shifts.jsx';
 import ReportesScreen from '@/screens/reportes.jsx';
-import CatalogInventoryScreen from '@/screens/catalog-inventory.jsx';
-import InventoryCostingScreen from '@/screens/inventory-costing.jsx';
+import ProductsHub from '@/screens/products-hub.jsx';
+import InventoryHub from '@/screens/inventory-hub.jsx';
 import DiagnosticsScreen from '@/screens/diagnostics.jsx';
 import CocinaScreen from '@/screens/cocina.jsx';
 import ProfileScreen from '@/screens/profile.jsx';
@@ -336,21 +336,28 @@ function DashboardLayout() {
               }
             />
             <Route
-              path="catalog-inventory"
+              path="products/:tab?"
               element={
-                <GuardedScreen moduleKey="catalog-inventory">
-                  <CatalogInventoryScreen />
+                <GuardedScreen moduleKey="products">
+                  <ProductsHub />
                 </GuardedScreen>
               }
             />
             <Route
-              path="inventory-costing"
+              path="inventory/:tab?"
               element={
-                <GuardedScreen moduleKey="inventory-costing">
-                  <InventoryCostingScreen />
+                <GuardedScreen moduleKey="inventory">
+                  <InventoryHub />
                 </GuardedScreen>
               }
             />
+            {/*
+              The two routes the audit of 2026-09-18 replaced. They redirect rather
+              than 404, because a bookmark, a printed runbook, and every link in an
+              older doc still point at them.
+            */}
+            <Route path="catalog-inventory" element={<Navigate to="/products" replace />} />
+            <Route path="inventory-costing" element={<Navigate to="/inventory/costos" replace />} />
             <Route
               path="diagnostics"
               element={
