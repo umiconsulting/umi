@@ -133,6 +133,18 @@ export const configSchema = z
 
     // One rate-limit schema controls ingress defaults.
     RATE_LIMIT_IP_PER_MINUTE: z.coerce.number().int().min(10).max(10000).default(300),
+    // The same address bucket, charged at this ceiling once the caller presents a
+    // VERIFIED principal (§3.5). Higher by design: everyone behind one NAT — a
+    // café's dashboard, its tills, a workstation running the UX sweep — shares the
+    // address budget, and the per-principal buckets are the limit that actually
+    // binds a signed-in caller. 10x the anonymous ceiling still throttles one
+    // abusive address (50 req/s), which is the point of keeping it.
+    RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(10000)
+      .default(3000),
     STARTUP_RETRY_ATTEMPTS: z.coerce.number().int().min(1).max(12).default(5),
     STARTUP_RETRY_DELAY_MS: z.coerce.number().int().min(0).max(10000).default(1000),
 
@@ -263,6 +275,56 @@ export const configSchema = z
     // Optional until the fiscal flow is wired (Fase 3b).
     FACTURAPI_USER_KEY: z.string().optional(),
     FACTURAPI_BASE_URL: z.string().url().default('https://www.facturapi.io/v2'),
+    // The per-Organization secret that stamps on a merchant emisor's behalf. Held here
+    // only until the merchant's fiscal profile carries it; until then a stamp is refused
+    // with a sentence naming what is missing rather than attempted and failed.
+    FACTURAPI_ORGANIZATION_SECRET: z.string().optional(),
+    // Mercado Pago Point — the only card-present tender (ADR 2026-09-16). Both optional:
+    // when either is missing the provider reports itself unavailable and the till offers
+    // no card-present method, which is the difference between a method that works and a
+    // button that fails after the customer has already decided.
+    MERCADO_PAGO_POINT_ACCESS_TOKEN: z.string().optional(),
+    MERCADO_PAGO_POINT_TERMINAL_ID: z.string().optional(),
+    // The Orders API origin. Overridable so the live transport can be pointed at a stub
+    // in a test without a different build; a deployment leaves it at the vendor's host.
+    MERCADO_PAGO_POINT_API_BASE_URL: z.string().url().default('https://api.mercadopago.com'),
+    // The secret the panel generates for the order webhook (research note 02 §2). Like the
+    // token, it is optional on purpose: with no secret the receiver REFUSES every
+    // notification rather than trusting an unsigned body, so an unconfigured deployment
+    // cannot be fed a forged payment by anyone who learns the URL.
+    MERCADO_PAGO_POINT_WEBHOOK_SECRET: z.string().optional(),
+    // ── The third-party path: the merchant's own account (Phase 5, decisions D7 and D8) ──
+    //
+    // ONE DEPLOYMENT TOKEN SERVES ONE ACCOUNT, and Umi's clients are other sellers, so the
+    // clients' money can only reach the clients' books through OAuth. These five values are
+    // the application's identity to the vendor and the key we hold the per-merchant tokens
+    // under. All optional: with any of them unset the connection flow reports itself
+    // unavailable rather than half-working, and the deployment token above still serves the
+    // "own account" mode that phases 1 to 4 use.
+    MERCADO_PAGO_POINT_CLIENT_ID: z.string().optional(),
+    MERCADO_PAGO_POINT_CLIENT_SECRET: z.string().optional(),
+    // Where the vendor sends the seller back. The vendor requires a STATIC https URL declared
+    // in the application, so it is configuration rather than something we compute.
+    MERCADO_PAGO_POINT_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // The key material the per-merchant tokens are encrypted under (AES-256-GCM, purpose
+    // derived). Never a vendor value, and never optional in a deployment that connects
+    // merchants: a credential with no key to hold it under is not stored at all.
+    MERCADO_PAGO_POINT_CREDENTIAL_KEY: z.string().min(32).optional(),
+    // The vendor's authorization and token hosts. Overridable so a test can point them at a
+    // stub; a deployment leaves them alone.
+    MERCADO_PAGO_POINT_OAUTH_AUTHORIZE_URL: z
+      .string()
+      .url()
+      .default('https://auth.mercadopago.com/authorization'),
+    MERCADO_PAGO_POINT_OAUTH_TOKEN_URL: z
+      .string()
+      .url()
+      .default('https://api.mercadopago.com/oauth/token'),
+    // The scripted tender providers and the scripted PAC — the acceptance suite's
+    // instrument for the success/failure/unknown sequence (§8G step 7). NEVER enable this
+    // in a deployment that takes real money: a scripted provider captures nothing and
+    // says it did.
+    TENDER_SCRIPTED_PROVIDERS: booleanFromEnv.default(false),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().positive().optional(),
     SMTP_USER: z.string().optional(),
@@ -336,6 +398,19 @@ export const configSchema = z
           message: 'must contain explicit origins',
         });
       }
+    }
+
+    // §3.5: the authenticated address ceiling exists to be LOOSER than the
+    // anonymous one — the per-principal buckets, not the address, are what binds a
+    // signed-in caller. A configuration that inverts the two hands anonymous
+    // callers more budget than verified ones, which is not a policy anyone wants;
+    // refuse the boot rather than run it.
+    if (cfg.RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE < cfg.RATE_LIMIT_IP_PER_MINUTE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE'],
+        message: 'must be at least RATE_LIMIT_IP_PER_MINUTE',
+      });
     }
 
     // PGSSLROOTCERT is the authority (D4): when it is set, PgService connects

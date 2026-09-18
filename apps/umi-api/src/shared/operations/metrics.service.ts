@@ -6,6 +6,7 @@ const MAX_SERIES = 2_000;
 export class MetricsService {
   private readonly counters = new Map<string, number>();
   private readonly durations = new Map<string, { count: number; totalMs: number; maxMs: number }>();
+  private readonly gauges = new Map<string, number>();
 
   increment(name: string, labels: Record<string, string> = {}, amount = 1): void {
     const key = metricKey(name, labels);
@@ -23,10 +24,23 @@ export class MetricsService {
     this.durations.set(key, current);
   }
 
+  /**
+   * A LEVEL, NOT A TOTAL. `increment` counts events and only ever rises; a number that answers
+   * "how many attempts are waiting for an answer they should already have" has to be SET, because
+   * an accumulating gauge would report the integral of the problem rather than the problem (plan
+   * §7 item 3).
+   */
+  gauge(name: string, value: number, labels: Record<string, string> = {}): void {
+    const key = metricKey(name, labels);
+    this.makeRoom(this.gauges, key);
+    this.gauges.set(key, value);
+  }
+
   snapshot(): object {
     return {
       counters: Object.fromEntries(this.counters),
       durations: Object.fromEntries(this.durations),
+      gauges: Object.fromEntries(this.gauges),
     };
   }
 

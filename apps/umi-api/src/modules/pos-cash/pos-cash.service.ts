@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import type {
   ReconcileCashShiftRequest,
   RecountRequest,
   RecoverCashShiftRequest,
+  ReclaimCashRegisterRequest,
   ResolveCashVarianceRequest,
   ShiftCloseRequest,
   ShiftHandoffRequest,
@@ -26,6 +28,7 @@ import { posPinLookupHash } from '../../shared/auth/pos-pin';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { IntegrityService } from '../integrity/integrity.service';
 import type { CommandResult, TransactionContext } from '../integrity/integrity.types';
+import { CashRefusal } from './cash-refusal';
 import { PosCashRepository, type CashAuthorization } from './pos-cash.repository';
 
 @Injectable()
@@ -574,6 +577,68 @@ export class PosCashService {
     );
   }
 
+  /**
+   * Free a register held by a terminal that is never coming back.
+   *
+   * The authority is `cash.shift.open`: the caller is trying to take a drawer
+   * into service, which is the operation the hold is blocking, and it is already
+   * held by every role that may open a register. It is deliberately NOT
+   * `cash.variance.approve` — that one is about counting somebody else's drawer,
+   * and this operation counts nothing. Whether the holding terminal is gone is
+   * proven inside the repository's transaction against `merchant.device`; the
+   * request carries no claim about it at all.
+   */
+  async reclaimRegister(
+    user: AuthUser,
+    merchantId: string,
+    registerId: string,
+    dto: ReclaimCashRegisterRequest,
+  ) {
+    if (registerId !== dto.registerId) {
+      throw new ForbiddenException({ code: 'CASH_REGISTER_SCOPE_VIOLATION' });
+    }
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'cash.shift.open',
+    );
+    return this.command(
+      merchantId,
+      dto.locationId,
+      dto.commandId,
+      dto.idempotencyKey,
+      'pos.cash.register.reclaim',
+      dto,
+      async (context) => {
+        const result = await this.repo.reclaimRegister(
+          context.client,
+          merchantId,
+          authorization,
+          dto,
+          context.correlationId,
+        );
+        await context.appendAudit({
+          eventType: 'cash.register_reclaimed',
+          entityType: 'physical_register',
+          entityId: dto.registerId,
+          outcome: 'success',
+          // Who did it, why, and which shift and terminal it was about. This is
+          // the question an auditor asks first: "who declared that till dead?"
+          publicData: {
+            reasonCode: dto.reasonCode,
+            shiftId: result.shift?.id ?? null,
+            shiftStatus: result.shift?.status ?? null,
+            holdingDeviceId: result.custody?.previousHoldingDeviceId ?? null,
+            responsibleOperatorId: result.custody?.responsibleOperatorId ?? null,
+          },
+        });
+        return result;
+      },
+    );
+  }
+
   private async authorize(
     user: AuthUser,
     merchantId: string,
@@ -630,12 +695,23 @@ export class PosCashService {
   }
 
   private async unwrap<T>(command: Promise<CommandResult<T>>): Promise<T> {
-    const result = await command;
-    if (result.status !== 'succeeded' || result.result === null) {
-      throw new ConflictException({
-        code: result.failureCode ?? 'CASH_OPERATION_CONFLICT',
-      });
+    try {
+      const result = await command;
+      if (result.status !== 'succeeded' || result.result === null) {
+        throw new ConflictException({
+          code: result.failureCode ?? 'CASH_OPERATION_CONFLICT',
+        });
+      }
+      return result.result;
+    } catch (error) {
+      // Every cash command goes through here, so this is the one place a
+      // repository refusal becomes a response. `CashRefusal` names its own
+      // status and carries the facts the operator needs; anything else keeps
+      // travelling as it did.
+      if (error instanceof CashRefusal) {
+        throw new HttpException({ code: error.code, details: error.details }, error.status);
+      }
+      throw error;
     }
-    return result.result;
   }
 }

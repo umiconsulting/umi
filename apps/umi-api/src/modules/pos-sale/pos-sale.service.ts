@@ -113,6 +113,15 @@ export class PosSaleService {
 
   async cancel(user: AuthUser, merchantId: string, saleId: string, dto: CancelSaleRequest) {
     await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    // THIS ROUTE DOES NOT TOUCH THE FISCAL RECORD, and the reason is worth stating because
+    // the obvious guess is wrong: it cancels a sale that has not been committed — the
+    // UPDATE below insists on `status in ('draft','prepared')` and a lifecycle state of
+    // building_cart, ready_for_checkout or recovered — and a fiscal document can only exist
+    // for a COMMITTED sale, because `fiscal.stampSale` refuses anything else. So there is
+    // nothing here to cancel, and putting the call here would look like the acceptance had
+    // been met while never once running. A committed sale is undone through
+    // `pos.saleException` (`void`), and that is where `FiscalService.cancelForSale` is
+    // called, in the same command and the same transaction.
     return this.command(
       merchantId,
       dto,

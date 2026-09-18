@@ -75,6 +75,11 @@ export const QUEUE_RELIABILITY: Record<QueueName, QueueReliability> = {
   [QUEUES.outbound]: { ...DEFAULTS, attempts: 5 },
   [QUEUES.integrations]: { ...DEFAULTS, attempts: 3 },
   [QUEUES.lifecycle]: { ...DEFAULTS, attempts: 3 },
+  // The terminal's answer, retried like any other background delivery: three attempts
+  // with exponential backoff. A notification that will not resolve is not an emergency
+  // — the till is polling the attempt at its own `queryAfterSeconds` — so this stays on
+  // the ordinary schedule rather than a tighter one.
+  [QUEUES.tender]: { ...DEFAULTS, attempts: 3 },
 };
 
 /** Default producer-side job options for a queue (retry/backoff/retention). */

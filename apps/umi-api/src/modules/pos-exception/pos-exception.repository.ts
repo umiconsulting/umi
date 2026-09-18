@@ -126,6 +126,25 @@ interface StoredTender {
   amount: number;
 }
 
+/**
+ * A terminal tender that a PROVIDER captured, and therefore a terminal tender whose refund
+ * must be asked of that provider rather than asserted by a person (plan §4 Phase 4).
+ *
+ * It exists as its own read because the money has to move BEFORE the sale records the
+ * refund: the tender command writes the giving-back in its own transaction, and this is
+ * what tells `PosExceptionService` which tenders to ask about and what to ask for.
+ */
+export interface ProviderRefundTarget {
+  /** The sale's tender fact — the thing the compensation row will point at. */
+  readonly tenderId: string;
+  /** The capture attempt the provider proved, which carries the payment id a refund needs. */
+  readonly attemptId: string;
+  /** What is being given back for this tender, in minor units. */
+  readonly tenderAmountMinorUnits: number;
+  readonly currency: string;
+  readonly provider: string;
+}
+
 interface PreviewRow {
   id: string;
   saleId: string;
@@ -465,6 +484,11 @@ export class PosExceptionRepository {
         const terminalTender = calculated.tenders.find(
           (tender) => tender.type === 'manual_terminal',
         );
+        // Which terminal this refund is about to face: one a provider answers, or one a
+        // person reads. See `providerBehindTender`.
+        const terminalTenderProvider = terminalTender
+          ? await this.providerBehindTender(client, merchantId, terminalTender.id)
+          : null;
         return {
           previewId,
           saleId,
@@ -509,11 +533,18 @@ export class PosExceptionRepository {
               : null,
           manualTerminal: terminalTender
             ? {
+                // A PROVIDER-BACKED TERMINAL IS NOT ASKED ABOUT. The status starts the same
+                // way for both kinds — nothing has happened yet — but `providerBacked` tells
+                // the till whether an operator's declaration has any power, and for an
+                // integrated terminal it does not: the vendor answers when the exception is
+                // committed (§13).
                 status: 'awaiting_operator_confirmation',
                 amount: money(terminalTender.amount),
                 correlationReference,
                 queryOnly: false,
                 canRetryAsNew: true,
+                providerBacked: terminalTenderProvider !== null,
+                provider: terminalTenderProvider,
               }
             : null,
           remainingRefundableAfter: money(source.remainingRefundable - calculated.total),
@@ -570,6 +601,34 @@ export class PosExceptionRepository {
     });
   }
 
+  /**
+   * THE PROVIDER THAT TOOK THIS TENDER'S MONEY, or null when a person did.
+   *
+   * Plan §4 Phase 4 and §13.4: a terminal we integrated with answers for itself, so the till
+   * must not ask an operator to declare an outcome the vendor will decide. The preview says
+   * which kind of terminal this sale's refund is about to face, and this is the question it
+   * asks. Read from the attempt the commit LINKED to the tender fact, so it is the same fact
+   * the refund path will use — and `manual_terminal` is excluded by name because it is the
+   * platform's own operator-attested adapter rather than an integration.
+   */
+  private async providerBehindTender(
+    client: PoolClient,
+    merchantId: string,
+    tenderId: string,
+  ): Promise<string | null> {
+    const { rows } = await client.query<{ provider: string }>(
+      `SELECT a.provider AS "provider"
+         FROM merchant.pos_payment_attempt a
+        WHERE a.merchant_id=$1::uuid AND a.tender_id=$2::uuid
+          AND a.status='succeeded' AND a.proof_source='provider'
+          AND a.provider IS NOT NULL AND a.provider <> 'manual_terminal'
+        ORDER BY a.created_at DESC
+        LIMIT 1`,
+      [merchantId, tenderId],
+    );
+    return rows[0]?.provider ?? null;
+  }
+
   async commit(
     client: PoolClient,
     merchantId: string,
@@ -578,6 +637,13 @@ export class PosExceptionRepository {
     dto: SaleExceptionCommand,
     commandFingerprint: string,
     correlationId: string,
+    /**
+     * The refund attempts a PROVIDER confirmed for this sale's card tenders, one per tender —
+     * empty for a sale with no provider-captured terminal. They are checked below and never
+     * trusted: the caller created them by asking the vendor, and this is where the sale
+     * verifies that the money really was asked for before it records that it moved.
+     */
+    providerRefunds: readonly { readonly tenderId: string; readonly attemptId: string }[] = [],
   ): Promise<SaleExceptionResult> {
     const preview = await this.lockPreview(
       client,
@@ -634,15 +700,97 @@ export class PosExceptionRepository {
     if (Number(exceptionCount.rows[0]?.count) !== Number(preview.exceptionVersion)) {
       throw new ConflictException({ code: 'STALE_PREVIEW' });
     }
-    if (
-      preview.tenderAllocations.some((tender) => tender.type === 'manual_terminal') &&
-      preview.terminalRefundStatus !== 'confirmed_success'
-    ) {
+    // ── A CARD TENDER IS CONFIRMED BY THE PROVIDER, NOT BY A PERSON (§4 Phase 4) ──
+    //
+    // The money moves BEFORE this command runs: `PosExceptionService.commit` asks the vendor
+    // for each provider-captured terminal tender first, because a sale that recorded a card
+    // refund nobody asked the terminal for would be the exact lie this workstream exists to
+    // prevent. What is checked here is that it happened: each handed-in attempt must exist,
+    // belong to this merchant, be a SUCCEEDED REFUND of the very capture that paid this
+    // tender, carry the vendor's refund id, and cover what is being given back. Nothing is
+    // taken on the caller's word.
+    const confirmedByProvider = new Map<string, string>();
+    for (const handed of providerRefunds) {
+      const tender = preview.tenderAllocations.find((item) => item.id === handed.tenderId);
+      const { rows } = await client.query<{ attemptId: string; amountMinorUnits: string }>(
+        /**
+         * THE TENDER IS THE CAPTURE'S, NOT THE REFUND'S — and getting that wrong made this guard
+         * refuse every legitimate refund.
+         *
+         * A refund attempt carries NO `tender_id`, and it cannot: `pos_payment_attempt_cart_tender_uq`
+         * is `(merchant_id, cart_id, tender_id)`, which is what lets one cart hold one attempt per
+         * tender, so a refund of that capture writing the same tender would collide with the
+         * capture it refunds. The first version of this query joined `t.id = a.tender_id` on the
+         * HANDED-IN attempt, which is always null for a refund, so the join found nothing and the
+         * command answered `TERMINAL_REFUND_CONFIRMATION_REQUIRED` for a refund the terminal had
+         * already made — money moved at the counter and refused a place in the sale's books, which
+         * is the one outcome §13 exists to prevent.
+         *
+         * The link is one hop further and it is the real relationship: this refund gives back
+         * THAT capture, and the capture paid THAT tender.
+         */
+        `SELECT a.id::text AS "attemptId", a.amount_minor_units::text AS "amountMinorUnits"
+           FROM merchant.pos_payment_attempt a
+           JOIN merchant.pos_payment_attempt c
+             ON c.id=a.refund_of_attempt_id AND c.merchant_id=a.merchant_id
+           JOIN merchant.pos_tender_fact t
+             ON t.id=c.tender_id AND t.merchant_id=c.merchant_id
+          WHERE a.id=$1::uuid AND a.merchant_id=$2::uuid AND t.id=$3::uuid
+            AND a.status='succeeded' AND a.proof_source='provider'
+            AND a.refund_of_attempt_id IS NOT NULL AND a.provider_refund_id IS NOT NULL`,
+        [handed.attemptId, merchantId, handed.tenderId],
+      );
+      const verified = rows[0];
+      if (!tender || !verified || Number(verified.amountMinorUnits) < tender.amount) {
+        throw new ConflictException({
+          code: 'TERMINAL_REFUND_CONFIRMATION_REQUIRED',
+          details: { tenderId: handed.tenderId, attemptId: handed.attemptId },
+        });
+      }
+      confirmedByProvider.set(handed.tenderId, verified.attemptId);
+    }
+
+    // A TENDER THE PROVIDER TOOK CANNOT BE REFUNDED BY A PERSON'S WORD. The operator's own
+    // `confirmed_success` on the preview is the honest answer for a terminal we never
+    // integrated with — and it is NOT an answer at all for one we did: the vendor is the only
+    // thing that can say whether that money came back. So a provider-backed tender needs a
+    // verified refund attempt, and the operator's declaration is ignored for it rather than
+    // accepted as a substitute.
+    const providerBacked = new Set<string>();
+    for (const tender of preview.tenderAllocations) {
+      if (tender.type !== 'manual_terminal') continue;
+      const { rows } = await client.query<{ attemptId: string }>(
+        `SELECT a.id::text AS "attemptId"
+           FROM merchant.pos_payment_attempt a
+           JOIN merchant.pos_tender_fact t
+             ON t.id=a.tender_id AND t.merchant_id=a.merchant_id
+          WHERE a.merchant_id=$1::uuid AND t.id=$2::uuid AND a.status='succeeded'
+            AND a.proof_source='provider' AND a.provider IS NOT NULL
+            AND a.provider <> 'manual_terminal'`,
+        [merchantId, tender.id],
+      );
+      if (rows[0]) providerBacked.add(tender.id);
+    }
+
+    const unconfirmedTerminal = preview.tenderAllocations.filter((tender) => {
+      if (tender.type !== 'manual_terminal') return false;
+      if (confirmedByProvider.has(tender.id)) return false;
+      // Answered by a person only where a person is the only witness there is.
+      return providerBacked.has(tender.id) || preview.terminalRefundStatus !== 'confirmed_success';
+    });
+    if (unconfirmedTerminal.length > 0) {
       throw new ConflictException({
         code:
           preview.terminalRefundStatus === 'outcome_unknown'
             ? 'PAYMENT_OUTCOME_UNKNOWN'
             : 'TERMINAL_REFUND_CONFIRMATION_REQUIRED',
+        details: {
+          tenders: unconfirmedTerminal.map((tender) => tender.id),
+          // Named so the caller knows WHY the operator's declaration did not settle it: this
+          // terminal answers to a provider, and only the provider's refund attempt will do.
+          providerBacked: [...providerBacked],
+          providerConfirmed: [...confirmedByProvider.keys()],
+        },
       });
     }
     let approvingOperator: string | null = null;
@@ -813,7 +961,12 @@ export class PosExceptionRepository {
           preview.currency,
           reversalStatus,
           preview.correlationId,
-          tender.type === 'manual_terminal',
+          // A terminal tender is an OPERATOR'S claim unless a provider-confirmed refund
+          // backs it, and then it says so: `operator_asserted = false` is the row telling
+          // the truth about who asserted the money moved (§4 Phase 4, D6).
+          tender.type === 'manual_terminal' &&
+            !confirmedByProvider.has(tender.id) &&
+            !providerBacked.has(tender.id),
         ],
       );
       tenderReceipt.push({
@@ -1120,6 +1273,67 @@ export class PosExceptionRepository {
     );
   }
 
+  /**
+   * WHICH TERMINAL TENDERS OF THIS SALE MUST BE GIVEN BACK BY A PROVIDER, and for how much.
+   *
+   * A tender is one of these when the money was taken by a device we integrated with rather
+   * than by a person: the sale's tender fact is linked to an attempt the provider PROVED, so
+   * the giving-back is the vendor's to make and the operator's to ask for. An
+   * operator-attested terminal tender is deliberately NOT in this list — its refund is the
+   * person's word, which is what the existing flow already records, and it is the honest
+   * answer for a terminal we never integrated with.
+   *
+   * Read BEFORE the exception command runs, because the money moves first (see
+   * `PosExceptionService.commit`); the commit re-checks every fact it is handed.
+   */
+  async providerRefundTargets(
+    userId: string,
+    merchantId: string,
+    locationId: string,
+    saleId: string,
+    previewId: string,
+  ): Promise<ProviderRefundTarget[]> {
+    const rows = await this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows: found } = await client.query<{
+          tenderId: string;
+          attemptId: string;
+          tenderAmountMinorUnits: string;
+          currency: string;
+          provider: string;
+        }>(
+          `SELECT t.id::text AS "tenderId", a.id::text AS "attemptId",
+                  e->>'amount' AS "tenderAmountMinorUnits", t.currency AS "currency",
+                  a.provider AS "provider"
+             FROM merchant.pos_exception_preview p
+             JOIN jsonb_array_elements(p.tender_allocations) e
+               ON e->>'type' = 'manual_terminal'
+             JOIN merchant.pos_tender_fact t
+               ON t.id = (e->>'id')::uuid AND t.merchant_id = p.merchant_id
+             JOIN merchant.pos_payment_attempt a
+               ON a.tender_id = t.id AND a.merchant_id = t.merchant_id
+            WHERE p.id=$1::uuid AND p.sale_id=$2::uuid AND p.merchant_id=$3::uuid
+              AND p.location_id=$4::uuid
+              AND a.status='succeeded' AND a.proof_source='provider'
+              AND a.provider IS NOT NULL AND a.provider <> 'manual_terminal'
+            ORDER BY t.position`,
+          [previewId, saleId, merchantId, locationId],
+        );
+        return found;
+      },
+      locationId,
+    );
+    return rows.map((row) => ({
+      tenderId: row.tenderId,
+      attemptId: row.attemptId,
+      tenderAmountMinorUnits: Number(row.tenderAmountMinorUnits),
+      currency: row.currency,
+      provider: row.provider,
+    }));
+  }
+
   async terminalOutcome(
     client: PoolClient,
     merchantId: string,
@@ -1134,9 +1348,13 @@ export class PosExceptionRepository {
       amount: string;
       currency: string;
       correlation: string;
+      /** The sale's terminal tender, so the instruction can say who answers for it. */
+      tenderId: string | null;
     }>(
       `SELECT p.id::text,p.terminal_refund_status AS status,p.currency,
               p.correlation_id AS correlation,
+              (SELECT value->>'id' FROM jsonb_array_elements(p.tender_allocations) value
+                WHERE value->>'type'='manual_terminal' LIMIT 1) AS "tenderId",
               coalesce((SELECT sum((value->>'amount')::bigint)
                 FROM jsonb_array_elements(p.tender_allocations) value
                 WHERE value->>'type'='manual_terminal'),0)::text AS amount
@@ -1168,6 +1386,11 @@ export class PosExceptionRepository {
       );
     }
     const queryOnly = dto.outcome === 'outcome_unknown';
+    // The same facts the preview carried: an instruction that says whether the terminal
+    // answers for itself, so a recovered or re-read one still tells the truth (§13).
+    const terminalProvider = row.tenderId
+      ? await this.providerBehindTender(client, merchantId, row.tenderId)
+      : null;
     return {
       previewId,
       status: dto.outcome,
@@ -1177,6 +1400,8 @@ export class PosExceptionRepository {
         correlationReference: row.correlation,
         queryOnly,
         canRetryAsNew: !queryOnly && dto.outcome === 'operator_reported_failure',
+        providerBacked: terminalProvider !== null,
+        provider: terminalProvider,
       },
       updatedAt: new Date().toISOString(),
       correlationReference: row.correlation,

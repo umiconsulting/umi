@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ProductionRecord, ProductionResult } from '@umi/contract';
 import type {
   AvailabilityQuery,
   CreateInventoryCountRequest,
@@ -12,28 +13,72 @@ import type {
   InventoryQuery,
   InventoryReconciliation,
   InventoryRecoveryQuery,
+  PosPrepListQuery,
   QuarantineRecord,
   RestockCommand,
   SubmitInventoryCountRequest,
   WasteRecord,
 } from '@umi/contract';
+import type { z } from 'zod';
+import { MetricsService } from '../../shared/operations/metrics.service';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import type { DashboardAdministrativeCommandContext } from '../administrative-commands/administrative-command-context.service';
 import { IntegrityService } from '../integrity/integrity.service';
 import type { CommandResult } from '../integrity/integrity.types';
+import { InventoryCostingService } from '../inventory-costing/inventory-costing.service';
+import { InventoryAuthoringService } from '../inventory-authoring/inventory-authoring.service';
 import { inventoryConflictCode, inventoryOperationFingerprint } from './inventory-errors';
 import { PosInventoryRepository } from './pos-inventory.repository';
+
+/**
+ * The production models are published as zod schemas only, so their shapes are read from
+ * the schema itself. A hand-written second interface would be a second author.
+ */
+type ProduceRequest = z.infer<typeof ProductionRecord>;
+type ProduceResult = z.infer<typeof ProductionResult>;
 
 @Injectable()
 export class PosInventoryService {
   constructor(
     private readonly repo: PosInventoryRepository,
     private readonly integrity: IntegrityService,
+    private readonly costing: InventoryCostingService,
+    private readonly metrics: MetricsService,
+    private readonly authoring: InventoryAuthoringService,
   ) {}
 
   async overview(user: AuthUser, merchantId: string, query: InventoryQuery) {
     await this.authorize(user, merchantId, query, 'inventory.read');
     return this.repo.overview(user.id, merchantId, query);
+  }
+
+  /**
+   * THE PREP LIST ON THE KITCHEN BOARD (§8.4). The console's own read sits behind
+   * `merchant.manage`, which a POS operator session does not carry, so the kitchen
+   * reads it here with the same `inventory.read` the rest of this screen uses.
+   *
+   * The forecast itself is the costing module's, called with the merchant id only: one
+   * author for the rate, the honest denominator and the par subtraction. This module
+   * must not grow a second one.
+   */
+  async prepList(user: AuthUser, merchantId: string, query: PosPrepListQuery) {
+    await this.authorize(
+      user,
+      merchantId,
+      { locationId: query.locationId, operatorSessionId: query.operatorSessionId },
+      'inventory.read',
+    );
+    // THE ACCESS THE FORECAST READ NEEDS, built from what the guard above just proved.
+    // The location guard inside that read asks whether the caller may SWITCH branches,
+    // which it answers from `permissions`; an empty list refuses every switch, so the
+    // till reads its own branch and no other. `locationId` is passed explicitly for the
+    // same reason: the operator is confined to the branch this request names.
+    const access = {
+      merchantId,
+      locationId: query.locationId,
+      permissions: [] as string[],
+    } as unknown as MerchantAccess;
+    return this.authoring.prepList(access, query);
   }
 
   async overviewAdministrative(
@@ -133,6 +178,116 @@ export class PosInventoryService {
   async createCount(user: AuthUser, merchantId: string, dto: CreateInventoryCountRequest) {
     const authorization = await this.authorize(user, merchantId, dto, 'inventory.count.create');
     return this.createCountAuthorized(merchantId, dto, authorization);
+  }
+
+  /**
+   * Produce a prep (plan §8.1 and D4/D5/D9), from the till's own route.
+   *
+   * The console posts the SAME work as the administrative command
+   * `inventory.production.produce`, and both call `produceAuthorized` below, so one
+   * batch is authored once whichever surface asked for it.
+   */
+  async production(user: AuthUser, merchantId: string, dto: ProduceRequest) {
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto,
+      'inventory.production.produce',
+    );
+    return this.produceAuthorized(merchantId, dto, authorization);
+  }
+
+  /** The merchant's business date, for the console's version of the produce command. */
+  currentBusinessDate(merchantId: string): Promise<string> {
+    return this.repo.currentBusinessDate(merchantId);
+  }
+
+  private async produceAuthorized(
+    merchantId: string,
+    dto: ProduceRequest,
+    authorization: Exclude<Awaited<ReturnType<PosInventoryRepository['authorize']>>, null>,
+  ): Promise<ProduceResult> {
+    // ONE basis read for the whole batch, taken before the transaction: the basis is
+    // merchant-wide and read-only, and the production repository must not open a second
+    // one of its own.
+    const unitCosts = await this.unitCostsByItem(merchantId);
+    try {
+      const result = await this.unwrap(
+        this.integrity.execute(
+          {
+            merchantId,
+            locationId: dto.locationId,
+            commandId: dto.commandId,
+            idempotencyKey: dto.idempotencyKey,
+            commandType: 'pos.inventory.production',
+            payload: dto,
+            expectedVersion: dto.expectedVersion,
+          },
+          async (context) => {
+            const result = await this.repo.produce(
+              context.client,
+              merchantId,
+              authorization,
+              dto,
+              unitCosts,
+              context.correlationId,
+            );
+            await context.appendAudit({
+              eventType: 'inventory_production_committed',
+              entityType: 'stock_lot',
+              entityId: result.lotId,
+              outcome: 'success',
+              publicData: {
+                outputItemId: result.outputItemId,
+                consumedCount: result.consumed.length,
+                yieldLossQuantity: result.yieldLossQuantity.value,
+                incompleteCost: result.incompleteCost,
+              },
+            });
+            return { ok: true, value: result };
+          },
+        ),
+      );
+      // Emitted only after the batch committed. `yieldLossQuantity` is the shortfall
+      // the repository wrote, so a positive value is the declared-yield miss.
+      const shortfall = result.yieldLossQuantity.value > 0;
+      this.metrics.increment('inventory.production.batches', {
+        outcome: shortfall ? 'shortfall' : 'full',
+      });
+      if (shortfall) {
+        this.metrics.increment(
+          'inventory.production.yield_loss_quantity',
+          { unit: result.yieldLossQuantity.unit },
+          result.yieldLossQuantity.value,
+        );
+      }
+      return result;
+    } catch (error) {
+      // A shortfall on a `manager_override` item is the ledger's own decision. Its refusal
+      // must reach the caller as a conflict, not as a server fault.
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('NEGATIVE_STOCK_APPROVAL_REQUIRED')) {
+        throw new ConflictException({ code: 'NEGATIVE_STOCK_APPROVAL_REQUIRED' });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * THE one weighted-average receipt basis this module reads, keyed by item. It is the
+   * costing module's own read; `no_receipts` leaves the item out of the map, so a
+   * missing cost reaches the arithmetic as NULL rather than as a zero.
+   */
+  private async unitCostsByItem(merchantId: string): Promise<Map<string, bigint>> {
+    const basis = await this.costing.costBasis({ merchantId } as unknown as MerchantAccess, {
+      includeWithoutReceipts: true,
+    });
+    const costs = new Map<string, bigint>();
+    for (const item of basis.items) {
+      if (item.unitCostMinor === null) continue;
+      costs.set(item.inventoryItemId, BigInt(item.unitCostMinor));
+    }
+    return costs;
   }
 
   private createCountAuthorized(
@@ -346,7 +501,8 @@ export class PosInventoryService {
       | QuarantineRecord
       | CreateInventoryCountRequest
       | SubmitInventoryCountRequest
-      | InventoryReconciliation,
+      | InventoryReconciliation
+      | ProduceRequest,
   ) {
     if (!context.locationId || !context.commandRecordId) {
       throw new ForbiddenException({ code: 'ADMINISTRATIVE_COMMAND_CONTEXT_REQUIRED' });
@@ -379,6 +535,11 @@ export class PosInventoryService {
         dto as InventoryReconciliation,
         authorization,
       );
+    }
+    if (operation === 'inventory.production.produce') {
+      // The console's own door to the same service method the till calls: one batch,
+      // authored once, whichever surface asked for it.
+      return this.produceAuthorized(access.merchantId, dto as ProduceRequest, authorization);
     }
     const commandType = `pos.${operation}`;
     return this.mutation(
@@ -492,7 +653,8 @@ function inventoryPermission(
     | QuarantineRecord
     | CreateInventoryCountRequest
     | SubmitInventoryCountRequest
-    | InventoryReconciliation,
+    | InventoryReconciliation
+    | ProduceRequest,
 ): string {
   if (operation === 'inventory.adjustment') {
     return (dto as InventoryAdjustment).direction === 'increase'
@@ -508,5 +670,6 @@ function inventoryPermission(
   }
   if (operation === 'inventory.count.create') return 'inventory.count.create';
   if (operation === 'inventory.count.submit') return 'inventory.count.submit';
+  if (operation === 'inventory.production.produce') return 'inventory.production.produce';
   return 'inventory.count.reconcile';
 }

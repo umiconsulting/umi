@@ -17,7 +17,7 @@ const CREDENTIAL = {
 
 function harness(over: Partial<Record<string, unknown>> = {}) {
   const repo = {
-    findCredentialByEmail: vi.fn().mockResolvedValue(CREDENTIAL),
+    findSignInCredentialByEmail: vi.fn().mockResolvedValue(CREDENTIAL),
     upgradeCredential: vi.fn().mockResolvedValue(undefined),
     findMembershipAccess: vi.fn().mockResolvedValue({ roles: ['owner'] }),
     mfaMethodByUserId: vi.fn().mockResolvedValue(null),
@@ -53,7 +53,7 @@ describe('cash staff login', () => {
     // refuse her because she capitalised it.
     const h = harness();
     await h.service.login(MERCHANT, CREDS);
-    expect(h.repo.findCredentialByEmail).toHaveBeenCalledWith('ana@kalala.mx');
+    expect(h.repo.findSignInCredentialByEmail).toHaveBeenCalledWith('ana@kalala.mx');
   });
 
   it('mints the session against THIS cafe, with the derived role', async () => {
@@ -63,7 +63,7 @@ describe('cash staff login', () => {
   });
 
   it('refuses an unknown account', async () => {
-    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(null) });
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(null) });
     await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(UnauthorizedException);
   });
 
@@ -72,7 +72,7 @@ describe('cash staff login', () => {
     // "no such account" measurably faster than "wrong password", which lets an
     // anonymous caller discover who works at a café one guess at a time. This
     // asserts the work happens; measuring the clock here would only be flaky.
-    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(null) });
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(null) });
     await h.service.login(MERCHANT, CREDS).catch(() => null);
     expect(h.passwords.verify).toHaveBeenCalledTimes(1);
   });
@@ -81,6 +81,19 @@ describe('cash staff login', () => {
     const h = harness();
     h.passwords.verify.mockReturnValue(false);
     await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('refuses a SUSPENDED login exactly as it refuses an unknown one', async () => {
+    // The read applies `umi.user.status` in SQL, so a suspension reaches this
+    // service as NO account — the branch the register already answers uniformly,
+    // and the one that burns the decoy hash. Neither the status nor the mere
+    // existence of the address leaks, and no session is minted.
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(null) });
+    const err = await h.service.login(MERCHANT, CREDS).catch((e) => e);
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    expect(err.getResponse()).toEqual({ error: 'Credenciales inválidas' });
+    expect(h.passwords.verify).toHaveBeenCalledTimes(1); // the decoy, not a row
+    expect(h.sessions.createSession).not.toHaveBeenCalled();
   });
 
   it('refuses someone with no role at this cafe', async () => {
@@ -102,7 +115,7 @@ describe('cash staff login', () => {
     // free account-enumeration oracle on a public endpoint.
     const bodies: unknown[] = [];
     for (const h of [
-      harness({ findCredentialByEmail: vi.fn().mockResolvedValue(null) }),
+      harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(null) }),
       harness({ findMembershipAccess: vi.fn().mockResolvedValue(null) }),
     ]) {
       await h.service.login(MERCHANT, CREDS).catch((e) => bodies.push(e.getResponse()));
@@ -126,7 +139,7 @@ describe('cash staff login · AB#115 the register refuses an MFA-enrolled accoun
     // The register cannot challenge — the frozen client has no screen for a code.
     // So the account that enrolled one uses the dashboard, and the till stops
     // being the weaker door into it.
-    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
     await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(ForbiddenException);
   });
 
@@ -135,7 +148,9 @@ describe('cash staff login · AB#115 the register refuses an MFA-enrolled accoun
     // not satisfy PCI DSS 8.4.1, but it still means the dashboard challenges and
     // the register would not — which is the asymmetry being closed.
     const h = harness({
-      findCredentialByEmail: vi.fn().mockResolvedValue({ ...CREDENTIAL, mfaMethod: 'email_otp' }),
+      findSignInCredentialByEmail: vi
+        .fn()
+        .mockResolvedValue({ ...CREDENTIAL, mfaMethod: 'email_otp' }),
     });
     await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(ForbiddenException);
   });
@@ -151,7 +166,7 @@ describe('cash staff login · AB#115 the register refuses an MFA-enrolled accoun
     // Refusing on the enrolment flag before verifying would answer "does this
     // address hold a second factor?" to anyone who asks. The wrong-password path
     // must still return the uniform body.
-    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
     h.passwords.verify.mockReturnValue(false);
     await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(UnauthorizedException);
     await h.service
@@ -162,7 +177,7 @@ describe('cash staff login · AB#115 the register refuses an MFA-enrolled accoun
   it('says something OTHER than "wrong credentials", for the logs and the next client', async () => {
     // Safe to be distinct: it is only reachable with a proven password. The frozen
     // client shows `Credenciales inválidas` regardless — it never reads the body.
-    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(ENROLLED) });
     // `rejects` first: a bare `.catch(assert)` passes vacuously when login RESOLVES,
     // so it would report green against a service that never refuses at all.
     await expect(h.service.login(MERCHANT, CREDS)).rejects.toThrow(ForbiddenException);
@@ -180,7 +195,7 @@ describe('cash staff login · AB#115 the register refuses an MFA-enrolled accoun
     // The refusal lands before the upgrade, so a refused login leaves the row
     // exactly as it found it.
     const h = harness({
-      findCredentialByEmail: vi
+      findSignInCredentialByEmail: vi
         .fn()
         .mockResolvedValue({ ...ENROLLED, passwordAlgorithm: 'legacy-sha256-v1' }),
     });
@@ -273,7 +288,7 @@ describe('cash login · legacy credentials upgrade themselves', () => {
   it('never re-hashes when the decoy path ran (no such account)', async () => {
     // The no-account path still hashes to keep the timing flat. It must not also
     // write a credential for a user that does not exist.
-    const h = harness({ findCredentialByEmail: vi.fn().mockResolvedValue(null) });
+    const h = harness({ findSignInCredentialByEmail: vi.fn().mockResolvedValue(null) });
     h.passwords.needsUpgrade.mockReturnValue(true);
 
     await h.service.login(MERCHANT, CREDS).catch(() => null);

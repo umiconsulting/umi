@@ -58,6 +58,33 @@ describe('validateConfig', () => {
     expect(cfg.PORT).toBe(8080);
   });
 
+  it('defaults the authenticated address ceiling above the anonymous one', () => {
+    const cfg = validateConfig({ ...base });
+    expect(cfg.RATE_LIMIT_IP_PER_MINUTE).toBe(300);
+    expect(cfg.RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE).toBe(3000);
+  });
+
+  it('accepts an explicit authenticated address ceiling', () => {
+    const cfg = validateConfig({ ...base, RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE: '6000' });
+    expect(cfg.RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE).toBe(6000);
+  });
+
+  it('refuses an authenticated address ceiling below the anonymous one', () => {
+    expect(() =>
+      validateConfig({
+        ...base,
+        RATE_LIMIT_IP_PER_MINUTE: '600',
+        RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE: '300',
+      }),
+    ).toThrowError(/RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE/);
+  });
+
+  it('refuses an out-of-range authenticated address ceiling', () => {
+    expect(() =>
+      validateConfig({ ...base, RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE: '10001' }),
+    ).toThrowError(/RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE/);
+  });
+
   it('requires an explicit UMI environment', () => {
     const { UMI_ENVIRONMENT: _environment, ...withoutEnvironment } = base;
     expect(() => validateConfig(withoutEnvironment)).toThrowError(/UMI_ENVIRONMENT/);

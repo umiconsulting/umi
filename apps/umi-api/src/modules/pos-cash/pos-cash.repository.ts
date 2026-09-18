@@ -24,6 +24,9 @@ import type {
   RecountRequest,
   RecoverCashShiftRequest,
   RecoverCashShiftResult,
+  ReclaimCashRegisterRequest,
+  ReclaimCashRegisterResult,
+  RegisterHold,
   RegisterStatus,
   ResolveCashVarianceRequest,
   ShiftCloseRequest,
@@ -35,6 +38,112 @@ import type {
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import { calculateExpectedCash, calculateVariance, type CashFact } from './cash-domain';
+import { CashRefusal } from './cash-refusal';
+
+/**
+ * WHO HOLDS A REGISTER, IN ONE QUERY, FOR EVERY REGISTER AT A LOCATION.
+ *
+ * `physical_register.status='in_use'` says a drawer is taken. It does not say by
+ * which terminal, and it cannot say whether that terminal can ever come back —
+ * which is the difference between "walk over to the other till" and "that tablet
+ * was replaced in March". The join is what makes the answer provable:
+ * `merchant.device.status` is the authority on whether a till still exists, and
+ * it is read here rather than asserted by a client.
+ *
+ * USABLE means exactly what the device-credential path means by it (see
+ * `merchant.device`'s check: only `revoked`/`replaced` carry `revoked_at`, and
+ * `retired` carries neither): a terminal that may still authenticate. Everything
+ * else — revoked, replaced, retired, rotated out, still enrolling, or a row that
+ * is not there at all — is a terminal nobody is coming back to.
+ *
+ * The shift join excludes the three terminal statuses, so a register left
+ * pointing at a shift that is already closed, blocked or recovered reads as
+ * `free`. That is the honest answer: nothing is holding it, even if the pointer
+ * was never cleaned up.
+ */
+const REGISTER_HOLD_SELECT = `
+  SELECT r.id::text AS "registerId",
+         s.id::text AS "shiftId",s.status AS "shiftStatus",
+         s.opened_at::text AS "openedAt",
+         s.holding_device_id::text AS "deviceId",
+         s.operator_session_id::text AS "operatorSessionId",
+         d.name AS "deviceName",d.status AS "deviceStatus",
+         -- ONE definition of "that terminal can still authenticate", in the
+         -- database (build-v3-68): the RLS policy that guards the write and the
+         -- trigger that guards the transition call the SAME function, so the
+         -- answer the till is shown cannot disagree with the answer that decides
+         -- whether its reclaim is allowed.
+         merchant.device_is_usable(s.holding_device_id) AS "deviceUsable"
+    FROM merchant.physical_register r
+    LEFT JOIN merchant.cash_shift s
+      ON s.register_id=r.id AND s.merchant_id=r.merchant_id
+     AND s.status NOT IN ('closed','blocked','recovered')
+    LEFT JOIN merchant.device d
+      ON d.id=s.holding_device_id AND d.merchant_id=s.merchant_id`;
+
+interface RegisterHoldRow {
+  registerId: string;
+  shiftId: string | null;
+  shiftStatus: string | null;
+  openedAt: string | null;
+  deviceId: string | null;
+  deviceName: string | null;
+  deviceStatus: string | null;
+  operatorSessionId: string | null;
+  deviceUsable: boolean;
+}
+
+/** The terminal that holds a register that has nobody on it. */
+const FREE_HOLD: RegisterHold = {
+  state: 'free',
+  shiftId: null,
+  shiftStatus: null,
+  openedAt: null,
+  deviceId: null,
+  deviceName: null,
+  deviceStatus: null,
+  operatorSessionId: null,
+  reclaimable: false,
+};
+
+const toRegisterHold = (
+  row: RegisterHoldRow | undefined,
+  callerDeviceId: string | null,
+): RegisterHold => {
+  if (!row || row.shiftId === null) return FREE_HOLD;
+  const state: RegisterHold['state'] = row.deviceUsable
+    ? row.deviceId !== null && row.deviceId === callerDeviceId
+      ? 'held_by_this_device'
+      : 'held_by_active_till'
+    : 'held_by_orphaned_till';
+  return {
+    state,
+    shiftId: row.shiftId,
+    shiftStatus: row.shiftStatus as RegisterHold['shiftStatus'],
+    openedAt: row.openedAt,
+    deviceId: row.deviceId,
+    deviceName: row.deviceName,
+    deviceStatus: row.deviceStatus,
+    operatorSessionId: row.operatorSessionId,
+    // Only an orphaned hold is reclaimable. A `free` register has nothing to
+    // reclaim, and a live till must be counted out by a manager instead —
+    // which is `POST /cash/shifts/:shiftId/recover`, a different operation.
+    reclaimable: state === 'held_by_orphaned_till',
+  };
+};
+
+/** The hold flattened into the scalar bag an error `details` allows. */
+const holdDetails = (hold: RegisterHold): Record<string, string | number | boolean | null> => ({
+  holdState: hold.state,
+  shiftId: hold.shiftId,
+  shiftStatus: hold.shiftStatus,
+  shiftOpenedAt: hold.openedAt,
+  holdingDeviceId: hold.deviceId,
+  holdingDeviceName: hold.deviceName,
+  holdingDeviceStatus: hold.deviceStatus,
+  holdingOperatorSessionId: hold.operatorSessionId,
+  reclaimable: hold.reclaimable,
+});
 
 export interface CashAuthorization {
   operatorSessionId: string;
@@ -275,12 +384,24 @@ export class PosCashRepository {
       [dto.registerId, merchantId, dto.locationId, dto.expectedRegisterVersion],
     );
     const current = register.rows[0];
+    // A register the caller cannot open is a conflict with a recovery action,
+    // never a server fault. `registerRefusal` re-reads the register without the
+    // version predicate and names the shift, the terminal that holds it and what
+    // became of that terminal — see `cash-refusal.ts` for what this replaced and
+    // why it mattered.
     if (
       !current ||
       (current.assignmentPolicy === 'device_required' &&
         current.assignedDeviceId !== authorization.deviceId)
     ) {
-      throw new Error('REGISTER_NOT_AVAILABLE');
+      throw await this.registerRefusal(
+        client,
+        merchantId,
+        dto.locationId,
+        dto.registerId,
+        dto.expectedRegisterVersion,
+        authorization.deviceId,
+      );
     }
     if (current.currency !== dto.openingFloat.currency) throw new Error('CURRENCY_MISMATCH');
     const policy = await this.policy(client, merchantId, dto.locationId, current.currency);
@@ -379,6 +500,17 @@ export class PosCashRepository {
       version: updated.rows[0].version,
       createdAt: current.createdAt,
       archivedAt: null,
+      // Resolved, not assumed: the shift was created a statement ago, so this is
+      // the one moment where the answer is known to be "held by this device" —
+      // and reading it back keeps `hold` a fact about the row instead of a
+      // second place that has to agree with it.
+      hold: await this.registerHold(
+        client,
+        merchantId,
+        dto.locationId,
+        dto.registerId,
+        authorization.deviceId,
+      ),
     };
     return {
       register: registerResult,
@@ -431,7 +563,8 @@ export class PosCashRepository {
       `SELECT sequence::text,entry_type AS type,amount_minor_units::text AS "amountMinorUnits",
               cash_received_minor_units::text AS received,
               change_given_minor_units::text AS change
-       FROM merchant.cash_ledger_entry WHERE shift_id=$1::uuid ORDER BY sequence`,
+       FROM merchant.cash_ledger_entry WHERE shift_id=$1::uuid
+       ORDER BY merchant.cash_ledger_entry.sequence`,
       [shiftId],
     );
     return calculateExpectedCash(
@@ -1204,6 +1337,15 @@ export class PosCashRepository {
         version: register.rows[0].version,
         createdAt: register.rows[0].createdAt,
         archivedAt: null,
+        // Read back rather than assumed free: the answer has to come from the
+        // same join the till reads, or the two can disagree again.
+        hold: await this.registerHold(
+          client,
+          merchantId,
+          current.locationId,
+          current.registerId,
+          authorization.deviceId,
+        ),
       },
       openingFloat: { minorUnits: Number(current.openingFloat), currency: current.currency },
       expectedCash: expected,
@@ -1310,7 +1452,13 @@ export class PosCashRepository {
                   closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version
            FROM merchant.cash_shift
            WHERE merchant_id=$1::uuid AND location_id=$2::uuid
-             AND holding_device_id=$3::uuid AND status<>'closed'
+             AND holding_device_id=$3::uuid
+             -- ALL THREE terminal statuses, not just 'closed'. A blocked shift
+             -- (the reclaim, build-v3-68) and a recovered one are equally over,
+             -- and while this said '<>closed' the Caja screen kept rendering
+             -- "Turno abierto" for a shift that was already finished — which is
+             -- how the till came to offer a drawer the API would not open.
+             AND status NOT IN ('closed','blocked','recovered')
              AND responsible_operator_id=$4::uuid
            ORDER BY opened_at DESC LIMIT 1`,
           [merchantId, locationId, deviceId, operatorId],
@@ -1347,6 +1495,10 @@ export class PosCashRepository {
               [merchantId, locationId, operatorId, deviceId],
             );
         const adoptableShift = adoptable?.rows[0] ?? null;
+        // One extra read for the whole screen, not one per register: the till has
+        // to be able to answer "is this drawer mine to take?" for every register
+        // it is offered, and the answer is a fact about `merchant.device`.
+        const holds = await this.registerHolds(client, merchantId, locationId, deviceId);
         const mappedRegisters = registers.rows.map((row) => ({
           ...row,
           assignment: {
@@ -1354,6 +1506,7 @@ export class PosCashRepository {
             allowedDeviceClasses: row.allowedDeviceClasses,
             assignedAt: null,
           },
+          hold: holds.get(row.id) ?? FREE_HOLD,
         }));
         const shift = current.rows[0] ?? null;
         const sessionMatches = shift?.operatorSessionId === operatorSessionId;
@@ -2012,7 +2165,12 @@ export class PosCashRepository {
     });
     return {
       shift,
-      register: await this.readRegister(client, merchantId, current.registerId),
+      register: await this.readRegister(
+        client,
+        merchantId,
+        current.registerId,
+        authorization.deviceId,
+      ),
       custody,
       correlationId,
     };
@@ -2202,6 +2360,16 @@ export class PosCashRepository {
           version: registerRow.version,
           createdAt: registerRow.createdAt,
           archivedAt: null,
+          // Read back rather than assumed free — the shift is `recovered` now,
+          // and `recovered` is one of the three terminal statuses the hold join
+          // excludes, but the till reads this join and so does the report.
+          hold: await this.registerHold(
+            client,
+            merchantId,
+            dto.locationId,
+            current.registerId,
+            authorization.deviceId,
+          ),
         },
         openingFloat: { minorUnits: Number(current.openingFloat), currency: current.currency },
         expectedCash: expected,
@@ -2221,10 +2389,222 @@ export class PosCashRepository {
     };
   }
 
+  /**
+   * FREE A REGISTER WHOSE HOLDING TERMINAL IS NEVER COMING BACK.
+   *
+   * This is the operation the till was missing. Both Chapultepec registers were
+   * held by shifts opened on 2026-09-03 and 2026-09-05 by terminals that no
+   * longer existed; opening a shift answered `REGISTER_NOT_AVAILABLE` and every
+   * sale answered `CASH_SHIFT_REQUIRED`, and the only way out was hand-written
+   * SQL. `recover` is the other door and it is the wrong one: it takes a drawer
+   * count under a manager's name. Nobody counted these drawers, and nothing here
+   * is allowed to pretend otherwise.
+   *
+   * WHAT PROVES THE SHIFT IS ORPHANED. Not the caller. `merchant.device.status`
+   * says whether the terminal that holds the shift can still authenticate, and it
+   * is read inside the same transaction that takes the lock, so a device revoked
+   * between the read and the write cannot slip through. A shift held by a LIVE
+   * terminal is refused with `REGISTER_HELD_BY_ACTIVE_TILL` and pointed at
+   * manager recovery: that drawer has somebody standing at it.
+   *
+   * WHAT IT MOVES. The shift goes to `blocked` — the domain's terminal state with
+   * no way out (`cash-domain.ts`: `blocked: []`) — and the register is released.
+   * The ledger is NOT touched: no movement, no adjustment, no variance, and no
+   * count. `blocked` rather than `closed` (reconciled by the cashier responsible
+   * for it) or `recovered` (counted by somebody else) precisely because neither
+   * of those may ever describe a drawer nobody counted, and `cash_custody_shape`
+   * (build-v3-68) refuses a custody row that would claim otherwise.
+   *
+   * `closed_at` is deliberately left NULL: the drawer was not closed, it was
+   * abandoned, and a report that reads these wants `status='blocked'`. The
+   * partial index `cash_shift_blocked_idx` is what that report uses.
+   */
+  async reclaimRegister(
+    client: PoolClient,
+    merchantId: string,
+    authorization: CashAuthorization,
+    dto: ReclaimCashRegisterRequest,
+    correlationId: string,
+  ): Promise<ReclaimCashRegisterResult> {
+    const register = await client.query<{
+      id: string;
+      locationId: string;
+      currency: string;
+      active: boolean;
+      archivedAt: string | null;
+      currentShiftId: string | null;
+      status: RegisterStatus;
+      version: number;
+    }>(
+      `SELECT id::text,location_id::text AS "locationId",currency,active,
+              archived_at::text AS "archivedAt",current_shift_id::text AS "currentShiftId",
+              status,version
+         FROM merchant.physical_register
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+        FOR UPDATE`,
+      [dto.registerId, merchantId, dto.locationId],
+    );
+    const current = register.rows[0];
+    if (!current)
+      throw await this.registerRefusal(
+        client,
+        merchantId,
+        dto.locationId,
+        dto.registerId,
+        dto.expectedRegisterVersion,
+        authorization.deviceId,
+      );
+    if (!current.active || current.archivedAt !== null) {
+      throw await this.registerRefusal(
+        client,
+        merchantId,
+        dto.locationId,
+        dto.registerId,
+        dto.expectedRegisterVersion,
+        authorization.deviceId,
+      );
+    }
+    if (current.version !== dto.expectedRegisterVersion) {
+      throw new CashRefusal('OPTIMISTIC_VERSION_CONFLICT', 409, {
+        reason: 'register_changed',
+        registerId: dto.registerId,
+        registerStatus: current.status,
+        registerVersion: current.version,
+        expectedRegisterVersion: dto.expectedRegisterVersion,
+      });
+    }
+
+    const hold = await this.registerHold(
+      client,
+      merchantId,
+      dto.locationId,
+      dto.registerId,
+      authorization.deviceId,
+    );
+    if (hold.shiftId !== null && hold.state !== 'held_by_orphaned_till') {
+      throw new CashRefusal('REGISTER_HELD_BY_ACTIVE_TILL', 409, {
+        reason: 'register_held_by_active_till',
+        registerId: dto.registerId,
+        registerStatus: current.status,
+        registerVersion: current.version,
+        action: hold.state === 'held_by_this_device' ? 'resume_shift' : 'manager_recovery',
+        ...holdDetails(hold),
+      });
+    }
+
+    const reclaimedAt = new Date().toISOString();
+    let shift: CashShift | null = null;
+    let custody: CashShiftCustodyEvent | null = null;
+
+    if (hold.shiftId !== null) {
+      const held = await client.query<{
+        id: string;
+        holdingDeviceId: string;
+        holdingDeviceCredentialVersion: number;
+        operatorSessionId: string;
+        responsibleOperatorId: string;
+        status: string;
+        ledgerSequence: string;
+      }>(
+        `SELECT id::text,holding_device_id::text AS "holdingDeviceId",
+                holding_device_credential_version AS "holdingDeviceCredentialVersion",
+                operator_session_id::text AS "operatorSessionId",
+                responsible_operator_id::text AS "responsibleOperatorId",
+                status,ledger_sequence::text AS "ledgerSequence"
+           FROM merchant.cash_shift
+          WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+            AND status NOT IN ('closed','blocked','recovered')
+          FOR UPDATE`,
+        [hold.shiftId, merchantId, dto.locationId],
+      );
+      const currentShift = held.rows[0];
+      if (currentShift) {
+        // `closed_at` stays NULL on purpose — see the note above the method.
+        const blocked = await client.query<CashShift>(
+          `UPDATE merchant.cash_shift
+              SET status='blocked',version=version+1
+            WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+              AND status NOT IN ('closed','blocked','recovered')
+            RETURNING id::text,merchant_id::text AS "merchantId",
+                      location_id::text AS "locationId",register_id::text AS "registerId",
+                      device_id::text AS "deviceId",
+                      device_credential_version AS "deviceCredentialVersion",
+                      holding_device_id::text AS "holdingDeviceId",
+                      holding_device_credential_version AS "holdingDeviceCredentialVersion",
+                      opening_operator_id::text AS "openingOperatorId",
+                      responsible_operator_id::text AS "responsibleOperatorId",
+                      operator_session_id::text AS "operatorSessionId",currency,
+                      business_date::text AS "businessDate",status,
+                      opening_command_id::text AS "openingCommandId",
+                      opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
+                      closed_at::text AS "closedAt",
+                      ledger_sequence::int AS "ledgerSequence",version`,
+          [hold.shiftId, merchantId, dto.locationId],
+        );
+        shift = blocked.rows[0] ?? null;
+        custody = await this.recordCustody(client, merchantId, {
+          locationId: dto.locationId,
+          registerId: dto.registerId,
+          shiftId: hold.shiftId,
+          eventType: 'orphan_reclaim',
+          previousHoldingDeviceId: currentShift.holdingDeviceId,
+          previousHoldingCredentialVersion: currentShift.holdingDeviceCredentialVersion,
+          previousOperatorSessionId: currentShift.operatorSessionId,
+          newHoldingDeviceId: null,
+          newHoldingCredentialVersion: null,
+          newOperatorSessionId: null,
+          actingOperatorId: authorization.operatorId,
+          responsibleOperatorId: currentShift.responsibleOperatorId,
+          shiftStatusBefore: currentShift.status,
+          shiftStatusAfter: shift?.status ?? 'blocked',
+          // Nothing was counted and nothing was expected. The constraint
+          // `cash_custody_shape` requires both to be NULL for this event type.
+          expectedCashMinorUnits: null,
+          countedCashMinorUnits: null,
+          currency: current.currency,
+          reasonCode: dto.reasonCode,
+          note: null,
+          approvalId: null,
+          commandId: dto.commandId,
+          ledgerSequence: Number(currentShift.ledgerSequence),
+        });
+      }
+    }
+
+    // Hand the drawer back. This is the half that was missing: without clearing
+    // `current_shift_id` and the status, a register stays `in_use` for ever and
+    // `openShift`'s predicate — status in ('available','assigned') — can never
+    // match it again, which is the trap the whole defect is.
+    //
+    // Only when there is something to hand back. A register that is already
+    // available with no shift is left exactly as it is: bumping its version for
+    // nothing would fail a concurrent open that is perfectly entitled to win.
+    const held =
+      current.currentShiftId !== null || !['available', 'assigned'].includes(current.status);
+    if (held) {
+      await client.query(
+        `UPDATE merchant.physical_register
+            SET status=CASE WHEN assigned_device_id IS NULL THEN 'available' ELSE 'assigned' END,
+                current_shift_id=NULL,version=version+1
+          WHERE id=$1::uuid AND merchant_id=$2::uuid AND version=$3`,
+        [dto.registerId, merchantId, current.version],
+      );
+    }
+
+    return {
+      register: await this.readRegister(client, merchantId, dto.registerId, authorization.deviceId),
+      shift,
+      custody,
+      reclaimedAt,
+      correlationId,
+    };
+  }
+
   private async readRegister(
     client: PoolClient,
     merchantId: string,
     registerId: string,
+    callerDeviceId: string | null,
   ): Promise<PhysicalRegister> {
     const { rows } = await client.query<PhysicalRegisterRow>(
       `SELECT id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
@@ -2243,7 +2623,128 @@ export class PosCashRepository {
     return {
       ...rest,
       assignment: { deviceId: assignedDeviceId, allowedDeviceClasses, assignedAt: null },
+      hold: await this.registerHold(client, merchantId, row.locationId, registerId, callerDeviceId),
     };
+  }
+
+  /**
+   * The hold on one register, resolved server-side.
+   *
+   * `callerDeviceId` is only used to tell the operator's OWN shift from another
+   * terminal's: both are held by a usable device, but only the first is the
+   * shift they are already standing in.
+   */
+  private async registerHold(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    registerId: string,
+    callerDeviceId: string | null,
+  ): Promise<RegisterHold> {
+    const { rows } = await client.query<RegisterHoldRow>(
+      `${REGISTER_HOLD_SELECT}
+        WHERE r.id=$1::uuid AND r.merchant_id=$2::uuid AND r.location_id=$3::uuid
+        ORDER BY s.opened_at DESC NULLS LAST
+        LIMIT 1`,
+      [registerId, merchantId, locationId],
+    );
+    return toRegisterHold(rows[0], callerDeviceId);
+  }
+
+  /** The same answer for every register at a location, in one round trip. */
+  private async registerHolds(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    callerDeviceId: string | null,
+  ): Promise<Map<string, RegisterHold>> {
+    const { rows } = await client.query<RegisterHoldRow>(
+      `${REGISTER_HOLD_SELECT}
+        WHERE r.merchant_id=$1::uuid AND r.location_id=$2::uuid`,
+      [merchantId, locationId],
+    );
+    const holds = new Map<string, RegisterHold>();
+    for (const row of rows) holds.set(row.registerId, toRegisterHold(row, callerDeviceId));
+    return holds;
+  }
+
+  /**
+   * The refusal for a register the caller cannot open, carrying the facts the
+   * operator needs. Reads the register WITHOUT the version predicate — the point
+   * of the refusal is to say what the register looks like now, which is by
+   * definition not what the caller thought it looked like.
+   */
+  private async registerRefusal(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    registerId: string,
+    expectedVersion: number,
+    callerDeviceId: string | null,
+  ): Promise<CashRefusal> {
+    const { rows } = await client.query<{
+      status: RegisterStatus;
+      version: number;
+      currentShiftId: string | null;
+      active: boolean;
+      archivedAt: string | null;
+      assignmentPolicy: 'device_required' | 'operator_selects';
+      assignedDeviceId: string | null;
+    }>(
+      `SELECT status,version,current_shift_id::text AS "currentShiftId",active,
+              archived_at::text AS "archivedAt",
+              assignment_policy AS "assignmentPolicy",
+              assigned_device_id::text AS "assignedDeviceId"
+         FROM merchant.physical_register
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid`,
+      [registerId, merchantId, locationId],
+    );
+    const register = rows[0];
+    if (!register) {
+      return new CashRefusal('REGISTER_NOT_AVAILABLE', 409, {
+        reason: 'register_not_found',
+        registerId,
+      });
+    }
+    const hold = await this.registerHold(
+      client,
+      merchantId,
+      locationId,
+      registerId,
+      callerDeviceId,
+    );
+    const details: Record<string, string | number | boolean | null> = {
+      reason: 'register_changed',
+      registerId,
+      registerStatus: register.status,
+      registerVersion: register.version,
+      expectedRegisterVersion: expectedVersion,
+      ...holdDetails(hold),
+    };
+    if (!register.active || register.archivedAt !== null) {
+      details.reason = 'register_archived';
+    } else if (register.version !== expectedVersion) {
+      details.reason = 'register_changed';
+    } else if (register.status === 'blocked') {
+      details.reason = 'register_blocked';
+    } else if (
+      register.assignmentPolicy === 'device_required' &&
+      register.assignedDeviceId !== callerDeviceId
+    ) {
+      details.reason = 'register_not_assigned_to_this_device';
+    } else if (hold.shiftId === null) {
+      details.reason = 'register_unavailable';
+    } else {
+      details.reason = 'register_held';
+    }
+    // The recovery action, named for the client. A drawer with a live till
+    // behind it must still be counted by a manager; a drawer whose terminal is
+    // gone is the caller's own to take.
+    details.action =
+      details.reason === 'register_held' && hold.reclaimable
+        ? 'reclaim_register'
+        : 'manager_recovery';
+    return new CashRefusal('REGISTER_NOT_AVAILABLE', 409, details);
   }
 
   private async recordCustody(

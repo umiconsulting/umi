@@ -7,6 +7,176 @@ import { PosCheckoutRepository } from './pos-checkout.repository';
 const id = (value: number) => `00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
 
 describe('Gate 3B checkout persistence', () => {
+  /**
+   * The tender a capture already owns (workstream G). A draft that was captured through a
+   * provider adapter arrives here with an attempt row keyed by the draft's own id, and the
+   * guard has three branches. Two of them are proved below; the third — no captured attempt
+   * at all — is the path every tender the till sends today takes, and it is covered by the
+   * existing cases in this file.
+   *
+   * These are the money-path branches with no other coverage: nothing in `apps/umi-pos`
+   * calls `pos.tenderCapture` yet, so no end-to-end run can produce this state. A branch
+   * that only a future client can reach is exactly the branch that must not ship untested.
+   */
+  const capturedTenderSummary = (): PaymentSummary => ({
+    checkoutId: id(7),
+    state: 'collecting_payment',
+    tenders: [
+      {
+        tenderId: id(8),
+        type: 'manual_terminal',
+        applied: { minorUnits: 5500, currency: 'MXN' },
+        received: null,
+        change: { minorUnits: 0, currency: 'MXN' },
+        status: 'confirmed_success',
+      },
+    ],
+    amountDue: { minorUnits: 5500, currency: 'MXN' },
+    appliedAmount: { minorUnits: 5500, currency: 'MXN' },
+    remainingBalance: { minorUnits: 0, currency: 'MXN' },
+    change: { minorUnits: 0, currency: 'MXN' },
+    partialPaymentState: 'fully_covered',
+    tip: null,
+    discounts: { total: { minorUnits: 0, currency: 'MXN' }, entries: [] },
+  });
+
+  const capturedCart = () => ({
+    id: id(9),
+    merchantId: id(10),
+    locationId: id(11),
+    operatorSessionId: id(12),
+    version: 1,
+    businessDate: '2026-07-29',
+    merchantName: 'Umi',
+    locationName: 'Local',
+    operatorName: 'Cashier',
+    customerId: null,
+    originOrderId: null,
+    originChannel: null,
+    lines: [],
+  });
+
+  /** Answers by SQL content, so the case does not depend on the order of the statements. */
+  const clientFor = (
+    captured: { status: string; amountMinorUnits?: string; currency?: string } | null,
+  ) => ({
+    query: vi.fn(async (sql: string) => {
+      if (sql.includes('INSERT INTO merchant.pos_tender_fact')) {
+        return { rowCount: 1, rows: [{ id: id(8) }] };
+      }
+      if (sql.includes('tender_draft_id')) {
+        return {
+          rowCount: captured ? 1 : 0,
+          rows: captured
+            ? [
+                {
+                  id: id(20),
+                  status: captured.status,
+                  provider: 'mercado_pago_point',
+                  proofSource: 'provider',
+                  amountMinorUnits: captured.amountMinorUnits ?? '5500',
+                  currency: captured.currency ?? 'MXN',
+                },
+              ]
+            : [],
+        };
+      }
+      if (sql.includes('UPDATE merchant.pos_payment_attempt')) {
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: id(20),
+              method: 'external_terminal',
+              amountMinorUnits: '5500',
+              currency: 'MXN',
+              status: 'succeeded',
+              queryOnly: false,
+              correlationId: 'corr',
+              expiresAt: null,
+              createdAt: '2026-07-29T10:00:00.000Z',
+            },
+          ],
+        };
+      }
+      return { rowCount: 1, rows: [] };
+    }),
+  });
+
+  it('refuses to commit a sale whose captured tender is still unresolved', async () => {
+    const repository = new PosCheckoutRepository({} as never);
+    await expect(
+      repository.payments(
+        clientFor({ status: 'unknown' }) as never,
+        capturedCart() as never,
+        id(7),
+        capturedTenderSummary(),
+        'corr',
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'PAYMENT_UNKNOWN',
+        details: { attemptId: id(20), attemptStatus: 'unknown' },
+      },
+    });
+  });
+
+  it('refuses a TIMEOUT too: neither unresolved state may become a paid sale', async () => {
+    // `timeout` is the other unresolved state, and the two are distinguished on purpose:
+    // one is "the provider answered in a way we cannot read", the other is "it never
+    // answered". Both are query-only, and neither may become a paid sale.
+    const repository = new PosCheckoutRepository({} as never);
+    await expect(
+      repository.payments(
+        clientFor({ status: 'timeout' }) as never,
+        capturedCart() as never,
+        id(7),
+        capturedTenderSummary(),
+        'corr',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'PAYMENT_UNKNOWN' } });
+  });
+
+  it('links the captured attempt instead of writing a second one for the same money', async () => {
+    const repository = new PosCheckoutRepository({} as never);
+    // Held as the mock it is, and cast only where the repository wants a real
+    // `PoolClient`: the assertions below read `client.query`'s call log, which a
+    // variable typed `never` cannot offer.
+    const client = clientFor({ status: 'succeeded' });
+    const outcomes = await repository.payments(
+      client as never,
+      capturedCart(),
+      id(7),
+      capturedTenderSummary(),
+      'corr',
+    );
+    // The outcome IS the captured attempt — the row that holds the provider's payment id —
+    // and no INSERT of a second attempt was issued.
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0].attempt.id).toBe(id(20));
+    expect(outcomes[0].attempt.method).toBe('external_terminal');
+    const issued = (client.query as unknown as { mock: { calls: string[][] } }).mock.calls.map(
+      (call) => call[0],
+    );
+    const attemptInserts = issued.filter((sql) =>
+      sql.includes('INSERT INTO merchant.pos_payment_attempt'),
+    );
+    expect(attemptInserts).toHaveLength(0);
+  });
+
+  it('refuses when the captured amount disagrees with the tender', async () => {
+    const repository = new PosCheckoutRepository({} as never);
+    await expect(
+      repository.payments(
+        clientFor({ status: 'succeeded', amountMinorUnits: '9900' }) as never,
+        capturedCart() as never,
+        id(7),
+        capturedTenderSummary(),
+        'corr',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'TENDER_OVERALLOCATION' } });
+  });
+
   it('leaves the protected stock balance write lock to append_stock_ledger', async () => {
     const source = readFileSync(join(__dirname, 'pos-checkout.repository.ts'), 'utf8');
     expect(source).toContain('FROM merchant.stock_balance');

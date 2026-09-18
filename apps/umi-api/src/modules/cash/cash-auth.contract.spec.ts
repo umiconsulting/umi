@@ -68,7 +68,7 @@ describe('cash auth · login, refresh, logout as one flow', () => {
     merchantByHandle: vi.fn(async (h: string) =>
       h === HANDLE ? { id: MERCHANT, name: 'Kalala Café', handle: HANDLE } : null,
     ),
-    findCredentialByEmail: vi.fn(async (email: string) =>
+    findSignInCredentialByEmail: vi.fn(async (email: string) =>
       email === 'ana@kalala.mx'
         ? {
             userId: USER,

@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -14,9 +15,11 @@ import type {
   CheckoutPolicy,
   CheckoutRecoveryQuery,
   CheckoutResult,
+  CheckoutTerminalRecoveryRequest,
   PaymentOutcome,
   PaymentSummary,
   PaymentStatusQuery,
+  PosCheckoutPolicyQuery,
   ReceiptSnapshot,
   StoredValueFingerprintInput,
   TaxBreakdown,
@@ -27,6 +30,8 @@ import { IntegrityService } from '../integrity/integrity.service';
 import { inventoryConflictCode } from '../pos-inventory/inventory-errors';
 import { canonicalStoredValueFingerprint } from '../pos-customer-value/customer-value-domain';
 import { PosCartRepository, type PricedSelection } from '../pos-cart/pos-cart.repository';
+import { getRequestContext } from '../../shared/database/request-context';
+import { CashRefusal } from '../pos-cash/cash-refusal';
 import { PosCheckoutRepository, type CheckoutCart } from './pos-checkout.repository';
 import { calculateCheckout } from './checkout-calculator';
 
@@ -236,6 +241,26 @@ export class PosCheckoutService {
             previewRecoveryState,
             confirmation.fingerprint,
           );
+          if (!previewDraft) {
+            // The draft's own guards refused the write: a settled draft, or a
+            // tender set that DROPS a terminal payment already marked confirmed.
+            // Both mean "this tender cannot be recorded", which is a refusal
+            // about the tender and not a server fault — so it is answered the
+            // way every other tender refusal is, instead of as a 500 that names
+            // nothing and invites a retry that cannot work.
+            return {
+              ok: true,
+              value: this.recoverableResult(
+                confirmation,
+                calculation.summary,
+                policy,
+                dto,
+                'INVALID_TENDER_AMOUNT',
+                context.correlationId,
+                null,
+              ),
+            };
+          }
           const previewSummary = calculation.summary
             ? { ...calculation.summary, checkoutId: previewDraft.id }
             : null;
@@ -374,6 +399,23 @@ export class PosCheckoutService {
             recoveryState,
             confirmed.fingerprint,
           );
+          if (!draft) {
+            // Same refusal as the preview's, at the commit: the tender cannot be
+            // recorded because it would drop a terminal payment already marked
+            // confirmed. See the preview site for why this is not an error.
+            return {
+              ok: true,
+              value: this.recoverableResult(
+                confirmed,
+                calculation.summary,
+                policy,
+                dto,
+                'INVALID_TENDER_AMOUNT',
+                context.correlationId,
+                null,
+              ),
+            };
+          }
           const persistedSummary = calculation.summary
             ? { ...calculation.summary, checkoutId: draft.id }
             : null;
@@ -569,6 +611,13 @@ export class PosCheckoutService {
     try {
       return await promise;
     } catch (error) {
+      // A cash refusal names its own status and carries the facts the operator
+      // needs (`CashShiftRequired` → the register and its `hold`). Without this
+      // it fell through the catch-all filter as a 500 "Internal server error"
+      // and the till offered a retry that re-sent the same broken payload.
+      if (error instanceof CashRefusal) {
+        throw new HttpException({ code: error.code, details: error.details }, error.status);
+      }
       const code = inventoryConflictCode(error);
       if (code) throw new ConflictException({ code });
       throw error;
@@ -593,6 +642,109 @@ export class PosCheckoutService {
     );
     if (!snapshot) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
     return snapshot;
+  }
+
+  /**
+   * Withdraw a terminal claim the operator has read and found false.
+   *
+   * `cancel` above refuses a draft that holds one, and the tender guard refuses a
+   * later tender set that would drop one — both correctly, because a claim that
+   * money changed hands must not be erased by a route that was not asked to erase
+   * it. This is the route that IS asked: it names the tender, it asks for the
+   * permission a card terminal requires, and it keeps the operator's reason in the
+   * audit trail. Without it a cashier whose terminal did not charge had a cart they
+   * could not pay, a screen they could not leave, and no sentence to say it with.
+   */
+  async recoverTerminalClaim(
+    user: AuthUser,
+    merchantId: string,
+    cartId: string,
+    dto: CheckoutTerminalRecoveryRequest,
+  ) {
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+    );
+    if (
+      !authorization.permissions.includes('checkout.terminal.confirm') &&
+      !authorization.permissions.includes('*')
+    ) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    }
+    const correlationId = getRequestContext()?.correlationId ?? randomUUID();
+    const result = await this.integrity.execute<{
+      draftId: string;
+      withdrawnTenderDraftId: string;
+      remainingTenderDrafts: number;
+      recoveredAt: string;
+      correlationId: string;
+    }>(
+      {
+        merchantId,
+        locationId: dto.locationId,
+        commandId: randomUUID(),
+        idempotencyKey: dto.idempotencyKey,
+        commandType: 'pos.checkout.terminal_recovery',
+        payload: { cartId, ...dto },
+        correlationId,
+      },
+      async (context) => {
+        const recovered = await this.repo.recoverTerminalClaim(
+          context.client,
+          merchantId,
+          dto.locationId,
+          dto.operatorSessionId,
+          cartId,
+          dto.tenderDraftId,
+        );
+        if (!recovered) {
+          // Either there is no draft, or it holds no unresolved terminal claim
+          // under that id. Both mean this route has nothing to withdraw, and a
+          // route that cleared tenders it was not pointed at would be exactly the
+          // erasure the guards exist to prevent.
+          return {
+            ok: false as const,
+            code: 'TENDER_NOT_RECOVERABLE',
+            failureClass: 'validation' as const,
+            retryable: false,
+          };
+        }
+        await context.appendAudit({
+          eventType: 'checkout.terminal_claim_withdrawn',
+          entityType: 'pos_checkout',
+          entityId: recovered.id,
+          outcome: 'success',
+          reasonCode: dto.evidence,
+          publicData: {
+            cartId,
+            tenderDraftId: dto.tenderDraftId,
+            evidence: dto.evidence,
+            note: dto.note,
+            remainingTenderDrafts: recovered.remaining,
+          },
+        });
+        return {
+          ok: true as const,
+          value: {
+            draftId: recovered.id,
+            withdrawnTenderDraftId: dto.tenderDraftId,
+            remainingTenderDrafts: recovered.remaining,
+            recoveredAt: new Date().toISOString(),
+            correlationId,
+          },
+        };
+      },
+    );
+    if (result.status !== 'succeeded' || !result.result) {
+      const code = result.failureCode ?? 'TENDER_NOT_RECOVERABLE';
+      if (code === 'TENDER_NOT_RECOVERABLE' || code === 'RESOURCE_NOT_FOUND') {
+        throw new NotFoundException({ code });
+      }
+      throw new ConflictException({ code });
+    }
+    return { ok: true as const, data: result.result };
   }
 
   async cancel(
@@ -669,6 +821,22 @@ export class PosCheckoutService {
     return value;
   }
 
+  /**
+   * What the tender screen may offer, answered BEFORE anything is charged.
+   *
+   * Same authorisation as the charge itself — an enrolled device and an active
+   * operator session with `checkout.commit` — because the answer is about what
+   * *this* operator may take. The policy is server-issued and a location without
+   * a row reads as default-deny, which is why this returns the policy rather
+   * than a boolean: the till has to be able to say "cash only" honestly, and to
+   * offer the card terminal when the location has one.
+   */
+  async policyForPos(user: AuthUser, merchantId: string, query: PosCheckoutPolicyQuery) {
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    const policy = await this.repo.policyForLocation(merchantId, query.locationId, query.currency);
+    return { ok: true as const, data: policy };
+  }
+
   private async reprice(
     client: Parameters<Parameters<IntegrityService['execute']>[1]>[0]['client'],
     cart: CheckoutCart,
@@ -687,6 +855,7 @@ export class PosCheckoutService {
         variantId: line.variantId,
         modifierSelections: line.modifiers,
         quantity: line.quantity,
+        courseNumber: line.courseNumber,
         note: line.note,
         expectedVersion: cart.version,
         idempotencyKey,
@@ -721,6 +890,7 @@ export class PosCheckoutService {
         productName: priced.productName,
         saleAction: priced.saleAction,
         quantity: line.quantity,
+        courseNumber: line.courseNumber,
         variant: priced.variantId
           ? {
               variantId: priced.variantId,

@@ -13,7 +13,7 @@ import { AuthService, isMfaChallenge, type LoginOutcome } from './auth.service';
 
 function make() {
   const repo = {
-    findCredentialByEmail: vi.fn(),
+    findSignInCredentialByEmail: vi.fn(),
     upgradeCredential: vi.fn().mockResolvedValue(undefined),
     findUserById: vi.fn(),
     findMerchantsForUser: vi.fn().mockResolvedValue([]),
@@ -28,7 +28,10 @@ function make() {
     markResetTokenUsed: vi.fn().mockResolvedValue(undefined),
     validatePosDevice: vi.fn(),
     findPosPinStaff: vi.fn(),
+    effectiveEntitlement: vi.fn(),
     recordPosPinFailure: vi.fn().mockResolvedValue(undefined),
+    clearPosPinFailures: vi.fn().mockResolvedValue(undefined),
+    createPosSession: vi.fn().mockResolvedValue(undefined),
     validatePosSession: vi.fn(),
     rotatePosSessionToken: vi.fn().mockResolvedValue(true),
     revokePosSession: vi.fn().mockResolvedValue(undefined),
@@ -93,12 +96,12 @@ describe('AuthService.login', () => {
   beforeEach(() => (h = make()));
 
   it('issues tokens + session on valid credentials (and lowercases username)', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(CRED);
     h.passwords.verify.mockReturnValue(true);
 
     const r = asSession(await h.svc.login('  Owner@Kala.co ', 'pw'));
 
-    expect(h.repo.findCredentialByEmail).toHaveBeenCalledWith('owner@kala.co');
+    expect(h.repo.findSignInCredentialByEmail).toHaveBeenCalledWith('owner@kala.co');
     expect(r.accessToken).toBe('access-tok');
     expect(r.refreshToken).toBe('refresh-tok');
     expect(r.user).toEqual({
@@ -117,14 +120,34 @@ describe('AuthService.login', () => {
   });
 
   it('401s on wrong password', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(CRED);
     h.passwords.verify.mockReturnValue(false);
     await expect(h.svc.login('owner@kala.co', 'bad')).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('401s (no enumeration) on unknown user', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(null);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(null);
     await expect(h.svc.login('nobody@x.co', 'pw')).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('refuses a SUSPENDED login with the SAME 401 as an unknown one and a wrong password', async () => {
+    // The gate is in the SQL — auth.repository.spec.ts asserts the predicate —
+    // so a suspended row arrives here as "no account". This pins the consequence
+    // that matters to the person on the way out: the three refusals are ONE body,
+    // and the verifier is never even reached for a row that was not handed over.
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(null); // suspended
+    const suspended = await h.svc.login('suspendido@kala.co', 'Umi2026!').catch((e) => e);
+    const unknown = await h.svc.login('nadie@kala.co', 'Umi2026!').catch((e) => e);
+
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(CRED);
+    h.passwords.verify.mockReturnValue(false);
+    const wrong = await h.svc.login('owner@kala.co', 'mala').catch((e) => e);
+
+    expect(suspended).toBeInstanceOf(UnauthorizedException);
+    expect(suspended.getStatus()).toBe(401);
+    expect(suspended.getResponse()).toEqual(unknown.getResponse());
+    expect(suspended.getResponse()).toEqual(wrong.getResponse());
+    expect(h.passwords.verify).toHaveBeenCalledTimes(1); // only the wrong-password try
   });
 });
 
@@ -137,6 +160,7 @@ describe('AuthService.refresh and logout · stateful dashboard session', () => {
       userId: 'u1',
       email: 'owner@kala.co',
       displayName: 'Owner',
+      status: 'active',
     });
   });
 
@@ -171,6 +195,31 @@ describe('AuthService.refresh and logout · stateful dashboard session', () => {
     expect(r.sessionId).toBe('session-1');
   });
 
+  it('refuses to renew the session of a SUSPENDED login, and rotates nothing', async () => {
+    // THE REVOCATION LEVER. An access token is good for its own TTL, so the next
+    // refresh is the only moment a suspension can land — and it must. The status
+    // rides on the row `refresh` already reads, so there is no second query to
+    // forget; nothing is rotated or issued, so the caller's token state is left
+    // exactly as it was.
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+      status: 'suspended',
+    });
+
+    const suspended = await h.svc.refresh('refresh-old').catch((e) => e);
+    expect(suspended).toBeInstanceOf(UnauthorizedException);
+    expect(suspended.getStatus()).toBe(401);
+    expect(h.repo.rotateDashboardSession).not.toHaveBeenCalled();
+    expect(h.jwt.signAccess).not.toHaveBeenCalled();
+
+    // Indistinguishable from a refresh token whose user is simply gone.
+    h.repo.findUserById.mockResolvedValue(null);
+    const missing = await h.svc.refresh('refresh-old').catch((e) => e);
+    expect(suspended.getResponse()).toEqual(missing.getResponse());
+  });
+
   it('revokes the session family when the user logs out', async () => {
     await h.svc.logout('refresh-old');
 
@@ -192,6 +241,7 @@ describe('AuthService POS session lifecycle', () => {
       userId: 'u1',
       email: 'owner@kala.co',
       displayName: 'Owner',
+      status: 'active',
     });
   });
 
@@ -210,6 +260,42 @@ describe('AuthService POS session lifecycle', () => {
     });
     expect(result.deviceId).toBe('device-1');
     expect(h.repo.rotatePosSessionToken).toHaveBeenCalledWith('session-1', expect.any(String));
+  });
+
+  it('renews an INVITED operator but not a SUSPENDED one — the till list, not the panel list', async () => {
+    // Two allow lists, two doors. The PIN door admits `invited` (the employer who
+    // typed the PIN granted the till), so demanding `active` at RENEWAL would kill
+    // every such register one TTL after it paired. `suspended` closes both doors.
+    const input = {
+      refreshToken: 'old-refresh',
+      installationId: 'installation-1',
+      deviceCredential: 'credential-1',
+      deviceProof: null,
+      deviceProofTimestamp: null,
+      deviceProofAlgorithm: null,
+    };
+    h.repo.validatePosSession.mockResolvedValue({
+      deviceId: 'device-1',
+      ephemeralPublicKey: null,
+    });
+
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+      status: 'invited',
+    });
+    await expect(h.svc.posRefresh(input)).resolves.toMatchObject({ accessToken: 'access-tok' });
+
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+      status: 'suspended',
+    });
+    await expect(h.svc.posRefresh(input)).rejects.toBeInstanceOf(UnauthorizedException);
+    // Only the invited rotation went through; the suspended one issued nothing.
+    expect(h.repo.rotatePosSessionToken).toHaveBeenCalledTimes(1);
   });
 
   it('rejects refresh after device authority ends', async () => {
@@ -310,6 +396,95 @@ describe('AuthService.pinLogin — device possession proof', () => {
   });
 });
 
+/**
+ * THE INVITATION IS NOT A LOCKOUT.
+ *
+ * The dashboard's staff screen writes an operator's login `invited` when the
+ * typed address is free, and this API has no flow that ever moves it to
+ * `active` — while the EMPLOYMENT is `active` and the PIN the employer typed is
+ * set. Which login states `findPosPinStaff` admits is a SQL predicate, proven in
+ * auth.repository.spec.ts and against the real database; the contract pinned
+ * here is the other half: once the repository hands this service a record, the
+ * service signs the operator in, and when it hands back nothing the operator is
+ * refused in a way that says NOTHING about which of the four reasons applied.
+ */
+describe('AuthService.pinLogin — an invited operator works, and a refusal stays mute', () => {
+  function input(overrides: Record<string, unknown> = {}) {
+    return {
+      pin: '2468',
+      merchantId: 'merchant-1',
+      locationId: 'location-1',
+      installationId: 'installation-1',
+      deviceId: 'device-1',
+      deviceCredential: 'credential-1',
+      deviceProof: null,
+      deviceProofTimestamp: null,
+      deviceProofAlgorithm: null,
+      ip: '127.0.0.1',
+      ...overrides,
+    } as Parameters<AuthService['pinLogin']>[0];
+  }
+
+  function allowDevice(h: ReturnType<typeof make>) {
+    h.repo.validatePosDevice.mockResolvedValue({ allowed: true, ephemeralPublicKey: null });
+  }
+
+  it('signs in an invited login whose PIN the employer set', async () => {
+    const h = make();
+    allowDevice(h);
+    h.repo.findPosPinStaff.mockResolvedValue({
+      staffId: 'staff-1',
+      userId: 'u-invited',
+      email: 'ux.invited@example.test',
+      displayName: 'Nueva Operadora',
+      pinSalt: 'salt',
+      pinHash: 'hash',
+    });
+    h.passwords.verify.mockReturnValue(true);
+    h.repo.effectiveEntitlement.mockResolvedValue({
+      featureKey: 'pos',
+      enabled: true,
+      limit: null,
+      subscriptionStatus: 'active',
+    });
+
+    const result = await h.svc.pinLogin(input());
+
+    expect(result.user).toMatchObject({ id: 'u-invited', email: 'ux.invited@example.test' });
+    expect(result.accessToken).toBe('access-tok');
+    expect(h.repo.findPosPinStaff).toHaveBeenCalledWith(
+      'merchant-1',
+      'location-1',
+      expect.any(String),
+    );
+    expect(h.repo.recordPosPinFailure).not.toHaveBeenCalled();
+    expect(h.repo.createPosSession).toHaveBeenCalled();
+  });
+
+  // WHERE THE THREE STATES ACTUALLY DIFFER is the SQL predicate, not this layer:
+  // the repository answers `null` for a suspended login, for a disabled
+  // employment and for a PIN nothing matches, so all three arrive here as the
+  // same event. (Their rows differ; see the integration suite.) What this service
+  // must guarantee is that the ANSWER does not differ — otherwise the message
+  // becomes a way to ask the till which operators exist.
+  it.each(['a suspended login', 'a disabled employment', 'an unknown PIN'])(
+    'refuses %s with the one code every other refusal uses',
+    async () => {
+      const h = make();
+      allowDevice(h);
+      h.repo.findPosPinStaff.mockResolvedValue(undefined);
+      h.passwords.verify.mockReturnValue(false);
+
+      const error = await h.svc.pinLogin(input()).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as ForbiddenException).getResponse()).toEqual({ code: 'PIN_INVALID' });
+      // A refusal is still counted against the device, so the next attempt is throttled.
+      expect(h.repo.recordPosPinFailure).toHaveBeenCalled();
+    },
+  );
+});
+
 describe('AuthService.login — second factor', () => {
   let h: ReturnType<typeof make>;
   beforeEach(() => (h = make()));
@@ -317,7 +492,7 @@ describe('AuthService.login — second factor', () => {
   const MFA_CRED = { ...CRED, mfaMethod: 'email_otp' };
 
   it('withholds tokens and returns a challenge when a factor is enrolled', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(MFA_CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(MFA_CRED);
     h.passwords.verify.mockReturnValue(true);
 
     const r = await h.svc.login('owner@kala.co', 'pw');
@@ -332,21 +507,21 @@ describe('AuthService.login — second factor', () => {
   });
 
   it('does not leak the merchant list before the factor is checked', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(MFA_CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(MFA_CRED);
     h.passwords.verify.mockReturnValue(true);
     await h.svc.login('owner@kala.co', 'pw');
     expect(h.repo.findMerchantsForUser).not.toHaveBeenCalled();
   });
 
   it('mails a code for email_otp', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(MFA_CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(MFA_CRED);
     h.passwords.verify.mockReturnValue(true);
     await h.svc.login('owner@kala.co', 'pw');
     expect(h.mfa.issueChallenge).toHaveBeenCalledOnce();
   });
 
   it('mails nothing for totp — the authenticator already holds the secret', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue({ ...CRED, mfaMethod: 'totp' });
+    h.repo.findSignInCredentialByEmail.mockResolvedValue({ ...CRED, mfaMethod: 'totp' });
     h.passwords.verify.mockReturnValue(true);
     const r = await h.svc.login('owner@kala.co', 'pw');
     expect(isMfaChallenge(r)).toBe(true);
@@ -354,7 +529,7 @@ describe('AuthService.login — second factor', () => {
   });
 
   it('still rejects a wrong password before ever issuing a challenge', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(MFA_CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(MFA_CRED);
     h.passwords.verify.mockReturnValue(false);
     await expect(h.svc.login('owner@kala.co', 'bad')).rejects.toBeInstanceOf(UnauthorizedException);
     expect(h.mfa.issueChallenge).not.toHaveBeenCalled();
@@ -370,6 +545,7 @@ describe('AuthService.verifyMfa', () => {
       userId: 'u1',
       email: 'owner@kala.co',
       displayName: 'Owner',
+      status: 'active',
     });
   });
 
@@ -394,6 +570,23 @@ describe('AuthService.verifyMfa', () => {
     expect(h.mfa.verifyCode).not.toHaveBeenCalled();
   });
 
+  it('refuses a login SUSPENDED between the two halves of the challenge', async () => {
+    // The challenge token is inert everywhere else, but it does outlive a
+    // suspension that lands inside its TTL — and this half is where the session
+    // is actually minted. Same 401 as a forged token, because the login is no
+    // longer one.
+    h.repo.findUserById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+      status: 'suspended',
+    });
+    const err = await h.svc.verifyMfa('challenge-tok', '123456').catch((e) => e);
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    expect(err.getStatus()).toBe(401);
+    expect(h.jwt.signAccess).not.toHaveBeenCalled();
+  });
+
   it('requires both halves', async () => {
     await expect(h.svc.verifyMfa('', '123456')).rejects.toBeInstanceOf(BadRequestException);
     await expect(h.svc.verifyMfa('challenge-tok', '')).rejects.toBeInstanceOf(BadRequestException);
@@ -404,15 +597,19 @@ describe('AuthService.forgotPassword', () => {
   let h: ReturnType<typeof make>;
   beforeEach(() => (h = make()));
 
-  it('does nothing (no email, no token) for an unknown address', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(null);
+  it('emits no reset for an address with no live login — unknown OR suspended', async () => {
+    // Suspension must not be a way back IN. The read is gated on
+    // `umi.user.status`, so a suspended login lands in this same branch: no token
+    // row, no email — and the decoy hash at the top of the branch still runs, so
+    // the timing does not tell the caller which of the two they hit.
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(null);
     await h.svc.forgotPassword('ghost@x.co');
     expect(h.repo.insertResetToken).not.toHaveBeenCalled();
     expect(h.email.send).not.toHaveBeenCalled();
   });
 
   it('persists a token and sends the reset email for a real user', async () => {
-    h.repo.findCredentialByEmail.mockResolvedValue(CRED);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(CRED);
     await h.svc.forgotPassword('owner@kala.co');
     expect(h.repo.insertResetToken).toHaveBeenCalledOnce();
     expect(h.email.send).toHaveBeenCalledOnce();
@@ -489,7 +686,7 @@ describe('AuthService · legacy credentials upgrade themselves', () => {
     // Without this the verifier assumes scrypt and a legacy account cannot log
     // in at all — a silent lockout, since the refusal looks like a bad password.
     const h = make();
-    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(LEGACY);
     h.passwords.verify.mockReturnValue(true);
 
     await h.svc.login(LEGACY.email, 'pw').catch(() => null);
@@ -504,7 +701,7 @@ describe('AuthService · legacy credentials upgrade themselves', () => {
 
   it('re-hashes the row after a successful legacy login', async () => {
     const h = make();
-    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(LEGACY);
     h.passwords.verify.mockReturnValue(true);
     h.passwords.needsUpgrade.mockReturnValue(true);
 
@@ -516,7 +713,7 @@ describe('AuthService · legacy credentials upgrade themselves', () => {
 
   it('does NOT re-hash a credential that is already scrypt', async () => {
     const h = make();
-    h.repo.findCredentialByEmail.mockResolvedValue({
+    h.repo.findSignInCredentialByEmail.mockResolvedValue({
       ...LEGACY,
       passwordAlgorithm: 'scrypt-sha256-v1',
     });
@@ -533,7 +730,7 @@ describe('AuthService · legacy credentials upgrade themselves', () => {
     // Otherwise a wrong password would rewrite the credential — and with the
     // wrong password's hash, locking the owner out permanently.
     const h = make();
-    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(LEGACY);
     h.passwords.verify.mockReturnValue(false);
     h.passwords.needsUpgrade.mockReturnValue(true);
 
@@ -547,7 +744,7 @@ describe('AuthService · legacy credentials upgrade themselves', () => {
     // The user is already authenticated. A database hiccup during a background
     // re-hash must not turn a good login into a 500.
     const h = make();
-    h.repo.findCredentialByEmail.mockResolvedValue(LEGACY);
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(LEGACY);
     h.passwords.verify.mockReturnValue(true);
     h.passwords.needsUpgrade.mockReturnValue(true);
     h.repo.upgradeCredential.mockRejectedValue(new Error('pg down'));
@@ -563,6 +760,7 @@ describe('the session says what platform grant the login holds', () => {
       userId: 'u1',
       email: 'ops@umiconsulting.co',
       displayName: 'Ops',
+      status: 'active',
     });
     h.repo.platformRole.mockResolvedValue(role);
     return h;

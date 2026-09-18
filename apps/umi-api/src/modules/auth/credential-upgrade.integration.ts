@@ -90,12 +90,12 @@ describe('legacy credential · verifies, then upgrades itself', () => {
   it('the credential read carries the scheme', async () => {
     // It did not before this change: the SELECT listed salt and hash only, so the
     // verifier had no way to know which scheme the row used.
-    const cred = await repo.findCredentialByEmail(EMAIL);
+    const cred = await repo.findSignInCredentialByEmail(EMAIL);
     expect(cred?.passwordAlgorithm).toBe('legacy-sha256-v1');
   });
 
   it('the legacy password verifies', async () => {
-    const cred = await repo.findCredentialByEmail(EMAIL);
+    const cred = await repo.findSignInCredentialByEmail(EMAIL);
     expect(
       passwords.verify(PASSWORD, cred!.passwordSalt, cred!.passwordHash, cred!.passwordAlgorithm),
     ).toBe(true);
@@ -117,7 +117,7 @@ describe('legacy credential · verifies, then upgrades itself', () => {
     const next = passwords.hash(PASSWORD);
     await repo.upgradeCredential(USER, next.salt, next.hash);
 
-    const cred = await repo.findCredentialByEmail(EMAIL);
+    const cred = await repo.findSignInCredentialByEmail(EMAIL);
     expect(
       passwords.verify(PASSWORD, cred!.passwordSalt, cred!.passwordHash, cred!.passwordAlgorithm),
     ).toBe(true);
@@ -136,7 +136,7 @@ describe('legacy credential · verifies, then upgrades itself', () => {
     const after = await row();
     expect(after.password_algorithm).toBe('scrypt-sha256-v1');
 
-    const cred = await repo.findCredentialByEmail(EMAIL);
+    const cred = await repo.findSignInCredentialByEmail(EMAIL);
     expect(
       passwords.verify(
         'una contraseña nueva',
@@ -151,7 +151,7 @@ describe('legacy credential · verifies, then upgrades itself', () => {
     const next = passwords.hash(PASSWORD);
     await repo.upgradeCredential(USER, next.salt, next.hash);
 
-    const cred = await repo.findCredentialByEmail(EMAIL);
+    const cred = await repo.findSignInCredentialByEmail(EMAIL);
     expect(
       passwords.verify(
         'otra cosa',

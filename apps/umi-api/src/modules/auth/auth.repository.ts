@@ -32,6 +32,13 @@ export interface UserSummary {
   userId: string;
   email: string;
   displayName: string | null;
+  /**
+   * `umi.user.status`, carried so the refresh paths can re-check their door's
+   * allow list on the row they were already reading — no extra round trip, and
+   * no way to read the summary and forget the gate. Never surfaced in a response
+   * body; see `findUserById` for which paths enforce it and which do not.
+   */
+  status: string;
 }
 
 export interface MerchantMembershipSummary {
@@ -83,6 +90,67 @@ export interface PosPinStaffRecord {
   pinSalt: string;
   pinHash: string;
 }
+
+/**
+ * The `umi.user.status` values whose owner may sign in AT THE TILL.
+ *
+ * TWO GRANTS, TWO TABLES, AND THE TILL ONLY READS ONE OF THEM. `merchant.staff`
+ * is the employment — `status`, `location_id`, the PIN — and `umi.user.status`
+ * says where the LOGIN stands. The only value of the latter that closes the till
+ * is `suspended`: an operator whose login was switched off must not open a
+ * register. `invited` does NOT close it. It means "this login still owes a
+ * dashboard invitation", and the employer who typed the PIN on the staff screen
+ * has already granted till access; the PIN *is* the grant. No endpoint in this
+ * API sends or accepts a dashboard invitation, so demanding `active` here
+ * stranded every operator the dashboard created with a free email address: the
+ * row was written `invited` (staff.repository.ts explains why), the employment
+ * was `active`, the PIN was set, and the till answered PERMISSION_DENIED for ever.
+ *
+ * An ALLOW list, not `<> 'suspended'`, on purpose: a status added later must fail
+ * closed rather than silently open every register in the estate.
+ *
+ * ⚠️ THE PASSWORD DOORS MUST AGREE WITH THIS ONE, AND THEY ARE STRICTER —
+ * `PASSWORD_SIGN_IN_STATUSES` below is the same idea minus `invited`. A status
+ * that closes the till and not the panel (or the reverse) is the bug this pair
+ * exists to make impossible: suspension closes BOTH lists, and every door reads
+ * exactly one of them.
+ */
+export const POS_PIN_LOGIN_STATUSES: readonly string[] = ['active', 'invited'];
+
+/**
+ * The `umi.user.status` value that opens a PASSWORD door — the dashboard's
+ * `POST /auth/local/login`, its forgot-password, and Umi Cash's register login.
+ *
+ * THE MIRROR OF {@link POS_PIN_LOGIN_STATUSES}, AND DELIBERATELY NARROWER. Both
+ * lists answer "may this LOGIN sign in at this door?", and both are allow lists
+ * so a status added to `10_umi.sql` later fails closed instead of silently
+ * opening every door in the estate. One row, one `status`, two lists:
+ *
+ *   PASSWORD_SIGN_IN_STATUSES  ['active']               dashboard · Umi Cash
+ *   POS_PIN_LOGIN_STATUSES     ['active', 'invited']    the till's PIN pad
+ *
+ * WHY THE TILL IS THE WIDER ONE. The till reads TWO grants — `merchant.staff`
+ * (the employment, its PIN, its location) and this column. An `invited` login
+ * means "a dashboard invitation is still owed", and the employer who typed the
+ * PIN on the staff screen already granted till access; see the note above. A
+ * password has no such second grant behind it, so a password door demands the
+ * login itself be live.
+ *
+ * WHY `invited` CANNOT BE LOCKED OUT BY ITS ABSENCE HERE. An invitation carries
+ * no credential yet — `10_umi.sql` documents `password_hash` as "null while
+ * status='invited'", and every write of a password (invite acceptance, the
+ * reset flow, the legacy upgrade) runs behind a credential that only an already
+ * -signing-in row has. A password door is therefore unreachable for an invited
+ * row whatever this list says; listing it would only be a promise the schema
+ * does not make.
+ *
+ * `suspended` is the revocation lever: suspending a departing or compromised
+ * employee must close every door at once, and this constant is the password
+ * half of that promise. `merchant.staff.status` is the employment, and a
+ * suspension is not the same act — see `AuthService.refresh` for the one place
+ * a live session is re-checked against this list.
+ */
+export const PASSWORD_SIGN_IN_STATUSES: readonly string[] = ['active'];
 
 /**
  * Auth/membership/entitlement reads. These run BEFORE any merchant RLS context
@@ -181,7 +249,10 @@ export class AuthRepository {
               s.operator_pin_salt AS "pinSalt",
               s.operator_pin_hash AS "pinHash"
          FROM merchant.staff AS s
-         JOIN umi.user AS u ON u.id = s.user_id AND u.status = 'active'
+         -- The employment (s.status, s.location_id) is the gate; the login
+         -- needs only to be un-suspended. See POS_PIN_LOGIN_STATUSES above for
+         -- why the invitation is admitted and why this is an allow list.
+         JOIN umi.user AS u ON u.id = s.user_id AND u.status = ANY($4::text[])
          JOIN merchant.location AS l
            ON l.id = $2::uuid AND l.merchant_id = s.merchant_id
         WHERE s.merchant_id = $1::uuid
@@ -191,7 +262,7 @@ export class AuthRepository {
           AND s.operator_pin_salt IS NOT NULL
           AND s.operator_pin_hash IS NOT NULL
         LIMIT 1`,
-      [merchantId, locationId, lookupHash],
+      [merchantId, locationId, lookupHash, POS_PIN_LOGIN_STATUSES],
     );
     return rows[0] ?? null;
   }
@@ -352,8 +423,25 @@ export class AuthRepository {
     );
   }
 
-  /** Login/forgot — only rows that actually have a local password. */
-  async findCredentialByEmail(email: string): Promise<UserCredential | null> {
+  /**
+   * THE password sign-in read. Login, forgot-password and Umi Cash's register
+   * login all come through here, and the gate lives in the WHERE clause rather
+   * than in each caller: one predicate, three doors, nothing left to remember.
+   *
+   * WHY A SUSPENSION READS AS "NO SUCH ACCOUNT", NOT AS AN ERROR. The row does
+   * not come back, so every caller falls down its existing not-found branch —
+   * which is already uniform by design (one 401 whether the account is missing
+   * or the password is wrong) and already spends the decoy scrypt work that
+   * equalises response timing in the reset and register paths. A suspended
+   * login must not be distinguishable from an unknown one, and this is the
+   * cheapest place to guarantee that: there is no branch to get wrong.
+   *
+   * THERE IS NO UNGATED SIBLING, ON PURPOSE. A read that hands back a credential
+   * whatever the login's state is what made `suspended` revoke nothing. A caller
+   * that genuinely needs such a row has to read `umi.user` itself and say why the
+   * read is not a sign-in.
+   */
+  async findSignInCredentialByEmail(email: string): Promise<UserCredential | null> {
     const { rows } = await this.pg.query<UserCredential>(
       `SELECT
          u.id::text          AS "userId",
@@ -366,8 +454,9 @@ export class AuthRepository {
        FROM umi.user AS u
        WHERE lower(u.email) = $1
          AND u.password_hash IS NOT NULL
+         AND u.status = ANY($2::text[])
        LIMIT 1`,
-      [email],
+      [email, PASSWORD_SIGN_IN_STATUSES],
     );
     return rows[0] ?? null;
   }
@@ -511,10 +600,29 @@ export class AuthRepository {
     }
   }
 
-  /** Refresh — re-load the user so a rotated access token carries fresh email. */
+  /**
+   * Re-load the user so a rotated access token carries a fresh email. Four
+   * callers, and the returned `status` is what lets the two REFRESH paths refuse
+   * a login whose door has since closed.
+   *
+   * ⚠️ STATUS IS CARRIED HERE, NOT FILTERED — and that is not a gap. This read
+   * answers "does this login exist", which four different questions need:
+   *   · `refresh`      mints a new dashboard session   → enforces PASSWORD_…
+   *   · `posRefresh`   mints a new till session        → enforces POS_PIN_…
+   *   · `verifyMfa`    completes a login already begun → enforces PASSWORD_…
+   *   · `session`      rehydrates `/me` for a live access token → no check
+   *
+   * The last one is deliberate. `AuthGuard` has no per-request session lookup —
+   * an access token is good for its own TTL and revocation lands at the next
+   * refresh (see the guard). Filtering here would not close that window: the
+   * token already reaches every merchant-scoped route. It would only make `/me`
+   * disagree with the requests it guards. The gate belongs where a session is
+   * MINTED, and each of those callers applies its own door's list.
+   */
   async findUserById(userId: string): Promise<UserSummary | null> {
     const { rows } = await this.pg.query<UserSummary>(
-      `SELECT u.id::text AS "userId", u.email, u.full_name AS "displayName"
+      `SELECT u.id::text AS "userId", u.email, u.full_name AS "displayName",
+              u.status AS "status"
        FROM umi.user AS u
        WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL
        LIMIT 1`,

@@ -52,6 +52,12 @@ export interface NewOrderLine {
   name: string;
   variantName?: string | null;
   quantity: number;
+  /**
+   * §8H step 4. The course this line is served in, 1..20. Absent means course 1, which
+   * is also the column default, so a producer that never sets a course behaves exactly
+   * as it did before the field existed.
+   */
+  courseNumber?: number | null;
   /** Centavos. The line total per unit, modifiers already folded in. */
   unitPriceCents: number;
   /** Where this line is prepared. NULL until a café configures routing. */
@@ -167,8 +173,8 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
     const row = await client.query<{ id: string }>(
       `INSERT INTO merchant.order_item
          (order_id, product_id, name, variant_name, quantity, unit_price,
-          station_id, notes, display_order)
-       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::uuid, $8, $9)
+          station_id, notes, display_order, course_number)
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::uuid, $8, $9, $10)
        RETURNING id::text`,
       [
         orderId,
@@ -181,6 +187,7 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
         line.notes ?? null,
         // Cart order IS ticket order — the KDS renders lines by display_order.
         i,
+        line.courseNumber ?? 1,
       ],
     );
     lineIds.push(row.rows[0].id);

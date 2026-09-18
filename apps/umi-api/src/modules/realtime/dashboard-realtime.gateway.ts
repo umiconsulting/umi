@@ -9,6 +9,7 @@ import {
   DASHBOARD_EVENT_CONVERSATION_MESSAGE,
   DASHBOARD_EVENT_DEVICES_CHANGED,
   DASHBOARD_REALTIME_NAMESPACE,
+  REALTIME_EVENT_TENDER_ATTEMPT_CHANGED,
   dashboardRoom,
 } from '@umi/contract';
 import type { Namespace, Socket } from 'socket.io';
@@ -48,6 +49,11 @@ export class DashboardRealtimeGateway implements OnGatewayInit, OnGatewayConnect
       this.server
         ?.to(dashboardRoom(event.merchantId))
         .emit(DASHBOARD_EVENT_CONVERSATION_MESSAGE, event);
+    });
+    this.events.tenderAttemptChanged$.subscribe((event) => {
+      this.server
+        ?.to(dashboardRoom(event.merchantId))
+        .emit(REALTIME_EVENT_TENDER_ATTEMPT_CHANGED, event);
     });
   }
 

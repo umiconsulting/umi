@@ -162,6 +162,33 @@ export const ADMINISTRATIVE_COMMAND_POLICIES: readonly AdministrativeCommandPoli
   policy('catalog.detail', DASHBOARD, 'catalog.manage'),
   policy('catalog.update', DASHBOARD, 'catalog.manage'),
   policy('catalog.archive', DASHBOARD, 'catalog.manage'),
+  // Recipes and inventory authoring (recipes module plan §11, phase 1). The console
+  // authors; the till operates. The permissions are the ones migration 76 seeded to
+  // owner, admin and manager, so the console's own staff hold them.
+  policy('inventory.item.create', DASHBOARD, 'inventory.item.manage'),
+  policy('inventory.item.update', DASHBOARD, 'inventory.item.manage'),
+  policy('inventory.item.archive', DASHBOARD, 'inventory.item.manage'),
+  policy('inventory.conversion.set', DASHBOARD, 'inventory.conversion.manage'),
+  policy('inventory.allergen.set', DASHBOARD, 'inventory.recipe.manage'),
+  policy('inventory.item_allergen.set', DASHBOARD, 'inventory.recipe.manage'),
+  // Recipes (plan §11, phase 2). An edit is a new version, so no approval gate is
+  // added here: the console authors, and the version the caller read is the guard.
+  policy('inventory.recipe.create', DASHBOARD, 'inventory.recipe.manage'),
+  policy('inventory.recipe.update', DASHBOARD, 'inventory.recipe.manage'),
+  policy('inventory.recipe.retire', DASHBOARD, 'inventory.recipe.manage'),
+  // Production (plan §11, phase 3). The kitchen produces, and the console posts the same
+  // batch the till would; both surfaces call one service method, so a batch is authored
+  // once. `inventory.production.produce` is the key migration 76 grants to the four
+  // roles that work the kitchen.
+  policy('inventory.production.produce', DASHBOARD, 'inventory.production.produce'),
+  // Supplier invoices (plan §11, phase 5). The console captures a supplier's document,
+  // lets a person correct the proposed matches, and commits the receipt that prices the
+  // stock. CAPTURE AND APPROVAL ARE SEPARATE KEYS on purpose: the person who uploads a
+  // document is not always the person who accepts the cost it sets, and migration 76
+  // grants `inventory.invoice.approve` to owner and admin alone.
+  policy('inventory.invoice.upload', DASHBOARD, 'inventory.invoice.capture'),
+  policy('inventory.invoice.match', DASHBOARD, 'inventory.invoice.capture'),
+  policy('inventory.invoice.commit', DASHBOARD, 'inventory.invoice.approve'),
   policy('recovery.query_original', DASHBOARD_AND_POS, 'audit.read'),
 ] as const;
 

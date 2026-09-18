@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MetricsService } from '../../shared/operations/metrics.service';
 import { PosInventoryService } from './pos-inventory.service';
 
 const id = (value: number) => `00000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
@@ -29,7 +30,13 @@ const adjustment = {
 
 describe('Gate 3E inventory application boundary', () => {
   it('requires an enrolled device', async () => {
-    const service = new PosInventoryService({ authorize: vi.fn() } as never, {} as never);
+    const service = new PosInventoryService(
+      { authorize: vi.fn() } as never,
+      {} as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(
       service.overview({ ...user, deviceId: null }, id(10), {
         locationId: id(4),
@@ -41,7 +48,13 @@ describe('Gate 3E inventory application boundary', () => {
 
   it('uses effective permissions instead of a role label', async () => {
     const repo = { authorize: vi.fn().mockResolvedValue(null) };
-    const service = new PosInventoryService(repo as never, {} as never);
+    const service = new PosInventoryService(
+      repo as never,
+      {} as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(
       service.overview({ ...user, role: 'owner' } as never, id(10), {
         locationId: id(4),
@@ -66,7 +79,13 @@ describe('Gate 3E inventory application boundary', () => {
       mutationApprovalRequirement: vi.fn().mockResolvedValue(null),
     };
     const integrity = { execute: vi.fn().mockRejectedValue(new Error('NEGATIVE_STOCK_BLOCKED')) };
-    const service = new PosInventoryService(repo as never, integrity as never);
+    const service = new PosInventoryService(
+      repo as never,
+      integrity as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(service.adjustment(user, id(10), adjustment)).rejects.toMatchObject({
       response: { code: 'NEGATIVE_STOCK_BLOCKED' },
     });
@@ -95,7 +114,13 @@ describe('Gate 3E inventory application boundary', () => {
         return { status: 'succeeded', result: outcome.value, failureCode: null };
       }),
     };
-    const service = new PosInventoryService(repo as never, integrity as never);
+    const service = new PosInventoryService(
+      repo as never,
+      integrity as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(service.adjustment(user, id(10), adjustment)).resolves.toEqual(result);
     expect(repo.mutate).toHaveBeenCalledOnce();
     expect(integrity.execute).toHaveBeenCalledOnce();
@@ -110,7 +135,13 @@ describe('Gate 3E inventory application boundary', () => {
       }),
     };
     const integrity = { execute: vi.fn() };
-    const service = new PosInventoryService(repo as never, integrity as never);
+    const service = new PosInventoryService(
+      repo as never,
+      integrity as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(service.adjustment(user, id(10), adjustment)).rejects.toMatchObject({
       response: {
         code: 'APPROVAL_REQUIRED',
@@ -131,7 +162,13 @@ describe('Gate 3E inventory application boundary', () => {
         fingerprint: 'c'.repeat(64),
       }),
     };
-    const service = new PosInventoryService(repo as never, {} as never);
+    const service = new PosInventoryService(
+      repo as never,
+      {} as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(
       service.reconcileCount(user, id(10), id(11), {
         ...adjustment,
@@ -174,7 +211,13 @@ describe('Gate 3E inventory application boundary', () => {
         return { status: 'succeeded', result: outcome.value, failureCode: null };
       }),
     };
-    const service = new PosInventoryService(repo as never, integrity as never);
+    const service = new PosInventoryService(
+      repo as never,
+      integrity as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(
       service.reconcileCount(user, id(10), id(11), {
         ...adjustment,
@@ -195,7 +238,13 @@ describe('Gate 3E inventory application boundary', () => {
         fingerprint: 'd'.repeat(64),
       }),
     };
-    const service = new PosInventoryService(repo as never, {} as never);
+    const service = new PosInventoryService(
+      repo as never,
+      {} as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
     await expect(
       service.reconcileCount(user, id(10), id(11), {
         ...adjustment,
@@ -213,5 +262,126 @@ describe('Gate 3E inventory application boundary', () => {
         },
       },
     });
+  });
+
+  it('gates production on the kitchen key and reads the basis before the transaction', async () => {
+    const denied = new PosInventoryService(
+      { authorize: vi.fn().mockResolvedValue(null) } as never,
+      {} as never,
+      {} as never,
+      new MetricsService(),
+      {} as never,
+    );
+    await expect(
+      denied.production(user, id(10), {
+        ...adjustment,
+        outputItemId: id(9),
+      } as never),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+
+    // An allowed call reads the ONE weighted-average basis, then posts the batch.
+    const batch = { lotId: id(12), consumed: [], yieldLossQuantity: { value: 0 } };
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      produce: vi.fn().mockResolvedValue(batch),
+    };
+    const audit = vi.fn();
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({ client: {}, correlationId: 'prod', appendAudit: audit });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const costing = {
+      costBasis: vi.fn().mockResolvedValue({
+        items: [{ inventoryItemId: id(9), unitCostMinor: 6025 }],
+      }),
+    };
+    const service = new PosInventoryService(
+      repo as never,
+      integrity as never,
+      costing as never,
+      new MetricsService(),
+      {} as never,
+    );
+    await expect(
+      service.production(user, id(10), {
+        ...adjustment,
+        outputItemId: id(9),
+      } as never),
+    ).resolves.toEqual(batch);
+    expect(costing.costBasis).toHaveBeenCalledOnce();
+    expect(repo.produce).toHaveBeenCalledWith(
+      {},
+      id(10),
+      authorization,
+      expect.objectContaining({ outputItemId: id(9) }),
+      new Map([[id(9), 6025n]]),
+      'prod',
+    );
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'inventory_production_committed' }),
+    );
+  });
+});
+
+describe('inventory production metrics', () => {
+  const produce = async (metrics: MetricsService, batch: Record<string, unknown>) => {
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      produce: vi.fn().mockResolvedValue(batch),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const outcome = await operation({
+          client: {},
+          correlationId: 'prod',
+          appendAudit: vi.fn(),
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const costing = { costBasis: vi.fn().mockResolvedValue({ items: [] }) };
+    const service = new PosInventoryService(
+      repo as never,
+      integrity as never,
+      costing as never,
+      metrics,
+      {} as never,
+    );
+    await service.production(user, id(10), { ...adjustment, outputItemId: id(9) } as never);
+  };
+
+  const countersOf = (metrics: MetricsService): Record<string, number> =>
+    (metrics.snapshot() as { counters: Record<string, number> }).counters;
+
+  it('counts a full batch once and counts no yield loss', async () => {
+    const metrics = new MetricsService();
+    await produce(metrics, {
+      lotId: id(12),
+      consumed: [],
+      declaredQuantity: { value: 10, scale: 0, unit: 'unit' },
+      producedQuantity: { value: 10, scale: 0, unit: 'unit' },
+      yieldLossQuantity: { value: 0, scale: 0, unit: 'unit' },
+    });
+    const counters = countersOf(metrics);
+    expect(counters['inventory.production.batches{outcome=full}']).toBe(1);
+    expect(counters['inventory.production.batches{outcome=shortfall}']).toBeUndefined();
+    expect(counters['inventory.production.yield_loss_quantity{unit=unit}']).toBeUndefined();
+  });
+
+  it('counts a shortfall batch and adds the shortfall quantity to the loss counter', async () => {
+    const metrics = new MetricsService();
+    await produce(metrics, {
+      lotId: id(12),
+      consumed: [],
+      declaredQuantity: { value: 10, scale: 0, unit: 'unit' },
+      producedQuantity: { value: 7, scale: 0, unit: 'unit' },
+      yieldLossQuantity: { value: 3, scale: 0, unit: 'unit' },
+    });
+    const counters = countersOf(metrics);
+    expect(counters['inventory.production.batches{outcome=shortfall}']).toBe(1);
+    expect(counters['inventory.production.batches{outcome=full}']).toBeUndefined();
+    expect(counters['inventory.production.yield_loss_quantity{unit=unit}']).toBe(3);
   });
 });

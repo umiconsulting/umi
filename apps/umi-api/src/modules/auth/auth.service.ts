@@ -30,7 +30,12 @@ type PlatformRole = 'super_admin' | 'developer' | null;
 function narrowPlatformRole(role: string | null): PlatformRole {
   return role === 'super_admin' || role === 'developer' ? role : null;
 }
-import { AuthRepository, type MerchantMembershipSummary } from './auth.repository';
+import {
+  AuthRepository,
+  PASSWORD_SIGN_IN_STATUSES,
+  POS_PIN_LOGIN_STATUSES,
+  type MerchantMembershipSummary,
+} from './auth.repository';
 import { MfaService } from './mfa.service';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 
@@ -105,8 +110,15 @@ export class AuthService {
       throw new BadRequestException('username and password are required');
     }
 
-    const credential = await this.repo.findCredentialByEmail(username);
-    // Same generic 401 whether the user is missing or the password is wrong.
+    // A SUSPENDED LOGIN IS NOT FOUND, NEVER "REFUSED". `umi.user.status` is the
+    // sign-in gate and the read applies it (PASSWORD_SIGN_IN_STATUSES), so a
+    // suspension arrives here as an absent row and takes the same branch as an
+    // address nobody has ever registered.
+    const credential = await this.repo.findSignInCredentialByEmail(username);
+    // Same generic 401 whether the user is missing or the password is wrong —
+    // and therefore also whether the account is suspended. A revocation lever
+    // that announces itself tells the person on the way out that the lock is
+    // theirs, and tells everyone else which addresses are real.
     if (
       !credential ||
       !this.passwords.verify(
@@ -165,6 +177,12 @@ export class AuthService {
 
     const summary = await this.repo.findUserById(userId);
     if (!summary) throw new UnauthorizedException('invalid_token');
+    // The challenge token outlives the suspension that may land inside its TTL,
+    // and this half MINTS the session. A login suspended between the two halves
+    // is refused exactly like a forged token: same 401, same body.
+    if (!PASSWORD_SIGN_IN_STATUSES.includes(summary.status)) {
+      throw new UnauthorizedException('invalid_token');
+    }
     const user: SessionUser = {
       id: summary.userId,
       email: summary.email,
@@ -173,11 +191,29 @@ export class AuthService {
     return this.loginResultFor(user);
   }
 
-  /** Rotate a live dashboard session and return its new token pair. */
+  /**
+   * Rotate a live dashboard session and return its new token pair.
+   *
+   * THIS IS WHERE A SUSPENSION ACTUALLY BITES. There is no per-request session
+   * lookup by design (`AuthGuard`), so an access token is good for its own TTL
+   * and revocation lands at the next refresh. A suspension that did not close
+   * this path would therefore renew itself for ever, one rotation at a time.
+   *
+   * The check rides on the row this method already reads — `findUserById` carries
+   * `umi.user.status` — so the gate costs no extra round trip and cannot be
+   * skipped without deleting the line. The refusal is the SAME `invalid_token`
+   * 401 as a forged or replayed refresh token, so it says nothing about the
+   * account: the cookie merely stops working.
+   */
   async refresh(refreshToken: string): Promise<LoginResult> {
     const claims = await this.jwt.verifyRefresh(refreshToken);
     const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
+    // Before anything is rotated or issued, so a refusal leaves the caller's
+    // token state exactly as it found it.
+    if (!PASSWORD_SIGN_IN_STATUSES.includes(summary.status)) {
+      throw new UnauthorizedException('invalid_token');
+    }
     const user: SessionUser = {
       id: summary.userId,
       email: summary.email,
@@ -353,8 +389,26 @@ export class AuthService {
       algorithm: input.deviceProofAlgorithm,
     });
 
+    // The till's refresh, and the same suspension rule as the dashboard's — but
+    // against the TILL's list, POS_PIN_LOGIN_STATUSES, which admits an `invited`
+    // login. An operator the dashboard recorded is signed in here with a PIN the
+    // employer typed; refusing their renewal on a status the PIN door accepts
+    // would kill every such register a TTL after it paired. `suspended` closes
+    // both lists, and that is the point of having two.
+    //
+    // ⚠️ KNOWN GAP IN THE READ, NOT IN THIS GATE. `findUserById` still demands
+    // `password_hash IS NOT NULL`, so a PIN-only invited operator — email and PIN
+    // but no password, which is exactly what the dashboard creates — is refused
+    // there as a MISSING user, before this line is reached. The till then opens
+    // for them and fails to renew one access TTL later. Not changed here: the same
+    // predicate decides what `/me` and the dashboard's refresh resolve, and the
+    // till cannot be driven end to end from a unit test (needs a paired device and
+    // a signed proof). Reported with the SQL evidence; see the hand-off notes.
     const summary = await this.repo.findUserById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
+    if (!POS_PIN_LOGIN_STATUSES.includes(summary.status)) {
+      throw new UnauthorizedException('invalid_token');
+    }
     const user: SessionUser = {
       id: summary.userId,
       email: summary.email,
@@ -474,7 +528,11 @@ export class AuthService {
     const email = emailRaw.trim().toLowerCase();
     if (!email) return;
 
-    const credential = await this.repo.findCredentialByEmail(email);
+    // The same gated read as `login`: a suspended login cannot start a reset
+    // either. It comes back null here, so the no-account branch below runs — the
+    // token is never issued AND the decoy hash still burns the same scrypt work,
+    // which is what keeps the timing equal in this path.
+    const credential = await this.repo.findSignInCredentialByEmail(email);
     if (!credential) {
       // Spend comparable CPU on the no-account path so response timing doesn't
       // leak which emails have local accounts (the real path hashes below).

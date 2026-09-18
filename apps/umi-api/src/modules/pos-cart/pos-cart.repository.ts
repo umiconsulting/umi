@@ -3,6 +3,18 @@ import type { PoolClient } from 'pg';
 import type { Cart, CartLineInput, PosIncomingOrder } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 
+/**
+ * What `price()` needs to price a line: the product, the variant (if any) and the
+ * modifier selections. Narrower than `CartLineInput` on purpose — a cart line carries
+ * the operator session, the expected version and an idempotency key, and none of those
+ * is a fact about what a product costs.
+ */
+export interface PriceableSelection {
+  productId: string;
+  variantId: string | null;
+  modifierSelections: Array<{ modifierId: string; quantity: number }>;
+}
+
 export interface PricedSelection {
   productId: string;
   productName: string;
@@ -65,10 +77,9 @@ export class PosCartRepository {
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO merchant.pos_cart
          (merchant_id,location_id,operator_session_id,original_operator_session_id,
-          original_operator_user_id,operator_user_id,business_date)
-       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id,
-         (now() at time zone COALESCE(b.timezone,business.timezone))::date
-       FROM merchant.location b JOIN merchant.merchant business ON business.id=b.merchant_id
+          original_operator_user_id,operator_user_id)
+       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id
+       FROM merchant.location b
        JOIN runtime.operator_session os ON os.id=$3::uuid
        WHERE b.id=$2::uuid AND b.merchant_id=$1::uuid AND b.status='active'
          AND os.merchant_id=$1::uuid AND os.location_id=$2::uuid
@@ -76,10 +87,6 @@ export class PosCartRepository {
          ('building_cart','ready_for_checkout','recovered')
        DO UPDATE SET operator_session_id=excluded.operator_session_id,
                      lifecycle_state='recovered',
-                     -- A cart picked up the next morning is today's cart. Leaving
-                     -- yesterday's stamp here is what sent stale dates downstream,
-                     -- where the cash ledger refuses them outright.
-                     business_date=excluded.business_date,
                      updated_at=now()
        RETURNING id::text`,
       [merchantId, locationId, operatorSessionId],
@@ -112,11 +119,23 @@ export class PosCartRepository {
     return rows[0]?.id ?? null;
   }
 
+  /**
+   * Price ONE selection against the live catalog: is the product orderable at this
+   * location, are the chosen modifiers this product's (and within its groups' min/max),
+   * and what does the line cost.
+   *
+   * The parameter is the three fields this actually reads, not a whole `CartLineInput`.
+   * A `CartLineInput` still satisfies it, so the till's callers are unchanged — and the
+   * public table-order intake (§8I step 2) can ask the SAME question about a guest's
+   * line without inventing an operator session, an expected cart version and an
+   * idempotency key to satisfy a shape it does not have. One pricing rule, two
+   * producers, and the guest is charged the number the till would have charged.
+   */
   async price(
     client: PoolClient,
     merchantId: string,
     locationId: string,
-    input: CartLineInput,
+    input: PriceableSelection,
   ): Promise<PricedSelection | null> {
     const product = await client.query<{
       productId: string;
@@ -222,10 +241,11 @@ export class PosCartRepository {
       `INSERT INTO merchant.pos_cart_line
          (merchant_id,cart_id,product_id,variant_id,identity_key,product_name,variant_name,
           variant_attributes,quantity,note,base_price,variant_delta,modifier_total,
-          tax_rate_basis_points)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          tax_rate_basis_points,course_number)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        ON CONFLICT (cart_id,identity_key) DO UPDATE
-         SET quantity=merchant.pos_cart_line.quantity+excluded.quantity,updated_at=now()
+         SET quantity=merchant.pos_cart_line.quantity+excluded.quantity,
+             course_number=excluded.course_number,updated_at=now()
        RETURNING id::text`,
       [
         merchantId,
@@ -242,6 +262,7 @@ export class PosCartRepository {
         priced.variantDelta,
         modifierTotal,
         priced.taxRateBasisPoints,
+        input.courseNumber,
       ],
     );
     const lineId = rows[0].id;
@@ -515,6 +536,7 @@ export class PosCartRepository {
       variantName: string | null;
       variantAttributes: Record<string, string>;
       note: string | null;
+      courseNumber: number;
       basePrice: string;
       variantDelta: string;
       modifierTotal: string;
@@ -527,6 +549,7 @@ export class PosCartRepository {
               l.variant_attributes AS "variantAttributes",l.note,l.base_price::text AS "basePrice",
               l.variant_delta::text AS "variantDelta",l.modifier_total::text AS "modifierTotal",
               l.tax_rate_basis_points AS "taxRateBasisPoints",
+              l.course_number AS "courseNumber",
               COALESCE(jsonb_agg(jsonb_build_object('modifierId',m.modifier_id::text,
                 'groupId',m.group_id::text,'name',m.name,'quantity',m.quantity,
                 'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text))
@@ -554,6 +577,7 @@ export class PosCartRepository {
         productName: line.productName,
         saleAction: line.saleAction,
         quantity: line.quantity,
+        courseNumber: line.courseNumber,
         variant: line.variantId
           ? {
               variantId: line.variantId,

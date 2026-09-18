@@ -2,12 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DASHBOARD_EVENT_CONVERSATION_MESSAGE,
   DASHBOARD_EVENT_DEVICES_CHANGED,
+  REALTIME_EVENT_TENDER_ATTEMPT_CHANGED,
 } from '@umi/contract';
 import { DashboardRealtimeGateway } from './dashboard-realtime.gateway';
 import { DashboardRealtimeEvents } from './dashboard-realtime.events';
 
 const MERCHANT_ID = '11111111-1111-4111-8111-111111111111';
 const CONVERSATION_ID = '22222222-2222-4222-8222-222222222222';
+const ATTEMPT_ID = '33333333-3333-4333-8333-333333333333';
+const COMMAND_IDENTITY = '44444444-4444-4444-8444-444444444444';
+const CART_ID = '55555555-5555-4555-8555-555555555555';
 const COOKIE = `umi_access=abc123; umi_refresh=def456`;
 
 const socketWith = (auth: Record<string, unknown>, cookie = COOKIE) => ({
@@ -156,5 +160,32 @@ describe('DashboardRealtimeGateway emit', () => {
 
     expect(to).toHaveBeenCalledWith(`dashboard:${MERCHANT_ID}`);
     expect(emit).toHaveBeenCalledWith(DASHBOARD_EVENT_CONVERSATION_MESSAGE, event);
+  });
+
+  it('emits a tender-attempt wake-up only to the merchant room, carrying ids only', () => {
+    const { gateway, events } = make();
+    const emit = vi.fn();
+    const to = vi.fn().mockReturnValue({ emit });
+    Reflect.set(gateway, 'server', { to });
+    gateway.onModuleInit();
+
+    const event = {
+      merchantId: MERCHANT_ID,
+      attemptId: ATTEMPT_ID,
+      commandIdentity: COMMAND_IDENTITY,
+      cartId: CART_ID,
+    };
+    events.emitTenderAttemptChanged(event);
+
+    expect(to).toHaveBeenCalledWith(`dashboard:${MERCHANT_ID}`);
+    expect(emit).toHaveBeenCalledWith(REALTIME_EVENT_TENDER_ATTEMPT_CHANGED, event);
+    // The nudge is a WAKE-UP: no amount, no provider status, no proof. The till re-reads
+    // the attempt over REST with the command identity its own capture used (plan D5).
+    expect(Object.keys(event).sort()).toEqual([
+      'attemptId',
+      'cartId',
+      'commandIdentity',
+      'merchantId',
+    ]);
   });
 });

@@ -1,6 +1,7 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, HttpException, UnauthorizedException } from '@nestjs/common';
 import type { PaymentSummary } from '@umi/contract';
 import { describe, expect, it, vi } from 'vitest';
+import { CashRefusal } from '../pos-cash/cash-refusal';
 import { PosCheckoutService } from './pos-checkout.service';
 
 const id = (value: number) => `00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
@@ -238,6 +239,45 @@ describe('PosCheckoutService', () => {
     expect(result.status).toBe('completed');
     expect(result.receipt?.grandTotal.minorUnits).toBe(23200);
     expect(repo.commit).toHaveBeenCalledOnce();
+  });
+
+  it('answers a missing cash shift with a typed 409 that carries the register and its hold', async () => {
+    const { service, repo } = harness();
+    const preview = await service.checkout(user, id(1), base);
+    repo.commit.mockRejectedValueOnce(
+      new CashRefusal('CASH_SHIFT_REQUIRED', 409, {
+        registerId: id(50),
+        registerName: 'Caja 1',
+        holdState: 'held_by_this_device',
+        shiftId: id(51),
+        shiftStatus: 'open',
+        reclaimable: false,
+      }),
+    );
+    let caught: unknown;
+    try {
+      await service.checkout(user, id(1), {
+        ...base,
+        idempotencyKey: id(15),
+        totalsFingerprint: preview.confirmation.fingerprint,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    // A 409 the till can act on, never a 500 "Internal server error".
+    expect(caught).toBeInstanceOf(HttpException);
+    const response = (caught as HttpException).getResponse() as {
+      code: string;
+      details: Record<string, unknown>;
+    };
+    expect((caught as HttpException).getStatus()).toBe(409);
+    expect(response.code).toBe('CASH_SHIFT_REQUIRED');
+    expect(response.details).toMatchObject({
+      registerId: id(50),
+      holdState: 'held_by_this_device',
+      shiftId: id(51),
+      reclaimable: false,
+    });
   });
 
   it('binds customer value to the stable checkout basis fingerprint', async () => {

@@ -266,7 +266,7 @@ export class IntegrityRepository {
 
   async searchAudit(merchantId: string, search: AuditSearch): Promise<unknown[]> {
     return this.pg.withMerchant(async (client) => {
-      const { rows } = await client.query(
+      const { rows } = await client.query<{ occurredAt: string }>(
         `SELECT id::text, merchant_id::text AS "merchantId", location_id::text AS "locationId",
                 event_type AS "eventType", entity_type AS "entityType",
                 entity_id::text AS "entityId", outcome, reason_code AS "reasonCode",
@@ -291,7 +291,19 @@ export class IntegrityRepository {
           search.limit,
         ],
       );
-      return rows;
+      // `occurred_at::text` is not ISO-8601: Postgres prints it as
+      // `2026-09-17 10:58:14.477621+00`, with a space where the contract's
+      // `IsoTimestamp` — `z.string().datetime({ offset: true })` — requires a
+      // `T`. `AuditEventView.parse` therefore threw on the first row, and this
+      // endpoint answered **500 for any merchant that had audit events** — which
+      // is every merchant that has done anything at all. The smoke sweep is what
+      // found it: it calls every GET route and requires each one to answer or to
+      // be a declared exception. Converting here keeps the query readable and
+      // matches how the rest of the API builds its timestamps.
+      return rows.map((row) => ({
+        ...row,
+        occurredAt: new Date(row.occurredAt).toISOString(),
+      }));
     });
   }
 }

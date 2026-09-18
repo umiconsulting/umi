@@ -6,6 +6,17 @@
 	reverse_proxy umi-api:3000
 }
 
+# Staging umi-api: the `umi-api-test` build-v3 QA stack (~/umi-api-test, its own
+# isolated docker-compose project — separate network, own Postgres via the QA
+# Supabase project, own redis/mailhog). It runs no caddy of its own; this Caddy
+# is the only TLS/reverse-proxy entrypoint, reaching it the same way as Plane
+# below — via the host-gateway route to the port it publishes on the docker
+# bridge (172.17.0.1:3001, see ~/umi-api-test/docker-compose.yml).
+api-staging.umiconsulting.co {
+	encode gzip
+	reverse_proxy host.docker.internal:3001
+}
+
 # Self-hosted Plane, which runs as its own stack out of /opt/plane. Its proxy
 # binds to the Docker bridge IP only (never the public interface), so this Caddy
 # stays the single TLS entrypoint on the box. PLANE_DOMAIN comes from the

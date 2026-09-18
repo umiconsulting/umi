@@ -1,6 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
 import { exceptionCommandFingerprint, PosExceptionService } from './pos-exception.service';
 
+/**
+ * The fiscal record, stubbed to "this sale has no CFDI".
+ *
+ * The unit suite is about the exception boundary — permissions, approvals, fingerprints —
+ * and a sale with a document is a fact about the DATABASE, which a mocked repository cannot
+ * represent. That the void and the CFDI cancellation happen in ONE transaction is proved at
+ * two levels instead: `pos-exception.void-fiscal.spec.ts` shows this service handing the
+ * fiscal cancellation the SAME client the sale was voided with, and
+ * `../fiscal/fiscal.integration.ts` shows `cancelForSale` doing that work against the real
+ * schema, inside a transaction and after a rollback.
+ */
+const stubFiscal = () => ({
+  cancelForSale: vi
+    .fn()
+    .mockResolvedValue({ documentFound: false, documentId: null, status: null }),
+});
+
 const id = (value: number) => `00000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
 const user = { id: id(1), email: 'cashier@example.test', sessionId: id(2), deviceId: id(3) };
 const authorization = {
@@ -16,8 +33,20 @@ const authorization = {
 
 describe('Gate 3D exception application boundary', () => {
   it('fails closed without the exact refund permission', async () => {
-    const repo = { authorize: vi.fn().mockResolvedValue(authorization) };
-    const service = new PosExceptionService(repo as never, {} as never, {} as never);
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      // No provider-captured terminal on these sales, so the card-refund path is inert.
+      providerRefundTargets: vi.fn().mockResolvedValue([]),
+    };
+    const service = new PosExceptionService(
+      repo as never,
+      {} as never,
+      {} as never,
+      stubFiscal() as never,
+      // The tender path: a card tender's refund is asked of the terminal through it
+      // (plan §4 Phase 4). These cases carry no card tender, so it is never called.
+      { refund: vi.fn() } as never,
+    );
     await expect(
       service.preview(user, id(5), id(7), {
         locationId: id(6),
@@ -44,7 +73,15 @@ describe('Gate 3D exception application boundary', () => {
         expiresAt: '2026-08-03T20:00:00.000Z',
       }),
     };
-    const service = new PosExceptionService(repo as never, {} as never, entry as never);
+    const service = new PosExceptionService(
+      repo as never,
+      {} as never,
+      entry as never,
+      stubFiscal() as never,
+      // The tender path: a card tender's refund is asked of the terminal through it
+      // (plan §4 Phase 4). These cases carry no card tender, so it is never called.
+      { refund: vi.fn() } as never,
+    );
     const result = await service.approval(user, id(5), id(7), {
       locationId: id(6),
       operatorSessionId: id(4),
@@ -63,8 +100,20 @@ describe('Gate 3D exception application boundary', () => {
   });
 
   it('rejects a manager fingerprint that belongs to another command', async () => {
-    const repo = { authorize: vi.fn().mockResolvedValue(authorization) };
-    const service = new PosExceptionService(repo as never, {} as never, {} as never);
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      // No provider-captured terminal on these sales, so the card-refund path is inert.
+      providerRefundTargets: vi.fn().mockResolvedValue([]),
+    };
+    const service = new PosExceptionService(
+      repo as never,
+      {} as never,
+      {} as never,
+      stubFiscal() as never,
+      // The tender path: a card tender's refund is asked of the terminal through it
+      // (plan §4 Phase 4). These cases carry no card tender, so it is never called.
+      { refund: vi.fn() } as never,
+    );
     await expect(
       service.approval(user, id(5), id(7), {
         locationId: id(6),
@@ -87,6 +136,8 @@ describe('Gate 3D exception application boundary', () => {
         exceptionType: 'partial_refund',
         status: 'committed',
       }),
+      // No provider-captured terminal on this sale, so the card-refund path is inert.
+      providerRefundTargets: vi.fn().mockResolvedValue([]),
     };
     const integrity = {
       execute: vi.fn(async (_input, operation) => {
@@ -98,7 +149,15 @@ describe('Gate 3D exception application boundary', () => {
         return { status: 'succeeded', result: outcome.value, failureCode: null };
       }),
     };
-    const service = new PosExceptionService(repo as never, integrity as never, {} as never);
+    const service = new PosExceptionService(
+      repo as never,
+      integrity as never,
+      {} as never,
+      stubFiscal() as never,
+      // The tender path: a card tender's refund is asked of the terminal through it
+      // (plan §4 Phase 4). These cases carry no card tender, so it is never called.
+      { refund: vi.fn() } as never,
+    );
     const result = await service.commit(user, id(5), id(7), {
       locationId: id(6),
       operatorSessionId: id(4),
@@ -109,6 +168,9 @@ describe('Gate 3D exception application boundary', () => {
       commandId: id(8),
       idempotencyKey: id(9),
       offline: false,
+      // The SAT motive travels with the command that undoes a committed sale, because that
+      // command also cancels the sale's CFDI in the same transaction.
+      fiscalMotive: '02' as const,
     });
     expect(result).toMatchObject({ exceptionId: id(10) });
     expect(integrity.execute).toHaveBeenCalledOnce();
@@ -120,6 +182,10 @@ describe('Gate 3D exception application boundary', () => {
       { authorize: vi.fn() } as never,
       {} as never,
       {} as never,
+      stubFiscal() as never,
+      // The tender path: a card tender's refund is asked of the terminal through it
+      // (plan §4 Phase 4). These cases carry no card tender, so it is never called.
+      { refund: vi.fn() } as never,
     );
     await expect(
       service.preview({ ...user, deviceId: null }, id(5), id(7), {

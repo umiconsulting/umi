@@ -63,6 +63,7 @@ describe('Dashboard administrative command execution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await service.execute(user, access, {
@@ -97,6 +98,7 @@ describe('Dashboard administrative command execution', () => {
     const service = new AdministrativeCommandExecutionService(
       context('refund.approval') as never,
       refunds as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -152,6 +154,7 @@ describe('Dashboard administrative command execution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     const result = await service.execute(user, access, {
       operation: 'inventory.adjustment',
@@ -189,6 +192,7 @@ describe('Dashboard administrative command execution', () => {
       context('inventory.count.create') as never,
       {} as never,
       inventory as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -237,6 +241,7 @@ describe('Dashboard administrative command execution', () => {
       repository as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     await service.execute(user, access, {
       operation: 'register.configure',
@@ -265,6 +270,7 @@ describe('Dashboard administrative command execution', () => {
       {} as never,
       kitchen as never,
       {} as never,
+      {} as never,
     );
     await service.execute(user, access, {
       operation: 'kitchen.station.create',
@@ -291,6 +297,7 @@ describe('Dashboard administrative command execution', () => {
       {} as never,
       {} as never,
       catalog as never,
+      {} as never,
     );
     await service.execute(user, access, {
       operation: 'catalog.update',
@@ -321,6 +328,7 @@ describe('Dashboard administrative command execution', () => {
       {} as never,
       {} as never,
       hardware as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,
@@ -376,6 +384,7 @@ describe('Dashboard administrative command execution', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     const result = await service.execute(user, access, {
@@ -405,5 +414,122 @@ describe('Dashboard administrative command execution', () => {
       fundingAssignment: null,
       deliveryStatus: 'issued_once',
     });
+  });
+
+  it('routes a recipe create to the inventory authoring service, with no injected target', async () => {
+    const authoring = {
+      executeAdministrative: vi.fn().mockResolvedValue({ recipe: { id: id(8) } }),
+    };
+    const service = new AdministrativeCommandExecutionService(
+      context('inventory.recipe.create') as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      authoring as never,
+    );
+    await service.execute(user, access, {
+      operation: 'inventory.recipe.create',
+      locationId: id(5),
+      targetAggregateId: id(8),
+      targetVersion: null,
+      commandId: id(6),
+      idempotencyKey: id(7),
+      approvalId: null,
+      parameters: {
+        targetKind: 'product',
+        productId: id(9),
+        yieldQuantity: { value: 1, scale: 0, unit: 'portion' },
+        components: [
+          { inventoryItemId: id(10), quantity: { value: 12, scale: 3, unit: 'kilogram' } },
+        ],
+      },
+    });
+    expect(authoring.executeAdministrative).toHaveBeenCalledWith(
+      user,
+      access,
+      expect.objectContaining({ type: 'dashboard_administrative' }),
+      'inventory.recipe.create',
+      // The new recipe id travels on the COMMAND, so `parameters` carries no id.
+      expect.objectContaining({
+        commandId: id(6),
+        idempotencyKey: id(7),
+        targetKind: 'product',
+      }),
+    );
+  });
+
+  it('routes a recipe update with the recipe id and version the command carried', async () => {
+    const authoring = {
+      executeAdministrative: vi.fn().mockResolvedValue({ recipe: { id: id(11), version: 3 } }),
+    };
+    const service = new AdministrativeCommandExecutionService(
+      context('inventory.recipe.update') as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      authoring as never,
+    );
+    await service.execute(user, access, {
+      operation: 'inventory.recipe.update',
+      locationId: id(5),
+      targetAggregateId: id(8),
+      targetVersion: 2,
+      commandId: id(6),
+      idempotencyKey: id(7),
+      approvalId: null,
+      parameters: { yieldQuantity: { value: 2, scale: 0, unit: 'portion' } },
+    });
+    expect(authoring.executeAdministrative).toHaveBeenCalledWith(
+      user,
+      access,
+      expect.any(Object),
+      'inventory.recipe.update',
+      expect.objectContaining({ recipeId: id(8), expectedVersion: 2 }),
+    );
+  });
+
+  it('routes a recipe retire with the version the caller read', async () => {
+    const authoring = {
+      executeAdministrative: vi.fn().mockResolvedValue({ recipe: { id: id(8), active: false } }),
+    };
+    const service = new AdministrativeCommandExecutionService(
+      context('inventory.recipe.retire') as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      authoring as never,
+    );
+    await service.execute(user, access, {
+      operation: 'inventory.recipe.retire',
+      locationId: id(5),
+      targetAggregateId: id(8),
+      targetVersion: 4,
+      commandId: id(6),
+      idempotencyKey: id(7),
+      approvalId: null,
+      parameters: {},
+    });
+    expect(authoring.executeAdministrative).toHaveBeenCalledWith(
+      user,
+      access,
+      expect.any(Object),
+      'inventory.recipe.retire',
+      expect.objectContaining({ recipeId: id(8), expectedVersion: 4 }),
+    );
   });
 });

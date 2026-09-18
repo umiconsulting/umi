@@ -11,6 +11,7 @@ import { PosHardwareModule } from '../pos-hardware/pos-hardware.module';
 import { PosCustomerValueModule } from '../pos-customer-value/pos-customer-value.module';
 import { KdsModule } from '../kds/kds.module';
 import { PosCatalogModule } from '../pos-catalog/pos-catalog.module';
+import { InventoryAuthoringModule } from '../inventory-authoring/inventory-authoring.module';
 
 @Module({
   imports: [
@@ -22,6 +23,9 @@ import { PosCatalogModule } from '../pos-catalog/pos-catalog.module';
     PosExceptionModule,
     PosHardwareModule,
     PosInventoryModule,
+    // The console's inventory authoring writes (recipes module plan §11, phase 1).
+    // Registered here because the execution service dispatches six of its operations.
+    InventoryAuthoringModule,
   ],
   controllers: [AdministrativeCommandController],
   providers: [
