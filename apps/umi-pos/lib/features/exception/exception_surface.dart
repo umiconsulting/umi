@@ -3,6 +3,7 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/inline_notice.dart';
 import 'exception_controller.dart';
 
 Future<void> showSaleExceptionDialog(
@@ -37,6 +38,11 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   final Map<String, int> _quantities = {};
   final Map<String, String> _restock = {};
   String _fullRestock = 'restock';
+
+  /// Why the last preview attempt was refused. It is shown under the button
+  /// that refused it rather than in a bar at the bottom of the screen, which is
+  /// a different part of the surface from the lines that have to be picked.
+  String? _validation;
 
   @override
   void initState() {
@@ -272,6 +278,10 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           decoration: InputDecoration(labelText: l.refundReasonLabel),
         ),
         const SizedBox(height: UmiSpacing.md),
+        if (_validation != null) ...[
+          InlineNotice(message: _validation!),
+          const SizedBox(height: UmiSpacing.md),
+        ],
         FilledButton.icon(
           onPressed: _createPreview,
           icon: const Icon(Icons.preview_outlined),
@@ -402,13 +412,13 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
             };
           }).toList();
     if (type == 'partial_refund' && lines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).selectRefundLinesMessage),
-        ),
+      setState(
+        () =>
+            _validation = AppLocalizations.of(context).selectRefundLinesMessage,
       );
       return;
     }
+    setState(() => _validation = null);
     await widget.controller.createPreview(
       exceptionType: type,
       reason: _reason,
@@ -419,6 +429,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
 
   Widget _preview(AppLocalizations l, SaleExceptionState state) {
     final preview = state.preview!;
+    final providerBacked = preview.manualTerminal?['providerBacked'] == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -455,6 +466,8 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
             title: Text(
               tender['tenderType'] == 'cash'
                   ? l.cashRefundLabel
+                  : providerBacked
+                  ? l.cardTerminalRefundLabel
                   : l.manualTerminalRefundLabel,
             ),
             trailing: Text(_money(tender['amount']! as Map<String, Object?>)),
@@ -474,6 +487,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           ),
         ),
         if (preview.manualTerminal != null &&
+            !providerBacked &&
             (state.terminalOutcome == null ||
                 state.terminalOutcome?.status ==
                     'operator_reported_failure')) ...[
@@ -506,6 +520,12 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
             ],
           ),
         ],
+        if (preview.manualTerminal != null && providerBacked) ...[
+          Text(
+            l.manualTerminalRefundOnCommitNotice,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ],
         if (preview.approvalRequired && state.approval == null) ...[
           const SizedBox(height: UmiSpacing.lg),
           TextField(
@@ -524,6 +544,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         ],
         if ((!preview.approvalRequired || state.approval != null) &&
             (preview.manualTerminal == null ||
+                providerBacked ||
                 state.terminalOutcome?.status == 'confirmed_success')) ...[
           const SizedBox(height: UmiSpacing.lg),
           FilledButton.icon(

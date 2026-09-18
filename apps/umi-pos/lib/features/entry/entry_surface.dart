@@ -12,6 +12,7 @@ final class EntrySurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (controller.state.phase) {
     EntryPhase.checkingDevice ||
+    EntryPhase.restoringSession ||
     EntryPhase.authenticating ||
     EntryPhase.pinAuthenticating ||
     EntryPhase.startingOperator => const Center(

@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
@@ -9,7 +11,10 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/connectivity_label.dart';
+import '../../shared/widgets/inline_notice.dart';
 import '../cart/cart_controller.dart';
+import '../cart/course_control.dart';
 import '../cart/incoming_orders_controller.dart';
 import '../cart/incoming_orders_surface.dart';
 import '../cash/cash_controller.dart';
@@ -18,6 +23,7 @@ import '../checkout/checkout_controller.dart';
 import '../checkout/checkout_surface.dart';
 import '../customer_value/customer_value_controller.dart';
 import '../customer_value/customer_value_surface.dart';
+import '../entry/device_channel_socket_client.dart';
 import '../entry/entry_controller.dart';
 import '../exception/exception_controller.dart';
 import '../hardware/hardware_runtime.dart';
@@ -34,6 +40,9 @@ import '../offline/recovery_center.dart';
 import '../offline/replay_engine.dart';
 import '../sale/sale_lifecycle_controller.dart';
 import '../sale/sale_surface.dart';
+import '../tables/floor_plan_controller.dart';
+import '../tables/floor_plan_surface.dart';
+import '../tables/table_state_controller.dart';
 import 'catalog_controller.dart';
 import 'catalog_repository.dart';
 import 'frequent_products.dart';
@@ -49,7 +58,10 @@ final class CatalogSurface extends StatefulWidget {
     required this.sales,
     this.kitchenStatus,
     this.kitchenBoard,
+    this.floorPlan,
+    this.tableState,
     this.customerValue,
+    this.deviceChannel,
     required this.exceptions,
     required this.connectivity,
     required this.telemetry,
@@ -68,7 +80,13 @@ final class CatalogSurface extends StatefulWidget {
   final SaleLifecycleController sales;
   final KitchenStatusRepository? kitchenStatus;
   final KitchenBoardController? kitchenBoard;
+  final FloorPlanController? floorPlan;
+  final TableStateController? tableState;
   final CustomerValueController? customerValue;
+
+  /// The till's realtime wake-up for a card terminal's answer. Null on a build
+  /// with no socket path wired; the poll carries the sale either way.
+  final DeviceChannelSocketClient? deviceChannel;
   final SaleExceptionController exceptions;
   final ConnectivityController connectivity;
   final Telemetry telemetry;
@@ -87,6 +105,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   bool _initialLoadStarted = false;
   bool _leaving = false;
   String? _lastSaleErrorCode;
+
+  /// The last thing that went wrong, shown inline above the grid instead of in
+  /// a bar that slid up from the bottom of the screen. See `InlineNotice`.
+  String? _notice;
   StreamSubscription<CanonicalScanEvent>? _scanSubscription;
   Future<void> _scanQueue = Future<void>.value();
   FrequentProductsStore? _frequent;
@@ -248,16 +270,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       }
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          matches.isEmpty
-              ? (spanish ? 'Código de barras desconocido.' : 'Unknown barcode.')
-              : (spanish
-                    ? 'Hay varios productos para este código.'
-                    : 'Multiple products match this barcode.'),
-        ),
-      ),
+    setState(
+      () => _notice = matches.isEmpty
+          ? (spanish ? 'Código de barras desconocido.' : 'Unknown barcode.')
+          : (spanish
+                ? 'Hay varios productos para este código.'
+                : 'Multiple products match this barcode.'),
     );
   }
 
@@ -296,11 +314,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     // mutates state) out of the current build/listener turn.
     scheduleMicrotask(() async {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).sessionEndedReauth),
-        ),
-      );
+      // No notice here on purpose: the till is about to drop to the PIN pad,
+      // and that screen IS the message. A bar saying "your session ended"
+      // while the keypad is already replacing the catalog is a caption for
+      // something the operator can see for themselves.
       await widget.entry.lock();
     });
     return true;
@@ -315,10 +332,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       if (!_reauthIfSessionLost(errorCode)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppLocalizations.of(context).saleLifecycleError),
-              ),
+            setState(
+              () => _notice = AppLocalizations.of(context).saleLifecycleError,
             );
           }
         });
@@ -332,13 +347,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           _search.clear();
           widget.catalog.search('');
           _searchFocus.requestFocus();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                AppLocalizations.of(context).readyForNextCustomerMessage,
-              ),
-            ),
-          );
+          // No "ready for the next customer" bar. Clearing the search and
+          // putting the cursor back in it IS the feedback: the till is visibly
+          // ready, and a bar that slides up to say so only covers the bottom
+          // of the screen - it landed exactly where the sale-complete dialog
+          // puts "Nuevo pedido", so a tap aimed there dismissed the bar and
+          // did nothing else.
         }
       });
     }
@@ -356,6 +370,42 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     _scroll.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  /// `Nueva venta`, with the one thing it never said out loud.
+  ///
+  /// Starting a sale while one is in progress ABANDONS that sale, so the operator
+  /// is asked first and told what is at stake: how many lines are unbilled, and
+  /// that nothing is charged for them. With an empty cart there is nothing to
+  /// abandon and the question would be noise. The escape matters because a cart
+  /// whose checkout draft holds a payment claim can be neither paid nor cancelled
+  /// — this is the only way out of it that does not kill the app.
+  Future<void> _newSale(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final lines = widget.cart.state.cart?.items.length ?? 0;
+    if (lines > 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l.newSaleConfirmTitle),
+          content: Text(l.newSaleConfirmBody(lines)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l.keepCartAction),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l.newSaleAction),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      await widget.sales.newSale(abandonCurrent: true);
+      return;
+    }
+    await widget.sales.newSale();
   }
 
   @override
@@ -397,6 +447,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                       permissions: permissions,
                       sales: widget.sales,
                       customerValue: widget.customerValue,
+                      deviceChannel: widget.deviceChannel,
                       orderType: _orderType,
                       onEdit: (item) => _showDetail(
                         item.productId,
@@ -446,16 +497,23 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
             child: Semantics(
               liveRegion: true,
-              label: _connectivityLabel(context, widget.connectivity.state),
-              child: Chip(
-                avatar: Icon(
-                  widget.connectivity.state == PosConnectivity.online
-                      ? Icons.cloud_done_outlined
-                      : Icons.cloud_off_outlined,
-                  size: 18,
-                ),
-                label: Text(
-                  _connectivityLabel(context, widget.connectivity.state),
+              label: connectivityLabel(context, widget.connectivity.state),
+              // Status, not a control. `Chip` publishes `checked` on web
+              // (Material's chip.dart does that for every chip), so without
+              // excluding it the bar announces "En línea, checkbox, not
+              // checked" — a setting the operator can never tick. The label
+              // above stays, so the status is still read out.
+              child: ExcludeSemantics(
+                child: Chip(
+                  avatar: Icon(
+                    widget.connectivity.state == PosConnectivity.online
+                        ? Icons.cloud_done_outlined
+                        : Icons.cloud_off_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    connectivityLabel(context, widget.connectivity.state),
+                  ),
                 ),
               ),
             ),
@@ -465,7 +523,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             _BarAction(
               icon: Icons.add_shopping_cart_outlined,
               label: l.newSaleAction,
-              onPressed: () => widget.sales.newSale(),
+              onPressed: () => _newSale(context),
             ),
           // Caja and Ventas moved to the bottom tab bar (PoloTab pattern).
           // Overflow — rare / admin actions (progressive disclosure).
@@ -600,7 +658,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       ),
       // The primary navigation, PoloTab-style: the order screen is home, with the
       // cash centre, the sales history, the kitchen board and settings a tap away.
-      bottomNavigationBar: _primaryNav(context, l, spanish, access, permissions),
+      bottomNavigationBar: _primaryNav(
+        context,
+        l,
+        spanish,
+        access,
+        permissions,
+      ),
     );
   }
 
@@ -647,7 +711,22 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 ? () => _openSaleCenter(context, permissions)
                 : null,
           ),
-          if (widget.kitchenBoard != null)
+          if (widget.floorPlan != null)
+            (
+              destination: NavigationDestination(
+                icon: const Icon(Icons.table_restaurant_outlined),
+                label: spanish ? 'Mesas' : 'Tables',
+              ),
+              onTap: () => showFloorPlan(
+                context,
+                controller: widget.floorPlan!,
+                entry: widget.entry,
+                tableState: widget.tableState,
+              ),
+            ),
+          // Both, and in this order: the device must have a board to show, and
+          // the operator must be allowed to see it. See `showKitchenBoard`.
+          if (widget.kitchenBoard != null && access.showKitchenBoard)
             (
               destination: NavigationDestination(
                 icon: const Icon(Icons.restaurant_menu_outlined),
@@ -658,6 +737,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 context,
                 controller: widget.kitchenBoard!,
                 entry: widget.entry,
+                connectivity: widget.connectivity,
               ),
             ),
           if (widget.incomingOrders != null)
@@ -820,6 +900,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             permissions: permissions,
             sales: widget.sales,
             customerValue: widget.customerValue,
+            deviceChannel: widget.deviceChannel,
             orderType: _orderType,
             onEdit: (item) =>
                 _showDetail(item.productId, item: item, canWrite: canWriteCart),
@@ -1000,10 +1081,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           code == 'UNAUTHORIZED';
       if (lock && !authorityLost) {
         _leaving = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).saleLifecycleError),
-          ),
+        setState(
+          () => _notice = AppLocalizations.of(context).saleLifecycleError,
         );
         return;
       }
@@ -1137,7 +1216,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   Widget _content(BuildContext context, CatalogState state) {
     final l = AppLocalizations.of(context);
-    return switch (state.phase) {
+    final body = switch (state.phase) {
       CatalogPhase.idle ||
       CatalogPhase.loading => _Skeleton(label: l.catalogLoading),
       CatalogPhase.empty => _Message(
@@ -1208,6 +1287,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         },
       ),
     };
+    final notice = _notice;
+    if (notice == null) return body;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: UmiSpacing.sm),
+          child: InlineNotice(message: notice),
+        ),
+        Expanded(child: body),
+      ],
+    );
   }
 
   Future<void> _showDetail(String id, {CartItem? item, bool? canWrite}) async {
@@ -1259,38 +1350,17 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       // session shows up here too — bounce to the PIN instead of a dead-end
       // "catalog unavailable" toast.
       if (_reauthIfSessionLost(error.code)) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).catalogUnexpectedError),
-        ),
+      setState(
+        () => _notice = AppLocalizations.of(context).catalogUnexpectedError,
       );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).catalogUnexpectedError),
-          ),
+        setState(
+          () => _notice = AppLocalizations.of(context).catalogUnexpectedError,
         );
       }
     }
   }
-}
-
-String _connectivityLabel(BuildContext context, PosConnectivity state) {
-  final spanish = Localizations.localeOf(context).languageCode == 'es';
-  return switch (state) {
-    PosConnectivity.unknown =>
-      spanish ? 'Conexión desconocida' : 'Connection unknown',
-    PosConnectivity.online => spanish ? 'En línea' : 'Online',
-    PosConnectivity.degraded => spanish ? 'Conexión inestable' : 'Degraded',
-    PosConnectivity.offline => spanish ? 'Sin conexión' : 'Offline',
-    PosConnectivity.recovering =>
-      spanish ? 'Recuperando conexión' : 'Recovering',
-    PosConnectivity.replaying => spanish ? 'Sincronizando' : 'Synchronizing',
-    PosConnectivity.reconciliationRequired =>
-      spanish ? 'Revisión necesaria' : 'Review required',
-    PosConnectivity.blocked => spanish ? 'Operación bloqueada' : 'Blocked',
-  };
 }
 
 PopupMenuItem<String> _overflowItem(
@@ -1402,19 +1472,25 @@ final class _AccountMenu extends StatelessWidget {
           ),
         ),
       ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.account_circle_outlined),
-            const SizedBox(width: UmiSpacing.sm),
-            Text(
-              operatorName ?? branch ?? '—',
-              style: theme.textTheme.titleSmall,
-            ),
-            const Icon(Icons.arrow_drop_down),
-          ],
+      // The row is what the operator aims at, so the row carries the floor.
+      // (`PopupMenuButton`'s own `tapTargetSize` route drops the
+      // `aria-expanded` wrapper when it is padded, so the size lives here.)
+      child: SizedBox(
+        height: UmiTouchTarget.minimum,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.account_circle_outlined),
+              const SizedBox(width: UmiSpacing.sm),
+              Text(
+                operatorName ?? branch ?? '—',
+                style: theme.textTheme.titleSmall,
+              ),
+              const Icon(Icons.arrow_drop_down),
+            ],
+          ),
         ),
       ),
     );
@@ -1437,6 +1513,12 @@ final class _CategoryRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
+    // A scrollable clips a node's published rect to the viewport plus the
+    // cache window, so a category below the fold was announced as a 42 px
+    // button when the tile is 72 px. Cache the whole rail (twelve tiles) so
+    // every category is published at its true geometry — the documented point
+    // of `SliverEnsureSemantics`, on a list small enough to pre-build.
+    scrollCacheExtent: const ScrollCacheExtent.viewport(2),
     children: [
       _CategoryTile(
         label: allLabel,
@@ -1793,6 +1875,11 @@ final class _DetailState extends State<_Detail> {
   final note = TextEditingController();
   int quantity = 1;
 
+  /// Which course the line belongs to. A new line starts on the first course,
+  /// and an edited one starts where the line already is — so the control states
+  /// a fact rather than asking a question the operator did not arrive to answer.
+  int course = CourseControl.minCourse;
+
   @override
   void initState() {
     super.initState();
@@ -1805,6 +1892,7 @@ final class _DetailState extends State<_Detail> {
     }
     note.text = item.note ?? '';
     quantity = item.quantity;
+    course = item.courseNumber;
   }
 
   @override
@@ -1870,6 +1958,48 @@ final class _DetailState extends State<_Detail> {
   /// One option group rendered per its menu rules (audit F1): a single-choice
   /// group (`maxSelections == 1`) is single-select chips; a multi-choice group
   /// caps at `maxSelections`; a required group shows a clear, coloured hint.
+  /// Option tiles laid out in rows that are level with one another.
+  ///
+  /// A `Wrap` gives every tile its own natural height, so an option that carries
+  /// a surcharge (one line of name, one of price) stood taller than the option
+  /// beside it and every row read as ragged. Here the tallest tile in a row sets
+  /// the row and the rest stretch to it. The row is also the only safe place to
+  /// absorb the 2 px border a SELECTED tile draws where an unselected one draws
+  /// 1 px - a pinned tile height has to guess that difference, and guessing it
+  /// wrong paints an overflow stripe in a debug build.
+  Widget _optionRows(List<Widget> tiles) => LayoutBuilder(
+    builder: (context, constraints) {
+      const gap = UmiSpacing.sm;
+      final perRow = math.max(
+        1,
+        ((constraints.maxWidth + gap) / (_OptionCard.width + gap)).floor(),
+      );
+      final rows = <List<Widget>>[];
+      for (var start = 0; start < tiles.length; start += perRow) {
+        rows.add(tiles.sublist(start, math.min(start + perRow, tiles.length)));
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var row = 0; row < rows.length; row++) ...[
+            if (row > 0) const SizedBox(height: gap),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var column = 0; column < rows[row].length; column++) ...[
+                    if (column > 0) const SizedBox(width: gap),
+                    rows[row][column],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    },
+  );
+
   Widget _buildOptionGroup(Map<String, Object?> group) {
     final spanish = Localizations.localeOf(context).languageCode == 'es';
     final name = group['name'] as String? ?? '';
@@ -1916,10 +2046,8 @@ final class _DetailState extends State<_Detail> {
             ],
           ),
           const SizedBox(height: UmiSpacing.sm),
-          Wrap(
-            spacing: UmiSpacing.sm,
-            runSpacing: UmiSpacing.sm,
-            children: modifiers.map((modifier) {
+          _optionRows(
+            modifiers.map((modifier) {
               final id = modifier['id']! as String;
               final selected = selectedModifiers.containsKey(id);
               if (single) {
@@ -1974,10 +2102,8 @@ final class _DetailState extends State<_Detail> {
         const SizedBox(height: 16),
         Text(l.variantsLabel, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: UmiSpacing.sm),
-        Wrap(
-          spacing: UmiSpacing.sm,
-          runSpacing: UmiSpacing.sm,
-          children: detail.variants
+        _optionRows(
+          detail.variants
               .map(
                 (item) => _OptionCard(
                   label: item['name']! as String,
@@ -2016,6 +2142,16 @@ final class _DetailState extends State<_Detail> {
           ),
         ],
       ),
+      const SizedBox(height: UmiSpacing.md),
+      // Which round the dish belongs to (§8H step 4). It sits with quantity and
+      // note because it is the same kind of fact about the line, and it is the
+      // only place the operator can set it before the kitchen ever sees the
+      // ticket.
+      CourseControl(
+        course: course,
+        enabled: widget.canWrite,
+        onChanged: (value) => setState(() => course = value),
+      ),
       const SizedBox(height: 24),
       FilledButton(
         onPressed:
@@ -2034,6 +2170,7 @@ final class _DetailState extends State<_Detail> {
                     modifiers: modifiers,
                     quantity: quantity,
                     note: note.text,
+                    courseNumber: course,
                   );
                   widget.onRecord?.call();
                 } else {
@@ -2043,6 +2180,7 @@ final class _DetailState extends State<_Detail> {
                     modifiers: modifiers,
                     quantity: quantity,
                     note: note.text,
+                    courseNumber: course,
                   );
                 }
                 if (widget.onClose != null) {
@@ -2118,6 +2256,11 @@ final class _OptionCard extends StatelessWidget {
     this.priceLabel,
     this.disabled = false,
   });
+
+  /// The one width `_optionRows` packs rows with. Height is the row's business:
+  /// see `_optionRows`.
+  static const double width = 200;
+
   final String label;
   final String? priceLabel;
   final bool selected;
@@ -2131,7 +2274,7 @@ final class _OptionCard extends StatelessWidget {
     return Opacity(
       opacity: disabled ? .45 : 1,
       child: SizedBox(
-        width: 176,
+        width: width,
         child: Material(
           color: selected
               ? accent.withValues(alpha: .16)
@@ -2169,7 +2312,7 @@ final class _OptionCard extends StatelessWidget {
                       children: [
                         Text(
                           label,
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
@@ -2178,12 +2321,11 @@ final class _OptionCard extends StatelessWidget {
                                     : FontWeight.w400,
                               ),
                         ),
-                        if (priceLabel != null)
-                          Text(
-                            priceLabel!,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(color: scheme.onSurfaceVariant),
-                          ),
+                        Text(
+                          priceLabel ?? '',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
                       ],
                     ),
                   ),
@@ -2255,6 +2397,7 @@ final class _CartPanel extends StatelessWidget {
     required this.permissions,
     required this.sales,
     required this.customerValue,
+    required this.deviceChannel,
     required this.onEdit,
     this.orderType,
   });
@@ -2265,6 +2408,7 @@ final class _CartPanel extends StatelessWidget {
   final OperatorPermissions permissions;
   final SaleLifecycleController sales;
   final CustomerValueController? customerValue;
+  final DeviceChannelSocketClient? deviceChannel;
   final ValueChanged<CartItem> onEdit;
   final String? orderType;
 
@@ -2340,18 +2484,27 @@ final class _CartPanel extends StatelessWidget {
                       final es =
                           Localizations.localeOf(context).languageCode == 'es';
                       final takeout = orderType == 'takeout';
-                      return Chip(
-                        visualDensity: VisualDensity.compact,
-                        avatar: Icon(
-                          takeout
-                              ? Icons.takeout_dining_outlined
-                              : Icons.restaurant_outlined,
-                          size: 16,
-                        ),
-                        label: Text(
-                          takeout
-                              ? (es ? 'Para llevar' : 'Takeout')
-                              : (es ? 'Comer aquí' : 'Dine in'),
+                      final label = takeout
+                          ? (es ? 'Para llevar' : 'Takeout')
+                          : (es ? 'Comer aquí' : 'Dine in');
+                      // The order type is set in the top bar; this is the cart
+                      // telling the barista which one is active. Material's
+                      // `Chip` publishes `checked` on web, so the bare chip
+                      // announced an unticked checkbox that cannot be ticked.
+                      // Keep the words, drop the false control.
+                      return Semantics(
+                        label: label,
+                        child: ExcludeSemantics(
+                          child: Chip(
+                            visualDensity: VisualDensity.compact,
+                            avatar: Icon(
+                              takeout
+                                  ? Icons.takeout_dining_outlined
+                                  : Icons.restaurant_outlined,
+                              size: 16,
+                            ),
+                            label: Text(label),
+                          ),
                         ),
                       );
                     },
@@ -2382,6 +2535,13 @@ final class _CartPanel extends StatelessWidget {
                                 title: Text(item.productName),
                                 subtitle: Text(
                                   [
+                                    // A course other than the first is said on
+                                    // the line itself, because it is a fact
+                                    // about the dish and the operator has to be
+                                    // able to check it without opening the
+                                    // sheet again. Course 1 stays quiet.
+                                    if (item.courseNumber != 1)
+                                      l.cartCourseCurrent(item.courseNumber),
                                     if (item.variant != null)
                                       item.variant!['name'] as String,
                                     ...item.modifiers.map(
@@ -2491,6 +2651,22 @@ final class _CartPanel extends StatelessWidget {
                       entry: entry,
                       sales: sales,
                       customerValue: customerValue,
+                      deviceChannel: deviceChannel,
+                      // A charge refused for a missing shift hands the recovery
+                      // decision here, where the cash state lives: reclaim a
+                      // drawer whose terminal is gone, otherwise take the till's
+                      // own shift back. The returned id is what the retry uses.
+                      onRecoverCashShift: (holdState) async {
+                        if (holdState == 'held_by_orphaned_till') {
+                          final orphaned = cash.reclaimableRegisters;
+                          if (orphaned.isEmpty) return null;
+                          await cash.reclaimRegister(
+                            orphaned.first['id']! as String,
+                          );
+                          return cash.activeShiftId;
+                        }
+                        return cash.recoverOwnShift();
+                      },
                     ),
               child: Text(l.checkoutAction),
             ),

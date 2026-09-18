@@ -79,62 +79,67 @@ SaleExceptionEligibility testEligibility({
   correlationReference: 'correlation-1',
 );
 
-RefundPreview testPreview({bool approval = false, bool terminal = false}) =>
-    RefundPreview(
-      previewId: '00000000-0000-4000-8000-000000000007',
-      saleId: sale,
-      originalReceiptId: '00000000-0000-4000-8000-000000000006',
-      exceptionType: 'partial_refund',
-      status: 'preview_ready',
-      lines: [
-        {
-          'saleLineId': line,
-          'quantity': 1,
-          'merchandise': money(6500),
-          'tax': money(1000),
-          'discount': money(0),
-          'tip': money(0),
-          'total': money(7500),
-          'restockDecision': 'restock',
-        },
-      ],
-      allocation: {
-        'merchandise': money(6500),
-        'tax': money(1000),
-        'discount': money(0),
-        'tip': money(0),
-        'total': money(7500),
-      },
-      tax: {'amount': money(1000), 'historical': true},
-      discount: {'amount': money(0), 'historical': true},
-      tip: {'amount': money(0), 'policy': 'non_refundable'},
-      tenders: [
-        {
-          'originalTenderId': '00000000-0000-4000-8000-000000000008',
-          'tenderType': terminal ? 'manual_terminal' : 'cash',
+RefundPreview testPreview({
+  bool approval = false,
+  bool terminal = false,
+  bool providerBacked = false,
+}) => RefundPreview(
+  previewId: '00000000-0000-4000-8000-000000000007',
+  saleId: sale,
+  originalReceiptId: '00000000-0000-4000-8000-000000000006',
+  exceptionType: 'partial_refund',
+  status: 'preview_ready',
+  lines: [
+    {
+      'saleLineId': line,
+      'quantity': 1,
+      'merchandise': money(6500),
+      'tax': money(1000),
+      'discount': money(0),
+      'tip': money(0),
+      'total': money(7500),
+      'restockDecision': 'restock',
+    },
+  ],
+  allocation: {
+    'merchandise': money(6500),
+    'tax': money(1000),
+    'discount': money(0),
+    'tip': money(0),
+    'total': money(7500),
+  },
+  tax: {'amount': money(1000), 'historical': true},
+  discount: {'amount': money(0), 'historical': true},
+  tip: {'amount': money(0), 'policy': 'non_refundable'},
+  tenders: [
+    {
+      'originalTenderId': '00000000-0000-4000-8000-000000000008',
+      'tenderType': terminal ? 'manual_terminal' : 'cash',
+      'amount': money(7500),
+      'strategy': 'proportional',
+    },
+  ],
+  cash: terminal ? null : {'amount': money(7500)},
+  manualTerminal: terminal
+      ? {
+          'status': 'awaiting_operator_confirmation',
           'amount': money(7500),
-          'strategy': 'proportional',
-        },
-      ],
-      cash: terminal ? null : {'amount': money(7500)},
-      manualTerminal: terminal
-          ? {
-              'status': 'awaiting_operator_confirmation',
-              'amount': money(7500),
-              'correlationReference': 'correlation-1',
-              'queryOnly': false,
-              'canRetryAsNew': true,
-            }
-          : null,
-      remainingRefundableAfter: money(7500),
-      approvalRequired: approval,
-      reason: 'product_defect',
-      previewFingerprint: 'a' * 64,
-      expiresAt: '2026-08-03T13:00:00.000Z',
-      saleVersion: 3,
-      exceptionVersion: 0,
-      correlationReference: 'correlation-1',
-    );
+          'correlationReference': 'correlation-1',
+          'queryOnly': false,
+          'canRetryAsNew': true,
+          'providerBacked': providerBacked,
+          'provider': providerBacked ? 'mercado_pago_point' : null,
+        }
+      : null,
+  remainingRefundableAfter: money(7500),
+  approvalRequired: approval,
+  reason: 'product_defect',
+  previewFingerprint: 'a' * 64,
+  expiresAt: '2026-08-03T13:00:00.000Z',
+  saleVersion: 3,
+  exceptionVersion: 0,
+  correlationReference: 'correlation-1',
+);
 
 SaleExceptionResult testResult() => SaleExceptionResult(
   exceptionId: '00000000-0000-4000-8000-000000000009',
@@ -339,6 +344,73 @@ void main() {
     await value.recordTerminalOutcome('outcome_unknown');
     expect(value.state.phase, SaleExceptionPhase.outcomeUnknown);
     expect(value.state.terminalOutcome?.instruction['queryOnly'], isTrue);
+  });
+
+  test(
+    'a provider-backed tender reaches the ready phase without a declaration',
+    () async {
+      final repository = TestExceptionRepository()
+        ..nextPreview = testPreview(terminal: true, providerBacked: true);
+      final value = controller(repository);
+      await setContext(value);
+      await value.load(sale);
+      await value.createPreview(
+        exceptionType: 'partial_refund',
+        reason: 'product_defect',
+        lines: [
+          {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+        ],
+      );
+      expect(value.state.phase, SaleExceptionPhase.previewReady);
+      expect(repository.terminalRequests, isEmpty);
+      await value.recordTerminalOutcome('confirmed_success');
+      expect(value.state.phase, SaleExceptionPhase.previewReady);
+      expect(repository.terminalRequests, isEmpty);
+      await value.commit();
+      expect(value.state.phase, SaleExceptionPhase.committed);
+    },
+  );
+
+  test(
+    'a provider-backed tender with approval parks on approval, not the terminal',
+    () async {
+      final repository = TestExceptionRepository()
+        ..nextPreview = testPreview(
+          terminal: true,
+          providerBacked: true,
+          approval: true,
+        );
+      final value = controller(repository);
+      await setContext(value);
+      await value.load(sale);
+      await value.createPreview(
+        exceptionType: 'partial_refund',
+        reason: 'product_defect',
+        lines: [
+          {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+        ],
+      );
+      expect(value.state.phase, SaleExceptionPhase.approvalRequired);
+    },
+  );
+
+  test('a person-operated terminal still requires its declaration', () async {
+    final repository = TestExceptionRepository()
+      ..nextPreview = testPreview(terminal: true);
+    final value = controller(repository);
+    await setContext(value);
+    await value.load(sale);
+    await value.createPreview(
+      exceptionType: 'partial_refund',
+      reason: 'product_defect',
+      lines: [
+        {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+      ],
+    );
+    expect(value.state.phase, SaleExceptionPhase.terminalRequired);
+    await value.recordTerminalOutcome('confirmed_success');
+    expect(repository.terminalRequests, hasLength(1));
+    expect(value.state.phase, SaleExceptionPhase.previewReady);
   });
 
   test(
@@ -571,5 +643,54 @@ void main() {
     expect(find.text('Anular venta'), findsOneWidget);
     expect(find.text('full_refund'), findsNothing);
     semantics.dispose();
+  });
+
+  testWidgets('a provider-backed terminal needs no declaration in the dialog', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final repository = TestExceptionRepository()
+      ..nextPreview = testPreview(terminal: true, providerBacked: true);
+    final value = controller(repository);
+    await setContext(value);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => showSaleExceptionDialog(
+                context,
+                controller: value,
+                saleId: sale,
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Revisar reembolso'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'El cobro se devolverá en la terminal al confirmar el reembolso.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('El reembolso externo tuvo éxito'), findsNothing);
+    expect(find.text('Confirmar reembolso'), findsOneWidget);
   });
 }

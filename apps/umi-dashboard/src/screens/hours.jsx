@@ -291,7 +291,11 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               <Select
                 aria-label={t`Zona horaria`}
                 className="select"
-                style={{ height: 36, fontSize: 13, padding: '0 32px 0 12px' }}
+                style={{
+                  height: 'var(--control-min)',
+                  fontSize: 13,
+                  padding: '0 32px 0 12px',
+                }}
                 value={tz}
                 onChange={(e) => setTz(e.target.value)}
               >
@@ -369,7 +373,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                       aria-label={t`${dayName} · abre`}
                       className="input"
                       style={{
-                        height: 38,
+                        height: 'var(--control-min)',
                         padding: '0 10px',
                         fontFamily: 'var(--font-mono)',
                         flex: 1,
@@ -386,7 +390,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                       aria-label={t`${dayName} · cierra`}
                       className="input"
                       style={{
-                        height: 38,
+                        height: 'var(--control-min)',
                         padding: '0 10px',
                         fontFamily: 'var(--font-mono)',
                         flex: 1,
@@ -445,6 +449,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
               <input
                 type="range"
                 aria-label={t`Minutos antes del cierre para dejar de aceptar pedidos`}
+                className="range-control range-control-bar"
                 min={0}
                 max={120}
                 step={5}
@@ -452,9 +457,12 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                 onChange={(e) => setCutoff(parseInt(e.target.value))}
                 style={{
                   flex: 1,
-                  height: 6,
                   appearance: 'none',
-                  background: `linear-gradient(90deg, var(--umi-navy) ${(cutoff / 120) * 100}%, var(--line-strong) ${(cutoff / 120) * 100}%)`,
+                  // `backgroundImage`, not the `background` shorthand: the
+                  // shorthand would reset `background-clip` and paint the whole
+                  // 44px box instead of the 6px bar `.range-control-bar` clips
+                  // the fill to.
+                  backgroundImage: `linear-gradient(90deg, var(--umi-navy) ${(cutoff / 120) * 100}%, var(--line-strong) ${(cutoff / 120) * 100}%)`,
                   borderRadius: 3,
                   accentColor: 'var(--umi-navy)',
                 }}
@@ -572,7 +580,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
             <input
               className="input"
               style={{
-                height: 32,
+                height: 'var(--control-min)',
                 fontSize: 13,
                 border: 'none',
                 background: 'transparent',

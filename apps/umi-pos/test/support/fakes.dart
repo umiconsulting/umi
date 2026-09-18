@@ -123,6 +123,7 @@ final class TestApiClient implements ApiClient {
     CancellationToken? cancellation,
     bool idempotent = false,
     bool authRefresh = true,
+    Map<String, String>? extraHeaders,
   }) async => {};
 }
 
@@ -131,6 +132,7 @@ AppCompositionRoot testRoot({
   ContractGateway contracts = const TestContracts(),
   AppConfig? config,
   ReleaseCompatibilityGateway? releaseCompatibility,
+  PlatformAdapters platform = const PlatformAdapters.unsupported(),
 }) {
   config ??= testConfig;
   releaseCompatibility ??= const TestReleaseCompatibility(
@@ -146,10 +148,7 @@ AppCompositionRoot testRoot({
   final credentials = CredentialVault(secureStorage);
   final api = TestApiClient();
   final cartRepository = ApiCartRepository(api);
-  final cart = CartController(
-    repository: cartRepository,
-    telemetry: telemetry,
-  );
+  final cart = CartController(repository: cartRepository, telemetry: telemetry);
   final incomingOrders = IncomingOrdersController(
     repository: cartRepository,
     telemetry: telemetry,
@@ -167,7 +166,7 @@ AppCompositionRoot testRoot({
     secureStorage: secureStorage,
     preferences: TestPreferences(),
     localDatabase: const UnsupportedLocalDatabase(),
-    platform: const PlatformAdapters.unsupported(),
+    platform: platform,
     apiClient: api,
     features: FeatureFlags.bootstrap(FeatureBootstrapMode.localSafeDefaults),
     credentials: credentials,

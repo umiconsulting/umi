@@ -7,6 +7,7 @@ import '../core/contracts/contract_gateway.dart';
 import '../core/feature_flags/feature_flags.dart';
 import '../core/network/api_client.dart';
 import '../core/observability/telemetry.dart';
+import '../core/platform/connectivity_plus_adapter.dart';
 import '../core/platform/platform_adapters.dart';
 import '../core/release/release_compatibility.dart';
 import '../core/security/credential_vault.dart';
@@ -28,6 +29,7 @@ import '../features/checkout/checkout_controller.dart';
 import '../features/checkout/checkout_repository.dart';
 import '../features/customer_value/customer_value_controller.dart';
 import '../features/customer_value/customer_value_repository.dart';
+import '../features/entry/device_channel_socket_client.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_gateway.dart';
 import '../features/entry/pairing_socket_client.dart';
@@ -50,6 +52,9 @@ import '../features/offline/offline_policy.dart';
 import '../features/offline/replay_engine.dart';
 import '../features/sale/sale_lifecycle_controller.dart';
 import '../features/sale/sale_repository.dart';
+import '../features/tables/floor_plan_controller.dart';
+import '../features/tables/table_state_controller.dart';
+import '../features/tables/table_state_repository.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -74,7 +79,10 @@ final class AppCompositionRoot {
     required this.sales,
     this.kitchenStatus,
     this.kitchenBoard,
+    this.floorPlan,
+    this.tableState,
     this.customerValue,
+    this.deviceChannel,
     required this.connectivity,
     required this.offlineJournal,
     this.inventory,
@@ -90,6 +98,7 @@ final class AppCompositionRoot {
       );
       _scheduleHardwareRelay();
     }
+    _observeInterface();
   }
 
   factory AppCompositionRoot.production() {
@@ -115,7 +124,15 @@ final class AppCompositionRoot {
     }
     const preferences = SharedPreferencesStore();
     const localDatabase = UnsupportedLocalDatabase();
-    const platform = PlatformAdapters.unsupported();
+    // The till's own view of the wire is the OS interface watch. Device
+    // identity and app lifecycle stay unsupported until something needs them
+    // (§8K step 1); an adapter that cannot watch leaves connectivity exactly as
+    // it was, driven by the requests the till is making anyway.
+    const platform = PlatformAdapters(
+      connectivity: ConnectivityPlusConnectivity(),
+      deviceIdentity: UnsupportedDeviceIdentity(),
+      lifecycle: UnsupportedAppLifecycle(),
+    );
     final apiClient = BoundedApiClient(
       config: config,
       telemetry: telemetry,
@@ -165,6 +182,17 @@ final class AppCompositionRoot {
     final apiBaseUri = config.apiBaseUri;
     final pairingSocket = config.realtimeEnrollmentEnabled && apiBaseUri != null
         ? SocketIoPairingClient(baseUri: apiBaseUri)
+        : null;
+    // The till's own nudge — Phase 3 step 3 — under the SAME opt-in as the pairing
+    // one, because it is the same capability: a deployment whose socket path
+    // works. It is inert without a device credential (the handshake is the
+    // credential the REST calls carry) and the poll stays the delivery path, so
+    // switching this off restores the previous behaviour exactly.
+    final deviceChannel = config.realtimeEnrollmentEnabled && apiBaseUri != null
+        ? SocketIoDeviceChannelClient(
+            baseUri: apiBaseUri,
+            deviceIdentity: credentials.deviceIdentity,
+          )
         : null;
     final entry = EntryController(
       gateway: ApiEntryGateway(
@@ -274,13 +302,24 @@ final class AppCompositionRoot {
         cart: cart,
         telemetry: telemetry,
       ),
+      floorPlan: FloorPlanController(ApiFloorPlanRepository(apiClient)),
+      tableState: TableStateController(ApiTableStateRepository(apiClient)),
       kitchenStatus: ApiKitchenStatusRepository(apiClient),
       kitchenBoard: KitchenBoardController(
         ApiKitchenBoardRepository(apiClient),
+        // The board reads on the operator session and writes on the till's own
+        // POS command route, so the cook can bump a dish without the screen it
+        // was read from going away (§8H step 3). That route authenticates with
+        // the session the ApiClient already carries — no separate header.
+        commands: ApiKitchenStatusRepository(apiClient),
+        // The board is the busiest API client on a kitchen till, so its own
+        // traffic is what keeps the till's connectivity state honest.
+        connectivity: connectivity,
       ),
       customerValue: CustomerValueController(
         ApiCustomerValueRepository(apiClient),
       ),
+      deviceChannel: deviceChannel,
       checkout: CheckoutController(
         repository: ApiCheckoutRepository(apiClient),
         offlineCheckout: offlineCheckout,
@@ -370,7 +409,10 @@ final class AppCompositionRoot {
   final SaleLifecycleController sales;
   final KitchenStatusRepository? kitchenStatus;
   final KitchenBoardController? kitchenBoard;
+  final FloorPlanController? floorPlan;
+  final TableStateController? tableState;
   final CustomerValueController? customerValue;
+  final DeviceChannelSocketClient? deviceChannel;
   final ConnectivityController connectivity;
   final EncryptedOfflineJournal offlineJournal;
   final InventoryController? inventory;
@@ -382,6 +424,76 @@ final class AppCompositionRoot {
   final DesktopUpdater updater;
   Timer? _hardwareRelayTimer;
   bool _hardwareRelayBusy = false;
+  // Long-lived by design: the root holds this watch for its whole life and
+  // cancels it in `dispose`, which is where every other teardown for the root
+  // lives. The lint only reads one method, so it cannot follow the handle.
+  // ignore: cancel_subscriptions
+  StreamSubscription<bool>? _interfaceWatch;
+  bool _disposed = false;
+
+  /// Feed the controller from the operating system's interface state.
+  ///
+  /// The OS source is earlier than the request path: a dropped interface is a
+  /// fact here at once, where requests only report it once they have failed.
+  /// The direction of each signal is decided in the controller, not here — a
+  /// gone interface goes straight to offline, a returning interface only to
+  /// `recovering`, because an interface being up is not the API answering.
+  void _observeInterface() {
+    // Idempotent: a second call replaces the watch rather than adding one.
+    _cancelInterfaceWatch();
+    final watch = platform.connectivity.watch();
+    if (watch != null) {
+      _interfaceWatch = watch.listen(
+        _interfaceChanged,
+        // An adapter that throws on its own stream is a broken source, not a
+        // down interface. Take no position rather than guess, and keep the
+        // subscription so a later transition still arrives.
+        onError: (Object _) {},
+      );
+    }
+    unawaited(_readInterfaceOnce());
+  }
+
+  /// Detach the interface watch, if one is attached.
+  ///
+  /// The field is cleared *before* the cancel is awaited, and the handle is
+  /// taken to a local first. An `await` between reading the field and clearing
+  /// it would let this microtask land after the next `listen` and null out the
+  /// subscription that replaced it, which leaks the watch this exists to stop.
+  void _cancelInterfaceWatch() {
+    final previous = _interfaceWatch;
+    _interfaceWatch = null;
+    if (previous != null) unawaited(previous.cancel());
+  }
+
+  void _interfaceChanged(bool present) {
+    if (_disposed) return;
+    if (present) {
+      connectivity.networkUp();
+    } else {
+      connectivity.networkDown();
+    }
+  }
+
+  /// The one-shot boot read ([ConnectivityAdapter.isOnline]).
+  ///
+  /// Only the negative answer is authoritative: "there is no interface" is a
+  /// fact a platform can assert, while "an interface is up" says nothing at all
+  /// about the API. So a positive read changes no state — it would be the exact
+  /// guess this design exists to avoid — and it is never awaited on the boot
+  /// path, because the till must start whether or not the watcher answers.
+  Future<void> _readInterfaceOnce() async {
+    final CapabilityResult<bool> read;
+    try {
+      read = await platform.connectivity.isOnline();
+    } on Object {
+      return;
+    }
+    if (_disposed) return;
+    if (read.status == CapabilityStatus.ready && read.value == false) {
+      connectivity.networkDown();
+    }
+  }
 
   void _scheduleHardwareRelay() {
     if (_hardwareRelayBusy) return;
@@ -425,6 +537,8 @@ final class AppCompositionRoot {
   }
 
   void dispose() {
+    _disposed = true;
+    _cancelInterfaceWatch();
     _hardwareRelayTimer?.cancel();
     entry.removeListener(_scheduleHardwareRelay);
     controller.dispose();
@@ -436,7 +550,11 @@ final class AppCompositionRoot {
     checkout.dispose();
     sales.dispose();
     kitchenBoard?.dispose();
+    floorPlan?.dispose();
+    tableState?.dispose();
     customerValue?.dispose();
+    final deviceChannelClose = deviceChannel?.close();
+    if (deviceChannelClose != null) unawaited(deviceChannelClose);
     connectivity.dispose();
     offlineRecovery?.dispose();
     inventory?.dispose();

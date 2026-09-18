@@ -443,22 +443,42 @@ table th {
    Chromium, so the white-in-dark-mode highlight lives on the custom <Select>
    listbox instead (see .ui-select-option rules). */
 
+/* The rail's collapse handle. The visible circle stays 24px — it is a quiet
+   discovery affordance, not a banner — but the BUTTON around it is a pointer
+   target like every other control, so the box takes the floor and ::before draws
+   the circle inside it. The geometry below puts the box's centre exactly where
+   the 24px button's centre sat (40px down, on the rail edge), so nothing in the
+   rail moves. The sweep runs below 1080px, where this control is display:none,
+   which is why it never showed up in the inventory. */
 .collapse-btn {
   position: absolute;
-  top: 28px;
-  right: -12px;
-  width: 24px;
-  height: 24px;
+  top: calc(40px - (var(--control-min) - 24px) / 2);
+  right: calc(var(--control-min) / -2);
+  width: var(--control-min);
+  height: var(--control-min);
+  padding: 0;
   border-radius: var(--r-pill);
-  background: var(--surface);
+  background: transparent;
   color: var(--ink-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(19, 31, 68, 0.18);
-  border: 1px solid var(--line);
   z-index: 10;
   transition: transform 0.18s var(--ease);
+}
+.collapse-btn::before {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 10px rgba(19, 31, 68, 0.18);
+}
+.collapse-btn > svg {
+  position: relative;
+  z-index: 1;
 }
 .collapse-btn:hover {
   transform: scale(1.06);
@@ -526,6 +546,10 @@ table th {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* Text-sized, but still a target: the offline state word is also the way to
+     retry, so the box meets the same pointer-target floor as every button. The
+     visible word is unchanged — only the transparent box around it grows. */
+  min-height: var(--control-min);
   cursor: pointer;
   text-underline-offset: 3px;
   text-decoration: underline;
@@ -541,7 +565,9 @@ table th {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
+  /* One measurement everywhere: every button clears the pointer-target floor
+     (--control-min = 44px, plan 5.2 "Minimum control 44 x 44 pt"). */
+  height: var(--control-min);
   padding: 0 16px;
   border-radius: 12px;
   font-weight: 550;
@@ -589,7 +615,10 @@ table th {
   font-size: 14.5px;
 }
 .btn-sm {
-  height: 32px;
+  /* Small means smaller type and padding, never a smaller target: the height is
+     the same floor as every other button. Filter rows and topbar chips read as
+     the dense variant, but a thumb still lands on them. */
+  height: var(--control-min);
   padding: 0 12px;
   font-size: 12.5px;
   border-radius: 10px;
@@ -598,7 +627,7 @@ table th {
    themes because canvas-2 tracks the theme, unlike the fixed navy tint that
    .btn-ghost:hover uses. */
 .theme-toggle {
-  width: 32px;
+  width: var(--control-min);
   padding: 0;
   justify-content: center;
   color: var(--ink-2);
@@ -611,11 +640,15 @@ table th {
    initials monogram and the operator's name read as ONE unit: a single rounded
    pill, avatar tight on the left, name beside it. It is the only accented member
    of the row (the blue monogram), so it leads; the theme, language and logout
-   controls that follow are muted ghosts. Height 32px keeps it level with them. */
+   controls that follow are muted ghosts. One height for the row — the pointer
+   target floor — keeps the pill level with them. */
 .profile-toggle {
   width: auto;
-  height: 32px;
-  padding: 0 12px 0 3px;
+  height: var(--control-min);
+  /* The 6px lead-in is the vertical inset of the 32px avatar inside the 44px
+     pill, so the monogram sits the same distance from the top, bottom and left
+     edge and the pill still reads as one shape. */
+  padding: 0 12px 0 6px;
   gap: 8px;
   justify-content: flex-start;
   border-radius: var(--r-pill);
@@ -635,8 +668,8 @@ table th {
   letter-spacing: -0.005em;
 }
 .profile-toggle-avatar {
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-pill);
   background: linear-gradient(135deg, var(--umi-blue), var(--umi-blue-soft));
   color: var(--umi-navy-ink);
@@ -668,12 +701,13 @@ table th {
   transform: rotate(180deg);
 }
 /* Topbar selects — language and branch. Both join the action cluster as ghost
-   controls: no resting border or fill, 32px tall like the theme and profile
-   buttons, hover reveals the same theme-aware tint. The `.select.` prefix raises
-   specificity over the base `.select` (height:44px, bordered), which otherwise
-   wins on source order and made these the odd, tall, boxed members of the row. */
+   controls: no resting border or fill, the pointer-target floor tall like the
+   theme and profile buttons, hover reveals the same theme-aware tint. The
+   `.select.` prefix keeps the ghost treatment (transparent border and fill) over
+   the base `.select` (bordered), which otherwise wins on source order and made
+   these the odd, boxed members of the row. */
 .select.topbar-select {
-  height: 32px;
+  height: var(--control-min);
   width: auto;
   padding: 0 8px;
   border-radius: 10px;
@@ -687,8 +721,10 @@ table th {
   color: var(--ink-1);
 }
 .btn-icon {
-  width: 36px;
-  height: 36px;
+  /* Square icon-only affordance — the row "view detail", the drawer trigger and
+     every dialog close. Both axes take the pointer-target floor. */
+  width: var(--control-min);
+  height: var(--control-min);
   padding: 0;
   border-radius: 10px;
   background: var(--surface);
@@ -702,12 +738,12 @@ table th {
   background: var(--canvas-2);
   color: var(--ink-1);
 }
-/* Logout inside the action cluster — same 32px ghost treatment as the theme
-   toggle, so the row reads as one set of controls instead of a bordered box
-   trailing two borderless icons. */
+/* Icon buttons inside the action cluster — same ghost treatment and same size as
+   the theme toggle, so the row reads as one set of controls instead of a bordered
+   box trailing two borderless icons. */
 .top-actions .btn-icon {
-  width: 32px;
-  height: 32px;
+  width: var(--control-min);
+  height: var(--control-min);
   background: transparent;
   border-color: transparent;
   color: var(--ink-2);
@@ -1276,6 +1312,21 @@ table th {
   height: 52px;
   border-radius: 14px;
 }
+/* A slider is a control like any other: the whole box takes the pointer-target
+   floor (--control-min = 44px, plan §5.2) so a thumb can land anywhere in the
+   band, not only on a 6px hairline. Native range inputs centre their own track
+   and thumb inside the taller box, so the look is unchanged. */
+.range-control {
+  height: var(--control-min);
+}
+/* The order cut-off slider paints its own 6px bar (appearance: none plus an
+   inline gradient), which would otherwise stretch to fill the 44px box. The
+   transparent padding and content-box clip keep the bar exactly as tall as it
+   was drawn while the target around it grows. */
+.range-control-bar {
+  padding: 19px 0;
+  background-clip: content-box;
+}
 .input:disabled {
   background: var(--canvas-2);
   color: var(--ink-4);
@@ -1551,17 +1602,38 @@ textarea.input {
   padding-right: 6px;
 }
 .chip .x {
-  width: 18px;
-  height: 18px;
+  /* The glyph and its dot stay small; the target does not. The × draws as the
+     18px icon it always was, while the button box takes the full pointer-target
+     floor (--control-min = 44px, plan §5.2) so a thumb can land on it. The
+     negative margin is half the difference, which keeps the button's layout
+     footprint at the 18px the chip was drawn around — the chip is a label, not
+     a target, and it should not grow a 44px-tall row around a 12px glyph. */
+  position: relative;
+  width: var(--control-min);
+  height: var(--control-min);
+  margin: calc((18px - var(--control-min)) / 2);
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--ink-3);
 }
+/* The hover tint is painted by a dot the size of the glyph, not by the 44px
+   button — otherwise the feedback for a 12px × would be a grey circle wider
+   than the chip that holds it. */
+.chip .x::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transition: background 0.16s var(--ease);
+}
 .chip .x:hover {
-  background: rgba(0, 0, 0, 0.06);
   color: var(--ink-1);
+}
+.chip .x:hover::before {
+  background: rgba(0, 0, 0, 0.06);
 }
 .chip.read {
   background: rgba(34, 57, 121, 0.08);
@@ -1586,9 +1658,17 @@ textarea.input {
 
 /* Day pill */
 .day-pill {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
+  /* Two jobs, one box: the weekday picker (Mon, Tue…) and the assistant tone
+     presets (Casual, Formal, Amigable). Both wrap onto a second line when the
+     card is narrow, so the width comes from the label and only the height comes
+     from the floor. The old fixed 38px circle clipped the longer preset labels —
+     "Amigable" ran into the pill beside it — and left the target under the
+     pointer floor (--control-min = 44px, plan §5.2). The pill radius keeps the
+     round ones round and stops the wide ones turning into ellipses. */
+  min-width: var(--control-min);
+  min-height: var(--control-min);
+  padding: 0 12px;
+  border-radius: var(--r-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1979,22 +2059,39 @@ textarea.input {
   color: #222;
 }
 
-/* Color picker swatch */
+/* Color picker swatch — the chip stays small, the target does not.
+   The row shows nine colours across a half-width card; painting the button
+   44px of colour would wrap the row onto a second line and coarsen the palette.
+   So the button box takes the full pointer-target floor (--control-min = 44px,
+   plan §5.2) and the 28px colour chip is painted by ::before, inset 8px inside
+   it — the same chip the row showed before, with eight more pixels of thumb on
+   every side. The caller passes the colour as `--swatch`. */
 .swatch {
-  width: 44px;
-  height: 44px;
+  position: relative;
+  width: var(--control-min);
+  height: var(--control-min);
+  padding: 0;
+  border: 0;
+  background: none;
   border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.16s var(--ease);
+}
+.swatch::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--swatch, transparent);
   border: 2px solid white;
   box-shadow: 0 0 0 1px var(--line);
-  cursor: pointer;
-  transition:
-    transform 0.16s var(--ease),
-    box-shadow 0.16s var(--ease);
+  transition: box-shadow 0.16s var(--ease);
 }
 .swatch:hover {
   transform: scale(1.06);
 }
-.swatch.on {
+.swatch.on::before {
   box-shadow: 0 0 0 2px var(--umi-navy);
 }
 
@@ -2026,6 +2123,11 @@ input[type='color']::-webkit-color-swatch {
   gap: 2px;
 }
 .seg button {
+  /* The strip is a row of targets, so each one clears the pointer-target floor
+     on both axes (--control-min = 44px, plan §5.2). The type and padding are
+     unchanged: only the box that a thumb has to land on grew. */
+  min-width: var(--control-min);
+  min-height: var(--control-min);
   padding: 7px 14px;
   border-radius: 9px;
   font-size: 13px;
@@ -2631,7 +2733,13 @@ time,
   align-items: center;
   flex-wrap: wrap;
   gap: 0 14px;
-  padding: 7px 0;
+  /* The band itself carries the pointer-target floor: the status word doubles as
+     the retry control when the console is offline, and the row must not change
+     height between the two states. `padding: 0` above and below is what the
+     height came from before, so the caption sits a little further off its own
+     hairlines — same band, one height, both states. */
+  min-height: var(--control-min);
+  padding: 0;
   margin-top: 12px;
   border-top: 1px solid var(--ink-1);
   border-bottom: 1px solid var(--line);
@@ -2871,7 +2979,7 @@ time,
 }
 .customer-search .input {
   width: 100%;
-  height: 40px;
+  height: var(--control-min);
   padding-left: 36px;
   font-size: 13px;
 }
@@ -3711,8 +3819,10 @@ time,
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
+  /* The eye glyph stays 16px; the button takes the pointer-target floor
+     (--control-min = 44px) and sits flush inside the 44px password field. */
+  width: var(--control-min);
+  height: var(--control-min);
   border-radius: 9px;
   display: flex;
   align-items: center;
@@ -3792,6 +3902,11 @@ time,
   padding: 0;
   text-underline-offset: 3px;
   transition: color 0.16s var(--ease);
+  /* Text-sized trigger, full-height target: the word is 18px of paint, the
+     button under it is the pointer-target floor (--control-min = 44px). */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-min);
 }
 .login-link:hover {
   color: var(--lg-accent);
@@ -3928,8 +4043,20 @@ time,
 .no-value {
   color: var(--ink-3);
 }
-.no-value::after {
-  content: '—';
+/* Screen-reader-only text: present for assistive technology, absent from the
+   layout. Used where an element's visible content is a symbol (the .no-value em
+   dash) and a generic span therefore cannot carry an aria-label. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ------------------------------------------------------------
@@ -4000,12 +4127,13 @@ time,
     background: rgba(19, 31, 68, 0.34);
   }
   /* The drawer trigger now sits OUTSIDE .top-actions, so it does not inherit the
-     cluster's 32px ghost treatment. State it here: same size and weight as the
-     controls beside it, so the topbar still reads as one row of controls. */
+     cluster's ghost treatment. State it here: same size and weight as the controls
+     beside it — the pointer-target floor on both axes — so the topbar still reads
+     as one row of controls. */
   .nav-toggle {
     display: inline-flex;
-    width: 32px;
-    height: 32px;
+    width: var(--control-min);
+    height: var(--control-min);
     padding: 0;
     background: transparent;
     border-color: transparent;
@@ -4121,6 +4249,9 @@ time,
   border-radius: 12px;
 }
 .hub-tab {
+  /* Same floor as every other control: the second-tier nav is still a row of
+     things a finger has to land on (--control-min = 44px, plan §5.2). */
+  min-height: var(--control-min);
   border: 0;
   background: transparent;
   color: var(--ink-3);
@@ -4278,8 +4409,11 @@ time,
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--umi-blue);
-  border: 1px solid var(--umi-blue);
+  /* --umi-blue is a fill, not an ink: at 10px on the card it measured 3.1:1
+     (axe: `color-contrast`, /profile). The navy reads as the same "this one"
+     blue and clears the bar by a wide margin. */
+  color: var(--umi-navy);
+  border: 1px solid var(--umi-navy);
   border-radius: var(--r-pill);
   padding: 1px 7px;
 }

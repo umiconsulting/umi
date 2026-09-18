@@ -164,6 +164,25 @@ void main() {
       expect(gateway.acknowledgements, 0);
     });
 
+    test('the realtime watch is released when the wait ends', () async {
+      final (gateway, _, controller) = await waiting();
+      expect(
+        gateway.nudges.hasListener,
+        isTrue,
+        reason: 'the wait watches for a nudge while it is pending',
+      );
+
+      await controller.cancelPairing();
+
+      expect(
+        gateway.nudges.hasListener,
+        isFalse,
+        reason:
+            'a watch that outlives the pairing holds a listener on the '
+            'realtime channel for the rest of the shift',
+      );
+    });
+
     test('a failing nudge channel leaves the poll loop in charge', () async {
       final storage = MemorySecureStorage();
       storage.values['device.installation_id'] = _installationId;
@@ -413,6 +432,38 @@ void main() {
       expect(await vault.refreshToken(), 'refresh2');
     },
   );
+
+  test('a restart that will restore never publishes the keypad first', () async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    await vault.saveDevice(
+      id: _deviceId,
+      publicId: _publicId,
+      credential: _secret,
+      credentialVersion: 1,
+      state: 'active',
+      merchantId: _merchantId,
+      locationId: _locationId,
+    );
+    await vault.saveTokens('old-access', 'old-refresh');
+    final gateway = _PairingGateway();
+    final controller = _controller(gateway, vault);
+    final seen = <EntryPhase>[];
+    controller.addListener(() => seen.add(controller.state.phase));
+
+    await controller.initialize();
+
+    // The restore is the outcome, and the keypad must not have been on the way
+    // to it. A cold till that draws a live keypad while it is still deciding
+    // takes the PIN out of the operator's hands: the digits are discarded with
+    // no rejection and the till lands in the previous operator's catalog. Two of
+    // four digits were measured landing in exactly that window on the real
+    // client, which is what this asserts against.
+    expect(controller.state.phase, EntryPhase.ready);
+    expect(seen, contains(EntryPhase.restoringSession));
+    expect(seen, isNot(contains(EntryPhase.pinRequired)));
+  });
 
   test('restart with a failed refresh falls back to the PIN', () async {
     final storage = MemorySecureStorage();

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 // The zero-dep entry, never the package root: the root re-exports the zod schemas,
-// and the Vercel build of this app has no zod (see packages/contract/src/index.ts).
+// which the shell's eager bundle must not carry — the floor-plan screen is the one
+// lazy route that does (see packages/contract/src/index.ts).
 import {
   DASHBOARD_EVENT_DEVICES_CHANGED,
   DASHBOARD_REALTIME_NAMESPACE,

@@ -74,6 +74,7 @@ final class CartController extends ChangeNotifier {
     List<Map<String, Object?>> modifiers = const [],
     int quantity = 1,
     String? note,
+    int courseNumber = 1,
   }) async {
     final cart = _state.cart;
     if (cart == null ||
@@ -93,6 +94,7 @@ final class CartController extends ChangeNotifier {
           variantId: variantId,
           modifierSelections: modifiers,
           quantity: quantity,
+          courseNumber: courseNumber,
           note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
           expectedVersion: cart.version,
           idempotencyKey: _uuid(),
@@ -127,6 +129,10 @@ final class CartController extends ChangeNotifier {
               )
               .toList(),
           quantity: quantity.clamp(1, 999).toInt(),
+          // The course is not what this action is about, so it rides along
+          // unchanged: the line is rewritten whole, and a missing course here
+          // would silently drop a dessert back to course 1.
+          courseNumber: item.courseNumber,
           note: item.note,
           expectedVersion: cart.version,
           idempotencyKey: _uuid(),
@@ -179,6 +185,7 @@ final class CartController extends ChangeNotifier {
     required List<Map<String, Object?>> modifiers,
     required int quantity,
     required String? note,
+    required int courseNumber,
   }) async {
     final cart = _state.cart;
     if (cart == null) return;
@@ -194,6 +201,7 @@ final class CartController extends ChangeNotifier {
           variantId: variantId,
           modifierSelections: modifiers,
           quantity: quantity.clamp(1, 999).toInt(),
+          courseNumber: courseNumber,
           note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
           expectedVersion: cart.version,
           idempotencyKey: _uuid(),

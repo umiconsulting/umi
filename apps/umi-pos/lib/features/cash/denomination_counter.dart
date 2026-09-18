@@ -107,80 +107,116 @@ class _DenominationCounterState extends State<DenominationCounter> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final denomination in widget.denominations)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
+    // Every denomination in the drawer, laid out in two columns whenever there
+    // is room for them.
+    //
+    // One column is taller than the counter terminal it is filled in on, so the
+    // count dialog used to scroll: the small coins and the running total sat
+    // below the fold of a screen whose entire job is to be read top to bottom
+    // and added up. Side by side, a café's twelve denominations and the total
+    // are all on screen at once, and counting never moves the list under the
+    // hand that is entering it.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = UmiSpacing.md;
+        final columns = constraints.maxWidth >= 620 ? 2 : 1;
+        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Wrap(
+              spacing: gap,
               children: [
-                SizedBox(
-                  width: 96,
-                  child: Text(
-                    _money(denomination),
-                    style: theme.textTheme.bodyLarge,
+                for (final denomination in widget.denominations)
+                  SizedBox(
+                    width: width,
+                    child: _denominationRow(context, l, theme, denomination),
                   ),
-                ),
-                IconButton(
-                  tooltip: l.decreaseQuantity,
-                  onPressed: (_counts[denomination] ?? 0) > 0
-                      ? () =>
-                            _set(denomination, (_counts[denomination] ?? 0) - 1)
-                      : null,
-                  icon: const Icon(Icons.remove_circle_outline),
-                ),
-                SizedBox(
-                  width: 36,
-                  child: Text(
-                    '${_counts[denomination] ?? 0}',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: l.increaseQuantity,
-                  onPressed: () =>
-                      _set(denomination, (_counts[denomination] ?? 0) + 1),
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-                Expanded(
-                  child: Text(
-                    (_counts[denomination] ?? 0) > 0
-                        ? _money(denomination * (_counts[denomination] ?? 0))
-                        : '',
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.outline,
-                    ),
-                  ),
-                ),
               ],
             ),
-          ),
-        const Divider(),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: UmiSpacing.xs),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                Localizations.localeOf(context).languageCode == 'es'
-                    ? 'Total contado'
-                    : 'Counted total',
-                style: theme.textTheme.titleMedium,
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: UmiSpacing.xs),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    Localizations.localeOf(context).languageCode == 'es'
+                        ? 'Total contado'
+                        : 'Counted total',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Text(
+                    _money(_total),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                _money(_total),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _denominationRow(
+    BuildContext context,
+    AppLocalizations l,
+    ThemeData theme,
+    int denomination,
+  ) {
+    final quantity = _counts[denomination] ?? 0;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            // Wide enough for the longest label a policy can produce
+            // ("MXN 1000.00", the app's own format) on one line. It used to
+            // wrap, so the top two rows read "MXN" above "1000.00" and the
+            // column looked broken.
+            width: 118,
+            child: Text(
+              _money(denomination),
+              style: theme.textTheme.bodyLarge,
+              maxLines: 1,
+              softWrap: false,
+            ),
           ),
-        ),
-      ],
+          IconButton(
+            tooltip: l.decreaseQuantity,
+            onPressed: quantity > 0
+                ? () => _set(denomination, quantity - 1)
+                : null,
+            icon: const Icon(Icons.remove_circle_outline),
+          ),
+          SizedBox(
+            width: 32,
+            child: Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
+          IconButton(
+            tooltip: l.increaseQuantity,
+            onPressed: () => _set(denomination, quantity + 1),
+            icon: const Icon(Icons.add_circle_outline),
+          ),
+          Expanded(
+            child: Text(
+              quantity > 0 ? _money(denomination * quantity) : '',
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -568,13 +568,24 @@ final class _SaleCenterState extends State<_SaleCenter> {
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+      // The operator asked a question and gets an answer either way, in the
+      // same dialog the successful path uses. A silent catch would leave the
+      // press doing visibly nothing.
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(spanish ? 'Estado de cocina' : 'Kitchen status'),
           content: Text(
             spanish
                 ? 'No se pudo obtener el estado de cocina.'
                 : 'Kitchen status is not available.',
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(spanish ? 'Cerrar' : 'Close'),
+            ),
+          ],
         ),
       );
     }

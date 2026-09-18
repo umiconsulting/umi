@@ -1,6 +1,13 @@
 // Single source of the entitlement vocabulary — @umi/contract/entitlements
-// (zero-dep, so no zod enters this browser bundle; resolved via the Vite source
-// alias). Re-exported to keep this module's public surface unchanged.
+// (zero-dep, so importing it puts no validator in the shell's eager bundle;
+// resolved via the Vite source alias). Re-exported to keep this module's public
+// surface unchanged.
+//
+// The console is no longer zod-free everywhere: `@umi/contract/floor-plan`
+// is zod-aware and the floor-plan editor imports it. That screen is the one route
+// loaded with `lazy()` in `app.jsx`, so the validator lands in its own chunk and
+// not in the shared one — the reason the entry below stays on the zero-dep
+// `entitlements` entry, and the reason the laziness must not be removed.
 import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements';
 import { msg } from '@lingui/core/macro';
 export { PRODUCT_ACTIVE_STATUSES };
@@ -10,6 +17,15 @@ export { PRODUCT_ACTIVE_STATUSES };
 // `i18n._(module.label)` (Sidebar, Topbar, GuardedScreen).
 
 export const MODULES = {
+  'floor-plan': {
+    id: 'floor-plan',
+    label: msg`Plano de mesas`,
+    icon: 'Layout',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    permissions: ['merchant.manage'],
+    locationScoped: true,
+  },
   overview: {
     id: 'overview',
     label: msg`Resumen`,
@@ -174,6 +190,23 @@ export const MODULES = {
     permissions: ['catalog.read', 'inventory.read'],
     locationScoped: true,
   },
+  'inventory-costing': {
+    id: 'inventory-costing',
+    label: msg`Costos y márgenes`,
+    // TrendUp, beside Reportes' own use of it: the two screens answer the same shape of
+    // question (what did the business keep) from opposite ends — a costing screen is
+    // about the cost half of that.
+    icon: 'TrendUp',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    // The four reads behind this screen are gated by `merchant.manage`, not by an
+    // `inventory.*` key: reading what a plate costs and what a day made is a manager's
+    // question about money, and an `inventory.*` key is carried only by POS operator
+    // sessions, which would make the screen unreachable from the console. The module
+    // carries exactly the permission its routes enforce.
+    permissions: ['merchant.manage'],
+    locationScoped: true,
+  },
   diagnostics: {
     id: 'diagnostics',
     label: msg`Diagnóstico`,
@@ -225,6 +258,8 @@ export const MODULE_ORDER = [
   'loyalty-value',
   // BUSINESS — the assets and people behind the shop.
   'catalog-inventory',
+  'inventory-costing',
+  'floor-plan',
   'devices',
   'staff',
   // CONFIGURATION — set up the business.

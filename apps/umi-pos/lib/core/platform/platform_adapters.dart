@@ -13,7 +13,18 @@ final class CapabilityResult<T> {
 }
 
 abstract interface class ConnectivityAdapter {
+  /// One-shot read of the interface state, for boot and for any caller that
+  /// cannot hold a stream open.
   Future<CapabilityResult<bool>> isOnline();
+
+  /// Interface presence as the platform reports it, or `null` when this
+  /// platform has no watcher to offer.
+  ///
+  /// `true` means an interface is up, `false` means every interface is gone.
+  /// `null` is the honest answer for a platform without an interface watcher:
+  /// the till then learns about the wire the way it always has, from its own
+  /// requests. An adapter is never made to fake events it cannot observe.
+  Stream<bool>? watch();
 }
 
 abstract interface class DeviceIdentityAdapter {
@@ -29,6 +40,8 @@ final class UnsupportedConnectivity implements ConnectivityAdapter {
   @override
   Future<CapabilityResult<bool>> isOnline() async =>
       const CapabilityResult.unavailable();
+  @override
+  Stream<bool>? watch() => null;
 }
 
 final class UnsupportedDeviceIdentity implements DeviceIdentityAdapter {

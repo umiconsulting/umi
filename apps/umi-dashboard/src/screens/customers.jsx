@@ -5,6 +5,7 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
 import { XSep } from '@/shell.jsx';
+import { Segmented } from '@/components/segmented.jsx';
 import {
   creditLoyaltySeals,
   loyaltyScan,
@@ -172,17 +173,13 @@ function CustomersList({ selectedId }) {
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <div className="seg customer-filter" role="tablist" aria-label={t`Filtros de clientes`}>
-          {FILTERS.map((item) => (
-            <button
-              key={item.id}
-              className={filter === item.id ? 'on' : ''}
-              onClick={() => changeFilter(item.id)}
-            >
-              {text(i18n, item.label)}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          className="customer-filter"
+          label={t`Filtros de clientes`}
+          value={filter}
+          onChange={changeFilter}
+          options={FILTERS.map((item) => ({ id: item.id, label: text(i18n, item.label) }))}
+        />
       </div>
 
       <div className="customer-list-head">
@@ -1188,6 +1185,9 @@ function CustomerProfile({ customerId }) {
         {TABS.map((item) => (
           <button
             key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === item.id}
             className={activeTab === item.id ? 'on' : ''}
             onClick={() => setTab(item.id)}
           >

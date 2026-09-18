@@ -88,21 +88,33 @@ msgid "Sesión expirada"
 msgstr "Session expired"
 
 #: src/data.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "El servicio no está disponible. Intenta de nuevo después."
+msgstr "The service is unavailable. Try again later."
+
+#: src/data.jsx
 msgid "No hay un negocio seleccionado"
 msgstr "No business selected"
 
 #: src/data.jsx
 #: src/screens/device-utils.js
+#: src/screens/devices.jsx
 msgid "nunca"
 msgstr "never"
 
 #: src/data.jsx
 #: src/screens/device-utils.js
+#: src/screens/devices.jsx
 msgid "hace un momento"
 msgstr "just now"
 
 #. placeholder {0}: Math.floor(ms / 1000)
 #: src/data.jsx
+#: src/screens/devices.jsx
 msgid "hace {0} s"
 msgstr "{0} s ago"
 
@@ -110,6 +122,7 @@ msgstr "{0} s ago"
 #. placeholder {0}: Math.floor(ms / LAST_SEEN_MINUTE)
 #: src/data.jsx
 #: src/screens/device-utils.js
+#: src/screens/devices.jsx
 #: src/screens/members.jsx
 msgid "hace {0} min"
 msgstr "{0} min ago"
@@ -118,9 +131,14 @@ msgstr "{0} min ago"
 #. placeholder {0}: Math.floor(ms / LAST_SEEN_HOUR)
 #: src/data.jsx
 #: src/screens/device-utils.js
+#: src/screens/devices.jsx
 #: src/screens/members.jsx
 msgid "hace {0} h"
 msgstr "{0} h ago"
+
+#: src/data.jsx
+msgid "No se pudo leer el costo"
+msgstr "Could not read the cost"
 
 #: src/lib/auth.jsx
 msgid "Credenciales incorrectas"
@@ -134,6 +152,12 @@ msgstr "The server did not return a session. Try again."
 #: src/screens/login.jsx
 msgid "Código incorrecto o vencido."
 msgstr "Incorrect or expired code."
+
+#: src/lib/module-registry.js
+#: src/screens/floor-plan.jsx
+#: src/shell.jsx
+msgid "Plano de mesas"
+msgstr "Floor plan"
 
 #: src/lib/module-registry.js
 #: src/screens/customers.jsx
@@ -237,6 +261,12 @@ msgid "Catálogo e inventario"
 msgstr "Catalog and inventory"
 
 #: src/lib/module-registry.js
+#: src/screens/inventory-costing.jsx
+#: src/shell.jsx
+msgid "Costos y márgenes"
+msgstr "Costs and margins"
+
+#: src/lib/module-registry.js
 #: src/screens/diagnostics.jsx
 #: src/screens/operations-workspace.jsx
 #: src/shell.jsx
@@ -278,10 +308,13 @@ msgstr "Open café"
 #: src/screens/customers.jsx
 #: src/screens/devices.jsx
 #: src/screens/gift-cards.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
 #: src/screens/recibos.jsx
+#: src/screens/recipe-workspace.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Cerrar"
@@ -350,13 +383,17 @@ msgstr "Password · 8 characters or more"
 #: src/screens/devices.jsx
 #: src/screens/gift-cards.jsx
 #: src/screens/hours.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
 #: src/screens/members.jsx
+#: src/screens/recipe-workspace.jsx
 #: src/screens/settings.jsx
 #: src/screens/staff.jsx
 msgid "Cancelar"
 msgstr "Cancel"
 
 #: src/screens/cafes.jsx
+#: src/screens/devices.jsx
 msgid "Abriendo…"
 msgstr "Opening…"
 
@@ -617,29 +654,22 @@ msgid "Categorías"
 msgstr "Categories"
 
 #: src/screens/catalog-inventory.jsx
+#: src/screens/inventory-workspace.jsx
 #: src/screens/operations-workspace.jsx
 msgid "Inventario"
 msgstr "Inventory"
 
-#: src/screens/categories-workspace.jsx
-#~ msgid "color propio"
-#~ msgstr "custom color"
+#: src/screens/catalog-inventory.jsx
+msgid "Recetas"
+msgstr "Recipes"
 
-#: src/screens/categories-workspace.jsx
-#~ msgid "color automático"
-#~ msgstr "automatic color"
+#: src/screens/catalog-inventory.jsx
+msgid "Preparación"
+msgstr "Preparation"
 
-#: src/screens/categories-workspace.jsx
-#~ msgid "Usar el color automático"
-#~ msgstr "Use the automatic color"
-
-#: src/screens/categories-workspace.jsx
-#~ msgid "Automático"
-#~ msgstr "Automatic"
-
-#: src/screens/categories-workspace.jsx
-#~ msgid "El color se ve en el punto de venta detrás de los productos sin foto, para ubicarlos por categoría."
-#~ msgstr "The color shows in the POS behind products without a photo, to find them by category."
+#: src/screens/catalog-inventory.jsx
+msgid "Facturas"
+msgstr "Invoices"
 
 #: src/screens/categories-workspace.jsx
 msgid "No se pudo guardar"
@@ -664,7 +694,9 @@ msgstr "Color in the POS"
 
 #: src/screens/categories-workspace.jsx
 #: src/screens/hours.jsx
+#: src/screens/inventory-workspace.jsx
 #: src/screens/operations-workspace.jsx
+#: src/screens/recipe-workspace.jsx
 #: src/screens/settings.jsx
 msgid "Guardar"
 msgstr "Save"
@@ -682,6 +714,8 @@ msgid "Nueva categoría"
 msgstr "New category"
 
 #: src/screens/categories-workspace.jsx
+#: src/screens/floor-plan.jsx
+#: src/screens/inventory-workspace.jsx
 #: src/screens/members.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/profile.jsx
@@ -701,18 +735,6 @@ msgstr "Each category starts with a random color; change it whenever you want. I
 #: src/screens/categories-workspace.jsx
 msgid "Aún no hay categorías. Crea la primera arriba."
 msgstr "There are no categories yet. Create the first one above."
-
-#: src/screens/conversations.jsx
-#~ msgid "Conversaciones WhatsApp"
-#~ msgstr "WhatsApp conversations"
-
-#: src/screens/conversations.jsx
-#~ msgid "{active, plural, one {# conversación activa ahora mismo.} other {# conversaciones activas ahora mismo.}}"
-#~ msgstr "{active, plural, one {# active conversation right now.} other {# active conversations right now.}}"
-
-#: src/screens/conversations.jsx
-#~ msgid "No hay conversaciones."
-#~ msgstr "No conversations."
 
 #: src/screens/conversations.jsx
 msgid "{total, plural, one {# cliente espera respuesta.} other {# clientes esperan respuesta.}}"
@@ -739,22 +761,7 @@ msgid "Espera"
 msgstr "Waiting"
 
 #: src/screens/customers.jsx
-#~ msgid "{total, plural, one {# cliente} other {# clientes}}"
-#~ msgstr "{total, plural, one {# customer} other {# customers}}"
-
-#: src/screens/customers.jsx
-#~ msgid "$0.00 en monedero"
-#~ msgstr "$0.00 in wallet"
-
-#: src/screens/customers.jsx
-#~ msgid "Datos de memoria"
-#~ msgstr "Memory facts"
-
-#: src/screens/customers.jsx
-#~ msgid "sin indexar"
-#~ msgstr "not indexed"
-
-#: src/screens/customers.jsx
+#: src/screens/inventory-costing.jsx
 #: src/screens/orders.jsx
 #: src/screens/recibos.jsx
 #: src/screens/reembolsos.jsx
@@ -1196,6 +1203,8 @@ msgid "Recargar ${pesos}"
 msgstr "Top up ${pesos}"
 
 #: src/screens/customers.jsx
+#: src/screens/floor-plan.jsx
+#: src/screens/recipe-workspace.jsx
 msgid "Recargar"
 msgstr "Top up"
 
@@ -1411,6 +1420,43 @@ msgstr "Static"
 #: src/screens/members.jsx
 msgid "hace {0} d"
 msgstr "{0} d ago"
+
+#: src/screens/device-utils.js
+msgid "Mercado Pago rechazó la dirección del negocio."
+msgstr "Mercado Pago rejected the business address."
+
+#: src/screens/device-utils.js
+msgid "Mercado Pago necesita la tienda antes de dar de alta un terminal."
+msgstr "Mercado Pago needs the store before a terminal can be set up."
+
+#: src/screens/device-utils.js
+msgid "Conecta la cuenta de Mercado Pago antes de crear la tienda."
+msgstr "Connect the Mercado Pago account before creating the store."
+
+#: src/screens/device-utils.js
+msgid "Mercado Pago rechazó el acceso de esta cuenta. Vuelve a conectarla desde esta pantalla."
+msgstr "Mercado Pago rejected access for this account. Connect it again from this screen."
+
+#: src/screens/device-utils.js
+#: src/screens/devices.jsx
+msgid "Tu usuario no puede administrar los pagos de este negocio."
+msgstr "Your user cannot manage payments for this business."
+
+#: src/screens/device-utils.js
+msgid "No se pudo crear la tienda. Intenta de nuevo."
+msgstr "The store could not be created. Try again."
+
+#: src/screens/devices.jsx
+#~ msgid "Consultando terminales…"
+#~ msgstr "Checking terminals…"
+
+#: src/screens/devices.jsx
+#~ msgid "Sin registro de esta sucursal"
+#~ msgstr "No register in this branch"
+
+#: src/screens/devices.jsx
+#~ msgid "Desconectar"
+#~ msgstr "Disconnect"
 
 #: src/screens/devices.jsx
 #: src/screens/overview.jsx
@@ -1922,6 +1968,260 @@ msgstr "Installation {0}"
 msgid "Denegar"
 msgstr "Deny"
 
+#: src/screens/devices.jsx
+msgid "Cuenta de Mercado Pago conectada."
+msgstr "Mercado Pago account connected."
+
+#: src/screens/devices.jsx
+msgid "Mercado Pago rechazó la conexión."
+msgstr "Mercado Pago rejected the connection."
+
+#: src/screens/devices.jsx
+msgid "La invitación ya no era válida. Inicia la conexión otra vez."
+msgstr "The invitation is no longer valid. Start the connection again."
+
+#: src/screens/devices.jsx
+msgid "Mercado Pago no devolvió el código de autorización."
+msgstr "Mercado Pago did not return the authorization code."
+
+#: src/screens/devices.jsx
+msgid "Este servidor no está configurado para conectar cuentas de Mercado Pago."
+msgstr "This server is not configured to connect Mercado Pago accounts."
+
+#: src/screens/devices.jsx
+msgid "No se pudo confirmar la conexión con Mercado Pago."
+msgstr "The connection to Mercado Pago could not be confirmed."
+
+#: src/screens/devices.jsx
+msgid "PDV"
+msgstr "PDV"
+
+#: src/screens/devices.jsx
+msgid "Autónomo"
+msgstr "Standalone"
+
+#: src/screens/devices.jsx
+msgid "Conecta la cuenta de Mercado Pago antes de configurar terminales."
+msgstr "Connect the Mercado Pago account before configuring terminals."
+
+#: src/screens/devices.jsx
+msgid "Ese terminal ya no está en la cuenta. Actualiza la lista."
+msgstr "That terminal is no longer in the account. Refresh the list."
+
+#: src/screens/devices.jsx
+msgid "Elige una sucursal antes de asignar el terminal."
+msgstr "Choose a branch before assigning the terminal."
+
+#. placeholder {0}: formatDate(status.expiresAt)
+#: src/screens/devices.jsx
+msgid "El acceso vence el {0}"
+msgstr "Access expires on {0}"
+
+#: src/screens/devices.jsx
+msgid "El acceso venció el {date}"
+msgstr "Access expired on {date}"
+
+#: src/screens/devices.jsx
+msgid "El acceso vence hoy"
+msgstr "Access expires today"
+
+#: src/screens/devices.jsx
+msgid "El acceso vence en 1 día ({date})"
+msgstr "Access expires in 1 day ({date})"
+
+#. placeholder {0}: formatNumber(days)
+#: src/screens/devices.jsx
+msgid "El acceso vence en {0} días ({date})"
+msgstr "Access expires in {0} days ({date})"
+
+#: src/screens/devices.jsx
+msgid "La última renovación falló el {date} (1 intento)."
+msgstr "The last renewal failed on {date} (1 attempt)."
+
+#. placeholder {0}: formatNumber(status.refreshAttempts)
+#: src/screens/devices.jsx
+msgid "La última renovación falló el {date} ({0} intentos)."
+msgstr "The last renewal failed on {date} ({0} attempts)."
+
+#: src/screens/devices.jsx
+msgid "Otro registro"
+msgstr "Another register"
+
+#: src/screens/devices.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Sin registro"
+msgstr "No register"
+
+#: src/screens/devices.jsx
+msgid "Modo"
+msgstr "Mode"
+
+#: src/screens/devices.jsx
+msgid "Modo de operación del terminal"
+msgstr "Terminal operating mode"
+
+#: src/screens/devices.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Registro"
+msgstr "Register"
+
+#: src/screens/devices.jsx
+msgid "Elige un registro"
+msgstr "Choose a register"
+
+#: src/screens/devices.jsx
+msgid "Quitando…"
+msgstr "Removing…"
+
+#: src/screens/devices.jsx
+msgid "Quitar del registro"
+msgstr "Remove from register"
+
+#: src/screens/devices.jsx
+msgid "El modo se guarda al asignar un registro."
+msgstr "The mode is saved when you assign a register."
+
+#: src/screens/devices.jsx
+msgid "Mercado Pago Point"
+msgstr "Mercado Pago Point"
+
+#: src/screens/devices.jsx
+msgid "Tienda del negocio"
+msgstr "Business store"
+
+#: src/screens/devices.jsx
+#: src/screens/settings.jsx
+msgid "Nombre del negocio"
+msgstr "Business name"
+
+#: src/screens/devices.jsx
+msgid "Calle"
+msgstr "Street"
+
+#: src/screens/devices.jsx
+msgid "Número"
+msgstr "Number"
+
+#: src/screens/devices.jsx
+#: src/screens/settings.jsx
+msgid "Ciudad"
+msgstr "City"
+
+#: src/screens/devices.jsx
+msgid "Estado de la dirección"
+msgstr "State of the address"
+
+#: src/screens/devices.jsx
+#: src/screens/settings.jsx
+msgid "Latitud"
+msgstr "Latitude"
+
+#: src/screens/devices.jsx
+#: src/screens/settings.jsx
+msgid "Longitud"
+msgstr "Longitude"
+
+#: src/screens/devices.jsx
+msgid "Referencia · opcional"
+msgstr "Reference · optional"
+
+#: src/screens/devices.jsx
+msgid "La dirección la valida Mercado Pago. Si rechaza la ciudad, usa el nombre exacto que registra la cuenta."
+msgstr "Mercado Pago validates the address. If it rejects the city, use the exact name the account registers."
+
+#: src/screens/devices.jsx
+msgid "Crear tienda"
+msgstr "Create store"
+
+#: src/screens/devices.jsx
+msgid "Tienda"
+msgstr "Store"
+
+#: src/screens/devices.jsx
+msgid "Tienda creada"
+msgstr "Store created"
+
+#: src/screens/devices.jsx
+msgid "Tienda de Mercado Pago"
+msgstr "Mercado Pago store"
+
+#. placeholder {0}: storedTerminals.length
+#: src/screens/devices.jsx
+msgid "{0, plural, one {Este terminal está conciliado con esta tienda.} other {Estos # terminales están conciliados con esta tienda.}}"
+msgstr "{0, plural, one {This terminal is reconciled with this store.} other {These # terminals are reconciled with this store.}}"
+
+#: src/screens/devices.jsx
+msgid "Sin tienda"
+msgstr "No store"
+
+#: src/screens/devices.jsx
+msgid "Mercado Pago pide la dirección del negocio antes de dar de alta la tienda donde cobran los terminales."
+msgstr "Mercado Pago asks for the business address before it sets up the store where the terminals take payment."
+
+#: src/screens/devices.jsx
+msgid "Elige un registro para guardar el terminal."
+msgstr "Choose a register to save the terminal."
+
+#: src/screens/devices.jsx
+msgid "Cuenta y terminales"
+msgstr "Account and terminals"
+
+#: src/screens/devices.jsx
+msgid "Consultando la cuenta…"
+msgstr "Checking the account…"
+
+#: src/screens/devices.jsx
+msgid "Sin conectar"
+msgstr "Not connected"
+
+#: src/screens/devices.jsx
+msgid "Conecta la cuenta de Mercado Pago que recibe el dinero de este negocio."
+msgstr "Connect the Mercado Pago account that receives the money for this business."
+
+#: src/screens/devices.jsx
+msgid "Conectar cuenta"
+msgstr "Connect account"
+
+#: src/screens/devices.jsx
+msgid "Conectado, con avisos"
+msgstr "Connected, with warnings"
+
+#: src/screens/devices.jsx
+msgid "Conectado"
+msgstr "Connected"
+
+#: src/screens/devices.jsx
+msgid "Cuenta de Mercado Pago"
+msgstr "Mercado Pago account"
+
+#: src/screens/devices.jsx
+msgid "Reconectar"
+msgstr "Reconnect"
+
+#: src/screens/devices.jsx
+msgid "Dejar de cobrar en la cuenta de este negocio"
+msgstr "Stop charging this business's account"
+
+#: src/screens/devices.jsx
+msgid "Desconectando…"
+msgstr "Disconnecting…"
+
+#: src/screens/devices.jsx
+msgid "Desconectar cuenta"
+msgstr "Disconnect account"
+
+#: src/screens/devices.jsx
+msgid "Terminales"
+msgstr "Terminals"
+
+#: src/screens/devices.jsx
+msgid "Conecta la cuenta para ver sus terminales."
+msgstr "Connect the account to see its terminals."
+
+#: src/screens/devices.jsx
+msgid "Esta cuenta de Mercado Pago no tiene terminales."
+msgstr "This Mercado Pago account has no terminals."
+
 #: src/screens/diagnostics.jsx
 #: src/screens/operations-workspace.jsx
 msgid "Recuperación"
@@ -1931,6 +2231,252 @@ msgstr "Recovery"
 #: src/screens/operations-workspace.jsx
 msgid "Auditoría"
 msgstr "Audit"
+
+#: src/screens/floor-plan.jsx
+msgid "Áreas"
+msgstr "Areas"
+
+#. placeholder {0}: areaTableCount(item)
+#: src/screens/floor-plan.jsx
+msgid "{0, plural, one {# mesa} other {# mesas}}"
+msgstr "{0, plural, one {# table} other {# tables}}"
+
+#: src/screens/floor-plan.jsx
+msgid "Agregar área"
+msgstr "Add area"
+
+#: src/screens/floor-plan.jsx
+msgid "Salón"
+msgstr "Dining room"
+
+#: src/screens/floor-plan.jsx
+msgid "Libre"
+msgstr "Open"
+
+#: src/screens/floor-plan.jsx
+msgid "Ocupada"
+msgstr "Seated"
+
+#: src/screens/floor-plan.jsx
+msgid "Pedido tomado"
+msgstr "Order taken"
+
+#: src/screens/floor-plan.jsx
+msgid "Servido"
+msgstr "Served"
+
+#: src/screens/floor-plan.jsx
+msgid "Por cobrar"
+msgstr "Awaiting payment"
+
+#: src/screens/floor-plan.jsx
+msgid "Por limpiar"
+msgstr "Needs cleaning"
+
+#: src/screens/floor-plan.jsx
+msgid "Muro"
+msgstr "Wall"
+
+#: src/screens/floor-plan.jsx
+msgid "Barra"
+msgstr "Counter"
+
+#: src/screens/floor-plan.jsx
+msgid "Puerta"
+msgstr "Door"
+
+#: src/screens/floor-plan.jsx
+msgid "Texto"
+msgstr "Text"
+
+#: src/screens/floor-plan.jsx
+msgid "Área"
+msgstr "Area"
+
+#: src/screens/floor-plan.jsx
+msgid "No se pudo cargar el plano."
+msgstr "Could not load the floor plan."
+
+#: src/screens/floor-plan.jsx
+#: src/screens/settings.jsx
+msgid "Reintentar"
+msgstr "Retry"
+
+#: src/screens/floor-plan.jsx
+msgid "Carga del plano…"
+msgstr "Loading floor plan…"
+
+#: src/screens/floor-plan.jsx
+msgid "Diseña tu espacio y publica el plano en el punto de venta."
+msgstr "Design your space and publish the floor plan to the POS."
+
+#: src/screens/floor-plan.jsx
+msgid "Guardado en curso…"
+msgstr "Saving…"
+
+#: src/screens/floor-plan.jsx
+msgid "Cambios pendientes"
+msgstr "Unsaved changes"
+
+#: src/screens/floor-plan.jsx
+msgid "Borrador guardado"
+msgstr "Draft saved"
+
+#: src/screens/floor-plan.jsx
+msgid "Nuevo borrador"
+msgstr "New draft"
+
+#: src/screens/floor-plan.jsx
+msgid "Volver al borrador"
+msgstr "Back to draft"
+
+#: src/screens/floor-plan.jsx
+msgid "Ver publicado"
+msgstr "View published"
+
+#: src/screens/floor-plan.jsx
+msgid "Publicar"
+msgstr "Publish"
+
+#: src/screens/floor-plan.jsx
+msgid "Otro usuario cambió el plano. Recarga para obtener la versión actual."
+msgstr "Another user changed the floor plan. Reload to get the current version."
+
+#: src/screens/floor-plan.jsx
+msgid "No se confirmó el guardado. Reintenta antes de continuar."
+msgstr "Save was not confirmed. Retry before you continue."
+
+#: src/screens/floor-plan.jsx
+msgid "Se descartarán los cambios locales. ¿Recargar el plano?"
+msgstr "Local changes will be discarded. Reload the floor plan?"
+
+#: src/screens/floor-plan.jsx
+msgid "Revisa nombres únicos, capacidad y dimensiones. Los elementos deben quedar dentro del área."
+msgstr "Check unique names, capacity, and dimensions. Elements must fit inside the area."
+
+#: src/screens/floor-plan.jsx
+msgid "No se pudo leer el estado del salón. El plano se puede seguir editando."
+msgstr "The room could not be read. The floor plan can still be edited."
+
+#: src/screens/floor-plan.jsx
+msgid "Historial"
+msgstr "History"
+
+#: src/screens/floor-plan.jsx
+msgid "Deshacer"
+msgstr "Undo"
+
+#: src/screens/floor-plan.jsx
+msgid "Rehacer"
+msgstr "Redo"
+
+#: src/screens/floor-plan.jsx
+msgid "Cuadrícula y zoom"
+msgstr "Grid and zoom"
+
+#: src/screens/floor-plan.jsx
+msgid "Ajustar a cuadrícula"
+msgstr "Snap to grid"
+
+#: src/screens/floor-plan.jsx
+msgid "Zoom"
+msgstr "Zoom"
+
+#: src/screens/floor-plan.jsx
+msgid "Elementos"
+msgstr "Elements"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa redonda"
+msgstr "Round table"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa cuadrada"
+msgstr "Square table"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa rectangular"
+msgstr "Rectangular table"
+
+#: src/screens/floor-plan.jsx
+msgid "Lista de elementos"
+msgstr "Element list"
+
+#: src/screens/floor-plan.jsx
+msgid "Grupo de {groupSize} mesas"
+msgstr "Group of {groupSize} tables"
+
+#: src/screens/floor-plan.jsx
+msgid "Plano. Selecciona un elemento de la lista para editarlo con el teclado."
+msgstr "Floor plan. Select an element from the list to edit it with the keyboard."
+
+#: src/screens/floor-plan.jsx
+msgid "Propiedades"
+msgstr "Properties"
+
+#: src/screens/floor-plan.jsx
+msgid "Forma"
+msgstr "Shape"
+
+#: src/screens/floor-plan.jsx
+msgid "Rectangular"
+msgstr "Rectangular"
+
+#: src/screens/floor-plan.jsx
+msgid "Redonda"
+msgstr "Round"
+
+#: src/screens/floor-plan.jsx
+msgid "Cuadrada"
+msgstr "Square"
+
+#: src/screens/floor-plan.jsx
+msgid "Capacidad"
+msgstr "Capacity"
+
+#: src/screens/floor-plan.jsx
+msgid "Ancho"
+msgstr "Width"
+
+#: src/screens/floor-plan.jsx
+msgid "Alto"
+msgstr "Height"
+
+#: src/screens/floor-plan.jsx
+msgid "Posición X"
+msgstr "X position"
+
+#: src/screens/floor-plan.jsx
+msgid "Posición Y"
+msgstr "Y position"
+
+#: src/screens/floor-plan.jsx
+msgid "Rotación"
+msgstr "Rotation"
+
+#: src/screens/floor-plan.jsx
+msgid "Duplicar"
+msgstr "Duplicate"
+
+#: src/screens/floor-plan.jsx
+msgid "Eliminar elemento"
+msgstr "Delete element"
+
+#: src/screens/floor-plan.jsx
+msgid "Editar área"
+msgstr "Edit area"
+
+#: src/screens/floor-plan.jsx
+msgid "Esta es la versión publicada en el punto de venta."
+msgstr "This is the version published to the POS."
+
+#: src/screens/floor-plan.jsx
+msgid "El borrador se guarda automáticamente. Publica para actualizar el punto de venta."
+msgstr "The draft saves automatically. Publish to update the POS."
+
+#: src/screens/floor-plan.jsx
+msgid "Selecciona una sucursal para editar su plano."
+msgstr "Select a location to edit its floor plan."
 
 #: src/screens/gift-cards.jsx
 msgid "No se pudo canjear la tarjeta."
@@ -1956,6 +2502,7 @@ msgid "Listo"
 msgstr "Done"
 
 #: src/screens/gift-cards.jsx
+#: src/screens/inventory-workspace.jsx
 #: src/screens/login.jsx
 msgid "Código"
 msgstr "Code"
@@ -2064,6 +2611,7 @@ msgid "Monto"
 msgstr "Amount"
 
 #: src/screens/gift-cards.jsx
+#: src/screens/inventory-costing.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/recibos.jsx
 msgid "Estado"
@@ -2314,6 +2862,1186 @@ msgstr "New customers will receive your special notice. <0>In-flight orders</0> 
 #: src/screens/hours.jsx
 msgid "Los clientes podrán hacer pedidos por WhatsApp otra vez, según tu horario y el corte de pedidos."
 msgstr "Customers will be able to place WhatsApp orders again, subject to your business hours and order cutoff."
+
+#. placeholder {0}: missing.length
+#. placeholder {1}: missing.length === 1 ? 'insumo' : 'insumos'
+#: src/screens/inventory-costing.jsx
+#~ msgid "Este platillo no se puede costear. Falta el precio de {0} {1}:"
+#~ msgstr "This dish cannot be costed. The price of {0} {1} is missing:"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "pza"
+msgstr "ea"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "g"
+msgstr "g"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "kg"
+msgstr "kg"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "ml"
+msgstr "ml"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "L"
+msgstr "L"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "porción"
+msgstr "portion"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "paquete"
+msgstr "pack"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "caja"
+msgstr "box"
+
+#: src/screens/inventory-costing.jsx
+msgid "Nadie registró qué consume este platillo"
+msgstr "Nobody recorded what this dish consumes"
+
+#: src/screens/inventory-costing.jsx
+msgid "La receta existe pero no tiene componentes"
+msgstr "The recipe exists but has no components"
+
+#: src/screens/inventory-costing.jsx
+msgid "Su insumo nunca se ha recibido, así que no hay precio"
+msgstr "Its ingredient has never been received, so there is no price"
+
+#: src/screens/inventory-costing.jsx
+msgid "No se lleva en inventario, así que su costo no se calcula"
+msgstr "It is not tracked in inventory, so its cost is not calculated"
+
+#: src/screens/inventory-costing.jsx
+msgid "La receta no se convierte en unidades completas del insumo"
+msgstr "The recipe does not convert into whole units of the ingredient"
+
+#: src/screens/inventory-costing.jsx
+msgid "Crea la receta o la asignación de inventario del producto."
+msgstr "Create the recipe or the inventory mapping for the product."
+
+#: src/screens/inventory-costing.jsx
+msgid "Agrega los insumos y sus cantidades a la receta."
+msgstr "Add the ingredients and their quantities to the recipe."
+
+#: src/screens/inventory-costing.jsx
+msgid "Registra una recepción de compra de ese insumo."
+msgstr "Record a purchase receipt for that ingredient."
+
+#: src/screens/inventory-costing.jsx
+msgid "No hay nada que arreglar: este producto no se cuenta en inventario."
+msgstr "Nothing to fix: this product is not tracked in inventory."
+
+#: src/screens/inventory-costing.jsx
+msgid "Ajusta la cantidad para que dé unidades completas del insumo."
+msgstr "Adjust the quantity so it lands on whole units of the ingredient."
+
+#: src/screens/inventory-costing.jsx
+msgid "Con costo"
+msgstr "With a cost"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+#: src/screens/menu-engineering.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Sin costo"
+msgstr "No cost"
+
+#: src/screens/inventory-costing.jsx
+msgid "Costo"
+msgstr "Cost"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/variance.jsx
+msgid "Variación"
+msgstr "Variance"
+
+#: src/screens/inventory-costing.jsx
+msgid "Ingeniería de menú"
+msgstr "Menu engineering"
+
+#: src/screens/inventory-costing.jsx
+msgid "Periodo"
+msgstr "Period"
+
+#: src/screens/inventory-costing.jsx
+msgid "{days} días"
+msgstr "{days} days"
+
+#: src/screens/inventory-costing.jsx
+msgid "Cargando el costo de lo que vendiste…"
+msgstr "Loading the cost of what you sold…"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/inventory-workspace.jsx
+msgid "Todas las sucursales"
+msgstr "All branches"
+
+#. placeholder {0}: shortDate(window.from)
+#. placeholder {1}: shortDate(window.to)
+#. placeholder {2}: window.days
+#: src/screens/inventory-costing.jsx
+msgid "{branchWords} · Del {0} al {1} · {2} días"
+msgstr "{branchWords} · From {0} to {1} · {2} days"
+
+#: src/screens/inventory-costing.jsx
+msgid "Los números del día"
+msgstr "The day's numbers"
+
+#. placeholder {0}: summary.uncostedDays
+#. placeholder {1}: summary.days
+#: src/screens/inventory-costing.jsx
+msgid "{0} de {1} días con venta no tienen costo"
+msgstr "{0} of {1} days with sales have no cost"
+
+#. placeholder {0}: summary.days
+#: src/screens/inventory-costing.jsx
+msgid "{0} días con venta en el periodo"
+msgstr "{0} days with sales in the period"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/ventas-report.jsx
+msgid "Venta neta"
+msgstr "Net sales"
+
+#: src/screens/inventory-costing.jsx
+msgid "Sin impuestos, tal como la mide el margen"
+msgstr "Net of tax, which is what the margin is measured against"
+
+#: src/screens/inventory-costing.jsx
+msgid "Costo de lo vendido"
+msgstr "Cost of goods sold"
+
+#. placeholder {0}: summary.uncostedDays
+#: src/screens/inventory-costing.jsx
+msgid "Faltan {0} días por costear"
+msgstr "{0} days still have no cost"
+
+#: src/screens/inventory-costing.jsx
+msgid "Lo que costó lo que salió de la cocina"
+msgstr "What the kitchen sent out actually cost"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/menu-engineering.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Margen"
+msgstr "Margin"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Sin margen"
+msgstr "No margin"
+
+#: src/screens/inventory-costing.jsx
+msgid "No se publica un margen que no está completo"
+msgstr "A margin that is not complete is not published"
+
+#: src/screens/inventory-costing.jsx
+msgid "Platillos vendidos"
+msgstr "Dishes sold"
+
+#. placeholder {0}: summary.salesCount
+#: src/screens/inventory-costing.jsx
+msgid "{0} tickets"
+msgstr "{0} tickets"
+
+#: src/screens/inventory-costing.jsx
+msgid "Estas ventas no bajaron nada del inventario porque nadie registró qué consumen. Su costo es desconocido, no cero, así que el costo y el margen del periodo no se publican."
+msgstr "These sales took nothing off the shelf because nobody recorded what they consume. Their cost is unknown, not zero, so the period's cost and margin are not published."
+
+#. placeholder {0}: summary.salesLinesWithoutMapping
+#. placeholder {1}: summary.uncostedProducts.map((product) => product.productName).join(', ')
+#: src/screens/inventory-costing.jsx
+msgid "{0} líneas de venta sin receta · {1}"
+msgstr "{0} sale lines with no recipe · {1}"
+
+#. placeholder {0}: summary.salesLinesWithoutMapping
+#: src/screens/inventory-costing.jsx
+msgid "{0} líneas de venta sin receta"
+msgstr "{0} sale lines with no recipe"
+
+#: src/screens/inventory-costing.jsx
+msgid "No hay ventas registradas en {branchName} en este periodo."
+msgstr "No sales are recorded at {branchName} in this period."
+
+#: src/screens/inventory-costing.jsx
+msgid "No hay ventas registradas en este periodo."
+msgstr "No sales are recorded in this period."
+
+#: src/screens/inventory-costing.jsx
+msgid "Día"
+msgstr "Day"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/menu-engineering.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Margen %"
+msgstr "Margin %"
+
+#: src/screens/inventory-costing.jsx
+msgid "Tickets"
+msgstr "Tickets"
+
+#: src/screens/inventory-costing.jsx
+msgid "Platillos"
+msgstr "Dishes"
+
+#. placeholder {0}: day.uncostedProducts .map((product) => product.productName) .join(', ')
+#: src/screens/inventory-costing.jsx
+msgid "Sin receta: {0}"
+msgstr "No recipe: {0}"
+
+#: src/screens/inventory-costing.jsx
+msgid "Costo por platillo"
+msgstr "Cost per dish"
+
+#. placeholder {0}: groups.counts.all
+#. placeholder {1}: groups.counts.uncosted + groups.counts.notCosted
+#: src/screens/inventory-costing.jsx
+msgid "{0} platillos · {1} sin costo"
+msgstr "{0} dishes · {1} with no cost"
+
+#: src/screens/inventory-costing.jsx
+msgid "Vista de platillos"
+msgstr "Dish view"
+
+#: src/screens/inventory-costing.jsx
+msgid "Buscar un platillo"
+msgstr "Search for a dish"
+
+#: src/screens/inventory-costing.jsx
+msgid "Ningún platillo coincide con esa búsqueda."
+msgstr "No dish matches that search."
+
+#: src/screens/inventory-costing.jsx
+msgid "Ningún platillo tiene costo todavía. Mientras un insumo no se reciba, su precio se desconoce, y con él el de todos los platillos que lo usan."
+msgstr "No dish has a cost yet. Until an ingredient is received its price is unknown, and so is the price of every dish that uses it."
+
+#: src/screens/inventory-costing.jsx
+msgid "Todos los platillos del catálogo tienen costo."
+msgstr "Every dish in the catalogue has a cost."
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/menu-engineering.jsx
+msgid "Platillo"
+msgstr "Dish"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/menu-engineering.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Precio"
+msgstr "Price"
+
+#. placeholder {0}: missing .map((item) => item.displayName) .join(', ')
+#: src/screens/inventory-costing.jsx
+msgid "Sin precio: {0}"
+msgstr "No price: {0}"
+
+#: src/screens/inventory-costing.jsx
+msgid "Completo"
+msgstr "Complete"
+
+#: src/screens/inventory-costing.jsx
+msgid "Falta un precio"
+msgstr "Missing a price"
+
+#: src/screens/inventory-costing.jsx
+msgid "Sin receta"
+msgstr "No recipe"
+
+#: src/screens/inventory-costing.jsx
+msgid "Se está acabando"
+msgstr "Running out"
+
+#. placeholder {0}: forecastSummary.below
+#. placeholder {1}: forecastSummary.noHistory
+#: src/screens/inventory-costing.jsx
+msgid "{0} bajo el mínimo · {1} sin consumo registrado"
+msgstr "{0} below threshold · {1} with no recorded use"
+
+#: src/screens/inventory-costing.jsx
+msgid "No hay insumos con existencia registrada."
+msgstr "No ingredients have recorded stock."
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/variance.jsx
+msgid "Insumo"
+msgstr "Ingredient"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/prep-list.jsx
+msgid "Existencia"
+msgstr "On hand"
+
+#: src/screens/inventory-costing.jsx
+msgid "Usado"
+msgstr "Used"
+
+#: src/screens/inventory-costing.jsx
+msgid "Por día"
+msgstr "Per day"
+
+#: src/screens/inventory-costing.jsx
+msgid "Alcanza"
+msgstr "Lasts"
+
+#: src/screens/inventory-costing.jsx
+msgid "sin costo base"
+msgstr "no cost basis"
+
+#: src/screens/inventory-costing.jsx
+msgid "sin consumo"
+msgstr "no use"
+
+#. placeholder {0}: item.daysOfCover
+#: src/screens/inventory-costing.jsx
+msgid "{0, plural, one {# día} other {# días}}"
+msgstr "{0, plural, one {# day} other {# days}}"
+
+#: src/screens/inventory-costing.jsx
+msgid "Bajo el mínimo"
+msgstr "Below threshold"
+
+#. placeholder {0}: item.daysWithConsumption
+#. placeholder {1}: data.window?.days ?? 28
+#: src/screens/inventory-costing.jsx
+msgid "Sólo hay {0} días de consumo en {1}."
+msgstr "There are only {0} days of use in {1}."
+
+#: src/screens/inventory-costing.jsx
+msgid "Historial corto"
+msgstr "Short history"
+
+#: src/screens/inventory-costing.jsx
+msgid "Sin alerta"
+msgstr "No alert"
+
+#: src/screens/inventory-costing.jsx
+msgid "El ritmo divide entre los días en que el insumo realmente se usó, no entre todo el periodo: un insumo que empezó a usarse hace cuatro días no tiene 28 días de historia."
+msgstr "The rate divides by the days the ingredient was actually used, not by the whole period: an ingredient that started being used four days ago does not have 28 days of history."
+
+#: src/screens/inventory-costing.jsx
+msgid "De dónde sale el costo"
+msgstr "Where the cost comes from"
+
+#. placeholder {0}: data.basis.length
+#. placeholder {1}: data.basis.filter((item) => item.unitCostMinor == null).length
+#: src/screens/inventory-costing.jsx
+msgid "{0} insumos · {1} sin recepciones"
+msgstr "{0} ingredients · {1} with no receipts"
+
+#: src/screens/inventory-costing.jsx
+msgid "No se pudo leer la base del costo."
+msgstr "The cost basis could not be read."
+
+#: src/screens/inventory-costing.jsx
+msgid "Este negocio no tiene insumos en inventario todavía."
+msgstr "This business has no ingredients in inventory yet."
+
+#: src/screens/inventory-costing.jsx
+msgid "El costo de un insumo es el promedio ponderado de lo que realmente se pagó al recibirlo, no lo que se pidió. Un insumo sin recepciones no tiene precio, y por eso no aparece como cero."
+msgstr "An ingredient's cost is the weighted average of what was actually paid when it arrived, not what was ordered. An ingredient with no receipts has no price, which is why it is not shown as zero."
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Costo unitario"
+msgstr "Unit cost"
+
+#: src/screens/inventory-costing.jsx
+msgid "Recepciones"
+msgstr "Receipts"
+
+#: src/screens/inventory-costing.jsx
+msgid "Del más barato al más caro"
+msgstr "Cheapest to dearest"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/variance.jsx
+msgid "Recibido"
+msgstr "Received"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Sin precio"
+msgstr "No price"
+
+#. placeholder {0}: item.receiptCount
+#: src/screens/inventory-costing.jsx
+msgid "{0} compra"
+msgstr "{0} purchase"
+
+#. placeholder {0}: item.receiptCount
+#: src/screens/inventory-costing.jsx
+msgid "{0} compras"
+msgstr "{0} purchases"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/menu-engineering.jsx
+#: src/screens/variance.jsx
+msgid "Sin periodo"
+msgstr "No period"
+
+#. placeholder {0}: data.partial.join(', ')
+#: src/screens/inventory-costing.jsx
+msgid "No se pudieron leer todas las cifras de este periodo. Falta: {0}."
+msgstr "Not every figure for this period could be read. Missing: {0}."
+
+#: src/screens/inventory-costing.jsx
+msgid "Costo del platillo"
+msgstr "Dish cost"
+
+#. placeholder {0}: shortDate(window.from)
+#. placeholder {1}: shortDate(window.to)
+#: src/screens/inventory-costing.jsx
+msgid "Consumo del {0} al {1}"
+msgstr "Consumption from {0} to {1}"
+
+#. placeholder {0}: missing.length
+#: src/screens/inventory-costing.jsx
+msgid "{0, plural, one {Este platillo no se puede costear. Falta el precio de # insumo:} other {Este platillo no se puede costear. Falta el precio de # insumos:}}"
+msgstr "{0, plural, one {This dish cannot be costed. The price of # ingredient is missing:} other {This dish cannot be costed. The price of # ingredients is missing:}}"
+
+#: src/screens/inventory-costing.jsx
+msgid "Este platillo no se puede costear todavía. La razón está abajo, y no se muestra un margen que no se puede calcular."
+msgstr "This dish cannot be costed yet. The reason is below, and a margin that cannot be calculated is not shown."
+
+#: src/screens/inventory-costing.jsx
+msgid "Registra su precio."
+msgstr "Record its price."
+
+#: src/screens/inventory-costing.jsx
+msgid "Por platillo"
+msgstr "Per dish"
+
+#: src/screens/inventory-costing.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Costo de la línea"
+msgstr "Line cost"
+
+#: src/screens/inventory-costing.jsx
+msgid "Consumido en el periodo"
+msgstr "Consumed in the period"
+
+#: src/screens/inventory-costing.jsx
+msgid "Consumido por las ventas, fuera de la receta"
+msgstr "Consumed by sales, outside the recipe"
+
+#: src/screens/inventory-costing.jsx
+msgid "Estas porciones extra no son parte del costo de la receta; su dinero está en el costo del día."
+msgstr "These extra portions are not part of the recipe's cost; their money is in the day's cost."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Producto físico"
+msgstr "Physical product"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Existencia por variante"
+msgstr "Stock by variant"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Ingrediente"
+msgstr "Ingredient"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Empaque"
+msgstr "Packaging"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Componente compuesto"
+msgstr "Composite component"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Componente de paquete"
+msgstr "Bundle component"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Insumo operativo"
+msgstr "Operating supply"
+
+#: src/screens/inventory-workspace.jsx
+msgid "No se cuenta"
+msgstr "Not tracked"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Se cuenta"
+msgstr "Tracked"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Requiere reserva"
+msgstr "Requires reservation"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Bloquear"
+msgstr "Block"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Con autorización"
+msgstr "Manager override"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Permitir y marcar"
+msgstr "Allow and flag"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Pedido pendiente"
+msgstr "Backorder"
+
+#: src/screens/inventory-workspace.jsx
+msgid "No aplica"
+msgstr "Not applicable"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Exacta"
+msgstr "Exact"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Hacia abajo"
+msgstr "Round down"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Hacia arriba"
+msgstr "Round up"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Al más cercano"
+msgstr "Round half up"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Ya existe un artículo con esa referencia. Escribe otra."
+msgstr "An item already uses that reference. Type another one."
+
+#: src/screens/inventory-workspace.jsx
+msgid "El artículo ya no existe. Actualiza la lista."
+msgstr "The item no longer exists. Refresh the list."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Los datos cambiaron. Cierra el editor y vuelve a abrirlo."
+msgstr "The data changed. Close the editor and open it again."
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "No tienes permiso para administrar el inventario."
+msgstr "You do not have permission to manage inventory."
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Revisa los datos. La API no aceptó la operación."
+msgstr "Check the data. The API refused the operation."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Las unidades no se dividen exactamente a esta escala. Elige redondear hacia abajo, hacia arriba o al más cercano."
+msgstr "The units do not divide evenly at this scale. Choose round down, round up or round half up."
+
+#: src/screens/inventory-workspace.jsx
+msgid "La etiqueta ya no existe. Actualiza la lista."
+msgstr "The label no longer exists. Refresh the list."
+
+#: src/screens/inventory-workspace.jsx
+msgid "No puedes administrar el inventario."
+msgstr "You cannot manage inventory."
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Pide a la persona propietaria que te dé el permiso para administrar el negocio."
+msgstr "Ask the owner to give you permission to manage the business."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Etiquetas de alérgenos"
+msgstr "Allergen labels"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Cada artículo toma etiquetas de esta lista. Usa minúsculas y guion bajo en el código."
+msgstr "Each item takes labels from this list. Use lowercase letters and underscores in the code."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Aún no hay etiquetas."
+msgstr "There are no labels yet."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Código de la etiqueta"
+msgstr "Label code"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Etiqueta"
+msgstr "Label"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Nombre de la etiqueta"
+msgstr "Label name"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Crear etiqueta"
+msgstr "Create label"
+
+#: src/screens/inventory-workspace.jsx
+msgid "El código empieza con una letra y sigue con letras, números o guion bajo."
+msgstr "The code starts with a letter. Then use letters, numbers or underscores."
+
+#. placeholder {0}: allergen.code
+#: src/screens/inventory-workspace.jsx
+msgid "Etiqueta de {0}"
+msgstr "Label for {0}"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/settings.jsx
+msgid "Activa"
+msgstr "Active"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Conversiones de unidad"
+msgstr "Unit conversions"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Convierte la unidad de compra a la unidad base del artículo. Un gramo a kilogramo se escribe 1 y 1000, con escala 3."
+msgstr "Convert the purchase unit to the base unit of the item. One gram to kilogram is 1 and 1000, at scale 3."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Sin conversiones."
+msgstr "No conversions."
+
+#. placeholder {0}: unitOf(conversion.fromUnit)
+#. placeholder {1}: unitOf(conversion.toUnit)
+#: src/screens/inventory-workspace.jsx
+msgid "Editar la conversión de {0} a {1}"
+msgstr "Edit the conversion from {0} to {1}"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Unidad origen"
+msgstr "From unit"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Unidad destino"
+msgstr "To unit"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Numerador"
+msgstr "Numerator"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Denominador"
+msgstr "Denominator"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Redondeo"
+msgstr "Rounding"
+
+#. placeholder {0}: item.quantityScale
+#: src/screens/inventory-workspace.jsx
+msgid "Escala del artículo: {0} decimales."
+msgstr "Item scale: {0} decimals."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Escribe el numerador y el denominador como enteros positivos."
+msgstr "Type the numerator and the denominator as positive whole numbers."
+
+#: src/screens/inventory-workspace.jsx
+msgid "La conversión da unidades completas a esta escala."
+msgstr "The conversion gives whole units at this scale."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Guardar conversión"
+msgstr "Save conversion"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Elige una política de redondeo para guardar."
+msgstr "Choose a rounding policy to save."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Alérgenos"
+msgstr "Allergens"
+
+#: src/screens/inventory-workspace.jsx
+msgid "El set completo se guarda. Si quitas todas, el artículo queda sin alérgenos."
+msgstr "The whole set is saved. If you clear all of them, the item has no allergens."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Crea primero una etiqueta de alérgeno en la lista."
+msgstr "Create an allergen label in the list first."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Guardar alérgenos"
+msgstr "Save allergens"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Editar artículo"
+msgstr "Edit item"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Nuevo artículo"
+msgstr "New item"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Referencia"
+msgstr "Reference"
+
+#: src/screens/inventory-workspace.jsx
+msgid "La API rechaza una referencia repetida."
+msgstr "The API refuses a repeated reference."
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Tipo"
+msgstr "Type"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Unidad base"
+msgstr "Base unit"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Decimales de cantidad"
+msgstr "Quantity decimals"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Política de inventario"
+msgstr "Inventory policy"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Existencia negativa"
+msgstr "Negative stock"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Umbral de stock bajo"
+msgstr "Low stock threshold"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Sin umbral"
+msgstr "No threshold"
+
+#: src/screens/inventory-workspace.jsx
+msgid "En la escala del artículo. 0 se guarda como un umbral real."
+msgstr "At the item scale. A 0 is saved as a real threshold."
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Vida útil en días"
+msgstr "Shelf life in days"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Sin vida útil"
+msgstr "No shelf life"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Par de preparación"
+msgstr "Prep par"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/prep-list.jsx
+msgid "Sin par"
+msgstr "No par"
+
+#: src/screens/inventory-workspace.jsx
+msgid "En la escala del artículo. La lista de preparación lo resta."
+msgstr "At the item's scale. The prep list subtracts it."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Guarda el artículo para agregar conversiones y alérgenos."
+msgstr "Save the item to add conversions and allergens."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Confirmar archivo"
+msgstr "Confirm archive"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/staff.jsx
+msgid "Archivar"
+msgstr "Archive"
+
+#: src/screens/inventory-workspace.jsx
+msgid "La vida útil y el umbral se guardan en la escala del artículo."
+msgstr "The shelf life and the threshold use the item scale."
+
+#: src/screens/inventory-workspace.jsx
+msgid "Cargando el inventario…"
+msgstr "Loading inventory…"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Buscar artículo"
+msgstr "Search item"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Mostrar archivados"
+msgstr "Show archived"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Solo con costo"
+msgstr "Costed only"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Aún no hay artículos. Crea el primero."
+msgstr "There are no items yet. Create the first one."
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Artículo"
+msgstr "Item"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Existencia · {locationName}"
+msgstr "On hand · {locationName}"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Vida útil"
+msgstr "Shelf life"
+
+#: src/screens/inventory-workspace.jsx
+msgid "Umbral bajo"
+msgstr "Low threshold"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/invoice-inbox.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+#: src/screens/recipe-workspace.jsx
+#: src/screens/staff.jsx
+msgid "Acciones"
+msgstr "Actions"
+
+#: src/screens/inventory-workspace.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/registros.jsx
+msgid "Archivado"
+msgstr "Archived"
+
+#: src/screens/inventory-workspace.jsx
+msgid "{value} días"
+msgstr "{value} days"
+
+#. placeholder {0}: item.displayName
+#. placeholder {0}: recipe.targetName
+#: src/screens/inventory-workspace.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Editar {0}"
+msgstr "Edit {0}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "La factura tiene líneas sin casar. Casa cada línea marcada antes de registrar la entrada."
+msgstr "The invoice has lines with no match. Match every marked line before you register the receipt."
+
+#: src/screens/invoice-inbox.jsx
+msgid "La factura ya no existe. Recarga la lista."
+msgstr "The invoice no longer exists. Reload the list."
+
+#: src/screens/invoice-inbox.jsx
+msgid "La factura ya tiene su entrada registrada."
+msgstr "The invoice already has its receipt registered."
+
+#: src/screens/invoice-inbox.jsx
+msgid "El pedido ya no existe. Recarga la lista."
+msgstr "The order no longer exists. Reload the list."
+
+#: src/screens/invoice-inbox.jsx
+msgid "Un artículo ya no existe. Recarga la lista."
+msgstr "An item no longer exists. Reload the list."
+
+#: src/screens/invoice-inbox.jsx
+msgid "No puedes administrar las facturas."
+msgstr "You cannot manage the invoices."
+
+#. placeholder {0}: line.lineNumber
+#: src/screens/invoice-inbox.jsx
+msgid "Casar la línea {0}"
+msgstr "Match line {0}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Descripción del proveedor"
+msgstr "Supplier description"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Artículo del inventario"
+msgstr "Inventory item"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Elige un artículo"
+msgstr "Choose an item"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Recordar el SKU del proveedor"
+msgstr "Remember the supplier SKU"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/invoice-model.js
+msgid "SKU del proveedor"
+msgstr "Supplier SKU"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Escribe el SKU que el proveedor usa en esta línea."
+msgstr "Type the SKU the supplier uses on this line."
+
+#: src/screens/invoice-inbox.jsx
+msgid "Guardar el cotejo"
+msgstr "Save the match"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Registrar la entrada de la factura"
+msgstr "Register the invoice receipt"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Registrar la entrada"
+msgstr "Register the receipt"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Sin folio"
+msgstr "No folio"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Proveedor sin identificar"
+msgstr "Unidentified supplier"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Pedido de compra"
+msgstr "Purchase order"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Elige un pedido"
+msgstr "Choose an order"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Esta línea no está casada. Casa la línea antes de registrar la entrada."
+msgstr "This line has no match. Match the line before you register the receipt."
+
+#: src/screens/invoice-inbox.jsx
+msgid "El pedido no tiene una línea para este artículo."
+msgstr "The order has no line for this item."
+
+#: src/screens/invoice-inbox.jsx
+msgid "Línea del pedido"
+msgstr "Order line"
+
+#. placeholder {0}: candidate.lineNumber
+#: src/screens/invoice-inbox.jsx
+msgid "Línea {0}"
+msgstr "Line {0}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Cantidad recibida"
+msgstr "Received quantity"
+
+#. placeholder {0}: line.lineNumber
+#: src/screens/invoice-inbox.jsx
+msgid "Cantidad recibida de la línea {0}"
+msgstr "Received quantity of line {0}"
+
+#. placeholder {0}: tally.unmatched
+#: src/screens/invoice-inbox.jsx
+msgid "{0, plural, one {# línea sin casar} other {# líneas sin casar}}"
+msgstr "{0, plural, one {# unmatched line} other {# unmatched lines}}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Cargando las facturas…"
+msgstr "Loading the invoices…"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Subir factura XML"
+msgstr "Upload invoice XML"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Solo archivos XML (CFDI)."
+msgstr "XML files only (CFDI)."
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/recibos.jsx
+msgid "Filtrar por estado"
+msgstr "Filter by status"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Todas las facturas"
+msgstr "All invoices"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Recargar las facturas"
+msgstr "Reload the invoices"
+
+#: src/screens/invoice-inbox.jsx
+msgid "No se pudieron leer los pedidos de compra. Recarga la lista."
+msgstr "The purchase orders could not be read. Reload the list."
+
+#: src/screens/invoice-inbox.jsx
+msgid "Aún no hay facturas. Sube el archivo XML del proveedor."
+msgstr "There are no invoices yet. Upload the supplier's XML file."
+
+#. placeholder {0}: invoice.issuedOn
+#: src/screens/invoice-inbox.jsx
+msgid "Facturada el {0}"
+msgstr "Invoiced on {0}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Sin fecha de factura"
+msgstr "No invoice date"
+
+#. placeholder {0}: formatMoney(invoice.subtotalMinor, invoice.currency)
+#: src/screens/invoice-inbox.jsx
+msgid "Subtotal {0}"
+msgstr "Subtotal {0}"
+
+#. placeholder {0}: formatMoney(invoice.taxMinor, invoice.currency)
+#: src/screens/invoice-inbox.jsx
+msgid "Impuestos {0}"
+msgstr "Tax {0}"
+
+#. placeholder {0}: tally.matched
+#: src/screens/invoice-inbox.jsx
+msgid "{0, plural, one {# línea casada} other {# líneas casadas}}"
+msgstr "{0, plural, one {# matched line} other {# matched lines}}"
+
+#. placeholder {0}: tally.priceChanged
+#: src/screens/invoice-inbox.jsx
+msgid "{0, plural, one {# cambio de precio} other {# cambios de precio}}"
+msgstr "{0, plural, one {# price change} other {# price changes}}"
+
+#. placeholder {0}: tally.total
+#: src/screens/invoice-inbox.jsx
+msgid "Total de {0} líneas."
+msgstr "Total of {0} lines."
+
+#: src/screens/invoice-inbox.jsx
+msgid "Nº"
+msgstr "No."
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Cantidad"
+msgstr "Quantity"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Cotejo"
+msgstr "Match"
+
+#. placeholder {0}: line.supplierSku
+#: src/screens/invoice-inbox.jsx
+msgid "SKU {0}"
+msgstr "SKU {0}"
+
+#: src/screens/invoice-inbox.jsx
+#: src/screens/invoice-model.js
+msgid "Sin casar"
+msgstr "Unmatched"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Cambió el precio"
+msgstr "Price changed"
+
+#. placeholder {0}: formatMoney(line.lineTotalMinor, invoice.currency)
+#: src/screens/invoice-inbox.jsx
+msgid "Total de la línea {0}"
+msgstr "Line total {0}"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Artículo sin nombre en la respuesta"
+msgstr "Item with no name in the response"
+
+#: src/screens/invoice-inbox.jsx
+msgid "Casa cada línea antes de registrar la entrada."
+msgstr "Match every line before you register the receipt."
+
+#: src/screens/invoice-model.js
+msgid "Cotejo recordado"
+msgstr "Remembered match"
+
+#: src/screens/invoice-model.js
+msgid "Historial de líneas"
+msgstr "Line history"
+
+#: src/screens/invoice-model.js
+msgid "Nombre parecido"
+msgstr "Similar name"
+
+#: src/screens/invoice-model.js
+msgid "Cotejo manual"
+msgstr "Manual match"
+
+#: src/screens/invoice-model.js
+msgid "Recibida"
+msgstr "Uploaded"
+
+#: src/screens/invoice-model.js
+msgid "Leída"
+msgstr "Read"
+
+#: src/screens/invoice-model.js
+msgid "Casada"
+msgstr "Matched"
+
+#: src/screens/invoice-model.js
+msgid "Registrada"
+msgstr "Registered"
+
+#: src/screens/invoice-model.js
+msgid "Rechazada"
+msgstr "Rejected"
+
+#: src/screens/invoice-model.js
+msgid "La factura cobra {current}"
+msgstr "The invoice charges {current}"
+
+#: src/screens/invoice-model.js
+msgid "Antes pagaste {previous}"
+msgstr "You paid {previous} before"
+
+#: src/screens/invoice-model.js
+msgid "El pedido esperaba {order}"
+msgstr "The order expected {order}"
 
 #: src/screens/login.jsx
 msgid "Te enviamos un código de seis dígitos a tu correo."
@@ -2609,157 +4337,100 @@ msgstr "goal: {0}"
 msgid "meta sin configurar"
 msgstr "goal not set"
 
-#. placeholder {0}: formatOperationMoney(expected, it.currency)
-#: src/screens/operations-workspace.jsx
-#~ msgid "Esperado <0>{0}</0>"
-#~ msgstr "Expected <0>{0}</0>"
+#: src/screens/menu-engineering.jsx
+msgid "Estrella"
+msgstr "Star"
 
-#. placeholder {0}: formatOperationMoney(counted, it.currency)
-#: src/screens/operations-workspace.jsx
-#~ msgid "Contado {0}"
-#~ msgstr "Counted {0}"
+#: src/screens/menu-engineering.jsx
+msgid "Caballo de arado"
+msgstr "Plow horse"
 
-#. placeholder {0}: formatOperationMoney(variance, it.currency)
-#: src/screens/operations-workspace.jsx
-#~ msgid "Diferencia {0}"
-#~ msgstr "Variance {0}"
+#: src/screens/menu-engineering.jsx
+msgid "Acertijo"
+msgstr "Puzzle"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Abierto hace {duration}"
-#~ msgstr "Open for {duration}"
+#: src/screens/menu-engineering.jsx
+msgid "Perro"
+msgstr "Dog"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Requiere revisión"
-#~ msgstr "Needs review"
+#: src/screens/menu-engineering.jsx
+msgid "Sin clasificar"
+msgstr "Unclassified"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "en cajones abiertos"
-#~ msgstr "in open drawers"
+#: src/screens/menu-engineering.jsx
+msgid "Se vende mucho y deja buen margen. Es el platillo que sostiene la venta."
+msgstr "It sells well and leaves a good margin. It is the dish that carries the sales."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "turnos con diferencia o bloqueados"
-#~ msgstr "shifts with a variance or blocked"
+#: src/screens/menu-engineering.jsx
+msgid "Se vende mucho pero deja poco margen. Sube el precio o baja su costo."
+msgstr "It sells well but leaves a thin margin. Raise the price or lower its cost."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "turnos cerrados en esta vista"
-#~ msgstr "closed shifts in this view"
+#: src/screens/menu-engineering.jsx
+msgid "Deja buen margen pero se vende poco. Dale más visibilidad en el menú."
+msgstr "It leaves a good margin but sells little. Give it more visibility on the menu."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Sin turnos abiertos."
-#~ msgstr "No open shifts."
+#: src/screens/menu-engineering.jsx
+msgid "Se vende poco y deja poco margen. Revisa si vale la pena mantenerlo."
+msgstr "It sells little and leaves little margin. Check whether it is worth keeping."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Sin turnos cerrados en esta vista."
-#~ msgstr "No closed shifts in this view."
+#: src/screens/menu-engineering.jsx
+msgid "Su receta todavía no se puede costear, así que no tiene clase."
+msgstr "Its recipe cannot be costed yet, so it has no class."
 
-#. placeholder {0}: formatOperationMoney(f.openingFloatMinorUnits, shift.currency)
-#: src/screens/operations-workspace.jsx
-#~ msgid "Fondo {0}"
-#~ msgstr "Float {0}"
+#: src/screens/menu-engineering.jsx
+msgid "Cargando las clases del menú…"
+msgstr "Loading the menu classes…"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "abierto hace {duration}"
-#~ msgstr "open for {duration}"
+#: src/screens/menu-engineering.jsx
+msgid "No se pudieron leer las clases del menú."
+msgstr "The menu classes could not be read."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "{reviewCount, plural, one {# turno requiere tu revisión} other {# turnos requieren tu revisión}}"
-#~ msgstr "{reviewCount, plural, one {# shift needs your review} other {# shifts need your review}}"
+#. placeholder {0}: shortDate(data.from)
+#. placeholder {1}: shortDate(data.to)
+#: src/screens/menu-engineering.jsx
+#: src/screens/variance.jsx
+msgid "Del {0} al {1}"
+msgstr "From {0} to {1}"
 
-#. placeholder {0}: formatOperationMoney(netClosedVariance, currency)
-#: src/screens/operations-workspace.jsx
-#~ msgid "Diferencia neta {0} en turnos cerrados"
-#~ msgstr "Net variance {0} in closed shifts"
+#: src/screens/menu-engineering.jsx
+msgid "Recargar las clases del menú"
+msgstr "Reload the menu classes"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Turnos bloqueados en conciliación"
-#~ msgstr "Shifts blocked in reconciliation"
+#: src/screens/menu-engineering.jsx
+msgid "No hay ventas de platillos en este periodo. Sin ventas no hay clase que calcular."
+msgstr "No dish sales in this period. With no sales there is no class to compute."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Todo cuadrado"
-#~ msgstr "All balanced"
+#: src/screens/menu-engineering.jsx
+msgid "Vendidos"
+msgstr "Sold"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Ningún turno requiere tu atención ahora."
-#~ msgstr "No shift needs your attention now."
+#: src/screens/menu-engineering.jsx
+msgid "Costo del plato"
+msgstr "Dish cost"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Efectivo esperado en cajones"
-#~ msgstr "Expected cash in drawers"
+#: src/screens/menu-engineering.jsx
+msgid "Popularidad %"
+msgstr "Popularity %"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "{openCount, plural, one {En # turno abierto ahora} other {En # turnos abiertos ahora}}"
-#~ msgstr "{openCount, plural, one {In # open shift now} other {In # open shifts now}}"
+#: src/screens/menu-engineering.jsx
+msgid "Margen del menú %"
+msgstr "Menu margin %"
 
-#. placeholder {0}: closed.length
-#: src/screens/operations-workspace.jsx
-#~ msgid "Diferencia neta de {0} turnos cerrados"
-#~ msgstr "Net variance from {0} closed shifts"
+#: src/screens/menu-engineering.jsx
+msgid "Clase"
+msgstr "Class"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Por revisar"
-#~ msgstr "To review"
+#: src/screens/menu-engineering.jsx
+msgid "Su receta todavía no se puede costear"
+msgstr "Its recipe cannot be costed yet"
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Turnos cerrados"
-#~ msgstr "Closed shifts"
+#: src/screens/menu-engineering.jsx
+msgid "La popularidad es la parte de unidades vendidas del periodo. El margen del menú es la parte del margen del periodo que deja este platillo."
+msgstr "Popularity is this dish's share of the units sold in the period. The menu margin is its share of the period's margin."
 
-#: src/screens/operations-workspace.jsx
-#~ msgid "Turnos abiertos y en curso"
-#~ msgstr "Open and in-progress shifts"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Esperado"
-#~ msgstr "Expected"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Contado"
-#~ msgstr "Counted"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Duración"
-#~ msgstr "Duration"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Aún no hay turnos cerrados en esta vista."
-#~ msgstr "No closed shifts in this view yet."
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Total vendido"
-#~ msgstr "Total sold"
-
-#. placeholder {0}: item.publicReference
-#: src/screens/operations-workspace.jsx
-#~ msgid "Copiar {0}"
-#~ msgstr "Copy {0}"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Excepciones"
-#~ msgstr "Exceptions"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Total devuelto"
-#~ msgstr "Total refunded"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "vía PIN de gerente"
-#~ msgstr "with a manager PIN"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "Copiar referencia"
-#~ msgstr "Copy the reference"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "entradas y salidas de efectivo"
-#~ msgstr "cash in and out"
-
-#: src/screens/operations-workspace.jsx
-#~ msgid "aperturas de cajón sin venta"
-#~ msgstr "no-sale drawer opens"
-
-#. placeholder {0}: String(item.status || '').replaceAll('_', ' ')
-#: src/screens/operations-workspace.jsx
-#~ msgid "{0} · {moves} movimientos · {noSaleOpens} sin venta"
-#~ msgstr "{0} · {moves} movements · {noSaleOpens} no-sale"
+#: src/screens/menu-engineering.jsx
+msgid "La clase sale de esas dos cifras, no de una opinión. Si un platillo no se puede costear, no tiene clase: primero arregla su receta."
+msgstr "The class comes from those two figures, not from an opinion. If a dish cannot be costed it has no class: fix its recipe first."
 
 #: src/screens/operations-workspace.jsx
 msgid "No tienes el permiso requerido para esta operación."
@@ -2780,10 +4451,6 @@ msgstr "The physical outcome is unknown. Check the equipment before retrying."
 #: src/screens/operations-workspace.jsx
 msgid "Consulta el comando original en el Centro de recuperación."
 msgstr "Look up the original command in the Recovery center."
-
-#: src/screens/operations-workspace.jsx
-msgid "El servicio no está disponible. Intenta de nuevo después."
-msgstr "The service is unavailable. Try again later."
 
 #: src/screens/operations-workspace.jsx
 msgid "Organización"
@@ -2851,11 +4518,6 @@ msgstr "Checking…"
 #: src/screens/operations-workspace.jsx
 msgid "Consultar elegibilidad"
 msgstr "Check eligibility"
-
-#: src/screens/operations-workspace.jsx
-#: src/screens/reembolsos.jsx
-msgid "Tipo"
-msgstr "Type"
 
 #: src/screens/operations-workspace.jsx
 #: src/screens/reembolsos.jsx
@@ -2930,10 +4592,12 @@ msgid "Ajuste"
 msgstr "Adjustment"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/variance.jsx
 msgid "Merma"
 msgstr "Waste"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/variance.jsx
 msgid "Daño"
 msgstr "Damage"
 
@@ -2953,10 +4617,6 @@ msgstr "Increase"
 #: src/screens/operations-workspace.jsx
 msgid "Reducir"
 msgstr "Decrease"
-
-#: src/screens/operations-workspace.jsx
-msgid "Cantidad"
-msgstr "Quantity"
 
 #: src/screens/operations-workspace.jsx
 msgid "Revisar operación"
@@ -3052,6 +4712,7 @@ msgid "Emitir y revelar"
 msgstr "Issue and reveal"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/recipe-workspace.jsx
 #: src/screens/ventas-report.jsx
 msgid "Producto"
 msgstr "Product"
@@ -3092,15 +4753,6 @@ msgstr "Requires preparation"
 #: src/screens/operations-workspace.jsx
 msgid "Artículo de inventario"
 msgstr "Inventory item"
-
-#: src/screens/operations-workspace.jsx
-#: src/screens/staff.jsx
-msgid "Archivar"
-msgstr "Archive"
-
-#: src/screens/operations-workspace.jsx
-msgid "Registro"
-msgstr "Register"
 
 #: src/screens/operations-workspace.jsx
 msgid "Configurar registro"
@@ -3147,6 +4799,7 @@ msgid "Predeterminada"
 msgstr "Default"
 
 #: src/screens/operations-workspace.jsx
+#: src/screens/recipe-workspace.jsx
 msgid "Objetivo"
 msgstr "Target"
 
@@ -3253,11 +4906,6 @@ msgid "En uso"
 msgstr "In use"
 
 #: src/screens/operations-workspace.jsx
-#: src/screens/registros.jsx
-msgid "Archivado"
-msgstr "Archived"
-
-#: src/screens/operations-workspace.jsx
 msgid "{reviewCount, plural, one {# turno necesita tu revisión.} other {# turnos necesitan tu revisión.}}"
 msgstr "{reviewCount, plural, one {# shift needs your review.} other {# shifts need your review.}}"
 
@@ -3346,10 +4994,6 @@ msgstr "Tax"
 #: src/screens/recibos.jsx
 msgid "Pago"
 msgstr "Payment"
-
-#: src/screens/operations-workspace.jsx
-msgid "Recibido"
-msgstr "Received"
 
 #: src/screens/operations-workspace.jsx
 msgid "Cambio"
@@ -3531,10 +5175,6 @@ msgid "Administrar"
 msgstr "Manage"
 
 #: src/screens/operations-workspace.jsx
-msgid "Referencia"
-msgstr "Reference"
-
-#: src/screens/operations-workspace.jsx
 msgid "Detalle"
 msgstr "Detail"
 
@@ -3547,12 +5187,6 @@ msgstr "Amount"
 #: src/screens/reembolsos.jsx
 msgid "Fecha"
 msgstr "Date"
-
-#: src/screens/operations-workspace.jsx
-#: src/screens/recibos.jsx
-#: src/screens/staff.jsx
-msgid "Acciones"
-msgstr "Actions"
 
 #: src/screens/operations-workspace.jsx
 msgid "Reembolsar"
@@ -3601,10 +5235,6 @@ msgstr "Operational domains"
 #: src/screens/operations.jsx
 msgid "Requiere {0}"
 msgstr "Requires {0}"
-
-#: src/screens/orders.jsx
-#~ msgid "Avanzar estado"
-#~ msgstr "Advance status"
 
 #: src/screens/orders.jsx
 msgid "Preparando"
@@ -3912,6 +5542,58 @@ msgstr "Redemptions"
 msgid "EN VIVO"
 msgstr "LIVE"
 
+#: src/screens/prep-list.jsx
+msgid "No puedes administrar la preparación."
+msgstr "You cannot manage prep."
+
+#: src/screens/prep-list.jsx
+msgid "Cargando la preparación…"
+msgstr "Loading prep…"
+
+#: src/screens/prep-list.jsx
+msgid "Mostrar también los que ya tienen suficiente"
+msgstr "Also show the items that already have enough"
+
+#: src/screens/prep-list.jsx
+msgid "Recargar la preparación"
+msgstr "Reload prep"
+
+#: src/screens/prep-list.jsx
+msgid "Imprimir etiquetas"
+msgstr "Print labels"
+
+#: src/screens/prep-list.jsx
+msgid "Aún no hay artículos con par. Define el par en Inventario."
+msgstr "No items have a par yet. Set the par in Inventory."
+
+#: src/screens/prep-list.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Unidad"
+msgstr "Unit"
+
+#: src/screens/prep-list.jsx
+msgid "Par"
+msgstr "Par"
+
+#: src/screens/prep-list.jsx
+msgid "Uso previsto"
+msgstr "Forecast usage"
+
+#: src/screens/prep-list.jsx
+msgid "Cantidad a preparar"
+msgstr "Quantity to make"
+
+#. placeholder {0}: item.expiresOn
+#: src/screens/prep-list.jsx
+msgid "Caduca el {0}"
+msgstr "Expires on {0}"
+
+#. placeholder {0}: String(from)
+#. placeholder {1}: String(to)
+#: src/screens/prep-model.js
+msgid "Uso previsto del {0} al {1}"
+msgstr "Forecast usage from {0} to {1}"
+
 #: src/screens/products-billing.jsx
 msgid "La consola del dueño: cambiar de café, elegir sucursal y administrar la cuenta."
 msgstr "The owner console: switch cafés, pick a location, and manage the account."
@@ -4069,10 +5751,6 @@ msgid "La sesión se renueva"
 msgstr "Session renews"
 
 #: src/screens/recibos.jsx
-#~ msgid "El recibo oficial se imprime en la caja. Aquí revisas cuáles se imprimieron y puedes ordenar una COPIA controlada cuando el cliente la pide."
-#~ msgstr "The official receipt prints at the register. Here you review which receipts printed. You can order a controlled COPY when the customer asks for one."
-
-#: src/screens/recibos.jsx
 #: src/screens/ventas-report.jsx
 msgid "Terminal manual"
 msgstr "Manual terminal"
@@ -4160,10 +5838,6 @@ msgid "Buscar recibos"
 msgstr "Search receipts"
 
 #: src/screens/recibos.jsx
-msgid "Filtrar por estado"
-msgstr "Filter by status"
-
-#: src/screens/recibos.jsx
 msgid "Recibo"
 msgstr "Receipt"
 
@@ -4174,6 +5848,256 @@ msgstr "No receipt matches your search."
 #: src/screens/recibos.jsx
 msgid "Abre un recibo para ver la venta con sus conceptos, impuestos y forma de pago. El recibo oficial se imprime en la caja; aquí puedes ordenar una COPIA controlada cuando el cliente la pide."
 msgstr "Open a receipt to see the sale: its items, taxes and payment method. The official receipt prints at the register. You can order a controlled COPY here when the customer asks for it."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Sub-receta"
+msgstr "Sub-recipe"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Otra persona guardó una versión nueva de esta receta. Recarga para ver la versión nueva."
+msgstr "Another person saved a new version of this recipe. Reload to see the new version."
+
+#: src/screens/recipe-workspace.jsx
+msgid "La receta se usaría a sí misma. Quita el artículo que forma el ciclo."
+msgstr "The recipe would use itself. Remove the item that makes the cycle."
+
+#: src/screens/recipe-workspace.jsx
+msgid "La receta pasa de 12 niveles. Acorta la cadena de sub-recetas."
+msgstr "The recipe is deeper than 12 levels. Shorten the sub-recipe chain."
+
+#: src/screens/recipe-workspace.jsx
+msgid "La receta ya no existe. Actualiza la lista."
+msgstr "The recipe no longer exists. Refresh the list."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Un artículo ya no existe. Actualiza la lista."
+msgstr "An item no longer exists. Refresh the list."
+
+#: src/screens/recipe-workspace.jsx
+msgid "No puedes administrar las recetas."
+msgstr "You cannot manage recipes."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Cargando las recetas…"
+msgstr "Loading recipes…"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Buscar receta"
+msgstr "Search recipe"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Mostrar retiradas"
+msgstr "Show retired"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Nueva receta"
+msgstr "New recipe"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Aún no hay recetas. Crea la primera."
+msgstr "There are no recipes yet. Create the first one."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Receta"
+msgstr "Recipe"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Rendimiento"
+msgstr "Yield"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Versión"
+msgstr "Version"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Costo por unidad"
+msgstr "Cost per unit"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Retirada"
+msgstr "Retired"
+
+#. placeholder {0}: Number(recipe.usedInRecipeCount) || 0
+#: src/screens/recipe-workspace.jsx
+msgid "{0, plural, one {Se usa en # receta} other {Se usa en # recetas}}"
+msgstr "{0, plural, one {Used in # recipe} other {Used in # recipes}}"
+
+#: src/screens/recipe-workspace.jsx
+msgid "El costo es el de una unidad de rendimiento, calculado con el precio de compra de cada insumo."
+msgstr "The cost is for one unit of yield, calculated from the purchase price of each ingredient."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Leyendo el costeo del servidor…"
+msgstr "Reading the server cost…"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Costeo del servidor"
+msgstr "Server costing"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Una línea no da unidades completas del insumo. El servidor no publica un costo para esta receta."
+msgstr "A line does not divide into whole units of the ingredient. The server publishes no cost for this recipe."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Exacto"
+msgstr "Exact"
+
+#: src/screens/recipe-workspace.jsx
+msgid "No exacto"
+msgstr "Not exact"
+
+#: src/screens/recipe-workspace.jsx
+#: src/screens/reembolsos.jsx
+msgid "Sí"
+msgstr "Yes"
+
+#: src/screens/recipe-workspace.jsx
+msgid "La explosión baja cada sub-receta hasta el insumo. Un insumo sin recepción no tiene precio, y por eso no se muestra un cero."
+msgstr "The explosion goes down through every sub-recipe to the ingredient. An ingredient with no receipt has no price, so no zero shows."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Editar receta"
+msgstr "Edit recipe"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Tipo de objetivo"
+msgstr "Target type"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Elige un producto"
+msgstr "Choose a product"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Variante"
+msgstr "Variant"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Sin variante"
+msgstr "No variant"
+
+#. placeholder {0}: hint.usedInRecipeCount
+#. placeholder {0}: targetSubRecipe.usedInRecipeCount
+#: src/screens/recipe-workspace.jsx
+msgid "{0, plural, one {Sub-receta. Se usa en # receta.} other {Sub-receta. Se usa en # recetas.}}"
+msgstr "{0, plural, one {Sub-recipe. Used in # recipe.} other {Sub-recipe. Used in # recipes.}}"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Este artículo no tiene receta propia."
+msgstr "This item has no recipe of its own."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Decimales"
+msgstr "Decimals"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Escribe la cantidad de rendimiento como un número mayor que cero."
+msgstr "Type the yield quantity as a number greater than zero."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Escribe la vida útil como días completos."
+msgstr "Type the shelf life as whole days."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Componentes"
+msgstr "Components"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Agregar componente"
+msgstr "Add component"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Agrega el primer componente para calcular el costo."
+msgstr "Add the first component to calculate the cost."
+
+#. placeholder {0}: index + 1
+#: src/screens/recipe-workspace.jsx
+msgid "Cantidad del componente {0}"
+msgstr "Quantity of component {0}"
+
+#. placeholder {0}: index + 1
+#: src/screens/recipe-workspace.jsx
+msgid "Quitar el componente {0}"
+msgstr "Remove component {0}"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Elige un artículo de tu inventario."
+msgstr "Choose an item from your inventory."
+
+#. placeholder {0}: item.quantityScale > 0 ? ` (${item.quantityScale} decimales).` : ' (sin decimales).'
+#: src/screens/recipe-workspace.jsx
+msgid "La cantidad no cabe en la escala del artículo{0}"
+msgstr "The quantity does not fit the scale of the item{0}"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Insumo comprado."
+msgstr "Purchased ingredient."
+
+#: src/screens/recipe-workspace.jsx
+msgid "El costo de esta sub-receta aún no se calcula. Revisa los precios de sus insumos."
+msgstr "The cost of this sub-recipe is not calculated yet. Check the prices of its ingredients."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Sin costo base. Registra una recepción de compra."
+msgstr "No cost basis. Record a purchase receipt."
+
+#. placeholder {0}: formatMoney(basis)
+#. placeholder {1}: unitOf(item.baseUnit)
+#: src/screens/recipe-workspace.jsx
+msgid "Costo base: {0} por {1}."
+msgstr "Cost basis: {0} per {1}."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Costo y margen"
+msgstr "Cost and margin"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Costo por unidad de rendimiento"
+msgstr "Cost per unit of yield"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Una cantidad no da unidades completas del artículo. Ajusta el rendimiento o la cantidad. El costo es desconocido, no cero."
+msgstr "A quantity does not divide into whole units of the item. Adjust the yield or the quantity. The cost is unknown, not zero."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Falta el costo de estos artículos. El costo es desconocido, no cero."
+msgstr "These items have no cost. Their cost is unknown, not zero."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Agrega un componente para calcular el costo."
+msgstr "Add a component to calculate the cost."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Una sub-receta no tiene precio de venta, así que no hay margen."
+msgstr "A sub-recipe has no sale price, so there is no margin."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Sin precio no hay margen. Elige el producto para ver su precio."
+msgstr "No price means no margin. Choose the product to see its price."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Esta versión está retirada. No se puede editar."
+msgstr "This version is retired. You cannot edit it."
+
+#. placeholder {0}: formatMoney(recipe.costMinor)
+#: src/screens/recipe-workspace.jsx
+msgid "Costo guardado: {0}. El número de arriba es el cálculo en pantalla."
+msgstr "Saved cost: {0}. The number above is the calculation on screen."
+
+#: src/screens/recipe-workspace.jsx
+msgid "El costo por unidad usa el precio de compra de cada insumo y se redondea una sola vez. Al guardar, la lista muestra el costo que calculó el servidor."
+msgstr "The unit cost uses the purchase price of each ingredient and is rounded only once. After you save, the list shows the cost the server calculated."
+
+#: src/screens/recipe-workspace.jsx
+msgid "Confirmar retirada"
+msgstr "Confirm retire"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Retirar"
+msgstr "Retire"
+
+#: src/screens/recipe-workspace.jsx
+msgid "Guardar escribe una versión nueva y retira la anterior."
+msgstr "Saving writes a new version and retires the old one."
 
 #: src/screens/reembolsos.jsx
 msgid "Parciales"
@@ -4218,10 +6142,6 @@ msgstr "Original receipt"
 #: src/screens/reembolsos.jsx
 msgid "Aprobación"
 msgstr "Approval"
-
-#: src/screens/reembolsos.jsx
-msgid "Sí"
-msgstr "Yes"
 
 #: src/screens/registros.jsx
 msgid "Cajas en uso"
@@ -4316,10 +6236,6 @@ msgid "Formal"
 msgstr "Formal"
 
 #: src/screens/settings.jsx
-msgid "Activa"
-msgstr "Active"
-
-#: src/screens/settings.jsx
 msgid "En periodo de prueba"
 msgstr "In trial period"
 
@@ -4362,14 +6278,6 @@ msgstr "Cash is not active: only business and operation settings are saved."
 #: src/screens/settings.jsx
 msgid "Información del negocio"
 msgstr "Business information"
-
-#: src/screens/settings.jsx
-msgid "Nombre del negocio"
-msgstr "Business name"
-
-#: src/screens/settings.jsx
-msgid "Ciudad"
-msgstr "City"
 
 #: src/screens/settings.jsx
 msgid "Inicio del día operativo"
@@ -4665,14 +6573,6 @@ msgid "Pin"
 msgstr "Pin"
 
 #: src/screens/settings.jsx
-msgid "Latitud"
-msgstr "Latitude"
-
-#: src/screens/settings.jsx
-msgid "Longitud"
-msgstr "Longitude"
-
-#: src/screens/settings.jsx
 msgid "No encontramos esa dirección. Puedes escribir el pin a mano."
 msgstr "We could not find that address. You can type the pin by hand."
 
@@ -4687,6 +6587,10 @@ msgstr "It could not be saved. Retry."
 #: src/screens/settings.jsx
 msgid "Nombre de la sucursal"
 msgstr "Location name"
+
+#: src/screens/settings.jsx
+msgid "Estado del negocio"
+msgstr "Business status"
 
 #: src/screens/settings.jsx
 msgid "Abierta"
@@ -4707,10 +6611,6 @@ msgstr "Unsaved"
 #: src/screens/settings.jsx
 msgid "✓ Guardado"
 msgstr "✓ Saved"
-
-#: src/screens/settings.jsx
-msgid "Reintentar"
-msgstr "Retry"
 
 #: src/screens/settings.jsx
 msgid "Apodos (cómo la llaman los clientes)"
@@ -5006,13 +6906,104 @@ msgstr "Enter the person's name."
 msgid "Guardar acceso"
 msgstr "Save access"
 
-#: src/screens/ventas-report.jsx
-#~ msgid "Productos más vendidos"
-#~ msgstr "Top-selling products"
+#: src/screens/variance-model.js
+msgid "existencia disponible"
+msgstr "available stock"
 
-#: src/screens/ventas-report.jsx
-#~ msgid "Aún no hay ventas en este periodo."
-#~ msgstr "No sales in this period yet."
+#: src/screens/variance.jsx
+msgid "Cargando la variación de uso…"
+msgstr "Loading the usage variance…"
+
+#: src/screens/variance.jsx
+msgid "No se pudo leer la variación de uso."
+msgstr "The usage variance could not be read."
+
+#. placeholder {0}: shortDate(data.from)
+#. placeholder {1}: shortDate(data.to)
+#. placeholder {2}: i18n._(basis)
+#: src/screens/variance.jsx
+msgid "Del {0} al {1} · Base: {2}"
+msgstr "From {0} to {1} · Basis: {2}"
+
+#: src/screens/variance.jsx
+msgid "Recargar la variación"
+msgstr "Reload the variance"
+
+#: src/screens/variance.jsx
+msgid "Variación del periodo"
+msgstr "Variance for the period"
+
+#: src/screens/variance.jsx
+msgid "Lo que salió menos lo que las ventas explican"
+msgstr "What left stock minus what the sales explain"
+
+#: src/screens/variance.jsx
+msgid "Sin explicar"
+msgstr "Unexplained"
+
+#: src/screens/variance.jsx
+msgid "Lo que ninguna merma, daño ni ajuste explica"
+msgstr "What no waste, damage or correction explains"
+
+#: src/screens/variance.jsx
+msgid "Insumos"
+msgstr "Ingredients"
+
+#: src/screens/variance.jsx
+msgid "Con movimiento en el periodo"
+msgstr "With movement in the period"
+
+#: src/screens/variance.jsx
+msgid "Sin explicar a fondo"
+msgstr "Mostly unexplained"
+
+#: src/screens/variance.jsx
+msgid "Insumos donde el resto es la mayor parte de la variación"
+msgstr "Ingredients where the remainder is most of the variance"
+
+#: src/screens/variance.jsx
+msgid "No hay insumos con movimiento en este periodo. Registra una recepción o un conteo para empezar a medir la variación."
+msgstr "No ingredient moved in this period. Record a receipt or a count to start measuring the variance."
+
+#: src/screens/variance.jsx
+msgid "Inicial"
+msgstr "Opening"
+
+#: src/screens/variance.jsx
+msgid "Producido"
+msgstr "Produced"
+
+#: src/screens/variance.jsx
+msgid "Final"
+msgstr "Closing"
+
+#: src/screens/variance.jsx
+msgid "Uso real"
+msgstr "Actual use"
+
+#: src/screens/variance.jsx
+msgid "Uso teórico"
+msgstr "Theoretical use"
+
+#: src/screens/variance.jsx
+msgid "Ajuste de conteo"
+msgstr "Count correction"
+
+#: src/screens/variance.jsx
+msgid "Pérdida de rendimiento"
+msgstr "Yield loss"
+
+#: src/screens/variance.jsx
+msgid "La respuesta no cuadra"
+msgstr "The answer does not add up"
+
+#: src/screens/variance.jsx
+msgid "El uso real es la existencia inicial más lo recibido y lo producido, menos la existencia final. La variación es el uso real menos lo que la receta de las ventas dice."
+msgstr "Actual use is the opening stock plus what arrived and what was produced, minus the closing stock. The variance is the actual use minus what the recipe of the sales says."
+
+#: src/screens/variance.jsx
+msgid "La merma, el daño, el ajuste de conteo y la pérdida de rendimiento tienen nombre. Lo demás no lo tiene, y esa es la cifra que hay que perseguir."
+msgstr "Waste, damage, count correction and yield loss have a name. The rest does not, and that is the number to chase."
 
 #: src/screens/ventas-report.jsx
 msgid "7 días"
@@ -5075,10 +7066,6 @@ msgid "Unidades"
 msgstr "Units"
 
 #: src/screens/ventas-report.jsx
-msgid "Venta neta"
-msgstr "Net sales"
-
-#: src/screens/ventas-report.jsx
 msgid "% del total"
 msgstr "% of total"
 
@@ -5129,23 +7116,6 @@ msgstr "Items sold"
 #: src/screens/ventas-report.jsx
 msgid "Propinas"
 msgstr "Tips"
-
-#. placeholder {0}: THEME_NAME[resolveTheme('system')]
-#: src/shell.jsx
-#~ msgid "Sistema ({0})"
-#~ msgstr "System ({0})"
-
-#: src/shell.jsx
-#~ msgid "Consola del dueño"
-#~ msgstr "Owner console"
-
-#: src/shell.jsx
-#~ msgid "Tema: {current}. Cambiar a {nextLabel}."
-#~ msgstr "Theme: {current}. Switch to {nextLabel}."
-
-#: src/shell.jsx
-#~ msgid "Tema actual: {current}. Cambiar a {nextLabel}."
-#~ msgstr "Current theme: {current}. Switch to {nextLabel}."
 
 #: src/shell.jsx
 msgid "Tema"

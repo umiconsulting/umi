@@ -1,3 +1,4 @@
+import { buildPath } from '@umi/contract/route-table';
 import { t } from '@lingui/core/macro';
 import {
   useState as useStateD,
@@ -6,9 +7,15 @@ import {
   useRef as useRefD,
 } from 'react';
 import { LIVE as _LIVE, COOKIE_AUTH, apiUrl, withCreds, errMessage } from '@/lib/config.js';
-import { getAuthHeaders, refreshSession, handleSessionExpired } from '@/lib/auth.jsx';
+import {
+  getAuthHeaders,
+  refreshSession,
+  handleSessionExpired,
+  REFRESH_OK,
+  REFRESH_DEAD,
+} from '@/lib/auth.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
-import { isProductActive } from '@/lib/module-registry.js';
+import { MODULES, hasRequiredPermission, isProductActive } from '@/lib/module-registry.js';
 import { routes } from '@umi/contract/routes';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { subscribeConversationMessages } from '@/lib/conversation-realtime.js';
@@ -63,6 +70,24 @@ function _active(ctx, productKey) {
   return isProductActive(productKey, ctx?.capabilities);
 }
 
+/**
+ * May this operator read the café's cash admin surface (`/api/{ref}/admin/settings`)?
+ *
+ * That route is the SETTINGS module's surface, and both its halves are gated on
+ * `merchant.manage` (`apps/umi-api/src/modules/cash/cash.controller.ts`) — the
+ * registry says the same thing, so the question is asked of the registry rather
+ * than re-typed here. A café product and a permission is all it takes.
+ *
+ * The shell mounts `_loadMerchant` on EVERY screen, so an un-gated call was one
+ * 403 per screen load for a cashier. The `.catch` kept it invisible, which is
+ * exactly why it survived: silent noise, and the café's branding never resolved
+ * from that path. `_loadMerchant` now skips the call and keeps its existing
+ * fallbacks (`cashSettings?.x || s.x`).
+ */
+function _canReadCashSettings(ctx) {
+  return _active(ctx, 'cash') && hasRequiredPermission(MODULES.settings, ctx?.capabilities);
+}
+
 function _withLocation(ctx, path) {
   const locationId = _locationId(ctx);
   if (!locationId) return path;
@@ -95,17 +120,33 @@ async function _apiFetch(path, opts, _retried) {
   );
 
   // Cookie-mode session recovery: a 401 means the short-lived access cookie
-  // expired. Refresh once (single-flight) and retry the request. If refresh
-  // fails, the session is truly dead → clear it and bounce to /login.
+  // expired. Refresh once (single-flight) and retry the request.
+  //
+  // ⚠️ Only a DEAD refresh may sign the operator out. A transient one (429 from
+  // the rate limiter, a 5xx, a dropped connection) leaves the refresh cookie
+  // valid, so the session — and localStorage — must survive it; bouncing to
+  // /login here is what logged operators out on a hiccup. The failed screen keeps
+  // its own error state, and the shell's connection indicator already reports the
+  // API as unreachable.
   if (res.status === 401 && COOKIE_AUTH && !_retried && !path.includes('/api/auth/')) {
-    const ok = await refreshSession();
-    if (ok) return _apiFetch(path, opts, true);
-    handleSessionExpired();
-    const dead = new Error(t`Sesión expirada`);
-    dead.status = 401;
-    dead.code = 'session_expired';
-    dead.path = path;
-    throw dead;
+    const outcome = await refreshSession();
+    if (outcome === REFRESH_OK) return _apiFetch(path, opts, true);
+    if (outcome === REFRESH_DEAD) {
+      handleSessionExpired();
+      const dead = new Error(t`Sesión expirada`);
+      dead.status = 401;
+      dead.code = 'session_expired';
+      dead.path = path;
+      throw dead;
+    }
+    // Transient: the API is unreachable or rate-limiting us, not refusing us.
+    // Report the degraded state and leave the session alone — auth.jsx has armed
+    // a bounded retry, and the next successful refresh retries this request.
+    const deferred = new Error(t`El servicio no está disponible. Intenta de nuevo después.`);
+    deferred.status = 503;
+    deferred.code = 'session_refresh_deferred';
+    deferred.path = path;
+    throw deferred;
   }
 
   const payload = await res.json().catch(() => ({}));
@@ -190,6 +231,12 @@ function _deps(ctx, extra) {
     products.cash?.status || '',
     products.kds?.status || '',
     products.conversaflow?.status || '',
+    // `_loadMerchant` branches on one permission before it will call the cash
+    // admin surface. A loader's deps carry everything it branches on — the same
+    // rule the product statuses above follow — or it can answer from a stale
+    // read: the first pass runs before the capabilities resolve, when the
+    // permission list is still empty.
+    _canReadCashSettings(ctx) ? 'cash-settings' : '',
     ...(extra || []),
   ];
 }
@@ -352,7 +399,9 @@ async function _loadMerchant(ctx) {
   // Reach the cash admin surface by merchant ID, not by the published handle. The two
   // used to be the same string; they are not, and a café created after cutover has no
   // handle at all. The route accepts either, and the id is the one that always exists.
-  const cashSettings = _active(ctx, 'cash')
+  // Permission-gated on the server (`merchant.manage`); a role that cannot read it
+  // does not ask, and falls through to the merchant record below.
+  const cashSettings = _canReadCashSettings(ctx)
     ? await _apiFetch(`/api/${encodeURIComponent(_merchantId(ctx))}/admin/settings`).catch(
         () => null,
       )
@@ -828,6 +877,141 @@ async function denyPosEnrollmentRequest(requestId, locationId) {
       method: 'POST',
       body: JSON.stringify({ idempotencyKey: crypto.randomUUID() }),
     },
+  );
+}
+
+// ── Mercado Pago Point: the café's own account, and its terminals (Phase 5) ──
+//
+// `routes` has no `mpPoint` group yet, so these routes are addressed by their ids in
+// the route table — the single author of the URL space — rather than by a path typed here.
+//
+// NOTHING IN THIS SECTION EVER CARRIES A TOKEN. The status route answers with the account
+// and the token's HEALTH; the authorization route answers with a URL to send the BROWSER
+// to, and the exchange happens server-side on the way back. The screen cannot leak what it
+// is never given.
+
+function _mpPointMerchantId() {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return merchantId;
+}
+
+async function getMpPointCredentialStatus() {
+  return _apiFetch(buildPath('mpPoint.status', { merchantId: _mpPointMerchantId() }));
+}
+
+/**
+ * Where to send the seller, and when that invitation stops being valid. The caller performs
+ * a FULL navigation to `url` — the vendor's page is where the approval happens — so this is
+ * a read, not a mutation, and the outcome arrives on the callback's redirect to `/devices`.
+ */
+async function getMpPointAuthorization() {
+  return _apiFetch(buildPath('mpPoint.authorize', { merchantId: _mpPointMerchantId() }));
+}
+
+async function getMpPointTerminals() {
+  return _apiFetch(buildPath('mpPoint.terminalList', { merchantId: _mpPointMerchantId() }));
+}
+
+/**
+ * Binding a terminal to a register, and choosing which side drives it, in ONE call: the
+ * route takes the complete binding, so a mode switch that did not restate the register (or
+ * the reverse) would be a half-write the database's `unique (device_id)` would refuse.
+ */
+async function bindMpPointTerminal(terminalId, binding) {
+  return _apiFetch(
+    buildPath('mpPoint.terminalBind', { merchantId: _mpPointMerchantId(), terminalId }),
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        terminalId,
+        deviceId: binding.deviceId,
+        locationId: binding.locationId,
+        operatingMode: binding.operatingMode,
+      }),
+    },
+  );
+}
+
+/** The register keeps its credential; the terminal simply stops belonging to it. */
+async function unbindMpPointTerminal(terminalId) {
+  return _apiFetch(
+    buildPath('mpPoint.terminalUnbind', { merchantId: _mpPointMerchantId(), terminalId }),
+    { method: 'DELETE' },
+  );
+}
+
+/**
+ * STOP CHARGING THIS ACCOUNT.
+ *
+ * The server answers with the status AFTER the change, so the caller re-renders from the
+ * answer rather than from an assumption — and the route is idempotent, so a double click is
+ * one unlink. A DELETE verb and no body: the vendor-side material is what ends, and the
+ * café's row survives it (`mpPoint.disconnect` in the route table says why).
+ */
+async function disconnectMpPointAccount() {
+  return _apiFetch(buildPath('mpPoint.disconnect', { merchantId: _mpPointMerchantId() }), {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * CREATE THE CAFÉ'S ONE STORE, from the address an operator typed.
+ *
+ * The vendor requires a store before it will hold a point of sale, and it validates the
+ * address against its own catalogue — so the address is the one field on this screen that a
+ * PERSON supplies and no code here invents. A POST with no idempotency key is still one
+ * store: the server derives the vendor's `external_id` from the merchant, so a retry
+ * collides at the vendor rather than opening a second store with a second fiscal address.
+ *
+ * The refusal that matters is `MP_POINT_STORE_REFUSED`, whose `details.vendorCode` names
+ * WHICH field the vendor rejected (`invalid_city` and friends); the screen shows that code,
+ * because "the address was refused" leaves the operator with nothing to change.
+ */
+async function createMpPointStore(address) {
+  return _apiFetch(buildPath('mpPoint.storeCreate', { merchantId: _mpPointMerchantId() }), {
+    method: 'POST',
+    body: JSON.stringify({
+      name: address.name,
+      streetName: address.streetName,
+      streetNumber: address.streetNumber,
+      cityName: address.cityName,
+      stateName: address.stateName,
+      latitude: address.latitude,
+      longitude: address.longitude,
+      reference: address.reference,
+    }),
+  });
+}
+
+const EMPTY_MP_POINT = { status: null, terminals: null };
+
+async function _loadMpPoint(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  const status = await _apiFetch(buildPath('mpPoint.status', { merchantId }));
+  // A café with no credential has no terminal list to read: that list is the VENDOR's
+  // answer about that merchant's account, so asking for it without one is a guaranteed
+  // refusal. `terminals: null` says "never asked", which the screen renders as the same
+  // connect prompt rather than as an error the operator cannot act on.
+  if (!status.connected) return { status, terminals: null };
+  const list = await _apiFetch(buildPath('mpPoint.terminalList', { merchantId }));
+  return { status, terminals: list.terminals || [] };
+}
+
+/**
+ * The account and its terminals, read as one picture for the same reason the POS
+ * enrollment pair is: a terminal row without its account says nothing about which API key
+ * a row's left half and its controls come from.
+ */
+function useMpPointData(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadMpPoint(ctx);
+    },
+    _deps(ctx, [refresh || 0]),
+    EMPTY_MP_POINT,
   );
 }
 
@@ -1596,6 +1780,26 @@ export {
   revokePosDevice,
   approvePosEnrollmentRequest,
   denyPosEnrollmentRequest,
+  // Data-module functions, not components. They carry the disable for the same reason
+  // `creditLoyaltySeals` above does: this file has always been a data module, and the rule
+  // exists to protect fast refresh in files that export components. Marking them keeps the
+  // baseline flat instead of raising it once per feature.
+  // eslint-disable-next-line react-refresh/only-export-components
+  getMpPointCredentialStatus,
+  // eslint-disable-next-line react-refresh/only-export-components
+  getMpPointAuthorization,
+  // eslint-disable-next-line react-refresh/only-export-components
+  getMpPointTerminals,
+  // eslint-disable-next-line react-refresh/only-export-components
+  bindMpPointTerminal,
+  // eslint-disable-next-line react-refresh/only-export-components
+  unbindMpPointTerminal,
+  // eslint-disable-next-line react-refresh/only-export-components
+  disconnectMpPointAccount,
+  // eslint-disable-next-line react-refresh/only-export-components
+  createMpPointStore,
+  // eslint-disable-next-line react-refresh/only-export-components
+  useMpPointData,
   approveDevicePairing,
   denyDevicePairing,
   updateDevice,
@@ -1613,3 +1817,687 @@ export {
   updateCatalogCategory,
   _LIVE as DATA_IS_LIVE,
 };
+
+// ── Floor plan (workstream D) ────────────────────────────────────────────────
+// Both halves capture the location at the CALL SITE. The editor's autosave can
+// land after the operator has switched branch in the topbar, and a save that
+// carried the new branch's id would rewrite a dining room nobody is looking at —
+// so the caller passes the scope it drew, never a value read at send time.
+//
+// They stay in this module, and carry the same suppression as the other
+// non-component exports above, because `_apiFetch` is what gives them the
+// cookie-session recovery (a save landing on an expired access cookie must
+// refresh and retry, not fall over).
+// eslint-disable-next-line react-refresh/only-export-components
+export function fetchFloorPlan(merchantId, locationId) {
+  return _apiFetch(
+    `${buildPath('floorPlan.read', { merchantId })}?locationId=${encodeURIComponent(locationId)}`,
+  );
+}
+// eslint-disable-next-line react-refresh/only-export-components
+export function changeFloorPlan(merchantId, payload, publish = false) {
+  return _apiFetch(buildPath(publish ? 'floorPlan.publish' : 'floorPlan.save', { merchantId }), {
+    method: publish ? 'POST' : 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+// The live state of the room, for the map the same screen edits (workstream D
+// steps 3 and 5). The layout above says which tables exist; this says who is on
+// them. It is a separate read with a separate lifetime — the editor is open for
+// minutes and a seating lasts ninety — so the screen polls one and not the other.
+//
+// A read failure is NOT a load failure. The editor keeps working on the last
+// room it saw, because a manager who cannot read the room must still be able to
+// edit the floor.
+// eslint-disable-next-line react-refresh/only-export-components
+export function fetchTableState(merchantId, locationId) {
+  return _apiFetch(
+    `${buildPath('tableState.read', { merchantId })}?locationId=${encodeURIComponent(locationId)}`,
+  );
+}
+
+// ── Inventory costing: the cost of a plate, a day, and what is about to run out ──
+//
+// Workstream E steps 5 and 6, rendered by the Costos y márgenes screen. Four reads,
+// gated by `merchant.manage` like purchasing — an owner's question about money, not an
+// operator's about stock, which is why a dashboard session can reach them and the
+// till's `inventory.*` keys are not involved.
+//
+// ⚠️ THE WINDOW IS THE SERVER'S, NOT THE BROWSER'S. A business date belongs to the
+// café's timezone, so a screen that computed its own "today" would ask a different
+// question than the API answers. The first read is `low-stock` with just a length,
+// and the `from`/`to` it echoes back are the window every other read is then given.
+// No date arithmetic happens in this module at all.
+//
+// ⚠️ ONE FAILING READ IS NOT A BLANK SCREEN. The three reads that hang off the window
+// go out together and are allowed to fail separately: a menu with no recipes has no
+// plates to cost but still has stock to forecast, and a person who came to see what is
+// about to run out should not be shown nothing because the margin column is empty.
+// `partial` names the reads that failed, so the screen can say which.
+//
+// `includeUnmapped` is deliberate, and it is D47's rule applied to this screen: a
+// product nobody said what it consumes costs an UNKNOWN amount, and asking only for
+// the mapped ones would leave the café's 121 un-reciped products invisible. The screen
+// counts them in the open, so "no recipe" is a number a person can act on.
+const EMPTY_COSTING = {
+  window: null,
+  days: [],
+  plates: [],
+  forecast: [],
+  basis: [],
+  receiptLocations: [],
+  truncated: false,
+  partial: [],
+};
+
+async function _loadInventoryCosting(ctx, rangeDays) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId) return EMPTY_COSTING;
+  const length = Number(rangeDays) > 0 ? Number(rangeDays) : 28;
+
+  const forecast = await _apiFetch(
+    _withLocation(ctx, _merchantPath(ctx, `/inventory-costing/low-stock?windowDays=${length}`)),
+  );
+  const from = forecast.from;
+  const to = forecast.to;
+
+  const [daysRead, platesRead, basisRead] = await Promise.allSettled([
+    _apiFetch(
+      _withLocation(ctx, _merchantPath(ctx, `/inventory-costing/days?from=${from}&to=${to}`)),
+    ),
+    _apiFetch(
+      _merchantPath(
+        ctx,
+        `/inventory-costing/plates?includeUnmapped=true&consumptionFrom=${from}&consumptionTo=${to}&limit=200`,
+      ),
+    ),
+    _apiFetch(_merchantPath(ctx, '/inventory-costing/cost-basis?includeWithoutReceipts=true')),
+  ]);
+
+  const partial = [];
+  if (daysRead.status !== 'fulfilled') partial.push('days');
+  if (platesRead.status !== 'fulfilled') partial.push('plates');
+  if (basisRead.status !== 'fulfilled') partial.push('basis');
+  if (partial.length === 3) {
+    const first = [daysRead, platesRead, basisRead].find((read) => read.status === 'rejected');
+    throw first.reason ?? new Error(t`No se pudo leer el costo`);
+  }
+
+  return {
+    window: { from, to, days: forecast.windowDays, locationId: forecast.locationId ?? null },
+    days: daysRead.status === 'fulfilled' ? daysRead.value.days || [] : [],
+    plates: platesRead.status === 'fulfilled' ? platesRead.value.plates || [] : [],
+    forecast: forecast.items || [],
+    basis: basisRead.status === 'fulfilled' ? basisRead.value.items || [] : [],
+    receiptLocations:
+      basisRead.status === 'fulfilled' ? basisRead.value.receiptLocations || [] : [],
+    truncated: platesRead.status === 'fulfilled' ? Boolean(platesRead.value.truncated) : false,
+    partial,
+  };
+}
+
+// The Costos y márgenes screen's one read. Re-fetches when the range, merchant or
+// location changes; the location is in `_deps` because two of the four reads are
+// location-scoped and would otherwise answer from the previous branch.
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryCosting(rangeDays) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadInventoryCosting(ctx, rangeDays);
+    },
+    _deps(ctx, [String(Number(rangeDays) > 0 ? Number(rangeDays) : 28)]),
+    EMPTY_COSTING,
+  );
+}
+
+// ── Console inventory authoring: items, conversions and allergens ────────────
+//
+// The three reads behind `Catálogo e inventario → Inventario` (recipes module plan
+// §7 and §11 Phase 1). They are gated by `merchant.manage` on the server, and the
+// `catalog-inventory` module is opened by `catalog.read` OR `inventory.read`, so a
+// cashier can reach the tab. A loader that fired anyway would answer with a 403 on
+// every pass, so `_canManageInventory` keeps the request off the wire and the
+// screen renders its own notice.
+//
+// `_deps` carries the permission because a capability set resolves after the first
+// render: without it the loader would read the empty list the first pass produced
+// and never ask again.
+const EMPTY_INVENTORY_ITEMS = { items: [], page: null, correlationId: null, costedIds: [] };
+const EMPTY_INVENTORY_CONVERSIONS = { items: [], page: null, correlationId: null };
+const EMPTY_INVENTORY_ALLERGENS = { allergens: [], page: null, correlationId: null };
+
+function _canManageInventory(ctx) {
+  return hasRequiredPermission({ permissions: ['merchant.manage'] }, ctx?.capabilities);
+}
+
+// ⚠️ `includeItemsWithoutCost=false` is OMITTED, not sent. The query model coerces
+// its booleans (`z.coerce.boolean()`), and `Boolean('false')` is TRUE, so sending
+// the string would ask for the opposite of what it says. The default is false, so
+// the second read asks the narrow question and the two answers together say which
+// items no receipt has ever priced. The list marks those `Sin costo` instead of
+// showing a zero the read never returned.
+async function _loadInventoryItems(ctx, includeArchived) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_INVENTORY_ITEMS;
+  const query = new URLSearchParams({ limit: '100' });
+  if (includeArchived) query.set('includeArchived', 'true');
+  const base = routes.inventory.items(merchantId);
+  const [withCost, costedOnly] = await Promise.all([
+    _apiFetch(`${base}?${query.toString()}&includeItemsWithoutCost=true`),
+    _apiFetch(`${base}?${query.toString()}`),
+  ]);
+  return {
+    items: (withCost && withCost.items) || [],
+    page: (withCost && withCost.page) || null,
+    correlationId: (withCost && withCost.correlationId) || null,
+    costedIds: ((costedOnly && costedOnly.items) || []).map((item) => item.id),
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryItems(options, refresh) {
+  const ctx = useMerchant();
+  const includeArchived = options?.includeArchived === true;
+  return _useAsync(
+    function () {
+      return _loadInventoryItems(ctx, includeArchived);
+    },
+    _deps(ctx, [
+      _canManageInventory(ctx) ? 'manage' : 'no-manage',
+      includeArchived ? 'archived' : 'active',
+      refresh || 0,
+    ]),
+    EMPTY_INVENTORY_ITEMS,
+  );
+}
+
+// The flat conversion read. The item read already nests its own conversions, so
+// this is the second answer: `inventory-workspace` merges them and the item's own
+// list wins.
+async function _loadInventoryUnitConversions(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_INVENTORY_CONVERSIONS;
+  const response = await _apiFetch(`${routes.inventory.unitConversions(merchantId)}?limit=100`);
+  return {
+    items: (response && response.items) || [],
+    page: (response && response.page) || null,
+    correlationId: (response && response.correlationId) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryUnitConversions(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadInventoryUnitConversions(ctx);
+    },
+    _deps(ctx, [_canManageInventory(ctx) ? 'manage' : 'no-manage', refresh || 0]),
+    EMPTY_INVENTORY_CONVERSIONS,
+  );
+}
+
+// The merchant's allergen labels. Inactive labels stay readable so the panel can
+// switch them back on, which is what the `includeInactive` flag is for.
+async function _loadInventoryAllergens(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_INVENTORY_ALLERGENS;
+  const response = await _apiFetch(
+    // 100 is the page cap the contract states (`InventoryAllergenQuery.limit` and
+    // `PageInfo.limit` agree on it). Asking for 200 was refused with VALIDATION_FAILED,
+    // and the refusal read as an empty label list on the screen.
+    `${routes.inventory.allergens(merchantId)}?limit=100&includeInactive=true`,
+  );
+  return {
+    allergens: (response && response.allergens) || [],
+    page: (response && response.page) || null,
+    correlationId: (response && response.correlationId) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryAllergens(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadInventoryAllergens(ctx);
+    },
+    _deps(ctx, [_canManageInventory(ctx) ? 'manage' : 'no-manage', refresh || 0]),
+    EMPTY_INVENTORY_ALLERGENS,
+  );
+}
+
+// ── Console recipes: the Recetas tab (recipes module plan §7 and §11 Phase 2) ──
+//
+// Three reads behind `Catálogo e inventario → Recetas`, plus the explosion on
+// demand for one recipe. All of them are gated on `merchant.manage` on the server,
+// and the tab is reachable with `catalog.read` OR `inventory.read`, so the same
+// `_canManageInventory` guard the item loaders use keeps a cashier's pass off the
+// wire. A recipe that is being edited is read again after every save, because the
+// server's answer is the cost the list shows.
+const EMPTY_INVENTORY_RECIPES = { recipes: [], page: null, correlationId: null };
+
+async function _loadInventoryRecipes(ctx, includeRetired) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_INVENTORY_RECIPES;
+  // 100 is the page cap the contract states (`InventoryRecipeQuery.limit`). A café
+  // with more recipes pages later; asking for more is refused as VALIDATION_FAILED,
+  // and a refusal reads as an empty recipe list.
+  const query = new URLSearchParams({ limit: '100' });
+  if (includeRetired) query.set('includeRetired', 'true');
+  const response = await _apiFetch(`${routes.inventory.recipes(merchantId)}?${query.toString()}`);
+  return {
+    recipes: (response && response.recipes) || [],
+    page: (response && response.page) || null,
+    correlationId: (response && response.correlationId) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryRecipes(options, refresh) {
+  const ctx = useMerchant();
+  const includeRetired = options?.includeRetired === true;
+  return _useAsync(
+    function () {
+      return _loadInventoryRecipes(ctx, includeRetired);
+    },
+    _deps(ctx, [
+      _canManageInventory(ctx) ? 'manage' : 'no-manage',
+      includeRetired ? 'retired' : 'active',
+      refresh || 0,
+    ]),
+    EMPTY_INVENTORY_RECIPES,
+  );
+}
+
+// One recipe exploded to its raw items. This is where the `exact` answer lives:
+// `quantity` is floored and both costs are null when the rational does not divide
+// at the item's scale, so the editor can say so instead of printing a rounded cost.
+const EMPTY_RECIPE_EXPLOSION = {
+  recipeId: null,
+  targetKind: null,
+  targetItemId: null,
+  depth: 0,
+  items: [],
+};
+
+async function _loadInventoryRecipeExplosion(ctx, recipeId) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !recipeId || !_canManageInventory(ctx)) return EMPTY_RECIPE_EXPLOSION;
+  const response = await _apiFetch(routes.inventory.recipeExplosion(merchantId, recipeId));
+  return Object.assign({}, EMPTY_RECIPE_EXPLOSION, response || {});
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryRecipeExplosion(recipeId, refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadInventoryRecipeExplosion(ctx, recipeId);
+    },
+    _deps(ctx, [_canManageInventory(ctx) ? 'manage' : 'no-manage', recipeId || '', refresh || 0]),
+    EMPTY_RECIPE_EXPLOSION,
+  );
+}
+
+// The target picker's list: what a recipe can be built for, with the menu price the
+// margin is measured against.
+//
+// ⚠️ THE MENU READ IS THE PLATE READ, AND THAT IS DELIBERATE. It is the only
+// session-authenticated read that names a PRODUCT, a VARIANT and their price in one
+// answer, and it is gated on `merchant.manage` rather than on `catalog.read`. The
+// operations catalogue read is the alternative, and it needs a permission this tab
+// does not require. Its limit is the read's own 200-plate cap.
+//
+// ⚠️ A KNOWN LIMIT. A variant appears when the catalogue already maps that variant.
+// The console has no variant-catalogue read today, so a variant with no mapping
+// cannot be chosen. A product-level target is always offered, because
+// `includeUnmapped=true` lists every active product.
+const EMPTY_RECIPE_TARGETS = { targets: [], truncated: false };
+
+async function _loadRecipeTargets(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_RECIPE_TARGETS;
+  const response = await _apiFetch(
+    _merchantPath(ctx, '/inventory-costing/plates?includeUnmapped=true&limit=200'),
+  );
+  return {
+    targets: ((response && response.plates) || []).map((plate) => ({
+      productId: plate.productId,
+      productName: plate.productName,
+      productActive: plate.productActive,
+      variantId: plate.variantId || null,
+      variantName: plate.variantName || null,
+      priceMinor: plate.priceMinor,
+    })),
+    truncated: Boolean(response && response.truncated),
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useRecipeTargets(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadRecipeTargets(ctx);
+    },
+    _deps(ctx, [_canManageInventory(ctx) ? 'manage' : 'no-manage', refresh || 0]),
+    EMPTY_RECIPE_TARGETS,
+  );
+}
+
+// The cost basis of every item, including the ones no receipt has priced. The
+// editor's live arithmetic needs it, and the four-read costing snapshot would be
+// three reads of noise for this one table.
+const EMPTY_INVENTORY_COST_BASIS = { items: [], receiptLocations: [], asOf: null };
+
+async function _loadInventoryCostBasis(ctx) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_INVENTORY_COST_BASIS;
+  const response = await _apiFetch(
+    _merchantPath(ctx, '/inventory-costing/cost-basis?includeWithoutReceipts=true'),
+  );
+  return {
+    items: (response && response.items) || [],
+    receiptLocations: (response && response.receiptLocations) || [],
+    asOf: (response && response.asOf) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryCostBasis(refresh) {
+  const ctx = useMerchant();
+  return _useAsync(
+    function () {
+      return _loadInventoryCostBasis(ctx);
+    },
+    _deps(ctx, [_canManageInventory(ctx) ? 'manage' : 'no-manage', refresh || 0]),
+    EMPTY_INVENTORY_COST_BASIS,
+  );
+}
+
+// ── Console prep list and label sheet (recipes module plan §8.4, §8.3 and D14) ─
+//
+// The prep list read and the label sheet are gated on `merchant.manage` on the
+// server, and the `catálogo e inventario` tab is reachable with `catalog.read`
+// OR `inventory.read`, so the same `_canManageInventory` guard the item loaders
+// use keeps a cashier's pass off the wire.
+//
+// The window (`from` / `to`) and the quantity come from the server, which owns
+// the forecast (plan D13). The screen reads them, and it never recomputes them.
+const EMPTY_PREP_LIST = {
+  items: [],
+  locationId: null,
+  from: null,
+  to: null,
+  asOf: null,
+  correlationId: null,
+};
+
+async function _loadPrepList(ctx, includeAbovePar) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_PREP_LIST;
+  // `PrepListQuery.includeAbovePar` coerces its boolean, and `Boolean('false')`
+  // is TRUE. The default is false, so the narrow question sends no parameter.
+  const query = new URLSearchParams();
+  if (includeAbovePar) query.set('includeAbovePar', 'true');
+  const search = query.toString();
+  const path = routes.inventory.prepList(merchantId) + (search ? `?${search}` : '');
+  const response = await _apiFetch(_withLocation(ctx, path));
+  return {
+    items: (response && response.items) || [],
+    locationId: (response && response.locationId) || null,
+    from: (response && response.from) || null,
+    to: (response && response.to) || null,
+    asOf: (response && response.asOf) || null,
+    correlationId: (response && response.correlationId) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function usePrepList(options, refresh) {
+  const ctx = useMerchant();
+  const includeAbovePar = options?.includeAbovePar === true;
+  return _useAsync(
+    function () {
+      return _loadPrepList(ctx, includeAbovePar);
+    },
+    _deps(ctx, [
+      _canManageInventory(ctx) ? 'manage' : 'no-manage',
+      includeAbovePar ? 'above' : 'short',
+      refresh || 0,
+    ]),
+    EMPTY_PREP_LIST,
+  );
+}
+
+// The label sheet is a PNG the SERVER renders (plan D14), so it is fetched as a
+// blob and saved. `_apiFetch` reads JSON, so this helper repeats that path's auth
+// and its single session refresh, and returns the blob instead.
+// eslint-disable-next-line react-refresh/only-export-components
+export async function downloadPrepListLabels(merchantId, locationId) {
+  const base = routes.inventory.prepListLabels(merchantId);
+  const path = locationId ? `${base}?locationId=${encodeURIComponent(locationId)}` : base;
+  const options = { headers: Object.assign({}, await getAuthHeaders()) };
+  let res = await fetch(apiUrl(path), withCreds(options));
+  if (res.status === 401 && COOKIE_AUTH) {
+    const outcome = await refreshSession();
+    if (outcome === REFRESH_OK) {
+      const retryOptions = { headers: Object.assign({}, await getAuthHeaders()) };
+      res = await fetch(apiUrl(path), withCreds(retryOptions));
+    } else if (outcome === REFRESH_DEAD) {
+      handleSessionExpired();
+      const dead = new Error(t`Sesión expirada`);
+      dead.status = 401;
+      dead.code = 'session_expired';
+      dead.path = path;
+      throw dead;
+    }
+  }
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    const err = new Error(errMessage(payload, `${res.status} ${path}`));
+    err.status = res.status;
+    err.code =
+      (payload && typeof payload.code === 'string' && payload.code) ||
+      (payload && payload.error && typeof payload.error.code === 'string'
+        ? payload.error.code
+        : null) ||
+      (payload && typeof payload.error === 'string' ? payload.error : null);
+    err.path = path;
+    err.details = payload;
+    throw err;
+  }
+  return res.blob();
+}
+
+// ── Usage variance and menu engineering (recipes module plan 9.3, 9.5 and phase 4) ──
+//
+// The two reads behind the Variacion and Ingenieria de menu tabs of the Costos y
+// margenes screen. Both are gated on `merchant.manage` on the server, and both take
+// the window the costing read already resolved: a business date belongs to the
+// cafe's timezone, so the browser never computes one.
+//
+// The variance read is BRANCH-SCOPED (its route carries a location context) and the
+// menu read is not, so only the variance path is given the selected branch.
+const EMPTY_USAGE_VARIANCE = {
+  basis: null,
+  lines: [],
+  from: null,
+  to: null,
+  locationId: null,
+  totalVarianceQuantity: null,
+  totalUnexplainedQuantity: null,
+  asOf: null,
+  correlationId: null,
+};
+
+async function _loadUsageVariance(ctx, from, to) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx) || !from || !to) return EMPTY_USAGE_VARIANCE;
+  const query = new URLSearchParams({ from, to });
+  const response = await _apiFetch(
+    _withLocation(ctx, `${routes.inventory.usageVariance(merchantId)}?${query.toString()}`),
+  );
+  return {
+    // The basis and the window are the answer's own words, and the screen prints
+    // them instead of guessing what pool the numbers measure.
+    basis: (response && response.basis) || null,
+    lines: (response && response.lines) || [],
+    from: (response && response.from) || null,
+    to: (response && response.to) || null,
+    locationId: (response && response.locationId) || null,
+    totalVarianceQuantity: (response && response.totalVarianceQuantity) || null,
+    totalUnexplainedQuantity: (response && response.totalUnexplainedQuantity) || null,
+    asOf: (response && response.asOf) || null,
+    correlationId: (response && response.correlationId) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useInventoryUsageVariance(period, refresh) {
+  const ctx = useMerchant();
+  const from = (period && period.from) || null;
+  const to = (period && period.to) || null;
+  return _useAsync(
+    function () {
+      return _loadUsageVariance(ctx, from, to);
+    },
+    _deps(ctx, [
+      _canManageInventory(ctx) ? 'manage' : 'no-manage',
+      from || '',
+      to || '',
+      refresh || 0,
+    ]),
+    EMPTY_USAGE_VARIANCE,
+  );
+}
+
+const EMPTY_MENU_ENGINEERING = {
+  items: [],
+  from: null,
+  to: null,
+  locationId: null,
+  asOf: null,
+  correlationId: null,
+};
+
+// `limit=100` is the widest page the house rule allows, and a menu is a list a
+// person reads in one pass. The contract caps the read at 200; asking for less is
+// always allowed.
+async function _loadMenuEngineering(ctx, from, to) {
+  const merchantId = _merchantId(ctx);
+  if (!merchantId || !_canManageInventory(ctx) || !from || !to) return EMPTY_MENU_ENGINEERING;
+  const query = new URLSearchParams({ from, to, limit: '100' });
+  const response = await _apiFetch(
+    `${routes.inventory.menuEngineering(merchantId)}?${query.toString()}`,
+  );
+  return {
+    items: (response && response.items) || [],
+    from: (response && response.from) || null,
+    to: (response && response.to) || null,
+    locationId: (response && response.locationId) || null,
+    asOf: (response && response.asOf) || null,
+    correlationId: (response && response.correlationId) || null,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useMenuEngineering(period, refresh) {
+  const ctx = useMerchant();
+  const from = (period && period.from) || null;
+  const to = (period && period.to) || null;
+  return _useAsync(
+    function () {
+      return _loadMenuEngineering(ctx, from, to);
+    },
+    _deps(ctx, [
+      _canManageInventory(ctx) ? 'manage' : 'no-manage',
+      from || '',
+      to || '',
+      refresh || 0,
+    ]),
+    EMPTY_MENU_ENGINEERING,
+  );
+}
+
+// ── Supplier invoices: the Facturas tab (recipes module plan §7, §10 and §11 Phase 5) ──
+//
+// One loader for the whole inbox. It reads the invoice list, and it reads the OPEN
+// purchase orders because `inventory.invoice.commit` needs the order and one of its
+// lines per invoice line (plan §10.4). The two reads answer different questions and
+// the order read is the one that can fail on its own, so the orders degrade to an
+// empty list with `ordersFailed` set, and the invoice list still renders.
+//
+// The read is gated on `merchant.manage` on the server, and the tab is reachable
+// with `catalog.read` or `inventory.read`, so the same `_canManageInventory` guard
+// the item loaders use keeps a cashier's pass off the wire.
+//
+// `limit=100` is the widest page the contract allows (`SupplierInvoiceQuery.limit`
+// and `PurchaseOrderQuery.limit` both cap at 100).
+const EMPTY_SUPPLIER_INVOICE_INBOX = {
+  invoices: [],
+  page: null,
+  correlationId: null,
+  purchaseOrders: [],
+  ordersFailed: false,
+};
+
+// The statuses an order still holds stock in transit for. The contract states the
+// same pair (`OPEN_PURCHASE_ORDER_STATUSES`), and receiving against any other
+// status is refused, so only these can carry a committed invoice.
+const OPEN_PURCHASE_ORDER_STATUSES = ['sent', 'partially_received'];
+
+async function _loadSupplierInvoiceInbox(ctx, status) {
+  const merchantId = _merchantId(ctx);
+  const locationId = _locationId(ctx);
+  if (!merchantId || !_canManageInventory(ctx)) return EMPTY_SUPPLIER_INVOICE_INBOX;
+
+  const invoiceQuery = new URLSearchParams({ limit: '100' });
+  if (status) invoiceQuery.set('status', status);
+
+  const ordersRead = locationId
+    ? _apiFetch(
+        `${buildPath('procurement.purchaseOrderList', { merchantId })}?${new URLSearchParams({
+          locationId,
+          limit: '100',
+        }).toString()}`,
+      ).then(
+        (response) => ({
+          ok: true,
+          purchaseOrders: ((response && response.purchaseOrders) || []).filter((order) =>
+            OPEN_PURCHASE_ORDER_STATUSES.includes(order && order.status),
+          ),
+        }),
+        () => ({ ok: false, purchaseOrders: [] }),
+      )
+    : Promise.resolve({ ok: true, purchaseOrders: [] });
+
+  const [invoicesRead, orders] = await Promise.all([
+    _apiFetch(`${routes.supplierInvoices.list(merchantId)}?${invoiceQuery.toString()}`),
+    ordersRead,
+  ]);
+
+  return {
+    invoices: (invoicesRead && invoicesRead.invoices) || [],
+    page: (invoicesRead && invoicesRead.page) || null,
+    correlationId: (invoicesRead && invoicesRead.correlationId) || null,
+    purchaseOrders: orders.purchaseOrders,
+    ordersFailed: !orders.ok,
+  };
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useSupplierInvoiceInbox(options, refresh) {
+  const ctx = useMerchant();
+  const status = (options && options.status) || null;
+  return _useAsync(
+    function () {
+      return _loadSupplierInvoiceInbox(ctx, status);
+    },
+    _deps(ctx, [_canManageInventory(ctx) ? 'manage' : 'no-manage', status || '', refresh || 0]),
+    EMPTY_SUPPLIER_INVOICE_INBOX,
+  );
+}

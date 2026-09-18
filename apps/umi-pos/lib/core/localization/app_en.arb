@@ -93,6 +93,18 @@
   "cartEmpty": "Open a product to begin this cart.",
   "cartUnavailable": "The cart is temporarily unavailable.",
   "cartNoteLabel": "Operator note",
+  "cartCourseLabel": "Course",
+  "cartCoursePrevious": "Previous course",
+  "cartCourseNext": "Next course",
+  "cartCourseCurrent": "Course {course}",
+  "@cartCourseCurrent": {
+    "description": "Names the course a cart line belongs to, for the operator and for a screen reader.",
+    "placeholders": {
+      "course": {
+        "type": "int"
+      }
+    }
+  },
   "addToCartAction": "Add to cart",
   "removeFromCartAction": "Remove line",
   "increaseQuantity": "Increase quantity",
@@ -136,7 +148,7 @@
   "officialReceiptAvailable": "Official receipt available",
   "cashReceivedLabel": "Cash received",
   "tenderSelectionTitle": "Payment selection",
-  "cashTenderTitle": "Cash",
+  "cashTenderTitle": "Cash applied",
   "tenderAmountLabel": "Amount applied",
   "exactAmountAction": "Exact amount",
   "manualTerminalLabel": "Manual terminal",
@@ -164,6 +176,7 @@
   "managerApprovalDeniedMessage": "The manager PIN or permission is not valid for this checkout.",
   "approveAction": "Approve",
   "insufficientCashMessage": "The cash received does not cover the applied cash amount.",
+  "invalidTenderMessage": "Check the payment method: this combination cannot be charged. If the terminal already confirmed a payment, it cannot be removed from this order.",
   "remainingBalanceMessage": "Add a tender for the remaining balance.",
   "approvalRequiredMessage": "A manager must approve this checkout.",
   "terminalFailureMessage": "The terminal payment failed. Review the tenders.",
@@ -255,6 +268,13 @@
   ,"adoptShiftTitle": "Your shift is still open on another terminal"
   ,"adoptShiftMessage": "This terminal lost its stored identity. The shift and the cash are still there; bring them to this screen to continue."
   ,"adoptShiftAction": "Bring the shift to this terminal"
+  ,"reclaimRegisterTitle": "This drawer is held by a terminal that no longer exists"
+  ,"reclaimRegisterMessage": "No active terminal holds this drawer. Free it so a shift can be opened on it; the cash is not counted because it is still in the drawer."
+  ,"reclaimRegisterAction": "Free the drawer"
+  ,"cashShiftRequiredMessage": "This charge has no cash shift to book the money against."
+  ,"resumeShiftAndRetryAction": "Resume shift and retry"
+  ,"reclaimRegisterAndRetryAction": "Free the drawer and retry"
+  ,"cashHeldByActiveTillMessage": "Another active terminal holds this drawer. Ask a manager to count it before you continue."
   ,"openShiftAction": "Open cash shift"
   ,"invalidAmountMessage": "Enter a valid amount, for example 1,500.00."
   ,"openingFloatLabel": "Opening float"
@@ -323,6 +343,8 @@
   ,"cashRefundLabel": "Cash refund"
   ,"manualTerminalRefundLabel": "Manual terminal refund"
   ,"manualTerminalRefundProviderNotice": "Process the refund in the external terminal. UmiPOS records your observation. It does not prove provider success."
+  ,"manualTerminalRefundOnCommitNotice": "The terminal will be refunded when you confirm."
+  ,"cardTerminalRefundLabel": "Card terminal refund"
   ,"managerPinLabel": "Manager PIN"
   ,"approvalExpiredMessage": "The approval expired. Request a new approval."
   ,"paymentOutcomeUnknownMessage": "The terminal outcome is unknown. Verify the original terminal operation."
@@ -367,4 +389,394 @@
   ,"restockInventoryReviewLabel": "Inventory review required"
   ,"sessionEndedReauth": "Your session ended. Please re-enter your PIN."
   ,"operatorShift": "Shift: {name}"
+  ,"tableStateOpenLabel": "Open"
+  ,"tableStateSeatedLabel": "Seated"
+  ,"tableStateOrderedLabel": "Order taken"
+  ,"tableStateServedLabel": "Served"
+  ,"tableStateAwaitingPaymentLabel": "Awaiting payment"
+  ,"tableStateDirtyLabel": "Needs cleaning"
+  ,"tableStatePartySizeLabel": "{count} guests"
+  ,"@tableStatePartySizeLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateElapsedLabel": "{duration} at table"
+  ,"@tableStateElapsedLabel": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStateGroupLabel": "Group of {count} tables"
+  ,"@tableStateGroupLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateSeatAction": "Seat"
+  ,"tableStateSeatTitle": "Seat table {table}"
+  ,"@tableStateSeatTitle": {
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStatePartySizeField": "Guests"
+  ,"tableStateMoveAction": "Move"
+  ,"tableStateMoveArmed": "Moving {table}. Tap a free table."
+  ,"@tableStateMoveArmed": {
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStateSplitAction": "Split"
+  ,"tableStateClearAction": "Clear table"
+  ,"tableStateReadyAction": "Mark ready"
+  ,"tableStateOrderedAction": "Order sent"
+  ,"tableStateServedAction": "Mark served"
+  ,"tableStateAwaitingPaymentAction": "Bill requested"
+  ,"tableStateSelectAction": "Select"
+  ,"tableStateMergeAction": "Merge"
+  ,"tableStateSelectHint": "Select two or more free tables"
+  ,"tableStateSelectedCount": "{count} selected"
+  ,"@tableStateSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateMergeTitle": "Merge tables"
+  ,"tableStateMergeSummary": "{tables} tables · {seats} seats"
+  ,"@tableStateMergeSummary": {
+    "placeholders": {
+      "tables": {
+        "type": "int"
+      },
+      "seats": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateTargetOccupied": "That table already has a party."
+  ,"tableStateTargetTooSmall": "That table cannot seat {count} guests."
+  ,"@tableStateTargetTooSmall": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateFailureTitle": "Could not complete"
+  ,"tableStateFailureRefresh": "Refresh map"
+  ,"tableStateFailureAlreadyOccupiedMessage": "That table already has a party."
+  ,"tableStateFailureAlreadyOccupiedRecovery": "Pick another table, or refresh the map before trying again."
+  ,"tableStateFailureCapacityExceededMessage": "The party is larger than the table seats."
+  ,"tableStateFailureCapacityExceededRecovery": "Choose a bigger table, or merge two tables."
+  ,"tableStateFailureNotOccupiedMessage": "There is no party on that table."
+  ,"tableStateFailureNotOccupiedRecovery": "Refresh the map: somebody else may have cleared the table."
+  ,"tableStateFailureNotGroupedMessage": "That table is not merged with another."
+  ,"tableStateFailureNotGroupedRecovery": "Only a table inside a group can be split."
+  ,"tableStateFailureNotInPlanMessage": "That table is not in the published floor plan."
+  ,"tableStateFailureNotInPlanRecovery": "Publish the plan from the dashboard, then refresh this view."
+  ,"tableStateFailureIdempotencyConflictMessage": "That change was already sent with different content."
+  ,"tableStateFailureIdempotencyConflictRecovery": "Refresh the map and repeat the action from the current state."
+  ,"tableStateFailurePermissionDeniedMessage": "Your role cannot change tables."
+  ,"tableStateFailurePermissionDeniedRecovery": "Ask a manager to do it, or sign in as another operator."
+  ,"tableStateFailurePlanNotPublishedMessage": "This location has no published floor plan."
+  ,"tableStateFailurePlanNotPublishedRecovery": "Publish the plan from the dashboard to operate its tables."
+  ,"tableStateFailureGenericMessage": "The table action could not be completed."
+  ,"tableStateFailureGenericRecovery": "Refresh the map and try again."
+  ,"tableStateCancelAction": "Cancel"
+  ,"kitchenBoardTitle": "Kitchen"
+  ,"kitchenBoardRefresh": "Refresh"
+  ,"kitchenBoardLoadFailed": "Could not load the kitchen."
+  ,"kitchenBoardEmpty": "No kitchen tickets."
+  ,"kitchenBoardTabTickets": "Tickets"
+  ,"kitchenPrepTab": "Preparation"
+  ,"kitchenPrepRefresh": "Reload prep"
+  ,"kitchenPrepLoadFailed": "Could not load the prep list."
+  ,"kitchenPrepEmpty": "No items have a par yet. Set the par in Inventory."
+  ,"kitchenPrepWindow": "Forecast usage from {from} to {to}"
+  ,"@kitchenPrepWindow": {
+    "description": "The window the forecast usage covers. It comes from the response.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenPrepItemColumn": "Item"
+  ,"kitchenPrepUnitColumn": "Unit"
+  ,"kitchenPrepParColumn": "Par"
+  ,"kitchenPrepOnHandColumn": "On hand"
+  ,"kitchenPrepForecastColumn": "Forecast usage"
+  ,"kitchenPrepQuantityColumn": "Quantity to make"
+  ,"kitchenPrepNoPar": "No par"
+  ,"kitchenStatusQueued": "Queued"
+  ,"kitchenStatusInPreparation": "Preparing"
+  ,"kitchenStatusPartiallyReady": "Partial"
+  ,"kitchenStatusReady": "Ready"
+  ,"kitchenStatusException": "Exception"
+  ,"kitchenPriorityUrgent": "Urgent"
+  ,"kitchenPriorityHigh": "High"
+  ,"kitchenElapsedNow": "now"
+  ,"kitchenElapsedMinutes": "{minutes} min"
+  ,"@kitchenElapsedMinutes": {
+    "description": "How long a kitchen ticket has been waiting.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenElapsedHoursMinutes": "{hours} h {minutes} min"
+  ,"@kitchenElapsedHoursMinutes": {
+    "description": "How long a kitchen ticket has been waiting, once it is over an hour.",
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  }
+  ,"kitchenElapsedDaysHours": "{days} d {hours} h"
+  ,"@kitchenElapsedDaysHours": {
+    "description": "How long a kitchen ticket has been waiting, once it is over a day. A ticket is not meant to reach this, and one that does must be readable at a glance rather than counted in minutes.",
+    "placeholders": {
+      "days": { "type": "int" },
+      "hours": { "type": "int" }
+    }
+  }
+  ,"kitchenItemMarkReady": "Mark {item} ready"
+  ,"@kitchenItemMarkReady": {
+    "description": "What a tap on one kitchen line does.",
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenItemAlreadyReady": "{item} is already ready"
+  ,"@kitchenItemAlreadyReady": {
+    "description": "Read by a screen reader on a line that is already bumped.",
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenCourseGroup": "Course {course}"
+  ,"@kitchenCourseGroup": {
+    "description": "The heading that names one course on a kitchen ticket. A ticket groups its lines by course so a dessert is not started with the starters.",
+    "placeholders": {
+      "course": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenCourseHeld": "Held · {count}"
+  ,"@kitchenCourseHeld": {
+    "description": "The label on a course the kitchen has not been told to start. The count is how many lines it holds.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenCourseHeldNote": "Not cooking yet"
+  ,"@kitchenCourseHeldNote": {
+    "description": "Says out loud that a held group is not work to start yet, so a cook does not begin it early."
+  }
+  ,"kitchenCourseFire": "Fire course {course}"
+  ,"@kitchenCourseFire": {
+    "description": "The one action that fires the next held course on a ticket.",
+    "placeholders": {
+      "course": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenItemHeld": "{item} is not cooking yet"
+  ,"@kitchenItemHeld": {
+    "description": "Read by a screen reader on a held line: it is not offered as work to start.",
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenItemVoided": "VOIDED"
+  ,"kitchenTicketStartAction": "Start"
+  ,"kitchenTicketCompleteAction": "Complete"
+  ,"kitchenTicketRecallAction": "Recall"
+  ,"kitchenTicketSending": "Sending…"
+  ,"kitchenRecallTitle": "Recall ticket"
+  ,"kitchenRecallBody": "Why is this ticket coming back to the kitchen?"
+  ,"kitchenRecallReasonCustomerReturned": "The customer sent it back"
+  ,"kitchenRecallReasonWrongItem": "The wrong dish went out"
+  ,"kitchenRecallReasonQuality": "It was not right"
+  ,"kitchenRecallReasonOther": "Another reason"
+  ,"kitchenRecallNoteLabel": "Note (optional)"
+  ,"kitchenRecallCancel": "Cancel"
+  ,"kitchenFailureTitle": "The kitchen did not change"
+  ,"kitchenFailureRefresh": "Refresh kitchen"
+  ,"kitchenFailureVersionConflictMessage": "Somebody else already moved ticket {reference}."
+  ,"@kitchenFailureVersionConflictMessage": {
+    "description": "The ticket moved between the board read and the bump.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenFailureVersionConflictGenericMessage": "Somebody else already moved that ticket."
+  ,"kitchenFailureVersionConflictRecovery": "The board has been refreshed. Check the ticket and mark whatever is still pending."
+  ,"kitchenFailureFingerprintMessage": "That change was already sent with different content, for ticket {reference}."
+  ,"@kitchenFailureFingerprintMessage": {
+    "description": "The same command id was reused with different content.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenFailureFingerprintRecovery": "Refresh the board and repeat the action from the current state."
+  ,"kitchenFailureInvalidTransitionMessage": "The ticket cannot take that step from its current state."
+  ,"kitchenFailureInvalidTransitionRecovery": "Refresh the board. To send a ticket back to the kitchen, use Recall on a ready ticket."
+  ,"kitchenFailurePermissionDeniedMessage": "Your role cannot move the kitchen."
+  ,"kitchenFailurePermissionDeniedRecovery": "Ask a manager to do it, or sign in as another operator."
+  ,"kitchenFailureTicketMissingMessage": "Ticket {reference} did not reach this device's station."
+  ,"@kitchenFailureTicketMissingMessage": {
+    "description": "The route refused the ticket for this device: it is either gone from the board or outside this device's kitchen station scope.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenFailureTicketMissingGenericMessage": "That ticket did not reach this device's station."
+  ,"kitchenFailureTicketMissingRecovery": "The ticket is still in the kitchen. Refresh the board, and if it keeps happening ask a manager to check that this device is assigned to its station."
+  ,"kitchenFailureDeviceMessage": "This device is no longer registered for the kitchen."
+  ,"kitchenFailureDeviceRecovery": "Enroll this device again from the dashboard."
+  ,"kitchenFailureGenericMessage": "The kitchen action could not be completed."
+  ,"kitchenFailureGenericRecovery": "Refresh the board and try again."
+  ,"terminalChargeTitle": "Card terminal"
+  ,"terminalChargeInstruction": "Charge {amount} on the terminal and confirm the outcome here."
+  ,"@terminalChargeInstruction": {
+    "description": "Read on the terminal face, above the operator declaration.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"terminalOperatorDeclaration": "The terminal is an operator declaration: the POS does not read its outcome."
+  ,"terminalStatusLabel": "Status"
+  ,"terminalStatusNotStarted": "Not started"
+  ,"terminalStatusProcessing": "Charging outside the POS"
+  ,"terminalStatusConfirmed": "Charge confirmed"
+  ,"terminalStatusFailed": "Failure reported"
+  ,"terminalStatusUnknown": "Outcome unknown"
+  ,"terminalStatusCancelled": "Cancelled before charging"
+  ,"cardTerminalLabel": "Card terminal"
+  ,"terminalWaitingTitle": "Waiting at the terminal…"
+  ,"terminalStopWaitingAction": "Stop waiting"
+  ,"terminalApprovedMessage": "The terminal approved the charge."
+  ,"terminalDeclinedMessage": "The terminal refused the charge ({code})."
+  ,"terminalUnresolvedMessage": "There is a card payment nobody has confirmed. The sale cannot close until it is resolved."
+  ,"terminalStoppedWaitingMessage": "You stopped waiting: the terminal may still hold the order. The attempt stays recorded and can be queried."
+  ,"terminalLastAnswerLabel": "Terminal says"
+  ,"terminalApprovedCollectMessage": "The terminal approved the charge. Press Charge to close the sale."
+  ,"terminalDeclinedNoChargeMessage": "The terminal declined the charge and nothing was taken. You can take cash, or start a new sale to retry the card."
+  ,"terminalUnavailableMessage": "The card terminal is not available. You can take cash."
+  ,"terminalBusyMessage": "The terminal is busy with another order. Try again."
+  ,"newSaleConfirmTitle": "Start a new sale?"
+  ,"newSaleConfirmBody": "This cart holds {count} unbilled line(s). It is abandoned and an empty sale starts; nothing is charged for it."
+  ,"@newSaleConfirmBody": {
+    "description": "Asked before `New sale` abandons a sale that is still in progress.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"keepCartAction": "Keep this cart"
+  ,"tenderConflictTitle": "This cart cannot be paid like this"
+  ,"tenderConflictBody": "It holds a split between cash and card, and this location takes one method per sale. The payment record stays for review; to carry on, start a new sale."
+  ,"splitTenderTitle": "Split payment"
+  ,"splitTenderAction": "Split payment"
+  ,"splitTenderCancelAction": "Single method"
+  ,"splitTenderPickSecond": "Choose the second payment method."
+  ,"singleMethodOnlyNote": "This location charges one method per sale."
+  ,"tenderShortBy": "Short by {amount}"
+  ,"@tenderShortBy": {
+    "description": "How much of a split payment the selected methods still do not cover.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tenderOverBy": "Over by {amount}"
+  ,"@tenderOverBy": {
+    "description": "How much a split payment takes beyond the bill.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenAllDayTooltip": "Ordered today: {ordered}. Still to make: {outstanding}."
+  ,"@kitchenAllDayTooltip": {
+    "description": "What the all-day count on a kitchen item means, spoken by the tooltip and the screen reader.",
+    "placeholders": {
+      "ordered": {
+        "type": "int"
+      },
+      "outstanding": {
+        "type": "int"
+      }
+    }
+  }
+  ,"inventoryProductionAction": "Produce"
+  ,"inventoryProductionTitle": "Produce prep"
+  ,"inventoryProductionOutputLabel": "Output item"
+  ,"inventoryProductionQuantityLabel": "Quantity produced"
+  ,"inventoryProductionQuantityHelper": "Use the item's scale and base unit."
+  ,"inventoryProductionLotLabel": "Batch code (optional)"
+  ,"inventoryProductionExpiryLabel": "Expiry (optional)"
+  ,"inventoryProductionExpiryHint": "YYYY-MM-DD"
+  ,"inventoryProductionResultTitle": "Produced batch"
+  ,"inventoryProductionLotReferenceLabel": "Batch"
+  ,"inventoryProductionExpiryReferenceLabel": "Expiry"
+  ,"inventoryProductionProducedLabel": "Produced"
+  ,"inventoryProductionDeclaredLabel": "Recipe yield"
+  ,"inventoryProductionYieldLossLabel": "Yield loss"
+  ,"inventoryProductionUnitCostLabel": "Unit cost"
+  ,"inventoryProductionTotalCostLabel": "Batch cost"
+  ,"inventoryProductionConsumedTitle": "Consumed inputs"
+  ,"inventoryProductionIncompleteCostMessage": "Some inputs have no recorded cost."
+  ,"inventoryProductionNoCostLabel": "No cost"
+  ,"inventoryProductionRecipeRequiredMessage": "This item has no production recipe."
+  ,"inventoryProductionQuantityNotExactMessage": "The quantity does not divide exactly across the recipe inputs."
+  ,"inventoryProductionInsufficientStockMessage": "There is not enough stock of an input to make this batch."
+  ,"inventoryUnitEach": "ea"
+  ,"inventoryUnitGram": "g"
+  ,"inventoryUnitKilogram": "kg"
+  ,"inventoryUnitMilliliter": "ml"
+  ,"inventoryUnitLiter": "L"
+  ,"inventoryUnitPortion": "portion"
+  ,"inventoryUnitPackage": "pack"
+  ,"inventoryUnitBox": "box"
 }

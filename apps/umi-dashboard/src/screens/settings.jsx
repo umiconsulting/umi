@@ -3,6 +3,7 @@ import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { XSep } from '@/shell.jsx';
+import { Segmented } from '@/components/segmented.jsx';
 import {
   useMerchantData,
   saveMerchantSettings,
@@ -725,7 +726,7 @@ const SettingsScreen = () => {
                         'swatch focusable' +
                         (brand.primary.toLowerCase() === c.toLowerCase() ? ' on' : '')
                       }
-                      style={{ background: c, width: 28, height: 28, borderRadius: 8 }}
+                      style={{ '--swatch': c }}
                       onClick={() => {
                         setBrand((b) => ({ ...b, primary: c }));
                         document.documentElement.style.setProperty('--merchant-brand', c);
@@ -783,7 +784,7 @@ const SettingsScreen = () => {
                         'swatch focusable' +
                         (brand.secondary.toLowerCase() === c.toLowerCase() ? ' on' : '')
                       }
-                      style={{ background: c, width: 28, height: 28, borderRadius: 8 }}
+                      style={{ '--swatch': c }}
                       onClick={() => setBrand((b) => ({ ...b, secondary: c }))}
                       aria-label={c}
                     />
@@ -903,6 +904,7 @@ const SettingsScreen = () => {
               <input
                 type="range"
                 aria-label={t`Sellos máximos en la tarjeta`}
+                className="range-control"
                 min={MIN_STAMP_TARGET}
                 max={MAX_STAMP_TARGET}
                 step={1}
@@ -1661,14 +1663,15 @@ function LocationProfileRow({ profile, showAliases }) {
           </div>
         )}
         {open ? (
-          <div className="seg">
-            <button className={!closed ? 'on' : ''} onClick={() => setStatus('active')}>
-              <Trans>Abierta</Trans>
-            </button>
-            <button className={closed ? 'on' : ''} onClick={() => setStatus('closed')}>
-              <Trans>Cerrada</Trans>
-            </button>
-          </div>
+          <Segmented
+            label={t`Estado del negocio`}
+            value={closed ? 'closed' : 'active'}
+            onChange={setStatus}
+            options={[
+              { id: 'active', label: <Trans>Abierta</Trans> },
+              { id: 'closed', label: <Trans>Cerrada</Trans> },
+            ]}
+          />
         ) : (
           closed && (
             <span className="chip read" style={{ fontSize: 11 }}>

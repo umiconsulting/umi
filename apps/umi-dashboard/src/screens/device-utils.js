@@ -13,7 +13,7 @@
  * the owner with nothing to act on. `credential_ready` and `credential_delivered` stay
  * too: those are approved but not yet connected, and the enrolment can still fail.
  */
-import { t } from '@lingui/core/macro';
+import { msg, t } from '@lingui/core/macro';
 
 export function visiblePosEnrollmentRequests(requests) {
   return (requests || []).filter((request) => request.state !== 'completed');
@@ -92,4 +92,55 @@ export function posDeviceCard(device, locations, now = Date.now()) {
     credentialVersion: device.credentialVersion,
     _raw: device,
   };
+}
+
+/**
+ * WHICH REFUSAL THE VENDOR GAVE, out of the envelope the API filter returns.
+ *
+ * A store the vendor refuses arrives as our own `MP_POINT_STORE_REFUSED` carrying the
+ * vendor's code in `details.vendorCode` — `invalid_city`, `invalid_street_number`, and the
+ * rest of the documented list (research note 01 §6.2). Our code alone says the address was
+ * refused, which leaves the operator nothing to change; the VENDOR'S code says which field.
+ *
+ * The path is unwrapped defensively because the filter nests the thrown payload as
+ * `{ statusCode, error: { … } }` while `_apiFetch` keeps the whole body on `err.details`, so
+ * the bag is at `err.details.error.details` — and a route that one day throws the bag at the
+ * top level must not turn the code into a silent null.
+ */
+export function mpPointStoreRefusalCode(err) {
+  const envelope = err && err.details;
+  if (!envelope || typeof envelope !== 'object') return null;
+  const refusal = envelope.error && typeof envelope.error === 'object' ? envelope.error : envelope;
+  const details = refusal.details && typeof refusal.details === 'object' ? refusal.details : null;
+  const code = details && typeof details.vendorCode === 'string' ? details.vendorCode : null;
+  return code && code.length > 0 ? code : null;
+}
+
+/**
+ * The sentence the store sheet shows when the create is refused.
+ *
+ * `i18n` is passed in rather than taken from a `t`: the macro binds to the scope that
+ * destructures `useLingui()`, so an out-of-component helper that receives one gets a runtime
+ * call with no message behind it.
+ */
+export function mpPointStoreRefusalMessage(i18n, err) {
+  const code = err && err.code;
+  if (code === 'MP_POINT_STORE_REFUSED') {
+    return i18n._(msg`Mercado Pago rechazó la dirección del negocio.`);
+  }
+  if (code === 'MP_POINT_STORE_REQUIRED') {
+    return i18n._(msg`Mercado Pago necesita la tienda antes de dar de alta un terminal.`);
+  }
+  if (code === 'MP_POINT_CREDENTIAL_ABSENT') {
+    return i18n._(msg`Conecta la cuenta de Mercado Pago antes de crear la tienda.`);
+  }
+  if (code === 'MP_POINT_CREDENTIAL_REJECTED') {
+    return i18n._(
+      msg`Mercado Pago rechazó el acceso de esta cuenta. Vuelve a conectarla desde esta pantalla.`,
+    );
+  }
+  if (code === 'PERMISSION_DENIED') {
+    return i18n._(msg`Tu usuario no puede administrar los pagos de este negocio.`);
+  }
+  return i18n._(msg`No se pudo crear la tienda. Intenta de nuevo.`);
 }

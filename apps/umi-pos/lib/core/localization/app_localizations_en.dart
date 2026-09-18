@@ -317,6 +317,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cartNoteLabel => 'Operator note';
 
   @override
+  String get cartCourseLabel => 'Course';
+
+  @override
+  String get cartCoursePrevious => 'Previous course';
+
+  @override
+  String get cartCourseNext => 'Next course';
+
+  @override
+  String cartCourseCurrent(int course) {
+    return 'Course $course';
+  }
+
+  @override
   String get addToCartAction => 'Add to cart';
 
   @override
@@ -453,7 +467,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tenderSelectionTitle => 'Payment selection';
 
   @override
-  String get cashTenderTitle => 'Cash';
+  String get cashTenderTitle => 'Cash applied';
 
   @override
   String get tenderAmountLabel => 'Amount applied';
@@ -534,6 +548,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get insufficientCashMessage =>
       'The cash received does not cover the applied cash amount.';
+
+  @override
+  String get invalidTenderMessage =>
+      'Check the payment method: this combination cannot be charged. If the terminal already confirmed a payment, it cannot be removed from this order.';
 
   @override
   String get remainingBalanceMessage =>
@@ -831,6 +849,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get adoptShiftAction => 'Bring the shift to this terminal';
 
   @override
+  String get reclaimRegisterTitle =>
+      'This drawer is held by a terminal that no longer exists';
+
+  @override
+  String get reclaimRegisterMessage =>
+      'No active terminal holds this drawer. Free it so a shift can be opened on it; the cash is not counted because it is still in the drawer.';
+
+  @override
+  String get reclaimRegisterAction => 'Free the drawer';
+
+  @override
+  String get cashShiftRequiredMessage =>
+      'This charge has no cash shift to book the money against.';
+
+  @override
+  String get resumeShiftAndRetryAction => 'Resume shift and retry';
+
+  @override
+  String get reclaimRegisterAndRetryAction => 'Free the drawer and retry';
+
+  @override
+  String get cashHeldByActiveTillMessage =>
+      'Another active terminal holds this drawer. Ask a manager to count it before you continue.';
+
+  @override
   String get openShiftAction => 'Open cash shift';
 
   @override
@@ -1041,6 +1084,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Process the refund in the external terminal. UmiPOS records your observation. It does not prove provider success.';
 
   @override
+  String get manualTerminalRefundOnCommitNotice =>
+      'The terminal will be refunded when you confirm.';
+
+  @override
+  String get cardTerminalRefundLabel => 'Card terminal refund';
+
+  @override
   String get approvalExpiredMessage =>
       'The approval expired. Request a new approval.';
 
@@ -1176,4 +1226,645 @@ class AppLocalizationsEn extends AppLocalizations {
   String operatorShift(String name) {
     return 'Shift: $name';
   }
+
+  @override
+  String get tableStateOpenLabel => 'Open';
+
+  @override
+  String get tableStateSeatedLabel => 'Seated';
+
+  @override
+  String get tableStateOrderedLabel => 'Order taken';
+
+  @override
+  String get tableStateServedLabel => 'Served';
+
+  @override
+  String get tableStateAwaitingPaymentLabel => 'Awaiting payment';
+
+  @override
+  String get tableStateDirtyLabel => 'Needs cleaning';
+
+  @override
+  String tableStatePartySizeLabel(int count) {
+    return '$count guests';
+  }
+
+  @override
+  String tableStateElapsedLabel(String duration) {
+    return '$duration at table';
+  }
+
+  @override
+  String tableStateGroupLabel(int count) {
+    return 'Group of $count tables';
+  }
+
+  @override
+  String get tableStateSeatAction => 'Seat';
+
+  @override
+  String tableStateSeatTitle(String table) {
+    return 'Seat table $table';
+  }
+
+  @override
+  String get tableStatePartySizeField => 'Guests';
+
+  @override
+  String get tableStateMoveAction => 'Move';
+
+  @override
+  String tableStateMoveArmed(String table) {
+    return 'Moving $table. Tap a free table.';
+  }
+
+  @override
+  String get tableStateSplitAction => 'Split';
+
+  @override
+  String get tableStateClearAction => 'Clear table';
+
+  @override
+  String get tableStateReadyAction => 'Mark ready';
+
+  @override
+  String get tableStateOrderedAction => 'Order sent';
+
+  @override
+  String get tableStateServedAction => 'Mark served';
+
+  @override
+  String get tableStateAwaitingPaymentAction => 'Bill requested';
+
+  @override
+  String get tableStateSelectAction => 'Select';
+
+  @override
+  String get tableStateMergeAction => 'Merge';
+
+  @override
+  String get tableStateSelectHint => 'Select two or more free tables';
+
+  @override
+  String tableStateSelectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get tableStateMergeTitle => 'Merge tables';
+
+  @override
+  String tableStateMergeSummary(int tables, int seats) {
+    return '$tables tables · $seats seats';
+  }
+
+  @override
+  String get tableStateTargetOccupied => 'That table already has a party.';
+
+  @override
+  String tableStateTargetTooSmall(int count) {
+    return 'That table cannot seat $count guests.';
+  }
+
+  @override
+  String get tableStateFailureTitle => 'Could not complete';
+
+  @override
+  String get tableStateFailureRefresh => 'Refresh map';
+
+  @override
+  String get tableStateFailureAlreadyOccupiedMessage =>
+      'That table already has a party.';
+
+  @override
+  String get tableStateFailureAlreadyOccupiedRecovery =>
+      'Pick another table, or refresh the map before trying again.';
+
+  @override
+  String get tableStateFailureCapacityExceededMessage =>
+      'The party is larger than the table seats.';
+
+  @override
+  String get tableStateFailureCapacityExceededRecovery =>
+      'Choose a bigger table, or merge two tables.';
+
+  @override
+  String get tableStateFailureNotOccupiedMessage =>
+      'There is no party on that table.';
+
+  @override
+  String get tableStateFailureNotOccupiedRecovery =>
+      'Refresh the map: somebody else may have cleared the table.';
+
+  @override
+  String get tableStateFailureNotGroupedMessage =>
+      'That table is not merged with another.';
+
+  @override
+  String get tableStateFailureNotGroupedRecovery =>
+      'Only a table inside a group can be split.';
+
+  @override
+  String get tableStateFailureNotInPlanMessage =>
+      'That table is not in the published floor plan.';
+
+  @override
+  String get tableStateFailureNotInPlanRecovery =>
+      'Publish the plan from the dashboard, then refresh this view.';
+
+  @override
+  String get tableStateFailureIdempotencyConflictMessage =>
+      'That change was already sent with different content.';
+
+  @override
+  String get tableStateFailureIdempotencyConflictRecovery =>
+      'Refresh the map and repeat the action from the current state.';
+
+  @override
+  String get tableStateFailurePermissionDeniedMessage =>
+      'Your role cannot change tables.';
+
+  @override
+  String get tableStateFailurePermissionDeniedRecovery =>
+      'Ask a manager to do it, or sign in as another operator.';
+
+  @override
+  String get tableStateFailurePlanNotPublishedMessage =>
+      'This location has no published floor plan.';
+
+  @override
+  String get tableStateFailurePlanNotPublishedRecovery =>
+      'Publish the plan from the dashboard to operate its tables.';
+
+  @override
+  String get tableStateFailureGenericMessage =>
+      'The table action could not be completed.';
+
+  @override
+  String get tableStateFailureGenericRecovery =>
+      'Refresh the map and try again.';
+
+  @override
+  String get tableStateCancelAction => 'Cancel';
+
+  @override
+  String get kitchenBoardTitle => 'Kitchen';
+
+  @override
+  String get kitchenBoardRefresh => 'Refresh';
+
+  @override
+  String get kitchenBoardLoadFailed => 'Could not load the kitchen.';
+
+  @override
+  String get kitchenBoardEmpty => 'No kitchen tickets.';
+
+  @override
+  String get kitchenBoardTabTickets => 'Tickets';
+
+  @override
+  String get kitchenPrepTab => 'Preparation';
+
+  @override
+  String get kitchenPrepRefresh => 'Reload prep';
+
+  @override
+  String get kitchenPrepLoadFailed => 'Could not load the prep list.';
+
+  @override
+  String get kitchenPrepEmpty =>
+      'No items have a par yet. Set the par in Inventory.';
+
+  @override
+  String kitchenPrepWindow(String from, String to) {
+    return 'Forecast usage from $from to $to';
+  }
+
+  @override
+  String get kitchenPrepItemColumn => 'Item';
+
+  @override
+  String get kitchenPrepUnitColumn => 'Unit';
+
+  @override
+  String get kitchenPrepParColumn => 'Par';
+
+  @override
+  String get kitchenPrepOnHandColumn => 'On hand';
+
+  @override
+  String get kitchenPrepForecastColumn => 'Forecast usage';
+
+  @override
+  String get kitchenPrepQuantityColumn => 'Quantity to make';
+
+  @override
+  String get kitchenPrepNoPar => 'No par';
+
+  @override
+  String get kitchenStatusQueued => 'Queued';
+
+  @override
+  String get kitchenStatusInPreparation => 'Preparing';
+
+  @override
+  String get kitchenStatusPartiallyReady => 'Partial';
+
+  @override
+  String get kitchenStatusReady => 'Ready';
+
+  @override
+  String get kitchenStatusException => 'Exception';
+
+  @override
+  String get kitchenPriorityUrgent => 'Urgent';
+
+  @override
+  String get kitchenPriorityHigh => 'High';
+
+  @override
+  String get kitchenElapsedNow => 'now';
+
+  @override
+  String kitchenElapsedMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String kitchenElapsedHoursMinutes(int hours, int minutes) {
+    return '$hours h $minutes min';
+  }
+
+  @override
+  String kitchenElapsedDaysHours(int days, int hours) {
+    return '$days d $hours h';
+  }
+
+  @override
+  String kitchenItemMarkReady(String item) {
+    return 'Mark $item ready';
+  }
+
+  @override
+  String kitchenItemAlreadyReady(String item) {
+    return '$item is already ready';
+  }
+
+  @override
+  String kitchenCourseGroup(int course) {
+    return 'Course $course';
+  }
+
+  @override
+  String kitchenCourseHeld(int count) {
+    return 'Held · $count';
+  }
+
+  @override
+  String get kitchenCourseHeldNote => 'Not cooking yet';
+
+  @override
+  String kitchenCourseFire(int course) {
+    return 'Fire course $course';
+  }
+
+  @override
+  String kitchenItemHeld(String item) {
+    return '$item is not cooking yet';
+  }
+
+  @override
+  String get kitchenItemVoided => 'VOIDED';
+
+  @override
+  String get kitchenTicketStartAction => 'Start';
+
+  @override
+  String get kitchenTicketCompleteAction => 'Complete';
+
+  @override
+  String get kitchenTicketRecallAction => 'Recall';
+
+  @override
+  String get kitchenTicketSending => 'Sending…';
+
+  @override
+  String get kitchenRecallTitle => 'Recall ticket';
+
+  @override
+  String get kitchenRecallBody =>
+      'Why is this ticket coming back to the kitchen?';
+
+  @override
+  String get kitchenRecallReasonCustomerReturned => 'The customer sent it back';
+
+  @override
+  String get kitchenRecallReasonWrongItem => 'The wrong dish went out';
+
+  @override
+  String get kitchenRecallReasonQuality => 'It was not right';
+
+  @override
+  String get kitchenRecallReasonOther => 'Another reason';
+
+  @override
+  String get kitchenRecallNoteLabel => 'Note (optional)';
+
+  @override
+  String get kitchenRecallCancel => 'Cancel';
+
+  @override
+  String get kitchenFailureTitle => 'The kitchen did not change';
+
+  @override
+  String get kitchenFailureRefresh => 'Refresh kitchen';
+
+  @override
+  String kitchenFailureVersionConflictMessage(String reference) {
+    return 'Somebody else already moved ticket $reference.';
+  }
+
+  @override
+  String get kitchenFailureVersionConflictGenericMessage =>
+      'Somebody else already moved that ticket.';
+
+  @override
+  String get kitchenFailureVersionConflictRecovery =>
+      'The board has been refreshed. Check the ticket and mark whatever is still pending.';
+
+  @override
+  String kitchenFailureFingerprintMessage(String reference) {
+    return 'That change was already sent with different content, for ticket $reference.';
+  }
+
+  @override
+  String get kitchenFailureFingerprintRecovery =>
+      'Refresh the board and repeat the action from the current state.';
+
+  @override
+  String get kitchenFailureInvalidTransitionMessage =>
+      'The ticket cannot take that step from its current state.';
+
+  @override
+  String get kitchenFailureInvalidTransitionRecovery =>
+      'Refresh the board. To send a ticket back to the kitchen, use Recall on a ready ticket.';
+
+  @override
+  String get kitchenFailurePermissionDeniedMessage =>
+      'Your role cannot move the kitchen.';
+
+  @override
+  String get kitchenFailurePermissionDeniedRecovery =>
+      'Ask a manager to do it, or sign in as another operator.';
+
+  @override
+  String kitchenFailureTicketMissingMessage(String reference) {
+    return 'Ticket $reference did not reach this device\'s station.';
+  }
+
+  @override
+  String get kitchenFailureTicketMissingGenericMessage =>
+      'That ticket did not reach this device\'s station.';
+
+  @override
+  String get kitchenFailureTicketMissingRecovery =>
+      'The ticket is still in the kitchen. Refresh the board, and if it keeps happening ask a manager to check that this device is assigned to its station.';
+
+  @override
+  String get kitchenFailureDeviceMessage =>
+      'This device is no longer registered for the kitchen.';
+
+  @override
+  String get kitchenFailureDeviceRecovery =>
+      'Enroll this device again from the dashboard.';
+
+  @override
+  String get kitchenFailureGenericMessage =>
+      'The kitchen action could not be completed.';
+
+  @override
+  String get kitchenFailureGenericRecovery =>
+      'Refresh the board and try again.';
+
+  @override
+  String get terminalChargeTitle => 'Card terminal';
+
+  @override
+  String terminalChargeInstruction(String amount) {
+    return 'Charge $amount on the terminal and confirm the outcome here.';
+  }
+
+  @override
+  String get terminalOperatorDeclaration =>
+      'The terminal is an operator declaration: the POS does not read its outcome.';
+
+  @override
+  String get terminalStatusLabel => 'Status';
+
+  @override
+  String get terminalStatusNotStarted => 'Not started';
+
+  @override
+  String get terminalStatusProcessing => 'Charging outside the POS';
+
+  @override
+  String get terminalStatusConfirmed => 'Charge confirmed';
+
+  @override
+  String get terminalStatusFailed => 'Failure reported';
+
+  @override
+  String get terminalStatusUnknown => 'Outcome unknown';
+
+  @override
+  String get terminalStatusCancelled => 'Cancelled before charging';
+
+  @override
+  String get cardTerminalLabel => 'Card terminal';
+
+  @override
+  String get terminalWaitingTitle => 'Waiting at the terminal…';
+
+  @override
+  String get terminalStopWaitingAction => 'Stop waiting';
+
+  @override
+  String get terminalApprovedMessage => 'The terminal approved the charge.';
+
+  @override
+  String terminalDeclinedMessage(String code) {
+    return 'The terminal refused the charge ($code).';
+  }
+
+  @override
+  String get terminalUnresolvedMessage =>
+      'There is a card payment nobody has confirmed. The sale cannot close until it is resolved.';
+
+  @override
+  String get terminalStoppedWaitingMessage =>
+      'You stopped waiting: the terminal may still hold the order. The attempt stays recorded and can be queried.';
+
+  @override
+  String get terminalLastAnswerLabel => 'Terminal says';
+
+  @override
+  String get terminalApprovedCollectMessage =>
+      'The terminal approved the charge. Press Charge to close the sale.';
+
+  @override
+  String get terminalDeclinedNoChargeMessage =>
+      'The terminal declined the charge and nothing was taken. You can take cash, or start a new sale to retry the card.';
+
+  @override
+  String get terminalUnavailableMessage =>
+      'The card terminal is not available. You can take cash.';
+
+  @override
+  String get terminalBusyMessage =>
+      'The terminal is busy with another order. Try again.';
+
+  @override
+  String get newSaleConfirmTitle => 'Start a new sale?';
+
+  @override
+  String newSaleConfirmBody(int count) {
+    return 'This cart holds $count unbilled line(s). It is abandoned and an empty sale starts; nothing is charged for it.';
+  }
+
+  @override
+  String get keepCartAction => 'Keep this cart';
+
+  @override
+  String get tenderConflictTitle => 'This cart cannot be paid like this';
+
+  @override
+  String get tenderConflictBody =>
+      'It holds a split between cash and card, and this location takes one method per sale. The payment record stays for review; to carry on, start a new sale.';
+
+  @override
+  String get splitTenderTitle => 'Split payment';
+
+  @override
+  String get splitTenderAction => 'Split payment';
+
+  @override
+  String get splitTenderCancelAction => 'Single method';
+
+  @override
+  String get splitTenderPickSecond => 'Choose the second payment method.';
+
+  @override
+  String get singleMethodOnlyNote =>
+      'This location charges one method per sale.';
+
+  @override
+  String tenderShortBy(String amount) {
+    return 'Short by $amount';
+  }
+
+  @override
+  String tenderOverBy(String amount) {
+    return 'Over by $amount';
+  }
+
+  @override
+  String kitchenAllDayTooltip(int ordered, int outstanding) {
+    return 'Ordered today: $ordered. Still to make: $outstanding.';
+  }
+
+  @override
+  String get inventoryProductionAction => 'Produce';
+
+  @override
+  String get inventoryProductionTitle => 'Produce prep';
+
+  @override
+  String get inventoryProductionOutputLabel => 'Output item';
+
+  @override
+  String get inventoryProductionQuantityLabel => 'Quantity produced';
+
+  @override
+  String get inventoryProductionQuantityHelper =>
+      'Use the item\'s scale and base unit.';
+
+  @override
+  String get inventoryProductionLotLabel => 'Batch code (optional)';
+
+  @override
+  String get inventoryProductionExpiryLabel => 'Expiry (optional)';
+
+  @override
+  String get inventoryProductionExpiryHint => 'YYYY-MM-DD';
+
+  @override
+  String get inventoryProductionResultTitle => 'Produced batch';
+
+  @override
+  String get inventoryProductionLotReferenceLabel => 'Batch';
+
+  @override
+  String get inventoryProductionExpiryReferenceLabel => 'Expiry';
+
+  @override
+  String get inventoryProductionProducedLabel => 'Produced';
+
+  @override
+  String get inventoryProductionDeclaredLabel => 'Recipe yield';
+
+  @override
+  String get inventoryProductionYieldLossLabel => 'Yield loss';
+
+  @override
+  String get inventoryProductionUnitCostLabel => 'Unit cost';
+
+  @override
+  String get inventoryProductionTotalCostLabel => 'Batch cost';
+
+  @override
+  String get inventoryProductionConsumedTitle => 'Consumed inputs';
+
+  @override
+  String get inventoryProductionIncompleteCostMessage =>
+      'Some inputs have no recorded cost.';
+
+  @override
+  String get inventoryProductionNoCostLabel => 'No cost';
+
+  @override
+  String get inventoryProductionRecipeRequiredMessage =>
+      'This item has no production recipe.';
+
+  @override
+  String get inventoryProductionQuantityNotExactMessage =>
+      'The quantity does not divide exactly across the recipe inputs.';
+
+  @override
+  String get inventoryProductionInsufficientStockMessage =>
+      'There is not enough stock of an input to make this batch.';
+
+  @override
+  String get inventoryUnitEach => 'ea';
+
+  @override
+  String get inventoryUnitGram => 'g';
+
+  @override
+  String get inventoryUnitKilogram => 'kg';
+
+  @override
+  String get inventoryUnitMilliliter => 'ml';
+
+  @override
+  String get inventoryUnitLiter => 'L';
+
+  @override
+  String get inventoryUnitPortion => 'portion';
+
+  @override
+  String get inventoryUnitPackage => 'pack';
+
+  @override
+  String get inventoryUnitBox => 'box';
 }

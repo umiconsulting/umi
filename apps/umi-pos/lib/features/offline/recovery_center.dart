@@ -5,6 +5,7 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/inline_notice.dart';
 import '../entry/entry_controller.dart';
 import 'offline_journal.dart';
 import 'recovery_actions.dart';
@@ -90,6 +91,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
   OfflineJournalSnapshot? snapshot;
   final Set<String> _hardwareRetries = {};
 
+  /// Why the last hardware retry did not finish, shown above the list it is
+  /// about. It used to be a bar at the bottom of the screen, far from the entry
+  /// that failed and over the controls underneath it.
+  String? _notice;
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +146,10 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                     ? null
                     : status.processed / status.total,
               ),
+              if (_notice != null) ...[
+                const SizedBox(height: UmiSpacing.sm),
+                InlineNotice(message: _notice!),
+              ],
               const SizedBox(height: UmiSpacing.md),
               Expanded(
                 child: entries.isEmpty
@@ -288,38 +298,22 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
       }
       if (result.items.any((item) => item.status != 'succeeded')) {
         final spanish = Localizations.localeOf(context).languageCode == 'es';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              spanish
-                  ? 'El hardware requiere atención.'
-                  : 'The hardware needs attention.',
-            ),
-          ),
+        setState(
+          () => _notice = spanish
+              ? 'El hardware requiere atención.'
+              : 'The hardware needs attention.',
         );
         return;
       }
-      final spanish = Localizations.localeOf(context).languageCode == 'es';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            spanish
-                ? 'La recuperación del hardware terminó.'
-                : 'Hardware recovery completed.',
-          ),
-        ),
-      );
+      // No completion bar: the entry leaves the recovery list, which is the
+      // list the operator is reading.
     } catch (_) {
       if (!mounted) return;
       final spanish = Localizations.localeOf(context).languageCode == 'es';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            spanish
-                ? 'El hardware requiere atención.'
-                : 'The hardware needs attention.',
-          ),
-        ),
+      setState(
+        () => _notice = spanish
+            ? 'El hardware requiere atención.'
+            : 'The hardware needs attention.',
       );
     } finally {
       if (mounted) setState(() => _hardwareRetries.remove(id));
@@ -381,27 +375,16 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
       await action();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            spanish
-                ? 'El resultado físico sigue desconocido.'
-                : 'The physical result is still unknown.',
-          ),
-        ),
+      setState(
+        () => _notice = spanish
+            ? 'El resultado físico sigue desconocido.'
+            : 'The physical result is still unknown.',
       );
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          spanish
-              ? 'La acción del hardware terminó.'
-              : 'The hardware action completed.',
-        ),
-      ),
-    );
+    // No completion bar, same reason as `_retryHardware`: the list is the
+    // feedback.
   }
 
   List<RecoveryAction> _availableActions(

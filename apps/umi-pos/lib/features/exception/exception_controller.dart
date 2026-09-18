@@ -154,13 +154,13 @@ final class SaleExceptionController extends ChangeNotifier {
       );
       _commandId = _uuid();
       _idempotencyKey = _uuid();
+      final requiresDeclaration =
+          preview.manualTerminal != null && !_providerBacked(preview);
       _set(
         SaleExceptionState(
-          phase: preview.manualTerminal != null
+          phase: requiresDeclaration
               ? SaleExceptionPhase.terminalRequired
-              : preview.approvalRequired
-              ? SaleExceptionPhase.approvalRequired
-              : SaleExceptionPhase.previewReady,
+              : _phaseAfterTerminal(preview),
           saleId: saleId,
           eligibility: eligibility,
           preview: preview,
@@ -178,6 +178,10 @@ final class SaleExceptionController extends ChangeNotifier {
     final preview = _state.preview;
     final saleId = _state.saleId;
     if (_busy || preview == null || saleId == null) return;
+    // A provider-backed tender is answered by the vendor at commit; the server
+    // does not accept this declaration as a substitute (plan §13, D25), so the
+    // client does not collect one.
+    if (_providerBacked(preview)) return;
     _busy = true;
     final commandId = _uuid();
     final idempotencyKey = _uuid();
@@ -402,13 +406,7 @@ final class SaleExceptionController extends ChangeNotifier {
         _idempotencyKey = _uuid();
         _set(
           SaleExceptionState(
-            phase: terminal.status == 'outcome_unknown'
-                ? SaleExceptionPhase.outcomeUnknown
-                : terminal.status == 'confirmed_success'
-                ? preview.approvalRequired
-                      ? SaleExceptionPhase.approvalRequired
-                      : SaleExceptionPhase.previewReady
-                : SaleExceptionPhase.terminalRequired,
+            phase: _terminalPhase(preview, terminal.status),
             saleId: pending.saleId,
             preview: preview,
             terminalOutcome: terminal,
@@ -437,13 +435,7 @@ final class SaleExceptionController extends ChangeNotifier {
         _idempotencyKey = _uuid();
         _set(
           SaleExceptionState(
-            phase: terminal.status == 'outcome_unknown'
-                ? SaleExceptionPhase.outcomeUnknown
-                : terminal.status == 'confirmed_success'
-                ? preview.approvalRequired
-                      ? SaleExceptionPhase.approvalRequired
-                      : SaleExceptionPhase.previewReady
-                : SaleExceptionPhase.terminalRequired,
+            phase: _terminalPhase(preview, terminal.status),
             saleId: pending.saleId,
             preview: preview,
             terminalOutcome: terminal,
@@ -471,6 +463,28 @@ final class SaleExceptionController extends ChangeNotifier {
     final callback = _afterCommit;
     if (callback == null) return;
     unawaited(callback(result).catchError((Object _) {}));
+  }
+
+  /// TRUE when a device UmiPOS integrated with took this tender, so the VENDOR
+  /// answers the refund when the exception is committed and the operator's
+  /// declaration is not accepted in its place.
+  bool _providerBacked(RefundPreview preview) =>
+      preview.manualTerminal?['providerBacked'] as bool? ?? false;
+
+  /// Where a preview lands after the terminal step. A provider-backed terminal
+  /// answers for itself at commit, so it never parks on `terminalRequired`; a
+  /// person-operated terminal has no other witness and keeps its declaration.
+  SaleExceptionPhase _phaseAfterTerminal(RefundPreview preview) =>
+      preview.approvalRequired
+      ? SaleExceptionPhase.approvalRequired
+      : SaleExceptionPhase.previewReady;
+
+  SaleExceptionPhase _terminalPhase(RefundPreview preview, String status) {
+    if (status == 'outcome_unknown') return SaleExceptionPhase.outcomeUnknown;
+    if (status == 'confirmed_success' || _providerBacked(preview)) {
+      return _phaseAfterTerminal(preview);
+    }
+    return SaleExceptionPhase.terminalRequired;
   }
 
   void clear() {

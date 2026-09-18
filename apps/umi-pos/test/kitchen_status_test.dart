@@ -6,6 +6,7 @@ import 'package:umi_pos/features/kitchen/kitchen_status_repository.dart';
 final class _KitchenApi implements ApiClient {
   ApiMethod? method;
   String? path;
+  Map<String, Object?>? body;
 
   @override
   void dispose() {}
@@ -18,9 +19,11 @@ final class _KitchenApi implements ApiClient {
     CancellationToken? cancellation,
     bool idempotent = false,
     bool authRefresh = true,
+    Map<String, String>? extraHeaders,
   }) async {
     this.method = method;
     this.path = path;
+    this.body = body;
     return {
       'kitchenOrderId': '00000000-0000-4000-8000-000000000010',
       'sourceOrderId': '00000000-0000-4000-8000-000000000011',
@@ -30,6 +33,15 @@ final class _KitchenApi implements ApiClient {
       'version': 4,
       'stationIds': ['00000000-0000-4000-8000-000000000012'],
       'updatedAt': '2026-08-09T12:00:00.000Z',
+      // The command route answers with its own envelope, which is what the
+      // repository unwraps; the status fields above stay for the read test.
+      'data': {
+        'kitchenOrderId': '00000000-0000-4000-8000-000000000010',
+        'status': 'in_preparation',
+        'version': 5,
+        'sequence': 6,
+        'updatedAt': '2026-08-09T12:01:00.000Z',
+      },
     };
   }
 }
@@ -50,5 +62,55 @@ void main() {
     expect(api.method, ApiMethod.get);
     expect(api.path, contains('/api/v1/pos/merchants/'));
     expect(api.path, contains('locationId='));
+  });
+
+  test('firing a course puts that course on the wire', () async {
+    final api = _KitchenApi();
+    final result = await ApiKitchenStatusRepository(api).command(
+      '00000000-0000-4000-8000-000000000001',
+      const PosKitchenCommandRequest(
+        action: 'command',
+        commandId: '00000000-0000-4000-8000-000000000020',
+        idempotencyKey: '00000000-0000-4000-8000-000000000021',
+        correlationId: '00000000-0000-4000-8000-000000000022',
+        expectedVersion: 4,
+        kitchenOrderId: '00000000-0000-4000-8000-000000000010',
+        commandType: 'fire_course',
+        courseNumber: 2,
+        locationId: '00000000-0000-4000-8000-000000000002',
+        operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      ),
+    );
+
+    // The course has to survive serialization, or the till's tap is a command
+    // with nothing in it.
+    expect(result.version, 5);
+    expect(api.method, ApiMethod.post);
+    expect(api.path, contains('/kitchen/command'));
+    expect(api.body?['commandType'], 'fire_course');
+    expect(api.body?['courseNumber'], 2);
+  });
+
+  test('a command that is not a fire leaves the course unset', () async {
+    final api = _KitchenApi();
+    await ApiKitchenStatusRepository(api).command(
+      '00000000-0000-4000-8000-000000000001',
+      const PosKitchenCommandRequest(
+        action: 'command',
+        commandId: '00000000-0000-4000-8000-000000000020',
+        idempotencyKey: '00000000-0000-4000-8000-000000000021',
+        correlationId: '00000000-0000-4000-8000-000000000022',
+        expectedVersion: 4,
+        kitchenOrderId: '00000000-0000-4000-8000-000000000010',
+        commandType: 'mark_item_ready',
+        itemIds: ['00000000-0000-4000-8000-0000000000c1'],
+        locationId: '00000000-0000-4000-8000-000000000002',
+        operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      ),
+    );
+
+    // `null`, not 1: a coarse default here would read as "fire the first course"
+    // attached to a bump that has nothing to do with courses.
+    expect(api.body?['courseNumber'], isNull);
   });
 }

@@ -4,6 +4,7 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate } from '@/lib/format.js';
 import { RegionHead } from '@/shell.jsx';
+import { Segmented } from '@/components/segmented.jsx';
 import {
   archiveMerchantRole,
   createMerchantRole,
@@ -67,14 +68,15 @@ const StaffScreen = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div className="seg" role="tablist" aria-label={t`Secciones de equipo y acceso`}>
-        <button className={section === 'people' ? 'on' : ''} onClick={() => setSection('people')}>
-          <Trans>Personas</Trans>
-        </button>
-        <button className={section === 'roles' ? 'on' : ''} onClick={() => setSection('roles')}>
-          <Trans>Roles y permisos</Trans>
-        </button>
-      </div>
+      <Segmented
+        label={t`Secciones de equipo y acceso`}
+        value={section}
+        onChange={setSection}
+        options={[
+          { id: 'people', label: <Trans>Personas</Trans> },
+          { id: 'roles', label: <Trans>Roles y permisos</Trans> },
+        ]}
+      />
       <RegionHead
         title={section === 'people' ? t`Equipo y acceso al POS` : t`Roles y permisos`}
         note={
@@ -94,17 +96,15 @@ const StaffScreen = () => {
         actions={
           section === 'people' ? (
             <>
-              <div className="seg" role="tablist" aria-label={t`Filtrar el equipo por rol`}>
-                {[{ id: 'ALL', name: t`Todos` }, ...roles].map((role) => (
-                  <button
-                    key={role.id}
-                    className={filter === role.id ? 'on' : ''}
-                    onClick={() => setFilter(role.id)}
-                  >
-                    {role.name}
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                label={t`Filtrar el equipo por rol`}
+                value={filter}
+                onChange={setFilter}
+                options={[{ id: 'ALL', name: t`Todos` }, ...roles].map((role) => ({
+                  id: role.id,
+                  label: role.name,
+                }))}
+              />
               <button className="btn btn-primary focusable" onClick={() => setInviteOpen(true)}>
                 <I.Plus size={16} /> <Trans>Añadir persona</Trans>
               </button>
@@ -495,17 +495,15 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
         ) : null}
       </div>
       <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--line)' }}>
-        <div className="seg" role="tablist" aria-label={t`Filtrar permisos por producto`}>
-          {['all', 'pos', 'dashboard', 'kds', 'cash'].map((value) => (
-            <button
-              key={value}
-              className={product === value ? 'on' : ''}
-              onClick={() => setProduct(value)}
-            >
-              {value === 'all' ? t`Todos` : value.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label={t`Filtrar permisos por producto`}
+          value={product}
+          onChange={setProduct}
+          options={['all', 'pos', 'dashboard', 'kds', 'cash'].map((value) => ({
+            id: value,
+            label: value === 'all' ? t`Todos` : value.toUpperCase(),
+          }))}
+        />
       </div>
       <div style={{ maxHeight: 520, overflow: 'auto' }}>
         {groups.map((group) => (

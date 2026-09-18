@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
 
+import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
 import '../entry/entry_controller.dart';
 import 'inventory_controller.dart';
@@ -52,6 +53,11 @@ final class InventorySurface extends StatefulWidget {
 final class _InventorySurfaceState extends State<InventorySurface> {
   final Map<String, TextEditingController> _countInputs = {};
   final Map<String, String> _varianceReasons = {};
+  // The produce dialog outlives its own future while the route pops, so the
+  // State owns these and disposes them once.
+  final _productionQuantity = TextEditingController();
+  final _productionLot = TextEditingController();
+  final _productionExpiry = TextEditingController();
 
   @override
   void initState() {
@@ -66,6 +72,9 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     for (final controller in _countInputs.values) {
       controller.dispose();
     }
+    _productionQuantity.dispose();
+    _productionLot.dispose();
+    _productionExpiry.dispose();
     super.dispose();
   }
 
@@ -189,6 +198,26 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                     ),
                   if (state.count != null && !blindCountActive)
                     _countPanel(state.count!),
+                  if (widget.permissions.allows('inventory.production.produce'))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          onPressed: state.busy
+                              ? null
+                              : () => _productionDialog(),
+                          icon: const Icon(
+                            Icons.precision_manufacturing_outlined,
+                          ),
+                          label: Text(
+                            AppLocalizations.of(
+                              context,
+                            ).inventoryProductionAction,
+                          ),
+                        ),
+                      ),
+                    ),
                   Expanded(
                     child: blindCountActive
                         ? SingleChildScrollView(
@@ -534,6 +563,201 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     }
   }
 
+  Future<void> _productionDialog() async {
+    final overview = widget.controller.state.overview;
+    if (overview == null) return;
+    // The till cannot read recipes, so it offers every tracked item. The server
+    // refuses an item with no recipe and the banner names that refusal.
+    final candidates = overview.items
+        .where((item) => item['trackingPolicy'] != 'not_tracked')
+        .toList();
+    if (candidates.isEmpty) return;
+    final l = AppLocalizations.of(context);
+    var outputItemId = candidates.first['id']! as String;
+    _productionQuantity.text = '1';
+    _productionLot.clear();
+    _productionExpiry.clear();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(l.inventoryProductionTitle),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: outputItemId,
+                    decoration: InputDecoration(
+                      labelText: l.inventoryProductionOutputLabel,
+                    ),
+                    items: [
+                      for (final item in candidates)
+                        DropdownMenuItem(
+                          value: item['id']! as String,
+                          child: Text(
+                            '${item['displayName']} · ${item['baseUnit']}',
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => outputItemId = value);
+                    },
+                  ),
+                  TextField(
+                    controller: _productionQuantity,
+                    autofocus: true,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: l.inventoryProductionQuantityLabel,
+                      helperText: l.inventoryProductionQuantityHelper,
+                    ),
+                  ),
+                  TextField(
+                    controller: _productionLot,
+                    decoration: InputDecoration(
+                      labelText: l.inventoryProductionLotLabel,
+                    ),
+                  ),
+                  TextField(
+                    controller: _productionExpiry,
+                    keyboardType: TextInputType.datetime,
+                    decoration: InputDecoration(
+                      labelText: l.inventoryProductionExpiryLabel,
+                      hintText: l.inventoryProductionExpiryHint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(_copy('Cancelar', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(_copy('Confirmar', 'Confirm')),
+            ),
+          ],
+        ),
+      ),
+    );
+    final quantity = int.tryParse(_productionQuantity.text);
+    final lotCode = _productionLot.text.trim();
+    final expiresOn = _productionExpiry.text.trim();
+    if (confirmed != true || quantity == null || quantity <= 0) return;
+    await widget.controller.produce(
+      widget.scope,
+      item: candidates.firstWhere((item) => item['id'] == outputItemId),
+      quantity: quantity,
+      lotCode: lotCode.isEmpty ? null : lotCode,
+      expiresOn: expiresOn.isEmpty ? null : expiresOn,
+    );
+    final result = widget.controller.state.production;
+    if (!mounted ||
+        result == null ||
+        widget.controller.state.errorCode != null) {
+      return;
+    }
+    await _productionResultDialog(result);
+  }
+
+  Future<void> _productionResultDialog(ProductionResult result) async {
+    final l = AppLocalizations.of(context);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l.inventoryProductionResultTitle),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(child: _productionSummary(result)),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(_copy('Cerrar', 'Close')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The server says what the batch consumed, so the cook reads the real inputs
+  /// and the rolled-up cost of the output.
+  Widget _productionSummary(ProductionResult result) {
+    final l = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${l.inventoryProductionLotReferenceLabel}: ${result.lotReference}',
+        ),
+        if (result.expiresOn != null)
+          Text(
+            '${l.inventoryProductionExpiryReferenceLabel}: ${result.expiresOn}',
+          ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            _Metric(
+              label: l.inventoryProductionProducedLabel,
+              value: _quantityLabel(result.producedQuantity),
+            ),
+            _Metric(
+              label: l.inventoryProductionDeclaredLabel,
+              value: _quantityLabel(result.declaredQuantity),
+            ),
+            _Metric(
+              label: l.inventoryProductionYieldLossLabel,
+              value: _quantityLabel(result.yieldLossQuantity),
+            ),
+            _Metric(
+              label: l.inventoryProductionUnitCostLabel,
+              value: _cost(result.unitCostMinor),
+            ),
+            _Metric(
+              label: l.inventoryProductionTotalCostLabel,
+              value: _cost(result.totalCostMinor),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          l.inventoryProductionConsumedTitle,
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        for (final line in result.consumed)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(line['displayName']! as String),
+            subtitle: Text(line['publicReference']! as String),
+            trailing: Text(
+              '${_quantityLabel(line['quantity']! as Map<String, Object?>)} · '
+              '${_cost(line['lineCostMinor'] as int?)}',
+            ),
+          ),
+        if (result.incompleteCost)
+          Text(l.inventoryProductionIncompleteCostMessage),
+      ],
+    );
+  }
+
+  String _quantityLabel(Map<String, Object?> quantity) =>
+      '${quantity['value']} ${quantity['unit']}';
+
+  String _cost(int? minorUnits) => minorUnits == null
+      ? AppLocalizations.of(context).inventoryProductionNoCostLabel
+      : (minorUnits / 100).toStringAsFixed(2);
+
   Future<void> _restockDialog(Map<String, Object?> review) async {
     final components = (review['components']! as List<Object?>)
         .cast<Map<String, Object?>>();
@@ -726,6 +950,14 @@ final class _InventorySurfaceState extends State<InventorySurface> {
       'La política bloquea las existencias negativas.',
       'The policy blocks negative stock.',
     ),
+    'INVENTORY_RECIPE_REQUIRED' || 'INVENTORY_RECIPE_NOT_FOUND' =>
+      AppLocalizations.of(context).inventoryProductionRecipeRequiredMessage,
+    'INVENTORY_QUANTITY_NOT_EXACT' => AppLocalizations.of(
+      context,
+    ).inventoryProductionQuantityNotExactMessage,
+    'INVENTORY_SOURCE_STATE_INSUFFICIENT' => AppLocalizations.of(
+      context,
+    ).inventoryProductionInsufficientStockMessage,
     _ => _copy(
       'No fue posible completar la operación de inventario.',
       'The inventory operation could not finish.',

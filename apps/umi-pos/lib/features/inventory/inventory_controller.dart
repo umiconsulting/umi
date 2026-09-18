@@ -38,6 +38,7 @@ final class InventoryUiState {
     this.count,
     this.pendingReconciliation,
     this.pendingOperation,
+    this.production,
     this.approvalPermission,
     this.approvalFingerprint,
     this.errorCode,
@@ -48,6 +49,10 @@ final class InventoryUiState {
   final InventoryCountResult? count;
   final InventoryReconciliation? pendingReconciliation;
   final Object? pendingOperation;
+
+  /// The batch the last produce command made. It stays until the next one, so
+  /// the cook can read what the server consumed and what the batch cost.
+  final ProductionResult? production;
   final String? approvalPermission;
   final String? approvalFingerprint;
   final String? errorCode;
@@ -67,6 +72,7 @@ final class InventoryController extends ChangeNotifier {
         history: _state.history,
         count: _state.count,
         pendingReconciliation: _state.pendingReconciliation,
+        production: _state.production,
         approvalPermission: _state.approvalPermission,
         approvalFingerprint: _state.approvalFingerprint,
       ),
@@ -92,6 +98,7 @@ final class InventoryController extends ChangeNotifier {
                   ? null
                   : InventoryCountResult.fromJson(overview.activeCount!)),
           pendingReconciliation: _state.pendingReconciliation,
+          production: _state.production,
           approvalPermission: _state.approvalPermission,
           approvalFingerprint: _state.approvalFingerprint,
         ),
@@ -103,6 +110,7 @@ final class InventoryController extends ChangeNotifier {
           history: _state.history,
           count: _state.count,
           pendingReconciliation: _state.pendingReconciliation,
+          production: _state.production,
           approvalPermission: _state.approvalPermission,
           approvalFingerprint: _state.approvalFingerprint,
           errorCode: error.code,
@@ -110,6 +118,23 @@ final class InventoryController extends ChangeNotifier {
       );
     }
   }
+
+  /// The prep list for the till's own merchant and location (§8.4).
+  ///
+  /// The kitchen board's Preparacion tab owns its own loading and error state,
+  /// because a failed prep read must not touch the inventory screens. This read
+  /// stays a thin call so the scope, the query and the route live in one place.
+  Future<PrepList> loadPrepList(
+    InventoryScope scope, {
+    bool includeAbovePar = false,
+  }) => _repository.prepList(
+    scope.merchantId,
+    PosPrepListQuery(
+      locationId: scope.locationId,
+      operatorSessionId: scope.operatorSessionId,
+      includeAbovePar: includeAbovePar,
+    ),
+  );
 
   Future<InventoryOverview> _loadCompleteOverview(
     InventoryScope scope,
@@ -294,6 +319,98 @@ final class InventoryController extends ChangeNotifier {
       ),
       (command) => _repository.quarantine(scope.merchantId, command),
     );
+  }
+
+  /// Produce a prep. The cook names only the output and what came out; the
+  /// server explodes the recipe and consumes the inputs.
+  ///
+  /// There is no approval dialog here. Production is the work the kitchen was
+  /// asked to do, so the refusal path never parks a pending operation.
+  Future<void> produce(
+    InventoryScope scope, {
+    required Map<String, Object?> item,
+    required int quantity,
+    String? lotCode,
+    String? expiresOn,
+  }) async {
+    final seed = _command(scope, item, null, null);
+    final command = ProductionRecord(
+      locationId: seed.locationId,
+      inventoryLocationId: seed.inventoryLocationId,
+      operatorSessionId: seed.operatorSessionId,
+      commandId: seed.commandId,
+      idempotencyKey: seed.idempotencyKey,
+      expectedVersion: seed.expectedVersion,
+      policyFingerprint: seed.policyFingerprint,
+      businessDate: seed.businessDate,
+      outputItemId: item['id']! as String,
+      quantity: _quantity(item, quantity),
+      lotCode: lotCode,
+      expiresOn: expiresOn,
+    );
+    _set(
+      InventoryUiState(
+        busy: true,
+        overview: _state.overview,
+        history: _state.history,
+        count: _state.count,
+        production: _state.production,
+      ),
+    );
+    try {
+      final result = await _repository.produce(scope.merchantId, command);
+      await load(scope);
+      _set(
+        InventoryUiState(
+          overview: _state.overview,
+          history: _state.history,
+          count: _state.count,
+          production: result,
+        ),
+      );
+    } on AppException catch (error) {
+      if (error.recoverable) {
+        try {
+          final recovered = await _repository.recover(
+            scope.merchantId,
+            command.commandId,
+            InventoryRecoveryQuery(
+              locationId: scope.locationId,
+              operatorSessionId: scope.operatorSessionId,
+            ),
+          );
+          if (recovered.state == 'recovered' && recovered.result != null) {
+            await load(scope);
+            return;
+          }
+        } on AppException {
+          // Keep the original safe error when the query cannot prove a terminal result.
+        }
+      }
+      _set(
+        InventoryUiState(
+          overview: _state.overview,
+          history: _state.history,
+          count: _state.count,
+          production: _state.production,
+          errorCode: error.code,
+        ),
+      );
+    } catch (error) {
+      // AN UNEXPECTED FAILURE MUST STILL REACH THE OPERATOR. It used to escape as an
+      // unhandled async error: the dialog closed, the surface said nothing, and the
+      // kitchen had no way to tell a refused batch from one that never left the till.
+      // The code is deliberately generic — a bug is not a refusal the cook can act on.
+      _set(
+        InventoryUiState(
+          overview: _state.overview,
+          history: _state.history,
+          count: _state.count,
+          production: _state.production,
+          errorCode: 'PRODUCTION_FAILED',
+        ),
+      );
+    }
   }
 
   Future<void> startCount(InventoryScope scope) async {
@@ -496,6 +613,7 @@ final class InventoryController extends ChangeNotifier {
         overview: _state.overview,
         history: _state.history,
         count: _state.count,
+        production: _state.production,
       ),
     );
     try {
@@ -721,16 +839,25 @@ final class InventoryController extends ChangeNotifier {
   ) {
     final overview = _state.overview!;
     final itemId = item['id']! as String;
-    final balance = overview.balances.firstWhere(
-      (candidate) => candidate['inventoryItemId'] == itemId,
-    );
+    // AN ITEM WITH NO STOCK ROW YET IS NORMAL, and it used to throw here. Producing a
+    // prep that has never been made is exactly that case: the balance row is created
+    // by the first movement, so there is nothing to read a version from. The server
+    // treats a missing row as version 1 (`assertBalanceVersion`), so the till sends
+    // the same thing instead of failing before the request leaves the device.
+    Map<String, Object?>? balance;
+    for (final candidate in overview.balances) {
+      if (candidate['inventoryItemId'] == itemId) {
+        balance = candidate;
+        break;
+      }
+    }
     return (
       locationId: scope.locationId,
       inventoryLocationId: overview.locations.first['id']! as String,
       operatorSessionId: scope.operatorSessionId,
       commandId: _uuid(),
       idempotencyKey: _uuid(),
-      expectedVersion: (balance['version']! as num).toInt(),
+      expectedVersion: balance == null ? 1 : (balance['version']! as num).toInt(),
       policyFingerprint: overview.policy['fingerprint']! as String,
       approvalId: approvalId,
       approvalFingerprint: approvalFingerprint,
@@ -755,6 +882,7 @@ final class InventoryController extends ChangeNotifier {
         overview: _state.overview,
         history: _state.history,
         count: _state.count,
+        production: _state.production,
       ),
     );
     try {
@@ -794,6 +922,7 @@ final class InventoryController extends ChangeNotifier {
           overview: _state.overview,
           history: _state.history,
           count: _state.count,
+          production: _state.production,
           pendingOperation: error.code == 'APPROVAL_REQUIRED' ? command : null,
           approvalPermission: permission,
           approvalFingerprint: fingerprint,
