@@ -103,3 +103,27 @@ docs/research/2026-09-18-inventory-surface-placement/assets/ugc/**/*.jpeg
 docs/research/2026-09-18-inventory-surface-placement/assets/ugc/**/*.webp
 docs/research/2026-09-18-inventory-surface-placement/assets/independent/*.png
 docs/research/2026-09-18-inventory-surface-placement/assets/marketplace/*.png
+
+# ---- Purchase-order pass, 2026-09-18 ----------------------------------------
+# The pass holds 43 captures and 23 MB. Each one is a render of a public vendor
+# help page or a vendor product image that the page embeds. The rule is the same
+# as the block above: assets/INDEX.md records the source URL, the device class and
+# what every screen shows, so each image is reproducible, and the history takes
+# only the curated set a reader needs beside the report. Un-ignore a file here to
+# commit it, and give the reason in the commit message.
+docs/research/2026-09-18-purchase-orders-competitive/assets/*.png
+docs/research/2026-09-18-purchase-orders-competitive/assets/*.jpeg
+!docs/research/2026-09-18-purchase-orders-competitive/assets/anglo-revel-po-list.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/anglo-revel-po-receive.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/anglo-revel-po-status.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/anglo-shopify-po-create-doc.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/anglo-square-po-article-doc.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/anglo-loyverse-po-create.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/spec-apicbase-purchase-order.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/spec-marginedge-place-order.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/spec-supy-ordering.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/mx-softrestaurant-compras-cfdi.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/mx-revo-ordenes-de-compra.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/mx-loyverse-autofill-po-es.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/mx-wansoft-orden-compra-sugerida.png
+!docs/research/2026-09-18-purchase-orders-competitive/assets/ugc-01-reddit-paper-order-guide.jpeg

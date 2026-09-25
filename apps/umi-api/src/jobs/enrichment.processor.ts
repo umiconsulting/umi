@@ -101,7 +101,10 @@ export class EnrichmentProcessor extends BaseProcessor {
     const older = await this.messages.getOlderMessages(conversationId, 8, batch);
     if (!older.length) return;
     const chronological = [...older].reverse();
-    const summary = await this.memory.generateSummary(chronological, conv.summary);
+    const summary = await this.memory.generateSummary(chronological, conv.summary, {
+      merchantId: conv.merchantId,
+      conversationId,
+    });
     if (summary) await this.conversations.setSummary(conversationId, summary);
   }
 
@@ -117,7 +120,10 @@ export class EnrichmentProcessor extends BaseProcessor {
       merchantId,
       personId,
     )) as CustomerFacts | null;
-    const facts = await this.memory.extractCustomerFacts(chronological, existing);
+    const facts = await this.memory.extractCustomerFacts(chronological, existing, {
+      merchantId,
+      conversationId,
+    });
     if (!facts) return;
     await this.memoryRepo.upsertCustomerFacts(
       merchantId,

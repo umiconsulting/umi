@@ -17,11 +17,14 @@ function make() {
   };
   const merchants = { loadProducts: vi.fn(), loadSegmentThresholds: vi.fn().mockResolvedValue({}) };
   const anthropic = { createCompletion: vi.fn() };
+  // The usage writer is out of scope here; the real one never rejects.
+  const usage = { record: vi.fn().mockResolvedValue(undefined) };
   return {
-    svc: new CustomersService(repo as never, merchants as never, anthropic),
+    svc: new CustomersService(repo as never, merchants as never, anthropic, usage as never),
     repo,
     merchants,
     anthropic,
+    usage,
   };
 }
 

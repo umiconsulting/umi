@@ -1,0 +1,154 @@
+{
+  "generated_at": "2026-09-18T19:55:03.196Z",
+  "generator": "scripts/ai-usage-report.mjs",
+  "database": {
+    "host": "127.0.0.1",
+    "port": 4003,
+    "database": "umi_transition_rehearsal_20260901",
+    "port_source": "docker port umi-buildv3-local-postgres-1"
+  },
+  "live": {
+    "available": false,
+    "reason": "The table umi.ai_usage exists, but it has no rows yet.",
+    "row_count": 0,
+    "totals": {
+      "row_count": 0,
+      "turn_count": 0,
+      "conversation_count": 0,
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "llm_call_count": 0,
+      "cost_usd": 0,
+      "avg_latency_ms": 0,
+      "first_at": null,
+      "last_at": null
+    },
+    "by_kind": [],
+    "by_model": [],
+    "over_time": []
+  },
+  "measured_model": {
+    "note": "Measured from source on 2026-09-18. Not from live traffic.",
+    "chars_per_token": 3.806,
+    "intent": {
+      "label": "Intent extraction",
+      "seam": "LLM_COMPLETION",
+      "file": "apps/umi-api/src/modules/conversations/intent.service.ts",
+      "system_prompt_chars": 4035,
+      "system_prompt_tokens": 1060,
+      "max_output_tokens": 500,
+      "on_live_path": false,
+      "evidence": "No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only."
+    },
+    "reply": {
+      "label": "Reply generation",
+      "seam": "Anthropic tool loop",
+      "file": "apps/umi-api/src/modules/conversations/tool-loop.service.ts",
+      "system_prompt_chars": 4252,
+      "system_prompt_tokens": 1120,
+      "tool_defs_chars": 7400,
+      "tool_defs_tokens": 1900,
+      "max_output_tokens": 900,
+      "max_tool_calls": 4,
+      "extra_budget": 3
+    },
+    "message_model": {
+      "base_tokens": 260,
+      "growth_per_iteration_tokens": 300,
+      "basis": "memory.service.ts reads the last 8 messages; each iteration appends a tool_use block and a tool result.",
+      "assumed": true
+    },
+    "loop_iterations": [
+      1,
+      2,
+      3,
+      4,
+      7
+    ],
+    "prices": {
+      "correct": {
+        "label": "Claude Haiku 4.5 (list price)",
+        "model": "claude-haiku-4-5-20251001",
+        "input_per_mtok": 1,
+        "output_per_mtok": 5,
+        "basis": "Anthropic standard pricing for Claude Haiku 4.5.",
+        "assumed": false
+      },
+      "code": {
+        "label": "Value in the API source",
+        "model": "claude-haiku-4-5-20251001",
+        "input_per_mtok": 0.25,
+        "output_per_mtok": 1.25,
+        "basis": "turn.service.ts lines 25-26: COST_PER_INPUT_TOKEN = 0.00000025, COST_PER_OUTPUT_TOKEN = 0.00000125. This value is four times too low.",
+        "assumed": false
+      }
+    }
+  },
+  "live_path": {
+    "description": "One live WhatsApp turn runs the tool loop only. It makes no intent call.",
+    "intent_on_live_path": false,
+    "intent_evidence": "No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only."
+  },
+  "cost_ladder": [
+    {
+      "iterations": 1,
+      "input_tokens": 3280,
+      "reply_input_tokens": 3280,
+      "output_tokens_ceiling": 900,
+      "live_path": true,
+      "cost_correct_usd": 0.00778,
+      "cost_code_usd": 0.001945,
+      "ratio": 4
+    },
+    {
+      "iterations": 2,
+      "input_tokens": 6860,
+      "reply_input_tokens": 6860,
+      "output_tokens_ceiling": 1800,
+      "live_path": true,
+      "cost_correct_usd": 0.01586,
+      "cost_code_usd": 0.003965,
+      "ratio": 4
+    },
+    {
+      "iterations": 3,
+      "input_tokens": 10740,
+      "reply_input_tokens": 10740,
+      "output_tokens_ceiling": 2700,
+      "live_path": true,
+      "cost_correct_usd": 0.02424,
+      "cost_code_usd": 0.00606,
+      "ratio": 4
+    },
+    {
+      "iterations": 4,
+      "input_tokens": 14920,
+      "reply_input_tokens": 14920,
+      "output_tokens_ceiling": 3600,
+      "live_path": true,
+      "cost_correct_usd": 0.03292,
+      "cost_code_usd": 0.00823,
+      "ratio": 4
+    },
+    {
+      "iterations": 7,
+      "input_tokens": 29260,
+      "reply_input_tokens": 29260,
+      "output_tokens_ceiling": 6300,
+      "live_path": true,
+      "cost_correct_usd": 0.06076,
+      "cost_code_usd": 0.01519,
+      "ratio": 4
+    }
+  ],
+  "intent_if_wired": {
+    "label": "Intent extraction, if wired",
+    "on_live_path": false,
+    "input_tokens": 1085,
+    "output_tokens_ceiling": 500,
+    "evidence": "No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only.",
+    "cost_correct_usd": 0.003585,
+    "cost_code_usd": 0.000896,
+    "ratio": 4
+  }
+}

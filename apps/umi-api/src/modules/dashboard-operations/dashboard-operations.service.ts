@@ -7,6 +7,7 @@ import type {
 } from '@umi/contract';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
+import { AiUsageRepository } from '../../shared/usage/ai-usage.repository';
 import { DashboardOperationsRepository } from './dashboard-operations.repository';
 import { DASHBOARD_DOMAIN_POLICY, hasDashboardPermission } from './dashboard-operations.policy';
 
@@ -43,6 +44,7 @@ export class DashboardOperationsService {
   constructor(
     private readonly repository: DashboardOperationsRepository,
     @Inject(LLM_COMPLETION) private readonly llm: LlmCompletionProvider,
+    private readonly usage: AiUsageRepository,
   ) {}
 
   async snapshot(user: AuthUser, access: MerchantAccess, query: DashboardOperationsQuery) {
@@ -180,6 +182,14 @@ export class DashboardOperationsService {
         system: SALES_INSIGHT_SYSTEM,
         userMessage: JSON.stringify(input),
       });
+      if (completion) {
+        await this.usage.record({
+          merchantId: access.merchantId,
+          kind: 'narrative',
+          promptTokens: completion.inputTokens,
+          completionTokens: completion.outputTokens,
+        });
+      }
       text = completion?.text?.trim() || null;
     } catch {
       // fail-safe: the narrative is optional; `text` stays null so the card hides
