@@ -61,6 +61,35 @@ cd "$REPO_DIR"
 git fetch --depth=1 origin "$BRANCH"
 git reset --hard FETCH_HEAD
 
+# 1b) Make sure the compose file is actually on disk.
+#
+#     A checkout can be a SPARSE worktree — the QA checkout on this box is
+#     cone-mode over apps/* + packages/* — and then `git reset --hard` moves
+#     HEAD without ever writing deploy/<env>/compose.yml. The roll then fails
+#     reading a file that plainly exists in the commit it just checked out.
+#     Measured on 2026-09-25: HEAD at the merge commit, `deploy/` absent,
+#     `docker compose` reporting "no such file or directory".
+#
+#     Widening the cone is persistent, so this is a no-op from the second run
+#     on. It only ever runs when the file is missing AND the worktree is
+#     genuinely sparse, so a non-sparse checkout with a typo'd UMI_COMPOSE_FILE
+#     still fails loudly at the check below rather than silently "fixing" it.
+if [ ! -f "$COMPOSE_FILE" ] &&
+  [ "$(git -C "$REPO_DIR" config --get core.sparseCheckout || true)" = "true" ]; then
+  case "$COMPOSE_FILE" in
+    "$REPO_DIR"/*)
+      SPARSE_DIR="$(dirname "${COMPOSE_FILE#"$REPO_DIR"/}")"
+      echo "    $SPARSE_DIR is outside the sparse cone — adding it"
+      git -C "$REPO_DIR" sparse-checkout add "$SPARSE_DIR"
+      ;;
+  esac
+fi
+
+if [ ! -f "$COMPOSE_FILE" ]; then
+  echo "FATAL: compose file not found after checkout: $COMPOSE_FILE" >&2
+  exit 1
+fi
+
 # 2) Pin the exact tag in .env -> deterministic restarts + one-line rollback.
 #    The `.env` lives in the PROJECT directory (prod: $APP_DIR; a second
 #    environment: its own state dir), never in the checkout.
