@@ -24,16 +24,16 @@ Labels: **documented fact**, **source-backed tradeoff**, **inference**, **UNVERI
 
 ## 2. Model facts and limits
 
-| Item | Value | Source |
-| --- | --- | --- |
-| Version | Jev 1.13, id `jev-1.13.0` | https://docs.typesafe.ai/models.md |
-| Aliases | `jev-latest` and `jev-preview`, both point to `jev-1.13.0` | https://docs.typesafe.ai/models.md |
-| Price | $42 per Btok, or $0.042 per Mtok, input only. Output tokens are free. | https://docs.typesafe.ai/models.md |
-| Rate limit | 250,000 tokens per second, and 1,200 requests per minute | https://docs.typesafe.ai/models.md |
-| Context | 64k tokens per request, and 32k for `state` plus the longest question | https://docs.typesafe.ai/models.md |
-| Input | Text only. A string, a JSON object, or an array of text values. | https://docs.typesafe.ai/models.md |
-| Language | English is primary. Other languages have lower accuracy. | https://docs.typesafe.ai/models.md |
-| Listing | `GET /v1/models` lists the model names. | https://docs.typesafe.ai/models.md |
+| Item       | Value                                                                 | Source                             |
+| ---------- | --------------------------------------------------------------------- | ---------------------------------- |
+| Version    | Jev 1.13, id `jev-1.13.0`                                             | https://docs.typesafe.ai/models.md |
+| Aliases    | `jev-latest` and `jev-preview`, both point to `jev-1.13.0`            | https://docs.typesafe.ai/models.md |
+| Price      | $42 per Btok, or $0.042 per Mtok, input only. Output tokens are free. | https://docs.typesafe.ai/models.md |
+| Rate limit | 250,000 tokens per second, and 1,200 requests per minute              | https://docs.typesafe.ai/models.md |
+| Context    | 64k tokens per request, and 32k for `state` plus the longest question | https://docs.typesafe.ai/models.md |
+| Input      | Text only. A string, a JSON object, or an array of text values.       | https://docs.typesafe.ai/models.md |
+| Language   | English is primary. Other languages have lower accuracy.              | https://docs.typesafe.ai/models.md |
+| Listing    | `GET /v1/models` lists the model names.                               | https://docs.typesafe.ai/models.md |
 
 - **documented fact** TypeSafe warns that the rate limits "can change without notice" while it adds users. Source: https://docs.typesafe.ai/models.md
 - **source-backed tradeoff** The alias `jev-latest` moves when a new release ships. The answers can change with no change on your side. Pin `jev-1.13.0` if a threshold depends on one version. Source: https://docs.typesafe.ai/models.md
@@ -41,16 +41,16 @@ Labels: **documented fact**, **source-backed tradeoff**, **inference**, **UNVERI
 
 ## 3. Pattern summary
 
-| Page | What the page says |
-| --- | --- |
-| Use case map | Lists decision shapes: classification, detection, scoring, routing, search, ranking, verification, and extraction. Claims 150 ms speed and 100x cost for two cards. Source: https://docs.typesafe.ai/concepts/use-case-map.md |
-| Intent routing | Classifies intent and complexity in one call with `type`, `instructions`, and `criteria`. Routes to a human below `confidence < 0.5`. Source: https://docs.typesafe.ai/patterns/intent-routing.md |
-| Confidence routing | Uses a different threshold for each action. A balance check needs 0.6. A transfer needs 0.85. Source: https://docs.typesafe.ai/patterns/confidence-routing.md |
-| Speculative fan-out | Sends many questions, including speculative ones, in one call. More questions usually add no latency. Source: https://docs.typesafe.ai/patterns/fan-out.md |
-| Composite scoring | Breaks one judgment into atomic Score questions. Code applies the weights. Example: four dimensions, each normalized to 0-1. Source: https://docs.typesafe.ai/patterns/composite-scoring.md |
-| Confidence | Defines high, medium, and low ranges. The page advises conservative thresholds at the start. Source: https://docs.typesafe.ai/confidence.md |
-| State | Defines `state` as the content under evaluation. All questions see the same state. Source: https://docs.typesafe.ai/concepts/state.md |
-| Models | Holds the model ids, the price, and the limits. Source: https://docs.typesafe.ai/models.md |
+| Page                | What the page says                                                                                                                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Use case map        | Lists decision shapes: classification, detection, scoring, routing, search, ranking, verification, and extraction. Claims 150 ms speed and 100x cost for two cards. Source: https://docs.typesafe.ai/concepts/use-case-map.md |
+| Intent routing      | Classifies intent and complexity in one call with `type`, `instructions`, and `criteria`. Routes to a human below `confidence < 0.5`. Source: https://docs.typesafe.ai/patterns/intent-routing.md                             |
+| Confidence routing  | Uses a different threshold for each action. A balance check needs 0.6. A transfer needs 0.85. Source: https://docs.typesafe.ai/patterns/confidence-routing.md                                                                 |
+| Speculative fan-out | Sends many questions, including speculative ones, in one call. More questions usually add no latency. Source: https://docs.typesafe.ai/patterns/fan-out.md                                                                    |
+| Composite scoring   | Breaks one judgment into atomic Score questions. Code applies the weights. Example: four dimensions, each normalized to 0-1. Source: https://docs.typesafe.ai/patterns/composite-scoring.md                                   |
+| Confidence          | Defines high, medium, and low ranges. The page advises conservative thresholds at the start. Source: https://docs.typesafe.ai/confidence.md                                                                                   |
+| State               | Defines `state` as the content under evaluation. All questions see the same state. Source: https://docs.typesafe.ai/concepts/state.md                                                                                         |
+| Models              | Holds the model ids, the price, and the limits. Source: https://docs.typesafe.ai/models.md                                                                                                                                    |
 
 ## 4. Accuracy caveats
 

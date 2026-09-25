@@ -142,13 +142,20 @@ function psqlJson(cfg, sql) {
   const result = spawnSync(
     'psql',
     [
-      '-h', cfg.host,
-      '-p', cfg.port,
-      '-U', cfg.user,
-      '-d', cfg.database,
-      '-v', 'ON_ERROR_STOP=1',
-      '-A', '-t',
-      '-c', sql,
+      '-h',
+      cfg.host,
+      '-p',
+      cfg.port,
+      '-U',
+      cfg.user,
+      '-d',
+      cfg.database,
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-A',
+      '-t',
+      '-c',
+      sql,
     ],
     { encoding: 'utf8', env: { ...process.env, PGPASSWORD: cfg.password }, timeout: 25000 },
   );
@@ -271,7 +278,8 @@ function replyInputTokens(iterations) {
   const fixed = MEASURED.reply.system_prompt_tokens + MEASURED.reply.tool_defs_tokens;
   let total = 0;
   for (let k = 1; k <= iterations; k++) {
-    const messages = MESSAGE_MODEL.base_tokens + MESSAGE_MODEL.growth_per_iteration_tokens * (k - 1);
+    const messages =
+      MESSAGE_MODEL.base_tokens + MESSAGE_MODEL.growth_per_iteration_tokens * (k - 1);
     total += fixed + messages;
   }
   return total;
@@ -707,7 +715,12 @@ function renderHtml(report) {
   const statusText = live.available ? `Live rows: ${int(live.row_count)}` : 'Live rows: none';
   const generated = report.generated_at.replace('T', ' ').replace(/\..*$/, ' UTC');
 
-  const sections = [liveSection(live), measuredSection(), ladderSection(), methodSection(report)].join('\n');
+  const sections = [
+    liveSection(live),
+    measuredSection(),
+    ladderSection(),
+    methodSection(report),
+  ].join('\n');
   // Lift each caption above its table, so a narrow screen still shows the
   // source line. The caption stays on the table for a screen reader. Each
   // table also gets its own horizontal scroll container, so the page itself
@@ -936,7 +949,9 @@ function main() {
 
   console.log('ai-usage-report');
   console.log(`  mode:      ${mode}`);
-  console.log(`  database:  ${cfg.host}:${cfg.port}/${cfg.database} (port from ${cfg.port_source})`);
+  console.log(
+    `  database:  ${cfg.host}:${cfg.port}/${cfg.database} (port from ${cfg.port_source})`,
+  );
   if (live.available) {
     console.log(`  live rows: ${live.row_count}`);
   } else {

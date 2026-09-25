@@ -15,13 +15,7 @@ function make(completion: unknown) {
   const llm = { createCompletion: vi.fn().mockResolvedValue(completion) };
   const memory = { getCustomerFacts: vi.fn(), searchCustomerMessages: vi.fn() };
   const messages = { getRecentMessages: vi.fn() };
-  const svc = new MemoryService(
-    llm,
-    {} as never,
-    memory as never,
-    messages as never,
-    usage,
-  );
+  const svc = new MemoryService(llm, {} as never, memory as never, messages as never, usage);
   return { svc, query };
 }
 

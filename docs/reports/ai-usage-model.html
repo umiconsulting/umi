@@ -1,375 +1,960 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Where the WhatsApp LLM money goes</title>
-<style>
-  :root {
-    --paper: #eef1ef;
-    --panel: #ffffff;
-    --ink: #141d1a;
-    --ink-2: #4d5a55;
-    --ink-3: #7c8783;
-    --rule: #d5dbd7;
-    --rule-strong: #b4bdb8;
-    --correct: #14584a;
-    --live: #1d4e89;
-    --signal: #9e2b4e;
-    --signal-bg: #fbeef1;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  }
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--sans);
-    font-size: 14px;
-    line-height: 1.5;
-  }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 72px; }
-
-  header.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 8px; }
-  .masthead h1 { font-size: 26px; line-height: 1.15; margin: 0 0 6px; letter-spacing: -0.01em; }
-  .masthead .sub { color: var(--ink-2); margin: 0; max-width: 66ch; }
-  .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 14px; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
-  .status { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 3px 9px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--panel); }
-  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
-  .status-live::before { background: var(--live); }
-  .status-empty::before { background: var(--signal); }
-
-  .section { margin-top: 44px; }
-  .section-head { display: flex; gap: 14px; align-items: baseline; border-bottom: 1px solid var(--rule-strong); padding-bottom: 8px; margin-bottom: 18px; }
-  .section-no { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--panel); background: var(--ink); width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
-  .section-head h2 { font-size: 17px; margin: 0; letter-spacing: -0.005em; }
-  .section-kicker { margin: 1px 0 0; color: var(--ink-2); font-size: 12.5px; }
-
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-bottom: 24px; }
-  .stat { background: var(--panel); padding: 12px 14px; }
-  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
-  .stat-value { font-family: var(--mono); font-size: 21px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .stat-sub { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
-
-  .table-wrap { overflow-x: auto; margin: 0 0 26px; border: 1px solid var(--rule); background: var(--panel); }
-  table.grid { width: 100%; border-collapse: collapse; margin: 0; background: var(--panel); }
-  table.grid caption { caption-side: top; text-align: left; }
-  .table-note { margin: 0 0 8px; color: var(--ink-2); font-size: 12px; max-width: 92ch; }
-  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  table.grid th, table.grid td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-  table.grid thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); border-bottom: 1px solid var(--rule-strong); background: #f7f9f8; white-space: nowrap; }
-  table.grid tbody tr:last-child td { border-bottom: none; }
-  table.grid .num, table.grid th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  table.grid .mono { font-family: var(--mono); font-size: 12.5px; }
-  table.grid .ratio { font-weight: 700; color: var(--signal); }
-  .muted { color: var(--ink-3); }
-
-  .bar-cell { position: relative; min-width: 130px; }
-  .bar { display: block; height: 7px; margin: 3px 0; }
-  .bar-correct { background: var(--correct); }
-  .bar-code { background: #eabfcc; border: 1px solid var(--signal); height: 7px; }
-  .bar-live { background: var(--live); height: 10px; }
-
-  .legend { display: flex; gap: 18px; margin: 0 0 12px; font-size: 12px; color: var(--ink-2); }
-  .legend-item { display: inline-flex; align-items: center; gap: 7px; }
-  .swatch { width: 16px; height: 8px; display: inline-block; }
-  .swatch-correct { background: var(--correct); }
-  .swatch-code { border: 1px solid var(--signal); background: #eabfcc; }
-  .subhead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 30px 0 8px; }
-
-  .note { background: var(--panel); border: 1px solid var(--rule); border-left: 3px solid var(--ink); padding: 12px 16px; margin: 0 0 26px; }
-  .note p { margin: 0; max-width: 84ch; }
-  .note-signal { border-left-color: var(--signal); background: var(--signal-bg); }
-  .note code, .empty code, dd code { font-family: var(--mono); font-size: 12.5px; background: #eef1ef; padding: 1px 4px; }
-
-  .empty { background: var(--panel); border: 1px dashed var(--rule-strong); padding: 20px 22px; }
-  .empty-title { font-family: var(--mono); font-size: 15px; font-weight: 700; margin: 0 0 8px; color: var(--signal); }
-  .empty p { margin: 0 0 8px; max-width: 80ch; }
-  .empty-note { color: var(--ink-2); font-size: 12.5px; }
-
-  .tag { font-family: var(--mono); font-size: 11px; padding: 2px 7px; border: 1px solid var(--rule-strong); white-space: nowrap; }
-  .tag-correct { color: var(--correct); border-color: var(--correct); }
-  .tag-signal { color: var(--signal); border-color: var(--signal); background: var(--signal-bg); }
-
-  dl.method { display: grid; grid-template-columns: 180px 1fr; gap: 0; border: 1px solid var(--rule); background: var(--panel); }
-  dl.method dt { padding: 10px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-2); background: #f7f9f8; border-bottom: 1px solid var(--rule); }
-  dl.method dd { padding: 10px 14px; margin: 0; border-bottom: 1px solid var(--rule); }
-  dl.method dt:last-of-type, dl.method dd:last-of-type { border-bottom: none; }
-
-  footer.foot { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--rule-strong); color: var(--ink-3); font-size: 12px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  button.copy { font-family: var(--mono); font-size: 12px; padding: 5px 12px; border: 1px solid var(--rule-strong); background: var(--panel); color: var(--ink); cursor: pointer; }
-  button.copy:hover { border-color: var(--ink); }
-  button.copy:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
-
-  @media (max-width: 640px) {
-    .wrap { padding: 20px 14px 56px; }
-    .masthead h1 { font-size: 21px; }
-    dl.method { grid-template-columns: 1fr; }
-    dl.method dt { border-bottom: none; padding-bottom: 2px; }
-    .bar-cell { min-width: 80px; }
-  }
-  @media print {
-    body { background: #fff; }
-    .wrap { max-width: none; }
-    button.copy { display: none; }
-  }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header class="masthead">
-    <h1>Where the WhatsApp LLM money goes</h1>
-    <p class="sub">A cost report for the Umi conversation pipeline. The live WhatsApp turn runs the tool loop only. The tool loop resends a large fixed prefix on every iteration. The intent extraction service is present in the code, but it has no caller.</p>
-    <div class="meta">
-      <span class="status status-empty">Live rows: none</span>
-      <span>generated 2026-09-18 19:55:03 UTC</span>
-      <span>model claude-haiku-4-5-20251001</span>
-    </div>
-  </header>
-
-  <section id="live" class="section">
-      <div class="section-head">
-        <span class="section-no">1</span>
-        <div>
-          <h2>Live usage</h2>
-          <p class="section-kicker">Usage rows recorded by the API</p>
-        </div>
-      </div>
-      <div class="empty" role="status">
-        <p class="empty-title">No live rows exist yet.</p>
-        <p>The table umi.ai_usage exists, but it has no rows yet.</p>
-        <p class="empty-note">This page shows no live number. The figures below are the measured call model. They come from the source code, not from traffic. The table <code>umi.ai_usage</code> will fill this section after the recorder writes rows.</p>
-      </div>
-    </section>
-<section id="model" class="section">
-    <div class="section-head">
-      <span class="section-no">2</span>
-      <div>
-        <h2>Measured call model</h2>
-        <p class="section-kicker">Measured from source, not from live traffic</p>
-      </div>
-    </div>
-
-    <p class="table-note">Call sizes. Source: the prompt builders and the loop in apps/umi-api. Measured 2026-09-18. Token counts use 3.806 characters per token. The live-path column states which call runs on a real WhatsApp turn.</p><div class="table-wrap"><table class="grid"><caption class="sr-only">Call sizes. Source: the prompt builders and the loop in apps/umi-api. Measured 2026-09-18. Token counts use 3.806 characters per token. The live-path column states which call runs on a real WhatsApp turn.</caption>
-      <thead>
-        <tr><th>Call</th><th>Live path</th><th>Seam</th><th class="num">System prompt</th><th class="num">Tool schemas</th><th class="num">Max output</th><th class="num">Iterations</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Intent extraction</td>
-          <td><span class="tag tag-signal">not on the live path</span><br><span class="muted">no caller in src or dist</span></td>
-          <td class="mono">LLM_COMPLETION</td>
-          <td class="num">4,035 chars<br><span class="muted">about 1,060 tok</span></td>
-          <td class="num muted">none</td>
-          <td class="num">500</td>
-          <td class="num">1</td>
-        </tr>
-        <tr>
-          <td>Reply generation</td>
-          <td><span class="tag tag-correct">live</span></td>
-          <td class="mono">Anthropic tool loop</td>
-          <td class="num">4,252 chars<br><span class="muted">about 1,120 tok</span></td>
-          <td class="num">7,400 chars<br><span class="muted">about 1,900 tok</span></td>
-          <td class="num">900</td>
-          <td class="num">1 to 7</td>
-        </tr>
-      </tbody>
-    </table></div>
-
-    <div class="note">
-      <p><strong>The loop resends the prefix.</strong> Each reply iteration sends the system prompt, the tool schemas, and the whole message list again. The loop budget is <code>MAX_TOOL_CALLS_PER_TURN = 4</code> plus 3 recovery steps, so one turn runs 1 to 7 iterations. The prefix cost grows with each iteration.</p>
-    </div>
-
-    <p class="table-note">Prices, in US dollars per one million tokens. Sources: Anthropic list price for Claude Haiku 4.5; the source constants in turn.service.ts lines 25-26.</p><div class="table-wrap"><table class="grid"><caption class="sr-only">Prices, in US dollars per one million tokens. Sources: Anthropic list price for Claude Haiku 4.5; the source constants in turn.service.ts lines 25-26.</caption>
-      <thead>
-        <tr><th>Value</th><th class="num">Input / Mtok</th><th class="num">Output / Mtok</th><th>Ratio to list price</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Claude Haiku 4.5 (list price)</td>
-          <td class="num">$1.00</td>
-          <td class="num">$5.00</td>
-          <td><span class="tag tag-correct">reference</span></td>
-        </tr>
-        <tr>
-          <td>Value in the API source</td>
-          <td class="num">$0.25</td>
-          <td class="num">$1.25</td>
-          <td><span class="tag tag-signal">4x too low</span></td>
-        </tr>
-      </tbody>
-    </table></div>
-  </section>
-<section id="ladder" class="section">
-    <div class="section-head">
-      <span class="section-no">3</span>
-      <div>
-        <h2>Cost per turn by loop count</h2>
-        <p class="section-kicker">Computed from the measured model</p>
-      </div>
-    </div>
-
-    <div class="legend">
-      <span class="legend-item"><span class="swatch swatch-correct"></span>List price</span>
-      <span class="legend-item"><span class="swatch swatch-code"></span>Value in source</span>
-    </div>
-
-    <p class="table-note">Live turn cost, by loop count. Source: the measured model above. This table counts the reply loop only. The intent call is not on the live path, so its tokens are absent here. Input tokens come from the prompt sizes and the message model. Output tokens are the source ceilings, so each value is an upper bound. Assumption: the message list starts at 260 tokens and grows 300 tokens per iteration.</p><div class="table-wrap"><table class="grid"><caption class="sr-only">Live turn cost, by loop count. Source: the measured model above. This table counts the reply loop only. The intent call is not on the live path, so its tokens are absent here. Input tokens come from the prompt sizes and the message model. Output tokens are the source ceilings, so each value is an upper bound. Assumption: the message list starts at 260 tokens and grows 300 tokens per iteration.</caption>
-      <thead>
-        <tr>
-          <th class="num">Loops</th>
-          <th class="num">Input tok</th>
-          <th class="num">Output tok ceil</th>
-          <th class="num">Cost, list</th>
-          <th class="num">Cost, source</th>
-          <th class="num">Ratio</th>
-          <th>Scale</th>
-        </tr>
-      </thead>
-      <tbody><tr>
-        <td class="mono">1</td>
-        <td class="num">3,280</td>
-        <td class="num">900</td>
-        <td class="num">$0.007780</td>
-        <td class="num">$0.001945</td>
-        <td class="num ratio">4.00x</td>
-        <td class="bar-cell">
-          <span class="bar bar-correct" style="width:12.8%"></span>
-          <span class="bar bar-code" style="width:3.2%"></span>
-        </td>
-      </tr><tr>
-        <td class="mono">2</td>
-        <td class="num">6,860</td>
-        <td class="num">1,800</td>
-        <td class="num">$0.015860</td>
-        <td class="num">$0.003965</td>
-        <td class="num ratio">4.00x</td>
-        <td class="bar-cell">
-          <span class="bar bar-correct" style="width:26.1%"></span>
-          <span class="bar bar-code" style="width:6.5%"></span>
-        </td>
-      </tr><tr>
-        <td class="mono">3</td>
-        <td class="num">10,740</td>
-        <td class="num">2,700</td>
-        <td class="num">$0.024240</td>
-        <td class="num">$0.006060</td>
-        <td class="num ratio">4.00x</td>
-        <td class="bar-cell">
-          <span class="bar bar-correct" style="width:39.9%"></span>
-          <span class="bar bar-code" style="width:10.0%"></span>
-        </td>
-      </tr><tr>
-        <td class="mono">4</td>
-        <td class="num">14,920</td>
-        <td class="num">3,600</td>
-        <td class="num">$0.032920</td>
-        <td class="num">$0.008230</td>
-        <td class="num ratio">4.00x</td>
-        <td class="bar-cell">
-          <span class="bar bar-correct" style="width:54.2%"></span>
-          <span class="bar bar-code" style="width:13.5%"></span>
-        </td>
-      </tr><tr>
-        <td class="mono">7</td>
-        <td class="num">29,260</td>
-        <td class="num">6,300</td>
-        <td class="num">$0.060760</td>
-        <td class="num">$0.015190</td>
-        <td class="num ratio">4.00x</td>
-        <td class="bar-cell">
-          <span class="bar bar-correct" style="width:100.0%"></span>
-          <span class="bar bar-code" style="width:25.0%"></span>
-        </td>
-      </tr></tbody>
-    </table></div>
-
-    <div class="note note-signal">
-      <p><strong>The source understates the bill by 4x.</strong> The ratio is the same at every loop count, because both prices scale by the same factor. The cost grows with the loop count, because one extra iteration resends the whole prefix.</p>
-    </div>
-
-    <h3 class="subhead">Intent extraction, not on the live path</h3>
-    <p class="table-note">What one turn would cost if the intent call were wired in. Source: the intent prompt size in intent.service.ts, and the same price pair. This figure is separate from the live ladder above. Do not add it to a live total. The scale is shared with the live table, so the two tables compare directly.</p><div class="table-wrap"><table class="grid"><caption class="sr-only">What one turn would cost if the intent call were wired in. Source: the intent prompt size in intent.service.ts, and the same price pair. This figure is separate from the live ladder above. Do not add it to a live total. The scale is shared with the live table, so the two tables compare directly.</caption>
-      <thead>
-        <tr>
-          <th>Call</th>
-          <th class="num">Input tok</th>
-          <th class="num">Output tok ceil</th>
-          <th class="num">Cost, list</th>
-          <th class="num">Cost, source</th>
-          <th class="num">Ratio</th>
-          <th>Scale</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Intent extraction, if wired</td>
-          <td class="num">1,085</td>
-          <td class="num">500</td>
-          <td class="num">$0.003585</td>
-          <td class="num">$0.000896</td>
-          <td class="num ratio">4.00x</td>
-          <td class="bar-cell">
-            <span class="bar bar-correct" style="width:5.9%"></span>
-            <span class="bar bar-code" style="width:1.5%"></span>
-          </td>
-        </tr>
-      </tbody>
-    </table></div>
-  </section>
-<section id="method" class="section">
-    <div class="section-head">
-      <span class="section-no">4</span>
-      <div>
-        <h2>Method</h2>
-        <p class="section-kicker">What each number is</p>
-      </div>
-    </div>
-    <dl class="method">
-      <dt>Measured from source</dt>
-      <dd>Prompt characters, token estimates, maximum output tokens, and the loop budget. Read from the files below on 2026-09-18.</dd>
-      <dt>Live path</dt>
-      <dd>One live WhatsApp turn runs the tool loop only. It makes no intent call. No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only. The intent figures in section 3 stand apart from the live ladder.</dd>
-      <dt>Assumed</dt>
-      <dd>memory.service.ts reads the last 8 messages; each iteration appends a tool_use block and a tool result. This value is not measured traffic. It sets the message part of each iteration.</dd>
-      <dt>Live</dt>
-      <dd>Rows in <code>umi.ai_usage</code>. Absent or empty. This page shows no live number.</dd>
-      <dt>Database</dt>
-      <dd><code>127.0.0.1:4003/umi_transition_rehearsal_20260901</code>, port from docker port umi-buildv3-local-postgres-1.</dd>
-      <dt>Sources</dt>
-      <dd class="mono">apps/umi-api/src/modules/conversations/intent.service.ts<br>apps/umi-api/src/modules/conversations/tool-loop.service.ts<br>apps/umi-api/src/modules/conversations/turn.service.ts<br>apps/umi-api/src/modules/conversations/memory.service.ts</dd>
-      <dt>Regenerate</dt>
-      <dd class="mono">node scripts/ai-usage-report.mjs</dd>
-    </dl>
-  </section>
-
-  <footer class="foot">
-    <span>Source of figures: apps/umi-api conversation modules and umi.ai_usage. Generated by scripts/ai-usage-report.mjs.</span>
-    <button class="copy" id="copy-figures" type="button">Copy figures</button>
-  </footer>
-</div>
-<script id="figures-json" type="application/json">{"generated_at":"2026-09-18T19:55:03.196Z","generator":"scripts/ai-usage-report.mjs","database":{"host":"127.0.0.1","port":4003,"database":"umi_transition_rehearsal_20260901","port_source":"docker port umi-buildv3-local-postgres-1"},"live":{"available":false,"reason":"The table umi.ai_usage exists, but it has no rows yet.","row_count":0,"totals":{"row_count":0,"turn_count":0,"conversation_count":0,"prompt_tokens":0,"completion_tokens":0,"llm_call_count":0,"cost_usd":0,"avg_latency_ms":0,"first_at":null,"last_at":null},"by_kind":[],"by_model":[],"over_time":[]},"measured_model":{"note":"Measured from source on 2026-09-18. Not from live traffic.","chars_per_token":3.806,"intent":{"label":"Intent extraction","seam":"LLM_COMPLETION","file":"apps/umi-api/src/modules/conversations/intent.service.ts","system_prompt_chars":4035,"system_prompt_tokens":1060,"max_output_tokens":500,"on_live_path":false,"evidence":"No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only."},"reply":{"label":"Reply generation","seam":"Anthropic tool loop","file":"apps/umi-api/src/modules/conversations/tool-loop.service.ts","system_prompt_chars":4252,"system_prompt_tokens":1120,"tool_defs_chars":7400,"tool_defs_tokens":1900,"max_output_tokens":900,"max_tool_calls":4,"extra_budget":3},"message_model":{"base_tokens":260,"growth_per_iteration_tokens":300,"basis":"memory.service.ts reads the last 8 messages; each iteration appends a tool_use block and a tool result.","assumed":true},"loop_iterations":[1,2,3,4,7],"prices":{"correct":{"label":"Claude Haiku 4.5 (list price)","model":"claude-haiku-4-5-20251001","input_per_mtok":1,"output_per_mtok":5,"basis":"Anthropic standard pricing for Claude Haiku 4.5.","assumed":false},"code":{"label":"Value in the API source","model":"claude-haiku-4-5-20251001","input_per_mtok":0.25,"output_per_mtok":1.25,"basis":"turn.service.ts lines 25-26: COST_PER_INPUT_TOKEN = 0.00000025, COST_PER_OUTPUT_TOKEN = 0.00000125. This value is four times too low.","assumed":false}}},"live_path":{"description":"One live WhatsApp turn runs the tool loop only. It makes no intent call.","intent_on_live_path":false,"intent_evidence":"No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only."},"cost_ladder":[{"iterations":1,"input_tokens":3280,"reply_input_tokens":3280,"output_tokens_ceiling":900,"live_path":true,"cost_correct_usd":0.00778,"cost_code_usd":0.001945,"ratio":4},{"iterations":2,"input_tokens":6860,"reply_input_tokens":6860,"output_tokens_ceiling":1800,"live_path":true,"cost_correct_usd":0.01586,"cost_code_usd":0.003965,"ratio":4},{"iterations":3,"input_tokens":10740,"reply_input_tokens":10740,"output_tokens_ceiling":2700,"live_path":true,"cost_correct_usd":0.02424,"cost_code_usd":0.00606,"ratio":4},{"iterations":4,"input_tokens":14920,"reply_input_tokens":14920,"output_tokens_ceiling":3600,"live_path":true,"cost_correct_usd":0.03292,"cost_code_usd":0.00823,"ratio":4},{"iterations":7,"input_tokens":29260,"reply_input_tokens":29260,"output_tokens_ceiling":6300,"live_path":true,"cost_correct_usd":0.06076,"cost_code_usd":0.01519,"ratio":4}],"intent_if_wired":{"label":"Intent extraction, if wired","on_live_path":false,"input_tokens":1085,"output_tokens_ceiling":500,"evidence":"No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only.","cost_correct_usd":0.003585,"cost_code_usd":0.000896,"ratio":4}}</script>
-<script>
-  (function () {
-    var button = document.getElementById('copy-figures');
-    if (!button) return;
-    button.addEventListener('click', function () {
-      var node = document.getElementById('figures-json');
-      var text = node ? node.textContent : '';
-      var done = function () {
-        button.textContent = 'Copied';
-        window.setTimeout(function () { button.textContent = 'Copy figures'; }, 1600);
-      };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, function () { button.textContent = 'Copy failed'; });
-      } else {
-        button.textContent = 'Copy unavailable';
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Where the WhatsApp LLM money goes</title>
+    <style>
+      :root {
+        --paper: #eef1ef;
+        --panel: #ffffff;
+        --ink: #141d1a;
+        --ink-2: #4d5a55;
+        --ink-3: #7c8783;
+        --rule: #d5dbd7;
+        --rule-strong: #b4bdb8;
+        --correct: #14584a;
+        --live: #1d4e89;
+        --signal: #9e2b4e;
+        --signal-bg: #fbeef1;
+        --mono:
+          ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+        --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       }
-    });
-  })();
-</script>
-</body>
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 24px 72px;
+      }
+
+      header.masthead {
+        border-bottom: 2px solid var(--ink);
+        padding-bottom: 16px;
+        margin-bottom: 8px;
+      }
+      .masthead h1 {
+        font-size: 26px;
+        line-height: 1.15;
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      .masthead .sub {
+        color: var(--ink-2);
+        margin: 0;
+        max-width: 66ch;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+        margin-top: 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 9px;
+        border: 1px solid var(--rule-strong);
+        border-radius: 2px;
+        background: var(--panel);
+      }
+      .status::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--ink-3);
+      }
+      .status-live::before {
+        background: var(--live);
+      }
+      .status-empty::before {
+        background: var(--signal);
+      }
+
+      .section {
+        margin-top: 44px;
+      }
+      .section-head {
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        border-bottom: 1px solid var(--rule-strong);
+        padding-bottom: 8px;
+        margin-bottom: 18px;
+      }
+      .section-no {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--panel);
+        background: var(--ink);
+        width: 22px;
+        height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+      }
+      .section-head h2 {
+        font-size: 17px;
+        margin: 0;
+        letter-spacing: -0.005em;
+      }
+      .section-kicker {
+        margin: 1px 0 0;
+        color: var(--ink-2);
+        font-size: 12.5px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1px;
+        background: var(--rule);
+        border: 1px solid var(--rule);
+        margin-bottom: 24px;
+      }
+      .stat {
+        background: var(--panel);
+        padding: 12px 14px;
+      }
+      .stat-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-3);
+      }
+      .stat-value {
+        font-family: var(--mono);
+        font-size: 21px;
+        font-weight: 600;
+        margin-top: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat-sub {
+        font-size: 11.5px;
+        color: var(--ink-2);
+        margin-top: 2px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        margin: 0 0 26px;
+        border: 1px solid var(--rule);
+        background: var(--panel);
+      }
+      table.grid {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        background: var(--panel);
+      }
+      table.grid caption {
+        caption-side: top;
+        text-align: left;
+      }
+      .table-note {
+        margin: 0 0 8px;
+        color: var(--ink-2);
+        font-size: 12px;
+        max-width: 92ch;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      table.grid th,
+      table.grid td {
+        text-align: left;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--rule);
+        vertical-align: top;
+      }
+      table.grid thead th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--ink-2);
+        border-bottom: 1px solid var(--rule-strong);
+        background: #f7f9f8;
+        white-space: nowrap;
+      }
+      table.grid tbody tr:last-child td {
+        border-bottom: none;
+      }
+      table.grid .num,
+      table.grid th.num {
+        text-align: right;
+        font-family: var(--mono);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      table.grid .mono {
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+      table.grid .ratio {
+        font-weight: 700;
+        color: var(--signal);
+      }
+      .muted {
+        color: var(--ink-3);
+      }
+
+      .bar-cell {
+        position: relative;
+        min-width: 130px;
+      }
+      .bar {
+        display: block;
+        height: 7px;
+        margin: 3px 0;
+      }
+      .bar-correct {
+        background: var(--correct);
+      }
+      .bar-code {
+        background: #eabfcc;
+        border: 1px solid var(--signal);
+        height: 7px;
+      }
+      .bar-live {
+        background: var(--live);
+        height: 10px;
+      }
+
+      .legend {
+        display: flex;
+        gap: 18px;
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .swatch {
+        width: 16px;
+        height: 8px;
+        display: inline-block;
+      }
+      .swatch-correct {
+        background: var(--correct);
+      }
+      .swatch-code {
+        border: 1px solid var(--signal);
+        background: #eabfcc;
+      }
+      .subhead {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--ink-2);
+        margin: 30px 0 8px;
+      }
+
+      .note {
+        background: var(--panel);
+        border: 1px solid var(--rule);
+        border-left: 3px solid var(--ink);
+        padding: 12px 16px;
+        margin: 0 0 26px;
+      }
+      .note p {
+        margin: 0;
+        max-width: 84ch;
+      }
+      .note-signal {
+        border-left-color: var(--signal);
+        background: var(--signal-bg);
+      }
+      .note code,
+      .empty code,
+      dd code {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        background: #eef1ef;
+        padding: 1px 4px;
+      }
+
+      .empty {
+        background: var(--panel);
+        border: 1px dashed var(--rule-strong);
+        padding: 20px 22px;
+      }
+      .empty-title {
+        font-family: var(--mono);
+        font-size: 15px;
+        font-weight: 700;
+        margin: 0 0 8px;
+        color: var(--signal);
+      }
+      .empty p {
+        margin: 0 0 8px;
+        max-width: 80ch;
+      }
+      .empty-note {
+        color: var(--ink-2);
+        font-size: 12.5px;
+      }
+
+      .tag {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 2px 7px;
+        border: 1px solid var(--rule-strong);
+        white-space: nowrap;
+      }
+      .tag-correct {
+        color: var(--correct);
+        border-color: var(--correct);
+      }
+      .tag-signal {
+        color: var(--signal);
+        border-color: var(--signal);
+        background: var(--signal-bg);
+      }
+
+      dl.method {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 0;
+        border: 1px solid var(--rule);
+        background: var(--panel);
+      }
+      dl.method dt {
+        padding: 10px 14px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+        background: #f7f9f8;
+        border-bottom: 1px solid var(--rule);
+      }
+      dl.method dd {
+        padding: 10px 14px;
+        margin: 0;
+        border-bottom: 1px solid var(--rule);
+      }
+      dl.method dt:last-of-type,
+      dl.method dd:last-of-type {
+        border-bottom: none;
+      }
+
+      footer.foot {
+        margin-top: 40px;
+        padding-top: 14px;
+        border-top: 1px solid var(--rule-strong);
+        color: var(--ink-3);
+        font-size: 12px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      button.copy {
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 5px 12px;
+        border: 1px solid var(--rule-strong);
+        background: var(--panel);
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button.copy:hover {
+        border-color: var(--ink);
+      }
+      button.copy:focus-visible {
+        outline: 2px solid var(--live);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 640px) {
+        .wrap {
+          padding: 20px 14px 56px;
+        }
+        .masthead h1 {
+          font-size: 21px;
+        }
+        dl.method {
+          grid-template-columns: 1fr;
+        }
+        dl.method dt {
+          border-bottom: none;
+          padding-bottom: 2px;
+        }
+        .bar-cell {
+          min-width: 80px;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        .wrap {
+          max-width: none;
+        }
+        button.copy {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <h1>Where the WhatsApp LLM money goes</h1>
+        <p class="sub">
+          A cost report for the Umi conversation pipeline. The live WhatsApp turn runs the tool loop
+          only. The tool loop resends a large fixed prefix on every iteration. The intent extraction
+          service is present in the code, but it has no caller.
+        </p>
+        <div class="meta">
+          <span class="status status-empty">Live rows: none</span>
+          <span>generated 2026-09-18 19:55:03 UTC</span>
+          <span>model claude-haiku-4-5-20251001</span>
+        </div>
+      </header>
+
+      <section id="live" class="section">
+        <div class="section-head">
+          <span class="section-no">1</span>
+          <div>
+            <h2>Live usage</h2>
+            <p class="section-kicker">Usage rows recorded by the API</p>
+          </div>
+        </div>
+        <div class="empty" role="status">
+          <p class="empty-title">No live rows exist yet.</p>
+          <p>The table umi.ai_usage exists, but it has no rows yet.</p>
+          <p class="empty-note">
+            This page shows no live number. The figures below are the measured call model. They come
+            from the source code, not from traffic. The table <code>umi.ai_usage</code> will fill
+            this section after the recorder writes rows.
+          </p>
+        </div>
+      </section>
+      <section id="model" class="section">
+        <div class="section-head">
+          <span class="section-no">2</span>
+          <div>
+            <h2>Measured call model</h2>
+            <p class="section-kicker">Measured from source, not from live traffic</p>
+          </div>
+        </div>
+
+        <p class="table-note">
+          Call sizes. Source: the prompt builders and the loop in apps/umi-api. Measured 2026-09-18.
+          Token counts use 3.806 characters per token. The live-path column states which call runs
+          on a real WhatsApp turn.
+        </p>
+        <div class="table-wrap">
+          <table class="grid">
+            <caption class="sr-only">
+              Call sizes. Source: the prompt builders and the loop in apps/umi-api. Measured
+              2026-09-18. Token counts use 3.806 characters per token. The live-path column states
+              which call runs on a real WhatsApp turn.
+            </caption>
+            <thead>
+              <tr>
+                <th>Call</th>
+                <th>Live path</th>
+                <th>Seam</th>
+                <th class="num">System prompt</th>
+                <th class="num">Tool schemas</th>
+                <th class="num">Max output</th>
+                <th class="num">Iterations</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Intent extraction</td>
+                <td>
+                  <span class="tag tag-signal">not on the live path</span><br /><span class="muted"
+                    >no caller in src or dist</span
+                  >
+                </td>
+                <td class="mono">LLM_COMPLETION</td>
+                <td class="num">4,035 chars<br /><span class="muted">about 1,060 tok</span></td>
+                <td class="num muted">none</td>
+                <td class="num">500</td>
+                <td class="num">1</td>
+              </tr>
+              <tr>
+                <td>Reply generation</td>
+                <td><span class="tag tag-correct">live</span></td>
+                <td class="mono">Anthropic tool loop</td>
+                <td class="num">4,252 chars<br /><span class="muted">about 1,120 tok</span></td>
+                <td class="num">7,400 chars<br /><span class="muted">about 1,900 tok</span></td>
+                <td class="num">900</td>
+                <td class="num">1 to 7</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note">
+          <p>
+            <strong>The loop resends the prefix.</strong> Each reply iteration sends the system
+            prompt, the tool schemas, and the whole message list again. The loop budget is
+            <code>MAX_TOOL_CALLS_PER_TURN = 4</code> plus 3 recovery steps, so one turn runs 1 to 7
+            iterations. The prefix cost grows with each iteration.
+          </p>
+        </div>
+
+        <p class="table-note">
+          Prices, in US dollars per one million tokens. Sources: Anthropic list price for Claude
+          Haiku 4.5; the source constants in turn.service.ts lines 25-26.
+        </p>
+        <div class="table-wrap">
+          <table class="grid">
+            <caption class="sr-only">
+              Prices, in US dollars per one million tokens. Sources: Anthropic list price for Claude
+              Haiku 4.5; the source constants in turn.service.ts lines 25-26.
+            </caption>
+            <thead>
+              <tr>
+                <th>Value</th>
+                <th class="num">Input / Mtok</th>
+                <th class="num">Output / Mtok</th>
+                <th>Ratio to list price</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Claude Haiku 4.5 (list price)</td>
+                <td class="num">$1.00</td>
+                <td class="num">$5.00</td>
+                <td><span class="tag tag-correct">reference</span></td>
+              </tr>
+              <tr>
+                <td>Value in the API source</td>
+                <td class="num">$0.25</td>
+                <td class="num">$1.25</td>
+                <td><span class="tag tag-signal">4x too low</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section id="ladder" class="section">
+        <div class="section-head">
+          <span class="section-no">3</span>
+          <div>
+            <h2>Cost per turn by loop count</h2>
+            <p class="section-kicker">Computed from the measured model</p>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span class="legend-item"><span class="swatch swatch-correct"></span>List price</span>
+          <span class="legend-item"><span class="swatch swatch-code"></span>Value in source</span>
+        </div>
+
+        <p class="table-note">
+          Live turn cost, by loop count. Source: the measured model above. This table counts the
+          reply loop only. The intent call is not on the live path, so its tokens are absent here.
+          Input tokens come from the prompt sizes and the message model. Output tokens are the
+          source ceilings, so each value is an upper bound. Assumption: the message list starts at
+          260 tokens and grows 300 tokens per iteration.
+        </p>
+        <div class="table-wrap">
+          <table class="grid">
+            <caption class="sr-only">
+              Live turn cost, by loop count. Source: the measured model above. This table counts the
+              reply loop only. The intent call is not on the live path, so its tokens are absent
+              here. Input tokens come from the prompt sizes and the message model. Output tokens are
+              the source ceilings, so each value is an upper bound. Assumption: the message list
+              starts at 260 tokens and grows 300 tokens per iteration.
+            </caption>
+            <thead>
+              <tr>
+                <th class="num">Loops</th>
+                <th class="num">Input tok</th>
+                <th class="num">Output tok ceil</th>
+                <th class="num">Cost, list</th>
+                <th class="num">Cost, source</th>
+                <th class="num">Ratio</th>
+                <th>Scale</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">1</td>
+                <td class="num">3,280</td>
+                <td class="num">900</td>
+                <td class="num">$0.007780</td>
+                <td class="num">$0.001945</td>
+                <td class="num ratio">4.00x</td>
+                <td class="bar-cell">
+                  <span class="bar bar-correct" style="width: 12.8%"></span>
+                  <span class="bar bar-code" style="width: 3.2%"></span>
+                </td>
+              </tr>
+              <tr>
+                <td class="mono">2</td>
+                <td class="num">6,860</td>
+                <td class="num">1,800</td>
+                <td class="num">$0.015860</td>
+                <td class="num">$0.003965</td>
+                <td class="num ratio">4.00x</td>
+                <td class="bar-cell">
+                  <span class="bar bar-correct" style="width: 26.1%"></span>
+                  <span class="bar bar-code" style="width: 6.5%"></span>
+                </td>
+              </tr>
+              <tr>
+                <td class="mono">3</td>
+                <td class="num">10,740</td>
+                <td class="num">2,700</td>
+                <td class="num">$0.024240</td>
+                <td class="num">$0.006060</td>
+                <td class="num ratio">4.00x</td>
+                <td class="bar-cell">
+                  <span class="bar bar-correct" style="width: 39.9%"></span>
+                  <span class="bar bar-code" style="width: 10%"></span>
+                </td>
+              </tr>
+              <tr>
+                <td class="mono">4</td>
+                <td class="num">14,920</td>
+                <td class="num">3,600</td>
+                <td class="num">$0.032920</td>
+                <td class="num">$0.008230</td>
+                <td class="num ratio">4.00x</td>
+                <td class="bar-cell">
+                  <span class="bar bar-correct" style="width: 54.2%"></span>
+                  <span class="bar bar-code" style="width: 13.5%"></span>
+                </td>
+              </tr>
+              <tr>
+                <td class="mono">7</td>
+                <td class="num">29,260</td>
+                <td class="num">6,300</td>
+                <td class="num">$0.060760</td>
+                <td class="num">$0.015190</td>
+                <td class="num ratio">4.00x</td>
+                <td class="bar-cell">
+                  <span class="bar bar-correct" style="width: 100%"></span>
+                  <span class="bar bar-code" style="width: 25%"></span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="note note-signal">
+          <p>
+            <strong>The source understates the bill by 4x.</strong> The ratio is the same at every
+            loop count, because both prices scale by the same factor. The cost grows with the loop
+            count, because one extra iteration resends the whole prefix.
+          </p>
+        </div>
+
+        <h3 class="subhead">Intent extraction, not on the live path</h3>
+        <p class="table-note">
+          What one turn would cost if the intent call were wired in. Source: the intent prompt size
+          in intent.service.ts, and the same price pair. This figure is separate from the live
+          ladder above. Do not add it to a live total. The scale is shared with the live table, so
+          the two tables compare directly.
+        </p>
+        <div class="table-wrap">
+          <table class="grid">
+            <caption class="sr-only">
+              What one turn would cost if the intent call were wired in. Source: the intent prompt
+              size in intent.service.ts, and the same price pair. This figure is separate from the
+              live ladder above. Do not add it to a live total. The scale is shared with the live
+              table, so the two tables compare directly.
+            </caption>
+            <thead>
+              <tr>
+                <th>Call</th>
+                <th class="num">Input tok</th>
+                <th class="num">Output tok ceil</th>
+                <th class="num">Cost, list</th>
+                <th class="num">Cost, source</th>
+                <th class="num">Ratio</th>
+                <th>Scale</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Intent extraction, if wired</td>
+                <td class="num">1,085</td>
+                <td class="num">500</td>
+                <td class="num">$0.003585</td>
+                <td class="num">$0.000896</td>
+                <td class="num ratio">4.00x</td>
+                <td class="bar-cell">
+                  <span class="bar bar-correct" style="width: 5.9%"></span>
+                  <span class="bar bar-code" style="width: 1.5%"></span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section id="method" class="section">
+        <div class="section-head">
+          <span class="section-no">4</span>
+          <div>
+            <h2>Method</h2>
+            <p class="section-kicker">What each number is</p>
+          </div>
+        </div>
+        <dl class="method">
+          <dt>Measured from source</dt>
+          <dd>
+            Prompt characters, token estimates, maximum output tokens, and the loop budget. Read
+            from the files below on 2026-09-18.
+          </dd>
+          <dt>Live path</dt>
+          <dd>
+            One live WhatsApp turn runs the tool loop only. It makes no intent call. No caller. grep
+            -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288.
+            The service is registered in conversations.module.ts at lines 65 and 95 and is never
+            invoked, in src or in dist. The live turn runs the tool loop only. The intent figures in
+            section 3 stand apart from the live ladder.
+          </dd>
+          <dt>Assumed</dt>
+          <dd>
+            memory.service.ts reads the last 8 messages; each iteration appends a tool_use block and
+            a tool result. This value is not measured traffic. It sets the message part of each
+            iteration.
+          </dd>
+          <dt>Live</dt>
+          <dd>
+            Rows in <code>umi.ai_usage</code>. Absent or empty. This page shows no live number.
+          </dd>
+          <dt>Database</dt>
+          <dd>
+            <code>127.0.0.1:4003/umi_transition_rehearsal_20260901</code>, port from docker port
+            umi-buildv3-local-postgres-1.
+          </dd>
+          <dt>Sources</dt>
+          <dd class="mono">
+            apps/umi-api/src/modules/conversations/intent.service.ts<br />apps/umi-api/src/modules/conversations/tool-loop.service.ts<br />apps/umi-api/src/modules/conversations/turn.service.ts<br />apps/umi-api/src/modules/conversations/memory.service.ts
+          </dd>
+          <dt>Regenerate</dt>
+          <dd class="mono">node scripts/ai-usage-report.mjs</dd>
+        </dl>
+      </section>
+
+      <footer class="foot">
+        <span
+          >Source of figures: apps/umi-api conversation modules and umi.ai_usage. Generated by
+          scripts/ai-usage-report.mjs.</span
+        >
+        <button class="copy" id="copy-figures" type="button">Copy figures</button>
+      </footer>
+    </div>
+    <script id="figures-json" type="application/json">
+      {
+        "generated_at": "2026-09-18T19:55:03.196Z",
+        "generator": "scripts/ai-usage-report.mjs",
+        "database": {
+          "host": "127.0.0.1",
+          "port": 4003,
+          "database": "umi_transition_rehearsal_20260901",
+          "port_source": "docker port umi-buildv3-local-postgres-1"
+        },
+        "live": {
+          "available": false,
+          "reason": "The table umi.ai_usage exists, but it has no rows yet.",
+          "row_count": 0,
+          "totals": {
+            "row_count": 0,
+            "turn_count": 0,
+            "conversation_count": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "llm_call_count": 0,
+            "cost_usd": 0,
+            "avg_latency_ms": 0,
+            "first_at": null,
+            "last_at": null
+          },
+          "by_kind": [],
+          "by_model": [],
+          "over_time": []
+        },
+        "measured_model": {
+          "note": "Measured from source on 2026-09-18. Not from live traffic.",
+          "chars_per_token": 3.806,
+          "intent": {
+            "label": "Intent extraction",
+            "seam": "LLM_COMPLETION",
+            "file": "apps/umi-api/src/modules/conversations/intent.service.ts",
+            "system_prompt_chars": 4035,
+            "system_prompt_tokens": 1060,
+            "max_output_tokens": 500,
+            "on_live_path": false,
+            "evidence": "No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only."
+          },
+          "reply": {
+            "label": "Reply generation",
+            "seam": "Anthropic tool loop",
+            "file": "apps/umi-api/src/modules/conversations/tool-loop.service.ts",
+            "system_prompt_chars": 4252,
+            "system_prompt_tokens": 1120,
+            "tool_defs_chars": 7400,
+            "tool_defs_tokens": 1900,
+            "max_output_tokens": 900,
+            "max_tool_calls": 4,
+            "extra_budget": 3
+          },
+          "message_model": {
+            "base_tokens": 260,
+            "growth_per_iteration_tokens": 300,
+            "basis": "memory.service.ts reads the last 8 messages; each iteration appends a tool_use block and a tool result.",
+            "assumed": true
+          },
+          "loop_iterations": [1, 2, 3, 4, 7],
+          "prices": {
+            "correct": {
+              "label": "Claude Haiku 4.5 (list price)",
+              "model": "claude-haiku-4-5-20251001",
+              "input_per_mtok": 1,
+              "output_per_mtok": 5,
+              "basis": "Anthropic standard pricing for Claude Haiku 4.5.",
+              "assumed": false
+            },
+            "code": {
+              "label": "Value in the API source",
+              "model": "claude-haiku-4-5-20251001",
+              "input_per_mtok": 0.25,
+              "output_per_mtok": 1.25,
+              "basis": "turn.service.ts lines 25-26: COST_PER_INPUT_TOKEN = 0.00000025, COST_PER_OUTPUT_TOKEN = 0.00000125. This value is four times too low.",
+              "assumed": false
+            }
+          }
+        },
+        "live_path": {
+          "description": "One live WhatsApp turn runs the tool loop only. It makes no intent call.",
+          "intent_on_live_path": false,
+          "intent_evidence": "No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only."
+        },
+        "cost_ladder": [
+          {
+            "iterations": 1,
+            "input_tokens": 3280,
+            "reply_input_tokens": 3280,
+            "output_tokens_ceiling": 900,
+            "live_path": true,
+            "cost_correct_usd": 0.00778,
+            "cost_code_usd": 0.001945,
+            "ratio": 4
+          },
+          {
+            "iterations": 2,
+            "input_tokens": 6860,
+            "reply_input_tokens": 6860,
+            "output_tokens_ceiling": 1800,
+            "live_path": true,
+            "cost_correct_usd": 0.01586,
+            "cost_code_usd": 0.003965,
+            "ratio": 4
+          },
+          {
+            "iterations": 3,
+            "input_tokens": 10740,
+            "reply_input_tokens": 10740,
+            "output_tokens_ceiling": 2700,
+            "live_path": true,
+            "cost_correct_usd": 0.02424,
+            "cost_code_usd": 0.00606,
+            "ratio": 4
+          },
+          {
+            "iterations": 4,
+            "input_tokens": 14920,
+            "reply_input_tokens": 14920,
+            "output_tokens_ceiling": 3600,
+            "live_path": true,
+            "cost_correct_usd": 0.03292,
+            "cost_code_usd": 0.00823,
+            "ratio": 4
+          },
+          {
+            "iterations": 7,
+            "input_tokens": 29260,
+            "reply_input_tokens": 29260,
+            "output_tokens_ceiling": 6300,
+            "live_path": true,
+            "cost_correct_usd": 0.06076,
+            "cost_code_usd": 0.01519,
+            "ratio": 4
+          }
+        ],
+        "intent_if_wired": {
+          "label": "Intent extraction, if wired",
+          "on_live_path": false,
+          "input_tokens": 1085,
+          "output_tokens_ceiling": 500,
+          "evidence": "No caller. grep -rn extractIntent apps/umi-api/src returns only the definition at intent.service.ts:288. The service is registered in conversations.module.ts at lines 65 and 95 and is never invoked, in src or in dist. The live turn runs the tool loop only.",
+          "cost_correct_usd": 0.003585,
+          "cost_code_usd": 0.000896,
+          "ratio": 4
+        }
+      }
+    </script>
+    <script>
+      (function () {
+        var button = document.getElementById('copy-figures');
+        if (!button) return;
+        button.addEventListener('click', function () {
+          var node = document.getElementById('figures-json');
+          var text = node ? node.textContent : '';
+          var done = function () {
+            button.textContent = 'Copied';
+            window.setTimeout(function () {
+              button.textContent = 'Copy figures';
+            }, 1600);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, function () {
+              button.textContent = 'Copy failed';
+            });
+          } else {
+            button.textContent = 'Copy unavailable';
+          }
+        });
+      })();
+    </script>
+  </body>
 </html>

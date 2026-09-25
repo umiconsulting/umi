@@ -58,13 +58,7 @@
       "basis": "memory.service.ts reads the last 8 messages; each iteration appends a tool_use block and a tool result.",
       "assumed": true
     },
-    "loop_iterations": [
-      1,
-      2,
-      3,
-      4,
-      7
-    ],
+    "loop_iterations": [1, 2, 3, 4, 7],
     "prices": {
       "correct": {
         "label": "Claude Haiku 4.5 (list price)",

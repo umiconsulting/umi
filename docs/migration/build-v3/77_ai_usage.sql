@@ -50,6 +50,34 @@ begin;
 --
 -- Idempotent and re-runnable: guarded table, guarded index, guarded policy,
 -- and an `on conflict do nothing` on the version row.
+--
+-- GROWTH, MEASURED — AND HOW TO BOUND IT.
+-- There is no real traffic yet. The legacy `observability.ai_runs` ran 521 rows
+-- over four months, and those were test messages too, so nothing in this
+-- repository is a production baseline — do not extrapolate from it.
+--
+-- Measured on THIS table instead: 20,000 synthetic rows occupy 7,296 kB
+-- including both indexes, that is 373 bytes/row.
+--
+-- At 10 cafés x 100 WhatsApp messages/day, about 2.5 rows per message (reply,
+-- plus intent/facts/summary amortised; portrait and narrative are
+-- dashboard-driven and rare), that is ~2,500 rows/day, ~0.9 MB/day,
+-- ~325 MB/year. Worth bounding eventually. Not worth machinery today.
+--
+-- FOR SCALE: the same traffic writes ~4.7 GB/year into `comms.messages`
+-- (12.9 kB/row — vector(1024) plus its index), so this table is roughly 7% of
+-- the corpus it measures. If storage becomes the problem, the embeddings are
+-- the lever, not this fact.
+--
+-- TO BOUND IT WHEN IT IS NEEDED. Replay-dedup only matters over minutes — no
+-- turn is replayed a month later — so the raw window can be short: keep ~90
+-- days raw (a permanent ~80 MB cap), roll the older rows into a daily
+-- (merchant_id, day, kind, provider, model) aggregate (~5 MB/year, forever),
+-- then drop the raw rows. Either as a monthly range partition on occurred_at,
+-- where pruning becomes DROP TABLE, or as a scheduled job in the worker, which
+-- already runs the lifecycle and leads schedulers. Deliberately NOT built here:
+-- five pilot cafés will not notice, and the shape above is what the next person
+-- needs rather than a mechanism nobody maintains.
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------

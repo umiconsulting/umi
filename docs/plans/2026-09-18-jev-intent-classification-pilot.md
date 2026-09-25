@@ -27,18 +27,18 @@ This plan does NOT cover:
 
 Measured from the source:
 
-| Item | Value |
-| --- | --- |
-| `INTENT_SYSTEM_PROMPT` | 4,035 characters, about 1,060 tokens |
-| User message | The state, the pending clarification, the cart summary, the customer facts, the conversation summary, the semantic context, and the turn |
-| Output ceiling | 500 tokens |
+| Item                   | Value                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `INTENT_SYSTEM_PROMPT` | 4,035 characters, about 1,060 tokens                                                                                                     |
+| User message           | The state, the pending clarification, the cart summary, the customer facts, the conversation summary, the semantic context, and the turn |
+| Output ceiling         | 500 tokens                                                                                                                               |
 
 Prices, read 2026-09-18:
 
-| Provider | Input | Output |
-| --- | --- | --- |
-| Claude Haiku 4.5 | $1.00 per Mtok | $5.00 per Mtok |
-| Jev 1.13 | $0.042 per Mtok | Free |
+| Provider         | Input           | Output         |
+| ---------------- | --------------- | -------------- |
+| Claude Haiku 4.5 | $1.00 per Mtok  | $5.00 per Mtok |
+| Jev 1.13         | $0.042 per Mtok | Free           |
 
 **Inference:** one turn of about 1,300 input tokens and 150 output tokens costs
 about $0.0021 on Haiku 4.5 and about $0.000055 on Jev. Jev is about 37 times
@@ -49,24 +49,24 @@ cheaper on that turn.
 The current call returns one JSON object. Jev answers typed questions instead.
 Most fields map directly.
 
-| Current field | Jev shape |
-| --- | --- |
-| `intent_type` (13 values) | Choice |
-| `tool_hint` (11 values) | Choice |
-| `clarification_target` (6 values) | Choice |
-| `confidence` (high, medium, low) | Score, or the native `confidence` value |
-| `complete`, `ambiguous`, `is_revision`, `references_prior_state` | One Noul each |
-| `entities.size`, `entities.temp`, `entities.milk` | Choice |
-| `entities.confirmation` | Noul |
+| Current field                                                    | Jev shape                               |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| `intent_type` (13 values)                                        | Choice                                  |
+| `tool_hint` (11 values)                                          | Choice                                  |
+| `clarification_target` (6 values)                                | Choice                                  |
+| `confidence` (high, medium, low)                                 | Score, or the native `confidence` value |
+| `complete`, `ambiguous`, `is_revision`, `references_prior_state` | One Noul each                           |
+| `entities.size`, `entities.temp`, `entities.milk`                | Choice                                  |
+| `entities.confirmation`                                          | Noul                                    |
 
 Four fields do **not** map:
 
-| Current field | Why it does not map |
-| --- | --- |
-| `entities.query` | Free text. Jev returns no free text. |
-| `entities.pickup_person` | Free text. |
-| `entities.customer_note` | Free text. |
-| `entities.cancel_reason` | Free text. |
+| Current field            | Why it does not map                  |
+| ------------------------ | ------------------------------------ |
+| `entities.query`         | Free text. Jev returns no free text. |
+| `entities.pickup_person` | Free text.                           |
+| `entities.customer_note` | Free text.                           |
+| `entities.cancel_reason` | Free text.                           |
 
 **Inference:** the classification half of the call is a good fit. The free-text
 half is not. Three options exist for the free-text fields:
@@ -111,14 +111,14 @@ Record latency p50 and p95, the token counts, and the cost per 1,000 turns.
 
 ## 5. The risks that decide the pilot
 
-| Risk | Evidence | Consequence |
-| --- | --- | --- |
-| Spanish accuracy | The vendor page says English is primary and other languages have lower accuracy | Umi's customers write Spanish. Measure this first. |
-| Context rot | The vendor's jaggedness page | The semantic context in the user message costs accuracy. Trim it. |
-| Prompt injection | The vendor's jaggedness page: state is not treated as hostile by default | Customer text can move the answer. Keep the confirmation override in code. |
-| Availability | The vendor calls the model early access | A production dependency on an early-access service needs a fallback. Keep the Anthropic path. |
-| Data handling | United States hosting, no zero retention on the self-serve plan, Telemetry is processed without restriction | Umi sends customer text. The owner must accept the terms. |
-| Publication | The Master Customer Agreement forbids publishing benchmark results | An internal comparison is permitted. A public write-up is not. |
+| Risk             | Evidence                                                                                                    | Consequence                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Spanish accuracy | The vendor page says English is primary and other languages have lower accuracy                             | Umi's customers write Spanish. Measure this first.                                            |
+| Context rot      | The vendor's jaggedness page                                                                                | The semantic context in the user message costs accuracy. Trim it.                             |
+| Prompt injection | The vendor's jaggedness page: state is not treated as hostile by default                                    | Customer text can move the answer. Keep the confirmation override in code.                    |
+| Availability     | The vendor calls the model early access                                                                     | A production dependency on an early-access service needs a fallback. Keep the Anthropic path. |
+| Data handling    | United States hosting, no zero retention on the self-serve plan, Telemetry is processed without restriction | Umi sends customer text. The owner must accept the terms.                                     |
+| Publication      | The Master Customer Agreement forbids publishing benchmark results                                          | An internal comparison is permitted. A public write-up is not.                                |
 
 ## 6. Steps
 
