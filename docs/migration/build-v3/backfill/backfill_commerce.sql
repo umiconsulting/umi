@@ -268,9 +268,11 @@ update merchant.location br
 --      (derived from latest order_event), station_id/name (KDS routing scratch),
 --      cancellation_reason* (contaminated free text; canceled fact is in status).
 --    total_cents: NOT carried as a stored column. build-v3 DERIVES the order total
---      (Σ live lines, merchant.order_total). PROVEN lossless on this snapshot:
---      total_cents = Σ(unit_price*qty WHERE NOT is_cancelled) for all 51 orders
---      (590300 = 590300); the stored total already excluded the 3 voided lines.
+--      (Σ live lines, merchant.order_total). PROVEN lossless, re-measured on the
+--      2026-09-25 dump: total_cents = Σ(unit_price_cents*quantity WHERE NOT
+--      is_cancelled) for all 53 orders (608800 = 608800, 0 mismatches). The
+--      stored total already excludes the voided lines. (It was 51 orders /
+--      590300 on the 2026-09-01 snapshot.)
 --      cancel_reason left NULL (source free-text is contaminated — see above).
 -- ----------------------------------------------------------------------------
 insert into merchant.customer_order
@@ -284,10 +286,27 @@ select o.id,
        null::uuid,
        o.source,                                   -- 'whatsapp' ∈ target CHECK
        null::text,
+       -- No ELSE, deliberately (BACKFILL_METHODOLOGY I7): an unmapped value must
+       -- abort, not be silently defaulted.
+       --
+       -- The 2026-09-25 dump carries a fourth status the older mapping did not
+       -- know — `in_progress`, one order (Kalala, created 2026-08-15) — and it
+       -- failed closed here rather than inventing a value. The 2026-09-01
+       -- snapshot resolved 23/23 redemptions and 51 orders with no such value,
+       -- so nothing had exercised this branch.
+       --
+       -- `in_progress` -> 'preparing' is not a guess:
+       --   * kds-contract.spec.ts names this exact vocabulary — "Rebound from the
+       --     legacy ops.orders vocabulary (pending/in_progress/cancelled) to
+       --     build-v3's CHECK (placed/preparing/ready/completed/canceled)".
+       --   * mapKitchenToOrderStatus folds accepted, preparing and
+       --     partial_cancelled into the single in-flight state, 'preparing'.
+       -- So pending -> placed (not started), in_progress -> preparing (underway).
        case o.status
-         when 'pending'   then 'placed'
-         when 'completed' then 'completed'
-         when 'cancelled' then 'canceled'
+         when 'pending'     then 'placed'
+         when 'in_progress' then 'preparing'
+         when 'completed'   then 'completed'
+         when 'cancelled'   then 'canceled'
        end,
        nullif(btrim(o.notes), ''),                 -- 7 populated; '' would be a fake note
        nullif(btrim(o.pickup_person), ''),         -- 0 populated in this snapshot
