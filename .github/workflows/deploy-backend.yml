@@ -37,6 +37,28 @@ on:
         description: "Optional URL to curl after deploy; empty disables the check"
         type: string
         default: ""
+      repo_dir:
+        description: >-
+          Repo checkout to deploy from on the VPS (passed through as UMI_REPO_DIR
+          to deploy.sh). Empty uses deploy.sh's own default ($HOME/umi) — set this
+          for a second, isolated environment (e.g. a staging checkout) on the same
+          box.
+        type: string
+        default: ""
+      branch:
+        description: >-
+          Branch that checkout tracks (passed through as UMI_DEPLOY_BRANCH to
+          deploy.sh, which git-resets the checkout to it before rolling
+          containers). Empty uses deploy.sh's own default (main).
+        type: string
+        default: ""
+      push_latest:
+        description: >-
+          Also tag+push the image as ":latest". Prod relies on this as a human
+          reference (the running tag is always pinned via .env, never :latest) —
+          leave false for a non-prod caller so it can never shadow prod's tag.
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -81,14 +103,20 @@ jobs:
           IMAGE: ${{ inputs.image }}
           DIR: ${{ inputs.app_dir }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUSH_LATEST: ${{ inputs.push_latest }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          TAGS=(-t "$IMAGE:sha-${{ github.sha }}")
+          if [ "$PUSH_LATEST" = "true" ]; then
+            TAGS+=(-t "$IMAGE:latest")
+          fi
           docker build \
-            -t "$IMAGE:sha-${{ github.sha }}" \
-            -t "$IMAGE:latest" \
+            "${TAGS[@]}" \
             -f "$DIR/Dockerfile" .
           docker push "$IMAGE:sha-${{ github.sha }}"
-          docker push "$IMAGE:latest"
+          if [ "$PUSH_LATEST" = "true" ]; then
+            docker push "$IMAGE:latest"
+          fi
 
       - name: Deploy over SSH
         env:
@@ -97,6 +125,8 @@ jobs:
           SSH_USER: ${{ secrets.VPS_USER }}
           SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
           APP_NAME: ${{ inputs.app_name }}
+          UMI_REPO_DIR: ${{ inputs.repo_dir }}
+          UMI_DEPLOY_BRANCH: ${{ inputs.branch }}
           DEPLOY_SCRIPT: ${{ inputs.app_dir }}/deploy/deploy.sh
         run: |
           mkdir -p ~/.ssh
@@ -108,10 +138,13 @@ jobs:
           # breaks: deploy.sh's own `git fetch` spawns an ssh-to-GitHub that
           # drains the very stdin the script is being read from, so bash hits
           # EOF mid-script and dies silently. cat-to-file + /dev/null avoids it.
+          # UMI_REPO_DIR/UMI_DEPLOY_BRANCH, when set, redirect deploy.sh at a
+          # second, isolated checkout/branch (e.g. a staging environment)
+          # instead of its $HOME/umi + main default.
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
+            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
             < "$DEPLOY_SCRIPT"
 
       - name: Health check
