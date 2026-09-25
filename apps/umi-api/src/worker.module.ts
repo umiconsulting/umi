@@ -28,6 +28,7 @@ import { PointAttemptHealthScheduler } from './jobs/mp-point-attempt-health.sche
 import { MercadoPagoPointModule } from './modules/mercado-pago/mercadopago-point.module';
 import { ReleaseModule } from './shared/release/release.module';
 import { RateLimitModule } from './shared/ratelimit/rate-limit.module';
+import { UsageModule } from './shared/usage/usage.module';
 import { TenderModule } from './modules/tender/tender.module';
 
 /**
@@ -40,6 +41,7 @@ import { TenderModule } from './modules/tender/tender.module';
     AppConfigModule,
     RateLimitModule,
     ReleaseModule,
+    UsageModule,
     DatabaseModule,
     AdaptersModule,
     LoggingModule,

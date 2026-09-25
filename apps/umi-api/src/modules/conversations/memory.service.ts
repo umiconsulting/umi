@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
 import { VoyageAdapter } from '../../shared/adapters/voyage.adapter';
+import { AiUsageRepository } from '../../shared/usage/ai-usage.repository';
 import { MemoryRepository, type SemanticRow } from './memory.repository';
 import { MessagesRepository } from './messages.repository';
 
@@ -52,6 +53,15 @@ export interface WorkingMemory {
   } | null;
 }
 
+/**
+ * The merchant and conversation a background LLM call belongs to. Both
+ * enrichment callers hold them already, and the billing row needs them.
+ */
+export interface MemoryCallContext {
+  merchantId: string;
+  conversationId?: string | null;
+}
+
 @Injectable()
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
@@ -61,6 +71,7 @@ export class MemoryService {
     private readonly voyage: VoyageAdapter,
     private readonly memory: MemoryRepository,
     private readonly messages: MessagesRepository,
+    private readonly usage: AiUsageRepository,
   ) {}
 
   // ── Working memory ─────────────────────────────────────────────────────────
@@ -194,6 +205,7 @@ export class MemoryService {
   async extractCustomerFacts(
     recentMessages: Array<{ role: string; content: string }>,
     existingFacts: CustomerFacts | null,
+    context: MemoryCallContext,
   ): Promise<CustomerFacts | null> {
     const convoText = recentMessages.map((m) => `${m.role}: ${m.content}`).join('\n');
     const existingJson = existingFacts ? JSON.stringify(existingFacts) : '{}';
@@ -218,6 +230,13 @@ Existing facts: ${existingJson}`,
       });
 
       if (!completion) return null;
+      await this.usage.record({
+        merchantId: context.merchantId,
+        conversationId: context.conversationId ?? null,
+        kind: 'facts',
+        promptTokens: completion.inputTokens,
+        completionTokens: completion.outputTokens,
+      });
       const jsonMatch = completion.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return null;
       return JSON.parse(jsonMatch[0]) as CustomerFacts;
@@ -233,6 +252,7 @@ Existing facts: ${existingJson}`,
   async generateSummary(
     olderMessages: Array<{ role: string; content: string }>,
     existingSummary: string | null,
+    context: MemoryCallContext,
   ): Promise<string | null> {
     const windowedMessages = olderMessages.slice(-16);
     const convoText = windowedMessages.map((m) => `${m.role}: ${m.content}`).join('\n');
@@ -252,6 +272,16 @@ CRITICAL RULES:
 - Start directly with the summary content.`,
       userMessage: `${existingContext}${convoText}`,
     });
+
+    if (completion) {
+      await this.usage.record({
+        merchantId: context.merchantId,
+        conversationId: context.conversationId ?? null,
+        kind: 'summary',
+        promptTokens: completion.inputTokens,
+        completionTokens: completion.outputTokens,
+      });
+    }
 
     const raw = completion?.text?.trim() ?? null;
     if (!raw) return null;

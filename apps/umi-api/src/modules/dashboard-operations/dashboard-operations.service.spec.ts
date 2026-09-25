@@ -23,11 +23,13 @@ const query = { domain: 'organization' as const, cursor: 0, limit: 20 };
 
 // A completion provider stub. Default: returns null (the fail-safe path).
 const stubLlm = (impl?: unknown) => ({ createCompletion: vi.fn(impl as never) }) as never;
+// The usage writer is out of scope here; the real one never rejects.
+const stubUsage = () => ({ record: vi.fn().mockResolvedValue(undefined) }) as never;
 
 describe('DashboardOperationsService', () => {
   it('returns exactly 20 permission-filtered domains', async () => {
     const repository = { list: vi.fn().mockResolvedValue([]) };
-    const service = new DashboardOperationsService(repository as never, stubLlm());
+    const service = new DashboardOperationsService(repository as never, stubLlm(), stubUsage());
     const result = await service.snapshot(user, access, query);
     expect(result.domains).toHaveLength(20);
     expect(result.domains.find((item) => item.domain === 'organization')?.available).toBe(true);
@@ -35,14 +37,22 @@ describe('DashboardOperationsService', () => {
   });
 
   it('denies an unavailable deep link', async () => {
-    const service = new DashboardOperationsService({ list: vi.fn() } as never, stubLlm());
+    const service = new DashboardOperationsService(
+      { list: vi.fn() } as never,
+      stubLlm(),
+      stubUsage(),
+    );
     await expect(
       service.snapshot(user, access, { ...query, domain: 'inventory' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects a location outside the membership assignment', async () => {
-    const service = new DashboardOperationsService({ list: vi.fn() } as never, stubLlm());
+    const service = new DashboardOperationsService(
+      { list: vi.fn() } as never,
+      stubLlm(),
+      stubUsage(),
+    );
     await expect(
       service.snapshot(
         user,
@@ -57,6 +67,7 @@ describe('DashboardOperationsService', () => {
     const service = new DashboardOperationsService(
       { list: vi.fn().mockResolvedValue(rows) } as never,
       stubLlm(),
+      stubUsage(),
     );
     const result = await service.snapshot(user, access, query);
     expect(result.items).toHaveLength(20);
@@ -105,6 +116,7 @@ describe('DashboardOperationsService.salesInsight', () => {
     const service = new DashboardOperationsService(
       { salesSummary: vi.fn().mockResolvedValue(summary(0)) } as never,
       llm,
+      stubUsage(),
     );
     const result = await service.salesInsight(user, salesAccess, insightQuery);
     expect(result).toMatchObject({ narrative: null, generated: false });
@@ -122,6 +134,7 @@ describe('DashboardOperationsService.salesInsight', () => {
     const service = new DashboardOperationsService(
       { salesSummary: vi.fn().mockResolvedValue(summary(7)) } as never,
       llm,
+      stubUsage(),
     );
     const first = await service.salesInsight(user, salesAccess, insightQuery);
     expect(first).toMatchObject({ narrative: 'Vendiste $482 hoy, 12% más.', generated: true });
@@ -139,13 +152,18 @@ describe('DashboardOperationsService.salesInsight', () => {
     const service = new DashboardOperationsService(
       { salesSummary: vi.fn().mockResolvedValue(summary(7)) } as never,
       llm,
+      stubUsage(),
     );
     const result = await service.salesInsight(user, salesAccess, insightQuery);
     expect(result).toMatchObject({ narrative: null, generated: false });
   });
 
   it('denies without the sales permission', async () => {
-    const service = new DashboardOperationsService({ salesSummary: vi.fn() } as never, stubLlm());
+    const service = new DashboardOperationsService(
+      { salesSummary: vi.fn() } as never,
+      stubLlm(),
+      stubUsage(),
+    );
     await expect(service.salesInsight(user, access, insightQuery)).rejects.toBeInstanceOf(
       ForbiddenException,
     );

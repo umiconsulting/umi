@@ -1066,3 +1066,30 @@ Project pages:
 - Official MCP servers: `https://github.com/modelcontextprotocol/servers`
 
 Test evidence: all HTTP status codes and byte counts in this file come from the calls on 2026-09-16.
+
+## Re-measurement, 2026-09-18
+
+The routes were called again from this workstation. The agent was Chrome 126 on
+Linux. Plain `curl` drove every call. This table is the baseline for the Firecrawl
+comparison.
+
+| Target           | Code | Bytes   | Verdict                                             |
+| ---------------- | ---- | ------- | --------------------------------------------------- |
+| G2 reviews       | 403  | 1,704   | Blocked. The body is the wall.                      |
+| Capterra reviews | 403  | 5,508   | Blocked. The body is the wall.                      |
+| Reddit `.json`   | 403  | 189,908 | Blocked. The body is large, but it is not the data. |
+| Mojeek           | 200  | 5,493   | Blocked. The body holds "automated queries".        |
+| DuckDuckGo HTML  | 202  | 14,218  | Bot check. Not usable.                              |
+| Bing             | 200  | 122,955 | Works. Ten result rows were parsed.                 |
+| `x.com` search   | 200  | 298,325 | The JavaScript shell. No result text.               |
+| Hacker News      | 200  | 34,128  | Control. Real content.                              |
+
+New facts:
+
+- **Bing answers this workstation again.** An earlier attempt on 2026-09-18 failed
+  to connect. A later plain `curl` with a desktop agent returned ten parsed
+  results.
+- **A Bing result link is wrapped.** Every `href` points at `www.bing.com/ck/a`,
+  not at the target. Read the title, or resolve the wrapper.
+- **`x.com` returns 200 with 298 KB and no result text.** A status code is not
+  evidence about X. Use the oEmbed route for a known post.

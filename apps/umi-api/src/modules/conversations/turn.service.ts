@@ -12,6 +12,7 @@ import { MessagesRepository } from './messages.repository';
 import { MemoryService } from './memory.service';
 import { ToolLoopService } from './tool-loop.service';
 import { TurnCommitRepository } from './turn-commit.repository';
+import { AiUsageRepository } from '../../shared/usage/ai-usage.repository';
 import { createToolOutcomeState, type ToolOutcomeState } from './tool-outcomes';
 import { shapeTurnMemory } from './turn-memory';
 import { buildHarnessSystemPrompt, PROMPT_VERSION, type LocationPromptContext } from './prompts';
@@ -22,8 +23,22 @@ import type { TurnProcessPayload } from './turn-integrity.service';
 const PROCESSOR_VERSION = 'mini_harness';
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_METADATA_BYTES = 10000;
-const COST_PER_INPUT_TOKEN = 0.00000025;
-const COST_PER_OUTPUT_TOKEN = 0.00000125;
+/**
+ * Prices for the reply model, `claude-haiku-4-5-20251001` (Claude Haiku 4.5).
+ * Haiku 4.5 costs $1.00 per Mtok input and $5.00 per Mtok output, that is
+ * 0.000001 and 0.000005 USD per token.
+ * Source: https://www.anthropic.com/pricing (checked 2026-09-18).
+ *
+ * The values before this change were 0.00000025 and 0.00000125 — the Claude 3
+ * Haiku prices — so every `ai_turn` cost figure and every stored
+ * `umi.ai_usage.cost_usd` was 4x too LOW for this model. This is a deliberate
+ * behaviour change: the number is now correct, it is not a new feature.
+ *
+ * The same two numbers live in `shared/usage/model-prices.ts`, which prices the
+ * stored billing row. Change both together.
+ */
+const COST_PER_INPUT_TOKEN = 0.000001;
+const COST_PER_OUTPUT_TOKEN = 0.000005;
 const MAX_TOOL_CALLS_PER_TURN = 4;
 /** Generous lock window for the per-conversation single-flight (matches the turns queue lock). */
 const TURN_LOCK_TTL_MS = 300_000;
@@ -65,6 +80,7 @@ export class TurnService {
     private readonly enqueue: EnqueueService,
     private readonly log: LoggingService,
     private readonly orderLocation: OrderLocationResolver,
+    private readonly usage: AiUsageRepository,
   ) {}
 
   /**
@@ -295,6 +311,10 @@ export class TurnService {
       metadata_bytes: jsonByteLength(metadata),
     };
 
+    const costUsd =
+      loopResult.inputTokens * COST_PER_INPUT_TOKEN +
+      loopResult.outputTokens * COST_PER_OUTPUT_TOKEN;
+
     this.log.log('ai_turn', {
       conversation_id: payload.conversation_id,
       customer_id: payload.person_id,
@@ -303,9 +323,7 @@ export class TurnService {
       prompt_version: `${PROMPT_VERSION}.${PROCESSOR_VERSION}`,
       prompt_tokens: loopResult.inputTokens,
       completion_tokens: loopResult.outputTokens,
-      cost_usd:
-        loopResult.inputTokens * COST_PER_INPUT_TOKEN +
-        loopResult.outputTokens * COST_PER_OUTPUT_TOKEN,
+      cost_usd: costUsd,
       latency_ms: Date.now() - start,
       response_type: responseType(toolOutcomes),
       customer_context: {
@@ -318,6 +336,25 @@ export class TurnService {
         unknown
       >,
       request_id: payload.request_id,
+    });
+
+    // The billing fact for the reply, on the same path as the log line above.
+    // The tool loop stays on Anthropic by design, so the provider is named here
+    // and is NOT read from LLM_PROVIDER. A failed insert logs a warning and
+    // never fails the turn: the reply is already committed.
+    await this.usage.record({
+      merchantId: payload.merchant_id,
+      conversationId: payload.conversation_id,
+      turnId: payload.turn_id,
+      requestId: payload.request_id,
+      kind: 'reply',
+      provider: 'anthropic',
+      model: MODEL,
+      promptTokens: loopResult.inputTokens,
+      completionTokens: loopResult.outputTokens,
+      llmCallCount: loopResult.llmCallCount,
+      latencyMs: Date.now() - start,
+      costUsd,
     });
 
     // Enrichment follow-ups (background).

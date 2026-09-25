@@ -29,6 +29,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { LeadsModule } from './modules/leads/leads.module';
 import { IntegrityModule } from './modules/integrity/integrity.module';
 import { OperationsModule } from './shared/operations/operations.module';
+import { UsageModule } from './shared/usage/usage.module';
 import { OperationalInterceptor } from './shared/operations/operational.interceptor';
 import { IpRateLimitGuard } from './shared/operations/ip-rate-limit.guard';
 import { DevicesModule } from './modules/devices/devices.module';
@@ -96,6 +97,7 @@ import { TableOrderModule } from './modules/table-order/table-order.module';
     LeadsModule,
     IntegrityModule,
     OperationsModule,
+    UsageModule,
     DevicesModule,
     RealtimeEventsModule,
     RealtimeModule,

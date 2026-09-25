@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
 import { isProductStatusActive } from '@umi/contract';
 import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
+import { AiUsageRepository } from '../../shared/usage/ai-usage.repository';
 import { MerchantsRepository } from '../merchants/merchants.repository';
 import { CustomersRepository, type Row } from './customers.repository';
 import {
@@ -126,6 +127,7 @@ export class CustomersService {
     private readonly repo: CustomersRepository,
     private readonly merchants: MerchantsRepository,
     @Inject(LLM_COMPLETION) private readonly llm: LlmCompletionProvider,
+    private readonly usage: AiUsageRepository,
   ) {}
 
   /** Merchant product map (drives availability flags in the DTOs). */
@@ -451,6 +453,14 @@ export class CustomersService {
       system: PORTRAIT_SYSTEM,
       userMessage: JSON.stringify(input),
     });
+    if (completion) {
+      await this.usage.record({
+        merchantId,
+        kind: 'portrait',
+        promptTokens: completion.inputTokens,
+        completionTokens: completion.outputTokens,
+      });
+    }
     const text = completion?.text?.trim() || null;
     if (text) {
       this.descriptionCache.set(key, { text, expires: now + DESCRIPTION_TTL_MS });
