@@ -1,0 +1,127 @@
+# deploy/staging/compose.yml — the build-v3 QA stack on the VPS.
+#
+# This is the version-controlled home of a stack that until now existed only as
+# a hand-maintained ~/umi-api-test/docker-compose.yml on the box. It is deployed
+# by .github/workflows/umi-api-deploy-staging.yml, which builds the image in CI,
+# pushes it to GHCR, then runs apps/umi-api/deploy/deploy.sh on the VPS with:
+#
+#   UMI_REPO_DIR=/home/juan/umi-buildv3      (the build-v3 checkout)
+#   UMI_DEPLOY_BRANCH=build-v3
+#   UMI_COMPOSE_FILE=deploy/staging/compose.yml
+#   UMI_PROJECT_DIR=/home/juan/umi-api-test
+#   UMI_API_TAG=sha-<commit>
+#
+# UMI_PROJECT_DIR stays the compose PROJECT directory, so the `.env`, `certs/`
+# and `secrets/` that live there keep resolving exactly as they did before.
+# Those files are gitignored state and must survive the checkout's
+# `git reset --hard`, which is why they are not moved into this repo.
+#
+# NOTHING IS BUILT ON THE VPS. `api` and `worker` pull the image CI pushed; the
+# local `build:` stanza the hand-maintained file carried is deliberately gone,
+# so `docker compose pull` is meaningful and the box needs no toolchain.
+#
+# Isolation from prod umi-api (its own compose project out of ~/umi/apps/umi-api):
+# separate project name, its own Postgres/redis/mailhog, bridge-only port
+# bindings, and no Caddy. The prod Caddy is the single TLS entrypoint and fronts
+# this stack at api-staging.umiconsulting.co via host.docker.internal:3001.
+name: umi-api-test
+
+services:
+  postgres-staging:
+    image: pgvector/pgvector:0.8.5-pg17-bookworm
+    environment:
+      - POSTGRES_PASSWORD_FILE=/run/secrets/pg_superuser_password
+      - POSTGRES_DB=postgres
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/certs-pg/server.crt
+      - -c
+      - ssl_key_file=/certs-pg/server.key
+      - -c
+      - ssl_ca_file=/certs-pg/ca.crt
+    volumes:
+      - pg-staging-data:/var/lib/postgresql/data
+      - pg-staging-certs:/certs-pg:ro
+    secrets:
+      - pg_superuser_password
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    # Pinned by deploy.sh via UMI_API_TAG, exactly like prod. The `:?` makes a
+    # missing tag a hard failure rather than a silent fall back to :latest, so
+    # staging can never drift onto the tag prod is tracking.
+    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:?set UMI_API_TAG in the staging .env}
+    command:
+      - node
+      - --require
+      - '@opentelemetry/auto-instrumentations-node/register'
+      - dist/main.js
+    env_file: .env
+    ports:
+      - '172.17.0.1:3001:3000'
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-staging:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:?set UMI_API_TAG in the staging .env}
+    command:
+      - node
+      - --require
+      - '@opentelemetry/auto-instrumentations-node/register'
+      - dist/worker.js
+    env_file: .env
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres-staging:
+        condition: service_healthy
+    # The image HEALTHCHECK pings /health/live on :3000 — the worker serves no
+    # HTTP, so it must not inherit that check.
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # SMTP sink — captures all outbound mail, sends nothing.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    ports:
+      - '172.17.0.1:8025:8025'
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  pg-staging-data:
+  pg-staging-certs:
+    external: true
+
+secrets:
+  pg_superuser_password:
+    file: ./secrets/pg_superuser_password

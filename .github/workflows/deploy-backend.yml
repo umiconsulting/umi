@@ -59,6 +59,22 @@ on:
           leave false for a non-prod caller so it can never shadow prod's tag.
         type: boolean
         default: true
+      compose_file:
+        description: >-
+          Compose file to roll on the VPS (passed through as UMI_COMPOSE_FILE).
+          Absolute, or relative to the deploy checkout. Empty uses deploy.sh's
+          own default of apps/<app_name>/docker-compose.yml.
+        type: string
+        default: ''
+      project_dir:
+        description: >-
+          Compose project directory on the VPS (passed through as
+          UMI_PROJECT_DIR): where `.env`, certs and secrets resolve, and where
+          the default project name comes from. Empty uses the compose file's own
+          directory. Set this for an environment whose compose file lives in the
+          repo but whose state (gitignored .env/certs/secrets) lives elsewhere.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -136,6 +152,8 @@ jobs:
           APP_NAME: ${{ inputs.app_name }}
           UMI_REPO_DIR: ${{ inputs.repo_dir }}
           UMI_DEPLOY_BRANCH: ${{ inputs.branch }}
+          UMI_COMPOSE_FILE: ${{ inputs.compose_file }}
+          UMI_PROJECT_DIR: ${{ inputs.project_dir }}
           DEPLOY_SCRIPT: ${{ inputs.app_dir }}/deploy/deploy.sh
         run: |
           mkdir -p ~/.ssh
@@ -149,10 +167,13 @@ jobs:
           # EOF mid-script and dies silently. cat-to-file + /dev/null avoids it.
           # UMI_REPO_DIR, when set, redirects deploy.sh at a second, isolated
           # checkout (e.g. a staging environment) instead of its $HOME/umi default.
+          # UMI_COMPOSE_FILE/UMI_PROJECT_DIR likewise let that environment keep a
+          # repo-tracked compose file apart from its state directory — see
+          # deploy/staging/compose.yml and apps/umi-api/deploy/deploy.sh.
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
+            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' UMI_COMPOSE_FILE='$UMI_COMPOSE_FILE' UMI_PROJECT_DIR='$UMI_PROJECT_DIR' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
             < "$DEPLOY_SCRIPT"
 
       - name: Health check
