@@ -83,15 +83,27 @@ from loyalty.programs p;
 -- ----------------------------------------------------------------------------
 -- 2. reward_configs → merchant.loyalty_reward   (PRESERVE id; redemptions FK to it)
 --    type: all are visit/stamp rewards → 'stamps_free_item'.
---    value <- reward_cost_cents (centavos). merchant <- program.tenant_id.
+--    value <- reward_cost_cents (centavos).
+--    merchant: the program's tenant when the config belongs to a program, else
+--    the config's OWN tenant_id. The join is a LEFT join for that reason.
 --    DROP: reward_description (no column; name-dupe/empty).
+--
+--    WHY THE LEFT JOIN. Measured on the 2026-09-25 production dump: 24
+--    reward_configs, of which 5 have program_id IS NULL (all El Gran Ribera,
+--    all retired: 'Latte en las rocas', 'Latte Rocas', 'Latte Frío', 'Latte
+--    Caramelo Rocas/Caliente', 'Capuccino'), and 161 reward_redemptions. The
+--    old INNER join dropped those 5 silently — the 2026-09-01 snapshot had
+--    23/23 configs attached to a program, so nothing exposed it — and then one
+--    redemption whose config was dropped failed the FK into this table at
+--    backfill_loyalty.sql line 126. A redemption is a historical fact about a
+--    customer; the fix is to carry the reward, never to drop the redemption.
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_reward
   (id, merchant_id, name, description, type, stamps_required, spend_required, value,
    active, created_at, updated_at)
 select
   rc.id,
-  p.tenant_id                                  as merchant_id,
+  coalesce(p.tenant_id, rc.tenant_id)           as merchant_id,
   rc.reward_name                               as name,
   rc.reward_description                         as description,
   'stamps_free_item'                           as type,
@@ -102,7 +114,7 @@ select
   rc.created_at,
   rc.created_at                                as updated_at
 from loyalty.reward_configs rc
-join loyalty.programs p on p.id = rc.program_id;
+left join loyalty.programs p on p.id = rc.program_id;
 
 -- ----------------------------------------------------------------------------
 -- 3. reward_redemptions → merchant.loyalty_redemption
@@ -123,7 +135,11 @@ select
   r.redeemed_at                                as occurred_at,
   r.redeemed_at                                as created_at
 from loyalty.reward_redemptions r
-join loyalty.reward_configs rc on rc.id = r.reward_config_id;   -- reward_config_id NOT NULL, 23/23 resolve
+join loyalty.reward_configs rc on rc.id = r.reward_config_id;
+-- reward_config_id NOT NULL. Measured 2026-09-25: 161/161 redemptions resolve to
+-- a config, and 0 point at a config that is missing. One points at a config that
+-- had no program — that is handled upstream now (see the LEFT join in section 2),
+-- which is what keeps this insert's FK into merchant.loyalty_reward satisfied.
 
 -- birthday_rewards → merchant.loyalty_birthday_grant (per-card birthday entitlement).
 --   loyalty_card_id → card_id, tenant_id → merchant_id, year/issued_at/expires_at/redeemed_at carried.
