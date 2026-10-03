@@ -47,6 +47,19 @@ jobs:
     name: build the iOS target
     runs-on: macos-15
     timeout-minutes: 30
+    # The till reads these at compile time, so a build that is not given them is
+    # not runnable on a device. Staging is the environment with the demo data:
+    # the seeded floor plans, the menu images, and the platform account.
+    env:
+      UMIPOS_DEFINES: >-
+        --dart-define=UMIPOS_ENVIRONMENT=staging
+        --dart-define=UMIPOS_API_BASE_URL=https://api-staging.umiconsulting.co
+        --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true
+        --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled
+        --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true
+        --dart-define=UMIPOS_RELEASE_VERSION=0.1.0
+        --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0
+        --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -91,4 +104,19 @@ jobs:
       # no certificate, no profile and no Apple account.
       - name: Build for iOS without signing
         working-directory: apps/umi-pos
-        run: flutter build ios --no-codesign --release
+        run: flutter build ios --no-codesign --release $UMIPOS_DEFINES
+
+      # A simulator build needs NO signing at all, so it is the one artifact
+      # anybody can produce today. It runs in a cloud iOS simulator — LambdaTest
+      # App Live's free tier includes them — which is how a developer on Linux
+      # can look at the till on an iPhone-shaped screen without an Apple account.
+      - name: Build for the simulator
+        working-directory: apps/umi-pos
+        run: flutter build ios --simulator --release $UMIPOS_DEFINES
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: umi-pos-ios-simulator
+          path: apps/umi-pos/build/ios/iphonesimulator/Runner.app
+          if-no-files-found: error
+          retention-days: 14

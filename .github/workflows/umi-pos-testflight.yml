@@ -1,0 +1,151 @@
+name: umi-pos testflight
+
+# Builds a signed iPhone build of the till and sends it to TestFlight, so a real
+# iPhone can install it from the TestFlight app. No Mac is needed anywhere: this
+# runs on GitHub's Apple-silicon runner.
+#
+# WHY `workflow_dispatch` ONLY. This publishes a build to Apple and needs four
+# secrets from the Apple Developer account. It must not run on every pull
+# request, and it must not run on a merge.
+#
+# ⚠️ NOT YET EXERCISED. The compile job (`umi-pos-ios.yml`) has run and is green;
+# this one has never run, because it needs the account secrets below. The first
+# run may need a fix to the export options or the uploader — do not treat a red
+# run as proof that the app is broken. It is written to the documented approach
+# and it fails early, with a named list, when a secret is missing.
+#
+# THE FOUR SECRETS (repository settings, Actions, Secrets):
+#
+#   ASC_KEY_ID    the App Store Connect API key id, 10 characters
+#   ASC_KEY_P8    the whole .p8 file the API key downloads as
+#   ASC_ISSUER_ID the issuer id App Store Connect shows beside the key
+#   ASC_TEAM_ID   the Apple Developer team id, from Membership
+#
+# Create the key in App Store Connect, Users and Access, Integrations, with the
+# App Manager role. Nothing else is needed: automatic signing creates the
+# distribution certificate and the provisioning profile on the runner from the
+# key itself, which is why there is no .p12 and no profile in these secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: API base URL the installed build will talk to
+        required: true
+        default: https://api-staging.umiconsulting.co
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: build and upload to TestFlight
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check the secrets are present
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in ASC_KEY_ID ASC_KEY_P8 ASC_ISSUER_ID ASC_TEAM_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::These repository secrets are not set:$missing"
+            echo "See the header of this workflow for what each one is."
+            exit 1
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+
+      # From the compile job: Xcode 16.4 cannot compile connectivity_plus 7.3.1,
+      # which calls the iOS 26 API `NWPath.isUltraConstrained`.
+      - name: Select the newest Xcode on the image
+        run: |
+          set -euo pipefail
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      # The App Store Connect key is also how Xcode authenticates when it creates
+      # the signing assets, so it goes in before the build, not at upload time.
+      - name: Install the App Store Connect key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      # Written here rather than committed: the team id is a secret, and a static
+      # plist in the repository would have to carry it.
+      - name: Write the export options
+        env:
+          ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>${ASC_TEAM_ID}</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>destination</key>
+            <string>export</string>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Build the IPA
+        working-directory: apps/umi-pos
+        env:
+          EXPORT_OPTIONS: ${{ runner.temp }}/ExportOptions.plist
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter gen-l10n
+          flutter build ipa --release \
+            --export-options-plist="$EXPORT_OPTIONS" \
+            --dart-define=UMIPOS_ENVIRONMENT=staging \
+            --dart-define=UMIPOS_API_BASE_URL=${{ inputs.api_base }} \
+            --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
+            --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
+            --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true \
+            --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
+            --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
+            --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
+
+      - name: Upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          IPA="$(ls apps/umi-pos/build/ios/ipa/*.ipa | head -1)"
+          echo "Uploading $IPA"
+          xcrun altool --upload-app --type ios --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      # The key must not outlive the job, and it must go even when a step failed.
+      - name: Remove the App Store Connect key
+        if: always()
+        run: rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_"*.p8
