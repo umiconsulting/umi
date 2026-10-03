@@ -34,12 +34,15 @@ CashCenterSnapshot _mismatchSnapshot({
         'openedAt': '2026-09-16T20:52:56.649669+00:00',
         'deviceId': '00000000-0000-4000-8000-0000000000d1',
         'deviceName': 'Mostrador',
-        'deviceStatus': holdState == 'held_by_orphaned_till' ? 'revoked' : 'active',
+        'deviceStatus': holdState == 'held_by_orphaned_till'
+            ? 'revoked'
+            : 'active',
         'operatorSessionId': '00000000-0000-4000-8000-0000000000e1',
         'reclaimable': reclaimable,
       },
     },
   ],
+  ledger: const [],
   adoptableShift: null,
   currentShift: {
     'id': shiftId,
@@ -90,6 +93,7 @@ CashCenterSnapshot _resumedSnapshot({
       },
     },
   ],
+  ledger: const [],
   adoptableShift: null,
   currentShift: {
     'id': shiftId,
@@ -222,53 +226,77 @@ final class _RestartFakeRepository implements CashRepository {
 }
 
 void main() {
-  test('a restart resumes the till own shift on load, so it is chargeable again', () async {
-    final repository = _RestartFakeRepository(orphaned: false);
-    final controller = CashController(repository: repository);
-    controller.setContext(
-      merchantId: '00000000-0000-4000-8000-000000000000',
-      locationId: '00000000-0000-4000-8000-000000000001',
-      operatorSessionId: _RestartFakeRepository.liveSession,
-    );
+  test(
+    'a restart resumes the till own shift on load, so it is chargeable again',
+    () async {
+      final repository = _RestartFakeRepository(orphaned: false);
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000000',
+        locationId: '00000000-0000-4000-8000-000000000001',
+        operatorSessionId: _RestartFakeRepository.liveSession,
+      );
 
-    await controller.load();
+      await controller.load();
 
-    expect(repository.resumeCalls, 1, reason: 'the till must resume its own shift');
-    expect(repository.centerCalls, 2, reason: 'it re-reads the snapshot after resuming');
-    expect(controller.activeShiftId, _RestartFakeRepository.shiftId);
-    expect(controller.activeRegisterHoldState, 'held_by_this_device');
-  });
+      expect(
+        repository.resumeCalls,
+        1,
+        reason: 'the till must resume its own shift',
+      );
+      expect(
+        repository.centerCalls,
+        2,
+        reason: 'it re-reads the snapshot after resuming',
+      );
+      expect(controller.activeShiftId, _RestartFakeRepository.shiftId);
+      expect(controller.activeRegisterHoldState, 'held_by_this_device');
+    },
+  );
 
-  test('recoverOwnShift is a no-op when the drawer is not this device own', () async {
-    final repository = _RestartFakeRepository(orphaned: true);
-    final controller = CashController(repository: repository);
-    controller.setContext(
-      merchantId: '00000000-0000-4000-8000-000000000000',
-      locationId: '00000000-0000-4000-8000-000000000001',
-      operatorSessionId: _RestartFakeRepository.liveSession,
-    );
+  test(
+    'recoverOwnShift is a no-op when the drawer is not this device own',
+    () async {
+      final repository = _RestartFakeRepository(orphaned: true);
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000000',
+        locationId: '00000000-0000-4000-8000-000000000001',
+        operatorSessionId: _RestartFakeRepository.liveSession,
+      );
 
-    await controller.load();
+      await controller.load();
 
-    expect(repository.resumeCalls, 0, reason: 'an orphaned hold is not resumed, it is reclaimed');
-    expect(controller.activeShiftId, isNull);
-    expect(controller.reclaimableRegisters, hasLength(1));
-  });
+      expect(
+        repository.resumeCalls,
+        0,
+        reason: 'an orphaned hold is not resumed, it is reclaimed',
+      );
+      expect(controller.activeShiftId, isNull);
+      expect(controller.reclaimableRegisters, hasLength(1));
+    },
+  );
 
-  test('reclaimRegister frees an orphaned drawer with the register version it saw', () async {
-    final repository = _RestartFakeRepository(orphaned: true);
-    final controller = CashController(repository: repository);
-    controller.setContext(
-      merchantId: '00000000-0000-4000-8000-000000000000',
-      locationId: '00000000-0000-4000-8000-000000000001',
-      operatorSessionId: _RestartFakeRepository.liveSession,
-    );
-    await controller.load();
+  test(
+    'reclaimRegister frees an orphaned drawer with the register version it saw',
+    () async {
+      final repository = _RestartFakeRepository(orphaned: true);
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000000',
+        locationId: '00000000-0000-4000-8000-000000000001',
+        operatorSessionId: _RestartFakeRepository.liveSession,
+      );
+      await controller.load();
 
-    await controller.reclaimRegister(_RestartFakeRepository.registerId);
+      await controller.reclaimRegister(_RestartFakeRepository.registerId);
 
-    expect(repository.reclaimRequest, isNotNull);
-    expect(repository.reclaimRequest!.registerId, _RestartFakeRepository.registerId);
-    expect(repository.reclaimRequest!.expectedRegisterVersion, 3);
-  });
+      expect(repository.reclaimRequest, isNotNull);
+      expect(
+        repository.reclaimRequest!.registerId,
+        _RestartFakeRepository.registerId,
+      );
+      expect(repository.reclaimRequest!.expectedRegisterVersion, 3);
+    },
+  );
 }

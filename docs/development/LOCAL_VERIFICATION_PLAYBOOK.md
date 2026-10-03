@@ -25,9 +25,40 @@ it as a local fixture, not as an example). Merchant **Kalala Café**
 `7cb0a615-45e2-7e8e-b756-f95b295ec356` and **Congreso**; the seeded POS operator PIN is `1234`.
 Postgres as superuser: `docker exec umi-buildv3-local-postgres-1 psql -U postgres -d <db>`.
 
+**The platform administrator.** One account holds the platform role, and that role is the
+only way to see every café and switch between them. `pnpm db:reset` grants it to
+`hola@umiconsulting.co`. To name a different account, or to repair a database that lacks the
+grant, run `scripts/umi-local-platform-admin.sh`. A database with no platform grant shows one
+café in the picker and gives no error — the cause is `umi.user_role`, not the account.
+
 **The POS is a native app.** Its web build is a development convenience and is _never_
 evidence about the product — see `docs/architecture/2026-09-16-pos-is-a-native-app.md`. Read
 that before measuring anything on the POS.
+
+### Secure storage, before the till will boot
+
+The POS fails closed when the platform credential service is absent, and the symptom
+names the wrong component. The storage fault is reported as `apiUnavailable`, so the till
+stops on the "No pudimos terminar la preparación" card while the API is healthy — and
+**not one HTTP request reaches `:4001`**. The app log holds the answer:
+`libsecret_error: Failed to unlock the keyring`. **Read the app log before the API log.**
+
+On Linux the credential service is the freedesktop Secret Service. Check the provider,
+then round-trip a secret:
+
+```sh
+scripts/local-secure-storage.sh                     # the check above, in one command
+
+busctl --user list | grep org.freedesktop.secrets   # must name an owner
+printf 'probe\n' | secret-tool store --label=umi-probe app umi-probe
+secret-tool lookup app umi-probe                    # must print probe
+```
+
+A stopped `ksecretd`, a locked KWallet, or `Enabled=false` in `~/.config/kwalletrc` fails
+this check. GNOME Keyring is the supported provider; install and unlock it as
+`docs/development/NEW_MACHINE_SETUP.md` says, or run
+`scripts/local-secure-storage.sh --install`. The decision and its evidence are in
+`docs/architecture/2026-09-28-linux-secret-service-provider.md`.
 
 ## 2. The commands that prove things
 
@@ -681,6 +712,99 @@ and neither failure said anything about a defect. When an incoming test fails ag
 implementation, decide which artifact is stale before editing either: the label is the feature, so
 the test changed to match the label-and-capacity prefix and left the state suffix to the tests that
 assert on state.
+
+**A Wayland launch makes the till invisible to the launcher and to the driver.** On this Hyprland
+session a shell carries `WAYLAND_DISPLAY=wayland-1`, GTK3 picks the Wayland backend, and the till
+never creates an X window. The till is running the whole time. Measured 2026-09-29 on the same
+binary with the same launcher, one variable changed:
+
+- With `WAYLAND_DISPLAY` inherited: `hyprctl clients` reports `class: co.umiconsulting.umi_pos`,
+  `title: UmiPOS`, `size: 1920,1080`, while `xdotool search --name '^UmiPOS$'` prints nothing. The
+  launcher never sees its window and never prints the success line (killed at a 240 s cap, exit 124;
+  its own wait is 300 s).
+- With `WAYLAND_DISPLAY= GDK_BACKEND=x11`: `xdotool search` prints `4194307`, and the launcher
+  exits 0 with the VM service URL.
+
+So **do not read a launcher non-zero exit as "the till did not start"** — check
+`hyprctl clients` first. The X-based driver needs the X11 backend:
+
+```sh
+WAYLAND_DISPLAY= GDK_BACKEND=x11 tools/ux-sweep/pos-native-launch.sh
+```
+
+A rendering, first-paint or screenshot claim measured on that instance is a claim about X11.
+Re-check it under Wayland before you publish it.
+
+Match the **title** (`UmiPOS`) when you script either tool, never the class: the same binary reports
+`co.umiconsulting.umi_pos` under Wayland and `Co.umiconsulting.umi_pos` under Xwayland.
+
+**The workspace helper cannot place a window on Hyprland.** `window-workspace.sh` drives `wmctrl`,
+and Hyprland does not implement the EWMH calls it uses. The launcher says so —
+`window 4194307 exists but the window manager never took it` — and reports `workspace=?`. The till
+lands wherever the compositor puts it, so §2's full-screen rule is an instruction to the operator,
+not something the launcher enforces. That much comes from the helper's own output, not from the
+geometry. **Read the live geometry before you trust a screenshot or a coordinate**, and expect the
+box to be driven by hand at the same time as a run: `hyprctl clients` for the viewport,
+`xdotool getwindowgeometry <id>` for the X frame.
+
+**Typing into the till on Hyprland needs `ydotool`.** Hyprland publishes no EWMH focus, so
+`xdotool` cannot read or set it (`xdo_get_focused_window_sane failed`,
+`XGetWindowProperty[_NET_ACTIVE_WINDOW] failed`). Three routes fail the same silent way —
+`xdotool type` (no target), `xdotool type --window` (GTK ignores the synthetic event) and `wtype`
+(routes to the Wayland-focused surface, and the till is Xwayland). `pos-native-driver.mjs type`
+reports `type "TOJIM47V" in 759ms` while the field stays empty. Pointer clicks are unaffected, so
+the working combination is: focus with `hyprctl dispatch` in its Lua form, click the control, and
+send keys with `ydotool`:
+
+```sh
+hyprctl dispatch 'hl.dsp.focus({ window = "address:0x..." })'   # classic `focuswindow pid:` fails on Lua configs
+sudo ydotoold --socket-path=/tmp/.ydotoold.sock --socket-perm=0666 &
+YDOTOOL_SOCKET=/tmp/.ydotoold.sock ydotool type 'TOJIM47V'
+YDOTOOL_SOCKET=/tmp/.ydotoold.sock ydotool key 29:1 30:1 30:0 29:0   # Ctrl+A, to clear a field
+```
+
+**An enrollment request is bound to the platform chosen in the Dashboard.** The Add device panel
+defaults to Web, and a Linux desktop till claims as `linux`. The claim then fails the repository's
+`request.platform !== input.platform` check, and the till shows
+`El código de registro no es válido o caducó` — the message for `ENROLLMENT_REJECTED`, which reads
+like an expired code and is not one. Set the platform before creating the code, and note that a
+rejected claim increments `runtime.device_enrollment_request.attempts` (five and the code is dead).
+The claim route is not written to the API request log, so an absent log line proves nothing here.
+
+**`scripts/umi-pos-local-access-seed.sh` replaces the merchant's subscription.** It points the
+merchant at the `umipos-local` plan, which carries `pos` and nothing else — so a café that had
+`growth` (cash, dashboard) loses the console, and the screen says
+`Devices is not active for this café`. Restore the plan and add the product as an override instead:
+
+```sql
+update umi.subscription set plan_id = (select id from umi.plan where key = 'growth')
+ where merchant_id = '<id>';
+insert into umi.entitlement_override (subscription_id, feature_id, enabled, reason)
+select s.id, f.id, true, 'local rehearsal' from umi.subscription s
+  join umi.feature f on f.key = 'pos' where s.merchant_id = '<id>'
+on conflict (subscription_id, feature_id) do update set enabled = true;
+```
+
+`tools/ux-sweep/pos-enrollment-probe.mjs` drives the Dashboard half of the enrollment with real
+clicks: `inspect` dumps the screen, `register --name <n> [--platform linux]` creates the request and
+prints `SETUP_CODE <code>`, `approve` accepts the pending request.
+
+**A person added from the Dashboard has no email, and the till cannot sign them in.** The POS
+`pin-login` handler refuses with `OPERATOR_LOGIN_UNAVAILABLE` when `umi.user.email` is empty
+(`auth.service.ts`), because a till session needs a user identity. That code is not in the
+contract's error union, so `all-exceptions.filter.ts` rewrites the 403 to `PERMISSION_DENIED`, the
+till maps that to `operatorPinInvalid`, and the screen says **"El PIN no es válido para esta
+sucursal"** for a PIN that is perfectly correct. Team and access collects a name, a phone and a
+PIN; it never collects an email. Until the form does, a locally created operator needs one set by
+hand:
+
+```sql
+update umi.user u set email = 'gerente@example.mx'
+ from merchant.staff s where s.user_id = u.id and u.full_name = 'Gerente Local';
+```
+
+`tools/ux-sweep/pos-operator-probe.mjs create --name <n> --role Manager --pin 1234` drives the
+Dashboard half of this, including the PIN.
 
 ## 5. How to treat a number
 

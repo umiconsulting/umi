@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "f9ba121601b4b1cb1c0e530be18a42f7eca61664300facef4a52931f37d6d0bb",
+  "contentHash": "5b3be6909e19afc1dfcea4795ec5ea41031e82d5c672906dbf0c8bc64c9ba488",
   "contractVersion": "2.23.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -2748,6 +2748,56 @@
       ],
       "type": "object"
     },
+    "CancelCashCountRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "commandId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedLedgerSequence": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expectedShiftVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reasonCode": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[a-z0-9_.-]+$",
+          "type": "string"
+        },
+        "shiftId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locationId",
+        "operatorSessionId",
+        "commandId",
+        "idempotencyKey",
+        "shiftId",
+        "expectedShiftVersion",
+        "expectedLedgerSequence",
+        "reasonCode"
+      ],
+      "type": "object"
+    },
     "CancelPurchaseOrderRequest": {
       "additionalProperties": false,
       "properties": {
@@ -4561,6 +4611,170 @@
               "type": "null"
             }
           ]
+        },
+        "ledger": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "amount": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "cashReceived": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "changeGiven": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "pattern": "^[A-Z]{3}$",
+                    "type": "string"
+                  },
+                  "minorUnits": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "minorUnits",
+                  "currency"
+                ],
+                "type": "object"
+              },
+              "note": {
+                "anyOf": [
+                  {
+                    "maxLength": 160,
+                    "minLength": 1,
+                    "pattern": "^[^<>]*$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "occurredAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "operatorReference": {
+                "anyOf": [
+                  {
+                    "maxLength": 120,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reasonCode": {
+                "anyOf": [
+                  {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "receiptNumber": {
+                "anyOf": [
+                  {
+                    "maxLength": 80,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "saleId": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sequence": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "type": {
+                "enum": [
+                  "opening_float",
+                  "cash_sale",
+                  "cash_refund",
+                  "paid_in",
+                  "paid_out",
+                  "safe_drop",
+                  "drawer_correction",
+                  "handoff_transfer",
+                  "count_observation",
+                  "variance_resolution",
+                  "close_adjustment"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "sequence",
+              "type",
+              "amount",
+              "cashReceived",
+              "changeGiven",
+              "saleId",
+              "receiptNumber",
+              "operatorReference",
+              "reasonCode",
+              "note",
+              "occurredAt"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
         },
         "policy": {
           "additionalProperties": false,
@@ -6539,6 +6753,7 @@
         "policy",
         "registers",
         "currentShift",
+        "ledger",
         "adoptableShift",
         "expectedCash",
         "latestCount",
@@ -7388,6 +7603,166 @@
         "updatedAt",
         "archivedAt",
         "optimisticVersion"
+      ],
+      "type": "object"
+    },
+    "CashJournalLine": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "cashReceived": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "changeGiven": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "minorUnits": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "minorUnits",
+            "currency"
+          ],
+          "type": "object"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "minLength": 1,
+              "pattern": "^[^<>]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "operatorReference": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reasonCode": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "receiptNumber": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "saleId": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequence": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "opening_float",
+            "cash_sale",
+            "cash_refund",
+            "paid_in",
+            "paid_out",
+            "safe_drop",
+            "drawer_correction",
+            "handoff_transfer",
+            "count_observation",
+            "variance_resolution",
+            "close_adjustment"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "sequence",
+        "type",
+        "amount",
+        "cashReceived",
+        "changeGiven",
+        "saleId",
+        "receiptNumber",
+        "operatorReference",
+        "reasonCode",
+        "note",
+        "occurredAt"
       ],
       "type": "object"
     },
@@ -99145,6 +99520,23 @@
       "pin": false,
       "request": "SubmitBlindCountRequest",
       "response": "CashCountSummary"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/counts/cancel": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "IDEMPOTENCY_CONFLICT",
+        "OPTIMISTIC_VERSION_CONFLICT"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "cash.count.submit",
+      "pin": false,
+      "request": "CancelCashCountRequest",
+      "response": "CashShift"
     },
     "POST /api/v1/pos/merchants/:merchantId/cash/shifts/:shiftId/counts/recount": {
       "approval": false,

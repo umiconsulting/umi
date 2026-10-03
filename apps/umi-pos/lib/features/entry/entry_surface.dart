@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:umi_contract/umi_contract.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/pin_entry.dart';
 import '../../shared/widgets/status_card.dart';
 import 'entry_controller.dart';
 
@@ -229,7 +230,7 @@ final class _PinLoginState extends State<_PinLogin> {
               const SizedBox(height: UmiSpacing.sm),
               Text(l.operatorPinBody, textAlign: TextAlign.center),
               const SizedBox(height: UmiSpacing.lg),
-              _PinDots(length: length, minLength: 4),
+              PinDots(length: length, minLength: 4),
               const SizedBox(height: UmiSpacing.sm),
               Text(
                 l.operatorPinHint,
@@ -247,7 +248,7 @@ final class _PinLoginState extends State<_PinLogin> {
                 ),
               ],
               const SizedBox(height: UmiSpacing.lg),
-              _PinPad(
+              PinPad(
                 onDigit: (digit) => _press(digit),
                 onBackspace: () => _press('back'),
                 onClear: () => _press('clear'),
@@ -318,114 +319,6 @@ final class _PinLoginState extends State<_PinLogin> {
     }
     setState(() => _tooShort = false);
     widget.controller.loginWithPin(pin.text);
-  }
-}
-
-/// A masked progress indicator for the PIN: one filled dot per entered digit,
-/// with at least [minLength] outlined slots so the operator sees the 4-digit
-/// floor. It never renders the digits themselves.
-final class _PinDots extends StatelessWidget {
-  const _PinDots({required this.length, required this.minLength});
-  final int length;
-  final int minLength;
-  @override
-  Widget build(BuildContext context) {
-    final slots = length < minLength ? minLength : length;
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        for (var i = 0; i < slots; i++)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i < length ? scheme.primary : Colors.transparent,
-                border: Border.all(
-                  color: i < length ? scheme.primary : scheme.outlineVariant,
-                  width: 2,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// The 3×4 numeric keypad: digits 1-9, then clear · 0 · backspace.
-final class _PinPad extends StatelessWidget {
-  const _PinPad({
-    required this.onDigit,
-    required this.onBackspace,
-    required this.onClear,
-    required this.canEdit,
-    required this.es,
-  });
-  final ValueChanged<String> onDigit;
-  final VoidCallback onBackspace;
-  final VoidCallback onClear;
-  final bool canEdit;
-  final bool es;
-  @override
-  Widget build(BuildContext context) => GridView.count(
-    crossAxisCount: 3,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: UmiSpacing.sm,
-    crossAxisSpacing: UmiSpacing.sm,
-    childAspectRatio: 1.7,
-    children: [
-      for (final digit in const ['1', '2', '3', '4', '5', '6', '7', '8', '9'])
-        _PinKey(label: digit, onTap: () => onDigit(digit)),
-      _PinKey(
-        icon: Icons.close,
-        semanticLabel: es ? 'Borrar todo' : 'Clear all',
-        onTap: canEdit ? onClear : null,
-        emphasized: false,
-      ),
-      _PinKey(label: '0', onTap: () => onDigit('0')),
-      _PinKey(
-        icon: Icons.backspace_outlined,
-        semanticLabel: es ? 'Borrar' : 'Backspace',
-        onTap: canEdit ? onBackspace : null,
-        emphasized: false,
-      ),
-    ],
-  );
-}
-
-/// One keypad key. A large, fixed target (fills its grid cell, ≥64dp tall).
-final class _PinKey extends StatelessWidget {
-  const _PinKey({
-    this.label,
-    this.icon,
-    this.semanticLabel,
-    required this.onTap,
-    this.emphasized = true,
-  });
-  final String? label;
-  final IconData? icon;
-  final String? semanticLabel;
-  final VoidCallback? onTap;
-  final bool emphasized;
-  @override
-  Widget build(BuildContext context) {
-    final child = icon != null
-        ? Icon(icon, size: 26)
-        : Text(label!, style: Theme.of(context).textTheme.headlineSmall);
-    return Semantics(
-      button: true,
-      label: semanticLabel ?? label,
-      child: SizedBox.expand(
-        child: emphasized
-            ? FilledButton.tonal(onPressed: onTap, child: child)
-            : OutlinedButton(onPressed: onTap, child: child),
-      ),
-    );
   }
 }
 

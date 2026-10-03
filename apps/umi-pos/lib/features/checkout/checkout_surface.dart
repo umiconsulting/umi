@@ -39,6 +39,9 @@ Future<void> showCheckoutSheet(
   Duration cardTerminalPollStart = const Duration(seconds: 1),
   Duration cardTerminalPollCap = const Duration(seconds: 5),
   Duration cardTerminalWaitBound = const Duration(seconds: 60),
+  // The wall clock the card wait reads. Injectable so a test can reach the
+  // bound without spending a minute of real time; the till passes the real one.
+  DateTime Function() now = DateTime.now,
 }) => Navigator.of(context).push(
   // PoloTab pays on a full screen, not a sheet — a focused, low-light surface.
   MaterialPageRoute<void>(
@@ -57,6 +60,7 @@ Future<void> showCheckoutSheet(
         cardTerminalPollStart: cardTerminalPollStart,
         cardTerminalPollCap: cardTerminalPollCap,
         cardTerminalWaitBound: cardTerminalWaitBound,
+        now: now,
       ),
     ),
   ),
@@ -75,6 +79,7 @@ final class _CheckoutSheet extends StatefulWidget {
     required this.cardTerminalPollStart,
     required this.cardTerminalPollCap,
     required this.cardTerminalWaitBound,
+    required this.now,
   });
   final CheckoutController checkout;
   final String? cashShiftId;
@@ -91,6 +96,10 @@ final class _CheckoutSheet extends StatefulWidget {
   final Duration cardTerminalPollStart;
   final Duration cardTerminalPollCap;
   final Duration cardTerminalWaitBound;
+
+  /// The clock the card wait reads. A test supplies its own so the bound can be
+  /// reached without waiting real seconds; the till uses the system clock.
+  final DateTime Function() now;
 
   @override
   State<_CheckoutSheet> createState() => _CheckoutSheetState();
@@ -2670,7 +2679,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         // Still unknown: the customer has not finished. Follow the attempt by
         // the identity the capture used, at the terminal's own query window.
         cardPollDelay = widget.cardTerminalPollStart;
-        final now = DateTime.now();
+        final now = widget.now();
         setState(
           () => cardWaitDeadline = now.add(widget.cardTerminalWaitBound),
         );
@@ -2728,7 +2737,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (raw == null) return cardPollDelay;
     final at = DateTime.tryParse(raw)?.toUtc();
     if (at == null) return cardPollDelay;
-    final delta = at.difference(DateTime.now().toUtc());
+    final delta = at.difference(widget.now().toUtc());
     // Never hammer the vendor: the terminal's window is the floor, not a
     // licence to ask early.
     return delta < widget.cardTerminalPollStart
@@ -2804,7 +2813,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     cardPollTimer?.cancel();
     final deadline = cardWaitDeadline;
     if (deadline == null) return;
-    final remaining = deadline.difference(DateTime.now());
+    final remaining = deadline.difference(widget.now());
     // Never sleep past the bound: the wait ends on time, and reaching the bound
     // is the UNRESOLVED case, not a silent failure.
     final effective = remaining < delay ? remaining : delay;
@@ -2820,7 +2829,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final identity = cardCommandIdentity;
     if (!mounted || !cardEnabled || identity == null) return;
     final deadline = cardWaitDeadline;
-    if (deadline != null && !DateTime.now().isBefore(deadline)) {
+    if (deadline != null && !widget.now().isBefore(deadline)) {
       _resolveCardUnresolved();
       return;
     }

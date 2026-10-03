@@ -50,4 +50,32 @@ describe('POS cash center SQL regression', () => {
     expect(source).not.toMatch(/ORDER BY sequence\b/);
     expect(source).toContain('ORDER BY merchant.cash_ledger_entry.sequence');
   });
+
+  it('gives the till the shift journal, oldest first, from the newest end', () => {
+    const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
+    // The operator reads the journal oldest-first, so the mapper reverses the rows.
+    // The query itself pages from the newest end: a shift longer than the bound must
+    // keep the entries the operator is standing next to, not the ones from opening.
+    expect(source).toContain('ORDER BY le.sequence DESC LIMIT 200');
+    expect(source).toContain('.reverse();');
+    // The ledger stores a magnitude and the entry type carries the direction, so the
+    // projection must not sign the amount on its way to the terminal.
+    expect(source).toContain('amount: lineMoney(Number(row.amount))');
+    expect(source).toContain('ledger,');
+  });
+
+  it('keeps the count exit behind the ledger and behind an unresolved difference', () => {
+    const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
+    // The drawer may go back to open only while the count still describes the
+    // drawer it was taken from: the shift's sequence and the count's sequence are
+    // the same number, and the caller read that number.
+    expect(source).toContain("AND status='reconciliation_required' AND version=$7");
+    expect(source).toContain('AND ledger_sequence=$8');
+    expect(source).toContain('COUNT_NOT_CANCELLABLE');
+    expect(source).toContain('STALE_COUNT');
+    // A recorded variance reason is a decision about money. This undoes a count,
+    // not a decision, so the presence of a resolution refuses the exit.
+    expect(source).toContain('VARIANCE_ALREADY_RESOLVED');
+    expect(source).toContain("SET status='open',version=version+1,suspended_at=NULL");
+  });
 });

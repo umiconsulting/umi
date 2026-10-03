@@ -3,15 +3,22 @@ import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useOperationsData, useCashShiftDetail } from '@/data.jsx';
 import { formatOperationMoney, formatOperationDate } from './operations-format.js';
+import {
+  ATTENTION_STATUSES as ATTENTION,
+  BUCKETS as BUCKET_IDS,
+  CLOSED_STATUS as CLOSED,
+  OPEN_STATUSES as OPEN,
+  buildVarianceSeries,
+  countBuckets,
+  filterShifts,
+  sortShifts,
+  varianceOf as variance,
+} from './caja-turnos-model.js';
 
 // Caja y turnos — the cash-custody view: a pulse over the shifts, a triage list, and the
 // reconciliation drill-down for the selected shift (cash-math, denominations, ledger,
 // separation of duties, trazabilidad) from /operations/cash-shifts/:id. Read-only:
 // cash movement stays POS-only; the owner reviews and governs.
-
-const CLOSED = 'closed';
-const OPEN = new Set(['open', 'opening']);
-const ATTENTION = new Set(['reconciliation_required', 'counting', 'closing', 'handoff_pending']);
 
 const STATUS_LABEL = {
   opening: msg`Abriendo`,
@@ -37,11 +44,6 @@ const ENTRY_LABEL = {
   count_observation: msg`Arqueo`,
 };
 
-function variance(f) {
-  const e = f?.expectedCashMinorUnits;
-  const c = f?.countedCashMinorUnits;
-  return e == null || c == null ? null : c - e;
-}
 function toneOf(v, tolerance = 0) {
   if (v == null) return null;
   if (v === 0) return 'var(--success)';
@@ -53,17 +55,18 @@ function signedMoney(v, currency) {
 }
 
 /** A boxed pulse tile: label over a big mono figure. */
-function Stat({ label, value, tone }) {
+/**
+ * A pulse figure. The label says what it counts, the value is the number, and the
+ * note says the window it covers — a figure without its window is a rumour.
+ */
+function Kpi({ label, value, note, tone }) {
   return (
     <div
       style={{
-        border: '1px solid var(--line)',
-        borderRadius: 14,
-        padding: '14px 16px',
-        background: 'var(--surface)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        gap: 4,
+        minWidth: 0,
       }}
     >
       <div className="eyebrow">{label}</div>
@@ -72,13 +75,364 @@ function Stat({ label, value, tone }) {
         style={{
           fontFamily: 'var(--font-mono)',
           fontWeight: 600,
-          fontSize: 24,
+          fontSize: 26,
           letterSpacing: '-0.02em',
           lineHeight: 1,
           color: tone || 'var(--ink-1)',
+          whiteSpace: 'nowrap',
         }}
       >
         {value}
+      </div>
+      {note ? <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{note}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Serie y tendencia. The back-office form of the difference: the same number the
+ * till shows today, read across business days. A day above the line is money
+ * left over; a day below is money missing. Bars are scaled to the worst day in
+ * the window, so the shape stays readable when one day dominates.
+ */
+function VarianceTrend({ series, currency }) {
+  if (!series.length) {
+    return (
+      <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+        <Trans>Sin turnos cerrados todavía. La tendencia aparece con el primer cierre.</Trans>
+      </div>
+    );
+  }
+  const max = Math.max(1, ...series.map((d) => Math.abs(d.varianceMinorUnits)));
+  const half = 30;
+  const worst = series.reduce((a, b) =>
+    Math.abs(b.varianceMinorUnits) > Math.abs(a.varianceMinorUnits) ? b : a,
+  );
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
+        gap: 24,
+        alignItems: 'end',
+      }}
+    >
+      <div style={{ position: 'relative' }}>
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: half,
+            height: 1,
+            background: 'var(--line-strong)',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          {series.map((d) => {
+            const up = d.varianceMinorUnits > 0;
+            const h = Math.max(2, Math.round((Math.abs(d.varianceMinorUnits) / max) * half));
+            return (
+              <div
+                key={d.businessDate}
+                title={`${d.businessDate} · ${signedMoney(d.varianceMinorUnits, currency)}`}
+                style={{ width: 44, display: 'flex', flexDirection: 'column' }}
+              >
+                <div style={{ height: half, display: 'flex', alignItems: 'flex-end' }}>
+                  {up ? (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: h,
+                        borderRadius: '4px 4px 0 0',
+                        background: 'color-mix(in srgb, var(--warning) 55%, transparent)',
+                      }}
+                    />
+                  ) : null}
+                </div>
+                <div style={{ height: half, display: 'flex', alignItems: 'flex-start' }}>
+                  {!up ? (
+                    <div
+                      style={{
+                        width: '100%',
+                        height: h,
+                        borderRadius: '0 0 4px 4px',
+                        background: 'color-mix(in srgb, var(--danger) 55%, transparent)',
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+          {series.map((d) => (
+            <div
+              key={d.businessDate}
+              className="figures"
+              style={{
+                width: 44,
+                textAlign: 'center',
+                fontSize: 10.5,
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--ink-3)',
+              }}
+            >
+              {d.businessDate.slice(5)}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+        <div>
+          {series.length === 1 ? (
+            <Trans>1 día con cierre</Trans>
+          ) : (
+            <Trans>{series.length} días con cierre</Trans>
+          )}
+        </div>
+        <div style={{ color: 'var(--ink-2)' }}>
+          <Trans>
+            Peor día {signedMoney(worst.varianceMinorUnits, currency)} el {worst.businessDate}
+          </Trans>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const BUCKET_LABEL = {
+  all: msg`Todas`,
+  open: msg`Abiertas`,
+  attention: msg`Requieren atención`,
+  closed: msg`Cerradas`,
+};
+
+/**
+ * Tabla filtrable. The back-office form of the shift list: every shift of the
+ * window in one table, sorted by whatever the manager is hunting for. The
+ * till shows one shift; this shows the day, the week, and the operator behind
+ * each difference.
+ */
+function ShiftTable({ items, selectedId, onSelect }) {
+  const { i18n } = useLingui();
+  const [bucket, setBucket] = useState('all');
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState({ key: 'date', dir: 'desc' });
+
+  const counts = countBuckets(items);
+  const rows = sortShifts(filterShifts(items, { bucket, query }), sort);
+
+  const toggle = (key) =>
+    setSort((prev) => ({ key, dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc' }));
+  const arrow = (key) => (sort.key === key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '');
+
+  const th = (key, label, align) => (
+    <th scope="col" style={{ textAlign: align || 'left', whiteSpace: 'nowrap' }}>
+      <button
+        type="button"
+        onClick={() => toggle(key)}
+        aria-label={i18n._(msg`Ordenar por esta columna`)}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          minHeight: 'var(--control-min)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          font: 'inherit',
+          color: sort.key === key ? 'var(--ink-1)' : 'inherit',
+        }}
+      >
+        {label}
+        {arrow(key)}
+      </button>
+    </th>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {BUCKET_IDS.map((id) => {
+          const on = bucket === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setBucket(id)}
+              aria-pressed={on}
+              className="sub-pill"
+              style={{
+                minHeight: 'var(--control-min)',
+                padding: '0 12px',
+                cursor: 'pointer',
+                border: `1px solid ${on ? 'var(--merchant-brand)' : 'var(--line)'}`,
+                background: on
+                  ? 'color-mix(in srgb, var(--merchant-brand) 12%, transparent)'
+                  : 'var(--surface)',
+                color: on ? 'var(--merchant-brand)' : 'var(--ink-2)',
+                fontWeight: 600,
+              }}
+            >
+              {i18n._(BUCKET_LABEL[id])} <span className="figures">{counts[id]}</span>
+            </button>
+          );
+        })}
+        <label
+          style={{
+            marginLeft: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            minHeight: 'var(--control-min)',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--r-ctl)',
+            padding: '0 10px',
+            background: 'var(--surface)',
+            minWidth: 200,
+          }}
+        >
+          <span className="sr-only">
+            <Trans>Buscar por caja u operador</Trans>
+          </span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={i18n._(msg`Buscar caja u operador`)}
+            style={{ border: 0, outline: 'none', background: 'none', width: '100%', fontSize: 13 }}
+          />
+        </label>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr
+              style={{
+                textAlign: 'left',
+                fontSize: 11,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+              }}
+            >
+              <th scope="col" style={{ whiteSpace: 'nowrap' }}>
+                <Trans>Caja</Trans>
+              </th>
+              <th scope="col">
+                <Trans>Operador</Trans>
+              </th>
+              {th('date', i18n._(msg`Fecha comercial`))}
+              <th scope="col">
+                <Trans>Estado</Trans>
+              </th>
+              {th('expected', i18n._(msg`Esperado`), 'right')}
+              <th scope="col" style={{ textAlign: 'right' }}>
+                <Trans>Contado</Trans>
+              </th>
+              {th('variance', i18n._(msg`Diferencia`), 'right')}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s) => {
+              const v = variance(s.facts);
+              const isSel = s.id === selectedId;
+              return (
+                <tr
+                  key={s.id}
+                  onClick={() => onSelect(s.id)}
+                  style={{
+                    borderTop: '1px solid var(--line-soft)',
+                    background: isSel
+                      ? 'color-mix(in srgb, var(--merchant-brand) 8%, transparent)'
+                      : undefined,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <td style={{ padding: 0 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(s.id);
+                      }}
+                      aria-pressed={isSel}
+                      style={{
+                        all: 'unset',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        minHeight: 'var(--control-min)',
+                        padding: '0 8px',
+                        fontWeight: 600,
+                        boxShadow: isSel ? 'inset 2px 0 0 var(--merchant-brand)' : undefined,
+                      }}
+                    >
+                      {s.facts?.register || s.title}
+                    </button>
+                  </td>
+                  <td style={{ padding: '0 8px', color: 'var(--ink-2)' }}>
+                    {s.facts?.operator || '—'}
+                  </td>
+                  <td
+                    className="figures"
+                    style={{
+                      padding: '0 8px',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--ink-2)',
+                    }}
+                  >
+                    {s.facts?.businessDate || '—'}
+                  </td>
+                  <td style={{ padding: '0 8px' }}>
+                    <StatusPill status={s.status} />
+                  </td>
+                  <td
+                    className="figures"
+                    style={{
+                      padding: '0 8px',
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    {formatOperationMoney(s.facts?.expectedCashMinorUnits ?? 0, s.currency)}
+                  </td>
+                  <td
+                    className="figures"
+                    style={{
+                      padding: '0 8px',
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--ink-2)',
+                    }}
+                  >
+                    {s.facts?.countedCashMinorUnits == null
+                      ? '—'
+                      : formatOperationMoney(s.facts.countedCashMinorUnits, s.currency)}
+                  </td>
+                  <td
+                    className="figures"
+                    style={{
+                      padding: '0 8px',
+                      textAlign: 'right',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 600,
+                      color: toneOf(v) || 'var(--ink-3)',
+                    }}
+                  >
+                    {v == null ? '—' : signedMoney(v, s.currency)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {!rows.length ? (
+          <div style={{ padding: '18px 2px', color: 'var(--ink-3)', fontSize: 13 }}>
+            <Trans>Ningún turno coincide con el filtro.</Trans>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -544,31 +898,82 @@ export default function CajaTurnos() {
   const closed = items.filter((s) => s.status === CLOSED);
   const net = closed.reduce((sum, s) => sum + (variance(s.facts) ?? 0), 0);
 
+  // Serie y tendencia: the same difference the till shows today, grouped by business day
+  // over the window the operations feed covers. The window label states what it covers,
+  // because a trend without its window is a claim the data cannot support.
+  const series = buildVarianceSeries(items);
+  const daysCovered = new Set(items.map((s) => s.facts?.businessDate).filter(Boolean)).size;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: 12,
-        }}
-      >
-        <Stat label={<Trans>Cajas abiertas</Trans>} value={openCount} />
-        <Stat
-          label={<Trans>Efectivo esperado en caja</Trans>}
-          value={formatOperationMoney(expected, currency)}
-        />
-        <Stat
-          label={<Trans>Requieren atención</Trans>}
-          value={attention}
-          tone={attention ? 'var(--warning)' : undefined}
-        />
-        <Stat
-          label={<Trans>Diferencia neta</Trans>}
-          value={closed.length ? signedMoney(net, currency) : '—'}
-          tone={net < 0 ? 'var(--danger)' : net > 0 ? 'var(--warning)' : undefined}
-        />
-      </div>
+      {/* Pulse and trend: the day's custody at a glance, then the same number over time. */}
+      <section className="card" style={{ padding: '18px 20px', display: 'grid', gap: 18 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)',
+            gap: 24,
+            alignItems: 'start',
+          }}
+          className="cash-pulse-grid"
+        >
+          <div>
+            <div className="eyebrow">
+              <Trans>Custodia de efectivo</Trans>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 6 }}>
+              {daysCovered > 1 ? (
+                <Trans>{daysCovered} días comerciales en la ventana de turnos cargada.</Trans>
+              ) : (
+                <Trans>La ventana de turnos cargada cubre un día comercial.</Trans>
+              )}
+            </div>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: 18,
+            }}
+          >
+            <Kpi
+              label={<Trans>Cajas abiertas</Trans>}
+              value={openCount}
+              note={<Trans>ahora mismo</Trans>}
+            />
+            <Kpi
+              label={<Trans>Efectivo esperado</Trans>}
+              value={formatOperationMoney(expected, currency)}
+              note={<Trans>en las cajas abiertas</Trans>}
+            />
+            <Kpi
+              label={<Trans>Requieren atención</Trans>}
+              value={attention}
+              note={<Trans>arqueo, traspaso o cierre</Trans>}
+              tone={attention ? 'var(--warning)' : undefined}
+            />
+            <Kpi
+              label={<Trans>Diferencia neta</Trans>}
+              value={closed.length ? signedMoney(net, currency) : '—'}
+              note={
+                closed.length ? (
+                  <Trans>{closed.length} turnos cerrados</Trans>
+                ) : (
+                  <Trans>sin cierres en la ventana</Trans>
+                )
+              }
+              tone={net < 0 ? 'var(--danger)' : net > 0 ? 'var(--warning)' : undefined}
+            />
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 14 }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>
+            <Trans>Diferencia neta por día comercial</Trans>
+          </div>
+          <VarianceTrend series={series} currency={currency} />
+        </div>
+      </section>
 
       {state.loading && !state.loaded ? (
         <div style={{ color: 'var(--ink-3)', fontSize: 14, padding: '20px 4px' }}>
@@ -582,76 +987,17 @@ export default function CajaTurnos() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 320px) minmax(0, 1fr)',
+            gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)',
             gap: 20,
           }}
           className="caja-grid"
         >
-          <aside
-            role="listbox"
-            aria-label={t`Turnos de caja`}
-            style={{ display: 'flex', flexDirection: 'column', gap: 8, alignContent: 'start' }}
-          >
-            {items.map((s) => {
-              const v = variance(s.facts);
-              const vt = toneOf(v);
-              const isSel = s.id === effectiveSelected;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isSel}
-                  onClick={() => setSelected(s.id)}
-                  className="card"
-                  style={{
-                    textAlign: 'left',
-                    padding: '12px 14px',
-                    display: 'grid',
-                    gap: 7,
-                    cursor: 'pointer',
-                    border: isSel ? '1px solid var(--merchant-brand)' : '1px solid var(--line)',
-                    boxShadow: isSel ? '0 0 0 1px var(--merchant-brand)' : undefined,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, fontSize: 13.5 }}>
-                      {s.facts?.register || s.title}
-                    </span>
-                    <StatusPill status={s.status} />
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      fontSize: 12,
-                      color: 'var(--ink-3)',
-                    }}
-                  >
-                    <span>{s.facts?.operator || '—'}</span>
-                    <span
-                      className="figures"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontWeight: 600,
-                        color: vt || 'var(--ink-3)',
-                      }}
-                    >
-                      {v == null ? '—' : signedMoney(v, s.currency)}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </aside>
+          <section className="card" style={{ padding: '18px 20px' }} aria-label={t`Turnos de caja`}>
+            <div className="eyebrow" style={{ marginBottom: 12 }}>
+              <Trans>Turnos de caja</Trans>
+            </div>
+            <ShiftTable items={items} selectedId={effectiveSelected} onSelect={setSelected} />
+          </section>
           <section className="card" style={{ padding: '20px 22px' }}>
             <ShiftDetail shiftId={effectiveSelected} />
           </section>

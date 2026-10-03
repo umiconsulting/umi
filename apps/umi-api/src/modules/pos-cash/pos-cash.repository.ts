@@ -4,9 +4,11 @@ import type { PoolClient } from 'pg';
 import type {
   AdoptCashShiftRequest,
   AdoptCashShiftResult,
+  CancelCashCountRequest,
   CashCenterSnapshot,
   CashCommandRecoveryResult,
   CashCountState,
+  CashJournalLine,
   CashMovement,
   CashMovementRequest,
   CashReconciliationOutcome,
@@ -37,7 +39,12 @@ import type {
   SubmitBlindCountRequest,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
-import { calculateExpectedCash, calculateVariance, type CashFact } from './cash-domain';
+import {
+  calculateExpectedCash,
+  calculateVariance,
+  closeNeedsApproval,
+  type CashFact,
+} from './cash-domain';
 import { CashRefusal } from './cash-refusal';
 
 /**
@@ -906,6 +913,91 @@ export class PosCashRepository {
     return rows[0];
   }
 
+  /**
+   * Put a counted drawer back to `open`, because the count should not have
+   * happened.
+   *
+   * Two conditions, both proven here rather than asserted by the caller. The
+   * ledger has not moved since the count — the shift's sequence and the count's
+   * recorded sequence are the same number. And nobody has recorded a variance
+   * reason against it, because a reason is a decision about money and this
+   * operation does not undo decisions.
+   *
+   * The count attempt stays where it is. It happened, it is an observation, and
+   * the history reads better with it.
+   */
+  async cancelCount(
+    client: PoolClient,
+    merchantId: string,
+    authorization: CashAuthorization,
+    dto: CancelCashCountRequest,
+  ): Promise<CashShift> {
+    const shift = await client.query<{ registerId: string; ledgerSequence: string }>(
+      `SELECT register_id::text AS "registerId",ledger_sequence::int AS "ledgerSequence"
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
+         AND operator_session_id=$6::uuid
+         AND status='reconciliation_required' AND version=$7
+         AND ledger_sequence=$8
+       FOR UPDATE`,
+      [
+        dto.shiftId,
+        merchantId,
+        dto.locationId,
+        authorization.operatorId,
+        authorization.deviceId,
+        dto.operatorSessionId,
+        dto.expectedShiftVersion,
+        dto.expectedLedgerSequence,
+      ],
+    );
+    const current = shift.rows[0];
+    if (!current) throw new Error('COUNT_NOT_CANCELLABLE');
+    const latest = await client.query<{ ledgerSequence: number; attempt: number }>(
+      `SELECT ledger_sequence::int AS "ledgerSequence",attempt_number AS attempt
+       FROM merchant.cash_count_attempt
+       WHERE shift_id=$1::uuid ORDER BY attempt_number DESC LIMIT 1`,
+      [dto.shiftId],
+    );
+    if (!latest.rows[0] || latest.rows[0].ledgerSequence !== dto.expectedLedgerSequence) {
+      throw new Error('STALE_COUNT');
+    }
+    const resolved = await client.query<{ present: boolean }>(
+      `SELECT EXISTS(
+         SELECT 1 FROM merchant.cash_variance_resolution r
+         WHERE r.shift_id=$1::uuid
+       ) AS present`,
+      [dto.shiftId],
+    );
+    if (resolved.rows[0].present) throw new Error('VARIANCE_ALREADY_RESOLVED');
+    const { rows } = await client.query<CashShift>(
+      `UPDATE merchant.cash_shift
+       SET status='open',version=version+1,suspended_at=NULL
+       WHERE id=$1::uuid
+       RETURNING id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
+                 register_id::text AS "registerId",device_id::text AS "deviceId",
+                 device_credential_version AS "deviceCredentialVersion",
+                 holding_device_id::text AS "holdingDeviceId",
+                 holding_device_credential_version AS "holdingDeviceCredentialVersion",
+                 opening_operator_id::text AS "openingOperatorId",
+                 responsible_operator_id::text AS "responsibleOperatorId",
+                 operator_session_id::text AS "operatorSessionId",currency,
+                 business_date::text AS "businessDate",status,
+                 opening_command_id::text AS "openingCommandId",
+                 opened_at::text AS "openedAt",suspended_at::text AS "suspendedAt",
+                 closed_at::text AS "closedAt",ledger_sequence::int AS "ledgerSequence",version`,
+      [dto.shiftId],
+    );
+    await client.query(
+      `UPDATE merchant.physical_register
+       SET status='in_use',version=version+1
+       WHERE id=$1::uuid`,
+      [current.registerId],
+    );
+    return rows[0];
+  }
+
   async resolveVariance(
     client: PoolClient,
     merchantId: string,
@@ -1069,8 +1161,19 @@ export class PosCashRepository {
         : variance.withinTolerance
           ? 'within_tolerance'
           : 'approved_variance';
-    const closeApprovalRequired =
-      expected.expectedDrawerCash.minorUnits > policy.closeApprovalThreshold.minorUnits;
+    // The approval is about the *variance*, not the size of the drawer.
+    //
+    // This compared `expectedDrawerCash` against the threshold, which inverted
+    // the control the policy describes: a drawer holding a large float needed a
+    // manager even when the count was exact, and a drawer holding a large
+    // variance closed without one as long as the float was small. Toast and
+    // Square gate the approval on the over/short, and the till's own policy card
+    // prints the rule as "PIN cierre: diferencia > …" — so the screen was
+    // stating a rule the server did not follow. (Deep-design finding 5.1.)
+    const closeApprovalRequired = closeNeedsApproval(
+      variance.absoluteVariance.minorUnits,
+      policy.closeApprovalThreshold.minorUnits,
+    );
     const closeApprovalFingerprint = closeApprovalRequired
       ? createHash('sha256')
           .update(
@@ -1079,7 +1182,7 @@ export class PosCashRepository {
               dto.locationId,
               dto.shiftId,
               selected.id,
-              expected.expectedDrawerCash.minorUnits,
+              variance.absoluteVariance.minorUnits,
               selected.ledgerSequence,
               'cash.shift.close',
             ].join(':'),
@@ -1241,8 +1344,10 @@ export class PosCashRepository {
     );
     if (!count.rows[0]) throw new Error('COUNT_NOT_FOUND');
     const variance = Number(count.rows[0].counted) - expected.expectedDrawerCash.minorUnits;
-    const closeApprovalRequired =
-      expected.expectedDrawerCash.minorUnits > policy.closeApprovalThreshold.minorUnits;
+    const closeApprovalRequired = closeNeedsApproval(
+      Math.abs(variance),
+      policy.closeApprovalThreshold.minorUnits,
+    );
     const closeApprovalFingerprint = closeApprovalRequired
       ? createHash('sha256')
           .update(
@@ -1251,7 +1356,7 @@ export class PosCashRepository {
               dto.locationId,
               dto.shiftId,
               dto.countAttemptId,
-              expected.expectedDrawerCash.minorUnits,
+              Math.abs(variance),
               current.ledgerSequence,
               'cash.shift.close',
             ].join(':'),
@@ -1657,6 +1762,18 @@ export class PosCashRepository {
               }
             : null;
         const reconciliationHeader = reconciliationResult?.rows[0] ?? null;
+        // The drawer may go back to `open` while the count still stands alone:
+        // nothing has moved through the ledger since it was taken, and nobody has
+        // recorded a variance reason against it. Both are facts of the rows
+        // already loaded here, so the terminal does not have to decide.
+        const countCancellable =
+          shift !== null &&
+          shift.status === 'reconciliation_required' &&
+          latestCount !== null &&
+          latestCountRow !== null &&
+          Number(latestCountRow.ledgerSequence) === Number(shift.ledgerSequence) &&
+          resolutionRow === null &&
+          reconciliationHeader === null;
         const handoffReady =
           policy.handoffAllowed &&
           policy.handoffCountRequired &&
@@ -1675,31 +1792,94 @@ export class PosCashRepository {
                 selectedCount: latestCount.count,
                 variance: latestCount.variance,
                 resolution: null,
-                closeApprovalRequired:
-                  expected.expectedDrawerCash.minorUnits > policy.closeApprovalThreshold.minorUnits,
-                closeApprovalFingerprint:
-                  expected.expectedDrawerCash.minorUnits > policy.closeApprovalThreshold.minorUnits
-                    ? createHash('sha256')
-                        .update(
-                          [
-                            merchantId,
-                            locationId,
-                            shift.id,
-                            latestCount.count.id,
-                            expected.expectedDrawerCash.minorUnits,
-                            latestCount.count.ledgerSequence,
-                            'cash.shift.close',
-                          ].join(':'),
-                        )
-                        .digest('hex')
-                    : null,
+                closeApprovalRequired: closeNeedsApproval(
+                  latestCount.variance.absoluteVariance.minorUnits,
+                  policy.closeApprovalThreshold.minorUnits,
+                ),
+                closeApprovalFingerprint: closeNeedsApproval(
+                  latestCount.variance.absoluteVariance.minorUnits,
+                  policy.closeApprovalThreshold.minorUnits,
+                )
+                  ? createHash('sha256')
+                      .update(
+                        [
+                          merchantId,
+                          locationId,
+                          shift.id,
+                          latestCount.count.id,
+                          latestCount.variance.absoluteVariance.minorUnits,
+                          latestCount.count.ledgerSequence,
+                          'cash.shift.close',
+                        ].join(':'),
+                      )
+                      .digest('hex')
+                  : null,
               }
             : null;
+        // The journal the operator reads. Bounded to one shift and ordered by
+        // sequence, because the expected cash is a projection of exactly these
+        // rows: an operator who sees a number they did not expect has to be able
+        // to find the line that produced it.
+        const ledgerRows = shift
+          ? await client.query<{
+              sequence: number;
+              type: CashJournalLine['type'];
+              amount: string;
+              received: string;
+              change: string;
+              saleId: string | null;
+              receiptNumber: string | null;
+              operator: string | null;
+              reasonCode: string | null;
+              note: string | null;
+              occurredAt: string;
+            }>(
+              `SELECT le.sequence::int,le.entry_type AS type,
+                      le.amount_minor_units::text AS amount,
+                      le.cash_received_minor_units::text AS received,
+                      le.change_given_minor_units::text AS change,
+                      le.sale_id::text AS "saleId",rc.receipt_number AS "receiptNumber",
+                      coalesce(st.name,sst.name) AS operator,mv.reason_code AS "reasonCode",mv.note,
+                      le.occurred_at::text AS "occurredAt"
+               FROM merchant.cash_ledger_entry le
+               LEFT JOIN merchant.cash_movement mv ON mv.id=le.movement_id
+               LEFT JOIN merchant.staff st ON st.user_id=mv.operator_id AND st.merchant_id=le.merchant_id
+               LEFT JOIN merchant.pos_committed_sale cs ON cs.id=le.sale_id
+               LEFT JOIN merchant.receipt_snapshot rc ON rc.id=cs.receipt_snapshot_id
+               -- A sale carries no operator of its own: the person who took it sits on
+               -- the cart's operator session, two joins away. Without this the journal
+               -- names who moved cash by hand and leaves the sales anonymous, which is
+               -- the half an operator is most often asked about.
+               LEFT JOIN merchant.pos_cart pc ON pc.id=cs.cart_id
+               LEFT JOIN runtime.operator_session os ON os.id=pc.operator_session_id
+               LEFT JOIN merchant.staff sst ON sst.user_id=os.user_id AND sst.merchant_id=le.merchant_id
+               WHERE le.shift_id=$1::uuid
+               ORDER BY le.sequence DESC LIMIT 200`,
+              [shift.id],
+            )
+          : null;
+        const lineMoney = (minorUnits: number) => ({ minorUnits, currency: shift.currency });
+        const ledger: CashJournalLine[] = (ledgerRows?.rows ?? [])
+          .map((row) => ({
+            sequence: row.sequence,
+            type: row.type,
+            amount: lineMoney(Number(row.amount)),
+            cashReceived: lineMoney(Number(row.received)),
+            changeGiven: lineMoney(Number(row.change)),
+            saleId: row.saleId,
+            receiptNumber: row.receiptNumber,
+            operatorReference: row.operator,
+            reasonCode: row.reasonCode,
+            note: row.note,
+            occurredAt: row.occurredAt,
+          }))
+          .reverse();
         return {
           businessDate: businessDateResult.rows[0].businessDate,
           policy,
           registers: mappedRegisters,
           currentShift: shift,
+          ledger,
           expectedCash: latestCount ? expected : null,
           latestCount,
           varianceResolution,
@@ -1733,7 +1913,12 @@ export class PosCashRepository {
                         ? ['handoff', 'reconcile', 'count']
                         : reconciliation
                           ? ['close']
-                          : ['resolve_variance', 'reconcile', 'count']
+                          : [
+                              ...(countCancellable ? ['cancel_count'] : []),
+                              'resolve_variance',
+                              'reconcile',
+                              'count',
+                            ]
                 : mappedRegisters.length
                   ? ['open_shift']
                   : [],

@@ -107,6 +107,22 @@ export const calculateExpectedCash = (
   };
 };
 
+/**
+ * Whether a close needs a manager's approval.
+ *
+ * The threshold is a *variance* rule: it compares the over/short, not the size
+ * of the drawer. The rule used to read `expectedDrawerCash > threshold`, which
+ * inverted the control the policy describes — a drawer holding a large float
+ * needed a manager even with an exact count, and a drawer holding a large
+ * variance closed without one as long as the float was small. Toast and Square
+ * gate on the over/short, and the till states the rule as "PIN cierre:
+ * diferencia > …". (Deep-design finding 5.1.)
+ */
+export const closeNeedsApproval = (
+  absoluteVarianceMinorUnits: number,
+  thresholdMinorUnits: number,
+): boolean => absoluteVarianceMinorUnits > thresholdMinorUnits;
+
 export const calculateVariance = (
   expected: number,
   counted: number,

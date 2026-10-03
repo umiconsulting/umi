@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -137,12 +139,93 @@ final class _UmiPosAppState extends State<UmiPosApp> {
         onActivity: widget.root.entry.noteActivity,
         child: child ?? const SizedBox.shrink(),
       ),
-      home: _GuardedSurface(root: widget.root),
+      home: TurnClosesSurfaces(
+        session: widget.root.entry,
+        hasTurn: () =>
+            widget.root.entry.navigationStage == TrustedEntryStage.ready,
+        child: _GuardedSurface(root: widget.root),
+      ),
       onUnknownRoute: (_) => MaterialPageRoute<void>(
         builder: (_) => _UnknownRoute(root: widget.root),
       ),
     );
   }
+}
+
+/// Closes everything the operator's turn had open when the turn ends.
+///
+/// The cash center, the floor plan, the checkout sheet and the settings screens
+/// are all routes pushed *above* the shell. The shell's route is chosen from the
+/// entry stage, so when the till locks — the idle timer, a handoff, or a session
+/// the server ended — the PIN pad is swapped in underneath those routes and the
+/// operator keeps looking at the tool that no longer has a session.
+///
+/// That is how a till that locked itself after half an hour showed a cash screen
+/// saying it could not read the drawer, with a Retry button that could not work,
+/// instead of the PIN pad it was actually asking for. A till that locks has to
+/// close what the till was doing.
+///
+/// It watches for the edge only, from a ready turn to anything else, so ordinary
+/// navigation inside a turn is left alone.
+final class TurnClosesSurfaces extends StatefulWidget {
+  const TurnClosesSurfaces({
+    required this.session,
+    required this.hasTurn,
+    required this.child,
+    super.key,
+  });
+
+  /// The thing that says the turn ended. A [Listenable], not the entry
+  /// controller, so this can be tested without a whole till behind it.
+  final Listenable session;
+
+  /// Whether the operator still holds the till. Read on every notification.
+  final bool Function() hasTurn;
+
+  final Widget child;
+
+  @override
+  State<TurnClosesSurfaces> createState() => _TurnClosesSurfacesState();
+}
+
+final class _TurnClosesSurfacesState extends State<TurnClosesSurfaces> {
+  bool _hadTurn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Read here rather than through a lazy `late` initialiser: a lazy field is
+    // first read inside the very notification this is built to catch, by which
+    // time the turn is already over and the edge it looks for is invisible.
+    _hadTurn = widget.hasTurn();
+    widget.session.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.session.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    final hasTurn = widget.hasTurn();
+    final lost = _hadTurn && !hasTurn;
+    _hadTurn = hasTurn;
+    if (!lost) return;
+    // A microtask, not a post-frame callback: the routes have to go even if the
+    // lock lands while nothing else is being pumped, and `popUntil` mutates the
+    // navigator, which must not happen inside a listener turn.
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.popUntil((route) => route.isFirst);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 final class _GuardedSurface extends StatelessWidget {

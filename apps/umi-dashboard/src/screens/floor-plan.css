@@ -141,6 +141,41 @@
 .fp-properties {
   padding: 16px;
 }
+/* The live reading of one table, above its editable properties. Bounded so a
+   long turn time cannot push the form off the panel. */
+.fp-room-detail {
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 0 14px;
+}
+.fp-room-detail h3 {
+  font-size: 13px;
+  margin: 0;
+}
+.fp-room-detail .fp-room-state {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+.fp-room-detail dl {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.fp-room-detail dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fp-room-detail dt {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.fp-room-detail dd {
+  font-size: 12px;
+  margin: 0;
+}
 .floor-plan h2 {
   font-size: 14px;
   margin: 0 0 14px;

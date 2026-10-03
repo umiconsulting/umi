@@ -118,60 +118,62 @@ void main() {
         expect(result.outcome, DesktopUpdateOutcome.applied);
         expect(result.version, '0.2.0');
         expect(await appImage.readAsBytes(), newBytes);
-        expect(
-          await File('${appImage.path}.zs-old').readAsBytes(),
-          oldBytes,
-        );
+        expect(await File('${appImage.path}.zs-old').readAsBytes(), oldBytes);
       });
 
-      test('reports alreadyCurrent when the latest matches the running version',
-          () async {
-        final dir = await Directory.systemTemp.createTemp('umi_pos_upd');
-        addTearDown(() => dir.delete(recursive: true));
-        final appImage = File('${dir.path}/umi_pos.AppImage');
-        await appImage.writeAsBytes(List<int>.filled(70000, 0x41));
+      test(
+        'reports alreadyCurrent when the latest matches the running version',
+        () async {
+          final dir = await Directory.systemTemp.createTemp('umi_pos_upd');
+          addTearDown(() => dir.delete(recursive: true));
+          final appImage = File('${dir.path}/umi_pos.AppImage');
+          await appImage.writeAsBytes(List<int>.filled(70000, 0x41));
 
-        final updater = AppImageDesktopUpdater(
-          owner: 'umiconsulting',
-          repo: 'umi',
-          currentVersion: '0.2.0',
-          environment: {'APPIMAGE': appImage.path},
-          client: MockClient(
-            (_) async => http.Response(jsonEncode(_release(tag: 'v0.2.0')), 200),
-          ),
-        );
+          final updater = AppImageDesktopUpdater(
+            owner: 'umiconsulting',
+            repo: 'umi',
+            currentVersion: '0.2.0',
+            environment: {'APPIMAGE': appImage.path},
+            client: MockClient(
+              (_) async =>
+                  http.Response(jsonEncode(_release(tag: 'v0.2.0')), 200),
+            ),
+          );
 
-        final result = await updater.update();
-        expect(result.outcome, DesktopUpdateOutcome.alreadyCurrent);
-        // The running file is untouched.
-        expect((await appImage.readAsBytes()).length, 70000);
-      });
+          final result = await updater.update();
+          expect(result.outcome, DesktopUpdateOutcome.alreadyCurrent);
+          // The running file is untouched.
+          expect((await appImage.readAsBytes()).length, 70000);
+        },
+      );
 
-      test('fails without touching the running file on a tiny download',
-          () async {
-        final dir = await Directory.systemTemp.createTemp('umi_pos_upd');
-        addTearDown(() => dir.delete(recursive: true));
-        final appImage = File('${dir.path}/umi_pos.AppImage');
-        await appImage.writeAsBytes(List<int>.filled(70000, 0x41));
+      test(
+        'fails without touching the running file on a tiny download',
+        () async {
+          final dir = await Directory.systemTemp.createTemp('umi_pos_upd');
+          addTearDown(() => dir.delete(recursive: true));
+          final appImage = File('${dir.path}/umi_pos.AppImage');
+          await appImage.writeAsBytes(List<int>.filled(70000, 0x41));
 
-        final updater = AppImageDesktopUpdater(
-          owner: 'umiconsulting',
-          repo: 'umi',
-          currentVersion: '0.1.0',
-          environment: {'APPIMAGE': appImage.path},
-          client: MockClient((request) async {
-            if (request.url.host == 'api.github.com') {
-              return http.Response(jsonEncode(_release(tag: 'v0.2.0')), 200);
-            }
-            return http.Response('not found', 404);
-          }),
-        );
+          final updater = AppImageDesktopUpdater(
+            owner: 'umiconsulting',
+            repo: 'umi',
+            currentVersion: '0.1.0',
+            environment: {'APPIMAGE': appImage.path},
+            client: MockClient((request) async {
+              if (request.url.host == 'api.github.com') {
+                return http.Response(jsonEncode(_release(tag: 'v0.2.0')), 200);
+              }
+              return http.Response('not found', 404);
+            }),
+          );
 
-        final result = await updater.update();
-        expect(result.outcome, DesktopUpdateOutcome.failed);
-        expect((await appImage.readAsBytes()).length, 70000);
-        expect(File('${appImage.path}.zs-old').existsSync(), isFalse);
-      });
+          final result = await updater.update();
+          expect(result.outcome, DesktopUpdateOutcome.failed);
+          expect((await appImage.readAsBytes()).length, 70000);
+          expect(File('${appImage.path}.zs-old').existsSync(), isFalse);
+        },
+      );
 
       test('reports noAsset when the release has no AppImage', () async {
         final dir = await Directory.systemTemp.createTemp('umi_pos_upd');
@@ -192,10 +194,7 @@ void main() {
           ),
         );
 
-        expect(
-          (await updater.update()).outcome,
-          DesktopUpdateOutcome.noAsset,
-        );
+        expect((await updater.update()).outcome, DesktopUpdateOutcome.noAsset);
       });
     },
     skip: !Platform.isLinux ? 'AppImage updater is Linux-only' : null,

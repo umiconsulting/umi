@@ -29,8 +29,23 @@ abstract final class UmiTheme {
   // PoloTab-style palette: a bright blue primary on a neutral near-black ground
   // with slightly lighter grey panels — the tender-floor look a barista reads in
   // low light without the old violet cast.
-  static const _primary = Color(0xFF2E7DFF);
+  //
+  // This is the brand blue, not the scheme's `primary`. Material 3 resolves a
+  // dark-mode `primary` to a pale tone, and this till wants the vivid blue for
+  // anything that acts or that marks the current choice. Use `UmiTheme.brand`
+  // wherever the till speaks in its own colour.
+  static const brand = Color(0xFF2E7DFF);
+  static const _primary = brand;
   static const _darkSurface = Color(0xFF23252B);
+
+  /// The colour of "act, but not because the money is wrong".
+  ///
+  /// Error red says a financial fact failed, and on this till that is almost
+  /// never what happened: the ledger commits first, and what fails afterwards is
+  /// the hardware. A drawer that did not answer needs the operator's hand, not
+  /// their alarm, and it needs a colour that does not read as "the sale is
+  /// broken". Amber on both grounds, dark enough for text on the light theme.
+  static const warning = Color(0xFFB26A00);
 
   static ThemeData dark() =>
       _theme(Brightness.dark, const Color(0xFF121317), _darkSurface);
@@ -127,12 +142,20 @@ abstract final class UmiTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.square(UmiTouchTarget.minimum),
+          // Material 3 inks an outlined button with the scheme's `primary`,
+          // which a dark scheme resolves to a pale periwinkle. On this till it
+          // read as purple text, so the label takes the surface ink instead and
+          // the outline carries the boundary.
+          foregroundColor: scheme.onSurface,
           shape: controlShape,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: const Size.square(UmiTouchTarget.minimum),
+          // Same M3 default, same fix: a text button still acts, so it speaks
+          // in the brand blue rather than in the pale dark-mode primary.
+          foregroundColor: brand,
           shape: controlShape,
         ),
       ),

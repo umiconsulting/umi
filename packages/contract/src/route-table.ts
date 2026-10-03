@@ -2624,6 +2624,17 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     permission: 'cash.count.recount',
   }),
   posMerchantRoute({
+    id: 'pos.cashCountCancel',
+    method: 'POST',
+    suffix: '/cash/shifts/:shiftId/counts/cancel',
+    params: ['shiftId'],
+    dart: 'posCashCountCancel',
+    request: 'CancelCashCountRequest',
+    response: 'CashShift',
+    permission: 'cash.count.submit',
+    errors: ['PERMISSION_DENIED', 'IDEMPOTENCY_CONFLICT', 'OPTIMISTIC_VERSION_CONFLICT'],
+  }),
+  posMerchantRoute({
     id: 'pos.cashVariance',
     method: 'POST',
     suffix: '/cash/shifts/:shiftId/variance',

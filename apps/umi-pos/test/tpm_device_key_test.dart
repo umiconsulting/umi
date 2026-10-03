@@ -47,7 +47,10 @@ final class _FakeTpmBackend implements TpmBackend {
 
 void main() {
   test('a TPM device key reports es256', () {
-    expect(TpmDeviceKey(_FakeTpmBackend(realPem, realDerSig)).algorithm, 'es256');
+    expect(
+      TpmDeviceKey(_FakeTpmBackend(realPem, realDerSig)).algorithm,
+      'es256',
+    );
   });
 
   test('it exposes the TPM public key as base64url SPKI DER', () async {

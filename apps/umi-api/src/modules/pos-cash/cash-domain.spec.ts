@@ -4,6 +4,7 @@ import {
   calculateVariance,
   cashEntryEffect,
   canTransitionShift,
+  closeNeedsApproval,
 } from './cash-domain';
 
 describe('Gate 3C cash domain', () => {
@@ -153,5 +154,17 @@ describe('Gate 3C cash domain', () => {
     expect(canTransitionShift('reconciliation_required', 'closing')).toBe(true);
     expect(canTransitionShift('closing', 'closed')).toBe(true);
     expect(canTransitionShift('closed', 'suspended')).toBe(false);
+  });
+
+  it('gates the close approval on the over/short, never on the drawer size', () => {
+    // The two cases the inverted comparison got wrong. A busy drawer with an
+    // exact count is nobody's approval; a small drawer with a large over/short
+    // is the manager's business whatever it holds.
+    const threshold = 500; // MX$5.00, the seeded policy
+    expect(closeNeedsApproval(0, threshold)).toBe(false);
+    expect(closeNeedsApproval(499, threshold)).toBe(false);
+    expect(closeNeedsApproval(501, threshold)).toBe(true);
+    // The caller passes a magnitude: a shortage of MX$15.00 is 1,500 here.
+    expect(closeNeedsApproval(1_500, threshold)).toBe(true);
   });
 });

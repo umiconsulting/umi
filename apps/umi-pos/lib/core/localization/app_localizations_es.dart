@@ -533,7 +533,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noReceiptAction => 'Sin recibo';
 
   @override
-  String get managerApprovalAction => 'Solicitar aprobación';
+  String get managerApprovalAction => 'Autorizar';
 
   @override
   String get managerApprovalTitle => 'Se requiere aprobación del gerente';
@@ -1876,4 +1876,264 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get inventoryUnitBox => 'caja';
+
+  @override
+  String get adoptShiftCardTitle => 'Recuperar el turno';
+
+  @override
+  String get cashShiftCardTitle => 'El turno';
+
+  @override
+  String get cashOpenedAtLabel => 'Abierto';
+
+  @override
+  String get openingFloatRequiredHint =>
+      'El fondo inicial no puede quedar en cero.';
+
+  @override
+  String get cashEquationLabel => 'La cuenta del cajón';
+
+  @override
+  String get cashExpectedHiddenLabel => 'Se revela al contar';
+
+  @override
+  String get cashExpectedHiddenHint =>
+      'El conteo ciego esconde el esperado hasta que envías tu conteo.';
+
+  @override
+  String get cashSalesLabel => 'Ventas en efectivo';
+
+  @override
+  String get cashPaidInLabel => 'Ingresos';
+
+  @override
+  String get cashPaidOutLabel => 'Retiros';
+
+  @override
+  String get cashSafeDropLabel => 'Caja fuerte';
+
+  @override
+  String get cashAdjustmentsLabel => 'Ajustes';
+
+  @override
+  String get cashPolicyLabel => 'Política de la caja';
+
+  @override
+  String get cashPolicyCountLabel => 'Conteo';
+
+  @override
+  String get cashPolicyAllowLabel => 'Permitido';
+
+  @override
+  String get cashBlindCountOnLabel => 'Conteo ciego';
+
+  @override
+  String get cashBlindCountOffLabel => 'Conteo visible';
+
+  @override
+  String get cashOfflineRequiredLabel => 'Requiere conexión';
+
+  @override
+  String get cashCloseApprovalLabel => 'PIN cierre: diferencia >';
+
+  @override
+  String get cashMovementApprovalLabel => 'PIN movimiento desde';
+
+  @override
+  String get cashJournalLabel => 'Libro del turno';
+
+  @override
+  String get cashStepCountDetail =>
+      'Cuenta las denominaciones del cajón y envía el total.';
+
+  @override
+  String get cashStepVarianceDetail =>
+      'Explica la diferencia para que quede en el historial.';
+
+  @override
+  String get cashStepReconcileDetail =>
+      'El sistema compara el esperado contra el contado.';
+
+  @override
+  String get cashStepCloseDetail =>
+      'El cierre es definitivo; el turno deja de aceptar efectivo.';
+
+  @override
+  String get cashJournalEmptyMessage => 'Sin movimientos todavía.';
+
+  @override
+  String get cashCountObservationLabel => 'Arqueo';
+
+  @override
+  String get cashVarianceResolutionLabel => 'Resolución de diferencia';
+
+  @override
+  String get cashCloseAdjustmentLabel => 'Ajuste de cierre';
+
+  @override
+  String get cancelCountAction => 'Cancelar conteo y volver a abierto';
+
+  @override
+  String get cancelCountMessage =>
+      'El conteo queda en el historial. El cajón vuelve a aceptar efectivo.';
+
+  @override
+  String get cashVarianceTitle => 'Arqueo del cajón';
+
+  @override
+  String get cashVarianceBalancedLabel => 'Sin diferencia';
+
+  @override
+  String get cashVarianceWithinToleranceLabel => 'Dentro de tolerancia';
+
+  @override
+  String get cashVarianceOutsideToleranceLabel => 'Fuera de tolerancia';
+
+  @override
+  String get cashPolicyMaxFloatLabel => 'Fondo máximo';
+
+  @override
+  String get cashMovementReasonHint => 'Ej. compra de hielo';
+
+  @override
+  String cashMovementApprovalHint(String amount) {
+    return 'A partir de $amount se pide el PIN del encargado.';
+  }
+
+  @override
+  String get noSaleDialogHint =>
+      'Abrir el cajón sin venta queda en el historial con tu operador y el motivo.';
+
+  @override
+  String get handoffDialogHint =>
+      'El turno pasa al operador entrante. El cajón no se mueve.';
+
+  @override
+  String get countDialogBlindHint =>
+      'Conteo ciego: el esperado se revela cuando envías tu conteo.';
+
+  @override
+  String countDialogRecountHint(int attempt) {
+    return 'Reconteo $attempt: este conteo reemplaza al anterior en el historial.';
+  }
+
+  @override
+  String get cashUnavailableTitle => 'No se pudo leer el cajón';
+
+  @override
+  String get cashUnavailableHint =>
+      'Revisa la conexión y vuelve a intentar. Si sigue fallando, avisa al encargado antes de cobrar en efectivo.';
+
+  @override
+  String get cashStatusReadyToClose => 'Listo para cerrar';
+
+  @override
+  String get closeDialogApprovalHint =>
+      'Este cierre pide el PIN del encargado.';
+
+  @override
+  String denominationQuantityLabel(String amount) {
+    return 'Cantidad de $amount';
+  }
+
+  @override
+  String get cashLastReadLabel => 'Actualizado';
+
+  @override
+  String get cashLedgerSequenceLabel => 'Secuencia del libro';
+
+  @override
+  String get cashReadOnlyTitle => 'Solo consulta';
+
+  @override
+  String get cashReadOnlyMessage =>
+      'Con tus permisos actuales no hay acciones de caja para este turno. Puedes consultar la cuenta del cajón y el libro del turno; si necesitas mover efectivo o cerrar el turno, pídeselo a un encargado.';
+
+  @override
+  String get cashDrawerUnansweredMessage =>
+      'El cajón no respondió. La operación quedó registrada; ábrelo a mano y avisa al encargado.';
+
+  @override
+  String get cashPolicyUndefinedLabel => 'Sin definir';
+
+  @override
+  String get cashPolicyExpiredTitle => 'La política de caja venció';
+
+  @override
+  String get cashPolicyExpiredMessage =>
+      'Esta terminal no puede mover efectivo, contar ni cerrar hasta que el propietario publique una política vigente. El dinero del cajón no se toca.';
+
+  @override
+  String get cashPolicyExpiresAtLabel => 'Vigente hasta';
+
+  @override
+  String get cashPolicyVersionLabel => 'Versión';
+
+  @override
+  String get cashOfflineLabel => 'Efectivo sin conexión';
+
+  @override
+  String get cashOfflineUnavailableLabel => 'No disponible aún';
+
+  @override
+  String get movementReasonRequiredMessage =>
+      'Escribe el motivo del movimiento.';
+
+  @override
+  String cashMovementApprovalScope(String operation, String amount) {
+    return 'Vas a aprobar $operation de $amount.';
+  }
+
+  @override
+  String get managerApprovalEyebrow => 'Vas a autorizar';
+
+  @override
+  String get managerApprovalCancelAction => 'Cancelar movimiento';
+
+  @override
+  String get managerApprovalPinHint => 'El encargado teclea su PIN.';
+
+  @override
+  String get openShiftOnStrandedDrawerMessage =>
+      'Esta caja quedó retenida por una terminal que ya no existe. Si abres el turno aquí, el turno anterior queda bloqueado y sin contar: el dinero sigue en el cajón.';
+
+  @override
+  String get cashVarianceNoApprovalLabel => 'Sin aprobación';
+
+  @override
+  String get cashVarianceApprovalRequiredLabel => 'Pide aprobación';
+
+  @override
+  String get managerApprovalPinLocked =>
+      'El PIN está bloqueado en esta caja unos minutos. Ningún encargado podrá autorizar hasta que termine el bloqueo.';
+
+  @override
+  String get managerApprovalPinRefused =>
+      'Ese PIN no autoriza este movimiento. Prueba con otro encargado; si nadie tiene PIN en esta caja, pide a un administrador que lo dé de alta.';
+
+  @override
+  String get managerApprovalDrawerEffectTitle => 'Efecto en el cajón';
+
+  @override
+  String get managerApprovalDrawerNow => 'En el cajón ahora';
+
+  @override
+  String get managerApprovalDrawerAfter => 'Después de este movimiento';
+
+  @override
+  String tableStatePanelTitle(String table) {
+    return 'Mesa $table';
+  }
+
+  @override
+  String get tableStatePanelEmpty => 'Toca una mesa para ver su detalle.';
+
+  @override
+  String get tableStatePanelActions => 'Acciones';
+
+  @override
+  String get tableStateElapsedField => 'Tiempo';
+
+  @override
+  String get tableStateGroupField => 'Grupo';
 }

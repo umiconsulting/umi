@@ -37,8 +37,10 @@ final class _FakeKeystore implements HardwareKeystore {
 
 void main() {
   test('a keystore device key reports es256', () {
-    expect(KeystoreDeviceKey(_FakeKeystore(realSpkiDer, realDerSig)).algorithm,
-        'es256');
+    expect(
+      KeystoreDeviceKey(_FakeKeystore(realSpkiDer, realDerSig)).algorithm,
+      'es256',
+    );
   });
 
   test('it encodes SPKI DER bytes from the keystore as base64url', () async {

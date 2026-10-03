@@ -48,6 +48,11 @@ abstract interface class CashRepository {
     String shiftId,
     RecountRequest request,
   );
+  Future<CashShift> cancelCount(
+    String merchantId,
+    String shiftId,
+    CancelCashCountRequest request,
+  );
   Future<CashVarianceResolution> resolve(
     String merchantId,
     String shiftId,
@@ -220,6 +225,20 @@ final class ApiCashRepository implements CashRepository {
     await _api.request(
       method: ApiMethod.post,
       path: UmiRoutes.posCashRecount(merchantId, shiftId),
+      body: request.toJson(),
+      idempotent: true,
+    ),
+  );
+
+  @override
+  Future<CashShift> cancelCount(
+    String merchantId,
+    String shiftId,
+    CancelCashCountRequest request,
+  ) async => CashShift.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posCashCountCancel(merchantId, shiftId),
       body: request.toJson(),
       idempotent: true,
     ),

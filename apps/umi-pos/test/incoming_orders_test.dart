@@ -52,7 +52,10 @@ final class _Repo implements CartRepository {
   }
 
   @override
-  Future<Cart> bindOrigin(String merchantId, BindCartOriginRequest input) async {
+  Future<Cart> bindOrigin(
+    String merchantId,
+    BindCartOriginRequest input,
+  ) async {
     lastBind = input;
     return _cart();
   }
@@ -67,8 +70,11 @@ final class _Repo implements CartRepository {
   Future<Cart> add(String merchantId, CartLineInput input) async =>
       throw UnimplementedError();
   @override
-  Future<Cart> update(String merchantId, String lineId, CartLineInput input) async =>
-      throw UnimplementedError();
+  Future<Cart> update(
+    String merchantId,
+    String lineId,
+    CartLineInput input,
+  ) async => throw UnimplementedError();
   @override
   Future<Cart> remove(
     String merchantId,
@@ -113,23 +119,32 @@ void main() {
     );
   });
 
-  test('pickUp binds the active cart to the order and returns the bound cart', () async {
-    final repo = _Repo();
-    final controller = IncomingOrdersController(
-      repository: repo,
-      telemetry: _telemetry,
-    );
-    await controller.load('m', 'l', 'o');
+  test(
+    'pickUp binds the active cart to the order and returns the bound cart',
+    () async {
+      final repo = _Repo();
+      final controller = IncomingOrdersController(
+        repository: repo,
+        telemetry: _telemetry,
+      );
+      await controller.load('m', 'l', 'o');
 
-    final cart = _cart();
-    final bound = await controller.pickUp(cart, controller.state.orders.first);
+      final cart = _cart();
+      final bound = await controller.pickUp(
+        cart,
+        controller.state.orders.first,
+      );
 
-    expect(bound, isNotNull);
-    expect(repo.lastBind, isNotNull);
-    expect(repo.lastBind!.cartId, cart.id);
-    expect(repo.lastBind!.originOrderId, '00000000-0000-4000-8000-0000000000a1');
-    expect(repo.lastBind!.expectedVersion, cart.version);
-    expect(controller.state.phase, IncomingOrdersPhase.ready);
-    expect(controller.state.binding, isFalse);
-  });
+      expect(bound, isNotNull);
+      expect(repo.lastBind, isNotNull);
+      expect(repo.lastBind!.cartId, cart.id);
+      expect(
+        repo.lastBind!.originOrderId,
+        '00000000-0000-4000-8000-0000000000a1',
+      );
+      expect(repo.lastBind!.expectedVersion, cart.version);
+      expect(controller.state.phase, IncomingOrdersPhase.ready);
+      expect(controller.state.binding, isFalse);
+    },
+  );
 }
