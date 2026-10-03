@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getModuleAvailability, getVisibleModules } from './module-registry.js';
+import { getModuleAvailability, getVisibleModules, missingLocationFor } from './module-registry.js';
 import { i18n, activateTestLocale } from '@/test/i18n.jsx';
 
 const capabilities = (permissions) => ({
@@ -53,5 +53,37 @@ describe('Dashboard permission navigation', () => {
     );
     expect(english).toContain('Customers');
     activateTestLocale('es');
+  });
+});
+
+describe('a café with no locations', () => {
+  // Umi Cafe on the staging database is exactly this: a live, entitled merchant
+  // whose locations never came across in the backfill. The screen it opened
+  // rendered empty under a working shell, which read as a broken console.
+  const entitled = {
+    ...capabilities(['merchant.manage', 'kitchen.read', 'catalog.read']),
+    locations: [],
+  };
+
+  it('has nothing to read on a location-scoped screen', () => {
+    expect(missingLocationFor('floor-plan', entitled)).toBe(true);
+    expect(missingLocationFor('products', entitled)).toBe(true);
+    expect(missingLocationFor('orders', entitled)).toBe(true);
+  });
+
+  it('still renders the screens that are not scoped to a branch', () => {
+    expect(missingLocationFor('overview', entitled)).toBe(false);
+    expect(missingLocationFor('staff', entitled)).toBe(false);
+  });
+
+  it('says nothing when the café does have a location', () => {
+    const withLocation = { ...entitled, locations: [{ id: 'loc', status: 'active' }] };
+    expect(missingLocationFor('floor-plan', withLocation)).toBe(false);
+  });
+
+  it('leaves the no-café case to the guard that owns it', () => {
+    // No capabilities at all is "no café selected", not "no locations".
+    expect(missingLocationFor('floor-plan', undefined)).toBe(false);
+    expect(missingLocationFor('floor-plan', {})).toBe(false);
   });
 });

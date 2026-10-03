@@ -6,7 +6,7 @@ import { applyMerchantLocale, activateLocale } from '@/lib/i18n.js';
 
 import { useAuth, signOut } from '@/lib/auth.jsx';
 import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
-import { MODULES } from '@/lib/module-registry.js';
+import { MODULES, missingLocationFor } from '@/lib/module-registry.js';
 import { landingRouteFor } from '@/lib/role-landing.js';
 import { I } from '@/icons.jsx';
 import {
@@ -161,6 +161,30 @@ function MerchantUnavailable({ state }) {
 }
 
 /**
+ * Says why a screen that reads per branch has nothing to read.
+ *
+ * The café is entitled to the screen and the sidebar is working, so nothing is
+ * broken — the café simply has no locations yet. Saying so is the whole point:
+ * without it the operator got an empty page under a working shell.
+ */
+function LocationUnavailable({ state }) {
+  const { t } = useLingui();
+  const name = state?.capabilities?.merchant?.name;
+  return (
+    <div className="card" style={{ padding: '38px 34px' }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
+        {name
+          ? t`${name} todavía no tiene sucursales`
+          : t`Este negocio todavía no tiene sucursales`}
+      </h2>
+      <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
+        {t`Los planos, el catálogo y las ventas se guardan por sucursal, así que esta pantalla necesita una. Crea la primera sucursal para este negocio y vuelve aquí.`}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Refuses a screen the selected café is not entitled to.
  *
  * The label and the product name come from MODULES, not from the route: they were
@@ -185,6 +209,10 @@ function GuardedScreen({ moduleKey, children }) {
         product={PRODUCT_LABELS[mod.product] || mod.product || undefined}
       />
     );
+  }
+  // Entitled, but a screen that reads per branch has no branch to read.
+  if (missingLocationFor(moduleKey, merchantState?.capabilities)) {
+    return <LocationUnavailable state={merchantState} />;
   }
   return children;
 }
