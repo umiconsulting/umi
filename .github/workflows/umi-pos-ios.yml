@@ -12,9 +12,11 @@ name: umi-pos ios
 #
 # An unbuilt target is not a supported target. This is the cheapest way to find
 # out which it is: `--no-codesign` needs NO Apple secrets, so it can run on every
-# pull request, and it fails on the two things already known to be wrong —
-# `ios/Runner` has no entitlements file at all, and its deployment target is
-# iOS 13.0 against Flutter's iOS 15 floor.
+# pull request. It compiles the whole Runner, the Swift Secure Enclave signer
+# included, and it parses the entitlement that signer needs. One known defect is
+# reported, not fixed here: the deployment target is iOS 13.0 against Flutter's
+# iOS 15 floor. `--no-codesign` does NOT apply the entitlement — the signed
+# TestFlight workflow is where the keychain access group is exercised.
 #
 # HOW TO BUILD ON A LINUX MACHINE
 # You do not need a Mac. GitHub runs this on an Apple-silicon machine for you:

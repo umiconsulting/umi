@@ -84,18 +84,24 @@ Labels: **Documented fact**, **Source-backed tradeoff**, **Inference**, **UNVERI
 
 **Inference.** One CI job, three steps, in this order.
 
-1. **Prove it compiles.** `flutter build ios --no-codesign` on a macOS runner. This is the cheapest useful result, because nothing has ever built the iOS target. It also fails loudly on the two known gaps: the missing iOS entitlements file and the iOS 13.0 deployment target that sits below Flutter's iOS 15 floor.
+1. **Prove it compiles.** `flutter build ios --no-codesign` on a macOS runner. This is the cheapest useful result, because nothing has ever built the iOS target. When this was written it failed loudly on two known gaps: there was no iOS entitlements file, and the deployment target is iOS 13.0, below Flutter's iOS 15 floor.
 2. **Sign and upload.** `flutter build ipa`, then upload to App Store Connect with an API key.
 3. **Install and test.** TestFlight internal testing on the real iPhone.
 
+**Update, later the same day.** Step 1 ran and went green (run 37144730213). `Runner.entitlements` now exists and is wired through `CODE_SIGN_ENTITLEMENTS` on all three Runner configurations; it carries the keychain access group the Secure Enclave signer stores the device key in, so a session cannot be duplicated onto a second device. The iOS 13.0 deployment target remains and is a decision, not a build blocker.
+
+**Inference.** Signing adds a requirement the compile job does not have: the App ID must allow Keychain Sharing. `flutter build ipa` signs with `-allowProvisioningUpdates`, so Xcode adds the capability to the App ID from the App Manager key on the first run. A key whose role may not edit App IDs would have to have the capability enabled by hand.
+
 The job needs four secrets, all from the Apple Developer account:
 
-| Secret                                               | Where it comes from                                       |
-| ---------------------------------------------------- | --------------------------------------------------------- |
-| App Store Connect API key (`.p8`, key id, issuer id) | App Store Connect, Users and Access, Integrations         |
-| Distribution certificate (`.p12` plus password)      | Apple Developer portal, or `xcodebuild` on a macOS runner |
-| Provisioning profile                                 | Apple Developer portal                                    |
-| Apple team id                                        | Apple Developer portal, Membership                        |
+| Secret                                  | Where it comes from                               |
+| --------------------------------------- | ------------------------------------------------- |
+| App Store Connect key id (`ASC_KEY_ID`) | App Store Connect, Users and Access, Integrations |
+| The `.p8` file (`ASC_KEY_P8`)           | Same place; the key downloads once                |
+| Issuer id (`ASC_ISSUER_ID`)             | Shown beside the key                              |
+| Apple team id (`ASC_TEAM_ID`)           | Apple Developer portal, Membership                |
+
+**Inference.** There is no `.p12` and no provisioning profile in these secrets. Automatic signing creates both on the runner from the App Manager key, which is why the key needs that role and nothing else.
 
 **Inference.** Step 1 alone is worth doing today. It is free, it needs no Apple secrets, and it answers a question that is currently open: does the iOS target compile at all?
 

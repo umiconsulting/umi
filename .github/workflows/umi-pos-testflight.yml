@@ -25,6 +25,16 @@ name: umi-pos testflight
 # App Manager role. Nothing else is needed: automatic signing creates the
 # distribution certificate and the provisioning profile on the runner from the
 # key itself, which is why there is no .p12 and no profile in these secrets.
+#
+# WHAT THE FIRST SIGNED BUILD NEEDS THAT THE COMPILE JOB DOES NOT
+# The Runner carries `Runner/Runner.entitlements`, holding the keychain access
+# group the Secure Enclave signer stores the device key in. Signing therefore
+# needs the App ID `co.umiconsulting.umiPos` to allow Keychain Sharing. Nothing
+# has to be clicked for that: `flutter build ipa` signs with
+# `-allowProvisioningUpdates`, so Xcode adds the capability to the App ID from
+# the App Manager key on the first run. If that is refused — an API key whose
+# role may not edit App IDs — enable Keychain Sharing on the App ID under
+# Certificates, Identifiers and Profiles, then dispatch this workflow again.
 on:
   workflow_dispatch:
     inputs:
