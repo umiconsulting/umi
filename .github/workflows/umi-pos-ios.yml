@@ -18,6 +18,11 @@ name: umi-pos ios
 # iOS 15 floor. `--no-codesign` does NOT apply the entitlement — the signed
 # TestFlight workflow is where the keychain access group is exercised.
 #
+# The defines below deliberately omit `UMIPOS_DEVICE_KEY=keystore`. The
+# artifact is for a simulator, a simulator has no Secure Enclave, and the
+# keystore backend would fail at the key instead of opening. The signed
+# TestFlight build sets it.
+#
 # HOW TO BUILD ON A LINUX MACHINE
 # You do not need a Mac. GitHub runs this on an Apple-silicon machine for you:
 # macOS 3-core (M1). Signing and installing are a later step; see

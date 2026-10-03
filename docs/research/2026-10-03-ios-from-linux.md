@@ -92,6 +92,8 @@ Labels: **Documented fact**, **Source-backed tradeoff**, **Inference**, **UNVERI
 
 **Inference.** Signing adds a requirement the compile job does not have: the App ID must allow Keychain Sharing. `flutter build ipa` signs with `-allowProvisioningUpdates`, so Xcode adds the capability to the App ID from the App Manager key on the first run. A key whose role may not edit App IDs would have to have the capability enabled by hand.
 
+**Documented fact.** The Secure Enclave backend is opt-in. `apps/umi-pos/lib/core/config/app_config.dart` reads `UMIPOS_DEVICE_KEY`, and only the value `keystore` selects `KeystoreDeviceKey(MethodChannelKeystore())`; the default is the software Ed25519 key. Nothing in the repository set that define when this was written, so a shipped build would have used the software key and the entitlement would not have been exercised. The signed workflow now passes `--dart-define=UMIPOS_DEVICE_KEY=keystore`, and the simulator artifact deliberately does not, because a simulator has no Secure Enclave.
+
 The job needs four secrets, all from the Apple Developer account:
 
 | Secret                                  | Where it comes from                               |

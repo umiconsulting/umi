@@ -35,6 +35,13 @@ name: umi-pos testflight
 # the App Manager key on the first run. If that is refused — an API key whose
 # role may not edit App IDs — enable Keychain Sharing on the App ID under
 # Certificates, Identifiers and Profiles, then dispatch this workflow again.
+#
+# The build passes `UMIPOS_DEVICE_KEY=keystore`, so the till signs with the key
+# in the Secure Enclave rather than the software key that runs everywhere. An
+# iPhone always has a Secure Enclave, so this is the backend a real till wants.
+# The simulator artifact from the compile job deliberately does NOT set it: a
+# simulator has no Secure Enclave, and the build would fail at the key rather
+# than open.
 on:
   workflow_dispatch:
     inputs:
@@ -159,6 +166,7 @@ jobs:
             --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
             --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
             --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true \
+            --dart-define=UMIPOS_DEVICE_KEY=keystore \
             --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
             --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
             --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
