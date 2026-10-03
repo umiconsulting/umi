@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The device key is what makes one till one till. It is generated inside the
+	     Secure Enclave and never leaves it, so the private half cannot be copied to
+	     a second device and a session cannot be duplicated on one. Keychain items
+	     belong to a keychain access group, and this is that group: without it the
+	     signer has nowhere to store the key, so it cannot create one, and the till
+	     falls back to an identity that a copy could carry away.
+
+	     Enabling Keychain Sharing in Xcode writes exactly this entitlement. With
+	     automatic signing the App ID gains the capability on the first build, which
+	     is what the TestFlight workflow relies on. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)co.umiconsulting.umiPos</string>
+	</array>
+</dict>
+</plist>
