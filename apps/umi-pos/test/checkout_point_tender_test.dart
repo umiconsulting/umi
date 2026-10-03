@@ -532,6 +532,7 @@ Future<_Sheet> _openSheet(
   Duration pollStart = const Duration(seconds: 10),
   Duration pollCap = const Duration(seconds: 10),
   Duration waitBound = const Duration(seconds: 60),
+  DateTime Function() now = DateTime.now,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(1280, 3200);
@@ -585,6 +586,7 @@ Future<_Sheet> _openSheet(
               cardTerminalPollStart: pollStart,
               cardTerminalPollCap: pollCap,
               cardTerminalWaitBound: waitBound,
+              now: now,
             ),
             child: const Text('open'),
           ),
@@ -1150,18 +1152,23 @@ void main() {
               'providerPaymentId': null,
             },
           ]);
+    // The bound is wall-clock, and `pump` moves only the fake clock, so the test
+    // moves the clock the surface reads. Otherwise the bound never arrives.
+    var clock = DateTime.parse('2026-09-16T18:00:00.000Z');
     final sheet = await _openSheet(
       tester,
       repository,
       pollStart: const Duration(milliseconds: 20),
       pollCap: const Duration(milliseconds: 20),
       waitBound: const Duration(milliseconds: 60),
+      now: () => clock,
     );
 
     await tester.tap(sheet.cardTile);
     await tester.pumpAndSettle();
     await tester.tap(sheet.chargeButton);
     await tester.pump();
+    clock = clock.add(const Duration(seconds: 5));
     await tester.pump(const Duration(milliseconds: 200));
     await tester.pump();
 

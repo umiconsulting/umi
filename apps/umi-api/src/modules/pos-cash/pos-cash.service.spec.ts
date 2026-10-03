@@ -520,4 +520,72 @@ describe('Gate 3C cash application boundary', () => {
     expect(repo.recover).not.toHaveBeenCalled();
     expect(cashierPermissions).not.toContain('cash.variance.approve');
   });
+
+  it('lets the counter undo a count the ledger has not moved past', async () => {
+    const audits: Array<Record<string, unknown>> = [];
+    const repo = {
+      authorize: vi.fn().mockResolvedValue(authorization),
+      cancelCount: vi.fn().mockResolvedValue({ id: id(9), status: 'open' }),
+    };
+    const integrity = {
+      execute: vi.fn(async (input, operation) => {
+        const outcome = await operation({
+          client: {},
+          commandId: input.commandId,
+          correlationId: 'cash-cancel-count',
+          appendAudit: vi.fn(async (entry: Record<string, unknown>) => audits.push(entry)),
+        });
+        return { status: 'succeeded', result: outcome.value, failureCode: null };
+      }),
+    };
+    const service = new PosCashService(repo as never, integrity as never);
+    const result = await service.cancelCount(user, id(5), id(9), {
+      locationId: id(6),
+      shiftId: id(9),
+      operatorSessionId: id(4),
+      expectedShiftVersion: 3,
+      expectedLedgerSequence: 2,
+      reasonCode: 'count_opened_in_error',
+      commandId: id(7),
+      idempotencyKey: id(10),
+    });
+
+    expect(repo.authorize).toHaveBeenCalledWith(id(1), id(2), id(3), id(5), id(6), id(4));
+    expect(integrity.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ commandType: 'pos.cash.count.cancel' }),
+      expect.anything(),
+    );
+    expect(result).toMatchObject({ status: 'open' });
+    expect(audits).toMatchObject([
+      {
+        eventType: 'cash.count_cancelled',
+        entityId: id(9),
+        reasonCode: 'count_opened_in_error',
+        publicData: { ledgerSequence: 2 },
+      },
+    ]);
+  });
+
+  it('asks for the count authority, not the closing one, to undo a count', async () => {
+    // A role that may count may undo a count. A role that may not count cannot.
+    const repo = {
+      authorize: vi.fn().mockResolvedValue({ ...authorization, permissions: [] }),
+      cancelCount: vi.fn(),
+    };
+    const service = new PosCashService(repo as never, { execute: vi.fn() } as never);
+    await expect(
+      service.cancelCount(user, id(5), id(9), {
+        locationId: id(6),
+        shiftId: id(9),
+        operatorSessionId: id(4),
+        expectedShiftVersion: 3,
+        expectedLedgerSequence: 2,
+        reasonCode: 'count_opened_in_error',
+        commandId: id(7),
+        idempotencyKey: id(10),
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(repo.cancelCount).not.toHaveBeenCalled();
+    expect(cashierPermissions).toContain('cash.count.submit');
+  });
 });

@@ -803,4 +803,176 @@
   ,"inventoryUnitPortion": "porción"
   ,"inventoryUnitPackage": "paquete"
   ,"inventoryUnitBox": "caja"
+  ,"adoptShiftCardTitle": "Recuperar el turno"
+  ,"cashShiftCardTitle": "El turno"
+  ,"cashOpenedAtLabel": "Abierto"
+  ,"openingFloatRequiredHint": "El fondo inicial no puede quedar en cero."
+  ,"cashEquationLabel": "La cuenta del cajón"
+  ,"cashExpectedHiddenLabel": "Se revela al contar"
+  ,"cashExpectedHiddenHint": "El conteo ciego esconde el esperado hasta que envías tu conteo."
+  ,"cashSalesLabel": "Ventas en efectivo"
+  ,"cashPaidInLabel": "Ingresos"
+  ,"cashPaidOutLabel": "Retiros"
+  ,"cashSafeDropLabel": "Caja fuerte"
+  ,"cashAdjustmentsLabel": "Ajustes"
+  ,"cashPolicyLabel": "Política de la caja"
+  ,"cashPolicyCountLabel": "Conteo"
+  ,"cashPolicyAllowLabel": "Permitido"
+  ,"cashBlindCountOnLabel": "Conteo ciego"
+  ,"cashBlindCountOffLabel": "Conteo visible"
+  ,"cashOfflineRequiredLabel": "Requiere conexión"
+  ,"cashCloseApprovalLabel": "PIN cierre: diferencia >"
+  ,"cashMovementApprovalLabel": "PIN movimiento desde"
+  ,"cashJournalLabel": "Libro del turno"
+  ,"cashStepCountDetail": "Cuenta las denominaciones del cajón y envía el total."
+  ,"cashStepVarianceDetail": "Explica la diferencia para que quede en el historial."
+  ,"cashStepReconcileDetail": "El sistema compara el esperado contra el contado."
+  ,"cashStepCloseDetail": "El cierre es definitivo; el turno deja de aceptar efectivo."
+  ,"cashJournalEmptyMessage": "Sin movimientos todavía."
+  ,"cashCountObservationLabel": "Arqueo"
+  ,"cashVarianceResolutionLabel": "Resolución de diferencia"
+  ,"cashCloseAdjustmentLabel": "Ajuste de cierre"
+  ,"cancelCountAction": "Cancelar conteo y volver a abierto"
+  ,"cancelCountMessage": "El conteo queda en el historial. El cajón vuelve a aceptar efectivo."
+  ,"cashVarianceTitle": "Arqueo del cajón"
+  ,"cashVarianceBalancedLabel": "Sin diferencia"
+  ,"cashVarianceWithinToleranceLabel": "Dentro de tolerancia"
+  ,"cashVarianceOutsideToleranceLabel": "Fuera de tolerancia"
+  ,"cashPolicyMaxFloatLabel": "Fondo máximo"
+  ,"cashMovementReasonHint": "Ej. compra de hielo"
+  ,"cashMovementApprovalHint": "A partir de {amount} se pide el PIN del encargado."
+  ,"@cashMovementApprovalHint": {
+    "description": "States the amount above which a cash movement needs a manager PIN, shown inside the movement dialog.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"noSaleDialogHint": "Abrir el cajón sin venta queda en el historial con tu operador y el motivo."
+  ,"handoffDialogHint": "El turno pasa al operador entrante. El cajón no se mueve."
+  ,"countDialogBlindHint": "Conteo ciego: el esperado se revela cuando envías tu conteo."
+  ,"countDialogRecountHint": "Reconteo {attempt}: este conteo reemplaza al anterior en el historial."
+  ,"@countDialogRecountHint": {
+    "description": "Shown in the blind-count dialog when this count replaces an earlier one.",
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      }
+    }
+  }
+  ,"cashUnavailableTitle": "No se pudo leer el cajón"
+  ,"cashUnavailableHint": "Revisa la conexión y vuelve a intentar. Si sigue fallando, avisa al encargado antes de cobrar en efectivo."
+  ,"cashStatusReadyToClose": "Listo para cerrar"
+  ,"closeDialogApprovalHint": "Este cierre pide el PIN del encargado."
+  ,"denominationQuantityLabel": "Cantidad de {amount}"
+  ,"@denominationQuantityLabel": {
+    "description": "Accessible name of the quantity field for one cash denomination.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"cashLastReadLabel": "Actualizado"
+  ,"cashLedgerSequenceLabel": "Secuencia del libro"
+  ,"cashReadOnlyTitle": "Solo consulta"
+  ,"cashReadOnlyMessage": "Con tus permisos actuales no hay acciones de caja para este turno. Puedes consultar la cuenta del cajón y el libro del turno; si necesitas mover efectivo o cerrar el turno, pídeselo a un encargado."
+  ,"cashDrawerUnansweredMessage": "El cajón no respondió. La operación quedó registrada; ábrelo a mano y avisa al encargado."
+  ,"cashPolicyUndefinedLabel": "Sin definir"
+  ,"cashPolicyExpiredTitle": "La política de caja venció"
+  ,"cashPolicyExpiredMessage": "Esta terminal no puede mover efectivo, contar ni cerrar hasta que el propietario publique una política vigente. El dinero del cajón no se toca."
+  ,"cashPolicyExpiresAtLabel": "Vigente hasta"
+  ,"cashPolicyVersionLabel": "Versión"
+  ,"cashOfflineLabel": "Efectivo sin conexión"
+  ,"cashOfflineUnavailableLabel": "No disponible aún"
+  ,"movementReasonRequiredMessage": "Escribe el motivo del movimiento."
+  ,"@movementReasonRequiredMessage": {
+    "description": "Error on the movement reason field when it is left empty."
+  }
+  ,"cashMovementApprovalScope": "Vas a aprobar {operation} de {amount}."
+  ,"@cashMovementApprovalScope": {
+    "description": "Says what a manager is being asked to approve: the operation and its amount.",
+    "placeholders": {
+      "operation": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "managerApprovalEyebrow": "Vas a autorizar"
+  ,"@managerApprovalEyebrow": {
+    "description": "Small label above the operation in the manager approval dialog."
+  }
+  ,"managerApprovalAction": "Autorizar"
+  ,"@managerApprovalAction": {
+    "description": "Primary button in the manager approval dialog. Names the act, not just 'confirm'."
+  }
+  ,"managerApprovalCancelAction": "Cancelar movimiento"
+  ,"@managerApprovalCancelAction": {
+    "description": "Secondary button in the manager approval dialog. Abandons the movement, not the screen."
+  }
+  ,"managerApprovalPinHint": "El encargado teclea su PIN."
+  ,"@managerApprovalPinHint": {
+    "description": "Says who is expected to enter the PIN in the approval dialog."
+  },
+  "@openShiftOnStrandedDrawerMessage": {
+    "description": "Says what opening a shift does when the chosen drawer was left behind by a terminal that no longer exists: the previous shift is blocked, uncounted, and the money stays in the drawer."
+  },
+  "openShiftOnStrandedDrawerMessage": "Esta caja quedó retenida por una terminal que ya no existe. Si abres el turno aquí, el turno anterior queda bloqueado y sin contar: el dinero sigue en el cajón.",
+  "cashVarianceNoApprovalLabel": "Sin aprobación",
+  "cashVarianceApprovalRequiredLabel": "Pide aprobación",
+  "@cashVarianceNoApprovalLabel": {
+    "description": "Says the over/short is inside the policy's tolerance, so the close will not ask a manager for a PIN."
+  },
+  "@cashVarianceApprovalRequiredLabel": {
+    "description": "Says the over/short is outside the policy's tolerance, so the close will ask a manager for a PIN."
+  },
+  "managerApprovalPinLocked": "El PIN está bloqueado en esta caja unos minutos. Ningún encargado podrá autorizar hasta que termine el bloqueo.",
+  "@managerApprovalPinLocked": {
+    "description": "The till itself is rate-limited: no credential on this device can authorize right now, so retrying is pointless."
+  },
+  "managerApprovalPinRefused": "Ese PIN no autoriza este movimiento. Prueba con otro encargado; si nadie tiene PIN en esta caja, pide a un administrador que lo dé de alta.",
+  "@managerApprovalPinRefused": {
+    "description": "The credential matched nothing. Names the two real possibilities: the wrong PIN, or a till with no manager credential enrolled at all."
+  },
+  "managerApprovalDrawerEffectTitle": "Efecto en el cajón",
+  "@managerApprovalDrawerEffectTitle": {
+    "description": "Heading over the two figures that show what the drawer holds now and what it will hold after the movement."
+  },
+  "managerApprovalDrawerNow": "En el cajón ahora",
+  "@managerApprovalDrawerNow": {
+    "description": "The expected cash in the drawer before the movement the manager is authorizing."
+  },
+  "managerApprovalDrawerAfter": "Después de este movimiento",
+  "@managerApprovalDrawerAfter": {
+    "description": "The expected cash in the drawer once the movement is booked."
+  },
+  "tableStatePanelTitle": "Mesa {table}",
+  "@tableStatePanelTitle": {
+    "description": "Heading of the persistent table detail panel. Combines the word for table with the published table label.",
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  },
+  "tableStatePanelEmpty": "Toca una mesa para ver su detalle.",
+  "@tableStatePanelEmpty": {
+    "description": "Shown in the persistent detail panel before any table is selected."
+  },
+  "tableStatePanelActions": "Acciones",
+  "@tableStatePanelActions": {
+    "description": "Heading over the contextual table actions in the detail panel."
+  },
+  "tableStateElapsedField": "Tiempo",
+  "@tableStateElapsedField": {
+    "description": "Label of the row that shows how long a party has held the table."
+  },
+  "tableStateGroupField": "Grupo",
+  "@tableStateGroupField": {
+    "description": "Label of the row that shows how many tables one party holds."
+  }
 }

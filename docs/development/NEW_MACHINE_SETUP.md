@@ -52,12 +52,57 @@ Install these Linux packages on Pop!_OS or Ubuntu:
 sudo apt-get update
 sudo apt-get install -y docker.io docker-compose-v2 postgresql-client redis-tools \
   clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev \
-  libsecret-1-dev uidmap slirp4netns fuse-overlayfs
+  libsecret-1-dev libsecret-tools gnome-keyring uidmap slirp4netns fuse-overlayfs
 sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER"
 ```
 
 Sign out after the Docker group change. Sign in before you run Docker.
+
+### Secure storage for UmiPOS
+
+UmiPOS keeps its device credential in the platform credential service. On Linux that
+service is the freedesktop Secret Service. GNOME Keyring is the supported provider; read
+[the provider record](../architecture/2026-09-28-linux-secret-service-provider.md)
+before you select a different one.
+
+A GNOME desktop (Pop!_OS, Ubuntu desktop) already runs GNOME Keyring, and PAM unlocks it
+at login. A minimal or compositor-only session does neither. Install it and unlock it:
+
+```sh
+sudo pacman -S --needed gnome-keyring libsecret        # Arch
+sudo apt-get install -y gnome-keyring libsecret-tools  # Debian, Ubuntu, PoP!_OS
+
+# Start the session service and unlock the login keyring. An empty line is an empty
+# password, which stops every prompter.
+eval "$(printf '\n' | gnome-keyring-daemon --unlock --components=secrets)"
+```
+
+An empty password protects the credential by file permissions only. Use the login
+password with PAM unlock on shared or pilot hardware.
+
+The package arms a user socket, so the daemon starts on demand at later logins. Verify
+that once, after the next login: `scripts/local-secure-storage.sh` must print `OK`. Add
+PAM unlock if a prompter appears instead.
+
+Prove the provider answers before you start the till:
+
+```sh
+busctl --user list | grep org.freedesktop.secrets   # must name an owner
+printf 'probe\n' | secret-tool store --label=umi-probe app umi-probe
+secret-tool lookup app umi-probe                    # must print probe
+```
+
+`scripts/local-secure-storage.sh` runs the install, the unlock and the check. The default
+is the check alone, so it is safe to run at any time:
+
+```sh
+scripts/local-secure-storage.sh            # check only, change nothing
+scripts/local-secure-storage.sh --install  # install, start and unlock GNOME Keyring
+```
+
+The install path refuses to run while `ksecretd` is alive, because only one process may
+own `org.freedesktop.secrets`.
 
 Install the Android SDK and accept its licenses if Android work is in scope.
 
@@ -128,9 +173,10 @@ pnpm db:reset -- --yes     # drops, rebuilds, seeds, regenerates the contract
 
 It reads the database from `DATABASE_URL_APP` in `apps/umi-api/.env`, applies
 `docs/migration/build-v3/00_run.sh`, seeds the demo merchant and catalogue, seeds
-the local operator roles and PINs, and regenerates the contract. It **refuses**
-while an API is listening on 4001 or 4014, because rebuilding a schema under a
-running server leaves a session that half-works; pass `--force` when you mean it.
+the local operator roles and PINs, grants the platform administrator, and
+regenerates the contract. It **refuses** while an API is listening on 4001 or
+4014, because rebuilding a schema under a running server leaves a session that
+half-works; pass `--force` when you mean it.
 
 Use `--database NAME` to rebuild a scratch database instead of the one in
 `.env` — that is how the reset itself is tested without touching a shared
@@ -139,6 +185,27 @@ database:
 ```sh
 pnpm db:reset -- --database umi_probe --yes
 ```
+
+### The platform administrator
+
+The Dashboard needs one account with a platform role. That role lets the account
+see every cafe and switch between them. Without it the merchant picker shows one
+cafe, and no error explains why.
+
+`db:reset` grants the role to `hola@umiconsulting.co` and sets the local password.
+Use `--admin-email` to name another account, and `--no-admin` to skip this step.
+
+A database that another path built can lack the grant. Grant the role again with:
+
+```sh
+scripts/umi-local-platform-admin.sh
+scripts/umi-local-platform-admin.sh --email someone@example.com
+scripts/umi-local-platform-admin.sh --create --password secret
+```
+
+The script is idempotent. It stops with a clear message when the address matches
+no account. That silence is the trap: `seed_rbac.sql` grants nothing and raises
+nothing for an address it cannot match.
 
 The seeds in `scripts/` are assertions as much as inserts: they fail loudly when
 the data they expect is not there. If a reset stops inside one of them, read the

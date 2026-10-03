@@ -53,7 +53,10 @@ final class _FakeTableStateRepository implements TableStateRepository {
   MarkTableAwaitingPaymentRequest? awaitingPayment;
 
   @override
-  Future<TableStateMap> read(String merchantId, PosTableStateQuery query) async {
+  Future<TableStateMap> read(
+    String merchantId,
+    PosTableStateQuery query,
+  ) async {
     reads += 1;
     final failure = readFailure;
     if (failure != null) throw failure;
@@ -134,10 +137,9 @@ final class _FakeTableStateRepository implements TableStateRepository {
           (state) =>
               state['groupId'] != null &&
               state['groupId'] ==
-                  map.states
-                      .firstWhere(
-                        (item) => item['tableId'] == request.tableId,
-                      )['groupId'],
+                  map.states.firstWhere(
+                    (item) => item['tableId'] == request.tableId,
+                  )['groupId'],
         )
         .toList();
     final entries = [
@@ -280,23 +282,26 @@ void main() {
     expect(controller.partyPresent(t1), isFalse);
   });
 
-  test('seating a party carries the session and a fresh idempotency key', () async {
-    final readsBefore = repository.reads;
-    expect(await controller.seat(t1, 4), isTrue);
-    final request = repository.seated!;
-    expect(request.tableId, t1);
-    expect(request.partySize, 4);
-    expect(request.locationId, locationId);
-    expect(request.operatorSessionId, operatorSessionId);
-    expect(request.idempotencyKey.length, 36);
-    expect(request.idempotencyKey[14], '4');
-    // Every write is followed by a read of the room.
-    expect(repository.reads, greaterThan(readsBefore));
-    expect(controller.stateOf(t1).state, tableStateSeated);
-    expect(controller.partyPresent(t1), isTrue);
-    expect(controller.busy, isFalse);
-    expect(controller.errorCode, isNull);
-  });
+  test(
+    'seating a party carries the session and a fresh idempotency key',
+    () async {
+      final readsBefore = repository.reads;
+      expect(await controller.seat(t1, 4), isTrue);
+      final request = repository.seated!;
+      expect(request.tableId, t1);
+      expect(request.partySize, 4);
+      expect(request.locationId, locationId);
+      expect(request.operatorSessionId, operatorSessionId);
+      expect(request.idempotencyKey.length, 36);
+      expect(request.idempotencyKey[14], '4');
+      // Every write is followed by a read of the room.
+      expect(repository.reads, greaterThan(readsBefore));
+      expect(controller.stateOf(t1).state, tableStateSeated);
+      expect(controller.partyPresent(t1), isTrue);
+      expect(controller.busy, isFalse);
+      expect(controller.errorCode, isNull);
+    },
+  );
 
   test('two commands never reuse one idempotency key', () async {
     await controller.seat(t1, 2);
@@ -330,72 +335,87 @@ void main() {
     expect(controller.partyPresent(t1), isFalse);
   });
 
-  test('a merge writes every selected table with one group and a party size', () async {
-    expect(
-      await controller.merge(tableIds: [t1, t2, t3], partySize: 6),
-      isTrue,
-    );
-    expect(repository.merged!.tableIds, [t1, t2, t3]);
-    expect(repository.merged!.partySize, 6);
-    final group = controller.stateOf(t1).groupId;
-    expect(group, isNotNull);
-    expect(controller.stateOf(t2).groupId, group);
-    expect(controller.group(group!).length, 3);
-  });
+  test(
+    'a merge writes every selected table with one group and a party size',
+    () async {
+      expect(
+        await controller.merge(tableIds: [t1, t2, t3], partySize: 6),
+        isTrue,
+      );
+      expect(repository.merged!.tableIds, [t1, t2, t3]);
+      expect(repository.merged!.partySize, 6);
+      final group = controller.stateOf(t1).groupId;
+      expect(group, isNotNull);
+      expect(controller.stateOf(t2).groupId, group);
+      expect(controller.group(group!).length, 3);
+    },
+  );
 
-  test('a split keeps the party on the named table and dirties the rest', () async {
-    await controller.merge(tableIds: [t1, t2], partySize: 4);
-    expect(await controller.split(t1), isTrue);
-    expect(repository.splitRequest!.tableId, t1);
-    expect(controller.stateOf(t1).state, tableStateSeated);
-    expect(controller.stateOf(t1).groupId, isNull);
-    expect(controller.stateOf(t2).state, tableStateDirty);
-    expect(controller.partyPresent(t2), isFalse);
-  });
+  test(
+    'a split keeps the party on the named table and dirties the rest',
+    () async {
+      await controller.merge(tableIds: [t1, t2], partySize: 4);
+      expect(await controller.split(t1), isTrue);
+      expect(repository.splitRequest!.tableId, t1);
+      expect(controller.stateOf(t1).state, tableStateSeated);
+      expect(controller.stateOf(t1).groupId, isNull);
+      expect(controller.stateOf(t2).state, tableStateDirty);
+      expect(controller.partyPresent(t2), isFalse);
+    },
+  );
 
-  test('clearing a table marks it dirty and marking it ready opens it', () async {
-    await controller.seat(t1, 2);
-    expect(await controller.clearTable(t1), isTrue);
-    expect(repository.cleared!.tableId, t1);
-    expect(repository.cleared!.operatorSessionId, operatorSessionId);
-    expect(controller.stateOf(t1).state, tableStateDirty);
-    expect(tableIsFree(controller.stateOf(t1).state), isTrue);
-    expect(await controller.markReady(t1), isTrue);
-    expect(repository.opened!.tableId, t1);
-    expect(controller.stateOf(t1).state, tableStateOpen);
-  });
+  test(
+    'clearing a table marks it dirty and marking it ready opens it',
+    () async {
+      await controller.seat(t1, 2);
+      expect(await controller.clearTable(t1), isTrue);
+      expect(repository.cleared!.tableId, t1);
+      expect(repository.cleared!.operatorSessionId, operatorSessionId);
+      expect(controller.stateOf(t1).state, tableStateDirty);
+      expect(tableIsFree(controller.stateOf(t1).state), isTrue);
+      expect(await controller.markReady(t1), isTrue);
+      expect(repository.opened!.tableId, t1);
+      expect(controller.stateOf(t1).state, tableStateOpen);
+    },
+  );
 
-  test('marking a table ordered sends the food-in state and draws it', () async {
-    await controller.seat(t1, 2);
-    final readsBefore = repository.reads;
-    expect(await controller.markOrdered(t1), isTrue);
-    final request = repository.ordered!;
-    expect(request.tableId, t1);
-    expect(request.locationId, locationId);
-    expect(request.operatorSessionId, operatorSessionId);
-    expect(request.idempotencyKey.length, 36);
-    expect(request.idempotencyKey[14], '4');
-    // Every write is followed by a read of the room.
-    expect(repository.reads, greaterThan(readsBefore));
-    expect(controller.stateOf(t1).state, tableStateOrdered);
-    expect(controller.partyPresent(t1), isTrue);
-    expect(controller.busy, isFalse);
-    expect(controller.errorCode, isNull);
-  });
+  test(
+    'marking a table ordered sends the food-in state and draws it',
+    () async {
+      await controller.seat(t1, 2);
+      final readsBefore = repository.reads;
+      expect(await controller.markOrdered(t1), isTrue);
+      final request = repository.ordered!;
+      expect(request.tableId, t1);
+      expect(request.locationId, locationId);
+      expect(request.operatorSessionId, operatorSessionId);
+      expect(request.idempotencyKey.length, 36);
+      expect(request.idempotencyKey[14], '4');
+      // Every write is followed by a read of the room.
+      expect(repository.reads, greaterThan(readsBefore));
+      expect(controller.stateOf(t1).state, tableStateOrdered);
+      expect(controller.partyPresent(t1), isTrue);
+      expect(controller.busy, isFalse);
+      expect(controller.errorCode, isNull);
+    },
+  );
 
-  test('marking a table served sends the food-out state and draws it', () async {
-    await controller.seat(t1, 2);
-    expect(await controller.markServed(t1), isTrue);
-    final request = repository.served!;
-    expect(request.tableId, t1);
-    expect(request.locationId, locationId);
-    expect(request.operatorSessionId, operatorSessionId);
-    expect(request.idempotencyKey.length, 36);
-    expect(controller.stateOf(t1).state, tableStateServed);
-    expect(controller.partyPresent(t1), isTrue);
-    expect(controller.busy, isFalse);
-    expect(controller.errorCode, isNull);
-  });
+  test(
+    'marking a table served sends the food-out state and draws it',
+    () async {
+      await controller.seat(t1, 2);
+      expect(await controller.markServed(t1), isTrue);
+      final request = repository.served!;
+      expect(request.tableId, t1);
+      expect(request.locationId, locationId);
+      expect(request.operatorSessionId, operatorSessionId);
+      expect(request.idempotencyKey.length, 36);
+      expect(controller.stateOf(t1).state, tableStateServed);
+      expect(controller.partyPresent(t1), isTrue);
+      expect(controller.busy, isFalse);
+      expect(controller.errorCode, isNull);
+    },
+  );
 
   test('asking for the bill sends the awaiting-payment state', () async {
     await controller.seat(t1, 4);
@@ -433,17 +453,20 @@ void main() {
     );
   });
 
-  test('a service command with no party on the table is refused by name', () async {
-    repository.commandFailure = const AppException(
-      category: AppErrorCategory.conflict,
-      code: 'TABLE_NOT_OCCUPIED',
-      recoverable: false,
-    );
-    expect(await controller.markServed(t1), isFalse);
-    expect(controller.errorCode, 'TABLE_NOT_OCCUPIED');
-    expect(controller.stateOf(t1).state, tableStateOpen);
-    expect(controller.busy, isFalse);
-  });
+  test(
+    'a service command with no party on the table is refused by name',
+    () async {
+      repository.commandFailure = const AppException(
+        category: AppErrorCategory.conflict,
+        code: 'TABLE_NOT_OCCUPIED',
+        recoverable: false,
+      );
+      expect(await controller.markServed(t1), isFalse);
+      expect(controller.errorCode, 'TABLE_NOT_OCCUPIED');
+      expect(controller.stateOf(t1).state, tableStateOpen);
+      expect(controller.busy, isFalse);
+    },
+  );
 
   test('an AppException refusal is kept as a typed code', () async {
     repository.commandFailure = const AppException(
@@ -458,15 +481,20 @@ void main() {
     expect(controller.errorCode, isNull);
   });
 
-  test('a failure that is not an AppException still releases the surface', () async {
-    repository.commandFailure = const FormatException('a bigint arrived as text');
-    expect(await controller.seat(t1, 2), isFalse);
-    expect(controller.busy, isFalse);
-    expect(controller.errorCode, 'TABLE_OPERATION_FAILED');
-    // And the surface can still take the next command.
-    expect(await controller.seat(t1, 2), isTrue);
-    expect(controller.errorCode, isNull);
-  });
+  test(
+    'a failure that is not an AppException still releases the surface',
+    () async {
+      repository.commandFailure = const FormatException(
+        'a bigint arrived as text',
+      );
+      expect(await controller.seat(t1, 2), isFalse);
+      expect(controller.busy, isFalse);
+      expect(controller.errorCode, 'TABLE_OPERATION_FAILED');
+      // And the surface can still take the next command.
+      expect(await controller.seat(t1, 2), isTrue);
+      expect(controller.errorCode, isNull);
+    },
+  );
 
   test('a failed read keeps the last room and says it is stale', () async {
     await controller.seat(t1, 2);
@@ -479,28 +507,28 @@ void main() {
     expect(controller.stale, isFalse);
   });
 
-  test('the turn timer follows the server clock, not the device clock', () async {
-    var deviceNow = DateTime.parse('2019-01-01T00:00:00Z');
-    final anchored = TableStateController(repository, clock: () => deviceNow);
-    repository.map = room(
-      [
+  test(
+    'the turn timer follows the server clock, not the device clock',
+    () async {
+      var deviceNow = DateTime.parse('2019-01-01T00:00:00Z');
+      final anchored = TableStateController(repository, clock: () => deviceNow);
+      repository.map = room([
         entryJson(
           t1,
           tableStateSeated,
           seatedAt: '2026-09-16T17:30:00.000Z',
           partySize: 2,
         ),
-      ],
-      at: serverClock,
-    );
-    await anchored.load(merchantId, locationId, operatorSessionId);
-    // The device believes it is 2019; the room says the party sat down 30
-    // minutes ago, and that is what the surface must draw.
-    expect(anchored.elapsedOf(t1), const Duration(minutes: 30));
-    deviceNow = deviceNow.add(const Duration(minutes: 5));
-    expect(anchored.elapsedOf(t1), const Duration(minutes: 35));
-    anchored.dispose();
-  });
+      ], at: serverClock);
+      await anchored.load(merchantId, locationId, operatorSessionId);
+      // The device believes it is 2019; the room says the party sat down 30
+      // minutes ago, and that is what the surface must draw.
+      expect(anchored.elapsedOf(t1), const Duration(minutes: 30));
+      deviceNow = deviceNow.add(const Duration(minutes: 5));
+      expect(anchored.elapsedOf(t1), const Duration(minutes: 35));
+      anchored.dispose();
+    },
+  );
 
   test('the six states are the contract values and nothing else', () {
     expect(tablePartyStates, {
@@ -559,11 +587,10 @@ void main() {
     // The known codes are distinct, and only the unknown one shares a message.
     expect(messages.length, codes.length);
     expect(
-      describeTableStateFailure(
-        'TABLE_ALREADY_OCCUPIED',
-        spanish,
-      ).message,
-      isNot(describeTableStateFailure('TABLE_ALREADY_OCCUPIED', english).message),
+      describeTableStateFailure('TABLE_ALREADY_OCCUPIED', spanish).message,
+      isNot(
+        describeTableStateFailure('TABLE_ALREADY_OCCUPIED', english).message,
+      ),
     );
     expect(
       describeTableStateFailure('TABLE_NOT_OCCUPIED', english).recovery,

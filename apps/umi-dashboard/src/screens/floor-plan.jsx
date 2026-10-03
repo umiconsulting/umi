@@ -1112,6 +1112,60 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         </div>
         <aside className="card fp-properties" aria-label={t`Propiedades`}>
           <h2>{element ? t`Propiedades` : t`Área`}</h2>
+          {/* The same reading the till puts beside the map: the table, its
+              state in the till's own words, and the party on it. The dashboard
+              reads the room; seating, moving, and merging stay on the POS. */}
+          {element?.kind === 'table' &&
+            (() => {
+              const { entry, turn } = stateOf(element);
+              const visual = tableStateVisual(entry, palette.dark);
+              const groupSize = tableGroupSize(room, entry);
+              return (
+                <section className="fp-room-detail" aria-label={t`Estado de la mesa`}>
+                  <h3>
+                    {t`Mesa`} {element.label}
+                  </h3>
+                  <p
+                    className="fp-room-state"
+                    style={visual.accent ? { color: visual.accent } : undefined}
+                  >
+                    {stateWords[visual.state] ?? stateWords.open}
+                  </p>
+                  <dl>
+                    <div>
+                      <dt>
+                        <Trans>Capacidad</Trans>
+                      </dt>
+                      <dd>{element.capacity}</dd>
+                    </div>
+                    {visual.present && entry?.partySize ? (
+                      <div>
+                        <dt>
+                          <Trans>Personas</Trans>
+                        </dt>
+                        <dd>{entry.partySize}</dd>
+                      </div>
+                    ) : null}
+                    {turn ? (
+                      <div>
+                        <dt>
+                          <Trans>En mesa</Trans>
+                        </dt>
+                        <dd>{turn}</dd>
+                      </div>
+                    ) : null}
+                    {groupSize > 1 ? (
+                      <div>
+                        <dt>
+                          <Trans>Grupo</Trans>
+                        </dt>
+                        <dd>{groupSize}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </section>
+              );
+            })()}
           <fieldset disabled={controlsDisabled || !area}>
             <label>
               <Trans>Nombre</Trans>

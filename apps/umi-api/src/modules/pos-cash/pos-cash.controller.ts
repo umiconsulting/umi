@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import {
   AdoptCashShiftRequest,
+  CancelCashCountRequest,
   CashCenterQuery,
   CashCommandRecoveryQuery,
   CashMovementRequest,
@@ -87,6 +88,16 @@ export class PosCashController {
     @Body(new ZodValidationPipe(RecountRequest)) dto: RecountRequest,
   ) {
     return this.cash.recount(user, merchantId, shiftId, dto);
+  }
+
+  @Post('shifts/:shiftId/counts/cancel')
+  cancelCount(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('shiftId') shiftId: string,
+    @Body(new ZodValidationPipe(CancelCashCountRequest)) dto: CancelCashCountRequest,
+  ) {
+    return this.cash.cancelCount(user, merchantId, shiftId, dto);
   }
 
   @Post('shifts/:shiftId/variance')

@@ -133,7 +133,7 @@ Future<EntryController> readyEntryController() async {
 
 void main() {
   testWidgets(
-    'idle lock closes the map and its table dialog and clears the layout',
+    'idle lock closes the map and its table detail and clears the layout',
     (tester) async {
       final entry = EntryController(
         gateway: SessionGateway(),
@@ -230,14 +230,16 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('T1'));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      // A surface wide enough for the detail panel holds the table there. The
+      // map keeps the room on screen instead of covering it with a dialog.
+      expect(find.text('Table T1'), findsOneWidget);
+      expect(find.byType(FloorPlanMap), findsOneWidget);
       await tester.pump(const Duration(seconds: 31));
       await tester.pumpAndSettle();
       await route;
       expect(entry.state.phase, EntryPhase.pinRequired);
       expect(find.text('Operator PIN'), findsOneWidget);
       expect(find.byType(FloorPlanSurface), findsNothing);
-      expect(find.byType(AlertDialog), findsNothing);
       expect(controller.plan, isNull);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());

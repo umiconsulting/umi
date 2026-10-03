@@ -568,12 +568,21 @@ const Topbar = ({
               {netWord} · <Trans>reintentar</Trans>
             </button>
           )}
-          <span className="sep" aria-hidden="true">
-            ·
-          </span>
-          <span className="live" title={merchantName || merchant}>
-            {merchantName || merchant}
-          </span>
+          {/* The café's name, or nothing. This slot used to render whatever it
+              was handed, and the shell handed it the literal "Umi Dash" when
+              there was no café at all — so a missing session or a failed read
+              appeared as a real, differently-named tenant. A separator with
+              nothing after it is a smaller lie than a name nobody chose. */}
+          {merchantName || merchant ? (
+            <>
+              <span className="sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="live" title={merchantName || merchant}>
+                {merchantName || merchant}
+              </span>
+            </>
+          ) : null}
           {branchName ? (
             <>
               <span className="sep" aria-hidden="true">

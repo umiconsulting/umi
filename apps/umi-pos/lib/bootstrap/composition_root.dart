@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:umi_contract/umi_contract.dart';
 
 import '../core/config/app_config.dart';
 import '../core/contracts/contract_gateway.dart';
@@ -222,9 +223,11 @@ final class AppCompositionRoot {
             location == null ||
             operator == null ||
             posDevice == null) {
-          return;
+          // Nothing to ask: there is no device to ask it of. That is not a
+          // drawer that failed to answer.
+          return true;
         }
-        await hardware.afterCashAction(
+        final results = await hardware.afterCashAction(
           HardwareScope(
             merchantId: merchant.id,
             locationId: location.id,
@@ -237,6 +240,10 @@ final class AppCompositionRoot {
           reason: action.reason,
           reference: action.reference,
         );
+        // The runtime answers with one entry per command: the command result, or
+        // the error that stopped it. Anything that is not a command result is a
+        // drawer the operator is waiting on.
+        return results.every((result) => result is HardwareCommandResult);
       },
     );
     final cartRepository = ApiCartRepository(apiClient);

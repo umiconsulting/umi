@@ -113,6 +113,54 @@ function PlatformOnly({ moduleName }) {
 }
 
 /**
+ * Says why the console has no café to show.
+ *
+ * `ProductUnavailable` below answers "this café does not have that product".
+ * It was also answering three other questions, because a screen guard only ever
+ * asked `canShowModule` — and that is false just as much when there is no café
+ * at all as when the café lacks the entitlement. So a signed-out session, or a
+ * read that never landed, produced "Resumen no está activo en este café" over an
+ * empty shell, which reads as a configuration problem at a business nobody
+ * selected. Different causes, different sentences, and only one of them is about
+ * products.
+ */
+function MerchantUnavailable({ state }) {
+  const { t } = useLingui();
+  const loading = state?.loading === true;
+  const failed = !loading && Boolean(state?.error);
+  const noMerchants = !loading && !failed && (state?.merchants?.length ?? 0) === 0;
+  const title = loading
+    ? t`Cargando el negocio`
+    : failed
+      ? t`No se pudo cargar el negocio`
+      : noMerchants
+        ? t`Esta cuenta no tiene negocios`
+        : t`Sin negocio seleccionado`;
+  const body = loading
+    ? t`Un momento.`
+    : failed
+      ? t`La consola no pudo leer tus negocios. Revisa la conexión y vuelve a cargar.`
+      : noMerchants
+        ? t`La cuenta con la que entraste no tiene acceso a ningún negocio todavía.`
+        : t`Elige un negocio en la barra lateral.`;
+  return (
+    <div className="card" style={{ padding: '38px 34px' }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>{title}</h2>
+      <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>{body}</div>
+      {loading ? null : (
+        <button
+          className="btn btn-ghost"
+          style={{ marginTop: 18 }}
+          onClick={() => window.location.reload()}
+        >
+          {t`Recargar`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * Refuses a screen the selected café is not entitled to.
  *
  * The label and the product name come from MODULES, not from the route: they were
@@ -123,6 +171,10 @@ function GuardedScreen({ moduleKey, children }) {
   const merchantState = useMerchant();
   const { i18n } = useLingui();
   if (!merchantState?.canShowModule?.(moduleKey)) {
+    // No café, no product information: this is not the product card's question.
+    if (!merchantState?.capabilities) {
+      return <MerchantUnavailable state={merchantState} />;
+    }
     const mod = MODULES[moduleKey] || {};
     const label = mod.label ? i18n._(mod.label) : moduleKey;
     return mod.platform && !mod.product ? (
@@ -257,7 +309,7 @@ function DashboardLayout() {
       />
       <main className="main">
         <Topbar
-          merchant={merchantName || 'Umi Dash'}
+          merchant={merchantName}
           onMenu={() => setNavOpen(true)}
           screen={screen}
           merchantName={merchantName}

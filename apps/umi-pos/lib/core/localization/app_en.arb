@@ -779,4 +779,176 @@
   ,"inventoryUnitPortion": "portion"
   ,"inventoryUnitPackage": "pack"
   ,"inventoryUnitBox": "box"
+  ,"adoptShiftCardTitle": "Recover the shift"
+  ,"cashShiftCardTitle": "The shift"
+  ,"cashOpenedAtLabel": "Opened"
+  ,"openingFloatRequiredHint": "The opening float cannot be zero."
+  ,"cashEquationLabel": "The drawer's account"
+  ,"cashExpectedHiddenLabel": "Revealed when you count"
+  ,"cashExpectedHiddenHint": "A blind count withholds the expected amount until you submit yours."
+  ,"cashSalesLabel": "Cash sales"
+  ,"cashPaidInLabel": "Paid in"
+  ,"cashPaidOutLabel": "Paid out"
+  ,"cashSafeDropLabel": "Safe drop"
+  ,"cashAdjustmentsLabel": "Adjustments"
+  ,"cashPolicyLabel": "Drawer policy"
+  ,"cashPolicyCountLabel": "Count"
+  ,"cashPolicyAllowLabel": "Allowed"
+  ,"cashBlindCountOnLabel": "Blind count"
+  ,"cashBlindCountOffLabel": "Visible count"
+  ,"cashOfflineRequiredLabel": "Needs a connection"
+  ,"cashCloseApprovalLabel": "Close PIN: variance >"
+  ,"cashMovementApprovalLabel": "Movement PIN from"
+  ,"cashJournalLabel": "Shift journal"
+  ,"cashStepCountDetail": "Count the drawer's denominations and send the total."
+  ,"cashStepVarianceDetail": "Explain the variance so it lands in the history."
+  ,"cashStepReconcileDetail": "The system compares expected against counted."
+  ,"cashStepCloseDetail": "Closing is final; the shift stops taking cash."
+  ,"cashJournalEmptyMessage": "No movements yet."
+  ,"cashCountObservationLabel": "Count"
+  ,"cashVarianceResolutionLabel": "Variance resolution"
+  ,"cashCloseAdjustmentLabel": "Close adjustment"
+  ,"cancelCountAction": "Cancel the count and reopen"
+  ,"cancelCountMessage": "The count stays in the history. The drawer takes cash again."
+  ,"cashVarianceTitle": "Drawer count"
+  ,"cashVarianceBalancedLabel": "No variance"
+  ,"cashVarianceWithinToleranceLabel": "Within tolerance"
+  ,"cashVarianceOutsideToleranceLabel": "Outside tolerance"
+  ,"cashPolicyMaxFloatLabel": "Maximum float"
+  ,"cashMovementReasonHint": "e.g. ice purchase"
+  ,"cashMovementApprovalHint": "From {amount}, the manager's PIN is required."
+  ,"@cashMovementApprovalHint": {
+    "description": "States the amount above which a cash movement needs a manager PIN, shown inside the movement dialog.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"noSaleDialogHint": "Opening the drawer without a sale is recorded with your operator and the reason."
+  ,"handoffDialogHint": "The shift passes to the incoming operator. The drawer does not move."
+  ,"countDialogBlindHint": "Blind count: the expected amount is revealed when you submit."
+  ,"countDialogRecountHint": "Recount {attempt}: this count replaces the previous one in the history."
+  ,"@countDialogRecountHint": {
+    "description": "Shown in the blind-count dialog when this count replaces an earlier one.",
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      }
+    }
+  }
+  ,"cashUnavailableTitle": "The drawer could not be read"
+  ,"cashUnavailableHint": "Check the connection and try again. If it keeps failing, tell the manager before taking cash."
+  ,"cashStatusReadyToClose": "Ready to close"
+  ,"closeDialogApprovalHint": "This close asks for the manager's PIN."
+  ,"denominationQuantityLabel": "Quantity of {amount}"
+  ,"@denominationQuantityLabel": {
+    "description": "Accessible name of the quantity field for one cash denomination.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"cashLastReadLabel": "Updated"
+  ,"cashLedgerSequenceLabel": "Ledger sequence"
+  ,"cashReadOnlyTitle": "View only"
+  ,"cashReadOnlyMessage": "With your current permissions there are no cash actions for this shift. You can read the drawer's account and the shift journal; if you need to move cash or close the shift, ask a manager."
+  ,"cashDrawerUnansweredMessage": "The drawer did not answer. The operation is recorded; open it by hand and tell a manager."
+  ,"cashPolicyUndefinedLabel": "Not set"
+  ,"cashPolicyExpiredTitle": "The cash policy has expired"
+  ,"cashPolicyExpiredMessage": "This terminal cannot move cash, count or close until the owner publishes a current policy. The money in the drawer is not touched."
+  ,"cashPolicyExpiresAtLabel": "Valid until"
+  ,"cashPolicyVersionLabel": "Version"
+  ,"cashOfflineLabel": "Cash without a connection"
+  ,"cashOfflineUnavailableLabel": "Not available yet"
+  ,"movementReasonRequiredMessage": "Write the reason for the movement."
+  ,"@movementReasonRequiredMessage": {
+    "description": "Error on the movement reason field when it is left empty."
+  }
+  ,"cashMovementApprovalScope": "You are approving {operation} of {amount}."
+  ,"@cashMovementApprovalScope": {
+    "description": "Says what a manager is being asked to approve: the operation and its amount.",
+    "placeholders": {
+      "operation": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "managerApprovalEyebrow": "You are authorizing"
+  ,"@managerApprovalEyebrow": {
+    "description": "Small label above the operation in the manager approval dialog."
+  }
+  ,"managerApprovalAction": "Authorize"
+  ,"@managerApprovalAction": {
+    "description": "Primary button in the manager approval dialog. Names the act, not just 'confirm'."
+  }
+  ,"managerApprovalCancelAction": "Cancel movement"
+  ,"@managerApprovalCancelAction": {
+    "description": "Secondary button in the manager approval dialog. Abandons the movement, not the screen."
+  }
+  ,"managerApprovalPinHint": "The manager types their PIN."
+  ,"@managerApprovalPinHint": {
+    "description": "Says who is expected to enter the PIN in the approval dialog."
+  },
+  "@openShiftOnStrandedDrawerMessage": {
+    "description": "Says what opening a shift does when the chosen drawer was left behind by a terminal that no longer exists: the previous shift is blocked, uncounted, and the money stays in the drawer."
+  },
+  "openShiftOnStrandedDrawerMessage": "This drawer was left behind by a terminal that no longer exists. Opening a shift here blocks the previous shift without a count: the money stays in the drawer.",
+  "cashVarianceNoApprovalLabel": "No approval",
+  "cashVarianceApprovalRequiredLabel": "Needs approval",
+  "@cashVarianceNoApprovalLabel": {
+    "description": "Says the over/short is inside the policy's tolerance, so the close will not ask a manager for a PIN."
+  },
+  "@cashVarianceApprovalRequiredLabel": {
+    "description": "Says the over/short is outside the policy's tolerance, so the close will ask a manager for a PIN."
+  },
+  "managerApprovalPinLocked": "PIN entry is locked on this till for a few minutes. No manager can authorize until the lock ends.",
+  "@managerApprovalPinLocked": {
+    "description": "The till itself is rate-limited: no credential on this device can authorize right now, so retrying is pointless."
+  },
+  "managerApprovalPinRefused": "That PIN does not authorize this movement. Try another manager; if nobody has a PIN on this till, ask an administrator to enrol one.",
+  "@managerApprovalPinRefused": {
+    "description": "The credential matched nothing. Names the two real possibilities: the wrong PIN, or a till with no manager credential enrolled at all."
+  },
+  "managerApprovalDrawerEffectTitle": "Effect on the drawer",
+  "@managerApprovalDrawerEffectTitle": {
+    "description": "Heading over the two figures that show what the drawer holds now and what it will hold after the movement."
+  },
+  "managerApprovalDrawerNow": "In the drawer now",
+  "@managerApprovalDrawerNow": {
+    "description": "The expected cash in the drawer before the movement the manager is authorizing."
+  },
+  "managerApprovalDrawerAfter": "After this movement",
+  "@managerApprovalDrawerAfter": {
+    "description": "The expected cash in the drawer once the movement is booked."
+  },
+  "tableStatePanelTitle": "Table {table}",
+  "@tableStatePanelTitle": {
+    "description": "Heading of the persistent table detail panel. Combines the word for table with the published table label.",
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  },
+  "tableStatePanelEmpty": "Tap a table to see its detail.",
+  "@tableStatePanelEmpty": {
+    "description": "Shown in the persistent detail panel before any table is selected."
+  },
+  "tableStatePanelActions": "Actions",
+  "@tableStatePanelActions": {
+    "description": "Heading over the contextual table actions in the detail panel."
+  },
+  "tableStateElapsedField": "Time at table",
+  "@tableStateElapsedField": {
+    "description": "Label of the row that shows how long a party has held the table."
+  },
+  "tableStateGroupField": "Group",
+  "@tableStateGroupField": {
+    "description": "Label of the row that shows how many tables one party holds."
+  }
 }

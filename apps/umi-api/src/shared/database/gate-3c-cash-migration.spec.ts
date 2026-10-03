@@ -160,9 +160,11 @@ describe('Gate 3C cash persistence', () => {
   });
 
   it('enforces a fingerprint-bound close approval threshold', () => {
-    expect(repository).toContain(
-      'expected.expectedDrawerCash.minorUnits > policy.closeApprovalThreshold.minorUnits',
-    );
+    // The threshold is a variance rule, not a drawer-size rule: a large float
+    // with an exact count closes without a manager, and a large over/short needs
+    // one whatever the drawer holds. (Deep-design finding 5.1.)
+    expect(repository).toContain('closeNeedsApproval(');
+    expect(repository).toContain('variance.absoluteVariance.minorUnits');
     expect(repository).toContain("permission: 'cash.shift.close.approve'");
     expect(repository).toContain('APPROVAL_FINGERPRINT_MISMATCH');
   });

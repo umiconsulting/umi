@@ -530,7 +530,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noReceiptAction => 'No receipt';
 
   @override
-  String get managerApprovalAction => 'Request manager approval';
+  String get managerApprovalAction => 'Authorize';
 
   @override
   String get managerApprovalTitle => 'Manager approval required';
@@ -1867,4 +1867,263 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inventoryUnitBox => 'box';
+
+  @override
+  String get adoptShiftCardTitle => 'Recover the shift';
+
+  @override
+  String get cashShiftCardTitle => 'The shift';
+
+  @override
+  String get cashOpenedAtLabel => 'Opened';
+
+  @override
+  String get openingFloatRequiredHint => 'The opening float cannot be zero.';
+
+  @override
+  String get cashEquationLabel => 'The drawer\'s account';
+
+  @override
+  String get cashExpectedHiddenLabel => 'Revealed when you count';
+
+  @override
+  String get cashExpectedHiddenHint =>
+      'A blind count withholds the expected amount until you submit yours.';
+
+  @override
+  String get cashSalesLabel => 'Cash sales';
+
+  @override
+  String get cashPaidInLabel => 'Paid in';
+
+  @override
+  String get cashPaidOutLabel => 'Paid out';
+
+  @override
+  String get cashSafeDropLabel => 'Safe drop';
+
+  @override
+  String get cashAdjustmentsLabel => 'Adjustments';
+
+  @override
+  String get cashPolicyLabel => 'Drawer policy';
+
+  @override
+  String get cashPolicyCountLabel => 'Count';
+
+  @override
+  String get cashPolicyAllowLabel => 'Allowed';
+
+  @override
+  String get cashBlindCountOnLabel => 'Blind count';
+
+  @override
+  String get cashBlindCountOffLabel => 'Visible count';
+
+  @override
+  String get cashOfflineRequiredLabel => 'Needs a connection';
+
+  @override
+  String get cashCloseApprovalLabel => 'Close PIN: variance >';
+
+  @override
+  String get cashMovementApprovalLabel => 'Movement PIN from';
+
+  @override
+  String get cashJournalLabel => 'Shift journal';
+
+  @override
+  String get cashStepCountDetail =>
+      'Count the drawer\'s denominations and send the total.';
+
+  @override
+  String get cashStepVarianceDetail =>
+      'Explain the variance so it lands in the history.';
+
+  @override
+  String get cashStepReconcileDetail =>
+      'The system compares expected against counted.';
+
+  @override
+  String get cashStepCloseDetail =>
+      'Closing is final; the shift stops taking cash.';
+
+  @override
+  String get cashJournalEmptyMessage => 'No movements yet.';
+
+  @override
+  String get cashCountObservationLabel => 'Count';
+
+  @override
+  String get cashVarianceResolutionLabel => 'Variance resolution';
+
+  @override
+  String get cashCloseAdjustmentLabel => 'Close adjustment';
+
+  @override
+  String get cancelCountAction => 'Cancel the count and reopen';
+
+  @override
+  String get cancelCountMessage =>
+      'The count stays in the history. The drawer takes cash again.';
+
+  @override
+  String get cashVarianceTitle => 'Drawer count';
+
+  @override
+  String get cashVarianceBalancedLabel => 'No variance';
+
+  @override
+  String get cashVarianceWithinToleranceLabel => 'Within tolerance';
+
+  @override
+  String get cashVarianceOutsideToleranceLabel => 'Outside tolerance';
+
+  @override
+  String get cashPolicyMaxFloatLabel => 'Maximum float';
+
+  @override
+  String get cashMovementReasonHint => 'e.g. ice purchase';
+
+  @override
+  String cashMovementApprovalHint(String amount) {
+    return 'From $amount, the manager\'s PIN is required.';
+  }
+
+  @override
+  String get noSaleDialogHint =>
+      'Opening the drawer without a sale is recorded with your operator and the reason.';
+
+  @override
+  String get handoffDialogHint =>
+      'The shift passes to the incoming operator. The drawer does not move.';
+
+  @override
+  String get countDialogBlindHint =>
+      'Blind count: the expected amount is revealed when you submit.';
+
+  @override
+  String countDialogRecountHint(int attempt) {
+    return 'Recount $attempt: this count replaces the previous one in the history.';
+  }
+
+  @override
+  String get cashUnavailableTitle => 'The drawer could not be read';
+
+  @override
+  String get cashUnavailableHint =>
+      'Check the connection and try again. If it keeps failing, tell the manager before taking cash.';
+
+  @override
+  String get cashStatusReadyToClose => 'Ready to close';
+
+  @override
+  String get closeDialogApprovalHint =>
+      'This close asks for the manager\'s PIN.';
+
+  @override
+  String denominationQuantityLabel(String amount) {
+    return 'Quantity of $amount';
+  }
+
+  @override
+  String get cashLastReadLabel => 'Updated';
+
+  @override
+  String get cashLedgerSequenceLabel => 'Ledger sequence';
+
+  @override
+  String get cashReadOnlyTitle => 'View only';
+
+  @override
+  String get cashReadOnlyMessage =>
+      'With your current permissions there are no cash actions for this shift. You can read the drawer\'s account and the shift journal; if you need to move cash or close the shift, ask a manager.';
+
+  @override
+  String get cashDrawerUnansweredMessage =>
+      'The drawer did not answer. The operation is recorded; open it by hand and tell a manager.';
+
+  @override
+  String get cashPolicyUndefinedLabel => 'Not set';
+
+  @override
+  String get cashPolicyExpiredTitle => 'The cash policy has expired';
+
+  @override
+  String get cashPolicyExpiredMessage =>
+      'This terminal cannot move cash, count or close until the owner publishes a current policy. The money in the drawer is not touched.';
+
+  @override
+  String get cashPolicyExpiresAtLabel => 'Valid until';
+
+  @override
+  String get cashPolicyVersionLabel => 'Version';
+
+  @override
+  String get cashOfflineLabel => 'Cash without a connection';
+
+  @override
+  String get cashOfflineUnavailableLabel => 'Not available yet';
+
+  @override
+  String get movementReasonRequiredMessage =>
+      'Write the reason for the movement.';
+
+  @override
+  String cashMovementApprovalScope(String operation, String amount) {
+    return 'You are approving $operation of $amount.';
+  }
+
+  @override
+  String get managerApprovalEyebrow => 'You are authorizing';
+
+  @override
+  String get managerApprovalCancelAction => 'Cancel movement';
+
+  @override
+  String get managerApprovalPinHint => 'The manager types their PIN.';
+
+  @override
+  String get openShiftOnStrandedDrawerMessage =>
+      'This drawer was left behind by a terminal that no longer exists. Opening a shift here blocks the previous shift without a count: the money stays in the drawer.';
+
+  @override
+  String get cashVarianceNoApprovalLabel => 'No approval';
+
+  @override
+  String get cashVarianceApprovalRequiredLabel => 'Needs approval';
+
+  @override
+  String get managerApprovalPinLocked =>
+      'PIN entry is locked on this till for a few minutes. No manager can authorize until the lock ends.';
+
+  @override
+  String get managerApprovalPinRefused =>
+      'That PIN does not authorize this movement. Try another manager; if nobody has a PIN on this till, ask an administrator to enrol one.';
+
+  @override
+  String get managerApprovalDrawerEffectTitle => 'Effect on the drawer';
+
+  @override
+  String get managerApprovalDrawerNow => 'In the drawer now';
+
+  @override
+  String get managerApprovalDrawerAfter => 'After this movement';
+
+  @override
+  String tableStatePanelTitle(String table) {
+    return 'Table $table';
+  }
+
+  @override
+  String get tableStatePanelEmpty => 'Tap a table to see its detail.';
+
+  @override
+  String get tableStatePanelActions => 'Actions';
+
+  @override
+  String get tableStateElapsedField => 'Time at table';
+
+  @override
+  String get tableStateGroupField => 'Group';
 }

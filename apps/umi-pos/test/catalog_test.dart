@@ -264,16 +264,20 @@ void main() {
       // without, which is the disproportion the owner reported from the till, and
       // "Leche entera" above is the surcharge that reproduces it.
       final plain = tester.getSize(
-        find.ancestor(
-          of: find.text('Leche de avena'),
-          matching: find.byType(SizedBox),
-        ).first,
+        find
+            .ancestor(
+              of: find.text('Leche de avena'),
+              matching: find.byType(SizedBox),
+            )
+            .first,
       );
       final withPrice = tester.getSize(
-        find.ancestor(
-          of: find.text('Leche entera'),
-          matching: find.byType(SizedBox),
-        ).first,
+        find
+            .ancestor(
+              of: find.text('Leche entera'),
+              matching: find.byType(SizedBox),
+            )
+            .first,
       );
       expect(plain, withPrice);
       expect(plain.width, 200);
@@ -285,16 +289,20 @@ void main() {
       await tester.tap(find.text('Leche entera'));
       await tester.pumpAndSettle();
       final selectedPlain = tester.getSize(
-        find.ancestor(
-          of: find.text('Leche de avena'),
-          matching: find.byType(SizedBox),
-        ).first,
+        find
+            .ancestor(
+              of: find.text('Leche de avena'),
+              matching: find.byType(SizedBox),
+            )
+            .first,
       );
       final selectedWithPrice = tester.getSize(
-        find.ancestor(
-          of: find.text('Leche entera'),
-          matching: find.byType(SizedBox),
-        ).first,
+        find
+            .ancestor(
+              of: find.text('Leche entera'),
+              matching: find.byType(SizedBox),
+            )
+            .first,
       );
       expect(selectedPlain, selectedWithPrice);
       expect(selectedWithPrice.height, plain.height + 2);

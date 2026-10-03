@@ -53,7 +53,10 @@ final class _Repo implements CartRepository {
   ) async => const PosIncomingOrders(orders: [_orderJson]);
 
   @override
-  Future<Cart> bindOrigin(String merchantId, BindCartOriginRequest input) async {
+  Future<Cart> bindOrigin(
+    String merchantId,
+    BindCartOriginRequest input,
+  ) async {
     lastBind = input;
     return _cart();
   }
@@ -68,8 +71,11 @@ final class _Repo implements CartRepository {
   Future<Cart> add(String merchantId, CartLineInput input) async =>
       throw UnimplementedError();
   @override
-  Future<Cart> update(String merchantId, String lineId, CartLineInput input) async =>
-      throw UnimplementedError();
+  Future<Cart> update(
+    String merchantId,
+    String lineId,
+    CartLineInput input,
+  ) async => throw UnimplementedError();
   @override
   Future<Cart> remove(
     String merchantId,
@@ -146,7 +152,10 @@ void main() {
     // The cart was bound to the picked order, and the sheet closed.
     expect(repo.lastBind, isNotNull);
     expect(repo.lastBind!.cartId, '00000000-0000-4000-8000-000000000001');
-    expect(repo.lastBind!.originOrderId, '00000000-0000-4000-8000-0000000000a1');
+    expect(
+      repo.lastBind!.originOrderId,
+      '00000000-0000-4000-8000-0000000000a1',
+    );
     expect(find.text('Atender'), findsNothing);
   });
 }

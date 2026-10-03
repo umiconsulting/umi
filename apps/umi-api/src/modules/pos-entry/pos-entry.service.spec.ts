@@ -257,6 +257,66 @@ describe('PosEntryService', () => {
     );
   });
 
+  it('a credential that matched nothing is a wrong PIN, not a locked till', async () => {
+    // The till can only say one true thing, so these must not be the same
+    // answer. A locked till means no credential will work for fifteen minutes;
+    // a lookup that matched nothing means another manager's PIN might.
+    const repo = {
+      managerPinRecord: vi.fn().mockResolvedValue(null),
+      recordPinFailure: vi.fn(),
+      grantManagerElevation: vi.fn(),
+    };
+    const service = new PosEntryService(
+      repo as never,
+      { verify: vi.fn() } as never,
+      { get: vi.fn().mockReturnValue('test-jwt-secret-with-enough-length') } as never,
+    );
+
+    await expect(
+      service.approveByManager(user, {
+        operatorSessionId: '00000000-0000-4000-8000-000000000020',
+        managerPin: '9999',
+        permission: 'cash.movement.paid_in.approve',
+        merchantId: '00000000-0000-4000-8000-000000000014',
+        locationId: '00000000-0000-4000-8000-000000000015',
+        commandFingerprint: null,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(repo.grantManagerElevation).not.toHaveBeenCalled();
+  });
+
+  it('a rate-locked till refuses a manager approval as locked, not as a wrong PIN', async () => {
+    const repo = {
+      managerPinRecord: vi.fn().mockResolvedValue({
+        staffId: '00000000-0000-4000-8000-000000000010',
+        userId: '00000000-0000-4000-8000-000000000011',
+        salt: 'salt',
+        hash: 'hash',
+        credential: 'operator_pin',
+        lockedUntil: new Date(Date.now() + 60_000),
+      }),
+      grantManagerElevation: vi.fn(),
+    };
+    const passwords = { verify: vi.fn() };
+    const service = new PosEntryService(
+      repo as never,
+      passwords as never,
+      { get: vi.fn().mockReturnValue('test-jwt-secret-with-enough-length') } as never,
+    );
+
+    await expect(
+      service.approveByManager(user, {
+        operatorSessionId: '00000000-0000-4000-8000-000000000020',
+        managerPin: '3333',
+        permission: 'cash.movement.paid_in.approve',
+        merchantId: '00000000-0000-4000-8000-000000000014',
+        locationId: '00000000-0000-4000-8000-000000000015',
+        commandFingerprint: null,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PIN_LOCKED' } });
+    expect(passwords.verify).not.toHaveBeenCalled();
+  });
+
   it('binds Dashboard manager approval to its session and exact fingerprint', async () => {
     const repo = {
       administrativeManagerPinRecord: vi.fn().mockResolvedValue({

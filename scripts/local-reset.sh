@@ -23,11 +23,15 @@
 #   scripts/local-reset.sh --yes                # do it
 #   scripts/local-reset.sh --database scratch --yes
 #   scripts/local-reset.sh --no-seed --yes      # schema only
+#   scripts/local-reset.sh --no-admin --yes     # seed the data, but no platform administrator
 #
 # Options:
 #   --database NAME   reset NAME instead of the database in DATABASE_URL_APP
 #   --container NAME  the postgres container, if it cannot be found by port
 #   --no-seed         skip the local access seed
+#   --no-admin        skip the platform administrator
+#   --admin-email A   the platform administrator. Default: hola@umiconsulting.co
+#   --admin-password P  its Dashboard password. Default: $UMI_LOCAL_ADMIN_PASSWORD
 #   --yes             actually drop and rebuild
 set -euo pipefail
 
@@ -36,14 +40,22 @@ ENV_FILE="$ROOT/apps/umi-api/.env"
 
 confirm=false
 seed=true
+admin=true
 force=false
 database=""
+admin_email="${UMI_LOCAL_ADMIN_EMAIL:-hola@umiconsulting.co}"
+# LOCAL USE ONLY. A disposable database needs a password that a person can type.
+# Never reuse this value anywhere that a real operator can reach.
+admin_password="${UMI_LOCAL_ADMIN_PASSWORD:-Umi2026!}"
 container=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --yes) confirm=true ;;
     --force) force=true ;;
     --no-seed) seed=false ;;
+    --no-admin) admin=false ;;
+    --admin-email) admin_email="${2:?--admin-email needs an address}"; shift ;;
+    --admin-password) admin_password="${2:?--admin-password needs a value}"; shift ;;
     --database) database="${2:?--database needs a name}"; shift ;;
     --container) container="${2:?--container needs a name}"; shift ;;
     -h|--help)
@@ -124,6 +136,7 @@ echo "container   $container"
 echo "database    $database  ($host:$port)"
 echo "chain       docs/migration/build-v3/00_run.sh $database"
 echo "seed        $([[ "$seed" == true ]] && echo "scripts/umi-pos-local-access-seed.sh" || echo "skipped")"
+echo "admin       $([[ "$admin" == true ]] && echo "$admin_email (platform super_admin)" || echo "skipped")"
 echo "contract    pnpm --filter @umi/contract generate"
 
 existing="$(psql_in -A -t -c "select count(*) from pg_database where datname='$database'" 2>/dev/null || echo 0)"
@@ -174,6 +187,18 @@ if [[ "$seed" == true ]]; then
     bash "$ROOT/scripts/umi-pos-local-access-seed.sh"
 fi
 
+if [[ "$admin" == true ]]; then
+  # The demo seed mints POS operators with a PIN, not a Dashboard password.
+  # A platform role alone cannot sign in, so this step makes the account too.
+  echo "== seeding the platform administrator =="
+  bash "$ROOT/scripts/umi-local-platform-admin.sh" \
+    --email "$admin_email" \
+    --create \
+    --password "$admin_password" \
+    --container "$container" \
+    --database "$database"
+fi
+
 echo "== regenerating the contract =="
 (cd "$ROOT" && pnpm --filter @umi/contract generate)
 
@@ -181,4 +206,7 @@ echo
 echo "== what the database says about itself =="
 psql_in -d "$database" -A -t \
   -c "select version||' ('||status||')' from runtime.schema_migration order by applied_at desc limit 1"
+if [[ "$admin" == true ]]; then
+  echo "Platform administrator: $admin_email"
+fi
 echo "Start the API against it, then run: pnpm ux:verify"

@@ -15,6 +15,11 @@ artifacts/
 
 # Screenshots / visual artifacts
 artifacts/
+docs/design/centro-de-caja/shots/
+# The till's render harness regenerates these with `--update-goldens`; the
+# harness itself is the source, the images are output.
+apps/umi-pos/test/render/shots/
+apps/umi-pos/test/render/failures/
 
 # Env and secrets — templates are tracked, real env files never are
 .env
