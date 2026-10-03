@@ -61,6 +61,22 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      # The image's DEFAULT Xcode is 16.4, and Xcode 16.4 cannot compile
+      # connectivity_plus 7.3.1: its PathMonitorConnectivityProvider.swift calls
+      # `NWPath.isUltraConstrained`, which is an iOS 26 API. The first run of this
+      # workflow failed on exactly that, with
+      # "Value of type 'NWPath' has no member 'isUltraConstrained'".
+      #
+      # Xcode 26 is already installed on the image beside 16.4, so this selects the
+      # newest one rather than changing the runner label. A developer on a Mac needs
+      # Xcode 26 or later for the same reason.
+      - name: Select the newest Xcode on the image
+        run: |
+          set -euo pipefail
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
       - name: Resolve packages
         working-directory: apps/umi-pos
         run: flutter pub get
