@@ -1,0 +1,78 @@
+name: umi-pos ios
+
+# Builds the iOS target of the till on a hosted macOS runner.
+#
+# WHY THIS EXISTS
+# `apps/umi-pos/ios/` has 41 tracked files — a complete Runner, the Swift Package
+# Manager plugin integration, and `ios/Runner/DeviceKeySigner.swift` — and nothing
+# has ever compiled any of it. The environment that wrote it had no Xcode, and the
+# signer's own header says so: "written to the documented Secure Enclave contract
+# but NOT compiled or run in the build environment... It must be built and
+# exercised on a device before it is trusted."
+#
+# An unbuilt target is not a supported target. This is the cheapest way to find
+# out which it is: `--no-codesign` needs NO Apple secrets, so it can run on every
+# pull request, and it fails on the two things already known to be wrong —
+# `ios/Runner` has no entitlements file at all, and its deployment target is
+# iOS 13.0 against Flutter's iOS 15 floor.
+#
+# HOW TO BUILD ON A LINUX MACHINE
+# You do not need a Mac. GitHub runs this on an Apple-silicon machine for you:
+# macOS 3-core (M1). Signing and installing are a later step; see
+# `docs/research/2026-10-03-ios-from-linux.md`.
+#
+# ⚠️ WHY THERE IS A `paths:` FILTER HERE AND NOT ON `lint`
+# `lint` is a REQUIRED check, and GitHub leaves a required-but-skipped check
+# Pending forever, which makes the pull request unmergeable. This workflow is not
+# required, so a filter is safe and keeps a macOS minute off a docs-only pull
+# request. If this ever becomes a required check, delete the filter first — the
+# `lint` workflow header explains the deadlock in full.
+#
+# COST. Standard GitHub-hosted runners are free in a public repository.
+# umiconsulting/umi is public today. If it goes private, the macOS runner bills at
+# $0.062 per minute — ten times the Linux rate — so the filter matters more then.
+on:
+  pull_request:
+    paths:
+      - 'apps/umi-pos/**'
+      - 'packages/contract/generated/dart/**'
+      - '.github/workflows/umi-pos-ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: build the iOS target
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # The version RUNNING_UMIPOS.md documents. A different Flutter here would
+      # make this job disagree with every local run.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Resolve packages
+        working-directory: apps/umi-pos
+        run: flutter pub get
+
+      # The localized strings are generated, and `AppLocalizations` is imported by
+      # the app. Run it rather than trusting the committed output.
+      - name: Generate localizations
+        working-directory: apps/umi-pos
+        run: flutter gen-l10n
+
+      # The point of the job. `--no-codesign` skips signing entirely, so this needs
+      # no certificate, no profile and no Apple account.
+      - name: Build for iOS without signing
+        working-directory: apps/umi-pos
+        run: flutter build ios --no-codesign --release
