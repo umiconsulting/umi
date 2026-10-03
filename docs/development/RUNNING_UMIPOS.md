@@ -180,7 +180,7 @@ The matrix permits Owner and Admin to assign only reviewed business roles. It ex
 ## One-command targets
 
 - Linux: `pnpm umi-pos:linux`
-- macOS: `pnpm umi-pos:mac` (`pnpm umi-pos:macos` remains an alias)
+- macOS: `pnpm umi-pos:macos`
 - Windows: `pnpm umi-pos:windows`
 - Android: `pnpm umi-pos:android`
 - iPhone/iPad (macOS and Xcode required): `pnpm umi-pos:ios`
