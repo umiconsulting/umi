@@ -110,9 +110,13 @@ jobs:
       # anybody can produce today. It runs in a cloud iOS simulator — LambdaTest
       # App Live's free tier includes them — which is how a developer on Linux
       # can look at the till on an iPhone-shaped screen without an Apple account.
+      #
+      # Debug, not release: Flutter refuses a release build for a simulator
+      # ("Release mode is not supported for simulators"). The cost is a slower
+      # app with the Dart VM in it; the benefit is that it exists at all.
       - name: Build for the simulator
         working-directory: apps/umi-pos
-        run: flutter build ios --simulator --release $UMIPOS_DEFINES
+        run: flutter build ios --simulator --debug $UMIPOS_DEFINES
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
