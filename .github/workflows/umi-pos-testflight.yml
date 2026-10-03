@@ -32,6 +32,10 @@ on:
         description: API base URL the installed build will talk to
         required: true
         default: https://api-staging.umiconsulting.co
+      build_number:
+        description: CFBundleVersion. Must be higher than the last upload.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -59,6 +63,17 @@ jobs:
             echo "See the header of this workflow for what each one is."
             exit 1
           fi
+
+      # Fail here rather than after a six-minute build. `altool` ships with Xcode
+      # and is deprecated; if a future Xcode removes it, this says so up front.
+      - name: Check the upload tool exists
+        run: |
+          set -euo pipefail
+          if ! xcrun --find altool >/dev/null 2>&1; then
+            echo "::error::xcrun altool is not in this Xcode. Upload another way (the App Store Connect API, or Transporter) and update this workflow."
+            exit 1
+          fi
+          xcrun altool --version || true
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -119,11 +134,15 @@ jobs:
         working-directory: apps/umi-pos
         env:
           EXPORT_OPTIONS: ${{ runner.temp }}/ExportOptions.plist
+          # App Store Connect refuses a build number it has already seen. The run
+          # number is always new, and an explicit input still wins when needed.
+          BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
         run: |
           set -euo pipefail
           flutter pub get
           flutter gen-l10n
           flutter build ipa --release \
+            --build-number="$BUILD_NUMBER" \
             --export-options-plist="$EXPORT_OPTIONS" \
             --dart-define=UMIPOS_ENVIRONMENT=staging \
             --dart-define=UMIPOS_API_BASE_URL=${{ inputs.api_base }} \
