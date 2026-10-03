@@ -380,6 +380,25 @@ export function canShowModule(moduleKey, capabilities, platformRole = null) {
   return getModuleAvailability(moduleKey, capabilities, platformRole).available;
 }
 
+/**
+ * Whether a location-scoped screen has no branch to read.
+ *
+ * Being entitled to a screen and being able to fill it are different questions.
+ * Every `locationScoped` module reads its data per branch, and a café can exist
+ * with none: the backfill carried merchants across from the source system, and a
+ * merchant whose locations never came with them is a live café with no rooms to
+ * sell from. The screen then rendered an empty page under a working sidebar,
+ * which reads as a broken console rather than as a café that is not set up yet.
+ *
+ * An absent `capabilities` is a different case: the guard answers that one with
+ * "no café selected", so this leaves it alone and returns false.
+ */
+export function missingLocationFor(moduleKey, capabilities) {
+  if (!MODULES[moduleKey]?.locationScoped) return false;
+  const locations = capabilities?.locations;
+  return Array.isArray(locations) && locations.length === 0;
+}
+
 export function getVisibleModules(capabilities, platformRole = null) {
   return MODULE_ORDER.filter((moduleKey) =>
     canShowModule(moduleKey, capabilities, platformRole),
