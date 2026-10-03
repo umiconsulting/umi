@@ -86,6 +86,18 @@ msgid "Recargar"
 msgstr "Recargar"
 
 #: src/app.jsx
+msgid "{name} todavía no tiene sucursales"
+msgstr "{name} todavía no tiene sucursales"
+
+#: src/app.jsx
+msgid "Este negocio todavía no tiene sucursales"
+msgstr "Este negocio todavía no tiene sucursales"
+
+#: src/app.jsx
+msgid "Los planos, el catálogo y las ventas se guardan por sucursal, así que esta pantalla necesita una. Crea la primera sucursal para este negocio y vuelve aquí."
+msgstr "Los planos, el catálogo y las ventas se guardan por sucursal, así que esta pantalla necesita una. Crea la primera sucursal para este negocio y vuelve aquí."
+
+#: src/app.jsx
 msgid "Cargando negocio…"
 msgstr "Cargando negocio…"
 
