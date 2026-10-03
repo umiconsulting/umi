@@ -118,9 +118,17 @@ jobs:
         working-directory: apps/umi-pos
         run: flutter build ios --simulator --debug $UMIPOS_DEFINES
 
+      # Zipped on purpose. `upload-artifact` stores files relative to the least
+      # common ancestor of the paths it is given, so handing it `Runner.app` puts
+      # the bundle's CONTENTS at the root of the download and the `.app` folder
+      # never arrives. App Live wants a `.app` bundle, so the zip carries one.
+      - name: Package the simulator app
+        working-directory: apps/umi-pos/build/ios/iphonesimulator
+        run: zip -qry "$RUNNER_TEMP/umi-pos-ios-simulator.zip" Runner.app
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: umi-pos-ios-simulator
-          path: apps/umi-pos/build/ios/iphonesimulator/Runner.app
+          path: ${{ runner.temp }}/umi-pos-ios-simulator.zip
           if-no-files-found: error
           retention-days: 14
