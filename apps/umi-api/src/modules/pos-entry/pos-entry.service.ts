@@ -169,13 +169,19 @@ export class PosEntryService {
       user.sessionId,
       user.deviceId,
     );
-    if (
-      !record ||
-      !record.salt ||
-      !record.hash ||
-      (record.lockedUntil?.getTime() ?? 0) > Date.now()
-    ) {
+    // Two different facts, two different answers.
+    //
+    // This used to answer PIN_LOCKED for both, and the two are not the same
+    // instruction: a locked till means no credential will work for fifteen
+    // minutes, while a credential that matched nothing means the operator typed
+    // the wrong PIN — or that no manager credential is enrolled here at all.
+    // The till could only hedge between them, so it told the operator to wait
+    // AND to find another manager, and did neither job.
+    if ((record?.lockedUntil?.getTime() ?? 0) > Date.now()) {
       throw new ForbiddenException({ code: 'PIN_LOCKED' });
+    }
+    if (!record || !record.salt || !record.hash) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
     if (!this.passwords.verify(credential.secretValue, record.salt, record.hash)) {
       await this.repo.recordPinFailure(dto.merchantId, dto.locationId, user.deviceId);

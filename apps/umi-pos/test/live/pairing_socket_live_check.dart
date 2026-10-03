@@ -60,30 +60,34 @@ void main() {
     return result;
   }
 
-  test('the real Dart client is admitted only with a valid triplet', () async {
-    expect(
-      await attempt(
-        credential: 'dart-credential',
-        installationId: 'dart-installation',
-        label: 'valid triplet     ',
-      ),
-      startsWith('ACCEPTED'),
-    );
-    expect(
-      await attempt(
-        credential: 'wrong-credential',
-        installationId: 'dart-installation',
-        label: 'wrong credential  ',
-      ),
-      'REFUSED',
-    );
-    expect(
-      await attempt(
-        credential: 'dart-credential',
-        installationId: 'wrong-installation',
-        label: 'wrong installation',
-      ),
-      'REFUSED',
-    );
-  }, timeout: const Timeout(Duration(seconds: 60)));
+  test(
+    'the real Dart client is admitted only with a valid triplet',
+    () async {
+      expect(
+        await attempt(
+          credential: 'dart-credential',
+          installationId: 'dart-installation',
+          label: 'valid triplet     ',
+        ),
+        startsWith('ACCEPTED'),
+      );
+      expect(
+        await attempt(
+          credential: 'wrong-credential',
+          installationId: 'dart-installation',
+          label: 'wrong credential  ',
+        ),
+        'REFUSED',
+      );
+      expect(
+        await attempt(
+          credential: 'dart-credential',
+          installationId: 'wrong-installation',
+          label: 'wrong installation',
+        ),
+        'REFUSED',
+      );
+    },
+    timeout: const Timeout(Duration(seconds: 60)),
+  );
 }

@@ -15,13 +15,21 @@ import '../../core/theme/umi_theme.dart';
 /// the bar used to be announced when it appeared, and this is announced the
 /// same way without a floating overlay.
 final class InlineNotice extends StatelessWidget {
-  const InlineNotice({required this.message, super.key});
+  const InlineNotice({
+    required this.message,
+    this.tone = InlineNoticeTone.error,
+    super.key,
+  });
 
   final String message;
+  final InlineNoticeTone tone;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final accent = tone == InlineNoticeTone.error
+        ? scheme.error
+        : UmiTheme.warning;
     return Semantics(
       liveRegion: true,
       container: true,
@@ -32,13 +40,19 @@ final class InlineNotice extends StatelessWidget {
           vertical: UmiSpacing.sm,
         ),
         decoration: BoxDecoration(
-          color: scheme.error.withValues(alpha: .14),
+          color: accent.withValues(alpha: .14),
           borderRadius: BorderRadius.circular(UmiRadius.control),
-          border: Border.all(color: scheme.error.withValues(alpha: .45)),
+          border: Border.all(color: accent.withValues(alpha: .45)),
         ),
         child: Row(
           children: [
-            Icon(Icons.error_outline, size: 20, color: scheme.error),
+            Icon(
+              tone == InlineNoticeTone.error
+                  ? Icons.error_outline
+                  : Icons.warning_amber_outlined,
+              size: 20,
+              color: accent,
+            ),
             const SizedBox(width: UmiSpacing.sm),
             Expanded(
               child: Text(
@@ -54,3 +68,11 @@ final class InlineNotice extends StatelessWidget {
     );
   }
 }
+
+/// What the notice is telling the operator.
+///
+/// `error` — a financial fact failed. `warning` — something the operator asked
+/// for did not happen, and the money is unaffected.
+enum InlineNoticeTone { error, warning }
+
+/// A message that stays where the work is.

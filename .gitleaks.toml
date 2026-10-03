@@ -68,3 +68,16 @@ description = "Integration-test harness JWT secret"
 regexes = [
   '''point-refund-harness-secret-0000''',
 ]
+
+[[allowlists]]
+description = "The Centro de Caja design mockups' localStorage key names"
+# `const KEY = 'umi.cash.split.v1'` in docs/design/centro-de-caja/split.html. The
+# identifier is `KEY` and the value is a namespaced `localStorage` key, so
+# `generic-api-key` matches it, but it opens nothing: the mockup writes the split
+# state to the browser it is opened in.
+#
+# Allowlisted by exact value, not by path, so a real credential pasted into that
+# same mockup is still caught.
+regexes = [
+  '''umi\.cash\.split\.v1''',
+]

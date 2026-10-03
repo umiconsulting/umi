@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type {
   AdoptCashShiftRequest,
+  CancelCashCountRequest,
   CashMovementRequest,
   CashCommandRecoveryQuery,
   NoSaleDrawerRequest,
@@ -226,6 +227,50 @@ export class PosCashService {
           outcome: 'success',
           reasonCode: dto.reasonCode,
           publicData: {},
+        });
+        return result;
+      },
+    );
+  }
+
+  /**
+   * Undo a count that should not have happened.
+   *
+   * The authority is `cash.count.submit`: whoever may count the drawer may also
+   * say "that was not a count". The repository refuses unless the ledger has
+   * stood still since the count and nobody has recorded a variance reason, so
+   * this cannot erase a fact that money has already moved through.
+   */
+  async cancelCount(
+    user: AuthUser,
+    merchantId: string,
+    shiftId: string,
+    dto: CancelCashCountRequest,
+  ) {
+    this.assertPathShift(shiftId, dto.shiftId);
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'cash.count.submit',
+    );
+    return this.command(
+      merchantId,
+      dto.locationId,
+      dto.commandId,
+      dto.idempotencyKey,
+      'pos.cash.count.cancel',
+      dto,
+      async (context) => {
+        const result = await this.repo.cancelCount(context.client, merchantId, authorization, dto);
+        await context.appendAudit({
+          eventType: 'cash.count_cancelled',
+          entityType: 'cash_shift',
+          entityId: dto.shiftId,
+          outcome: 'success',
+          reasonCode: dto.reasonCode,
+          publicData: { ledgerSequence: dto.expectedLedgerSequence },
         });
         return result;
       },

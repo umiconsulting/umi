@@ -108,9 +108,27 @@ bool _groupsWellFormed(String whole, String separator) {
   return true;
 }
 
-/// The amount as the field should show it once it is valid.
-String formatMinorUnits(int minorUnits) =>
-    (minorUnits / 100).toStringAsFixed(2);
+/// `MXN 1,500.00`, from minor units. One division, at the edge of the system.
+///
+/// This is the only money formatter in the app. There used to be two — this one
+/// without the currency, and a second inside the drawer equation — so the same
+/// amount printed as `1458.50` in one card and `MXN 1,458.50` in the next. The
+/// currency is optional for the field helpers that format a bare amount, and the
+/// sign is the true minus (−), never the hyphen, because a figure is read beside
+/// other figures and a hyphen reads as a dash.
+String formatMinorUnits(int minorUnits, [String currency = '']) {
+  final sign = minorUnits < 0 ? '−' : '';
+  final value = minorUnits.abs();
+  final whole = (value ~/ 100).toString();
+  final cents = (value % 100).toString().padLeft(2, '0');
+  final grouped = StringBuffer();
+  for (var i = 0; i < whole.length; i++) {
+    if (i > 0 && (whole.length - i) % 3 == 0) grouped.write(',');
+    grouped.write(whole[i]);
+  }
+  final prefix = currency.isEmpty ? '' : '$currency ';
+  return '$sign$prefix$grouped.$cents';
+}
 
 /// Keeps a cash field to digits and separators, so most of the shapes
 /// [parseMinorUnits] has to refuse never get typed in the first place. It is a

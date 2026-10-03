@@ -1064,10 +1064,10 @@ abstract class AppLocalizations {
   /// **'Sin recibo'**
   String get noReceiptAction;
 
-  /// No description provided for @managerApprovalAction.
+  /// Primary button in the manager approval dialog. Names the act, not just 'confirm'.
   ///
   /// In es, this message translates to:
-  /// **'Solicitar aprobación'**
+  /// **'Autorizar'**
   String get managerApprovalAction;
 
   /// No description provided for @managerApprovalTitle.
@@ -3445,6 +3445,468 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'caja'**
   String get inventoryUnitBox;
+
+  /// No description provided for @adoptShiftCardTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperar el turno'**
+  String get adoptShiftCardTitle;
+
+  /// No description provided for @cashShiftCardTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'El turno'**
+  String get cashShiftCardTitle;
+
+  /// No description provided for @cashOpenedAtLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Abierto'**
+  String get cashOpenedAtLabel;
+
+  /// No description provided for @openingFloatRequiredHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El fondo inicial no puede quedar en cero.'**
+  String get openingFloatRequiredHint;
+
+  /// No description provided for @cashEquationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'La cuenta del cajón'**
+  String get cashEquationLabel;
+
+  /// No description provided for @cashExpectedHiddenLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Se revela al contar'**
+  String get cashExpectedHiddenLabel;
+
+  /// No description provided for @cashExpectedHiddenHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El conteo ciego esconde el esperado hasta que envías tu conteo.'**
+  String get cashExpectedHiddenHint;
+
+  /// No description provided for @cashSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas en efectivo'**
+  String get cashSalesLabel;
+
+  /// No description provided for @cashPaidInLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresos'**
+  String get cashPaidInLabel;
+
+  /// No description provided for @cashPaidOutLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Retiros'**
+  String get cashPaidOutLabel;
+
+  /// No description provided for @cashSafeDropLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja fuerte'**
+  String get cashSafeDropLabel;
+
+  /// No description provided for @cashAdjustmentsLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get cashAdjustmentsLabel;
+
+  /// No description provided for @cashPolicyLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Política de la caja'**
+  String get cashPolicyLabel;
+
+  /// No description provided for @cashPolicyCountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo'**
+  String get cashPolicyCountLabel;
+
+  /// No description provided for @cashPolicyAllowLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Permitido'**
+  String get cashPolicyAllowLabel;
+
+  /// No description provided for @cashBlindCountOnLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo ciego'**
+  String get cashBlindCountOnLabel;
+
+  /// No description provided for @cashBlindCountOffLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo visible'**
+  String get cashBlindCountOffLabel;
+
+  /// No description provided for @cashOfflineRequiredLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Requiere conexión'**
+  String get cashOfflineRequiredLabel;
+
+  /// No description provided for @cashCloseApprovalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN cierre: diferencia >'**
+  String get cashCloseApprovalLabel;
+
+  /// No description provided for @cashMovementApprovalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN movimiento desde'**
+  String get cashMovementApprovalLabel;
+
+  /// No description provided for @cashJournalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Libro del turno'**
+  String get cashJournalLabel;
+
+  /// No description provided for @cashStepCountDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'Cuenta las denominaciones del cajón y envía el total.'**
+  String get cashStepCountDetail;
+
+  /// No description provided for @cashStepVarianceDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'Explica la diferencia para que quede en el historial.'**
+  String get cashStepVarianceDetail;
+
+  /// No description provided for @cashStepReconcileDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'El sistema compara el esperado contra el contado.'**
+  String get cashStepReconcileDetail;
+
+  /// No description provided for @cashStepCloseDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'El cierre es definitivo; el turno deja de aceptar efectivo.'**
+  String get cashStepCloseDetail;
+
+  /// No description provided for @cashJournalEmptyMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin movimientos todavía.'**
+  String get cashJournalEmptyMessage;
+
+  /// No description provided for @cashCountObservationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Arqueo'**
+  String get cashCountObservationLabel;
+
+  /// No description provided for @cashVarianceResolutionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Resolución de diferencia'**
+  String get cashVarianceResolutionLabel;
+
+  /// No description provided for @cashCloseAdjustmentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajuste de cierre'**
+  String get cashCloseAdjustmentLabel;
+
+  /// No description provided for @cancelCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar conteo y volver a abierto'**
+  String get cancelCountAction;
+
+  /// No description provided for @cancelCountMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El conteo queda en el historial. El cajón vuelve a aceptar efectivo.'**
+  String get cancelCountMessage;
+
+  /// No description provided for @cashVarianceTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Arqueo del cajón'**
+  String get cashVarianceTitle;
+
+  /// No description provided for @cashVarianceBalancedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin diferencia'**
+  String get cashVarianceBalancedLabel;
+
+  /// No description provided for @cashVarianceWithinToleranceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Dentro de tolerancia'**
+  String get cashVarianceWithinToleranceLabel;
+
+  /// No description provided for @cashVarianceOutsideToleranceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fuera de tolerancia'**
+  String get cashVarianceOutsideToleranceLabel;
+
+  /// No description provided for @cashPolicyMaxFloatLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fondo máximo'**
+  String get cashPolicyMaxFloatLabel;
+
+  /// No description provided for @cashMovementReasonHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Ej. compra de hielo'**
+  String get cashMovementReasonHint;
+
+  /// States the amount above which a cash movement needs a manager PIN, shown inside the movement dialog.
+  ///
+  /// In es, this message translates to:
+  /// **'A partir de {amount} se pide el PIN del encargado.'**
+  String cashMovementApprovalHint(String amount);
+
+  /// No description provided for @noSaleDialogHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir el cajón sin venta queda en el historial con tu operador y el motivo.'**
+  String get noSaleDialogHint;
+
+  /// No description provided for @handoffDialogHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El turno pasa al operador entrante. El cajón no se mueve.'**
+  String get handoffDialogHint;
+
+  /// No description provided for @countDialogBlindHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo ciego: el esperado se revela cuando envías tu conteo.'**
+  String get countDialogBlindHint;
+
+  /// Shown in the blind-count dialog when this count replaces an earlier one.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconteo {attempt}: este conteo reemplaza al anterior en el historial.'**
+  String countDialogRecountHint(int attempt);
+
+  /// No description provided for @cashUnavailableTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo leer el cajón'**
+  String get cashUnavailableTitle;
+
+  /// No description provided for @cashUnavailableHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisa la conexión y vuelve a intentar. Si sigue fallando, avisa al encargado antes de cobrar en efectivo.'**
+  String get cashUnavailableHint;
+
+  /// No description provided for @cashStatusReadyToClose.
+  ///
+  /// In es, this message translates to:
+  /// **'Listo para cerrar'**
+  String get cashStatusReadyToClose;
+
+  /// No description provided for @closeDialogApprovalHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Este cierre pide el PIN del encargado.'**
+  String get closeDialogApprovalHint;
+
+  /// Accessible name of the quantity field for one cash denomination.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad de {amount}'**
+  String denominationQuantityLabel(String amount);
+
+  /// No description provided for @cashLastReadLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizado'**
+  String get cashLastReadLabel;
+
+  /// No description provided for @cashLedgerSequenceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Secuencia del libro'**
+  String get cashLedgerSequenceLabel;
+
+  /// No description provided for @cashReadOnlyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo consulta'**
+  String get cashReadOnlyTitle;
+
+  /// No description provided for @cashReadOnlyMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Con tus permisos actuales no hay acciones de caja para este turno. Puedes consultar la cuenta del cajón y el libro del turno; si necesitas mover efectivo o cerrar el turno, pídeselo a un encargado.'**
+  String get cashReadOnlyMessage;
+
+  /// No description provided for @cashDrawerUnansweredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El cajón no respondió. La operación quedó registrada; ábrelo a mano y avisa al encargado.'**
+  String get cashDrawerUnansweredMessage;
+
+  /// No description provided for @cashPolicyUndefinedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin definir'**
+  String get cashPolicyUndefinedLabel;
+
+  /// No description provided for @cashPolicyExpiredTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'La política de caja venció'**
+  String get cashPolicyExpiredTitle;
+
+  /// No description provided for @cashPolicyExpiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta terminal no puede mover efectivo, contar ni cerrar hasta que el propietario publique una política vigente. El dinero del cajón no se toca.'**
+  String get cashPolicyExpiredMessage;
+
+  /// No description provided for @cashPolicyExpiresAtLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Vigente hasta'**
+  String get cashPolicyExpiresAtLabel;
+
+  /// No description provided for @cashPolicyVersionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Versión'**
+  String get cashPolicyVersionLabel;
+
+  /// No description provided for @cashOfflineLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo sin conexión'**
+  String get cashOfflineLabel;
+
+  /// No description provided for @cashOfflineUnavailableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'No disponible aún'**
+  String get cashOfflineUnavailableLabel;
+
+  /// Error on the movement reason field when it is left empty.
+  ///
+  /// In es, this message translates to:
+  /// **'Escribe el motivo del movimiento.'**
+  String get movementReasonRequiredMessage;
+
+  /// Says what a manager is being asked to approve: the operation and its amount.
+  ///
+  /// In es, this message translates to:
+  /// **'Vas a aprobar {operation} de {amount}.'**
+  String cashMovementApprovalScope(String operation, String amount);
+
+  /// Small label above the operation in the manager approval dialog.
+  ///
+  /// In es, this message translates to:
+  /// **'Vas a autorizar'**
+  String get managerApprovalEyebrow;
+
+  /// Secondary button in the manager approval dialog. Abandons the movement, not the screen.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar movimiento'**
+  String get managerApprovalCancelAction;
+
+  /// Says who is expected to enter the PIN in the approval dialog.
+  ///
+  /// In es, this message translates to:
+  /// **'El encargado teclea su PIN.'**
+  String get managerApprovalPinHint;
+
+  /// Says what opening a shift does when the chosen drawer was left behind by a terminal that no longer exists: the previous shift is blocked, uncounted, and the money stays in the drawer.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta caja quedó retenida por una terminal que ya no existe. Si abres el turno aquí, el turno anterior queda bloqueado y sin contar: el dinero sigue en el cajón.'**
+  String get openShiftOnStrandedDrawerMessage;
+
+  /// Says the over/short is inside the policy's tolerance, so the close will not ask a manager for a PIN.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin aprobación'**
+  String get cashVarianceNoApprovalLabel;
+
+  /// Says the over/short is outside the policy's tolerance, so the close will ask a manager for a PIN.
+  ///
+  /// In es, this message translates to:
+  /// **'Pide aprobación'**
+  String get cashVarianceApprovalRequiredLabel;
+
+  /// The till itself is rate-limited: no credential on this device can authorize right now, so retrying is pointless.
+  ///
+  /// In es, this message translates to:
+  /// **'El PIN está bloqueado en esta caja unos minutos. Ningún encargado podrá autorizar hasta que termine el bloqueo.'**
+  String get managerApprovalPinLocked;
+
+  /// The credential matched nothing. Names the two real possibilities: the wrong PIN, or a till with no manager credential enrolled at all.
+  ///
+  /// In es, this message translates to:
+  /// **'Ese PIN no autoriza este movimiento. Prueba con otro encargado; si nadie tiene PIN en esta caja, pide a un administrador que lo dé de alta.'**
+  String get managerApprovalPinRefused;
+
+  /// Heading over the two figures that show what the drawer holds now and what it will hold after the movement.
+  ///
+  /// In es, this message translates to:
+  /// **'Efecto en el cajón'**
+  String get managerApprovalDrawerEffectTitle;
+
+  /// The expected cash in the drawer before the movement the manager is authorizing.
+  ///
+  /// In es, this message translates to:
+  /// **'En el cajón ahora'**
+  String get managerApprovalDrawerNow;
+
+  /// The expected cash in the drawer once the movement is booked.
+  ///
+  /// In es, this message translates to:
+  /// **'Después de este movimiento'**
+  String get managerApprovalDrawerAfter;
+
+  /// Heading of the persistent table detail panel. Combines the word for table with the published table label.
+  ///
+  /// In es, this message translates to:
+  /// **'Mesa {table}'**
+  String tableStatePanelTitle(String table);
+
+  /// Shown in the persistent detail panel before any table is selected.
+  ///
+  /// In es, this message translates to:
+  /// **'Toca una mesa para ver su detalle.'**
+  String get tableStatePanelEmpty;
+
+  /// Heading over the contextual table actions in the detail panel.
+  ///
+  /// In es, this message translates to:
+  /// **'Acciones'**
+  String get tableStatePanelActions;
+
+  /// Label of the row that shows how long a party has held the table.
+  ///
+  /// In es, this message translates to:
+  /// **'Tiempo'**
+  String get tableStateElapsedField;
+
+  /// Label of the row that shows how many tables one party holds.
+  ///
+  /// In es, this message translates to:
+  /// **'Grupo'**
+  String get tableStateGroupField;
 }
 
 class _AppLocalizationsDelegate

@@ -135,8 +135,10 @@ final class RoomRepository implements TableStateRepository {
   MarkTableAwaitingPaymentRequest? awaitingPayment;
 
   @override
-  Future<TableStateMap> read(String merchantId, PosTableStateQuery query) async =>
-      map;
+  Future<TableStateMap> read(
+    String merchantId,
+    PosTableStateQuery query,
+  ) async => map;
 
   @override
   Future<TableStateChangeResult> seat(
@@ -442,7 +444,14 @@ void main() {
     // The turn timer, from the server's clock rather than the device's.
     expect(find.text('2 min'), findsOneWidget);
     // The state is carried by a glyph as well as by colour.
-    expect(find.byIcon(Icons.event_seat), findsOneWidget);
+    // The legend repeats the glyph, so name the map that draws it.
+    expect(
+      find.descendant(
+        of: find.byType(FloorPlanMap),
+        matching: find.byIcon(Icons.event_seat),
+      ),
+      findsOneWidget,
+    );
     final dots = tester.widgetList<FloorPlanSeatDots>(
       find.byType(FloorPlanSeatDots),
     );
@@ -456,14 +465,25 @@ void main() {
   ) async {
     final harness = await pumpSurface(
       tester,
-      repository: RoomRepository(
-        states: [entryJson(t1, tableStateDirty)],
-      ),
+      repository: RoomRepository(states: [entryJson(t1, tableStateDirty)]),
     );
-    expect(find.byIcon(Icons.cleaning_services), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(FloorPlanMap),
+        matching: find.byIcon(Icons.cleaning_services),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('T1'));
     await tester.pumpAndSettle();
-    expect(find.text('Needs cleaning'), findsOneWidget);
+    // The state word appears in the legend too, so name the panel that shows it.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('table-detail-panel')),
+        matching: find.text('Needs cleaning'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Mark ready'));
     await tester.pumpAndSettle();
     expect(harness.room.map.states.first['state'], tableStateOpen);
@@ -490,7 +510,10 @@ void main() {
     expect(harness.room.merged!.tableIds, [t1, t2]);
     expect(harness.room.merged!.partySize, 6);
     // One party is one bounded region, named by the server's group id.
-    expect(find.byKey(const ValueKey('floor-plan-group-$groupId')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('floor-plan-group-$groupId')),
+      findsOneWidget,
+    );
     // And the group can be dissolved from the same table.
     await tester.tap(find.text('T1'));
     await tester.pumpAndSettle();
@@ -528,10 +551,7 @@ void main() {
     expect(harness.room.moved!.fromTableId, t1);
     expect(harness.room.moved!.toTableId, t2);
     // The origin did not restart: the destination inherits the seated time.
-    expect(
-      harness.tableState.stateOf(t2).seatedAt,
-      '2026-09-16T17:30:00.000Z',
-    );
+    expect(harness.tableState.stateOf(t2).seatedAt, '2026-09-16T17:30:00.000Z');
     expect(harness.tableState.elapsedOf(t2), const Duration(minutes: 30));
     expect(tester.takeException(), isNull);
     await harness.dispose(tester);

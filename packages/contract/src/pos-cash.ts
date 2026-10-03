@@ -235,6 +235,11 @@ export const CashShiftPolicy = z
     handoffAllowed: z.boolean(),
     handoffCountRequired: z.boolean(),
     varianceTolerance: NonNegativeMoney,
+    /**
+     * The over/short above which a close needs a manager's approval — a variance
+     * rule, not a drawer-size rule. The till prints it as "PIN cierre:
+     * diferencia > …", and the API gates on `abs(counted - expected)`.
+     */
     closeApprovalThreshold: NonNegativeMoney,
     noSaleDrawerAllowed: z.boolean(),
     offlineCashShiftAllowed: z.boolean(),
@@ -331,6 +336,35 @@ export const CashLedgerEntry = z
     saleId: Uuid.nullable(),
     commandId: Uuid,
     businessDate: MerchantDate,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+
+/**
+ * One line of the drawer's journal, as the till reads it.
+ *
+ * The ledger is append-only and the expected cash is a projection of it, so the
+ * operator who sees a number they did not expect must be able to read the line
+ * that produced it. This is that line: what happened, how much, who, and the
+ * references back to the sale or the movement that caused it.
+ *
+ * `reports.ts` carries `CashLedgerLine`, which is the same table read for the
+ * owner: a signed amount and the audit references, without the sequence or the
+ * operator. Two surfaces, two projections of one append-only fact — deliberately
+ * not one shape bent to serve both.
+ */
+export const CashJournalLine = z
+  .object({
+    sequence: z.number().int().positive(),
+    type: CashLedgerEntryType,
+    amount: Money,
+    cashReceived: NonNegativeMoney,
+    changeGiven: NonNegativeMoney,
+    saleId: Uuid.nullable(),
+    receiptNumber: z.string().min(1).max(80).nullable(),
+    operatorReference: z.string().min(1).max(120).nullable(),
+    reasonCode: z.string().min(1).max(80).nullable(),
+    note: SafeNote,
     occurredAt: IsoTimestamp,
   })
   .strict();
@@ -445,6 +479,39 @@ export const RecountRequest = z
     priorCountAttemptId: Uuid,
     reasonCode: z.string().min(1).max(80),
     expectedShiftVersion: z.number().int().positive(),
+  })
+  .strict();
+
+/**
+ * UNDO A COUNT THAT SHOULD NOT HAVE HAPPENED.
+ *
+ * A count moves the drawer out of `open`, and no money can be booked to a
+ * drawer under count. That is the right lock — a sale that lands while the
+ * cashier is counting belongs to neither number — but it also means one tap on
+ * the count button at the wrong moment freezes the till until somebody closes
+ * the shift.
+ *
+ * So the drawer can go back to `open`, under one condition the server proves
+ * itself: the ledger has not moved since the count. `expectedLedgerSequence` is
+ * the sequence the caller read, and the count's own recorded sequence must equal
+ * the shift's current sequence. A count followed by any cash fact is a count
+ * that has to be resolved, not erased.
+ *
+ * The count attempt stays. It is an immutable observation of a drawer at a
+ * moment, and the history is more useful with it than without it.
+ */
+export const CancelCashCountRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    expectedShiftVersion: z.number().int().positive(),
+    expectedLedgerSequence: z.number().int().min(0),
+    reasonCode: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9_.-]+$/),
   })
   .strict();
 
@@ -777,6 +844,12 @@ export const CashCenterSnapshot = z
     registers: z.array(PhysicalRegister).max(100),
     currentShift: CashShift.nullable(),
     /**
+     * The current shift's journal, in sequence order. Bounded on purpose: the
+     * till shows the shift in front of it, and the whole history belongs to the
+     * back office.
+     */
+    ledger: z.array(CashJournalLine).max(200),
+    /**
      * The operator's own open shift, sitting on a terminal that is not this one. It
      * appears when this device cannot find a shift of its own but the operator still
      * has one somewhere — the ordinary shape of a web POS that lost its stored
@@ -819,6 +892,7 @@ export type RegisterHold = z.infer<typeof RegisterHold>;
 export type CashShiftStatus = z.infer<typeof CashShiftStatus>;
 export type CashMovementType = z.infer<typeof CashMovementType>;
 export type CashLedgerEntryType = z.infer<typeof CashLedgerEntryType>;
+export type CashJournalLine = z.infer<typeof CashJournalLine>;
 export type CashCountState = z.infer<typeof CashCountState>;
 export type CashVariance = z.infer<typeof CashVariance>;
 export type CashVarianceReason = z.infer<typeof CashVarianceReason>;
@@ -845,6 +919,7 @@ export type CashCenterSnapshot = z.infer<typeof CashCenterSnapshot>;
 export type ShiftTransitionRequest = z.infer<typeof ShiftTransitionRequest>;
 export type ShiftHandoffRequest = z.infer<typeof ShiftHandoffRequest>;
 export type RecountRequest = z.infer<typeof RecountRequest>;
+export type CancelCashCountRequest = z.infer<typeof CancelCashCountRequest>;
 export type NoSaleDrawerRequest = z.infer<typeof NoSaleDrawerRequest>;
 export type NoSaleDrawerEvent = z.infer<typeof NoSaleDrawerEvent>;
 export type ShiftHandoff = z.infer<typeof ShiftHandoff>;
@@ -872,6 +947,7 @@ export const posCashModels = {
   CashMovementType,
   CashLedgerEntryType,
   CashLedgerEntry,
+  CashJournalLine,
   CashMovementRequest,
   CashMovement,
   ExpectedCash,
@@ -886,6 +962,7 @@ export const posCashModels = {
   ResolveCashVarianceRequest,
   CashCountSummary,
   RecountRequest,
+  CancelCashCountRequest,
   CashApprovalRequest,
   CashApprovalResult,
   ShiftTransitionRequest,

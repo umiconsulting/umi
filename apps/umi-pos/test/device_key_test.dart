@@ -30,8 +30,12 @@ void main() {
   });
 
   test('a fresh store yields a different device key', () async {
-    final one = await SoftwareDeviceKey(MemorySecureStorage()).ensurePublicKey();
-    final two = await SoftwareDeviceKey(MemorySecureStorage()).ensurePublicKey();
+    final one = await SoftwareDeviceKey(
+      MemorySecureStorage(),
+    ).ensurePublicKey();
+    final two = await SoftwareDeviceKey(
+      MemorySecureStorage(),
+    ).ensurePublicKey();
     expect(one, isNot(two));
   });
 

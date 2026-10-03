@@ -47,6 +47,45 @@ msgid "{name} es para operadores de Umi."
 msgstr "{name} is for Umi operators."
 
 #: src/app.jsx
+msgid "Cargando el negocio"
+msgstr "Loading the business"
+
+#: src/app.jsx
+msgid "No se pudo cargar el negocio"
+msgstr "The business could not be loaded"
+
+#: src/app.jsx
+msgid "Esta cuenta no tiene negocios"
+msgstr "This account has no businesses"
+
+#: src/app.jsx
+msgid "Sin negocio seleccionado"
+msgstr "No business selected"
+
+#: src/app.jsx
+msgid "Un momento."
+msgstr "One moment."
+
+#: src/app.jsx
+msgid "La consola no pudo leer tus negocios. Revisa la conexión y vuelve a cargar."
+msgstr "The console could not read your businesses. Check the connection and reload."
+
+#: src/app.jsx
+msgid "La cuenta con la que entraste no tiene acceso a ningún negocio todavía."
+msgstr "The account you signed in with does not have access to any business yet."
+
+#: src/app.jsx
+msgid "Elige un negocio en la barra lateral."
+msgstr "Choose a business in the sidebar."
+
+#: src/app.jsx
+#: src/screens/customers.jsx
+#: src/screens/floor-plan.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Recargar"
+msgstr "Top up"
+
+#: src/app.jsx
 msgid "Cargando negocio…"
 msgstr "Loading business…"
 
@@ -83,8 +122,8 @@ msgid "Sin mensajes en esta conversación."
 msgstr "No messages in this conversation."
 
 #: src/components/page-head.jsx
-msgid "{value} {of} {noun}"
-msgstr "{value} {of} {noun}"
+#~ msgid "{value} {of} {noun}"
+#~ msgstr "{value} {of} {noun}"
 
 #: src/data.jsx
 msgid "Sesión expirada"
@@ -497,6 +536,16 @@ msgid "por id"
 msgstr "by id"
 
 #: src/screens/caja-turnos.jsx
+#~ msgid "Efectivo esperado en caja"
+#~ msgstr "Expected cash in drawer"
+
+#. placeholder {0}: signedMoney(worst.varianceMinorUnits, currency)
+#. placeholder {1}: worst.businessDate
+#: src/screens/caja-turnos.jsx
+#~ msgid "Peor día: {0}, el {1}"
+#~ msgstr "Worst day: {0}, on {1}"
+
+#: src/screens/caja-turnos.jsx
 msgid "Abriendo"
 msgstr "Opening"
 
@@ -577,6 +626,93 @@ msgid "Arqueo"
 msgstr "Count"
 
 #: src/screens/caja-turnos.jsx
+msgid "Sin turnos cerrados todavía. La tendencia aparece con el primer cierre."
+msgstr "No closed shifts yet. The trend appears with the first close."
+
+#: src/screens/caja-turnos.jsx
+msgid "1 día con cierre"
+msgstr "1 day with a close"
+
+#. placeholder {0}: series.length
+#: src/screens/caja-turnos.jsx
+msgid "{0} días con cierre"
+msgstr "{0} days with a close"
+
+#. placeholder {0}: signedMoney(worst.varianceMinorUnits, currency)
+#. placeholder {1}: worst.businessDate
+#: src/screens/caja-turnos.jsx
+msgid "Peor día {0} el {1}"
+msgstr "Worst day {0} on {1}"
+
+#: src/screens/caja-turnos.jsx
+msgid "Todas"
+msgstr "All"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/gift-cards.jsx
+msgid "Abiertas"
+msgstr "Open"
+
+#: src/screens/caja-turnos.jsx
+msgid "Requieren atención"
+msgstr "Need attention"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cerradas"
+msgstr "Closed"
+
+#: src/screens/caja-turnos.jsx
+msgid "Ordenar por esta columna"
+msgstr "Sort by this column"
+
+#: src/screens/caja-turnos.jsx
+msgid "Buscar por caja u operador"
+msgstr "Search by drawer or operator"
+
+#: src/screens/caja-turnos.jsx
+msgid "Buscar caja u operador"
+msgstr "Search drawer or operator"
+
+#: src/screens/caja-turnos.jsx
+msgid "Caja"
+msgstr "Drawer"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/recibos.jsx
+#: src/screens/reembolsos.jsx
+msgid "Operador"
+msgstr "Operator"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/recibos.jsx
+msgid "Fecha comercial"
+msgstr "Business date"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/gift-cards.jsx
+#: src/screens/inventory-costing.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/recibos.jsx
+msgid "Estado"
+msgstr "Status"
+
+#: src/screens/caja-turnos.jsx
+msgid "Esperado"
+msgstr "Expected"
+
+#: src/screens/caja-turnos.jsx
+msgid "Contado"
+msgstr "Counted"
+
+#: src/screens/caja-turnos.jsx
+msgid "Diferencia"
+msgstr "Variance"
+
+#: src/screens/caja-turnos.jsx
+msgid "Ningún turno coincide con el filtro."
+msgstr "No shift matches the filter."
+
+#: src/screens/caja-turnos.jsx
 #: src/screens/operations-workspace.jsx
 #: src/screens/orders.jsx
 #: src/screens/recibos.jsx
@@ -642,10 +778,6 @@ msgid "Pendiente"
 msgstr "Pending"
 
 #: src/screens/caja-turnos.jsx
-msgid "Diferencia"
-msgstr "Variance"
-
-#: src/screens/caja-turnos.jsx
 msgid "Denominaciones de apertura"
 msgstr "Opening denominations"
 
@@ -679,20 +811,49 @@ msgid "Trazabilidad del turno"
 msgstr "Shift traceability"
 
 #: src/screens/caja-turnos.jsx
+msgid "Custodia de efectivo"
+msgstr "Cash custody"
+
+#: src/screens/caja-turnos.jsx
+msgid "{daysCovered} días comerciales en la ventana de turnos cargada."
+msgstr "{daysCovered} business days in the loaded shift window."
+
+#: src/screens/caja-turnos.jsx
+msgid "La ventana de turnos cargada cubre un día comercial."
+msgstr "The loaded shift window covers one business day."
+
+#: src/screens/caja-turnos.jsx
 msgid "Cajas abiertas"
 msgstr "Open drawers"
 
 #: src/screens/caja-turnos.jsx
-msgid "Efectivo esperado en caja"
-msgstr "Expected cash in drawer"
+msgid "ahora mismo"
+msgstr "right now"
 
 #: src/screens/caja-turnos.jsx
-msgid "Requieren atención"
-msgstr "Need attention"
+msgid "en las cajas abiertas"
+msgstr "across the open drawers"
+
+#: src/screens/caja-turnos.jsx
+msgid "arqueo, traspaso o cierre"
+msgstr "count, handoff, or close"
 
 #: src/screens/caja-turnos.jsx
 msgid "Diferencia neta"
 msgstr "Net variance"
+
+#. placeholder {0}: closed.length
+#: src/screens/caja-turnos.jsx
+msgid "{0} turnos cerrados"
+msgstr "{0} closed shifts"
+
+#: src/screens/caja-turnos.jsx
+msgid "sin cierres en la ventana"
+msgstr "no closes in the window"
+
+#: src/screens/caja-turnos.jsx
+msgid "Diferencia neta por día comercial"
+msgstr "Net difference by business day"
 
 #: src/screens/caja-turnos.jsx
 msgid "Cargando turnos…"
@@ -936,6 +1097,7 @@ msgid "Aún no ha comprado."
 msgstr "Has not bought yet."
 
 #: src/screens/customers.jsx
+#: src/screens/floor-plan.jsx
 msgid "En mesa"
 msgstr "Dine-in"
 
@@ -1263,12 +1425,6 @@ msgstr "Topping up…"
 #: src/screens/customers.jsx
 msgid "Recargar ${pesos}"
 msgstr "Top up ${pesos}"
-
-#: src/screens/customers.jsx
-#: src/screens/floor-plan.jsx
-#: src/screens/recipe-workspace.jsx
-msgid "Recargar"
-msgstr "Top up"
 
 #: src/screens/customers.jsx
 #: src/screens/settings.jsx
@@ -2125,6 +2281,7 @@ msgid "Elige un registro"
 msgstr "Choose a register"
 
 #: src/screens/devices.jsx
+#: src/screens/staff.jsx
 msgid "Quitando…"
 msgstr "Removing…"
 
@@ -2476,6 +2633,27 @@ msgid "Propiedades"
 msgstr "Properties"
 
 #: src/screens/floor-plan.jsx
+msgid "Estado de la mesa"
+msgstr "Table state"
+
+#: src/screens/floor-plan.jsx
+msgid "Mesa"
+msgstr "Table"
+
+#: src/screens/floor-plan.jsx
+msgid "Capacidad"
+msgstr "Capacity"
+
+#: src/screens/floor-plan.jsx
+#: src/screens/staff.jsx
+msgid "Personas"
+msgstr "People"
+
+#: src/screens/floor-plan.jsx
+msgid "Grupo"
+msgstr "Group"
+
+#: src/screens/floor-plan.jsx
 msgid "Forma"
 msgstr "Shape"
 
@@ -2490,10 +2668,6 @@ msgstr "Round"
 #: src/screens/floor-plan.jsx
 msgid "Cuadrada"
 msgstr "Square"
-
-#: src/screens/floor-plan.jsx
-msgid "Capacidad"
-msgstr "Capacity"
 
 #: src/screens/floor-plan.jsx
 msgid "Ancho"
@@ -2642,10 +2816,6 @@ msgid "Emitir tarjeta"
 msgstr "Issue card"
 
 #: src/screens/gift-cards.jsx
-msgid "Abiertas"
-msgstr "Open"
-
-#: src/screens/gift-cards.jsx
 msgid "Saldo abierto en esta página"
 msgstr "Open balance on this page"
 
@@ -2671,13 +2841,6 @@ msgstr "Recipient"
 #: src/screens/reembolsos.jsx
 msgid "Monto"
 msgstr "Amount"
-
-#: src/screens/gift-cards.jsx
-#: src/screens/inventory-costing.jsx
-#: src/screens/operations-workspace.jsx
-#: src/screens/recibos.jsx
-msgid "Estado"
-msgstr "Status"
 
 #: src/screens/gift-cards.jsx
 msgid "Creada"
@@ -6392,15 +6555,6 @@ msgid "No se pudo cargar el detalle de esta venta."
 msgstr "This sale's detail could not be loaded."
 
 #: src/screens/recibos.jsx
-#: src/screens/reembolsos.jsx
-msgid "Operador"
-msgstr "Operator"
-
-#: src/screens/recibos.jsx
-msgid "Fecha comercial"
-msgstr "Business date"
-
-#: src/screens/recibos.jsx
 msgid "Concepto"
 msgstr "Item"
 
@@ -7315,6 +7469,14 @@ msgstr "e.g. the downtown one, next to the park"
 #~ msgstr "Role permissions are managed under Roles and permissions."
 
 #: src/screens/staff.jsx
+#~ msgid "Pierde el acceso a UmiPOS en cuanto confirmes. Si está trabajando en una caja, su sesión se cierra en ese momento y se le pedirá el PIN otra vez: el pedido que tenía abierto se queda en esa caja y vuelve a aparecer cuando entre de nuevo."
+#~ msgstr "They lose access to UmiPOS as soon as you confirm. If they are working at a till, that session ends right then and they will be asked for their PIN again: the order they had open stays at that till, and comes back when they sign in."
+
+#: src/screens/staff.jsx
+#~ msgid "No se borra nada: el historial de sus turnos y ventas se conserva, y puedes devolverle el acceso desde esta misma pantalla cuando quieras."
+#~ msgstr "Nothing is deleted: their shift and sales history is kept, and you can hand the access back from this same screen whenever you want."
+
+#: src/screens/staff.jsx
 msgid "Admin"
 msgstr "Admin"
 
@@ -7381,10 +7543,6 @@ msgid "Secciones de equipo y acceso"
 msgstr "Team and access sections"
 
 #: src/screens/staff.jsx
-msgid "Personas"
-msgstr "People"
-
-#: src/screens/staff.jsx
 msgid "Roles"
 msgstr "Roles"
 
@@ -7427,6 +7585,23 @@ msgstr "Only the owner can manage an Admin access."
 #: src/screens/staff.jsx
 msgid "Administrar rol y PIN"
 msgstr "Manage role and PIN"
+
+#: src/screens/staff.jsx
+msgid "Equipo · Acceso"
+msgstr "Team · Access"
+
+#. placeholder {0}: person.name
+#: src/screens/staff.jsx
+msgid "Quitar el acceso a {0}"
+msgstr "Remove {0}'s access"
+
+#: src/screens/staff.jsx
+msgid "Su sesión en la caja se cierra ahora y se le pedirá el PIN otra vez. El pedido que tenía abierto se queda ahí. No se borra nada: puedes devolverle el acceso desde esta pantalla."
+msgstr "Their till session ends now and they will be asked for their PIN again. The order they had open stays there. Nothing is deleted: you can hand the access back from this screen."
+
+#: src/screens/staff.jsx
+msgid "Quitar el acceso"
+msgstr "Remove access"
 
 #: src/screens/staff.jsx
 msgid "Nuevo rol"

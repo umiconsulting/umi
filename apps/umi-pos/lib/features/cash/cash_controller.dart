@@ -19,6 +19,7 @@ final class CashState {
     this.resolution,
     this.reconciliation,
     this.closeResult,
+    this.drawerUnanswered = false,
   });
 
   final bool busy;
@@ -28,6 +29,12 @@ final class CashState {
   final CashVarianceResolution? resolution;
   final ShiftReconciliation? reconciliation;
   final ShiftCloseResult? closeResult;
+
+  /// The last committed command asked the hardware to open the drawer, and the
+  /// hardware did not answer. The money is recorded — a drawer failure never
+  /// changes a financial fact — but somebody has to open the drawer by hand, and
+  /// the till is the only thing that knows it.
+  final bool drawerUnanswered;
 }
 
 final class CommittedCashHardwareAction {
@@ -46,16 +53,30 @@ final class CashController extends ChangeNotifier {
   CashController({
     required CashRepository repository,
     CashRecoveryStore? recoveryStore,
-    Future<void> Function(CommittedCashHardwareAction action)? afterCommit,
+    Future<bool> Function(CommittedCashHardwareAction action)? afterCommit,
   }) : _repository = repository,
        _recoveryStore = recoveryStore ?? MemoryCashRecoveryStore(),
        _afterCommit = afterCommit;
 
   final CashRepository _repository;
   final CashRecoveryStore _recoveryStore;
-  final Future<void> Function(CommittedCashHardwareAction action)? _afterCommit;
+
+  /// Runs the hardware a committed command asks for, and answers whether the
+  /// hardware took it. The controller does not know what a drawer is; it knows
+  /// that something the operator asked for either happened or did not.
+  final Future<bool> Function(CommittedCashHardwareAction action)? _afterCommit;
   CashState _state = const CashState();
   CashState get state => _state;
+
+  /// When the server last answered this screen with a snapshot.
+  ///
+  /// The drawer's figures are a reading, not a live feed: the till asks, the
+  /// answer is a moment old, and the operator may be looking at a number that
+  /// predates the cash somebody else just put in the drawer. The screen says the
+  /// moment, so "is this current?" is answerable without pressing refresh to find
+  /// out. Null before the first answer.
+  DateTime? _lastReadAt;
+  DateTime? get lastReadAt => _lastReadAt;
   String? _merchantId;
   String? _locationId;
   String? _operatorSessionId;
@@ -163,6 +184,7 @@ final class CashController extends ChangeNotifier {
         }
       }
       final restored = _restore(snapshot);
+      _lastReadAt = DateTime.now();
       _set(
         CashState(
           snapshot: restored.snapshot,
@@ -183,10 +205,7 @@ final class CashController extends ChangeNotifier {
       // resolves is that sentence in the negative. Found by driving the real app
       // against a failing API (defect D26).
       _set(
-        CashState(
-          snapshot: _state.snapshot,
-          errorCode: unexpectedFailureCode,
-        ),
+        CashState(snapshot: _state.snapshot, errorCode: unexpectedFailureCode),
       );
     }
   }
@@ -254,7 +273,8 @@ final class CashController extends ChangeNotifier {
     for (final register in snapshot.registers) {
       if (register['id'] != shift['registerId']) continue;
       final hold = register['hold'];
-      return hold is Map<String, Object?> && hold['state'] == 'held_by_this_device';
+      return hold is Map<String, Object?> &&
+          hold['state'] == 'held_by_this_device';
     }
     return false;
   }
@@ -568,6 +588,38 @@ final class CashController extends ChangeNotifier {
     });
   }
 
+  /// Put the drawer back to open because the count should not have happened.
+  ///
+  /// The server refuses unless the ledger has stood still since the count and
+  /// nobody has recorded a variance reason, so this cannot erase a fact that
+  /// money has already moved through. The count stays in the history.
+  Future<void> cancelCount({
+    String reasonCode = 'count_opened_in_error',
+  }) async {
+    final shift = _requireShift();
+    final count = _state.count;
+    if (count == null) throw StateError('A prior count is required.');
+    await _perform(() async {
+      final ids = await _commandIds('cancel_count');
+      await _repository.cancelCount(
+        _merchantId!,
+        shift['id']! as String,
+        CancelCashCountRequest(
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+          commandId: ids.commandId,
+          idempotencyKey: ids.idempotencyKey,
+          shiftId: shift['id']! as String,
+          expectedShiftVersion: shift['version']! as int,
+          expectedLedgerSequence: count.count['ledgerSequence']! as int,
+          reasonCode: reasonCode,
+        ),
+      );
+      await _completeCommand(ids);
+      await _reload();
+    });
+  }
+
   Future<String> approveVariance(String managerPin) async {
     final count = _state.count;
     final fingerprint = count?.approvalFingerprint;
@@ -819,6 +871,7 @@ final class CashController extends ChangeNotifier {
         (snapshot.reconciliation == null
             ? null
             : ShiftReconciliation.fromJson(snapshot.reconciliation!));
+    _lastReadAt = DateTime.now();
     _set(
       CashState(
         snapshot: snapshot,
@@ -957,7 +1010,31 @@ final class CashController extends ChangeNotifier {
   void _runPostCommit(CommittedCashHardwareAction action) {
     final callback = _afterCommit;
     if (callback == null) return;
-    unawaited(callback(action).catchError((Object _) {}));
+    unawaited(
+      callback(action).then((answered) {
+        // The command is already committed, so this is not an error: it is a
+        // fact about the drawer that the operator standing in front of it has
+        // no other way to learn. It used to be swallowed on purpose, and the
+        // result was a person pressing "abrir cajón", watching nothing happen,
+        // and being told nothing.
+        if (!answered) _noteDrawerUnanswered();
+      }, onError: (Object _) => _noteDrawerUnanswered()),
+    );
+  }
+
+  void _noteDrawerUnanswered() {
+    if (!_hasContext || _state.drawerUnanswered) return;
+    _set(
+      CashState(
+        snapshot: _state.snapshot,
+        errorCode: _state.errorCode,
+        count: _state.count,
+        resolution: _state.resolution,
+        reconciliation: _state.reconciliation,
+        closeResult: _state.closeResult,
+        drawerUnanswered: true,
+      ),
+    );
   }
 
   Future<String?> _recoverPendingCommand() async {

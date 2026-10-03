@@ -93,6 +93,9 @@ const StaffScreen = () => {
   const { t, i18n } = useLingui();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  // Whose access the owner is about to remove, held here until they confirm.
+  const [confirmingDisable, setConfirmingDisable] = useState(null);
+  const [disabling, setDisabling] = useState(false);
   const [filter, setFilter] = useState('ALL');
   const [refresh, setRefresh] = useState(0);
   const [rosterError, setRosterError] = useState(null);
@@ -119,12 +122,16 @@ const StaffScreen = () => {
   };
 
   async function disable(person) {
+    setDisabling(true);
     try {
       setRosterError(null);
       await deleteStaffMember(person.id);
+      setConfirmingDisable(null);
       reload();
     } catch (error) {
       setRosterError(error.message || t`No se pudo desactivar el acceso.`);
+    } finally {
+      setDisabling(false);
     }
   }
 
@@ -315,7 +322,9 @@ const StaffScreen = () => {
                           icon: I.Trash,
                           danger: true,
                           disabled: locked,
-                          onSelect: () => disable(person),
+                          // Asks first. The action is reversible, but it is not
+                          // small: it ends a working session at the till.
+                          onSelect: () => setConfirmingDisable(person),
                         },
                       ]}
                       renderTrigger={({ ref, props }) => (
@@ -377,6 +386,80 @@ const StaffScreen = () => {
           onReload={reloadRoles}
         />
       )}
+      {confirmingDisable ? (
+        <DisableAccessDialog
+          person={confirmingDisable}
+          busy={disabling}
+          onCancel={() => setConfirmingDisable(null)}
+          onConfirm={() => disable(confirmingDisable)}
+        />
+      ) : null}
+    </div>
+  );
+};
+
+/**
+ * Asks before removing someone's till access, and says what the action really
+ * does.
+ *
+ * The menu item says "Desactivar acceso", and the API behind it is a soft
+ * delete — this is the reversible one. That is exactly why it needed asking
+ * about: it reads like housekeeping, and it is not. The moment the staff row
+ * goes to `disabled`, the database ends that operator's live session, so a
+ * barista who is halfway through an order with a customer is dropped back to
+ * the PIN pad. The order survives — it is parked at the till and comes back when
+ * they sign in again — but it stops them mid-sentence, and the person clicking
+ * this button cannot see that from here.
+ *
+ * So the dialog says the consequence in plain words, names the person, and makes
+ * clear that nothing is deleted and the access can be handed back from this same
+ * screen. Three facts, one paragraph: a card that reads heavier than the act
+ * invites the owner to click through it without reading.
+ */
+const DisableAccessDialog = ({ person, busy, onCancel, onConfirm }) => {
+  const { t } = useLingui();
+  return (
+    <div className="modal-backdrop" onClick={() => !busy && onCancel()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 14,
+          }}
+        >
+          <div>
+            <div className="eyebrow">
+              <Trans>Equipo · Acceso</Trans>
+            </div>
+            <h2 className="h-section" style={{ marginTop: 4 }}>
+              <Trans>Quitar el acceso a {person.name}</Trans>
+            </h2>
+          </div>
+          <button className="btn-icon" disabled={busy} onClick={onCancel} aria-label={t`Cerrar`}>
+            <I.X size={16} />
+          </button>
+        </div>
+        {/* One paragraph, three facts, in the order they matter to the person
+            clicking: what stops now, what happens to the order they were on,
+            and that it can be undone. A second block restating the third fact
+            in a grey panel made the card read heavier than the act. */}
+        <p style={{ margin: 0, color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5 }}>
+          <Trans>
+            Su sesión en la caja se cierra ahora y se le pedirá el PIN otra vez. El pedido que tenía
+            abierto se queda ahí. No se borra nada: puedes devolverle el acceso desde esta pantalla.
+          </Trans>
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
+          <button className="btn btn-ghost" disabled={busy} onClick={onCancel}>
+            <Trans>Cancelar</Trans>
+          </button>
+          <button className="btn btn-primary focusable" disabled={busy} onClick={onConfirm}>
+            {busy ? <Trans>Quitando…</Trans> : <Trans>Quitar el acceso</Trans>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

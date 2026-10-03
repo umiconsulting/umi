@@ -815,17 +815,23 @@ table th {
 }
 
 .role-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* Three pills per row is what the 480px sheet fits. A grid keeps every pill the same
+     width, so the last one no longer stretches to fill a row of its own. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
   gap: 8px;
 }
 .role-tab {
-  flex: 1 1 120px;
   height: 32px;
   justify-content: center;
   border: 1px solid transparent;
   opacity: 0.65;
+}
+/* Seven roles land as three rows of three plus one. The lone pill keeps the size of its
+   peers and sits on the centre column, instead of spanning the row as a wide button. */
+.role-tab:last-child:nth-child(3n + 1) {
+  grid-column: 2;
 }
 
 .roles-workspace {
@@ -3664,6 +3670,7 @@ time,
    trazabilidad each stack into one column. ===== */
 @media (max-width: 1080px) {
   .caja-grid,
+  .cash-pulse-grid,
   .ventas-grid,
   .cash-detail-grid {
     grid-template-columns: 1fr !important;
