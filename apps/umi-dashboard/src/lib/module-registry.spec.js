@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getModuleAvailability,
-  getVisibleModules,
-  missingLocationFor,
-} from './module-registry.js';
+import { getModuleAvailability, getVisibleModules, missingLocationFor } from './module-registry.js';
 import { i18n, activateTestLocale } from '@/test/i18n.jsx';
 
 const capabilities = (permissions) => ({
