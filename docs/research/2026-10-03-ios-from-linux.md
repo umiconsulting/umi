@@ -84,18 +84,30 @@ Labels: **Documented fact**, **Source-backed tradeoff**, **Inference**, **UNVERI
 
 **Inference.** One CI job, three steps, in this order.
 
-1. **Prove it compiles.** `flutter build ios --no-codesign` on a macOS runner. This is the cheapest useful result, because nothing has ever built the iOS target. It also fails loudly on the two known gaps: the missing iOS entitlements file and the iOS 13.0 deployment target that sits below Flutter's iOS 15 floor.
+1. **Prove it compiles.** `flutter build ios --no-codesign` on a macOS runner. This is the cheapest useful result, because nothing has ever built the iOS target. When this was written it failed loudly on two known gaps: there was no iOS entitlements file, and the deployment target is iOS 13.0, below Flutter's iOS 15 floor.
 2. **Sign and upload.** `flutter build ipa`, then upload to App Store Connect with an API key.
 3. **Install and test.** TestFlight internal testing on the real iPhone.
 
+**Update, later the same day.** Step 1 ran and went green (run 37144730213). `Runner.entitlements` now exists and is wired through `CODE_SIGN_ENTITLEMENTS` on all three Runner configurations; it carries the keychain access group the Secure Enclave signer stores the device key in, so a session cannot be duplicated onto a second device. The iOS 13.0 deployment target remains and is a decision, not a build blocker.
+
+**Documented fact — there is no Keychain Sharing checkbox in the portal.** Apple's "Sharing access to keychain items among a collection of apps" says: "Xcode handles the application identifier (app ID) for you when you set the bundle ID. You set the others by manipulating capabilities in Xcode." It also states that an app is "always part of at least one group that contains only itself", named from the app ID, and that "if you don't specify any keychain access groups, then the app ID is the default". A search of the Certificates, Identifiers & Profiles capability list returns no Keychain Sharing row: it is an Xcode capability, and it is nothing more than the entitlement this repository now carries. Apple lists "Keychain sharing" on its supported-capabilities page as a name only.
+
+**Inference, corrected.** Registration of the App ID is still required, because automatic signing fetches a provisioning profile for that bundle ID; but no capability has to be enabled on it. `flutter build ipa` signs with `-allowProvisioningUpdates`, so Xcode does that from the App Manager key on the first run, and no profile or `.p12` is needed in the secrets. An earlier revision of this document said the App ID had to "allow Keychain Sharing"; that was wrong.
+
+**Inference.** For the same reason the entitlement file is not what makes the device key work: `DeviceKeySigner` sets no `kSecAttrAccessGroup` on the key it creates, so the key lands in the app ID's default group whether or not the file exists. The file earns its place by making the group explicit in the project and by letting a companion app or extension join it with one added string. It does no harm: the group it names is the default group, which every provisioning profile already carries, so there is nothing for signing to conflict with.
+
+**Documented fact.** The Secure Enclave backend is opt-in. `apps/umi-pos/lib/core/config/app_config.dart` reads `UMIPOS_DEVICE_KEY`, and only the value `keystore` selects `KeystoreDeviceKey(MethodChannelKeystore())`; the default is the software Ed25519 key. Nothing in the repository set that define when this was written, so a shipped build would have used the software key and the entitlement would not have been exercised. The signed workflow now passes `--dart-define=UMIPOS_DEVICE_KEY=keystore`, and the simulator artifact deliberately does not, because a simulator has no Secure Enclave.
+
 The job needs four secrets, all from the Apple Developer account:
 
-| Secret                                               | Where it comes from                                       |
-| ---------------------------------------------------- | --------------------------------------------------------- |
-| App Store Connect API key (`.p8`, key id, issuer id) | App Store Connect, Users and Access, Integrations         |
-| Distribution certificate (`.p12` plus password)      | Apple Developer portal, or `xcodebuild` on a macOS runner |
-| Provisioning profile                                 | Apple Developer portal                                    |
-| Apple team id                                        | Apple Developer portal, Membership                        |
+| Secret                                  | Where it comes from                               |
+| --------------------------------------- | ------------------------------------------------- |
+| App Store Connect key id (`ASC_KEY_ID`) | App Store Connect, Users and Access, Integrations |
+| The `.p8` file (`ASC_KEY_P8`)           | Same place; the key downloads once                |
+| Issuer id (`ASC_ISSUER_ID`)             | Shown beside the key                              |
+| Apple team id (`ASC_TEAM_ID`)           | Apple Developer portal, Membership                |
+
+**Inference.** There is no `.p12` and no provisioning profile in these secrets. Automatic signing creates both on the runner from the App Manager key, which is why the key needs that role and nothing else.
 
 **Inference.** Step 1 alone is worth doing today. It is free, it needs no Apple secrets, and it answers a question that is currently open: does the iOS target compile at all?
 

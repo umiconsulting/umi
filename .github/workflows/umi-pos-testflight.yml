@@ -1,0 +1,330 @@
+name: umi-pos testflight
+
+# Builds a signed iPhone build of the till and sends it to TestFlight, so a real
+# iPhone can install it from the TestFlight app. No Mac is needed anywhere: this
+# runs on GitHub's Apple-silicon runner.
+#
+# WHY `workflow_dispatch` ONLY. This publishes a build to Apple and needs four
+# secrets from the Apple Developer account. It must not run on every pull
+# request, and it must not run on a merge.
+#
+# ⚠️ IT NEEDS ONE RUN BEFORE GITHUB WILL DISPATCH IT. `gh workflow run` and the
+# REST endpoint answer 404 "not found on the default branch" for a workflow the
+# repository has never run — even though this file is on the branch you name.
+# Dispatch of `umi-pos ios` works for exactly that reason, and not because that
+# file is on the default branch, which it is not. This workflow was registered
+# by a throwaway push trigger on a branch that was then deleted; if this file is
+# ever renamed or removed, register it the same way, or put it on `main`.
+#
+# WHY SIGNING IS MANUAL, WHICH COST THREE RUNS TO LEARN.
+#
+# Run 37216747459 stopped in the archive: "No valid code signing certificates
+# were found ... No development certificates available to code sign app for
+# device deployment". The Runner target names no DEVELOPMENT_TEAM, and the export
+# options only cover the export step.
+#
+# Run 37216936520, with the team supplied through FLUTTER_XCODE_DEVELOPMENT_TEAM,
+# got past that and stopped one layer deeper: "No Accounts: Add a new account in
+# Accounts settings" plus "No profiles for 'co.umiconsulting.umiPos' were
+# found". `-allowProvisioningUpdates` alone looks for an Apple ID signed into
+# Xcode's Accounts pane, which a runner does not have.
+#
+# Run 37217382884 named the key explicitly — xcodebuild's man page documents
+# -authenticationKeyPath, -authenticationKeyID and -authenticationKeyIssuerID
+# for exactly this — and cloud signing still refused: "exportArchive Cloud
+# signing permission error", "No signing certificate 'iOS Distribution' found".
+# The permission was not the problem. The same key created an IOS_DISTRIBUTION
+# certificate through the REST API and got HTTP 201 on the first try. It is
+# Xcode's cloud signing service that will not run headless here.
+#
+# So the account now holds one distribution certificate and one App Store
+# profile, created once, out of band, with the App Store Connect key. They travel
+# in the three secrets below, are installed on the runner, and are used with
+# MANUAL signing. No step of the build needs to reach Apple to sign anything.
+#
+# Run 37217956797 confirmed the identity installs and the archive builds, then
+# failed on scoping: FLUTTER_XCODE_* is a build setting for every target, so the
+# profile went to Pods and to the Swift packages too, and the archive stopped at
+# "flutter_secure_storage does not support provisioning profiles ... but
+# provisioning profile UMI POS App Store has been manually specified". Signing
+# settings are therefore NOT passed to the archive at all. The archive is built
+# with --no-codesign and the profile is applied at export, where
+# `provisioningProfiles` scopes it to the app's bundle id.
+#
+# ⚠️ THE UPLOAD STEP IS STILL UNEXERCISED. Nothing has reached App Store Connect
+# yet, so a later failure in the export or in `altool` is still possible and is
+# not evidence that the app is broken.
+#
+# THE SEVEN SECRETS (repository settings, Actions, Secrets):
+#
+#   ASC_KEY_ID    the App Store Connect API key id, 10 characters
+#   ASC_KEY_P8    the whole .p8 file the API key downloads as
+#   ASC_ISSUER_ID the issuer id App Store Connect shows beside the key
+#   ASC_TEAM_ID   the Apple Developer team id, from Membership
+#
+# and the signing identity, which automatic signing would have made on the
+# runner if it worked there:
+#
+#   ASC_DIST_P12_B64        base64 of the distribution certificate and its key
+#   ASC_DIST_P12_PASSWORD   the password that .p12 was exported with
+#   ASC_PROFILE_B64         base64 of the App Store provisioning profile
+#
+# ⚠️ THE .p12 MUST BE EXPORTED WITH LEGACY ALGORITHMS. OpenSSL 3 defaults to
+# AES/PBES2, which macOS cannot read, and `security import` answers with "MAC
+# verification failed during PKCS12 import (wrong password?)" even when the
+# password is right. Export it like this:
+#
+#   openssl pkcs12 -export -out dist.p12 -inkey key.pem -in cert.pem \
+#     -name "UMI POS Distribution" -passout pass:... \
+#     -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
+#
+# `openssl pkcs12 -info -noout` should then say pbeWithSHA1And3-KeyTripleDES-CBC
+# for both the shrouded keybag and the encrypted data.
+#
+# Create the key in App Store Connect, Users and Access, Integrations, with the
+# App Manager role. That role is enough to create both the certificate and the
+# profile through the API, which is how they were made. The key is also what
+# `altool` uses to upload.
+#
+# WHAT SIGNING NEEDS THAT THE COMPILE JOB DOES NOT
+# The Runner carries `Runner/Runner.entitlements`, naming the keychain access
+# group the Secure Enclave signer stores the device key in. That group is the
+# app ID, and Apple documents the app ID as every app's own default group. So
+# there is NOTHING to tick in Certificates, Identifiers & Profiles: Keychain
+# Sharing is not one of the portal capabilities, it is an Xcode capability and
+# it is that file. The App ID must still exist for `co.umiconsulting.umiPos`,
+# because automatic signing needs it to fetch a profile. `flutter build ipa`
+# signs with `-allowProvisioningUpdates`, so Xcode does that from the App
+# Manager key with no profile in the secrets.
+#
+# The build passes `UMIPOS_DEVICE_KEY=keystore`, so the till signs with the key
+# in the Secure Enclave rather than the software key that runs everywhere. An
+# iPhone always has a Secure Enclave, so this is the backend a real till wants.
+# The simulator artifact from the compile job deliberately does NOT set it: a
+# simulator has no Secure Enclave, and the build would fail at the key rather
+# than open.
+on:
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: API base URL the installed build will talk to
+        required: true
+        default: https://api-staging.umiconsulting.co
+      build_number:
+        description: CFBundleVersion. Must be higher than the last upload.
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: build and upload to TestFlight
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - name: Check the secrets are present
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+          ASC_DIST_P12_B64: ${{ secrets.ASC_DIST_P12_B64 }}
+          ASC_DIST_P12_PASSWORD: ${{ secrets.ASC_DIST_P12_PASSWORD }}
+          ASC_PROFILE_B64: ${{ secrets.ASC_PROFILE_B64 }}
+        run: |
+          set -euo pipefail
+          missing=""
+          for name in ASC_KEY_ID ASC_KEY_P8 ASC_ISSUER_ID ASC_TEAM_ID \
+                      ASC_DIST_P12_B64 ASC_DIST_P12_PASSWORD ASC_PROFILE_B64; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::These repository secrets are not set:$missing"
+            echo "See the header of this workflow for what each one is."
+            exit 1
+          fi
+
+      # Fail here rather than after a six-minute build. `altool` ships with Xcode
+      # and is deprecated; if a future Xcode removes it, this says so up front.
+      - name: Check the upload tool exists
+        run: |
+          set -euo pipefail
+          if ! xcrun --find altool >/dev/null 2>&1; then
+            echo "::error::xcrun altool is not in this Xcode. Upload another way (the App Store Connect API, or Transporter) and update this workflow."
+            exit 1
+          fi
+          xcrun altool --version || true
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+
+      # From the compile job: Xcode 16.4 cannot compile connectivity_plus 7.3.1,
+      # which calls the iOS 26 API `NWPath.isUltraConstrained`.
+      - name: Select the newest Xcode on the image
+        run: |
+          set -euo pipefail
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      # The App Store Connect key is also how Xcode authenticates when it creates
+      # the signing assets, so it goes in before the build, not at upload time.
+      - name: Install the App Store Connect key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+      # Install the distribution identity. It exists because Xcode's cloud
+      # signing refused to make one on a runner ("Cloud signing permission
+      # error", run 37217382884) even though the same App Store Connect key
+      # creates a certificate through the API without complaint. So the
+      # certificate and the profile were created once, out of band, and live in
+      # these secrets. Manual signing then needs no cloud at all.
+      - name: Install the signing identity
+        env:
+          ASC_DIST_P12_B64: ${{ secrets.ASC_DIST_P12_B64 }}
+          ASC_DIST_P12_PASSWORD: ${{ secrets.ASC_DIST_P12_PASSWORD }}
+          ASC_PROFILE_B64: ${{ secrets.ASC_PROFILE_B64 }}
+          KEYCHAIN_PASSWORD: umi-pos-signing
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/umi-signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          decode() { python3 -c 'import base64,sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))'; }
+          echo "$ASC_DIST_P12_B64" | decode > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" \
+            -P "$ASC_DIST_P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          # Without this the key is importable but not usable, and codesign asks
+          # for a keychain password that no one is there to type.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          PROFILES="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES"
+          echo "$ASC_PROFILE_B64" | decode > "$PROFILES/umi-pos.mobileprovision"
+          # Read the name back out of the installed profile rather than trusting
+          # a copy here: manual signing matches on it, and a renamed profile
+          # would otherwise fail at export with no clue why.
+          PROFILE_NAME="$(security cms -D -i "$PROFILES/umi-pos.mobileprovision" | plutil -extract Name raw -)"
+          echo "ASC_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "profile installed: $PROFILE_NAME"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Write the export options
+        env:
+          ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${ASC_TEAM_ID}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>co.umiconsulting.umiPos</key>
+              <string>${ASC_PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>destination</key>
+            <string>export</string>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Build the IPA
+        working-directory: apps/umi-pos
+        env:
+          EXPORT_OPTIONS: ${{ runner.temp }}/ExportOptions.plist
+          # App Store Connect refuses a build number it has already seen. The run
+          # number is always new, and an explicit input still wins when needed.
+          BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+          KEYCHAIN_PASSWORD: umi-pos-signing
+        run: |
+          set -euo pipefail
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/umi-signing.keychain-db"
+
+          flutter pub get
+          flutter gen-l10n
+          # ARCHIVE UNSIGNED, SIGN ON EXPORT — and the reason is scoping.
+          #
+          # Flutter forwards FLUTTER_XCODE_* to xcodebuild as a build setting for
+          # EVERY target, so setting PROVISIONING_PROFILE_SPECIFIER there hands
+          # the App Store profile to Pods and to the Swift packages as well, and
+          # the archive dies with "flutter_secure_storage does not support
+          # provisioning profiles ... but provisioning profile UMI POS App Store
+          # has been manually specified" (run 37217956797). The profile belongs
+          # to the app target only, which is precisely what the export options
+          # are for: there, `provisioningProfiles` names the app's bundle id.
+          #
+          # `--no-codesign` still produces the whole xcarchive — Flutter skips
+          # only the export — and keeps Flutter applying the dart-defines, which
+          # a hand-rolled xcodebuild would have to rebuild itself.
+          flutter build ipa --release --no-codesign \
+            --build-number="$BUILD_NUMBER" \
+            --dart-define=UMIPOS_ENVIRONMENT=staging \
+            --dart-define=UMIPOS_API_BASE_URL=${{ inputs.api_base }} \
+            --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
+            --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
+            --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true \
+            --dart-define=UMIPOS_DEVICE_KEY=keystore \
+            --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
+            --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
+            --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
+
+          ARCHIVE=build/ios/archive/Runner.xcarchive
+          test -d "$ARCHIVE" || { echo "::error::no xcarchive at $ARCHIVE"; exit 1; }
+
+          # No -allowProvisioningUpdates and no authentication key here on
+          # purpose: manual signing with a profile that is already installed has
+          # no reason to talk to Apple, and asking would hand the decision back
+          # to the cloud signing service that refuses to run on a runner.
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$EXPORT_OPTIONS" \
+            -exportPath build/ios/ipa
+
+          ls -l build/ios/ipa
+
+      - name: Upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          IPA="$(ls apps/umi-pos/build/ios/ipa/*.ipa | head -1)"
+          echo "Uploading $IPA"
+          xcrun altool --upload-app --type ios --file "$IPA" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      # Nothing secret may outlive the job, and it must all go even when a step
+      # failed.
+      - name: Remove the App Store Connect key and the signing identity
+        if: always()
+        run: |
+          rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_"*.p8
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/umi-pos.mobileprovision"
+          security delete-keychain "$RUNNER_TEMP/umi-signing.keychain-db" || true

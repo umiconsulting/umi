@@ -1,0 +1,141 @@
+name: umi-pos ios
+
+# Builds the iOS target of the till on a hosted macOS runner.
+#
+# WHY THIS EXISTS
+# `apps/umi-pos/ios/` has 41 tracked files — a complete Runner, the Swift Package
+# Manager plugin integration, and `ios/Runner/DeviceKeySigner.swift` — and nothing
+# has ever compiled any of it. The environment that wrote it had no Xcode, and the
+# signer's own header says so: "written to the documented Secure Enclave contract
+# but NOT compiled or run in the build environment... It must be built and
+# exercised on a device before it is trusted."
+#
+# An unbuilt target is not a supported target. This is the cheapest way to find
+# out which it is: `--no-codesign` needs NO Apple secrets, so it can run on every
+# pull request. It compiles the whole Runner, the Swift Secure Enclave signer
+# included, and it parses the entitlement that signer needs. One known defect is
+# reported, not fixed here: the deployment target is iOS 13.0 against Flutter's
+# iOS 15 floor. `--no-codesign` does NOT apply the entitlement — the signed
+# TestFlight workflow is where the keychain access group is exercised.
+#
+# The defines below deliberately omit `UMIPOS_DEVICE_KEY=keystore`. The
+# artifact is for a simulator, a simulator has no Secure Enclave, and the
+# keystore backend would fail at the key instead of opening. The signed
+# TestFlight build sets it.
+#
+# HOW TO BUILD ON A LINUX MACHINE
+# You do not need a Mac. GitHub runs this on an Apple-silicon machine for you:
+# macOS 3-core (M1). Signing and installing are a later step; see
+# `docs/research/2026-10-03-ios-from-linux.md`.
+#
+# ⚠️ WHY THERE IS A `paths:` FILTER HERE AND NOT ON `lint`
+# `lint` is a REQUIRED check, and GitHub leaves a required-but-skipped check
+# Pending forever, which makes the pull request unmergeable. This workflow is not
+# required, so a filter is safe and keeps a macOS minute off a docs-only pull
+# request. If this ever becomes a required check, delete the filter first — the
+# `lint` workflow header explains the deadlock in full.
+#
+# COST. Standard GitHub-hosted runners are free in a public repository.
+# umiconsulting/umi is public today. If it goes private, the macOS runner bills at
+# $0.062 per minute — ten times the Linux rate — so the filter matters more then.
+on:
+  pull_request:
+    paths:
+      - 'apps/umi-pos/**'
+      - 'packages/contract/generated/dart/**'
+      - '.github/workflows/umi-pos-ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: build the iOS target
+    runs-on: macos-15
+    timeout-minutes: 30
+    # The till reads these at compile time, so a build that is not given them is
+    # not runnable on a device. Staging is the environment with the demo data:
+    # the seeded floor plans, the menu images, and the platform account.
+    env:
+      UMIPOS_DEFINES: >-
+        --dart-define=UMIPOS_ENVIRONMENT=staging
+        --dart-define=UMIPOS_API_BASE_URL=https://api-staging.umiconsulting.co
+        --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true
+        --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled
+        --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true
+        --dart-define=UMIPOS_RELEASE_VERSION=0.1.0
+        --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0
+        --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # The version RUNNING_UMIPOS.md documents. A different Flutter here would
+      # make this job disagree with every local run.
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: 3.44.6
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      # The image's DEFAULT Xcode is 16.4, and Xcode 16.4 cannot compile
+      # connectivity_plus 7.3.1: its PathMonitorConnectivityProvider.swift calls
+      # `NWPath.isUltraConstrained`, which is an iOS 26 API. The first run of this
+      # workflow failed on exactly that, with
+      # "Value of type 'NWPath' has no member 'isUltraConstrained'".
+      #
+      # Xcode 26 is already installed on the image beside 16.4, so this selects the
+      # newest one rather than changing the runner label. A developer on a Mac needs
+      # Xcode 26 or later for the same reason.
+      - name: Select the newest Xcode on the image
+        run: |
+          set -euo pipefail
+          XCODE="$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Resolve packages
+        working-directory: apps/umi-pos
+        run: flutter pub get
+
+      # The localized strings are generated, and `AppLocalizations` is imported by
+      # the app. Run it rather than trusting the committed output.
+      - name: Generate localizations
+        working-directory: apps/umi-pos
+        run: flutter gen-l10n
+
+      # The point of the job. `--no-codesign` skips signing entirely, so this needs
+      # no certificate, no profile and no Apple account.
+      - name: Build for iOS without signing
+        working-directory: apps/umi-pos
+        run: flutter build ios --no-codesign --release $UMIPOS_DEFINES
+
+      # A simulator build needs NO signing at all, so it is the one artifact
+      # anybody can produce today. It runs in a cloud iOS simulator — LambdaTest
+      # App Live's free tier includes them — which is how a developer on Linux
+      # can look at the till on an iPhone-shaped screen without an Apple account.
+      #
+      # Debug, not release: Flutter refuses a release build for a simulator
+      # ("Release mode is not supported for simulators"). The cost is a slower
+      # app with the Dart VM in it; the benefit is that it exists at all.
+      - name: Build for the simulator
+        working-directory: apps/umi-pos
+        run: flutter build ios --simulator --debug $UMIPOS_DEFINES
+
+      # Zipped on purpose. `upload-artifact` stores files relative to the least
+      # common ancestor of the paths it is given, so handing it `Runner.app` puts
+      # the bundle's CONTENTS at the root of the download and the `.app` folder
+      # never arrives. App Live wants a `.app` bundle, so the zip carries one.
+      - name: Package the simulator app
+        working-directory: apps/umi-pos/build/ios/iphonesimulator
+        run: zip -qry "$RUNNER_TEMP/umi-pos-ios-simulator.zip" Runner.app
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: umi-pos-ios-simulator
+          path: ${{ runner.temp }}/umi-pos-ios-simulator.zip
+          if-no-files-found: error
+          retention-days: 14

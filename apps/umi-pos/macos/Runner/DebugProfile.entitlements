@@ -2,6 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- The device key is what makes one till one till. It is generated inside the
+	     Secure Enclave and never leaves it, so the private half cannot be copied
+	     to a second Mac and a session cannot be duplicated on one. The key is a
+	     keychain item, and this names the keychain access group it lives in: the
+	     app ID, which Apple documents as every app's own default group and which
+	     needs no portal step. Enabling Keychain Sharing in Xcode writes exactly
+	     this entitlement. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)co.umiconsulting.umiPos</string>
+	</array>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<key>com.apple.security.cs.allow-jit</key>
