@@ -112,14 +112,26 @@ name: umi-pos testflight
 # hardware simulator. The flags now follow the environment: development and test
 # get both, everything else gets neither, so a staging or pilot dispatch yields
 # a build that starts.
+#
+# TWO MORE GUARDS LIVE BEHIND THAT ONE, and build 9 hit both. The environment
+# input must equal what the API reports at /health/release —
+# ApiReleaseCompatibilityGateway returns `unsupported` otherwise, and the server
+# there answers {"environment":"staging"} — so a `development` client can never
+# talk to the staging API. And a staging, pilot or production build must carry a
+# complete release identity: a 40-hex git commit, a UTC timestamp, and semantic
+# versions, or validate() returns RELEASE_IDENTITY_INVALID. Both failures show
+# the same screen as the first one, with no Retry button, because
+# `unsupported` and RELEASE_IDENTITY_INVALID are unrecoverable.
 on:
   workflow_dispatch:
     inputs:
       environment:
         description: >-
-          App environment the build claims. Only development and test may carry
-          diagnostics and the hardware simulator; staging, pilot and production
-          refuse to start with them (PILOT_CONFIGURATION_UNSAFE).
+          App environment the build claims. It MUST be what the API reports at
+          /health/release, or the till refuses to start with "unsupported".
+          Only development and test may carry diagnostics and the hardware
+          simulator; staging, pilot and production refuse to start with them
+          (PILOT_CONFIGURATION_UNSAFE).
         required: true
         default: development
         type: choice
@@ -287,9 +299,18 @@ jobs:
           BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
           KEYCHAIN_PASSWORD: umi-pos-signing
           ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/umi-signing.keychain-db"
+
+          # THE RELEASE IDENTITY IS NOT DECORATION EITHER. validate() returns
+          # RELEASE_IDENTITY_INVALID for a staging, pilot or production build
+          # whose identity is not complete, and completeness means a 40-hex git
+          # commit, a UTC timestamp, and semantic versions. Build 9 shipped
+          # without the first two, so a staging build could never have started
+          # however the other flags were set.
+          RELEASE_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
           # THE DEBUG AFFORDANCES FOLLOW THE ENVIRONMENT, and they are not
           # decoration. AppConfig.validate() returns PILOT_CONFIGURATION_UNSAFE
@@ -338,6 +359,8 @@ jobs:
             --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
             --dart-define=UMIPOS_DEVICE_KEY=keystore \
             --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
+            --dart-define=UMIPOS_RELEASE_GIT_COMMIT="$RELEASE_COMMIT" \
+            --dart-define=UMIPOS_RELEASE_BUILD_TIMESTAMP="$RELEASE_TIMESTAMP" \
             --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
             --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \
             "${DEBUG_DEFINES[@]}"
