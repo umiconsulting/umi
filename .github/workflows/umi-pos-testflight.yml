@@ -8,11 +8,20 @@ name: umi-pos testflight
 # secrets from the Apple Developer account. It must not run on every pull
 # request, and it must not run on a merge.
 #
-# ⚠️ NOT YET EXERCISED. The compile job (`umi-pos-ios.yml`) has run and is green;
-# this one has never run, because it needs the account secrets below. The first
-# run may need a fix to the export options or the uploader — do not treat a red
-# run as proof that the app is broken. It is written to the documented approach
-# and it fails early, with a named list, when a secret is missing.
+# ⚠️ IT NEEDS ONE RUN BEFORE GITHUB WILL DISPATCH IT. `gh workflow run` and the
+# REST endpoint answer 404 "not found on the default branch" for a workflow the
+# repository has never run — even though this file is on the branch you name.
+# Dispatch of `umi-pos ios` works for exactly that reason, and not because that
+# file is on the default branch, which it is not. This workflow was registered
+# by a throwaway push trigger on a branch that was then deleted; if this file is
+# ever renamed or removed, register it the same way, or put it on `main`.
+#
+# ⚠️ THE BUILD AND UPLOAD STEPS ARE STILL UNEXERCISED. This workflow has run
+# once, and it stopped at the secrets guard below with
+# "These repository secrets are not set: ASC_KEY_ID ASC_KEY_P8 ASC_ISSUER_ID
+# ASC_TEAM_ID" — that is the guard working, not a build. The first real run may
+# need a fix to the export options or the uploader, so do not treat a red run as
+# proof that the app is broken.
 #
 # THE FOUR SECRETS (repository settings, Actions, Secrets):
 #
