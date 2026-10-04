@@ -103,9 +103,32 @@ name: umi-pos testflight
 # The simulator artifact from the compile job deliberately does NOT set it: a
 # simulator has no Secure Enclave, and the build would fail at the key rather
 # than open.
+#
+# WHY THE ENVIRONMENT IS AN INPUT. Build 8 reached a real iPhone and refused to
+# start: "UmiPOS no puede iniciar de forma segura con esta configuración". That
+# is `PILOT_CONFIGURATION_UNSAFE` from AppConfig.validate(), which rejects a
+# build claiming staging, pilot or production while any debug affordance is on —
+# and build 8 claimed staging while turning on development diagnostics and the
+# hardware simulator. The flags now follow the environment: development and test
+# get both, everything else gets neither, so a staging or pilot dispatch yields
+# a build that starts.
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: >-
+          App environment the build claims. Only development and test may carry
+          diagnostics and the hardware simulator; staging, pilot and production
+          refuse to start with them (PILOT_CONFIGURATION_UNSAFE).
+        required: true
+        default: development
+        type: choice
+        options:
+          - development
+          - test
+          - staging
+          - pilot
+          - production
       api_base:
         description: API base URL the installed build will talk to
         required: true
@@ -263,9 +286,34 @@ jobs:
           # number is always new, and an explicit input still wins when needed.
           BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
           KEYCHAIN_PASSWORD: umi-pos-signing
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/umi-signing.keychain-db"
+
+          # THE DEBUG AFFORDANCES FOLLOW THE ENVIRONMENT, and they are not
+          # decoration. AppConfig.validate() returns PILOT_CONFIGURATION_UNSAFE
+          # for a build that claims staging, pilot or production while any of
+          # diagnostics, a bootstrap mode, or the hardware simulator is on. The
+          # first TestFlight build hardcoded all three with
+          # `UMIPOS_ENVIRONMENT=staging`, and the app refused to start on a real
+          # iPhone with "UmiPOS no puede iniciar de forma segura con esta
+          # configuración". Deriving them here means a staging or pilot dispatch
+          # produces a build that starts, and a development dispatch still
+          # produces one that can be debugged and that has fake hardware.
+          DEBUG_DEFINES=()
+          case "$ENVIRONMENT" in
+            development|test)
+              DEBUG_DEFINES+=(
+                --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true
+                --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true
+              ) ;;
+            *)
+              DEBUG_DEFINES+=(
+                --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=false
+                --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false
+              ) ;;
+          esac
 
           flutter pub get
           flutter gen-l10n
@@ -285,15 +333,14 @@ jobs:
           # a hand-rolled xcodebuild would have to rebuild itself.
           flutter build ipa --release --no-codesign \
             --build-number="$BUILD_NUMBER" \
-            --dart-define=UMIPOS_ENVIRONMENT=staging \
+            --dart-define=UMIPOS_ENVIRONMENT="$ENVIRONMENT" \
             --dart-define=UMIPOS_API_BASE_URL=${{ inputs.api_base }} \
-            --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
             --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled \
-            --dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=true \
             --dart-define=UMIPOS_DEVICE_KEY=keystore \
             --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
             --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
-            --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
+            --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \
+            "${DEBUG_DEFINES[@]}"
 
           ARCHIVE=build/ios/archive/Runner.xcarchive
           test -d "$ARCHIVE" || { echo "::error::no xcarchive at $ARCHIVE"; exit 1; }
