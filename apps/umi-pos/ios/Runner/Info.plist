@@ -24,6 +24,18 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- The till's only cryptography is HTTPS to the API, the Keychain, and a
+	     P-256 key generated inside the Secure Enclave. All three are standard
+	     algorithms, two of them Apple's own implementations, so this is the
+	     exempt case Apple describes in "Complying with Encryption Export
+	     Regulations": "the use of encryption that's built into the operating
+	     system ... is exempt from export documentation upload requirements".
+
+	     Declared here rather than answered in App Store Connect after every
+	     upload, which is what happened for builds 8 and 9. Same statement, so
+	     the two can never disagree. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

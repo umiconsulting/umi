@@ -1797,6 +1797,16 @@ textarea.input {
   flex-direction: column;
   animation: slide-in-right 0.32s var(--ease) forwards;
   box-shadow: -24px 0 60px -20px rgba(19, 31, 68, 0.32);
+  /* Bounded explicitly. `top:0; bottom:0` alone resolves against the LAYOUT
+     viewport, which on a phone is taller than the visible screen while the
+     browser chrome is showing: the foot of the sheet sat below the fold and the
+     body never overflowed, so a sheet could be neither read nor scrolled — the
+     same failure the sidebar drawer had. With top, bottom and height all set,
+     `bottom` is ignored and the height wins. `dvh` tracks the visible viewport
+     as the chrome slides away; `vh` stays as the fallback for engines without
+     it. Every sheet in the console inherits this. */
+  height: 100vh;
+  height: 100dvh;
 }
 .sheet-head {
   padding: 22px 26px 18px;
@@ -1808,7 +1818,17 @@ textarea.input {
 .sheet-body {
   padding: 22px 26px;
   flex: 1;
+  /* A flex child defaults to `min-height: auto`, which means it refuses to shrink
+     below its content: the body grew to fit its fields instead of settling into
+     the panel, the sheet overflowed, and `overflow-y: auto` never had anything
+     to scroll. That is why a phone could not reach the bottom of the device
+     enrollment form while the Close and Generate PIN buttons stayed on screen.
+     Nine screens share this class, so the fix is here rather than in each. */
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* A swipe that reaches the end of the form must not drag the page behind it. */
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1834,6 +1854,11 @@ textarea.input {
 .modal {
   width: 460px;
   max-width: 92vw;
+  /* A confirmation with a long body needs the same treatment: without a ceiling
+     it grows past the screen and its buttons become unreachable. */
+  max-height: 86vh;
+  max-height: 86dvh;
+  overflow-y: auto;
   background: var(--surface);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-pop);
@@ -1889,14 +1914,24 @@ textarea.input {
    class that no longer means anything; the delay variants are gone.
    ------------------------------------------------------------ */
 .screen-body {
-  /* OPACITY ONLY, and that is load-bearing. A transform on this element would make
-     it the containing block for every `position: fixed` descendant — and every
-     sheet in the console is one. `animation-fill-mode: both` keeps the final
-     keyframe applied, so even `translateY(0)` would hold that containing block
-     open forever and lay each sheet out against the screen body instead of the
-     viewport: a clipped panel with its fields cut off. `filter` and `perspective`
-     do the same thing. The rise is not worth the bug. */
-  animation: screen-arrive var(--dur-2) var(--ease-out) both;
+  /* OPACITY ONLY, AND `backwards` RATHER THAN `both` — both halves are
+     load-bearing, and the second half was measured, not reasoned.
+
+     A `transform` here would make this the containing block for every
+     `position: fixed` descendant, and every sheet in the console is one, so the
+     animation is opacity only. That was the original reasoning and it is still
+     right. What it missed is the fill: `animation-fill-mode: both` keeps the
+     element as a live composited layer after the fade finishes, and a fixed
+     descendant of a composited layer is painted inside it. Measured on the
+     Devices screen at 1016px, the sheet's own box was x 536..1016, y 0..900,
+     while only y ≥ 157 was reachable — 157 being this element's top. The header
+     and the first field were simply not painted, and the panel looked like it
+     started halfway down the form.
+
+     Hit-testing the sheet's header at y=40 with each fill: `both` clips it,
+     `backwards` and `none` do not. `backwards` keeps the fade AND drops the
+     layer when it ends, so the rise survives without the trap. */
+  animation: screen-arrive var(--dur-2) var(--ease-out) backwards;
 }
 @keyframes screen-arrive {
   from {
@@ -3564,6 +3599,30 @@ time,
     margin-left: auto;
     justify-content: flex-end;
     overflow-x: auto;
+    /* The cluster has to be able to SHRINK, not wrap. At 360px its controls plus
+       the drawer button were wider than the line, so it wrapped to a row of its
+       own and pushed the title onto a third: a 200px masthead, and the screen's
+       own actions below it out of reach. `flex: 1 1 auto` with `min-width: 0`
+       lets it take whatever is left and scroll internally, which keeps the
+       masthead at two rows all the way down. */
+    /* Basis 0, not auto. A wrapping flex container decides where to break using
+       each item's flex BASE size, so `auto` meant the cluster was measured at its
+       332px of content and pushed onto a line of its own even though `flex-shrink`
+       could have taken it down. With a basis of 0 it takes the space that is left
+       (278px at 360px) and scrolls the remainder internally. */
+    flex: 1 1 0;
+    min-width: 0;
+    /* A scroll container clips on BOTH axes. The cluster keeps its scroll for the
+       cases that need it, but the couple of pixels its controls' focus rings and
+       the avatar's edge occupy are clipped without this, so the row reads as
+       misaligned. The negative margin means the row's own height is unchanged. */
+    padding-block: 4px;
+    margin-block: -4px;
+    /* The bar is sticky: a rail scrolling inside it is noise, not an affordance. */
+    scrollbar-width: none;
+  }
+  .top-actions::-webkit-scrollbar {
+    display: none;
   }
   .masthead-row .h-page {
     order: 3;
@@ -4169,6 +4228,23 @@ time,
     z-index: 55;
     background: rgba(19, 31, 68, 0.34);
   }
+  /* A phone reaches the end of a sheet with a gesture, not a scrollbar, so the
+     foot has to clear the home indicator and the head the notch. `max()` keeps
+     the authored padding on devices that report no inset. */
+  .sheet-head {
+    padding-top: max(22px, env(safe-area-inset-top));
+  }
+  .sheet-foot {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  /* The customers list is bounded against the viewport, and on a phone `100vh`
+     overshoots the visible screen while the 420px floor can be taller than the
+     space the pager leaves it. Both are loosened here so the list scrolls in the
+     room it actually has, rather than running past the bottom of the screen. */
+  .customer-list-scroll {
+    max-height: calc(100dvh - 330px);
+    min-height: 240px;
+  }
   /* The drawer trigger now sits OUTSIDE .top-actions, so it does not inherit the
      cluster's ghost treatment. State it here: same size and weight as the controls
      beside it — the pointer-target floor on both axes — so the topbar still reads
@@ -4259,10 +4335,25 @@ time,
   .topbar {
     margin-inline: -14px;
     padding-inline: 14px;
-    padding-top: 16px;
+    padding-top: 10px;
+    padding-bottom: 8px;
   }
+  /* The masthead is two rows on a phone, and the wrap gap WAS the space between
+     them: 20px of daylight above the title, on top of a 28px title and 12px
+     below it, left the sticky bar around 170px tall before any content — a fifth
+     of a phone screen, permanently. Tighter gaps, a smaller title, and centred
+     alignment give the page that space back without changing the two-row order. */
   .masthead-row {
-    align-items: flex-start;
+    align-items: center;
+    row-gap: 8px;
+    column-gap: 10px;
+  }
+  .masthead-row .h-page {
+    font-size: 22px;
+    line-height: 1.12;
+  }
+  .dateline {
+    margin-top: 8px;
   }
   .dateline {
     font-size: 10px;

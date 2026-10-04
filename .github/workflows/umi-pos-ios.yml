@@ -55,11 +55,24 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     # The till reads these at compile time, so a build that is not given them is
-    # not runnable on a device. Staging is the environment with the demo data:
-    # the seeded floor plans, the menu images, and the platform account.
+    # not runnable on a device. The API base is staging, which is where the demo
+    # data lives: the seeded floor plans, the menu images, and the platform
+    # account.
+    #
+    # ⚠️ THE ENVIRONMENT IS DEVELOPMENT WHILE THE API IS STAGING, ON PURPOSE.
+    # `AppConfig.validate()` returns PILOT_CONFIGURATION_UNSAFE for a build that
+    # claims staging, pilot or production AND turns on any debug affordance, and
+    # this artifact turns on two: development diagnostics and the hardware
+    # simulator (without which a simulator or a phone has no printer, drawer or
+    # scanner). Claiming staging here would produce an app that refuses to start
+    # with "UmiPOS no puede iniciar de forma segura con esta configuración" —
+    # verified on a real iPhone from the first TestFlight build, version 8.
+    # Development is the honest label for a build that carries those two, and it
+    # is the same reason the TestFlight workflow derives them from its input
+    # rather than hardcoding them.
     env:
       UMIPOS_DEFINES: >-
-        --dart-define=UMIPOS_ENVIRONMENT=staging
+        --dart-define=UMIPOS_ENVIRONMENT=development
         --dart-define=UMIPOS_API_BASE_URL=https://api-staging.umiconsulting.co
         --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true
         --dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled
