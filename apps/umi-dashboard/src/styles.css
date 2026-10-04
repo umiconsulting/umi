@@ -1797,16 +1797,6 @@ textarea.input {
   flex-direction: column;
   animation: slide-in-right 0.32s var(--ease) forwards;
   box-shadow: -24px 0 60px -20px rgba(19, 31, 68, 0.32);
-  /* Bounded explicitly. `top:0; bottom:0` alone resolves against the LAYOUT
-     viewport, which on a phone is taller than the visible screen while the
-     browser chrome is showing: the foot of the sheet sat below the fold and the
-     body never overflowed, so a sheet could be neither read nor scrolled — the
-     same failure the sidebar drawer had. With top, bottom and height all set,
-     `bottom` is ignored and the height wins. `dvh` tracks the visible viewport
-     as the chrome slides away; `vh` stays as the fallback for engines without
-     it. Every sheet in the console inherits this. */
-  height: 100vh;
-  height: 100dvh;
 }
 .sheet-head {
   padding: 22px 26px 18px;
@@ -1818,17 +1808,7 @@ textarea.input {
 .sheet-body {
   padding: 22px 26px;
   flex: 1;
-  /* A flex child defaults to `min-height: auto`, which means it refuses to shrink
-     below its content: the body grew to fit its fields instead of settling into
-     the panel, the sheet overflowed, and `overflow-y: auto` never had anything
-     to scroll. That is why a phone could not reach the bottom of the device
-     enrollment form while the Close and Generate PIN buttons stayed on screen.
-     Nine screens share this class, so the fix is here rather than in each. */
-  min-height: 0;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  /* A swipe that reaches the end of the form must not drag the page behind it. */
-  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1854,11 +1834,6 @@ textarea.input {
 .modal {
   width: 460px;
   max-width: 92vw;
-  /* A confirmation with a long body needs the same treatment: without a ceiling
-     it grows past the screen and its buttons become unreachable. */
-  max-height: 86vh;
-  max-height: 86dvh;
-  overflow-y: auto;
   background: var(--surface);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-pop);
@@ -3589,17 +3564,6 @@ time,
     margin-left: auto;
     justify-content: flex-end;
     overflow-x: auto;
-    /* A scroll container clips on BOTH axes. The cluster keeps its scroll for the
-       cases that need it, but the couple of pixels its controls' focus rings and
-       the avatar's edge occupy are clipped without this, so the row reads as
-       misaligned. The negative margin means the row's own height is unchanged. */
-    padding-block: 4px;
-    margin-block: -4px;
-    /* The bar is sticky: a rail scrolling inside it is noise, not an affordance. */
-    scrollbar-width: none;
-  }
-  .top-actions::-webkit-scrollbar {
-    display: none;
   }
   .masthead-row .h-page {
     order: 3;
@@ -4205,23 +4169,6 @@ time,
     z-index: 55;
     background: rgba(19, 31, 68, 0.34);
   }
-  /* A phone reaches the end of a sheet with a gesture, not a scrollbar, so the
-     foot has to clear the home indicator and the head the notch. `max()` keeps
-     the authored padding on devices that report no inset. */
-  .sheet-head {
-    padding-top: max(22px, env(safe-area-inset-top));
-  }
-  .sheet-foot {
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-  }
-  /* The customers list is bounded against the viewport, and on a phone `100vh`
-     overshoots the visible screen while the 420px floor can be taller than the
-     space the pager leaves it. Both are loosened here so the list scrolls in the
-     room it actually has, rather than running past the bottom of the screen. */
-  .customer-list-scroll {
-    max-height: calc(100dvh - 330px);
-    min-height: 240px;
-  }
   /* The drawer trigger now sits OUTSIDE .top-actions, so it does not inherit the
      cluster's ghost treatment. State it here: same size and weight as the controls
      beside it — the pointer-target floor on both axes — so the topbar still reads
@@ -4312,25 +4259,10 @@ time,
   .topbar {
     margin-inline: -14px;
     padding-inline: 14px;
-    padding-top: 10px;
-    padding-bottom: 8px;
+    padding-top: 16px;
   }
-  /* The masthead is two rows on a phone, and the wrap gap WAS the space between
-     them: 20px of daylight above the title, on top of a 28px title and 12px
-     below it, left the sticky bar around 170px tall before any content — a fifth
-     of a phone screen, permanently. Tighter gaps, a smaller title, and centred
-     alignment give the page that space back without changing the two-row order. */
   .masthead-row {
-    align-items: center;
-    row-gap: 8px;
-    column-gap: 10px;
-  }
-  .masthead-row .h-page {
-    font-size: 22px;
-    line-height: 1.12;
-  }
-  .dateline {
-    margin-top: 8px;
+    align-items: flex-start;
   }
   .dateline {
     font-size: 10px;
