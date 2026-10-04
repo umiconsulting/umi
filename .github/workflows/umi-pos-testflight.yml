@@ -16,14 +16,28 @@ name: umi-pos testflight
 # by a throwaway push trigger on a branch that was then deleted; if this file is
 # ever renamed or removed, register it the same way, or put it on `main`.
 #
-# WHAT THE FIRST SIGNED RUN TAUGHT US. Run 37216747459 passed the secrets guard,
-# selected Xcode, installed the key, wrote the export options, and then stopped
-# in the archive with "No valid code signing certificates were found ... No
-# development certificates available to code sign app for device deployment".
-# The export options carry the team for the export step, but the archive needs it
-# as a build setting and the Runner target names no team. The build step now
-# passes it through FLUTTER_XCODE_DEVELOPMENT_TEAM, which Flutter forwards to
-# xcodebuild, so the team still never enters the repository.
+# WHAT THE FIRST TWO SIGNED RUNS TAUGHT US, and why signing is two steps.
+#
+# Run 37216747459 stopped in the archive: "No valid code signing certificates
+# were found ... No development certificates available to code sign app for
+# device deployment". The Runner target names no DEVELOPMENT_TEAM, and the export
+# options only cover the export step.
+#
+# Run 37216936520, with the team supplied, got past that and stopped one layer
+# deeper: "No Accounts: Add a new account in Accounts settings" and "No profiles
+# for 'co.umiconsulting.umiPos' were found". `-allowProvisioningUpdates` alone
+# looks for an Apple ID in Xcode's Accounts pane, which a runner does not have.
+# Xcode will use the App Store Connect key instead, but only when it is named:
+# -authenticationKeyPath, with -authenticationKeyID and
+# -authenticationKeyIssuerID.
+#
+# Flutter does not pass those, and it does not expose a way to add xcodebuild
+# flags. So the archive is built with `--no-codesign` — which still produces the
+# xcarchive, and is the only path that keeps Flutter applying the dart-defines —
+# and the signing happens in this workflow's own `xcodebuild -exportArchive`.
+# Xcode then creates the distribution certificate and the App Store profile on
+# the runner from the key, which is why the secrets carry no .p12 and no
+# .mobileprovision.
 #
 # ⚠️ THE UPLOAD STEP IS STILL UNEXERCISED. Nothing has reached App Store Connect
 # yet, so a later failure in the export or in `altool` is still possible and is
@@ -170,22 +184,34 @@ jobs:
           # App Store Connect refuses a build number it has already seen. The run
           # number is always new, and an explicit input still wins when needed.
           BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
-          # Flutter forwards every FLUTTER_XCODE_* variable to xcodebuild as a
-          # build setting. That is how the team id reaches the ARCHIVE without
-          # being committed: the export options carry the team for the export
-          # step only, and the Runner target in the Xcode project names no team
-          # and no code signing style, so the archive had no identity to resolve
-          # and stopped at "No development certificates available to code sign
-          # app for device deployment" (run 37216747459).
-          FLUTTER_XCODE_DEVELOPMENT_TEAM: ${{ secrets.ASC_TEAM_ID }}
-          FLUTTER_XCODE_CODE_SIGN_STYLE: Automatic
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           set -euo pipefail
           flutter pub get
           flutter gen-l10n
-          flutter build ipa --release \
+          # ARCHIVE UNSIGNED, THEN SIGN ON EXPORT.
+          #
+          # `flutter build ipa --no-codesign` runs the whole archive and skips
+          # only the export step (build_ios.dart returns right after the
+          # xcarchive, before the export). That matters here because the archive
+          # is where the dart-defines are applied, and this is the one path that
+          # keeps Flutter handling them.
+          #
+          # The signing then happens in our own xcodebuild call, because
+          # automatic signing needs an identity xcodebuild can use. The archive
+          # with only `-allowProvisioningUpdates` fails at "No Accounts: Add a
+          # new account in Accounts settings" and "No profiles for
+          # 'co.umiconsulting.umiPos' were found" (run 37216936520): that flag
+          # looks for an Apple ID in Xcode's Accounts pane. The App Store Connect
+          # key has to be named explicitly. Per the xcodebuild man page,
+          # -authenticationKeyPath "Specifies the path to an authentication key
+          # issued by App Store Connect" and requires -authenticationKeyID and
+          # -authenticationKeyIssuerID. With those three, Xcode creates the
+          # distribution certificate and the App Store profile on the runner,
+          # which is why no .p12 and no .mobileprovision are in the secrets.
+          flutter build ipa --release --no-codesign \
             --build-number="$BUILD_NUMBER" \
-            --export-options-plist="$EXPORT_OPTIONS" \
             --dart-define=UMIPOS_ENVIRONMENT=staging \
             --dart-define=UMIPOS_API_BASE_URL=${{ inputs.api_base }} \
             --dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true \
@@ -195,6 +221,20 @@ jobs:
             --dart-define=UMIPOS_RELEASE_VERSION=0.1.0 \
             --dart-define=UMIPOS_CONTRACT_VERSION=2.23.0 \
             --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1
+
+          ARCHIVE=build/ios/archive/Runner.xcarchive
+          test -d "$ARCHIVE" || { echo "::error::no xcarchive at $ARCHIVE"; exit 1; }
+
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$EXPORT_OPTIONS" \
+            -exportPath build/ios/ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+          ls -l build/ios/ipa
 
       - name: Upload to TestFlight
         env:
