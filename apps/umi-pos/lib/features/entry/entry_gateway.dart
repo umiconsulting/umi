@@ -83,7 +83,15 @@ final class ApiEntryGateway implements EntryGateway {
         body: ClaimDevicePairingRequest(
           setupCode: setupCode,
           installationId: identity.installationId,
-          platform: kIsWeb ? 'web' : defaultTargetPlatform.name,
+          // LOWER CASE, and that is not cosmetic. The contract declares
+          // `DevicePlatform = z.enum(['android', 'ios', 'linux', 'macos',
+          // 'windows', 'web'])` and validates the body with `.strict()`, while
+          // `defaultTargetPlatform.name` is `iOS` on an iPhone. Every claim from
+          // a real device was therefore refused with 400 VALIDATION_FAILED
+          // ("The request does not match the public contract") and the app showed
+          // its catch-all sentence — while the enrollment code sat untouched on
+          // the server, which is what made this look like a network failure.
+          platform: kIsWeb ? 'web' : defaultTargetPlatform.name.toLowerCase(),
           deviceType: 'pos_terminal',
           ephemeralPublicKey: publicKey,
         ).toJson(),
