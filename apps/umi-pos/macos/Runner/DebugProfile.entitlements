@@ -4,10 +4,11 @@
 <dict>
 	<!-- The device key is what makes one till one till. It is generated inside the
 	     Secure Enclave and never leaves it, so the private half cannot be copied
-	     to a second Mac and a session cannot be duplicated on one. Keychain items
-	     belong to a keychain access group, and this is that group: without it the
-	     signer has nowhere to store the key. Enabling Keychain Sharing in Xcode
-	     writes exactly this entitlement. -->
+	     to a second Mac and a session cannot be duplicated on one. The key is a
+	     keychain item, and this names the keychain access group it lives in: the
+	     app ID, which Apple documents as every app's own default group and which
+	     needs no portal step. Enabling Keychain Sharing in Xcode writes exactly
+	     this entitlement. -->
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)co.umiconsulting.umiPos</string>
