@@ -203,7 +203,32 @@ final class EntryController extends ChangeNotifier {
       _beginPairingWait(pairing);
     } on AppException catch (error) {
       _event('device.enrollment_failed', error.code);
+      // The screen shows one friendly sentence for every failure — including
+      // "the request never left the device" and "the keystore refused" — so the
+      // console has to carry the distinguishing fact. Measured on a real iPhone
+      // against staging: the dashboard created the enrollment (201) and the API
+      // never saw a `POST /api/v1/devices/pairing/claim`, while Safari on the
+      // same phone reached `/health/release` in the same minute. This line is
+      // what tells us which half failed next time.
+      debugPrint(
+        '[umipos] enrollment failed code=${error.code} '
+        'category=${error.category.name} correlationId=${error.correlationId}',
+      );
       _set(EntryState(EntryPhase.enrollmentRequired, errorCode: error.code));
+    } catch (error, stack) {
+      // Anything that is NOT an AppException — a PlatformException from the
+      // Secure Enclave signer is the one that matters, because `claimPairing`
+      // asks the keystore for a public key before it builds the request. It used
+      // to escape this method entirely, which is why the screen could be blank of
+      // any explanation at all.
+      debugPrint('[umipos] enrollment threw ${error.runtimeType}: $error');
+      debugPrintStack(stackTrace: stack, maxFrames: 6);
+      _set(
+        const EntryState(
+          EntryPhase.enrollmentRequired,
+          errorCode: 'UNEXPECTED_CLIENT_ERROR',
+        ),
+      );
     }
   }
 
