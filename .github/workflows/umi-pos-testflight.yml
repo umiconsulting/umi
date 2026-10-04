@@ -60,6 +60,18 @@ name: umi-pos testflight
 #   ASC_DIST_P12_PASSWORD   the password that .p12 was exported with
 #   ASC_PROFILE_B64         base64 of the App Store provisioning profile
 #
+# ⚠️ THE .p12 MUST BE EXPORTED WITH LEGACY ALGORITHMS. OpenSSL 3 defaults to
+# AES/PBES2, which macOS cannot read, and `security import` answers with "MAC
+# verification failed during PKCS12 import (wrong password?)" even when the
+# password is right. Export it like this:
+#
+#   openssl pkcs12 -export -out dist.p12 -inkey key.pem -in cert.pem \
+#     -name "UMI POS Distribution" -passout pass:... \
+#     -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
+#
+# `openssl pkcs12 -info -noout` should then say pbeWithSHA1And3-KeyTripleDES-CBC
+# for both the shrouded keybag and the encrypted data.
+#
 # Create the key in App Store Connect, Users and Access, Integrations, with the
 # App Manager role. That role is enough to create both the certificate and the
 # profile through the API, which is how they were made. The key is also what
