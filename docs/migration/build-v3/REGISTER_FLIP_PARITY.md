@@ -35,6 +35,23 @@ café screen that renders zeros — and no test, no gate and no log says a word.
 
 ## The part that is not a gap in the port
 
+### Three routes are on no list at all
+
+`--routes-only` walks every `/api/${...}/...` the umi-cash app builds and compares
+it with the flip list. Three of the register's own routes are called by its screens,
+are on **no** switch, and do not exist in umi-api — so after a flip they would keep
+being served by umi-cash against a database nothing else writes to any more, and go
+on answering as if nothing had changed:
+
+| route                          | who calls it                         | what it does                                                                                                                                                         |
+| ------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `admin/redemptions/:id/revert` | the customer screen's two-tap revert | undoes a redemption. This is the one that reads a canje back after a mistake.                                                                                        |
+| `admin/reward-config/resync`   | the rewards screen's "resync"        | republishes a reward change to every pass at the café                                                                                                                |
+| `admin/messages`               | the messages screen                  | next.config says this screen was "rebuilt from `merchant.message`" and the route was "deleted, not moved" — the route is still on disk and the screen still calls it |
+
+The first two are write paths on money-adjacent state. They need to be ported, or
+the flip needs to be accompanied by a decision that those two buttons stop working.
+
 Three fields cannot come back by writing more code, because build-v3 dropped what
 they were read from:
 
@@ -43,14 +60,25 @@ they were read from:
 | `device`, `os`      | `core.people.metadata`, written from the User-Agent     | no `metadata` on `merchant.customer`. umi-api already returns an honest `null` and says so in `getCustomer` |
 | `pendingRewardName` | `cards.metadata.pending_tier1` — the banked-reward flag | no `metadata` on `merchant.loyalty_card`; no column anywhere carries a banked tier                          |
 
-The register's own port answered `null` for the first pair and dropped the third,
-which is defensible. What is not defensible is flipping the switch without saying
-so out loud, because `pendingRewardName` drives the redemption a barista hands
-over: a card holding a reward banked under the old single threshold would be read
-as holding the top tier instead of the lower one.
+**Decision, 2026-10-06: they are recreated.** Sized against real data first, rather
+than against the shape of the old schema:
 
-Before this can flip, someone has to either recreate those two facts in the new
-schema or state, in the runbook, that they are gone on purpose.
+| legacy source                | how much of it is real                                               |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `core.people.metadata`       | `device` and `os` on **1019** of 1048 customers                      |
+| `merchant`… `cards` metadata | `pending_tier1` on **7** cards — a small set, and a load-bearing one |
+
+`pending_tier1` is a **counter**, not a flag, and three writers move it in umi-cash:
+the reward-config save tags every card that already holds a banked reward, a scan
+that cashes one of those out decrements it, and a redemption revert increments it.
+Recreating the column without recreating those three writes would leave the counter
+permanently out of step with the rewards it describes — which is the redemption a
+barista hands over.
+
+The two `metadata` columns also carried `source_systems`, `synthetic`,
+`lifecycle_message` and `lifecycle_message_updated_at`. The last pair already has
+typed homes on `merchant.loyalty_card`; the first two are not read by the register
+and are not being carried.
 
 ## The harness
 
@@ -74,11 +102,13 @@ stage them — that decision is itself an exit criterion below.
 
 1. The harness is green on **two** cafés: `elgranribera` (has the 7/9 ladder and a
    card-level override) and one single-tier café, e.g. `kalalacafe`.
-2. `device`/`os` and `pendingRewardName` are either implemented or written down as
-   deliberately gone.
-3. The write routes are exercised somewhere that is not a customer's card, or
+2. `device`, `os` and `pending_tier1` are recreated in the new schema — the column,
+   the backfill from the old one, **and** the three writers that move the counter.
+3. `admin/redemptions/:id/revert`, `admin/reward-config/resync` and `admin/messages`
+   are ported, or a decision is recorded that they stop working.
+4. The write routes are exercised somewhere that is not a customer's card, or
    accepted in writing as code-reviewed only.
-4. A response-shape test lives in CI, so that the next hand-edited route list
+5. A response-shape test lives in CI, so that the next hand-edited route list
    cannot pass on existence alone the way this one did.
 
 ## Where each fix goes

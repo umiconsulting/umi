@@ -28,13 +28,85 @@
  *   PARITY_LEGACY_TOKEN=... PARITY_API_TOKEN=... node scripts/umi-cash-register-parity.mjs
  *
  * Exit code 0 = every comparable route answers the same shape on both origins.
+ *
+ * `--routes-only` runs the static half alone and answers "which routes does the
+ * panel call that no switch will forward?" without needing credentials or network.
  */
+
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const LEGACY = process.env.PARITY_LEGACY_ORIGIN ?? 'https://cash.umiconsulting.co';
 const API = process.env.PARITY_API_ORIGIN ?? 'https://api.umiconsulting.co';
 const SLUG = process.env.PARITY_SLUG;
 const IDENTIFIER = process.env.PARITY_IDENTIFIER;
 const PASSWORD = process.env.PARITY_PASSWORD;
+
+/**
+ * THE OTHER HALF OF THE PROBLEM, and the half no runtime check can see.
+ *
+ * Comparing responses only ever looks at routes that ARE on the flip list. A route
+ * the panel calls that is on NO list is invisible to it — it simply stays on
+ * umi-cash, keeps reading the old schemas, and goes on working against a database
+ * nothing else writes to any more. Three of the register's routes were in that
+ * state when this was written, including the button that undoes a redemption.
+ *
+ * So: every `/api/${...}/...` the umi-cash app builds, against the flip list.
+ */
+function staticRouteCheck() {
+  const appDir = join(REPO, 'apps/umi-cash/src/app');
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (/\.(tsx|ts)$/.test(entry.name)) files.push(p);
+    }
+  };
+  walk(appDir);
+
+  const called = new Set();
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const m of source.matchAll(/[`'"]\/api\/\$\{[A-Za-z.]+\}(\/[^`'"]*)?[`'"]/g)) {
+      called.add(
+        m[0]
+          .slice(1, -1)
+          .replace(/\$\{[^}]*\}/g, ':p')
+          .split('?')[0],
+      );
+    }
+  }
+
+  const config = readFileSync(join(REPO, 'apps/umi-cash/next.config.mjs'), 'utf8');
+  const block = config.match(/const REGISTER_ROUTES = \[([\s\S]*?)\];/)?.[1] ?? '';
+  const listed = new Set(
+    [...block.replace(/\/\/[^\n]*/g, '').matchAll(/'(\/[^']+)'/g)].map((m) => m[1]),
+  );
+
+  // The pass surface belongs to the Wallet switch, not the register's: it is served
+  // by `WALLET_API_ORIGIN`, listed in the same file, and compared on its own.
+  const WALLET = /^\/api\/:p\/(passes\/(apple|google)|stamp-strip)\b/;
+  const shape = (r) => r.replace(/:[A-Za-z]+/g, ':p');
+  const listedShapes = new Set([...listed].map(shape));
+  const unported = [...called].filter((r) => !listedShapes.has(shape(r)) && !WALLET.test(shape(r)));
+
+  console.log(`${called.size} routes the umi-cash app calls, ${listed.size} in the flip list`);
+  if (unported.length === 0) {
+    console.log('ok    every route the panel calls is forwarded, or the wallet switch has it');
+  } else {
+    console.log('FAIL  called by the panel, on no flip list, served only by umi-cash:');
+    for (const route of unported.sort()) console.log(`        ${route}`);
+  }
+  return unported.length === 0;
+}
+
+const routesOk = staticRouteCheck();
+if (process.argv.includes('--routes-only')) process.exit(routesOk ? 0 : 1);
+console.log();
 
 if (!SLUG || !IDENTIFIER || !PASSWORD) {
   if (!SLUG || !process.env.PARITY_LEGACY_TOKEN || !process.env.PARITY_API_TOKEN) {
