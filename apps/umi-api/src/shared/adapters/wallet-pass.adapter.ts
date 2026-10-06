@@ -95,4 +95,22 @@ export class WalletPassAdapter {
       return { cards: 0, sent: 0 };
     }
   }
+
+  /**
+   * The Google half of the same escape hatch: PATCH every Android object at the café
+   * with the state it should be showing. Answers with what it did, and never throws —
+   * a café must be able to refresh its passes even when Google is unreachable.
+   */
+  async refreshMerchantGoogleObjects(
+    merchantId: string,
+  ): Promise<{ total: number; refreshed: number; failed: number }> {
+    try {
+      return await this.wallet.refreshMerchantGoogleObjects(merchantId);
+    } catch (err) {
+      this.logger.warn(
+        `wallet_merchant_google_refresh_failed merchant=${merchantId}: ${String(err)}`,
+      );
+      return { total: 0, refreshed: 0, failed: 0 };
+    }
+  }
 }

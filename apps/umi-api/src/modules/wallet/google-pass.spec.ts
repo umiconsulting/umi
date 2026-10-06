@@ -1,5 +1,64 @@
 import { describe, expect, it } from 'vitest';
-import { buildLoyaltyObject, type GooglePassData } from './google-pass.service';
+import { buildLoyaltyObject, GooglePassService, type GooglePassData } from './google-pass.service';
+
+/**
+ * The service with its two seams replaced: whether Google is configured, and the
+ * per-object PATCH. Everything else (the walk, the counting, the failure handling)
+ * is the code under test.
+ */
+function walker(patched: (objectId: string) => boolean) {
+  const svc = new GooglePassService({ get: () => undefined } as never, {} as never);
+  const seen: string[] = [];
+  (svc as unknown as { isConfigured: () => boolean }).isConfigured = () => true;
+  (svc as unknown as { updateObject: (d: GooglePassData) => Promise<boolean> }).updateObject =
+    async (d) => {
+      seen.push(d.objectId ?? 'constructed');
+      return patched(d.objectId ?? '');
+    };
+  return { svc, seen };
+}
+
+describe('GooglePassService.refreshMerchantObjects', () => {
+  it('walks every object, counts what landed, and keeps going past a failure', async () => {
+    const { svc, seen } = walker((objectId) => objectId !== 'object-2');
+    const result = await svc.refreshMerchantObjects(
+      [
+        { cardId: 'card-1', objectId: 'object-1' },
+        { cardId: 'card-2', objectId: 'object-2' },
+        { cardId: 'card-3', objectId: 'object-3' },
+      ],
+      async (_cardId, objectId) => ({ objectId }) as GooglePassData,
+    );
+
+    expect(result).toEqual({ total: 3, refreshed: 2, failed: 1 });
+    // The STORED id reaches Google, never the one this codebase would construct.
+    expect(seen.sort()).toEqual(['object-1', 'object-2', 'object-3']);
+  });
+
+  it('counts a card whose render throws as a failure rather than aborting the café', async () => {
+    const { svc } = walker(() => true);
+    const result = await svc.refreshMerchantObjects(
+      [
+        { cardId: 'bad', objectId: 'object-1' },
+        { cardId: 'good', objectId: 'object-2' },
+      ],
+      async (cardId, objectId) => {
+        if (cardId === 'bad') throw new Error('render failed');
+        return { objectId } as GooglePassData;
+      },
+    );
+    expect(result).toEqual({ total: 2, refreshed: 1, failed: 1 });
+  });
+
+  it('reports every object as failed when Google is not configured', async () => {
+    const svc = new GooglePassService({ get: () => undefined } as never, {} as never);
+    const result = await svc.refreshMerchantObjects(
+      [{ cardId: 'card-1', objectId: 'object-1' }],
+      async () => ({}) as GooglePassData,
+    );
+    expect(result).toEqual({ total: 1, refreshed: 0, failed: 1 });
+  });
+});
 
 /**
  * These assert the three details build-v3's stale copy of `pass-google.ts` had

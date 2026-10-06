@@ -166,6 +166,24 @@ export class WalletPassService {
     if (data) await this.google.updateObject(data);
   }
 
+  /**
+   * Refresh every Android pass at one café — the other half of the register's
+   * "Actualizar pases", and the half that did not exist.
+   *
+   * It matters today rather than in principle: the Android objects have been stale
+   * since the Wallet switch (every refresh 404'd on an invented id), so 155 customers
+   * are looking at numbers from before the cutover, and until this runs the only way
+   * their pass catches up is a transaction.
+   */
+  async refreshMerchantGoogleObjects(
+    merchantId: string,
+  ): Promise<{ total: number; refreshed: number; failed: number }> {
+    const entries = await this.repo.googleObjectsForMerchant(merchantId);
+    return this.google.refreshMerchantObjects(entries, (cardId, objectId) =>
+      this.googlePassData(merchantId, cardId, objectId).catch(() => null),
+    );
+  }
+
   private async googlePassData(
     merchantId: string,
     cardId: string,
