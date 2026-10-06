@@ -35,10 +35,12 @@
 ### Task 1: Pure reward-profile resolver
 
 **Files:**
+
 - Create: `apps/umi-cash/src/lib/reward-profile.ts`
 - Test: `apps/umi-cash/src/lib/reward-profile.test.ts`
 
 **Interfaces:**
+
 - Consumes: `DEFAULT_VISITS_REQUIRED`, `DEFAULT_REWARD_NAME` from `@/lib/constants` (already exist; used by `rewardConfigDefaults`).
 - Produces: `type RewardProfile = { visitsRequired: number; rewardName: string; rewardDescription: string | null; redemptionConfigId: string | null }` and `resolveRewardProfile(defaultConfig, overrideConfig): RewardProfile`. Tasks 2–6 build on these exact names.
 
@@ -159,11 +161,13 @@ git commit -m "feat(umi-cash): pure reward-profile resolver for per-client overr
 ### Task 2: Schema column, migration, and card-scoped fetch helper
 
 **Files:**
+
 - Modify: `apps/umi-cash/prisma/schema.prisma` (`model cards` ~line 546, `model reward_configs` ~line 764)
 - Create: `apps/umi-cash/prisma/migrations/20260902000000_add_card_reward_override/migration.sql`
 - Modify: `apps/umi-cash/src/lib/prisma-helpers.ts`
 
 **Interfaces:**
+
 - Consumes: `resolveRewardProfile`, `RewardProfile` from Task 1.
 - Produces: `cards.reward_config_id: string | null` on every fetched card row; `getRewardProfileForCard(tenantId: string, card: { reward_config_id: string | null }): Promise<RewardProfile>` in `@/lib/prisma-helpers`. Tasks 3–6 call it with card rows they already have.
 
@@ -266,11 +270,13 @@ git commit -m "feat(umi-cash): cards.reward_config_id override column + card-sco
 ### Task 3: Scan commit, preview, and seals use the card's profile
 
 **Files:**
+
 - Modify: `apps/umi-cash/src/app/api/[slug]/admin/scan/route.ts:101-102, 120-123, 181-187`
 - Modify: `apps/umi-cash/src/app/api/[slug]/admin/scan/preview/route.ts:44-56`
 - Modify: `apps/umi-cash/src/app/api/[slug]/admin/scan/seals/route.ts:82-83`
 
 **Interfaces:**
+
 - Consumes: `getRewardProfileForCard` (Task 2). Every route already holds a hydrated card row (`resolveScanTarget` / `findCardByIdentifier` return full rows, which now include `reward_config_id` after `prisma generate`).
 - Produces: no API shape changes — `rewardName`/`visitsRequired` in responses now reflect the override; `reward_redemptions.reward_config_id` records the resolved config.
 
@@ -347,9 +353,11 @@ git commit -m "feat(umi-cash): scan/preview/seals resolve the card's reward over
 ### Task 4: Admin API — read and set the override (ADMIN-only PATCH)
 
 **Files:**
+
 - Modify: `apps/umi-cash/src/app/api/[slug]/admin/customers/[id]/route.ts` (GET ~lines 21-24, 45, response ~line 100; add PATCH export)
 
 **Interfaces:**
+
 - Consumes: `getRewardProfileForCard` (Task 2), `triggerWalletUpdates` + `readLifecycleMessage` from `@/lib/scan-helpers`, `afterResponse` from `@/lib/after-response`, `getActiveRewardConfig`.
 - Produces (Task 5 relies on these exact shapes):
   - GET adds `rewardName: string` and `customReward: { name: string; description: string | null } | null`.
@@ -514,9 +522,11 @@ git commit -m "feat(umi-cash): ADMIN endpoint to set/clear a client's custom rew
 ### Task 5: Customer profile UI — show and edit the custom reward
 
 **Files:**
+
 - Modify: `apps/umi-cash/src/app/[slug]/(admin)/admin/customers/[id]/page.tsx` (interface at line 10; render near the visits stat at ~line 181; handlers near `handleRevert` at ~line 108)
 
 **Interfaces:**
+
 - Consumes: Task 4's GET fields (`rewardName`, `customReward`) and PATCH contract. Page idioms: `authedFetch(slug, url, init)`, classes `u-btn u-btn-primary`, `u-btn-secondary`, `u-input`, `u-surface`, `u-eyebrow`; `customer.viewerIsAdmin` gates admin controls (line ~365 shows the existing pattern).
 
 - [ ] **Step 1: Extend the `CustomerDetail` interface**
@@ -636,6 +646,7 @@ git commit -m "feat(umi-cash): customer profile shows and edits the per-client r
 Every site below currently does the same two lines (`getActiveRewardConfig(tenant.id)` then `rewardConfigDefaults(...)`) with a card row in scope; each swaps to `const { visitsRequired, rewardName } = await getRewardProfileForCard(tenant.id, card);` (destructure `rewardDescription` too where the old code used it) and updates the `@/lib/prisma-helpers` import accordingly. Anchors:
 
 **Files (all Modify):**
+
 - `apps/umi-cash/src/app/api/[slug]/card/route.ts:29,35` — move the fetch out of the `Promise.all` to after the `!card` guard (it needs the card row).
 - `apps/umi-cash/src/app/api/[slug]/passes/apple/route.ts:33,39` — same restructure as card view.
 - `apps/umi-cash/src/app/api/[slug]/passes/apple/v1/[...path]/route.ts:184,187` — card is already in scope; replace the `Promise.all` member with `getRewardProfileForCard(tenant.id, card)`.
@@ -662,6 +673,7 @@ In every edited file, also remove the now-unused `getActiveRewardConfig`/`reward
 Leave tenant-scoped on purpose: `src/app/[slug]/page.tsx` (public landing) and `src/app/api/[slug]/admin/analytics/route.ts` (aggregates).
 
 **Interfaces:**
+
 - Consumes: `getRewardProfileForCard` (Task 2); every listed route already holds the card row.
 - Produces: wallet passes, the customer card view, and lifecycle pushes render the override name.
 
@@ -681,6 +693,7 @@ Mechanical per the anchors above. In `card/route.ts` also pass through `rewardDe
    ```
 
    (`existing` is the selected card row at that point in the function.)
+
 3. Update the import at lifecycle.ts:12 to `import { getRewardProfileForCard } from './prisma-helpers';`.
 
 - [ ] **Step 3: Verify and commit**
