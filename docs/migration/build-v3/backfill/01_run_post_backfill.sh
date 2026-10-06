@@ -54,6 +54,7 @@ FILES=(
   75_table_order_credential
   76_recipes_inventory
   77_ai_usage
+  78_customer_pass_metadata
 )
 
 echo "== post-backfill migrations -> $DB =="
