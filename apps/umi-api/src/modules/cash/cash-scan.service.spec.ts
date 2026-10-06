@@ -183,7 +183,7 @@ describe('CashScanService.scan — the two-tier ladder', () => {
     // 6 stamps, one more reaches the base tier at 7 — NOT the end of the cycle.
     h.cards.findCard.mockResolvedValue({ ...CARD, visits_this_cycle: 6, total_visits: 6 });
     const r = await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'VISIT' });
-    const arg = h.repo.performScan.mock[0]?.[0] ?? h.repo.performScan.mock.calls[0][0];
+    const arg = h.repo.performScan.mock.calls[0][0];
     expect(arg.earnedReward).toBe(false);
     expect(arg.momentMessage).toContain('Capuccino');
     expect(arg.momentMessage).toContain('Latte rocas');

@@ -5,11 +5,7 @@ import {
   ACTIVE_LADDER_ROWS_SQL,
   CARD_OVERRIDE_ROW_SQL,
 } from '../../shared/loyalty/reward-config.sql';
-import {
-  resolveRewardProfile,
-  type RewardConfigRow,
-  type RewardProfile,
-} from '../../shared/loyalty/reward-profile';
+import type { RewardConfigRow } from '../../shared/loyalty/reward-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -18,6 +14,10 @@ export interface AnalyticsWindows {
   thirtyDaysAgo: Date;
   eightWeeksAgo: Date;
   monthStart: Date;
+  /** Midnight, (days − 1) ago: the start of the window the range chips select. */
+  rangeStart: Date;
+  /** The equally long window immediately before `rangeStart`, for the delta. */
+  prevRangeStart: Date;
 }
 
 /**
@@ -67,7 +67,11 @@ const CUST_CTE = `
              JOIN umi.channel_type ch ON ch.id = ct.channel_id
             WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
               AND ch.key = 'email'
-            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS email
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS email,
+          -- The phone and OS the customer self-registered from, read off the
+          -- User-Agent at sign-up. Display only: nothing branches on them, and a
+          -- customer a barista enrolled by hand legitimately has neither.
+          cu.device, cu.os
         FROM merchant.customer cu
         LEFT JOIN merchant.loyalty_card c
           ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
@@ -106,7 +110,11 @@ export class CashRepository {
            p.promo_message                AS "promoMessage",
            p.promo_starts_at              AS "promoStartsAt",
            p.promo_ends_at                AS "promoEndsAt",
-           p.promo_days                   AS "promoDays"
+           p.promo_days                   AS "promoDays",
+           -- Per-journey copy overrides. The Settings screen renders one textarea
+           -- per journey and counts how many the café has overridden, so it needs
+           -- the raw map, not a resolved string.
+           p.lifecycle_copy               AS "lifecycleCopy"
          -- city used to come from a second table: ops.businesses, the CHILD row that
          -- carried a tenant's trading details. build-v3 dissolved that child into the
          -- merchant itself, and the rename sweep turned the join into merchant.merchant
@@ -216,11 +224,14 @@ export class CashRepository {
         activeRewardConfigRow,
         highBalanceRow,
         birthdayRow,
+        prevPeriodVisits,
+        rewardsInRange,
+        redemptionLog,
       ] = await Promise.all([
         c.query<Row>(
           `SELECT occurred_at AS "scannedAt" FROM merchant.loyalty_visit
            WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
-          [merchantId, w.thirtyDaysAgo],
+          [merchantId, w.rangeStart],
         ),
         c.query<Row>(
           `SELECT ca.customer_id::text AS "userId", cu.name AS name,
@@ -306,6 +317,37 @@ export class CashRepository {
            WHERE merchant_id = $1::uuid AND status = 'active' AND expires_at > now()`,
           [merchantId],
         ),
+        // Visits in the window BEFORE the selected range. The range chips are a
+        // comparison, and the "vs periodo anterior" delta has nothing to compare
+        // against without this.
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM merchant.loyalty_visit
+           WHERE merchant_id = $1::uuid AND occurred_at >= $2 AND occurred_at < $3`,
+          [merchantId, w.prevRangeStart, w.rangeStart],
+        ),
+        // Canjes inside the selected range. umi-cash counted
+        // `reward_redemptions`; the events table is the same rows after the carry.
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM merchant.loyalty_redemption
+           WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
+          [merchantId, w.rangeStart],
+        ),
+        // Bitácora de canjes: who redeemed, when, and whether it was reverted — so
+        // a register cut can be reconciled days later against named redemptions.
+        c.query<Row>(
+          `SELECT r.id::text AS id, r.occurred_at AS "redeemedAt",
+                  cu.name AS name, ca.customer_id::text AS "customerId",
+                  ca.card_number AS "cardNumber", r.reverted_at AS "revertedAt"
+             FROM merchant.loyalty_redemption r
+             JOIN merchant.loyalty_card ca
+               ON ca.merchant_id = r.merchant_id AND ca.id = r.card_id
+             LEFT JOIN merchant.customer cu
+               ON cu.merchant_id = r.merchant_id AND cu.id = ca.customer_id
+            WHERE r.merchant_id = $1::uuid AND r.occurred_at >= $2
+            ORDER BY r.occurred_at DESC
+            LIMIT 50`,
+          [merchantId, w.rangeStart],
+        ),
       ]);
       return {
         recentVisits: recentVisits.rows,
@@ -319,6 +361,9 @@ export class CashRepository {
         activeRewardConfigRow: activeRewardConfigRow.rows,
         highBalanceRow: highBalanceRow.rows,
         birthdayRow: birthdayRow.rows,
+        prevPeriodVisits: prevPeriodVisits.rows,
+        rewardsInRange: rewardsInRange.rows,
+        redemptionLog: redemptionLog.rows,
       };
     });
   }
@@ -344,6 +389,7 @@ export class CashRepository {
         await c.query<Row>(
           `WITH ${CUST_CTE}, vr_n AS (SELECT n FROM vr)
            SELECT id::text AS id, name, phone, email, created_at AS "createdAt",
+                  device, os,
                   card_id::text AS "cardId", card_number AS "cardNumber",
                   balance_cents AS "balanceCentavos", total_visits AS "totalVisits",
                   (total_visits % (SELECT n FROM vr_n))::int                       AS "visitsThisCycle",
@@ -442,9 +488,9 @@ export class CashRepository {
     merchantId: string,
     cardId: string | null,
   ): Promise<{
-    defaultConfig: Row | null;
-    upgradeConfig: Row | null;
-    overrideConfig: Row | null;
+    defaultConfig: RewardConfigRow | null;
+    upgradeConfig: RewardConfigRow | null;
+    overrideConfig: RewardConfigRow | null;
   }> {
     return this.pg.withMerchant(async (c) => {
       const [rows, override] = await Promise.all([
@@ -456,9 +502,9 @@ export class CashRepository {
       // Newest row wins within a kind: this query is already ordered by created_at
       // DESC, and a save inserts rather than updates.
       return {
-        defaultConfig: rows.rows.find((r) => r.kind === 'standard') ?? null,
-        upgradeConfig: rows.rows.find((r) => r.kind === 'upgrade') ?? null,
-        overrideConfig: override.rows[0] ?? null,
+        defaultConfig: (rows.rows.find((r) => r.kind === 'standard') as RewardConfigRow) ?? null,
+        upgradeConfig: (rows.rows.find((r) => r.kind === 'upgrade') as RewardConfigRow) ?? null,
+        overrideConfig: (override.rows[0] as RewardConfigRow) ?? null,
       };
     });
   }
@@ -640,6 +686,7 @@ export class CashRepository {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT cu.id::text AS id, cu.name, cu.birthday, cu.created_at AS "createdAt",
+                cu.device, cu.os,
                 c.id::text AS "cardId", c.card_number AS "cardNumber",
                 c.created_at AS "cardCreatedAt",
                 (SELECT ct.normalized_value FROM merchant.contact ct
@@ -681,6 +728,45 @@ export class CashRepository {
       ),
     );
     return rows[0] ?? { ltvCentavos: 0, topupCentavos: 0 };
+  }
+
+  /**
+   * This card's canjes: the count, and the most recent `limit` of them.
+   *
+   * BOTH, from one place, because the detail screen shows a footer when the list
+   * is shorter than the count ("y N más") — two queries that disagree make that
+   * footer lie. Reverted canjes are INCLUDED: a reversal is an audit fact, and the
+   * row stays in the bitácora with its `revertedAt` set.
+   */
+  async cardRedemptions(
+    merchantId: string,
+    cardId: string,
+    limit: number,
+  ): Promise<{ total: number; rows: Row[] }> {
+    return this.pg.withMerchant(async (c) => {
+      const [rows, count] = await Promise.all([
+        c.query<Row>(
+          // `note` is always null: build-v3's loyalty_redemption has no note column.
+          // Only ONE row in production ever carried one — the early cash-out marker
+          // ("Canje anticipado con 7/9 visitas") — and carrying it is part of the
+          // cycle-anchor work in REGISTER_FLIP_PARITY.md, not a string this reader
+          // can invent. The key stays so the frozen client's shape is intact.
+          `SELECT id::text AS id, occurred_at AS "redeemedAt", NULL::text AS note,
+                  reverted_at AS "revertedAt"
+             FROM merchant.loyalty_redemption
+            WHERE merchant_id = $1::uuid AND card_id = $2::uuid
+            ORDER BY occurred_at DESC
+            LIMIT $3`,
+          [merchantId, cardId, limit],
+        ),
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM merchant.loyalty_redemption
+            WHERE merchant_id = $1::uuid AND card_id = $2::uuid`,
+          [merchantId, cardId],
+        ),
+      ]);
+      return { total: Number(count.rows[0]?.n ?? 0), rows: rows.rows };
+    });
   }
 
   /**

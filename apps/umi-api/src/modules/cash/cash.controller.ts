@@ -28,6 +28,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { CashReadService } from './cash-read.service';
+import { registerRole } from './cash-roles';
 import { ClientErrorDto } from './dto/client-error.dto';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 
@@ -145,12 +146,12 @@ export class CashController {
 
   @Get('stats')
   getStats(@Merchant() t: MerchantAccess) {
-    return this.cash.getStats(t.merchantId);
+    return this.cash.getStats(t.merchantId, registerRole(t));
   }
 
   @Get('analytics')
-  getAnalytics(@Merchant() t: MerchantAccess) {
-    return this.cash.getAnalytics(t.merchantId);
+  getAnalytics(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
+    return this.cash.getAnalytics(t.merchantId, query);
   }
 
   @Get('customers')
@@ -164,7 +165,7 @@ export class CashController {
    */
   @Get('customers/:id')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
-    return this.cash.getCustomer(t.merchantId, id);
+    return this.cash.getCustomer(t.merchantId, id, registerRole(t));
   }
 
   /**

@@ -12,7 +12,7 @@ import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import { CashWriteRepository } from './cash-write.repository';
 import { CashScanRepository, type ScannedCard } from './cash-scan.repository';
-import { resolveJourneyTemplate, renderTemplate, type LifecycleJourneyKey } from './lifecycle-copy';
+import { resolveJourneyTemplate, renderTemplate } from './lifecycle-copy';
 import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
 import {
   bankedReward,
@@ -28,8 +28,6 @@ const BIRTHDAY = 'BIRTHDAY_REDEEM';
 const ACTION_ORDER = [BIRTHDAY, REDEEM, VISIT] as const;
 type ScanAction = (typeof ACTION_ORDER)[number];
 
-const DEFAULT_VISITS_REQUIRED = 10;
-const DEFAULT_REWARD_NAME = 'Recompensa de temporada';
 const DEFAULT_CUSTOMER_NAME = 'Cliente';
 const DEFAULT_TZ = 'America/Mexico_City';
 

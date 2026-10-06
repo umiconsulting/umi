@@ -15,6 +15,18 @@ function make() {
     giftCards: vi.fn(),
     adminCustomerDetail: vi.fn(),
     cardMoneyTotals: vi.fn().mockResolvedValue({ ltvCentavos: 0, topupCentavos: 0 }),
+    // A single-reward café with no per-card override: the ladder's null case.
+    rewardProfileRows: vi.fn().mockResolvedValue({
+      defaultConfig: {
+        id: 'rc1',
+        visits_required: 10,
+        reward_name: 'Café gratis',
+        reward_description: null,
+      },
+      upgradeConfig: null,
+      overrideConfig: null,
+    }),
+    cardRedemptions: vi.fn().mockResolvedValue({ total: 0, rows: [] }),
     adminExportRows: vi.fn().mockResolvedValue([]),
   };
   const cards = {
