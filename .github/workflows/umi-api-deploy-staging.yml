@@ -1,11 +1,12 @@
-# Deploys build-v3 to the VPS QA stack on every merge to build-v3. Thin caller of
+# Deploys `staging` to the VPS QA stack on every merge to `staging`. Thin caller of
 # the reusable deploy-backend workflow — see .github/workflows/deploy-backend.yml.
 #
-# This is the build-v3 twin of umi-api-deploy.yml (which ships main to prod).
-# Until now build-v3 had no deployment path at all: the QA stack was updated by
-# hand on the box, so the running image and the checkout routinely disagreed —
-# on 2026-09-25 the checkout sat at 3bf06d5 while the image running reported
-# d0cb3d3. Nothing on the box said which was true.
+# This is the non-production twin of umi-api-deploy.yml (which ships main to prod).
+# It used to deploy `build-v3` — a branch that no longer exists, because the cutover
+# of 2026-10-06 merged everything into main and the merged branches were deleted.
+# Pointing this at `staging` is what turns the QA stack into the pre-production
+# environment it was meant to be: the same code as main, one step behind it, with its
+# own database, its own domain and its own secrets.
 #
 # It ships the same image prod does, built from this branch, into a separate
 # compose project on the same host — see deploy/staging/compose.yml.
@@ -13,7 +14,7 @@ name: umi-api deploy (staging)
 
 on:
   push:
-    branches: [build-v3]
+    branches: [staging]
     paths:
       - 'apps/umi-api/**'
       - 'packages/contract/**'
@@ -47,10 +48,12 @@ jobs:
       package_name: '@umi/api'
       image: ghcr.io/umiconsulting/umi-api
       health_url: https://api-staging.umiconsulting.co/health
-      # The build-v3 checkout on the box. deploy.sh git-resets it to the branch
-      # before rolling containers, so what runs always matches what CI built.
-      repo_dir: /home/juan/umi-buildv3
-      branch: build-v3
+      # The staging checkout on the box. deploy.sh git-resets it to the branch before
+      # rolling containers, so what runs always matches what CI built. The directory
+      # was renamed with the branch — it was /home/juan/umi-buildv3, a name that
+      # outlived the branch it referred to.
+      repo_dir: /home/juan/umi-staging
+      branch: staging
       # The QA stack's compose file now lives in the repo; its .env, certs and
       # secrets deliberately do not (gitignored state that must survive the
       # reset). UMI_PROJECT_DIR keeps them resolving where they have always been.
