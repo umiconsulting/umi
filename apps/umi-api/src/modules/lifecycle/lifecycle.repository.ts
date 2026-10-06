@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import { effectiveVisitsRequiredSql } from '../../shared/loyalty/card-state.sql';
+import { EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL } from '../../shared/loyalty/card-state.sql';
 
 /**
  * Canonical reads for the scheduled lifecycle WhatsApp journeys (3d-lifecycle),
@@ -69,7 +69,7 @@ const HAS_PHONE = `ph.phone IS NOT NULL`;
 // shared/loyalty/card-state.sql.ts for why, and for the one copy of the rule.
 const VISITS_THIS_CYCLE = `(
   (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
-  % COALESCE(${effectiveVisitsRequiredSql('c.merchant_id')}, ${DEFAULT_VISITS_REQUIRED})
+  % COALESCE(${EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL}, ${DEFAULT_VISITS_REQUIRED})
 )::int`;
 
 @Injectable()

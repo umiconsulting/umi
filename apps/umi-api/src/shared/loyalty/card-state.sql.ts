@@ -45,30 +45,52 @@
  * sells — stopped existing. The four cafés with no ladder are untouched: with no
  * `upgrade` row this is exactly the old single-row subquery, defaulting to 10.
  *
- * `merchant` is the SQL expression holding the merchant id — a parameter
- * (`'$1::uuid'`) or a column (`'c.merchant_id'`). Pass it in rather than letting
- * each caller spell the subquery out again: five readers did exactly that, and only
- * one of them has to drift for the till, the pass and the dashboard to disagree.
+ * A PLAIN LITERAL, and deliberately not a function. `sql-preflight` rebuilds every
+ * interpolated statement by substituting named template constants, one import deep —
+ * a fragment built by a function call is invisible to it, so every reader would be
+ * counted as UNCOVERED and the gate's "name every exception in writing" rule would
+ * force five written exceptions for five statements that are perfectly checkable.
+ * Every reader therefore names the merchant id `$1`.
  */
-export const effectiveVisitsRequiredSql = (merchant: string): string => `
+export const EFFECTIVE_VISITS_REQUIRED_SQL = `
   (SELECT CASE
             WHEN up.n IS NOT NULL AND up.n > COALESCE(std.n, 0) THEN up.n
             WHEN std.n IS NOT NULL THEN std.n
             ELSE 10
           END
      FROM (SELECT (SELECT r.stamps_required FROM merchant.loyalty_reward r
-                    WHERE r.merchant_id = ${merchant} AND r.active
+                    WHERE r.merchant_id = $1::uuid AND r.active
                       AND r.type = 'stamps_free_item'
                       AND r.kind = 'upgrade'
                     ORDER BY r.created_at DESC NULLS LAST LIMIT 1) AS n) AS up,
           (SELECT (SELECT r.stamps_required FROM merchant.loyalty_reward r
-                    WHERE r.merchant_id = ${merchant} AND r.active
+                    WHERE r.merchant_id = $1::uuid AND r.active
                       AND r.type = 'stamps_free_item'
                       AND r.kind = 'standard'
                     ORDER BY r.created_at DESC NULLS LAST LIMIT 1) AS n) AS std)`;
 
-/** `effectiveVisitsRequiredSql` for the common case, where the merchant id is `$1`. */
-export const EFFECTIVE_VISITS_REQUIRED_SQL = effectiveVisitsRequiredSql('$1::uuid');
+/**
+ * The same rule for a statement whose merchant id is a COLUMN rather than `$1`
+ * (`lifecycle.repository.ts` correlates on `c.merchant_id`). Kept as its own literal
+ * for the same preflight reason, and defined next to the other so the two cannot
+ * drift apart.
+ */
+export const EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL = `
+  (SELECT CASE
+            WHEN up.n IS NOT NULL AND up.n > COALESCE(std.n, 0) THEN up.n
+            WHEN std.n IS NOT NULL THEN std.n
+            ELSE 10
+          END
+     FROM (SELECT (SELECT r.stamps_required FROM merchant.loyalty_reward r
+                    WHERE r.merchant_id = c.merchant_id AND r.active
+                      AND r.type = 'stamps_free_item'
+                      AND r.kind = 'upgrade'
+                    ORDER BY r.created_at DESC NULLS LAST LIMIT 1) AS n) AS up,
+          (SELECT (SELECT r.stamps_required FROM merchant.loyalty_reward r
+                    WHERE r.merchant_id = c.merchant_id AND r.active
+                      AND r.type = 'stamps_free_item'
+                      AND r.kind = 'standard'
+                    ORDER BY r.created_at DESC NULLS LAST LIMIT 1) AS n) AS std)`;
 
 export const LOYALTY_CARD_STATE_SQL = `
   WITH vr AS (

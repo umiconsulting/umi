@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import { effectiveVisitsRequiredSql } from '../../shared/loyalty/card-state.sql';
+import { EFFECTIVE_VISITS_REQUIRED_SQL } from '../../shared/loyalty/card-state.sql';
 
 export interface CustomerListQuery {
   limit: number;
@@ -337,7 +337,7 @@ export class CustomersRepository {
         // Loyalty state DERIVED (no account layer): the customer's active card +
         // balance=SUM(card_ledger), visits=COUNT(visit), cycle/pending vs the rule.
         `WITH vr AS (
-           SELECT COALESCE(${effectiveVisitsRequiredSql('$2::uuid')}, 10) AS n
+           SELECT COALESCE(${EFFECTIVE_VISITS_REQUIRED_SQL}, 10) AS n
          )
          SELECT
            lc.customer_id::text AS "loyaltyAccountId",
@@ -356,13 +356,13 @@ export class CustomersRepository {
          CROSS JOIN LATERAL (
            SELECT
              (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = lc.merchant_id AND v.card_id = lc.id) AS total_visits,
-             (SELECT count(*) FROM merchant.loyalty_redemption r WHERE r.merchant_id = lc.merchant_id AND r.card_id = lc.id) AS redemptions,
+             (SELECT count(*) FROM merchant.loyalty_redemption r WHERE r.merchant_id = lc.merchant_id AND r.card_id = lc.id AND r.reverted_at IS NULL) AS redemptions,
              COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l WHERE l.merchant_id = lc.merchant_id AND l.card_id = lc.id), 0) AS balance_cents
          ) AS agg
-         WHERE lc.customer_id = $1::uuid AND lc.merchant_id = $2::uuid
+         WHERE lc.customer_id = $2::uuid AND lc.merchant_id = $1::uuid
          ORDER BY lc.created_at DESC
          LIMIT 1`,
-        [contactId, merchantId],
+        [merchantId, contactId],
       ),
     );
     return rows[0] ?? null;
