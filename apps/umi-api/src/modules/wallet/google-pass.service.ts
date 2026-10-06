@@ -17,6 +17,13 @@ const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/wallet_object.issuer';
 /** Google's p99 here is well under a second; an unbounded hop loses the update. */
 const GOOGLE_TIMEOUT_MS = 8_000;
+
+/**
+ * What one PATCH did. Three answers, not two: `missing` is the difference between "we
+ * could not update it" and "there is nothing to update" — a distinction that was worth
+ * 19 permanent 404s on every café-wide refresh.
+ */
+export type GoogleUpdateOutcome = 'updated' | 'missing' | 'failed';
 const TOKEN_TTL_MS = 50 * 60 * 1000;
 
 /**
@@ -97,8 +104,8 @@ export class GooglePassService {
    * Best-effort, like the Apple push: the money write has committed and must not
    * be undone by an unreachable Google. Nothing here throws.
    */
-  async updateObject(data: GooglePassData): Promise<boolean> {
-    if (!this.isConfigured()) return false;
+  async updateObject(data: GooglePassData): Promise<GoogleUpdateOutcome> {
+    if (!this.isConfigured()) return 'failed';
     // ⚠️ THE ID THE OBJECT ACTUALLY HAS. Every object in circulation was created by
     // umi-cash under a Prisma cuid (…card_cmnuuglu40004oyt5s8bve44e); the id a NEW
     // object would get here is …card_<uuid>. Patching the constructed id asked Google
@@ -108,7 +115,7 @@ export class GooglePassService {
     const objectId = data.objectId ?? this.objectId(data.cardId);
     try {
       const token = await this.accessToken();
-      if (!token) return false;
+      if (!token) return 'failed';
 
       const patched = await fetch(
         `${WALLET_OBJECTS}/loyaltyObject/${encodeURIComponent(objectId)}`,
@@ -121,11 +128,18 @@ export class GooglePassService {
       );
       // A rejected PATCH means the customer's pass silently keeps stale state.
       if (!patched.ok) {
+        // A 404 is not a Google fault: it means this row points at an object that does
+        // not exist — the customer never finished adding the pass, or removed it. The
+        // caller marks the row so the next walk does not count it again.
+        if (patched.status === 404) {
+          this.logger.log(`google_object_missing object=${objectId}`);
+          return 'missing';
+        }
         this.logger.warn(
           `google_patch_failed object=${objectId} status=${patched.status} ` +
             `${await patched.text().catch(() => '')}`,
         );
-        return false;
+        return 'failed';
       }
 
       // PATCHing text modules updates the card but raises NO notification. Google
@@ -134,10 +148,10 @@ export class GooglePassService {
       if (data.lifecycleMessage) {
         await this.notify(objectId, token, data);
       }
-      return true;
+      return 'updated';
     } catch (err) {
       this.logger.warn(`google_update_failed object=${objectId}: ${String(err)}`);
-      return false;
+      return 'failed';
     }
   }
 
@@ -156,27 +170,33 @@ export class GooglePassService {
    */
   async refreshMerchantObjects(
     entries: { cardId: string; objectId: string }[],
-    load: (cardId: string, objectId: string) => Promise<GooglePassData | null>,
+    refresh: (cardId: string, objectId: string) => Promise<GoogleUpdateOutcome>,
     concurrency = 4,
-  ): Promise<{ total: number; refreshed: number; failed: number }> {
+  ): Promise<{ total: number; refreshed: number; missing: number; failed: number }> {
     if (!this.isConfigured())
-      return { total: entries.length, refreshed: 0, failed: entries.length };
+      return { total: entries.length, refreshed: 0, missing: 0, failed: entries.length };
     const queue = [...entries];
     let refreshed = 0;
     let failed = 0;
+    // A row whose object is not in Google is not a fault: it is a pass the customer
+    // never finished adding (or removed). Counted apart so a café-wide refresh can end
+    // at zero failures while still being honest about what it found.
+    let missing = 0;
     const worker = async () => {
       for (let entry = queue.shift(); entry; entry = queue.shift()) {
         try {
-          const data = await load(entry.cardId, entry.objectId);
-          if (data && (await this.updateObject(data))) refreshed++;
+          const outcome = await refresh(entry.cardId, entry.objectId);
+          if (outcome === 'updated') refreshed++;
+          else if (outcome === 'missing') missing++;
           else failed++;
           // Progress, not just a summary. A walk that never finishes tells you nothing
           // if the only line it would have written is the one that never comes — which
           // is how a stalled merchant-wide refresh looked like silence.
-          const done = refreshed + failed;
+          const done = refreshed + failed + missing;
           if (done % 25 === 0) {
             this.logger.log(
-              `google_merchant_refresh_progress done=${done}/${entries.length} failed=${failed}`,
+              `google_merchant_refresh_progress done=${done}/${entries.length} ` +
+                `missing=${missing} failed=${failed}`,
             );
           }
         } catch (err) {
@@ -187,9 +207,10 @@ export class GooglePassService {
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker));
     this.logger.log(
-      `google_merchant_refresh objects=${entries.length} refreshed=${refreshed} failed=${failed}`,
+      `google_merchant_refresh objects=${entries.length} refreshed=${refreshed} ` +
+        `missing=${missing} failed=${failed}`,
     );
-    return { total: entries.length, refreshed, failed };
+    return { total: entries.length, refreshed, missing, failed };
   }
 
   private async notify(objectId: string, token: string, data: GooglePassData): Promise<void> {
@@ -268,6 +289,16 @@ export class GooglePassService {
 
   private objectId(cardId: string): string {
     return `${this.issuerId}.card_${cardId}`;
+  }
+
+  /**
+   * The id a NEW object gets, for callers that must record it as well as sign it.
+   *
+   * The row and the JWT have to agree: the row is what every later refresh looks up, and
+   * a mismatch is a 404 that nothing reports to the customer.
+   */
+  objectIdFor(cardId: string): string {
+    return this.objectId(cardId);
   }
 
   private classId(handle: string): string {

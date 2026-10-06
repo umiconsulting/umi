@@ -84,13 +84,20 @@ function makeService(render: PassRenderData | null = RENDER) {
     googleObjectsForMerchant: vi
       .fn()
       .mockResolvedValue([{ cardId: 'card-1', objectId: 'stored-object-id' }]),
+    googleRowForCard: vi.fn().mockResolvedValue(null),
+    cardForCustomer: vi.fn().mockResolvedValue('card-1'),
+    upsertGoogleObject: vi.fn().mockResolvedValue(undefined),
+    markGoogleObjectRemoved: vi.fn().mockResolvedValue(undefined),
   };
   const builder = { build, isConfigured: () => true, assetOrigin: () => '' };
   const google = {
     isConfigured: () => false,
     saveUrl: vi.fn(),
     updateObject: vi.fn().mockResolvedValue(true),
-    refreshMerchantObjects: vi.fn().mockResolvedValue({ total: 1, refreshed: 1, failed: 0 }),
+    refreshMerchantObjects: vi
+      .fn()
+      .mockResolvedValue({ total: 1, refreshed: 1, missing: 0, failed: 0 }),
+    objectIdFor: (cardId: string) => `3388000000022.card_${cardId}`,
   };
   const service = new WalletPassService(
     repo as unknown as ConstructorParameters<typeof WalletPassService>[0],
@@ -133,6 +140,44 @@ describe('WalletPassService · the Android object id', () => {
     await service.refreshMerchantGoogleObjects('merchant-1');
     expect(repo.googleObjectsForMerchant).toHaveBeenCalledWith('merchant-1');
     expect(google.refreshMerchantObjects).toHaveBeenCalled();
+  });
+
+  /**
+   * THE ROW HAS TO BE WRITTEN WHEN THE OBJECT IS CREATED.
+   *
+   * The legacy save route did it; the port dropped it. Without the row, a customer who
+   * added her Android pass after the Wallet switch was invisible to every later
+   * refresh — per-write and café-wide — so her pass froze at whatever it showed the day
+   * she saved it. Silent, and permanent.
+   */
+  describe('the "add to Google Wallet" link', () => {
+    it('records the object it is about to create', async () => {
+      const { service, repo, google } = makeService();
+      repo.googleRowForCard.mockResolvedValue(null);
+      await service.googleSaveUrl('merchant-1', 'customer-1');
+      expect(repo.upsertGoogleObject).toHaveBeenCalledWith('card-1', '3388000000022.card_card-1');
+      // …and the JWT carries the SAME id as the row, or the refresh 404s later.
+      expect(google.saveUrl.mock.calls[0][0].objectId).toBe('3388000000022.card_card-1');
+    });
+
+    it('reuses the id the customer already has, so a second tap does not duplicate', async () => {
+      const { service, repo, google } = makeService();
+      repo.googleRowForCard.mockResolvedValue({
+        objectId: 'the-existing-object',
+        status: 'active',
+      });
+      await service.googleSaveUrl('merchant-1', 'customer-1');
+      expect(repo.upsertGoogleObject).toHaveBeenCalledWith('card-1', 'the-existing-object');
+      expect(google.saveUrl.mock.calls[0][0].objectId).toBe('the-existing-object');
+    });
+
+    it('mints a fresh id for a row marked removed, because that object is gone', async () => {
+      const { service, repo, google } = makeService();
+      repo.googleRowForCard.mockResolvedValue({ objectId: 'the-old-object', status: 'removed' });
+      await service.googleSaveUrl('merchant-1', 'customer-1');
+      expect(repo.upsertGoogleObject).toHaveBeenCalledWith('card-1', '3388000000022.card_card-1');
+      expect(google.saveUrl.mock.calls[0][0].objectId).toBe('3388000000022.card_card-1');
+    });
   });
 });
 

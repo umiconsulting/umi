@@ -6,16 +6,11 @@ import { buildLoyaltyObject, GooglePassService, type GooglePassData } from './go
  * per-object PATCH. Everything else (the walk, the counting, the failure handling)
  * is the code under test.
  */
-function walker(patched: (objectId: string) => boolean) {
+/** The service with Google "configured", so the walk runs. */
+function walker() {
   const svc = new GooglePassService({ get: () => undefined } as never, {} as never);
-  const seen: string[] = [];
   (svc as unknown as { isConfigured: () => boolean }).isConfigured = () => true;
-  (svc as unknown as { updateObject: (d: GooglePassData) => Promise<boolean> }).updateObject =
-    async (d) => {
-      seen.push(d.objectId ?? 'constructed');
-      return patched(d.objectId ?? '');
-    };
-  return { svc, seen };
+  return svc;
 }
 
 describe('GooglePassService.refreshMerchantObjects', () => {
@@ -39,43 +34,62 @@ describe('GooglePassService.refreshMerchantObjects', () => {
   });
 
   it('walks every object, counts what landed, and keeps going past a failure', async () => {
-    const { svc, seen } = walker((objectId) => objectId !== 'object-2');
+    const svc = walker();
+    const seen: string[] = [];
     const result = await svc.refreshMerchantObjects(
       [
         { cardId: 'card-1', objectId: 'object-1' },
         { cardId: 'card-2', objectId: 'object-2' },
         { cardId: 'card-3', objectId: 'object-3' },
       ],
-      async (_cardId, objectId) => ({ objectId }) as GooglePassData,
+      async (_cardId, objectId) => {
+        seen.push(objectId);
+        return objectId === 'object-2' ? 'failed' : 'updated';
+      },
     );
 
-    expect(result).toEqual({ total: 3, refreshed: 2, failed: 1 });
+    expect(result).toEqual({ total: 3, refreshed: 2, missing: 0, failed: 1 });
     // The STORED id reaches Google, never the one this codebase would construct.
     expect(seen.sort()).toEqual(['object-1', 'object-2', 'object-3']);
   });
 
   it('counts a card whose render throws as a failure rather than aborting the café', async () => {
-    const { svc } = walker(() => true);
+    const svc = walker();
     const result = await svc.refreshMerchantObjects(
       [
         { cardId: 'bad', objectId: 'object-1' },
         { cardId: 'good', objectId: 'object-2' },
       ],
-      async (cardId, objectId) => {
+      async (cardId) => {
         if (cardId === 'bad') throw new Error('render failed');
-        return { objectId } as GooglePassData;
+        return 'updated';
       },
     );
-    expect(result).toEqual({ total: 2, refreshed: 1, failed: 1 });
+    expect(result).toEqual({ total: 2, refreshed: 1, missing: 0, failed: 1 });
+  });
+
+  it('counts an object Google does not have as MISSING, not as a failure', async () => {
+    // 19 rows in production point at objects that were never created: the customer
+    // tapped "add to Wallet" and never finished. Reporting those as failures made a
+    // café-wide refresh look broken on every run.
+    const svc = walker();
+    const result = await svc.refreshMerchantObjects(
+      [
+        { cardId: 'card-1', objectId: 'object-1' },
+        { cardId: 'card-2', objectId: 'object-2' },
+      ],
+      async (_cardId, objectId) => (objectId === 'object-2' ? 'missing' : 'updated'),
+    );
+    expect(result).toEqual({ total: 2, refreshed: 1, missing: 1, failed: 0 });
   });
 
   it('reports every object as failed when Google is not configured', async () => {
     const svc = new GooglePassService({ get: () => undefined } as never, {} as never);
     const result = await svc.refreshMerchantObjects(
       [{ cardId: 'card-1', objectId: 'object-1' }],
-      async () => ({}) as GooglePassData,
+      async () => 'updated',
     );
-    expect(result).toEqual({ total: 1, refreshed: 0, failed: 1 });
+    expect(result).toEqual({ total: 1, refreshed: 0, missing: 0, failed: 1 });
   });
 });
 
