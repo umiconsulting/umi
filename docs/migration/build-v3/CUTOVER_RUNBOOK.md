@@ -1,11 +1,13 @@
 # build-v3 cutover runbook
 
-Status: `EXECUTED 2026-10-06 — the database and the API are live on main, and the Wallet switch is
-flipped and verified against a real pass. The register switch is still OFF, on purpose.` See §8.
+Status: `EXECUTED 2026-10-06 — the database and the API are live on main. The Wallet switch was
+flipped, then reverted the same night and verified in both directions. The register switch is OFF
+and BLOCKED on response shape.` See §8 and [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md).
 Last updated: 2026-10-06.
 Companion docs: [`GATED_CUTOVER_PLAN.md`](./GATED_CUTOVER_PLAN.md) (the roadmap and gates) ·
 [`BACKFILL_METHODOLOGY.md`](./BACKFILL_METHODOLOGY.md) (why snapshot-rebuild, not FDW) ·
 [`SECURITY_GATE.md`](./SECURITY_GATE.md) (the deployment gate) ·
+[`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md) (why the register switch has not flipped) ·
 `docs/pilot/UMIPOS_SITE_DEVICE_INVENTORY.md` (the café's hardware).
 
 ## 0 · What this document is for
@@ -139,9 +141,10 @@ are closed; it is not a steady state.
 
    On 2026-10-06, **before** the API cutover, production (`main`) answered **404** there; staging
    (build-v3) answered **401**. The order therefore is: API first, verify 401, then flip
-   `WALLET_API_ORIGIN`. That order was followed; production now answers 401 and the switch is
-   on. `CASH_API_ORIGIN` (the register) flips on its own switch, by design, and has not been
-   flipped.
+   `WALLET_API_ORIGIN`. That order was followed, and then the switch was reverted — the register
+   could not follow it the same night, and a Wallet reading the new schemas while the register
+   wrote the old ones is worse than neither. See §8. `CASH_API_ORIGIN` (the register) flips on its
+   own switch, by design, and is still off.
 
 ## 6 · Rollback
 
@@ -175,6 +178,12 @@ are closed; it is not a steady state.
   not restart (Docker does not act on health) and `deploy.sh` does not pass `--wait`, so nothing
   breaks — but the signal is worthless, and a real worker death looks exactly like this. The
   compose service needs its own probe or its own `disable: true`.
+- **A route that exists is not a route that answers.** `register-flip.integration.ts` is the only
+  thing connecting `REGISTER_ROUTES` to this app, and it compares paths, not payloads. Four of the
+  register's six screens answered a different shape while that test stayed green — including the
+  reward ladder, which is to say money. Measure the response before flipping a proxy:
+  `scripts/umi-cash-register-parity.mjs`. Full inventory in
+  [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md).
 
 ## 8 · Execution log — 2026-10-06
 
@@ -210,9 +219,9 @@ schemas are intact and were never written to by the new code.
 carries `D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)`. `Caddyfile`,
 `Dockerfile` and `docker-compose.yml` on the box were compared against the merged tree and match.
 
-**The Wallet switch.** The API shipped with **no** `APPLE_*`/`GOOGLE_*` values at all, so its pass
-routes would have answered 503. Thirteen credentials were merged into `apps/umi-api/.env` and the
-containers recreated. Then, checked rather than assumed:
+**The Wallet switch (flipped, then reverted).** The API shipped with **no** `APPLE_*`/`GOOGLE_*`
+values at all, so its pass routes would have answered 503. Thirteen credentials were merged into
+`apps/umi-api/.env` and the containers recreated. Then, checked rather than assumed:
 
 - the signer key decrypts under `APPLE_KEY_PASSPHRASE` and the APN key parses as EC;
 - a throwaway pass signs through `passkit-generator` (magic `PK`), so the template, the WWDR copy
@@ -228,10 +237,22 @@ containers recreated. Then, checked rather than assumed:
   row for El Gran Ribera, called at `…/passes/apple/v1/passes/{passTypeId}/{serial}` with its own
   `Authorization: ApplePass <token>`, returned **200** and an 89 948-byte `.pkpass`.
 
+**Then it was put back.** Flipping the Wallet before the register leaves the pass reading the new
+schemas while the till writes the old ones, so a stamp taken on the panel never reaches the
+customer's phone. The register switch was found to be blocked (see
+[`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md)), so `WALLET_API_ORIGIN` was **removed** and
+umi-cash redeployed — `rewrites()` is evaluated at build time, so the revert is a redeploy too.
+Verified both ways rather than assumed: the frozen prefix answers from umi-cash's own handler
+again (`x-matched-path`, no `via:`), and a real pass re-issued through it — **200**, 94 268 bytes,
+magic `PK`.
+
 **Still open, in this order.**
 
-1. Flip `CASH_API_ORIGIN` — the register — once a register session has been exercised against
-   umi-api (one login, one read). Until then the split in §4 is live.
+1. Flip `CASH_API_ORIGIN` — the register — but not yet: the ported routes answer a different
+   shape than the frozen panel reads, on four of its screens. The full inventory, the harness that
+   measures it and the exit criteria are in
+   [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md). Until it flips, the split in §4 is live
+   — and so the Wallet switch has to stay off with it.
 2. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
 3. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
    during the cutover and must be treated as exposed.
