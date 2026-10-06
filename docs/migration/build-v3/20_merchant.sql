@@ -763,6 +763,16 @@ create table merchant.loyalty_reward (
   description      text,      -- café-authored copy for the reward (umi-cash reward config)
   type             text not null
                      check (type in ('stamps_free_item','spend_cashback','birthday','manual')),
+  -- WHICH ROLE the reward plays in the ladder, carried verbatim from legacy
+  -- `loyalty.reward_configs.kind`. This is a THIRD axis, deliberately named the same
+  -- as its source so the carry is a one-to-one copy: `type` is the mechanism, and
+  -- `reward_type` (added in 37) is the POS customer-value vocabulary. This one says
+  -- whether the row is the café's standard reward, the optional UPPER TIER above it,
+  -- or a PER-CARD override. A ladder is rows, not columns — the upper tier is a
+  -- second row with a higher `stamps_required` and `kind='upgrade'`, which is exactly
+  -- how legacy stored it and why nothing here needs a "second tier" column.
+  kind             text not null default 'standard'
+                     check (kind in ('standard','upgrade','override')),
   stamps_required  integer,   -- for type='stamps_free_item'
   spend_required   bigint,    -- centavos, for type='spend_cashback'
   value            bigint,    -- reward value in centavos where applicable
@@ -782,7 +792,15 @@ create table merchant.loyalty_redemption (
   value        bigint,        -- centavos granted
   staff_id     uuid references merchant.staff(id),
   occurred_at  timestamptz not null default now(),
-  created_at   timestamptz not null default now()
+  created_at   timestamptz not null default now(),
+  -- Reversal audit, carried from `loyalty.reward_redemptions.reverted_at` /
+  -- `reverted_by_staff_member_id`. A reverted canje STAYS in this table — the
+  -- bitácora has to show it — so these are audit columns, not a soft delete, and
+  -- the redemption is never removed. This table is deliberately NOT append-only
+  -- (unlike the ledgers): the reversal edits this row's audit fields, it is not a
+  -- second event, and a second row would double-count in the stamp arithmetic.
+  reverted_at          timestamptz,
+  reverted_by_staff_id uuid references merchant.staff(id)
 );
 comment on table merchant.loyalty_redemption is
   'A reward was consumed (the event). Birthday once-per-year is enforced by the app/a partial unique.';
