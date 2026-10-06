@@ -501,6 +501,30 @@ export class CashScanService {
       throw new ForbiddenException({ error: 'No puedes escanear tu propia tarjeta' });
     }
 
+    // The moment the credit leaves on the card — the legacy seals route wrote one, and
+    // it is the pass's only notification channel. Without it the customer's lock screen
+    // keeps whatever the last scan said, and (worse) Apple has nothing to fetch.
+    const profileRows = await this.repo.rewardProfileRows(merchantId, card.id);
+    const profile = resolveRewardProfile(
+      profileRows.defaultConfig,
+      profileRows.overrideConfig,
+      profileRows.upgradeConfig,
+    );
+    const required = profile.visitsRequired;
+    const newVisitsThisCycle = (card.visits_this_cycle + input.seals) % required;
+    const moment = visitMoment(profile, {
+      newVisitsThisCycle,
+      earnedReward: card.visits_this_cycle + input.seals >= required,
+      isFirstVisitEver: card.total_visits + input.seals === input.seals,
+    });
+    const momentMessage = renderTemplate(
+      resolveJourneyTemplate(cfg?.lifecycleCopy, moment.journey),
+      momentVars(profile, moment, {
+        name: card.display_name ?? DEFAULT_CUSTOMER_NAME,
+        tenant: cfg?.name ?? '',
+      }),
+    );
+
     const credited = await this.repo.creditSeals({
       merchantId,
       cardId: card.id,
@@ -510,16 +534,17 @@ export class CashScanService {
       // Kept NULL when the register sends none. Minting one here would look like
       // idempotency and provide none — a fresh key can never match a retry.
       idempotencyKey: input.idempotencyKey ?? null,
+      momentMessage,
     });
 
     // Rewards THIS action minted: how many thresholds the credit crossed from
     // where the cycle stood. No divide-by-zero guard, because there is nothing
     // left to guard — the threshold arrives from the derived-state query, which
     // took the same modulo first and would have raised before returning.
-    const required = credited.visitsRequired;
+    const creditedRequired = credited.visitsRequired;
     const rewardsEarned = credited.replayed
       ? 0
-      : Math.floor((credited.cycleBefore + input.seals) / required);
+      : Math.floor((credited.cycleBefore + input.seals) / creditedRequired);
 
     void this.walletPass.refreshCard(card.id);
 

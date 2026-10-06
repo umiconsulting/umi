@@ -62,10 +62,29 @@ export class WalletPassRepository {
   /** Which café a card belongs to. Used where only the card id is in hand. */
   async merchantForCard(cardId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ merchant_id: string }>(
-      `SELECT merchant_id::text FROM merchant.loyalty_card WHERE id = $1::uuid`,
+      `SELECT merchant_id::text FROM merchant.loyalty_card WHERE id = $1::uuid LIMIT 1`,
       [cardId],
     );
     return rows[0]?.merchant_id ?? null;
+  }
+
+  /**
+   * The Google object id this card's pass ACTUALLY has, or null when the customer
+   * never added the Android pass.
+   *
+   * It cannot be derived: objects created by umi-cash carry a Prisma cuid, and the id
+   * this codebase would mint for a new object is a uuid. Asking Google to PATCH the
+   * constructed one returns 404 for every pass in circulation, and a 404 on a refresh
+   * is invisible in the customer's direction — the pass just stays where it was.
+   */
+  async googleObjectForCard(cardId: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ external_object_id: string }>(
+      `SELECT external_object_id FROM merchant.loyalty_wallet_pass
+        WHERE card_id = $1::uuid AND platform = 'google' AND status = 'active'
+        LIMIT 1`,
+      [cardId],
+    );
+    return rows[0]?.external_object_id ?? null;
   }
 
   /** The loyalty card a signed-in customer holds at this café, if any. */
