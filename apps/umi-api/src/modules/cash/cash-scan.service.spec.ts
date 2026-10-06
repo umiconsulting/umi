@@ -26,6 +26,17 @@ function make() {
     activeRewardConfig: vi
       .fn()
       .mockResolvedValue({ id: 'rc1', visits_required: 10, reward_name: 'Café' }),
+    // A single-reward café by default: no upgrade row, no per-card override.
+    rewardProfileRows: vi.fn().mockResolvedValue({
+      defaultConfig: {
+        id: 'rc1',
+        visits_required: 10,
+        reward_name: 'Café',
+        reward_description: null,
+      },
+      upgradeConfig: null,
+      overrideConfig: null,
+    }),
     recentVisitWithin: vi.fn().mockResolvedValue(false),
     visitedToday: vi.fn().mockResolvedValue(false),
     lastVisitToday: vi.fn().mockResolvedValue(null),
@@ -73,6 +84,7 @@ const CARD = {
   visits_this_cycle: 3,
   pending_rewards: 0,
   balance_cents: 0,
+  pending_tier1: 0,
   person_id: 'p1',
   display_name: 'Ana',
   normalized_email: null,
@@ -91,7 +103,10 @@ describe('CashScanService.scan — visit cycle', () => {
     expect(arg.doVisit).toBe(true);
     expect(arg.earnedReward).toBe(false);
     expect(arg.newVisitsThisCycle).toBe(4);
-    expect(arg.momentMessage).toBeNull();
+    // A plain mid-cycle visit still leaves a moment: on Apple the lifecycle field
+    // is the pass's ONLY notification channel, so an empty slot is not "quiet", it
+    // is a customer who is never told about the stamp she just got.
+    expect(arg.momentMessage).toBe('Visita registrada ☕ 4/10 hacia tu Café en Kala.');
     expect(r.rewardEarned).toBe(false);
     expect(r.actions).toEqual(['VISIT']);
   });
@@ -108,7 +123,7 @@ describe('CashScanService.scan — visit cycle', () => {
     const r = await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'VISIT' });
     const arg = h.repo.performScan.mock.calls[0][0];
     expect(arg.earnedReward).toBe(true);
-    expect(arg.momentMessage).toContain('¡Ganaste Café!');
+    expect(arg.momentMessage).toContain('Ganaste Café');
     expect(r.rewardEarned).toBe(true);
   });
 
@@ -121,6 +136,82 @@ describe('CashScanService.scan — visit cycle', () => {
     });
     const arg = h.repo.performScan.mock.calls[0][0];
     expect(arg.doBirthday && arg.doRedeem && arg.doVisit).toBe(true);
+  });
+});
+
+/**
+ * El Gran Ribera's ladder, which the register's screens and the customer's pass
+ * both read: 7 = capuccino (cash out early) / 9 = latte o frappe (the cycle).
+ * Before this port the scan counted to 7 and the upper tier did not exist.
+ */
+const LADDER_ROWS = {
+  defaultConfig: {
+    id: 'rc-base',
+    visits_required: 7,
+    reward_name: 'Capuccino',
+    reward_description: null,
+  },
+  upgradeConfig: {
+    id: 'rc-top',
+    visits_required: 9,
+    reward_name: 'Latte rocas',
+    reward_description: null,
+  },
+  overrideConfig: null,
+};
+
+describe('CashScanService.scan — the two-tier ladder', () => {
+  let h: ReturnType<typeof make>;
+  beforeEach(() => {
+    h = make();
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    h.cards.findCard.mockResolvedValue(CARD);
+  });
+
+  it('runs the cycle to the upper tier, not the lower one', async () => {
+    // 8 stamps: one more is 9, which earns. Under the standard-only read the cycle
+    // would have ended at 7 and this visit would have banked a reward instead.
+    h.cards.findCard.mockResolvedValue({ ...CARD, visits_this_cycle: 8, total_visits: 8 });
+    const r = await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'VISIT' });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.earnedReward).toBe(true);
+    expect(arg.momentMessage).toContain('Latte rocas');
+    expect(r.card.visitsRequired).toBe(9);
+  });
+
+  it('announces the lower tier the moment it becomes cashable', async () => {
+    // 6 stamps, one more reaches the base tier at 7 — NOT the end of the cycle.
+    h.cards.findCard.mockResolvedValue({ ...CARD, visits_this_cycle: 6, total_visits: 6 });
+    const r = await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'VISIT' });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.earnedReward).toBe(false);
+    expect(arg.momentMessage).toContain('Capuccino');
+    expect(arg.momentMessage).toContain('Latte rocas');
+    expect(r.rewardEarned).toBe(false);
+  });
+
+  it('hands over the LOWER tier when the card still carries pre-ladder banked rewards', async () => {
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      pending_rewards: 1,
+      pending_tier1: 1,
+    });
+    await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'REDEEM' });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.rewardConfigId).toBe('rc-base');
+    expect(arg.decrementPendingTier1).toBe(true);
+  });
+
+  it('hands over the UPPER tier when nothing is tagged, and leaves the counter alone', async () => {
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      pending_rewards: 1,
+      pending_tier1: 0,
+    });
+    await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'REDEEM' });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.rewardConfigId).toBe('rc-top');
+    expect(arg.decrementPendingTier1).toBe(false);
   });
 });
 

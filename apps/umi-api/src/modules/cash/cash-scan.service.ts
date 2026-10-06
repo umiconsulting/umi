@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -12,7 +13,15 @@ import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import { CashWriteRepository } from './cash-write.repository';
 import { CashScanRepository, type ScannedCard } from './cash-scan.repository';
-import { resolveJourneyTemplate, renderTemplate, type LifecycleJourneyKey } from './lifecycle-copy';
+import { resolveJourneyTemplate, renderTemplate } from './lifecycle-copy';
+import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
+import {
+  bankedReward,
+  cardRewardFields,
+  momentVars,
+  visitMoment,
+  type VisitMoment,
+} from '../../shared/loyalty/reward-tiers';
 
 const VISIT = 'VISIT';
 const REDEEM = 'REDEEM';
@@ -20,8 +29,6 @@ const BIRTHDAY = 'BIRTHDAY_REDEEM';
 const ACTION_ORDER = [BIRTHDAY, REDEEM, VISIT] as const;
 type ScanAction = (typeof ACTION_ORDER)[number];
 
-const DEFAULT_VISITS_REQUIRED = 10;
-const DEFAULT_REWARD_NAME = 'Recompensa de temporada';
 const DEFAULT_CUSTOMER_NAME = 'Cliente';
 const DEFAULT_TZ = 'America/Mexico_City';
 
@@ -99,9 +106,18 @@ export class CashScanService {
       }
     }
 
-    const rewardConfig = await this.repo.activeRewardConfig(merchantId);
-    const visitsRequired = rewardConfig?.visits_required ?? DEFAULT_VISITS_REQUIRED;
-    const rewardName = rewardConfig?.reward_name ?? DEFAULT_REWARD_NAME;
+    // The card's reward profile — the café's ladder (standard + optional upgrade)
+    // plus any per-card override. `visitsRequired` is the tier the CYCLE runs to,
+    // so a café on a 7/9 ladder counts to 9 and offers the 7-tier as an early
+    // cash-out, exactly as umi-cash did.
+    const profileRows = await this.repo.rewardProfileRows(merchantId, card.id);
+    const profile = resolveRewardProfile(
+      profileRows.defaultConfig,
+      profileRows.overrideConfig,
+      profileRows.upgradeConfig,
+    );
+    const visitsRequired = profile.visitsRequired;
+    const rewardName = profile.rewardName;
 
     const activeBirthday = await this.repo.activeBirthdayReward(merchantId, card.id);
     if (includesBirthday && !activeBirthday) {
@@ -112,13 +128,17 @@ export class CashScanService {
       if (card.pending_rewards <= 0) {
         throw new BadRequestException({ error: 'No hay recompensas pendientes para canjear' });
       }
-      if (!rewardConfig) {
+      // Which tier this redemption hands over. A banked reward is the top tier —
+      // unless the card still carries pre-ladder tags, in which case the older
+      // rewards were earned under the single threshold and are the LOWER tier.
+      if (!bankedReward(profile, card.pending_tier1).configId) {
         throw new BadRequestException({ error: 'No hay configuración de recompensa activa' });
       }
       if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30)) {
         tooMany('Recompensa ya canjeada. Espera un momento si deseas canjear otra.');
       }
     }
+    const banked = includesRedeem ? bankedReward(profile, card.pending_tier1) : null;
 
     const customerName = card.display_name ?? null;
 
@@ -127,25 +147,40 @@ export class CashScanService {
     const newTotalVisits = card.total_visits + 1;
     const earnedReward = includesVisit && newVisitsThisCycle >= visitsRequired;
 
-    let momentMessage: string | null = null;
-    if (includesVisit) {
-      let journey: LifecycleJourneyKey | null = null;
-      if (earnedReward) journey = 'reward_earned';
-      else if (newTotalVisits === 1) journey = 'first_visit';
-      else if (newVisitsThisCycle === visitsRequired - 1) journey = 'milestone_one_left';
-      else if (visitsRequired >= 4 && newVisitsThisCycle === Math.floor(visitsRequired / 2)) {
-        journey = 'milestone_halfway';
-      }
-      if (journey) {
-        momentMessage = renderTemplate(resolveJourneyTemplate(cfg?.lifecycleCopy, journey), {
-          name: customerName || DEFAULT_CUSTOMER_NAME,
-          merchant: cfg?.name ?? '',
-          rewardName,
-          visitsThisCycle: earnedReward ? visitsRequired : newVisitsThisCycle,
+    // The scan's single "moment" — the one lifecycle message this interaction
+    // leaves on the card, and on Apple the pass's ONLY notification channel. A
+    // redeem claims the slot first; a visit then outranks it when the visit is
+    // itself the headline (a reward earned, or the lower tier coming within reach)
+    // and otherwise only fills an empty slot. That is umi-cash's precedence:
+    // reward_earned > base_reward_ready > reward_redeemed > first_visit >
+    // milestone_one_left > milestone_halfway > visit_recorded.
+    let moment: VisitMoment | null = banked
+      ? {
+          journey: 'reward_redeemed',
+          rewardName: banked.rewardName,
           visitsRequired,
-        });
-      }
+          visitsThisCycle: card.visits_this_cycle,
+        }
+      : null;
+    if (includesVisit) {
+      const visitM = visitMoment(profile, {
+        newVisitsThisCycle,
+        earnedReward,
+        isFirstVisitEver: newTotalVisits === 1,
+      });
+      if (earnedReward || visitM.journey === 'base_reward_ready' || moment === null)
+        moment = visitM;
     }
+    // Rendered with the same variables umi-cash's copy uses — including the ladder
+    // extras, so café copy may name the upper tier.
+    const momentMessage = moment
+      ? renderTemplate(resolveJourneyTemplate(cfg?.lifecycleCopy, moment.journey), {
+          ...momentVars(profile, moment, {
+            name: customerName || DEFAULT_CUSTOMER_NAME,
+            tenant: cfg?.name ?? '',
+          }),
+        })
+      : null;
 
     const updated = await this.repo.performScan({
       merchantId,
@@ -154,7 +189,8 @@ export class CashScanService {
       doBirthday: includesBirthday && !!activeBirthday,
       birthdayRewardId: activeBirthday?.id ?? null,
       doRedeem: includesRedeem,
-      rewardConfigId: rewardConfig?.id ?? null,
+      rewardConfigId: banked?.configId ?? null,
+      decrementPendingTier1: !!banked?.isBase,
       doVisit: includesVisit,
       earnedReward,
       newVisitsThisCycle,
@@ -243,6 +279,67 @@ export class CashScanService {
   }
 
   /**
+   * Undo a canje — the customer screen's two-tap revert.
+   *
+   * ADMIN-only, by the café owner's request: staff may redeem, only the owner may
+   * un-redeem, so an accidental canje has a supervised undo instead of a support
+   * ticket. The button that calls this is hidden from staff by the screen itself
+   * (`viewerIsAdmin` on the customer detail), and the API refuses it anyway — the
+   * client hides, the API decides.
+   *
+   * WHICH TIER COMES BACK. On a ladder, undoing a canje of the LOWER tier restores
+   * a banked lower-tier reward: that canje consumed the early cash-out, the visits
+   * it took are gone, and a banked capuccino is the honest restoration. Anything
+   * else comes back as the tier the cycle banks. umi-cash decided this by comparing
+   * the redemption's config against the profile's base tier, and so does this.
+   */
+  async revertRedemption(merchantId: string, userId: string, redemptionId: string) {
+    const redemption = await this.repo.findRedemption(merchantId, redemptionId);
+    if (!redemption) throw new NotFoundException({ error: 'Canje no encontrado' });
+    if (redemption.revertedAt) {
+      throw new ConflictException({ error: 'Este canje ya fue revertido' });
+    }
+
+    // Fail closed on attribution: a reversal is value-bearing, so it must name a
+    // real staff member — the same stance as the top-up and bulk-seal paths.
+    const staffMemberId = await this.cards.getStaffMemberId(merchantId, userId);
+    if (!staffMemberId) {
+      throw new ForbiddenException({ error: 'Tu usuario no está registrado como personal' });
+    }
+
+    const profileRows = await this.repo.rewardProfileRows(merchantId, redemption.cardId);
+    const profile = resolveRewardProfile(
+      profileRows.defaultConfig,
+      profileRows.overrideConfig,
+      profileRows.upgradeConfig,
+    );
+    const revertsBaseTier =
+      !!profile.baseTier?.configId && redemption.rewardId === profile.baseTier.configId;
+    const rewardName = revertsBaseTier ? profile.baseTier!.rewardName : profile.rewardName;
+
+    const { alreadyReverted, card } = await this.repo.revertRedemption({
+      merchantId,
+      redemptionId,
+      cardId: redemption.cardId,
+      staffMemberId,
+      restoreBaseTier: revertsBaseTier,
+      message: `Te devolvimos tu ${rewardName} — está lista para canjear de nuevo 🎁`,
+    });
+    if (alreadyReverted || !card) {
+      throw new ConflictException({ error: 'Este canje ya fue revertido' });
+    }
+
+    // The reversal is committed; the wallet refresh must not delay the response.
+    void this.walletPass.refreshCard(redemption.cardId);
+
+    return {
+      success: true,
+      message: `Canje revertido — ${rewardName} devuelta al cliente`,
+      pendingRewards: card.pending_rewards,
+    };
+  }
+
+  /**
    * Read a card and change nothing. The register calls this before it commits a
    * visit, so staff see who the customer is and what the scan will do.
    *
@@ -254,11 +351,16 @@ export class CashScanService {
   async preview(merchantId: string, userId: string, input: PreviewInput) {
     const { card } = await this.resolveScanTarget(merchantId, input.qrPayload);
 
-    const [cfg, rewardConfig, userPersonId] = await Promise.all([
+    const [cfg, profileRows, userPersonId] = await Promise.all([
       this.repo.merchantConfig(merchantId),
-      this.repo.activeRewardConfig(merchantId),
+      this.repo.rewardProfileRows(merchantId, card.id),
       this.cards.getUserPersonId(userId),
     ]);
+    const profile = resolveRewardProfile(
+      profileRows.defaultConfig,
+      profileRows.overrideConfig,
+      profileRows.upgradeConfig,
+    );
 
     // Same refusal as the scan itself. Preview leads straight to the commit
     // button, so letting staff read their own card here only moves the block one
@@ -279,11 +381,16 @@ export class CashScanService {
       customer: { name: card.display_name ?? null },
       card: {
         visitsThisCycle: card.visits_this_cycle,
-        visitsRequired: rewardConfig?.visits_required ?? DEFAULT_VISITS_REQUIRED,
         pendingRewards: card.pending_rewards,
         balanceMXN: formatMxn2(card.balance_cents),
         balanceCentavos: card.balance_cents,
-        rewardName: rewardConfig?.reward_name ?? DEFAULT_REWARD_NAME,
+        // visitsRequired / rewardName (cycle values) + baseReward / pendingRewardName
+        // (ladder) — the register draws "puede canjear {baseReward.rewardName} ya"
+        // from these, which is the button that hands over the lower tier.
+        ...cardRewardFields(profile, {
+          visitsThisCycle: card.visits_this_cycle,
+          pendingTier1: card.pending_tier1,
+        }),
         visitLimitReached: lastVisitAt !== null,
         lastVisitAt: iso(lastVisitAt),
       },

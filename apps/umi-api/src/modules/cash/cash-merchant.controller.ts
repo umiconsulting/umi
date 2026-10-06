@@ -8,6 +8,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Merchant } from '../auth/current-user.decorator';
 import type { MerchantAccess } from '../auth/auth.types';
 import { CashReadService } from './cash-read.service';
+import { registerRole } from './cash-roles';
 
 /**
  * Merchant-scoped cash façade the dashboard SPA calls (`/api/merchants/:merchantId/cash/*`).
@@ -37,12 +38,12 @@ export class CashMerchantController {
 
   @Get('stats')
   getStats(@Merchant() t: MerchantAccess) {
-    return this.cash.getStats(t.merchantId);
+    return this.cash.getStats(t.merchantId, registerRole(t));
   }
 
   @Get('analytics')
-  getAnalytics(@Merchant() t: MerchantAccess) {
-    return this.cash.getAnalytics(t.merchantId);
+  getAnalytics(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
+    return this.cash.getAnalytics(t.merchantId, query);
   }
 
   @Get('customers')

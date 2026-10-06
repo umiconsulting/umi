@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL } from '../../shared/loyalty/card-state.sql';
 
 /**
  * Canonical reads for the scheduled lifecycle WhatsApp journeys (3d-lifecycle),
@@ -63,12 +64,12 @@ const CARD_PERSON_JOIN = `
      LIMIT 1
   ) ph ON true`;
 const HAS_PHONE = `ph.phone IS NOT NULL`;
-// visits_this_cycle = COUNT(visit) % active visits_required (default 10).
+// visits_this_cycle = SUM(visit stamps) % the café's cycle threshold (default 10).
+// The threshold is the ladder's TOP tier where one exists — see
+// shared/loyalty/card-state.sql.ts for why, and for the one copy of the rule.
 const VISITS_THIS_CYCLE = `(
   (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
-  % COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
-       WHERE merchant_id = c.merchant_id AND active AND type = 'stamps_free_item'
-       ORDER BY created_at DESC NULLS LAST LIMIT 1), ${DEFAULT_VISITS_REQUIRED})
+  % COALESCE(${EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL}, ${DEFAULT_VISITS_REQUIRED})
 )::int`;
 
 @Injectable()
@@ -103,7 +104,12 @@ export class LifecycleRepository {
            SELECT stamps_required, name
              FROM merchant.loyalty_reward
             WHERE merchant_id = t.id AND active = true AND type = 'stamps_free_item'
-            ORDER BY created_at DESC NULLS LAST LIMIT 1
+              AND kind IN ('standard','upgrade')
+            -- The tier the cycle runs to: the higher of the two thresholds, which
+            -- is exactly when resolveRewardProfile counts an upgrade row at all.
+            ORDER BY stamps_required DESC NULLS LAST, (kind = 'upgrade') DESC,
+                     created_at DESC NULLS LAST
+            LIMIT 1
          ) rc ON true
         WHERE t.id = $1::uuid
         LIMIT 1`,

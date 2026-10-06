@@ -19,3 +19,17 @@ export function legacyRole(roleKeys: string[]): LegacyRole | null {
   if (roleKeys.some((k) => k === 'staff' || k === 'cashier')) return 'STAFF';
   return null;
 }
+
+/**
+ * The role to REPORT to the register, from whatever the guard put on the request.
+ *
+ * A till session already carries `role` in the register's own vocabulary, while a
+ * dashboard or API session carries build-v3 role keys — and the dashboard reaches
+ * the same `stats` route through `/api/merchants/:id/cash/stats`. Both must answer
+ * the value the frozen panel reads (`ADMIN`/`STAFF`), never a build-v3 key.
+ */
+export function registerRole(access: { role: string | null; roles: string[] }): LegacyRole | null {
+  const mapped = legacyRole(access.roles);
+  if (mapped) return mapped;
+  return access.role === 'ADMIN' || access.role === 'STAFF' ? access.role : null;
+}

@@ -28,6 +28,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { CashReadService } from './cash-read.service';
+import { registerRole } from './cash-roles';
+import { CashScanService } from './cash-scan.service';
 import { ClientErrorDto } from './dto/client-error.dto';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 
@@ -88,6 +90,7 @@ export class CashController {
     private readonly cash: CashReadService,
     private readonly walletPass: WalletPassAdapter,
     private readonly rateLimit: RateLimitService,
+    private readonly scan: CashScanService,
   ) {}
 
   /**
@@ -145,12 +148,12 @@ export class CashController {
 
   @Get('stats')
   getStats(@Merchant() t: MerchantAccess) {
-    return this.cash.getStats(t.merchantId);
+    return this.cash.getStats(t.merchantId, registerRole(t));
   }
 
   @Get('analytics')
-  getAnalytics(@Merchant() t: MerchantAccess) {
-    return this.cash.getAnalytics(t.merchantId);
+  getAnalytics(@Merchant() t: MerchantAccess, @Query() query: Record<string, string>) {
+    return this.cash.getAnalytics(t.merchantId, query);
   }
 
   @Get('customers')
@@ -164,7 +167,7 @@ export class CashController {
    */
   @Get('customers/:id')
   getCustomer(@Merchant() t: MerchantAccess, @Param('id', ParseUUIDPipe) id: string) {
-    return this.cash.getCustomer(t.merchantId, id);
+    return this.cash.getCustomer(t.merchantId, id, registerRole(t));
   }
 
   /**
@@ -235,6 +238,42 @@ export class CashController {
     const result = await this.cash.updateRewardConfig(t.merchantId, body);
     void this.walletPass.refreshMerchant(t.merchantId);
     return result;
+  }
+
+  /**
+   * Re-render every pass at the café from current state, without changing any
+   * configuration — the Rewards screen's "Actualizar pases" escape hatch for "I
+   * changed the rewards and the passes didn't update". ADMIN-only and idempotent,
+   * exactly as umi-cash had it.
+   *
+   * Apple only re-fetches a pass whose card row changed, so the touch is part of
+   * the push (see ApplePushService.pushMerchant), not a separate step. A
+   * café-wide Google re-PATCH is NOT ported yet: `google: null` says so rather
+   * than reporting a number nobody measured.
+   */
+  @Post('reward-config/resync')
+  @HttpCode(200)
+  @RequirePermission('merchant.manage')
+  async resyncRewardConfig(@Merchant() t: MerchantAccess) {
+    const apple = await this.walletPass.refreshMerchantWithCounts(t.merchantId);
+    return { apple, google: null };
+  }
+
+  /**
+   * Undo a canje. ADMIN-only ("solo a mí"): staff can redeem, only the owner can
+   * un-redeem, so a mistake has a supervised undo instead of a support ticket.
+   * The customer's reward comes back, their pass is refreshed, and the canje stays
+   * in the bitácora as reverted.
+   */
+  @Post('redemptions/:id/revert')
+  @HttpCode(200)
+  @RequirePermission('merchant.manage')
+  revertRedemption(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.scan.revertRedemption(t.merchantId, user.id, id);
   }
 
   @Get('gift-cards')

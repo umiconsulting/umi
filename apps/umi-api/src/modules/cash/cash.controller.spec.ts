@@ -4,13 +4,19 @@ import { CashController } from './cash.controller';
 import type { CashReadService } from './cash-read.service';
 import type { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import type { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
+import type { CashScanService } from './cash-scan.service';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 
 const MERCHANT = { merchantId: '9f000000-0000-4000-8000-00000000e001' } as MerchantAccess;
 const USER = { id: '9f000000-0000-4000-8000-00000000e002' } as AuthUser;
 
 function controller(): CashController {
-  return new CashController({} as CashReadService, {} as WalletPassAdapter, {} as RateLimitService);
+  return new CashController(
+    {} as CashReadService,
+    {} as WalletPassAdapter,
+    {} as RateLimitService,
+    {} as CashScanService,
+  );
 }
 
 describe('cash client-error sink', () => {

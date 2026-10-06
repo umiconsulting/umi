@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
+import { EFFECTIVE_VISITS_REQUIRED_SQL } from '../../shared/loyalty/card-state.sql';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -29,6 +30,8 @@ export interface CardRow {
   total_visits: number;
   visits_this_cycle: number;
   pending_rewards: number;
+  /** Banked rewards owed as the LOWER tier of the café's ladder (see card-state.sql.ts). */
+  pending_tier1: number;
   qr_token: string | null;
   person_id: string | null;
   display_name: string | null;
@@ -89,16 +92,14 @@ export class CashWriteRepository {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<CardRow>(
         `WITH vr AS (
-           SELECT COALESCE((
-             SELECT stamps_required FROM merchant.loyalty_reward
-             WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
-             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+           SELECT COALESCE(${EFFECTIVE_VISITS_REQUIRED_SQL}, 10) AS n
          )
          SELECT c.id::text, c.customer_id::text, c.card_number, c.qr_token,
                 agg.balance_cents::int                                   AS balance_cents,
                 agg.total_visits::int                                    AS total_visits,
                 (agg.total_visits % vr.n)::int                           AS visits_this_cycle,
                 (agg.total_visits / vr.n - agg.redemptions)::int         AS pending_rewards,
+                c.pending_tier1,
                 cu.id::text                                              AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
@@ -111,8 +112,10 @@ export class CashWriteRepository {
            SELECT
              (SELECT COALESCE(SUM(v.stamps), 0) FROM merchant.loyalty_visit v
                WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)              AS total_visits,
+             -- Canjes that still STAND: a reverted one no longer consumes a reward.
              (SELECT COUNT(*) FROM merchant.loyalty_redemption r
-               WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)             AS redemptions,
+               WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
+                 AND r.reverted_at IS NULL)                                           AS redemptions,
              COALESCE((SELECT SUM(l.delta) FROM merchant.loyalty_stored_value_ledger l
                WHERE l.merchant_id = c.merchant_id AND l.card_id = c.id), 0)         AS balance_cents
          ) AS agg

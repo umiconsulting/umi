@@ -78,4 +78,21 @@ export class WalletPassAdapter {
       this.logger.warn(`wallet_merchant_refresh_failed merchant=${merchantId}: ${String(err)}`);
     }
   }
+
+  /**
+   * `refreshMerchant`, but it answers with what it did.
+   *
+   * The register's "Actualizar pases" button reports a count back to the operator
+   * ("Pases actualizados · Apple: 412"), which is the whole point of an escape
+   * hatch: without a number the operator cannot tell a refresh that reached nobody
+   * from one that reached everyone. Still never throws.
+   */
+  async refreshMerchantWithCounts(merchantId: string): Promise<{ cards: number; sent: number }> {
+    try {
+      return await this.push.pushMerchant(merchantId);
+    } catch (err) {
+      this.logger.warn(`wallet_merchant_resync_failed merchant=${merchantId}: ${String(err)}`);
+      return { cards: 0, sent: 0 };
+    }
+  }
 }

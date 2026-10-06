@@ -4,6 +4,11 @@ import { PgService } from '../../shared/database/pg.service';
 import { isOpenAt, parseOpenHours } from '../business-hours/open-hours';
 import { WEEKDAY_INDEX } from '../../shared/format/weekday';
 import { LOYALTY_CARD_STATE_SQL, type LoyaltyCardState } from '../../shared/loyalty/card-state.sql';
+import {
+  ACTIVE_LADDER_ROWS_SQL,
+  CARD_OVERRIDE_ROW_SQL,
+} from '../../shared/loyalty/reward-config.sql';
+import type { RewardConfigRow } from '../../shared/loyalty/reward-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -51,11 +56,25 @@ export interface PerformScanInput {
   birthdayRewardId: string | null;
   doRedeem: boolean;
   rewardConfigId: string | null;
+  /**
+   * The redemption consumed one of the card's pre-ladder banked rewards, so the
+   * `pending_tier1` counter comes down by one with it. False when the reward handed
+   * over was the top tier (or the café runs no ladder).
+   */
+  decrementPendingTier1: boolean;
   doVisit: boolean;
   earnedReward: boolean;
   newVisitsThisCycle: number;
   momentMessage: string | null;
   newQrToken: string;
+}
+
+/** One canje, as the revert path reads it. */
+export interface RedemptionRow {
+  id: string;
+  cardId: string;
+  rewardId: string | null;
+  revertedAt: Date | null;
 }
 
 /**
@@ -92,11 +111,42 @@ export class CashScanRepository {
                 description AS reward_description
          FROM merchant.loyalty_reward
          WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           AND kind = 'standard'
          ORDER BY created_at DESC NULLS LAST LIMIT 1`,
         [merchantId],
       ),
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * The three reward rows that decide what this card is working toward: the café's
+   * standard reward, the café's optional `upgrade` tier, and the card's own
+   * override. `resolveRewardProfile` turns them into one profile — the same
+   * resolution umi-cash ran, and the same one the wallet pass and the admin screens
+   * use, so the till and the customer's phone cannot disagree.
+   */
+  async rewardProfileRows(
+    merchantId: string,
+    cardId: string,
+  ): Promise<{
+    defaultConfig: RewardConfigRow | null;
+    upgradeConfig: RewardConfigRow | null;
+    overrideConfig: RewardConfigRow | null;
+  }> {
+    return this.pg.withMerchant(async (c) => {
+      const [rows, override] = await Promise.all([
+        c.query<Row>(ACTIVE_LADDER_ROWS_SQL, [merchantId]),
+        c.query<Row>(CARD_OVERRIDE_ROW_SQL, [merchantId, cardId]),
+      ]);
+      // Both statements are ordered newest-first within a kind, and a reward-config
+      // save inserts rather than updates.
+      return {
+        defaultConfig: (rows.rows.find((r) => r.kind === 'standard') as RewardConfigRow) ?? null,
+        upgradeConfig: (rows.rows.find((r) => r.kind === 'upgrade') as RewardConfigRow) ?? null,
+        overrideConfig: (override.rows[0] as RewardConfigRow) ?? null,
+      };
+    });
   }
 
   async merchantConfig(merchantId: string): Promise<ScanMerchantConfig | null> {
@@ -271,6 +321,87 @@ export class CashScanRepository {
     return rows[0] ?? null;
   }
 
+  /** One canje, scoped to the café it was made at. */
+  async findRedemption(merchantId: string, redemptionId: string): Promise<RedemptionRow | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<RedemptionRow>(
+        `SELECT id::text AS id, card_id::text AS "cardId", reward_id::text AS "rewardId",
+                reverted_at AS "revertedAt"
+           FROM merchant.loyalty_redemption
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [merchantId, redemptionId],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Undo a canje: mark it reverted, and give the customer the reward back.
+   *
+   * THREE THINGS, and all three are needed for the undo to be an undo:
+   *
+   *  1. `reverted_at` + who did it. The row STAYS — the bitácora has to show that a
+   *     canje happened and was taken back, and the reversal is audited, not erased.
+   *  2. The reward comes back by itself: `pending_rewards` derives from the canjes
+   *     that still stand (card-state.sql.ts excludes reverted rows), so marking the
+   *     row is what restores it. There is no counter to increment here — which is
+   *     exactly why that filter had to exist before this route could be ported.
+   *  3. `pending_tier1` goes back up when the canje handed over the LOWER tier: the
+   *     tag is the record that this card is owed a lower-tier reward.
+   *
+   * The card row is locked for the transaction so a double-tap, or a scan landing
+   * at the same moment, cannot revert twice or credit two rewards.
+   */
+  async revertRedemption(input: {
+    merchantId: string;
+    redemptionId: string;
+    cardId: string;
+    staffMemberId: string | null;
+    /** The canje handed over the ladder's lower tier, so the tag comes back. */
+    restoreBaseTier: boolean;
+    /** The lock-screen line the customer sees: her reward is back. */
+    message: string;
+  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null }> {
+    return this.pg.withMerchant(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`card:${input.cardId}`]);
+
+      const fresh = await c.query<Row>(
+        `SELECT reverted_at AS "revertedAt" FROM merchant.loyalty_redemption
+          WHERE merchant_id = $1::uuid AND id = $2::uuid
+          FOR UPDATE`,
+        [input.merchantId, input.redemptionId],
+      );
+      if (!fresh.rows[0]) throw new NotFoundException('redemption_not_found');
+      if (fresh.rows[0].revertedAt) return { alreadyReverted: true, card: null };
+
+      await c.query(
+        `UPDATE merchant.loyalty_redemption
+            SET reverted_at = now(), reverted_by_staff_id = $3::uuid
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [input.merchantId, input.redemptionId, input.staffMemberId],
+      );
+      if (input.restoreBaseTier) {
+        await c.query(
+          `UPDATE merchant.loyalty_card SET pending_tier1 = pending_tier1 + 1, updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId],
+        );
+      }
+      await c.query(
+        `UPDATE merchant.loyalty_card
+            SET lifecycle_message = $3, lifecycle_message_at = now(), updated_at = now()
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [input.merchantId, input.cardId, input.message],
+      );
+
+      const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
+        input.merchantId,
+        input.cardId,
+      ]);
+      return { alreadyReverted: false, card: rows[0] };
+    });
+  }
+
   /**
    * Best-effort after-hours flag for a staff scan, against `merchant.merchant.open_hours`
    * in the café's timezone. True when the café has no hours for the local day, or the
@@ -341,6 +472,19 @@ export class CashScanRepository {
              (merchant_id, card_id, reward_id, reason, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid, 'stamps', $4::uuid)`,
           [input.merchantId, input.cardId, input.rewardConfigId, input.staffMemberId],
+        );
+      }
+      // Handing over a pre-ladder banked reward retires one tag with it — the
+      // counter tracks exactly the rewards that are owed as the LOWER tier, so it
+      // must come down as they are handed over. GREATEST(0, …) so a counter that
+      // somehow drifted below the truth can never go negative (the column carries a
+      // CHECK for that, and a failing scan is worse than a clamped one).
+      if (input.doRedeem && input.decrementPendingTier1) {
+        await c.query(
+          `UPDATE merchant.loyalty_card
+              SET pending_tier1 = GREATEST(0, pending_tier1 - 1), updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId],
         );
       }
       if (input.doVisit) {
