@@ -4,9 +4,10 @@ import { formatMxn2 } from '../../shared/format/money';
 import { QrService } from '../../shared/auth/qr.service';
 import { CashCardRepository } from './cash-card.repository';
 import { CashScanRepository } from './cash-scan.repository';
+import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
+import { cardRewardFields } from '../../shared/loyalty/reward-tiers';
 
 const DEFAULT_VISITS_REQUIRED = 10;
-const DEFAULT_REWARD_NAME = 'Recompensa de temporada';
 const RECENT_LIMIT = 5;
 /** The QR is signed for five minutes; the page counts down against this. */
 const QR_TTL_MS = 5 * 60 * 1000;
@@ -29,9 +30,9 @@ export class CashCardService {
     const card = await this.repo.cardForCustomer(merchantId, customerId);
     if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
 
-    const [state, rewardConfig, recentVisits, recentLedger] = await Promise.all([
+    const [state, profileRows, recentVisits, recentLedger] = await Promise.all([
       this.repo.cardState(merchantId, card.id),
-      this.scan.activeRewardConfig(merchantId),
+      this.scan.rewardProfileRows(merchantId, card.id),
       this.repo.recentVisits(merchantId, card.id, RECENT_LIMIT),
       this.repo.recentLedger(merchantId, card.id, RECENT_LIMIT),
     ]);
@@ -39,7 +40,24 @@ export class CashCardService {
     // reads. Answer the same way as a missing card rather than render zeroes.
     if (!state) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
 
-    const visitsRequired = rewardConfig?.visits_required ?? DEFAULT_VISITS_REQUIRED;
+    // ⚠️ THE CYCLE'S THRESHOLD, NOT THE STANDARD ROW'S. Reading `active_reward_config`
+    // here made a ladder café's card page divide by the LOWER tier (7) while the
+    // position was derived against the cycle's (9) — a progress bar that reads 43%
+    // instead of 33%, and the standard reward's name where the customer is working
+    // toward the upper one. `resolveRewardProfile` is the same resolution the scan and
+    // the pass use, and `cardRewardFields` is the shape umi-cash's own card route
+    // returns (visitsRequired / rewardName / rewardDescription / baseReward /
+    // pendingRewardName).
+    const profile = resolveRewardProfile(
+      profileRows.defaultConfig,
+      profileRows.overrideConfig,
+      profileRows.upgradeConfig,
+    );
+    const reward = cardRewardFields(profile, {
+      visitsThisCycle: state.visits_this_cycle,
+      pendingTier1: state.pending_tier1,
+    });
+    const visitsRequired = reward.visitsRequired || DEFAULT_VISITS_REQUIRED;
 
     return {
       cardId: card.id,
@@ -50,10 +68,8 @@ export class CashCardService {
       balanceMXN: formatMxn2(state.balance_cents),
       totalVisits: state.total_visits,
       visitsThisCycle: state.visits_this_cycle,
-      visitsRequired,
       pendingRewards: state.pending_rewards,
-      rewardName: rewardConfig?.reward_name ?? DEFAULT_REWARD_NAME,
-      rewardDescription: rewardConfig?.reward_description ?? null,
+      ...reward,
       // Capped, because a cycle can overshoot its threshold between the visit
       // that crossed it and the redemption that clears it.
       progressPercent: Math.min(Math.round((state.visits_this_cycle / visitsRequired) * 100), 100),

@@ -61,6 +61,29 @@ export interface StampStripInput {
   welcomeStampUrl?: string | null;
   backgroundColor?: string | null;
   assetBase: string;
+  /**
+   * The ladder's bonus tier. Slots at or above `fromIndex` are drawn in their own
+   * colour, so a 7/9 card reads as "seven stamps for the capuccino, then two more for
+   * the frappe" instead of nine identical circles.
+   */
+  bonusFrom?: number | null;
+}
+
+/**
+ * Fallback colour for bonus stamps when a café ships no bonus art: an ice-blue tint
+ * (reads as "en las rocas" against the warm café palettes) applied with sharp's LAB
+ * tint, which keeps the artwork's luminance — the cup stays a cup, the disc changes
+ * hue. Ported from umi-cash's strip generator.
+ */
+const BONUS_TINT = { r: 120, g: 170, b: 210 };
+
+/** Tenant-supplied bonus art when present; otherwise the regular stamp, tinted. */
+async function loadBonusStamp(url: string, assetBase: string, regular: Buffer): Promise<Buffer> {
+  try {
+    return await loadAsset(url, assetBase);
+  } catch {
+    return sharp(regular).tint(BONUS_TINT).png().toBuffer();
+  }
 }
 
 /**
@@ -70,6 +93,7 @@ export interface StampStripInput {
  */
 export async function generateStampStrip(input: StampStripInput): Promise<Buffer> {
   const { visitsThisCycle, visitsRequired, assetBase } = input;
+  const bonusFrom = input.bonusFrom ?? null;
 
   const [filledBuf, emptyBuf] = await Promise.all([
     loadAsset(input.filledStampUrl, assetBase),
@@ -100,6 +124,23 @@ export async function generateStampStrip(input: StampStripInput): Promise<Buffer
     sharp(emptyBuf).resize(stampSize, stampSize).png().toBuffer(),
     welcomeBuf ? sharp(welcomeBuf).resize(stampSize, stampSize).png().toBuffer() : null,
   ]);
+  // Resolved once, not per slot: the bonus pair is the same image for every slot that
+  // uses it, and a café with bonus art should not pay for ten downloads of it.
+  const [bonusFilled, bonusEmpty] =
+    bonusFrom === null
+      ? [null, null]
+      : await Promise.all([
+          loadBonusStamp(
+            input.filledStampUrl.replace('stamp-filled', 'stamp-bonus-filled'),
+            assetBase,
+            filledStamp,
+          ),
+          loadBonusStamp(
+            input.emptyStampUrl.replace('stamp-empty', 'stamp-bonus-empty'),
+            assetBase,
+            emptyStamp,
+          ),
+        ]);
 
   const composites: sharp.OverlayOptions[] = [];
   const lastRowCols = visitsRequired > cols ? visitsRequired - cols : cols;
@@ -111,7 +152,15 @@ export async function generateStampStrip(input: StampStripInput): Promise<Buffer
     const rowW = rowColCount * (stampSize + GAP) - GAP;
     const rowStartX = Math.floor((STRIP_W - rowW) / 2);
     const stamp =
-      i === 0 && welcomeStamp ? welcomeStamp : i < visitsThisCycle ? filledStamp : emptyStamp;
+      i === 0 && welcomeStamp
+        ? welcomeStamp
+        : bonusFrom !== null && i >= bonusFrom
+          ? i < visitsThisCycle
+            ? (bonusFilled ?? filledStamp)
+            : (bonusEmpty ?? emptyStamp)
+          : i < visitsThisCycle
+            ? filledStamp
+            : emptyStamp;
     composites.push({
       input: stamp,
       left: rowStartX + col * (stampSize + GAP),

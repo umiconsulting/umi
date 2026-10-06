@@ -5,6 +5,12 @@ import { SignJWT } from 'jose';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { QrService } from '../../shared/auth/qr.service';
 import { formatMxn2 } from '../../shared/format/money';
+import {
+  nextRewardCopy,
+  pendingRewardsCopy,
+  profileFromWalletFields,
+  stripState,
+} from '../../shared/loyalty/reward-tiers';
 
 const WALLET_OBJECTS = 'https://walletobjects.googleapis.com/walletobjects/v1';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
@@ -236,8 +242,16 @@ export function buildLoyaltyObject(input: {
   data: GooglePassData;
 }): Record<string, unknown> {
   const { issuerId, classPrefix, origin, barcodeValue, data } = input;
-  const remaining = data.visitsRequired - data.visitsThisCycle;
   const handle = data.merchantHandle ?? '';
+  // THE LADDER, in the customer's words. `nextRewardCopy` and `pendingRewardsCopy` are
+  // ported byte-for-byte from umi-cash and take the profile; on a single-reward café
+  // they collapse to exactly what the ported strings said, and on a ladder they name
+  // the choice — "capuccino listo · o 2 visitas más y bebida rocas".
+  const profile = profileFromWalletFields({
+    visitsRequired: data.visitsRequired,
+    rewardName: data.rewardName,
+    baseReward: data.baseReward,
+  });
 
   // The stamp progress is DRAWN (heroImage) and the name lives in accountName,
   // so the only text modules left are the genuinely free-form ones.
@@ -256,25 +270,15 @@ export function buildLoyaltyObject(input: {
 
   // The copy changes as the reward gets nearer, to keep the line useful on the
   // card face. These two ids are named by the class cardTemplateOverride.
-  if (data.pendingRewards > 0) {
-    const plural = data.pendingRewards > 1;
-    textModules.push({
-      header: plural ? 'RECOMPENSAS DISPONIBLES' : 'RECOMPENSA LISTA',
-      body: plural
-        ? `🎉 Tienes ${data.pendingRewards} ${data.rewardName} — ¡canjéalas en tienda!`
-        : `🎉 Tu ${data.rewardName} te espera — ¡canjéala en tienda!`,
-      id: 'pending_rewards',
-    });
+  // The copy changes as the reward gets nearer, to keep the line useful on the card
+  // face. These two ids are named by the class cardTemplateOverride, and on a ladder
+  // the same two ids carry the tier the customer can take now versus the one she is
+  // still working toward.
+  const pending = pendingRewardsCopy(profile, data.pendingRewards, data.pendingTier1 ?? 0);
+  if (pending) {
+    textModules.push({ ...pending, id: 'pending_rewards' });
   } else {
-    let body: string;
-    if (remaining === 1) {
-      body = `¡Última visita! Tu próxima compra desbloquea ${data.rewardName} 🎁`;
-    } else if (remaining === 2) {
-      body = `¡Ya casi! Solo 2 visitas para ${data.rewardName}`;
-    } else {
-      body = `${remaining} visitas para ${data.rewardName}`;
-    }
-    textModules.push({ header: 'PRÓXIMA RECOMPENSA', body, id: 'next_reward' });
+    textModules.push({ ...nextRewardCopy(profile, data.visitsThisCycle), id: 'next_reward' });
   }
 
   // Saldo as a STRING. See the class comment: money does not render in a
@@ -330,7 +334,10 @@ export function buildLoyaltyObject(input: {
   if (handle) {
     object.heroImage = {
       sourceUri: {
-        uri: `${origin}/api/${handle}/stamp-strip/${data.visitsThisCycle}-${data.visitsRequired}.png`,
+        // Content-addressed INCLUDING the ladder: `7-9-b7` is a different image from
+        // `7-9`, so the slots the customer has not reached yet can render as the bonus
+        // tier's and the change is a new URL Google has not cached.
+        uri: `${origin}/api/${handle}/stamp-strip/${stripState(profile, data.visitsThisCycle)}.png`,
       },
       contentDescription: {
         defaultValue: {
@@ -363,6 +370,10 @@ export interface GooglePassData {
   pendingRewards: number;
   totalVisits: number;
   rewardName: string;
+  /** The ladder's LOWER tier, when the café runs one. Null otherwise. */
+  baseReward?: { visitsRequired: number; rewardName: string } | null;
+  /** Banked rewards owed as the lower tier (the pre-ladder tag). */
+  pendingTier1?: number;
   memberSince: Date;
   topupEnabled: boolean;
   lifecycleMessage: string | null;

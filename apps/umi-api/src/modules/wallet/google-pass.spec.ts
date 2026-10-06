@@ -76,6 +76,48 @@ describe('Google loyalty object · hero image', () => {
   });
 });
 
+/**
+ * THE LADDER ON THE PASS. El Gran Ribera's 7/9: the strip has to show which slots are
+ * the second tier's, and the copy has to name the choice once the lower tier is
+ * reached. Both are content-addressed by the SAME numbers the pass is rendered from,
+ * so a change is a new URL Google has not cached.
+ */
+describe('Google loyalty object · the two-tier ladder', () => {
+  const LADDER = {
+    visitsRequired: 9,
+    rewardName: 'Bebida rocas',
+    baseReward: { visitsRequired: 7, rewardName: 'Capuccino' },
+    pendingTier1: 0,
+  };
+
+  it('draws the bonus slots into the hero image url', () => {
+    const obj = build({ ...LADDER, visitsThisCycle: 5 }) as {
+      heroImage: { sourceUri: { uri: string } };
+    };
+    expect(obj.heroImage.sourceUri.uri).toBe(
+      'https://cash.umiconsulting.co/api/kalala/stamp-strip/5-9-b7.png',
+    );
+  });
+
+  it('turns the reward line into the choice once the lower tier is reached', () => {
+    const obj = build({ ...LADDER, visitsThisCycle: 7 }) as {
+      textModulesData: { id: string; header: string; body: string }[];
+    };
+    const next = obj.textModulesData.find((m) => m.id === 'next_reward');
+    expect(next?.header).toBe('ELIGE TU RECOMPENSA');
+    expect(next?.body).toBe('🎁 Capuccino listo para canjear · o 2 visitas más y Bebida rocas');
+  });
+
+  it('names both tiers while the lower one is still ahead', () => {
+    const obj = build({ ...LADDER, visitsThisCycle: 3 }) as {
+      textModulesData: { id: string; body: string }[];
+    };
+    expect(obj.textModulesData.find((m) => m.id === 'next_reward')?.body).toBe(
+      '4 visitas para Capuccino · 6 para Bebida rocas',
+    );
+  });
+});
+
 describe('Google loyalty object · reward copy', () => {
   it('keeps the module ids the class cardTemplateOverride names', () => {
     expect(modules(build({ pendingRewards: 0 })).some((m) => m.id === 'next_reward')).toBe(true);
