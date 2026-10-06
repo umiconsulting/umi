@@ -301,11 +301,55 @@ rolls turns the customer list, the customer detail and every scan into a 500. So
      the derived numbers reproduce the till for **1053 of 1053** cards. Read them back the same
      way 78's carry was read back.
 
-4. Flip `CASH_API_ORIGIN` — the register. Until then the split in §4 is live, and so the Wallet
-   switch stays off with it. The remaining blocker is in
-   [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md#what-still-blocks-the-flip): the
-   café-wide Google resync is not ported (`google: null`).
+4. Flip `CASH_API_ORIGIN` — the register. ☑ **Executed 2026-10-06 12:16Z**, and the Wallet switch
+   followed it at 12:19Z (see §9). The legacy schemas are now frozen: nothing writes them.
 5. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
+   ☐ outstanding.
 6. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
-   during the cutover and must be treated as exposed.
+   during the cutover and must be treated as exposed. ☐ outstanding.
 7. `umi-cash` → Cloudflare, once the Wallet and register switches make its database unnecessary.
+   ☐ outstanding.
+
+## 9 · The flip, and the four bugs that only appeared once it was exercised
+
+Register and Wallet were flipped together on 2026-10-06, before opening, and each step below was
+**verified rather than assumed**. What follows is not the plan; it is what happened.
+
+**The flips.** `CASH_API_ORIGIN` set in Vercel (project `umi-cash`) plus a redeploy — `rewrites()`
+is evaluated at build time, so setting the variable alone changes nothing. Verified by header:
+requests to `cash.umiconsulting.co/api/…` answer `via: 1.1 Caddy` with no `x-matched-path`, meaning
+Caddy serves the API rather than the local handler. `WALLET_API_ORIGIN` set 3 minutes later and
+verified the same way on a **real pass**: 200, `application/vnd.apple.pkpass`, 89 956 bytes, magic
+`PK`. Passes for all four cafés with issued passes render through the API.
+
+**Why they had to go together, in that order.** With the register flipped and the Wallet not, the
+till writes the new schemas while the customer's pass is still rendered from the frozen ones — every
+scan would leave the pass stale. The window was deliberately 3 minutes, before opening.
+
+**The rehearsal, before any of it.** A real register session against production, on a throwaway card,
+driving `VISIT`, `REDEEM_BASE` and a top-up through the flipped origin. Numbers checked against
+umi-cash's own rules at every step (anchor 8, cycle 0/9, `cycle_reset` marker, balance). Every row
+created was deleted; the ledger is append-only, so the top-up was **compensated** with an
+`adjustment` of the same magnitude and a note, and the card was blocked so it cannot appear in a
+café's customer list.
+
+Then the four things no test had caught, all found by exercising it:
+
+| what                                     | how it showed                                | what it was                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| the birthday line on every pass          | reported from a phone                        | `renderData` handed the café's configured `birthday_reward_name` to both builders unconditionally; all five cafés have the name set with the feature OFF and zero grants, so **1 007 passes** grew a "REGALO DE CUMPLEANOS" row. Both legacy paths gated it on an active grant.                  |
+| "agregar sellos" never reached the phone | reported from a phone, with the log          | `creditSeals` wrote the card row only when the credit crossed a threshold, and never wrote a moment. Apple answers `passesUpdatedSince` by comparing that row, so the phone asked, heard 204, and showed nothing — no stamp, no notification, because a 204 delivers no `changeMessage`.         |
+| every Android refresh 404'd              | the API log, on the first write              | the object id was **constructed** (`…card_<uuid>`) instead of read from the pass row (`…card_<cuid>`); 0 of 155 matched. Fixing the URL was not enough — the PATCH **body** still carried the minted id, and Google names the body's id in its error, so one log line carried two different ids. |
+| a café-wide resync hung with no error    | it never answered, 8 minutes in, at 0.3% CPU | `req.setTimeout` only arms once the http2 request has a stream, so a connection that never establishes leaves the promise pending forever and the batch — and the refresh — never settles. A push is a signal: there is now a hard deadline on the whole attempt.                                |
+
+**The Android fleet.** 155 Android objects had been stale since the Wallet switch. After the id fix,
+`?platform=google` refreshed them per café: **92 of 108** at El Gran Ribera and **41 of 44** at
+Kalalacafe. The 19 that remain are rows pointing at objects that were never created — the customer
+tapped "add to Wallet" and never finished — and they are now marked `removed` instead of reported as
+failures on every refresh.
+
+**One thing learned about this API's own front door.** A café-wide resync answers **502** to the
+client and completes anyway: Kalalacafe's own run logged `status 200, ms 14643`, and the proxy in
+front had already given up at 10 seconds. The counts in that response are lost, not the work. The
+same call now takes `?platform=apple|google`, which is the difference between ~100 object PATCHes
+and 449 APNs round trips.
