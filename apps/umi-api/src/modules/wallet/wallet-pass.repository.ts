@@ -88,6 +88,61 @@ export class WalletPassRepository {
   }
 
   /**
+   * The card's Google row, WHATEVER its status — the save flow needs to see a row it
+   * previously marked removed, because `unique (card_id, platform)` means it cannot
+   * create a second one.
+   */
+  async googleRowForCard(
+    cardId: string,
+  ): Promise<{ objectId: string | null; status: string } | null> {
+    const { rows } = await this.pg.query<{ external_object_id: string | null; status: string }>(
+      `SELECT external_object_id, status FROM merchant.loyalty_wallet_pass
+        WHERE card_id = $1::uuid AND platform = 'google' LIMIT 1`,
+      [cardId],
+    );
+    const row = rows[0];
+    return row ? { objectId: row.external_object_id, status: row.status } : null;
+  }
+
+  /**
+   * Record (or reactivate) the object the customer is about to save.
+   *
+   * ⚠️ WITHOUT THIS ROW, AN ANDROID PASS IS UNREFRESHABLE FOREVER. The legacy save
+   * route wrote it (`prisma.passes.create` when the card had none); the ported one did
+   * not, so a customer who added her pass after the Wallet switch got no row — and
+   * every later refresh, per-write and merchant-wide, skipped her because there was
+   * nothing to look up. Silently: her Apple-less, Google-only pass just stopped at
+   * whatever it showed the day she saved it.
+   */
+  async upsertGoogleObject(cardId: string, objectId: string): Promise<void> {
+    await this.pg.query(
+      `INSERT INTO merchant.loyalty_wallet_pass
+         (card_id, platform, external_object_id, status)
+       VALUES ($1::uuid, 'google', $2, 'active')
+       ON CONFLICT (card_id, platform) DO UPDATE
+         SET external_object_id = EXCLUDED.external_object_id,
+             status = 'active',
+             updated_at = now()`,
+      [cardId, objectId],
+    );
+  }
+
+  /**
+   * Google says this object does not exist: the customer tapped "add to Wallet" and
+   * never completed it, or removed the pass. Marking the row `removed` is what that
+   * status is for, and it stops every future walk from counting a 404 as a fault —
+   * 19 rows did, on every refresh, for objects that were never there to update.
+   */
+  async markGoogleObjectRemoved(objectId: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE merchant.loyalty_wallet_pass
+          SET status = 'removed', updated_at = now()
+        WHERE platform = 'google' AND external_object_id = $1`,
+      [objectId],
+    );
+  }
+
+  /**
    * Every card at this café whose customer actually added the Android pass, with the
    * object id that pass has.
    *

@@ -103,14 +103,14 @@ export class WalletPassAdapter {
    */
   async refreshMerchantGoogleObjects(
     merchantId: string,
-  ): Promise<{ total: number; refreshed: number; failed: number }> {
+  ): Promise<{ total: number; refreshed: number; missing: number; failed: number }> {
     try {
       return await this.wallet.refreshMerchantGoogleObjects(merchantId);
     } catch (err) {
       this.logger.warn(
         `wallet_merchant_google_refresh_failed merchant=${merchantId}: ${String(err)}`,
       );
-      return { total: 0, refreshed: 0, failed: 0 };
+      return { total: 0, refreshed: 0, missing: 0, failed: 0 };
     }
   }
 }

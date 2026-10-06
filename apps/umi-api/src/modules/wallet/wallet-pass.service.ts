@@ -139,11 +139,20 @@ export class WalletPassService {
     // If she already has the object, the save link must carry ITS id — otherwise
     // tapping "add to Wallet" a second time mints a duplicate pass beside the one she
     // already holds, and the duplicate is the one that gets updated from then on.
-    const data = await this.googlePassData(
-      merchantId,
-      cardId,
-      await this.repo.googleObjectForCard(cardId),
-    );
+    //
+    // ⚠️ THE ROW IS WRITTEN HERE, because this is the only moment that knows an object
+    // is being created. The legacy route did exactly this (`if (!existingPass)
+    // prisma.passes.create(...)`) and the port dropped it — so a customer who added her
+    // Android pass after the Wallet switch had no row, and every later refresh, per-write
+    // and café-wide, skipped her. Her pass simply froze at whatever it showed the day she
+    // saved it. A row marked `removed` means the object is gone, so it gets a fresh id.
+    const existing = await this.repo.googleRowForCard(cardId);
+    const objectId =
+      existing?.status === 'active' && existing.objectId
+        ? existing.objectId
+        : this.google.objectIdFor(cardId);
+    await this.repo.upsertGoogleObject(cardId, objectId);
+    const data = await this.googlePassData(merchantId, cardId, objectId);
     return this.google.saveUrl(data);
   }
 
@@ -177,11 +186,18 @@ export class WalletPassService {
    */
   async refreshMerchantGoogleObjects(
     merchantId: string,
-  ): Promise<{ total: number; refreshed: number; failed: number }> {
+  ): Promise<{ total: number; refreshed: number; missing: number; failed: number }> {
     const entries = await this.repo.googleObjectsForMerchant(merchantId);
-    return this.google.refreshMerchantObjects(entries, (cardId, objectId) =>
-      this.googlePassData(merchantId, cardId, objectId).catch(() => null),
-    );
+    return this.google.refreshMerchantObjects(entries, async (cardId, objectId) => {
+      const data = await this.googlePassData(merchantId, cardId, objectId).catch(() => null);
+      if (!data) return 'failed';
+      const outcome = await this.google.updateObject(data);
+      // Google does not have this object. Marking the row `removed` is what the status
+      // is for, and it stops every future walk from counting a 404 as an outage — 19
+      // rows did that on each refresh, for objects that were never there to update.
+      if (outcome === 'missing') await this.repo.markGoogleObjectRemoved(objectId);
+      return outcome;
+    });
   }
 
   private async googlePassData(
