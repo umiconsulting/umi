@@ -82,8 +82,11 @@ export const LOYALTY_CARD_STATE_SQL = `
   -- COALESCE because a card with no visits yet must read 0, not NULL.
   tv AS (SELECT COALESCE(SUM(stamps), 0)::int AS n FROM merchant.loyalty_visit
           WHERE merchant_id = $1::uuid AND card_id = $2::uuid),
+  -- COUNT(*) of the canjes that still STAND. A reverted canje keeps its row (the
+  -- bitácora has to show it) but gives the reward back, so counting it would make
+  -- the undo cost the customer a reward — the exact opposite of what it is for.
   rr AS (SELECT COUNT(*)::int AS n FROM merchant.loyalty_redemption
-          WHERE merchant_id = $1::uuid AND card_id = $2::uuid),
+          WHERE merchant_id = $1::uuid AND card_id = $2::uuid AND reverted_at IS NULL),
   bal AS (SELECT COALESCE(SUM(delta), 0)::int AS n FROM merchant.loyalty_stored_value_ledger
            WHERE merchant_id = $1::uuid AND card_id = $2::uuid)
   SELECT c.card_number,

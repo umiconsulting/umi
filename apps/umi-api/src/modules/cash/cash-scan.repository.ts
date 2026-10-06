@@ -313,6 +313,95 @@ export class CashScanRepository {
     return rows[0] ?? null;
   }
 
+  /** One canje, scoped to the café it was made at. */
+  async findRedemption(
+    merchantId: string,
+    redemptionId: string,
+  ): Promise<{
+    id: string;
+    cardId: string;
+    rewardId: string | null;
+    revertedAt: Date | null;
+  } | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT id::text AS id, card_id::text AS "cardId", reward_id::text AS "rewardId",
+                reverted_at AS "revertedAt"
+           FROM merchant.loyalty_redemption
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [merchantId, redemptionId],
+      ),
+    );
+    return (rows[0] as never) ?? null;
+  }
+
+  /**
+   * Undo a canje: mark it reverted, and give the customer the reward back.
+   *
+   * THREE THINGS, and all three are needed for the undo to be an undo:
+   *
+   *  1. `reverted_at` + who did it. The row STAYS — the bitácora has to show that a
+   *     canje happened and was taken back, and the reversal is audited, not erased.
+   *  2. The reward comes back by itself: `pending_rewards` derives from the canjes
+   *     that still stand (card-state.sql.ts excludes reverted rows), so marking the
+   *     row is what restores it. There is no counter to increment here — which is
+   *     exactly why that filter had to exist before this route could be ported.
+   *  3. `pending_tier1` goes back up when the canje handed over the LOWER tier: the
+   *     tag is the record that this card is owed a lower-tier reward.
+   *
+   * The card row is locked for the transaction so a double-tap, or a scan landing
+   * at the same moment, cannot revert twice or credit two rewards.
+   */
+  async revertRedemption(input: {
+    merchantId: string;
+    redemptionId: string;
+    cardId: string;
+    staffMemberId: string | null;
+    /** The canje handed over the ladder's lower tier, so the tag comes back. */
+    restoreBaseTier: boolean;
+    /** The lock-screen line the customer sees: her reward is back. */
+    message: string;
+  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null }> {
+    return this.pg.withMerchant(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`card:${input.cardId}`]);
+
+      const fresh = await c.query<Row>(
+        `SELECT reverted_at AS "revertedAt" FROM merchant.loyalty_redemption
+          WHERE merchant_id = $1::uuid AND id = $2::uuid
+          FOR UPDATE`,
+        [input.merchantId, input.redemptionId],
+      );
+      if (!fresh.rows[0]) throw new NotFoundException('redemption_not_found');
+      if (fresh.rows[0].revertedAt) return { alreadyReverted: true, card: null };
+
+      await c.query(
+        `UPDATE merchant.loyalty_redemption
+            SET reverted_at = now(), reverted_by_staff_id = $3::uuid
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [input.merchantId, input.redemptionId, input.staffMemberId],
+      );
+      if (input.restoreBaseTier) {
+        await c.query(
+          `UPDATE merchant.loyalty_card SET pending_tier1 = pending_tier1 + 1, updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId],
+        );
+      }
+      await c.query(
+        `UPDATE merchant.loyalty_card
+            SET lifecycle_message = $3, lifecycle_message_at = now(), updated_at = now()
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [input.merchantId, input.cardId, input.message],
+      );
+
+      const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
+        input.merchantId,
+        input.cardId,
+      ]);
+      return { alreadyReverted: false, card: rows[0] };
+    });
+  }
+
   /**
    * Best-effort after-hours flag for a staff scan, against `merchant.merchant.open_hours`
    * in the café's timezone. True when the café has no hours for the local day, or the

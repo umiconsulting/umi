@@ -112,8 +112,10 @@ export class CashWriteRepository {
            SELECT
              (SELECT COALESCE(SUM(v.stamps), 0) FROM merchant.loyalty_visit v
                WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)              AS total_visits,
+             -- Canjes that still STAND: a reverted one no longer consumes a reward.
              (SELECT COUNT(*) FROM merchant.loyalty_redemption r
-               WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)             AS redemptions,
+               WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
+                 AND r.reverted_at IS NULL)                                           AS redemptions,
              COALESCE((SELECT SUM(l.delta) FROM merchant.loyalty_stored_value_ledger l
                WHERE l.merchant_id = c.merchant_id AND l.card_id = c.id), 0)         AS balance_cents
          ) AS agg

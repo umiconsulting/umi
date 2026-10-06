@@ -52,8 +52,11 @@ const CUST_CTE = `
             WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
           (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
             WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)::int                 AS total_visits,
+          -- Canjes that still STAND: a reverted one keeps its row for the bitácora
+          -- but no longer consumes a reward (see shared/loyalty/card-state.sql.ts).
           (SELECT count(*) FROM merchant.loyalty_redemption r
-            WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id)::int                 AS redemptions,
+            WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id
+              AND r.reverted_at IS NULL)::int                                               AS redemptions,
           (SELECT max(v.occurred_at) FROM merchant.loyalty_visit v
             WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)                       AS last_visit,
           COALESCE((SELECT sum(abs(l.delta)) FROM merchant.loyalty_stored_value_ledger l
@@ -194,7 +197,8 @@ export class CashRepository {
                (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
                  WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id) / (SELECT n FROM vr)
                - (SELECT count(*) FROM merchant.loyalty_redemption r
-                   WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)
+                   WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
+                     AND r.reverted_at IS NULL)
              ) AS pend
              FROM merchant.loyalty_card c
              WHERE c.merchant_id = $1::uuid AND c.status = 'active'
@@ -625,7 +629,8 @@ export class CashRepository {
                                    WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id), 0)::int
                           / $2::int
                         - (SELECT COUNT(*) FROM merchant.loyalty_redemption r
-                            WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id) AS pending
+                            WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
+                              AND r.reverted_at IS NULL) AS pending
                    FROM merchant.loyalty_card c
                   WHERE c.merchant_id = $1::uuid
                ) AS d

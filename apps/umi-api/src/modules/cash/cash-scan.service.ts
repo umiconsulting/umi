@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -274,6 +275,73 @@ export class CashScanService {
     }
 
     throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+  }
+
+  /**
+   * Undo a canje — the customer screen's two-tap revert.
+   *
+   * ADMIN-only, by the café owner's request: staff may redeem, only the owner may
+   * un-redeem, so an accidental canje has a supervised undo instead of a support
+   * ticket. The button that calls this is hidden from staff by the screen itself
+   * (`viewerIsAdmin` on the customer detail), and the API refuses it anyway — the
+   * client hides, the API decides.
+   *
+   * WHICH TIER COMES BACK. On a ladder, undoing a canje of the LOWER tier restores
+   * a banked lower-tier reward: that canje consumed the early cash-out, the visits
+   * it took are gone, and a banked capuccino is the honest restoration. Anything
+   * else comes back as the tier the cycle banks. umi-cash decided this by comparing
+   * the redemption's config against the profile's base tier, and so does this.
+   */
+  async revertRedemption(
+    merchantId: string,
+    userId: string,
+    redemptionId: string,
+  ) {
+    const redemption = await this.repo.findRedemption(merchantId, redemptionId);
+    if (!redemption) throw new NotFoundException({ error: 'Canje no encontrado' });
+    if (redemption.revertedAt) {
+      throw new ConflictException({ error: 'Este canje ya fue revertido' });
+    }
+
+    // Fail closed on attribution: a reversal is value-bearing, so it must name a
+    // real staff member — the same stance as the top-up and bulk-seal paths.
+    const staffMemberId = await this.cards.getStaffMemberId(merchantId, userId);
+    if (!staffMemberId) {
+      throw new ForbiddenException({ error: 'Tu usuario no está registrado como personal' });
+    }
+
+    const profileRows = await this.repo.rewardProfileRows(merchantId, redemption.cardId);
+    const profile = resolveRewardProfile(
+      profileRows.defaultConfig,
+      profileRows.overrideConfig,
+      profileRows.upgradeConfig,
+    );
+    const revertsBaseTier =
+      !!profile.baseTier?.configId && redemption.rewardId === profile.baseTier.configId;
+    const rewardName = revertsBaseTier
+      ? profile.baseTier!.rewardName
+      : profile.rewardName;
+
+    const { alreadyReverted, card } = await this.repo.revertRedemption({
+      merchantId,
+      redemptionId,
+      cardId: redemption.cardId,
+      staffMemberId,
+      restoreBaseTier: revertsBaseTier,
+      message: `Te devolvimos tu ${rewardName} — está lista para canjear de nuevo 🎁`,
+    });
+    if (alreadyReverted || !card) {
+      throw new ConflictException({ error: 'Este canje ya fue revertido' });
+    }
+
+    // The reversal is committed; the wallet refresh must not delay the response.
+    void this.walletPass.refreshCard(redemption.cardId);
+
+    return {
+      success: true,
+      message: `Canje revertido — ${rewardName} devuelta al cliente`,
+      pendingRewards: card.pending_rewards,
+    };
   }
 
   /**

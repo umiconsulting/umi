@@ -15,8 +15,13 @@
  * NOT FORWARDED, each for a reason:
  *
  *   `/admin/messages` — never ported. The lifecycle bodies live in
- *   `merchant.message` now and the screen is rebuilt from there (AB#107). The
- *   route is deleted, not moved.
+ *   `merchant.message` now and the screen is rebuilt from there (AB#107).
+ *   ⚠️ THE ROUTE IS STILL ON DISK AND THE SCREEN STILL CALLS IT — `next.config`
+ *   said "deleted, not moved" and that stopped being true. It is the one
+ *   register route with no port and no switch, so until AB#107 lands the
+ *   Mensajes screen reads the old schemas. Named here, excluded in
+ *   `scripts/umi-cash-register-parity.mjs` (KNOWN_UNPORTED), tracked in
+ *   REGISTER_FLIP_PARITY.md.
  *
  * The `/umi/*` panel is absent for the same reason: AB#108 replaces it with a
  * form in umi-dashboard.
@@ -37,6 +42,12 @@ const REGISTER_ROUTES = [
   '/api/:handle/admin/gift-cards',
   '/api/:handle/admin/purchase',
   '/api/:handle/admin/reward-config',
+  // The two write halves of screens already on this list: "Actualizar pases" on
+  // the Rewards screen, and the customer screen's two-tap undo of a canje. Both
+  // are ADMIN-only and both were on NO list before — a flip would have left the
+  // register serving them against a database nothing else wrote to any more.
+  '/api/:handle/admin/reward-config/resync',
+  '/api/:handle/admin/redemptions/:id/revert',
   '/api/:handle/admin/settings',
   '/api/:handle/admin/stats',
   '/api/:handle/admin/topup',
