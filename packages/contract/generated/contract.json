@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "5b3be6909e19afc1dfcea4795ec5ea41031e82d5c672906dbf0c8bc64c9ba488",
+  "contentHash": "11de10f21fb3e10523ebcde6329d6e1ef2e010355a8aaf28b60494296f06e7ef",
   "contractVersion": "2.23.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -84484,6 +84484,7 @@
           "enum": [
             "VISIT",
             "REDEEM",
+            "REDEEM_BASE",
             "BIRTHDAY_REDEEM"
           ],
           "type": "string"
@@ -84493,6 +84494,7 @@
             "enum": [
               "VISIT",
               "REDEEM",
+              "REDEEM_BASE",
               "BIRTHDAY_REDEEM"
             ],
             "type": "string"

@@ -1,15 +1,27 @@
 /**
  * The derived loyalty state of one card, in SQL. One author, two readers.
  *
- * `merchant.loyalty_card` is identity-only. The old `total_visits`,
+ * `merchant.loyalty_card` carries no counters. The old `total_visits`,
  * `visits_this_cycle`, `pending_rewards` and `balance_cents` cache columns are
- * gone, so every caller computes the same four numbers from the event tables:
+ * gone, so every caller computes the same four numbers from the event tables and
+ * the CARD'S TWO ANCHORS (79_cycle_anchor.sql):
  *
- *   total_visits      = COUNT(merchant.loyalty_visit)
- *   visits_this_cycle = total_visits % visits_required
- *   pending_rewards   = floor(total_visits / visits_required)
- *                         - COUNT(merchant.loyalty_redemption)
+ *   total_visits      = SUM(merchant.loyalty_visit.stamps)
+ *   visits_this_cycle = (total_visits - cycle_anchor) % visits_required
+ *   pending_rewards   = rewards_earned - COUNT(canjes that stand)
  *   balance_cents     = COALESCE(SUM(merchant.loyalty_stored_value_ledger.delta), 0)
+ *
+ * WHY THE ANCHORS ARE THERE, in one line each: a plain modulo assumes every cycle
+ * ran 0 → 1 → … → threshold → 0 at a threshold that never moved. An early cash-out
+ * restarts the cycle at the customer's current stamp count (not a multiple), and a
+ * threshold that moved leaves a cycle finishing under the old one. `cycle_anchor` is
+ * where the current cycle began, and `rewards_earned` counts the cycles this card
+ * has completed — which no formula can recover from the events, because earning a
+ * reward wrote no row. Measured before that file was written: the derivation below
+ * reproduces umi-cash's own numbers for 1053 of 1053 cards.
+ *
+ * A canje with `cycle_reset` is an early cash-out: it consumed the cycle, not a
+ * banked reward, so it does not count here.
  *
  * `visits_required` is the merchant's active `merchant.loyalty_reward`, and it
  * defaults to 10 when no reward row exists. The default also prevents a division
@@ -108,15 +120,22 @@ export const LOYALTY_CARD_STATE_SQL = `
   -- bitácora has to show it) but gives the reward back, so counting it would make
   -- the undo cost the customer a reward — the exact opposite of what it is for.
   rr AS (SELECT COUNT(*)::int AS n FROM merchant.loyalty_redemption
-          WHERE merchant_id = $1::uuid AND card_id = $2::uuid AND reverted_at IS NULL),
+          WHERE merchant_id = $1::uuid AND card_id = $2::uuid
+            AND reverted_at IS NULL AND NOT cycle_reset),
   bal AS (SELECT COALESCE(SUM(delta), 0)::int AS n FROM merchant.loyalty_stored_value_ledger
            WHERE merchant_id = $1::uuid AND card_id = $2::uuid)
   SELECT c.card_number,
-        tv.n                 AS total_visits,
-        (tv.n % vr.n)        AS visits_this_cycle,
-        (tv.n / vr.n - rr.n) AS pending_rewards,
-        bal.n                AS balance_cents,
-        vr.n                 AS visits_required,
+         tv.n                 AS total_visits,
+         ((tv.n - c.cycle_anchor) % vr.n) AS visits_this_cycle,
+         (c.rewards_earned - rr.n)        AS pending_rewards,
+         bal.n                AS balance_cents,
+         vr.n                 AS visits_required,
+         -- Both anchors ride along: a writer needs them to compute the next value
+         -- (the scan) or to preserve the position across a threshold change (the
+         -- reward-config save), and re-reading the card to get them would be a
+         -- second round trip under the same lock.
+         c.cycle_anchor,
+         c.rewards_earned,
         -- How many of this card's banked rewards were earned under the pre-ladder
         -- single threshold and must therefore be handed over as the LOWER tier
         -- first. A counter, not a flag: the reward-config save that turns a ladder
@@ -135,4 +154,8 @@ export interface LoyaltyCardState {
   balance_cents: number;
   visits_required: number;
   pending_tier1: number;
+  /** The lifetime stamp count at which the current cycle began (79_cycle_anchor.sql). */
+  cycle_anchor: number;
+  /** Cycles this card has completed in its life — the numerator of pending_rewards. */
+  rewards_earned: number;
 }

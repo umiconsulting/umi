@@ -56,7 +56,7 @@ const CUST_CTE = `
           -- but no longer consumes a reward (see shared/loyalty/card-state.sql.ts).
           (SELECT count(*) FROM merchant.loyalty_redemption r
             WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id
-              AND r.reverted_at IS NULL)::int                                               AS redemptions,
+              AND r.reverted_at IS NULL AND NOT r.cycle_reset)::int                          AS redemptions,
           (SELECT max(v.occurred_at) FROM merchant.loyalty_visit v
             WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)                       AS last_visit,
           COALESCE((SELECT sum(abs(l.delta)) FROM merchant.loyalty_stored_value_ledger l
@@ -74,7 +74,11 @@ const CUST_CTE = `
           -- The phone and OS the customer self-registered from, read off the
           -- User-Agent at sign-up. Display only: nothing branches on them, and a
           -- customer a barista enrolled by hand legitimately has neither.
-          cu.device, cu.os
+          cu.device, cu.os,
+          -- The two anchors the cycle derives from (79_cycle_anchor.sql). Carried
+          -- through the CTE so the list, the export and the count all speak the same
+          -- arithmetic as the scan and the pass.
+          c.cycle_anchor, c.rewards_earned
         FROM merchant.customer cu
         LEFT JOIN merchant.loyalty_card c
           ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
@@ -187,18 +191,17 @@ export class CashRepository {
            WHERE merchant_id = $1::uuid AND reason = 'topup' AND created_at >= $2`,
           [merchantId, dayStart],
         ),
-        // pending rewards across all active cards = Σ max(visits/n − redemptions, 0)
+        // pending rewards across all active cards = Σ max(rewards_earned − standing
+        // canjes, 0). Rewards EARNED is the card's own anchor, not a division: a
+        // division cannot tell a cycle that was cut short from one that completed
+        // (79_cycle_anchor.sql).
         c.query<Row>(
-          `WITH vr AS (
-             SELECT COALESCE(${EFFECTIVE_VISITS_REQUIRED_SQL}, 10) AS n
-           )
-           SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
+          `SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
              SELECT (
-               (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
-                 WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id) / (SELECT n FROM vr)
+               c.rewards_earned
                - (SELECT count(*) FROM merchant.loyalty_redemption r
                    WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
-                     AND r.reverted_at IS NULL)
+                     AND r.reverted_at IS NULL AND NOT r.cycle_reset)
              ) AS pend
              FROM merchant.loyalty_card c
              WHERE c.merchant_id = $1::uuid AND c.status = 'active'
@@ -396,8 +399,9 @@ export class CashRepository {
                   device, os,
                   card_id::text AS "cardId", card_number AS "cardNumber",
                   balance_cents AS "balanceCentavos", total_visits AS "totalVisits",
-                  (total_visits % (SELECT n FROM vr_n))::int                       AS "visitsThisCycle",
-                  (total_visits / (SELECT n FROM vr_n) - redemptions)::int         AS "pendingRewards",
+                  ((total_visits - coalesce(cycle_anchor, 0)) % (SELECT n FROM vr_n))::int
+                                                                                   AS "visitsThisCycle",
+                  (coalesce(rewards_earned, 0) - redemptions)::int                 AS "pendingRewards",
                   last_visit AS "lastVisit", ltv_centavos AS "ltvCentavos"
            FROM cust
            WHERE ${filter}
@@ -572,6 +576,30 @@ export class CashRepository {
              WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
                AND kind = 'standard'
              ORDER BY created_at DESC NULLS LAST LIMIT 1) AS n,
+           -- The tier the CYCLE was running to before this save. A card mid-cycle
+           -- keeps its position across a threshold change (umi-cash kept it because
+           -- the position was a stored column), and re-anchoring is how that is
+           -- expressed once the position is derived.
+           COALESCE(
+             CASE WHEN (SELECT stamps_required FROM merchant.loyalty_reward
+                         WHERE merchant_id = $1::uuid AND active = true
+                           AND type = 'stamps_free_item' AND kind = 'upgrade'
+                         ORDER BY created_at DESC NULLS LAST LIMIT 1)
+                     > (SELECT stamps_required FROM merchant.loyalty_reward
+                         WHERE merchant_id = $1::uuid AND active = true
+                           AND type = 'stamps_free_item' AND kind = 'standard'
+                         ORDER BY created_at DESC NULLS LAST LIMIT 1)
+                  THEN (SELECT stamps_required FROM merchant.loyalty_reward
+                         WHERE merchant_id = $1::uuid AND active = true
+                           AND type = 'stamps_free_item' AND kind = 'upgrade'
+                         ORDER BY created_at DESC NULLS LAST LIMIT 1)
+             END,
+             (SELECT stamps_required FROM merchant.loyalty_reward
+               WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+                 AND kind = 'standard'
+               ORDER BY created_at DESC NULLS LAST LIMIT 1),
+             10
+           ) AS "cycleThreshold",
            EXISTS (SELECT 1 FROM merchant.loyalty_reward
              WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
                AND kind = 'upgrade') AS "hadUpgrade"`,
@@ -579,6 +607,7 @@ export class CashRepository {
       );
       const previousThreshold = Number(before.rows[0]?.n ?? 0);
       const hadUpgrade = before.rows[0]?.hadUpgrade === true;
+      const previousCycleThreshold = Number(before.rows[0]?.cycleThreshold ?? 10) || 10;
 
       // Retire the running tiers — every active STANDARD and UPGRADE row. Per-card
       // overrides are inactive and are deliberately not matched here.
@@ -639,6 +668,35 @@ export class CashRepository {
           );
         }
       }
+
+      // RE-ANCHOR EVERY CARD to keep its cycle position across the new threshold.
+      // Without this, a card sitting at 8/10 would silently become 8/9 the moment the
+      // café renames its reward — and then complete a cycle it had not earned. The
+      // position is preserved by moving the anchor to "where this cycle would have
+      // started under the new threshold"; `rewards_earned` does not move, because how
+      // many cycles a card has completed is history, not arithmetic.
+      const nextThreshold = Number(data.upgrade?.visitsRequired ?? data.visitsRequired) || 1;
+      await c.query(
+        `UPDATE merchant.loyalty_card ca
+            SET cycle_anchor = MOD(
+                  GREATEST(
+                    0,
+                    d.total - MOD(GREATEST(0, d.total - ca.cycle_anchor), $2::int)
+                  ),
+                  $3::int
+                ),
+                updated_at = now()
+           FROM (
+             SELECT c.id,
+                    COALESCE((SELECT SUM(v.stamps) FROM merchant.loyalty_visit v
+                               WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id), 0)::int
+                      AS total
+               FROM merchant.loyalty_card c
+              WHERE c.merchant_id = $1::uuid
+           ) AS d
+          WHERE ca.merchant_id = $1::uuid AND ca.id = d.id`,
+        [merchantId, Math.max(1, previousCycleThreshold), Math.max(1, nextThreshold)],
+      );
 
       return {
         ...rows[0],
@@ -792,8 +850,9 @@ export class CashRepository {
          SELECT name, phone, email, card_number AS "cardNumber",
                 balance_cents AS "balanceCentavos",
                 total_visits AS "totalVisits",
-                (total_visits % (SELECT n FROM vr_n))::int               AS "visitsThisCycle",
-                (total_visits / (SELECT n FROM vr_n) - redemptions)::int AS "pendingRewards",
+                ((total_visits - coalesce(cycle_anchor, 0)) % (SELECT n FROM vr_n))::int
+                                                                        AS "visitsThisCycle",
+                (coalesce(rewards_earned, 0) - redemptions)::int         AS "pendingRewards",
                 to_char(created_at AT TIME ZONE $2, 'FMDD/FMMM/YYYY')    AS "registeredOn"
            FROM cust
           ORDER BY created_at DESC`,

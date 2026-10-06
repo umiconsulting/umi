@@ -346,8 +346,8 @@ export class CustomersRepository {
            lc.card_number,
            agg.balance_cents::int                        AS balance_cents,
            agg.total_visits::int                         AS total_visits,
-           (agg.total_visits % vr.n)::int                AS visits_this_cycle,
-           (agg.total_visits / vr.n - agg.redemptions)::int AS pending_rewards,
+           ((agg.total_visits - lc.cycle_anchor) % vr.n)::int AS visits_this_cycle,
+           (lc.rewards_earned - agg.redemptions)::int    AS pending_rewards,
            lc.created_at,
            lc.updated_at
          FROM merchant.loyalty_card AS lc
@@ -356,7 +356,8 @@ export class CustomersRepository {
          CROSS JOIN LATERAL (
            SELECT
              (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = lc.merchant_id AND v.card_id = lc.id) AS total_visits,
-             (SELECT count(*) FROM merchant.loyalty_redemption r WHERE r.merchant_id = lc.merchant_id AND r.card_id = lc.id AND r.reverted_at IS NULL) AS redemptions,
+             (SELECT count(*) FROM merchant.loyalty_redemption r WHERE r.merchant_id = lc.merchant_id AND r.card_id = lc.id
+                AND r.reverted_at IS NULL AND NOT r.cycle_reset) AS redemptions,
              COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l WHERE l.merchant_id = lc.merchant_id AND l.card_id = lc.id), 0) AS balance_cents
          ) AS agg
          WHERE lc.customer_id = $2::uuid AND lc.merchant_id = $1::uuid

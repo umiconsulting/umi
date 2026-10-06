@@ -213,6 +213,72 @@ describe('CashScanService.scan — the two-tier ladder', () => {
     expect(arg.rewardConfigId).toBe('rc-top');
     expect(arg.decrementPendingTier1).toBe(false);
   });
+
+  /**
+   * THE EARLY CASH-OUT — the action that made the cycle anchor necessary.
+   *
+   * Reached from the register's customer screen when `baseReward.ready` is true. It
+   * hands over the LOWER tier and tears the card off: a different write from a banked
+   * canje, and the one that makes `sum % threshold` stop describing the customer's
+   * position.
+   */
+  it('refuses the early cash-out before the lower tier is reached', async () => {
+    h.cards.findCard.mockResolvedValue({ ...CARD, visits_this_cycle: 5, total_visits: 5 });
+    await expect(
+      h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'REDEEM_BASE' }),
+    ).rejects.toMatchObject({
+      response: { error: 'Aún no llega a 7 visitas para Capuccino' },
+    });
+    expect(h.repo.performScan).not.toHaveBeenCalled();
+  });
+
+  it('refuses it when the café has no ladder at all', async () => {
+    h.repo.rewardProfileRows.mockResolvedValue({
+      defaultConfig: LADDER_ROWS.defaultConfig,
+      upgradeConfig: null,
+      overrideConfig: null,
+    });
+    h.cards.findCard.mockResolvedValue({ ...CARD, visits_this_cycle: 8, total_visits: 8 });
+    await expect(
+      h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'REDEEM_BASE' }),
+    ).rejects.toMatchObject({
+      response: { error: 'Este café no tiene un segundo nivel activo' },
+    });
+  });
+
+  it('hands over the LOWER tier, resets the cycle, and consumes no banked reward', async () => {
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      visits_this_cycle: 7,
+      total_visits: 7,
+      pending_rewards: 0,
+    });
+    const r = await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'REDEEM_BASE' });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.resetCycle).toBe(true);
+    expect(arg.rewardConfigId).toBe('rc-base');
+    // It consumed the CYCLE, not a reward: the pre-ladder tag must not move.
+    expect(arg.decrementPendingTier1).toBe(false);
+    expect(r.message).toContain('Capuccino');
+    expect(r.message).toContain('tarjeta reiniciada');
+  });
+
+  it('lets an early cash-out and the visit it lands on happen in one tap', async () => {
+    // The register sends both: the canje resets the cycle and the visit is the first
+    // stamp of the new one. umi-cash ordered it that way, and so does this.
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      visits_this_cycle: 7,
+      total_visits: 7,
+      pending_rewards: 0,
+    });
+    await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', actions: ['VISIT', 'REDEEM_BASE'] });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.resetCycle).toBe(true);
+    expect(arg.doVisit).toBe(true);
+    // The visit counted against the FRESH cycle, so it did not complete one.
+    expect(arg.earnedReward).toBe(false);
+  });
 });
 
 describe('CashScanService.scan — guards', () => {

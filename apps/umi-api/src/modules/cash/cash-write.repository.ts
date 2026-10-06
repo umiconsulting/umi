@@ -32,6 +32,10 @@ export interface CardRow {
   pending_rewards: number;
   /** Banked rewards owed as the LOWER tier of the café's ladder (see card-state.sql.ts). */
   pending_tier1: number;
+  /** Lifetime stamps at which the current cycle began (79_cycle_anchor.sql). */
+  cycle_anchor: number;
+  /** Cycles this card has completed in its life — the numerator of pending_rewards. */
+  rewards_earned: number;
   qr_token: string | null;
   person_id: string | null;
   display_name: string | null;
@@ -97,9 +101,9 @@ export class CashWriteRepository {
          SELECT c.id::text, c.customer_id::text, c.card_number, c.qr_token,
                 agg.balance_cents::int                                   AS balance_cents,
                 agg.total_visits::int                                    AS total_visits,
-                (agg.total_visits % vr.n)::int                           AS visits_this_cycle,
-                (agg.total_visits / vr.n - agg.redemptions)::int         AS pending_rewards,
-                c.pending_tier1,
+                ((agg.total_visits - c.cycle_anchor) % vr.n)::int        AS visits_this_cycle,
+                (c.rewards_earned - agg.redemptions)::int                AS pending_rewards,
+                c.pending_tier1, c.cycle_anchor, c.rewards_earned,
                 cu.id::text                                              AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
@@ -112,10 +116,11 @@ export class CashWriteRepository {
            SELECT
              (SELECT COALESCE(SUM(v.stamps), 0) FROM merchant.loyalty_visit v
                WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)              AS total_visits,
-             -- Canjes that still STAND: a reverted one no longer consumes a reward.
+             -- Canjes that still STAND: a reverted one no longer consumes a reward,
+             -- and an early cash-out never did (it consumed the cycle).
              (SELECT COUNT(*) FROM merchant.loyalty_redemption r
                WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
-                 AND r.reverted_at IS NULL)                                           AS redemptions,
+                 AND r.reverted_at IS NULL AND NOT r.cycle_reset)                     AS redemptions,
              COALESCE((SELECT SUM(l.delta) FROM merchant.loyalty_stored_value_ledger l
                WHERE l.merchant_id = c.merchant_id AND l.card_id = c.id), 0)         AS balance_cents
          ) AS agg

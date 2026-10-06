@@ -18,6 +18,7 @@ import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
 import {
   bankedReward,
   cardRewardFields,
+  isBaseReady,
   momentVars,
   visitMoment,
   type VisitMoment,
@@ -25,8 +26,17 @@ import {
 
 const VISIT = 'VISIT';
 const REDEEM = 'REDEEM';
+/**
+ * The early cash-out of the ladder's LOWER tier. Same bar, same card, different
+ * arithmetic: it consumes the cycle (the card is torn off) instead of a banked
+ * reward, so the cycle restarts at the customer's current stamp count.
+ */
+const REDEEM_BASE = 'REDEEM_BASE';
 const BIRTHDAY = 'BIRTHDAY_REDEEM';
-const ACTION_ORDER = [BIRTHDAY, REDEEM, VISIT] as const;
+// umi-cash's order, kept: the birthday claim first, then a banked canje, then an
+// early cash-out (which resets the cycle the visit below then lands on), then the
+// visit. The order is load-bearing, not cosmetic.
+const ACTION_ORDER = [BIRTHDAY, REDEEM, REDEEM_BASE, VISIT] as const;
 type ScanAction = (typeof ACTION_ORDER)[number];
 
 const DEFAULT_CUSTOMER_NAME = 'Cliente';
@@ -77,6 +87,7 @@ export class CashScanService {
     const actionList = ACTION_ORDER.filter((a) => requested.has(a));
     const includesVisit = actionList.includes(VISIT);
     const includesRedeem = actionList.includes(REDEEM);
+    const includesRedeemBase = actionList.includes(REDEEM_BASE);
     const includesBirthday = actionList.includes(BIRTHDAY);
 
     const { card, qrData } = await this.resolveScanTarget(merchantId, input.qrPayload);
@@ -140,6 +151,25 @@ export class CashScanService {
     }
     const banked = includesRedeem ? bankedReward(profile, card.pending_tier1) : null;
 
+    // The EARLY CASH-OUT. The customer may take the lower tier as soon as she has
+    // reached its threshold, instead of stamping on toward the upper one — and the
+    // card is torn off, which is what makes this a different write from a banked
+    // canje. Refused before that threshold, exactly as umi-cash refused it.
+    if (includesRedeemBase) {
+      const base = profile.baseTier;
+      if (!base?.configId) {
+        throw new BadRequestException({ error: 'Este café no tiene un segundo nivel activo' });
+      }
+      if (!isBaseReady(profile, card.visits_this_cycle)) {
+        throw new BadRequestException({
+          error: `Aún no llega a ${base.visitsRequired} visitas para ${base.rewardName}`,
+        });
+      }
+      if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30)) {
+        tooMany('Recompensa ya canjeada. Espera un momento si deseas canjear otra.');
+      }
+    }
+
     const customerName = card.display_name ?? null;
 
     // Reward-cycle math (only meaningful on visit).
@@ -154,14 +184,25 @@ export class CashScanService {
     // and otherwise only fills an empty slot. That is umi-cash's precedence:
     // reward_earned > base_reward_ready > reward_redeemed > first_visit >
     // milestone_one_left > milestone_halfway > visit_recorded.
-    let moment: VisitMoment | null = banked
-      ? {
-          journey: 'reward_redeemed',
-          rewardName: banked.rewardName,
-          visitsRequired,
-          visitsThisCycle: card.visits_this_cycle,
-        }
-      : null;
+    // A banked canje and an early cash-out both leave `reward_redeemed`, naming the
+    // tier that left the bar. The early one resets the cycle it was running, so the
+    // moment reports the position the customer now holds: zero.
+    let moment: VisitMoment | null = null;
+    if (banked) {
+      moment = {
+        journey: 'reward_redeemed',
+        rewardName: banked.rewardName,
+        visitsRequired,
+        visitsThisCycle: card.visits_this_cycle,
+      };
+    } else if (includesRedeemBase && profile.baseTier) {
+      moment = {
+        journey: 'reward_redeemed',
+        rewardName: profile.baseTier.rewardName,
+        visitsRequired: profile.baseTier.visitsRequired,
+        visitsThisCycle: 0,
+      };
+    }
     if (includesVisit) {
       const visitM = visitMoment(profile, {
         newVisitsThisCycle,
@@ -188,9 +229,14 @@ export class CashScanService {
       staffMemberId,
       doBirthday: includesBirthday && !!activeBirthday,
       birthdayRewardId: activeBirthday?.id ?? null,
-      doRedeem: includesRedeem,
-      rewardConfigId: banked?.configId ?? null,
+      doRedeem: includesRedeem || includesRedeemBase,
+      // A banked canje hands over the tier it is owed; an early cash-out always hands
+      // over the LOWER one, which is the whole point of the action.
+      rewardConfigId: banked?.configId ?? profile.baseTier?.configId ?? null,
       decrementPendingTier1: !!banked?.isBase,
+      // Only one of the two canjes can be in one action list, and only the early one
+      // moves the cycle. `rewardConfigId` above carries the tier either way.
+      resetCycle: includesRedeemBase,
       doVisit: includesVisit,
       earnedReward,
       newVisitsThisCycle,
@@ -215,6 +261,7 @@ export class CashScanService {
       updated,
       visitsRequired,
       rewardName,
+      profile.baseTier?.rewardName ?? null,
       cfg?.birthdayRewardName ?? null,
       customerName,
       earnedReward,
@@ -323,6 +370,9 @@ export class CashScanService {
       cardId: redemption.cardId,
       staffMemberId,
       restoreBaseTier: revertsBaseTier,
+      // An early cash-out never consumed a banked reward, so undoing one has to hand
+      // a banked reward back explicitly (see CashScanRepository.revertRedemption).
+      restoreEarnedReward: redemption.cycleReset,
       message: `Te devolvimos tu ${rewardName} — está lista para canjear de nuevo 🎁`,
     });
     if (alreadyReverted || !card) {
@@ -502,6 +552,7 @@ export class CashScanService {
     updated: ScannedCard,
     visitsRequired: number,
     rewardName: string,
+    baseRewardName: string | null,
     birthdayRewardName: string | null,
     customerName: string | null,
     earnedReward: boolean,
@@ -518,6 +569,12 @@ export class CashScanService {
     }
     if (performed.includes(REDEEM)) {
       parts.push(`✓ Recompensa canjeada: ${rewardName}`);
+    }
+    if (performed.includes(REDEEM_BASE)) {
+      // The staff line has to say the card restarted, because that is what the
+      // customer is about to see on her pass and the barista is about to be asked
+      // about ("¿por qué mi tarjeta quedó en cero?").
+      parts.push(`✓ ${baseRewardName ?? rewardName} canjeado en nivel 1 — tarjeta reiniciada`);
     }
     if (performed.includes(VISIT)) {
       const remaining = visitsRequired - updated.visits_this_cycle;

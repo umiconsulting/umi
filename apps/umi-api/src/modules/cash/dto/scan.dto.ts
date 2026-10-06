@@ -13,7 +13,14 @@ import {
   MinLength,
 } from 'class-validator';
 
-const ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const;
+/**
+ * The four actions the register's scan screen can commit. `REDEEM_BASE` is the
+ * early cash-out: at the ladder's LOWER threshold the barista hands over that tier
+ * and the card is torn off, which is a different operation from `REDEEM` (a banked
+ * reward) in two ways that matter — it consumes the cycle rather than a banked
+ * reward, and it moves the card's `cycle_anchor`. See 79_cycle_anchor.sql.
+ */
+const ACTIONS = ['VISIT', 'REDEEM', 'REDEEM_BASE', 'BIRTHDAY_REDEEM'] as const;
 type ScanAction = (typeof ACTIONS)[number];
 
 export class ScanDto {

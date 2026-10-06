@@ -94,7 +94,40 @@ out of the count. One card in production has reverted redemptions.
 
 ## What still blocks the flip
 
-### 1. The cycle cannot be cut short (El Gran Ribera only)
+### 1. ~~The cycle cannot be cut short~~ — RESOLVED by `79_cycle_anchor.sql`
+
+Keep the analysis below: it is why the columns exist, and the next reader of that
+file should not have to rediscover it. What changed is that the two facts the event
+log cannot carry are now stored.
+
+**The repair, in one paragraph.** `merchant.loyalty_card` gained `cycle_anchor` (the
+lifetime stamp count at which the current cycle began) and `rewards_earned` (how many
+cycles the card has completed in its life). A canje gained `cycle_reset`, so an early
+cash-out is distinguishable from a banked redemption without parsing a note. Every
+screen still DERIVES its numbers — `visits_this_cycle = (SUM(stamps) − cycle_anchor) %
+threshold`, `pending_rewards = rewards_earned − canjes that stand` — from the events
+plus those anchors, and the writers keep the anchors honest: a completed cycle
+increments `rewards_earned`, an early cash-out moves the anchor, a reward-config save
+re-anchors every card so a threshold change does not move a cycle already in flight.
+
+**Why it is not simply the old cache.** Carrying umi-cash's `visits_this_cycle` and
+`pending_rewards` columns back would also have reproduced the till. It would also have
+rotted the same way: a number nobody can recompute, moved by five writers, wrong after
+the first missed write. The anchors are the two facts the EVENTS cannot express, and
+everything visible stays derived.
+
+**Verified.** The carry derives both anchors from umi-cash's own cache, so the derived
+numbers reproduce the till for **1053 of 1053 cards** on production, 0 mismatches. A
+history replay from the event log and the config activation times agrees on 1052 of
+1053 — the odd card out is a seeded card whose cache is the authority, not a
+falsifiable fact. CI cannot test the carry at all (the gate builds a PRISTINE
+database, where the legacy schemas do not exist by design), so it ships with
+`backfill/verify_cycle_anchor.sh`, which builds a legacy twin, re-applies the file and
+asserts the round trip. That script caught a real ordering bug: marking the early
+cash-out AFTER computing the anchors left the one such card in production one reward
+too generous.
+
+### The detail, as measured on 2026-10-06
 
 umi-cash's scan accepts a `REDEEM_BASE` action: at 7 of 9 stamps the barista can
 hand over the capuccino early and **tear the card off** — `visits_this_cycle` goes
@@ -136,9 +169,7 @@ count visits since the anchor, a data carry for the cards that already cashed ou
 and `REDEEM_BASE` added to the scan. Then the two counters are right for every card,
 not approximately right for most of them.
 
-Until then, flipping means telling El Gran Ribera's baristas that the "canjear
-nivel 1" button no longer exists and that 23 customers' progress reads differently
-from yesterday — that is a product decision for the owner, not a deploy step.
+That was the blocker. `79_cycle_anchor.sql` is the repair, described above.
 
 ### 2. The café-wide Google resync is not ported
 
@@ -262,7 +293,10 @@ Status as of the update above.
    AB#107 rebuilds the screen from `merchant.message`; the harness excludes it by
    name.
 4. The write routes are exercised somewhere that is not a customer's card, or
-   accepted in writing as code-reviewed only. ☐ **outstanding** — unchanged.
+   accepted in writing as code-reviewed only. ☐ **outstanding** — unchanged. The scan
+   is now covered by `loyalty-stamps` (the derive, on a real database) and
+   `cash-seals` (the writer's arithmetic), but no suite commits a real scan against a
+   real café's card.
 5. A response-shape test lives in CI, so that the next hand-edited route list
    cannot pass on existence alone the way this one did.
    ☑ `register-shape.contract.spec.ts` compares against

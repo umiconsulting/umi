@@ -285,13 +285,27 @@ rolls turns the customer list, the customer detail and every scan into a 500. So
    `device`/`os` are populated from the new columns, and `?days=7` returns a 7-day window.
    The parity harness is green on **both** cafés — 10 of 10 comparable routes — with the register
    switch still off.
-3. Flip `CASH_API_ORIGIN` — the register — **but only after the two blockers in
-   [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md#what-still-blocks-the-flip) are settled**:
-   the cycle cannot be cut short (`REDEEM_BASE` at El Gran Ribera), and the café-wide Google
-   resync is not ported. Until then the split in §4 is live, and so the Wallet switch stays off
-   with it. The shapes themselves are done and are tested against a recording of the original in
-   CI.
-4. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
-5. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
+3. **Apply `79_cycle_anchor.sql`, and bump `EXPECTED_SCHEMA_VERSION` to `build-v3-79` with it —
+   then roll the image that reads it.** This is the step that makes the register flippable:
+   `merchant.loyalty_card` gains the two anchors that let the cycle survive an early cash-out and
+   a threshold that moved (`cycle_anchor`, `rewards_earned`), a canje gains `cycle_reset`, and the
+   scan gains the `REDEEM_BASE` action the register's customer screen has always called.
+
+   Two things to know before running it:
+
+   - **The carry must be verified, not assumed.** `backfill/verify_cycle_anchor.sh` builds a
+     legacy twin, re-applies the file and asserts that the derived numbers reproduce the till's
+     — CI cannot, because its gate builds a pristine database where the carry never runs. Run it
+     first; it exits non-zero on any mismatch.
+   - The carry is computed from `loyalty.cards` (the old cache) and the ACTIVE reward config, and
+     the derived numbers reproduce the till for **1053 of 1053** cards. Read them back the same
+     way 78's carry was read back.
+
+4. Flip `CASH_API_ORIGIN` — the register. Until then the split in §4 is live, and so the Wallet
+   switch stays off with it. The remaining blocker is in
+   [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md#what-still-blocks-the-flip): the
+   café-wide Google resync is not ported (`google: null`).
+5. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
+6. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
    during the cutover and must be treated as exposed.
-6. `umi-cash` → Cloudflare, once the Wallet and register switches make its database unnecessary.
+7. `umi-cash` → Cloudflare, once the Wallet and register switches make its database unnecessary.

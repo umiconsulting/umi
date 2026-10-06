@@ -212,8 +212,18 @@ const isCalendarDate = (s: string): boolean => {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 };
 
-/** Scan actions — mirrors cash/dto/scan.dto.ts `ACTIONS`. */
-export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'BIRTHDAY_REDEEM'] as const;
+/**
+ * Scan actions — mirrors cash/dto/scan.dto.ts `ACTIONS`, which mirrors the frozen
+ * client's `lib/constants.ts#SCAN_ACTIONS`.
+ *
+ * `REDEEM_BASE` is the early cash-out: at the ladder's LOWER threshold the barista
+ * hands that tier over and the card is torn off. It was always in the client and in
+ * umi-cash's route; it was missing here and in the DTO, so a register flipped onto
+ * umi-api refused the tap with a 400. See 79_cycle_anchor.sql for what it costs to
+ * represent: the cycle restarts at the customer's stamp count, which is not a
+ * multiple of the threshold.
+ */
+export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'REDEEM_BASE', 'BIRTHDAY_REDEEM'] as const;
 
 /** POST /api/:merchantRef/admin/scan — mirrors ScanDto. */
 export const ScanRequest = z.object({
