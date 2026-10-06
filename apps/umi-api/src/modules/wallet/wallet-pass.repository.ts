@@ -79,7 +79,12 @@ export class WalletPassRepository {
    */
   async googleObjectForCard(cardId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ external_object_id: string }>(
-      `SELECT external_object_id FROM merchant.loyalty_wallet_pass
+      // btrim: one row in production holds an object id with a NEWLINE inside it
+      // (…3388000000023116211\n.card_cmnuuglu…), left by the legacy save flow reading a
+      // padded env var. Google answers `400 Invalid resource ID` for it, which reads
+      // like a Google fault and is not one. Normalising on READ keeps the URL, the body
+      // and the mark-as-removed below agreeing on the same string.
+      `SELECT btrim(external_object_id) AS external_object_id FROM merchant.loyalty_wallet_pass
         WHERE card_id = $1::uuid AND platform = 'google' AND status = 'active'
         LIMIT 1`,
       [cardId],
@@ -137,7 +142,7 @@ export class WalletPassRepository {
     await this.pg.query(
       `UPDATE merchant.loyalty_wallet_pass
           SET status = 'removed', updated_at = now()
-        WHERE platform = 'google' AND external_object_id = $1`,
+        WHERE platform = 'google' AND btrim(external_object_id) = btrim($1)`,
       [objectId],
     );
   }
@@ -155,7 +160,7 @@ export class WalletPassRepository {
     merchantId: string,
   ): Promise<{ cardId: string; objectId: string }[]> {
     const { rows } = await this.pg.query<{ card_id: string; external_object_id: string }>(
-      `SELECT wp.card_id::text, wp.external_object_id
+      `SELECT wp.card_id::text, btrim(wp.external_object_id) AS external_object_id
          FROM merchant.loyalty_wallet_pass AS wp
          JOIN merchant.loyalty_card AS c ON c.id = wp.card_id
         WHERE c.merchant_id = $1::uuid AND wp.platform = 'google' AND wp.status = 'active'
