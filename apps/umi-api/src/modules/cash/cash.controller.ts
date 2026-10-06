@@ -254,14 +254,21 @@ export class CashController {
   @Post('reward-config/resync')
   @HttpCode(200)
   @RequirePermission('merchant.manage')
-  async resyncRewardConfig(@Merchant() t: MerchantAccess) {
+  async resyncRewardConfig(@Merchant() t: MerchantAccess, @Query('platform') platform?: string) {
     // BOTH PLATFORMS, and they are independent — one unreachable provider must not
     // silence the other. This used to answer `google: null` because the merchant-wide
     // Google refresh had no counterpart here; the operator saw "Google: 0/0" and every
     // Android pass kept yesterday's numbers.
+    //
+    // `?platform=apple|google` runs ONE half. It exists because the halves have very
+    // different costs: refreshing Android at a café is ~100 object PATCHes, while
+    // pushing Apple is one APNs round trip per card (449 at El Gran Ribera) and is what
+    // outlives the proxy window in front of this API. When only one platform needs it,
+    // asking for one platform is the difference between seconds and minutes.
+    const only = platform === 'apple' || platform === 'google' ? platform : null;
     const [apple, google] = await Promise.all([
-      this.walletPass.refreshMerchantWithCounts(t.merchantId),
-      this.walletPass.refreshMerchantGoogleObjects(t.merchantId),
+      only === 'google' ? null : this.walletPass.refreshMerchantWithCounts(t.merchantId),
+      only === 'apple' ? null : this.walletPass.refreshMerchantGoogleObjects(t.merchantId),
     ]);
     return { apple, google };
   }

@@ -170,6 +170,15 @@ export class GooglePassService {
           const data = await load(entry.cardId, entry.objectId);
           if (data && (await this.updateObject(data))) refreshed++;
           else failed++;
+          // Progress, not just a summary. A walk that never finishes tells you nothing
+          // if the only line it would have written is the one that never comes — which
+          // is how a stalled merchant-wide refresh looked like silence.
+          const done = refreshed + failed;
+          if (done % 25 === 0) {
+            this.logger.log(
+              `google_merchant_refresh_progress done=${done}/${entries.length} failed=${failed}`,
+            );
+          }
         } catch (err) {
           failed++;
           this.logger.warn(`google_merchant_refresh_failed card=${entry.cardId}: ${String(err)}`);
