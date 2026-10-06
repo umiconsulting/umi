@@ -99,8 +99,21 @@ end $$;
 --
 -- The role-level control is narrower, and a cluster-level change cannot undo it.
 --
--- Both are attempted. A managed target may refuse either one; the block reports
--- what it could not set and does not abort the file.
+-- All three are attempted. A managed target may refuse any of them; the block
+-- reports what it could not set and does not abort the file.
+--
+-- ⚠️ `log_statement = none` IS THE ONE THAT DECIDES THE GATE, and it was missing.
+-- `security_gate.sql`'s D10 row accepts a cluster-wide `none` OR a per-role `none`
+-- for every request-path role. The cluster is NOT `none` on the managed target:
+-- measured on both the QA project and production on 2026-10-06, it is `ddl` — kept
+-- deliberately, because the DDL trail is how an unauthorised schema change gets
+-- noticed. So the per-role pin is the only thing that satisfies the row, and
+-- without it the file provisioned roles the gate immediately fails.
+--
+-- Found by running the in-place rehearsal against a real Supabase project: prod
+-- passes today only because its `umi_app`/`umi_worker` carry `log_statement=none`
+-- (`log_statement=none, log_min_duration_statement=-1`), and those are the roles
+-- the flip REPLACES. The two pins below never covered it.
 -- ----------------------------------------------------------------------------
 do $$
 declare
@@ -108,7 +121,11 @@ declare
   p text;
 begin
   foreach r in array array['api_login', 'worker_login'] loop
-    foreach p in array array['log_min_duration_statement = -1', 'log_parameter_max_length = 0'] loop
+    foreach p in array array[
+      'log_statement = none',
+      'log_min_duration_statement = -1',
+      'log_parameter_max_length = 0'
+    ] loop
       begin
         execute format('alter role %I set %s', r, p);
       exception when insufficient_privilege then
