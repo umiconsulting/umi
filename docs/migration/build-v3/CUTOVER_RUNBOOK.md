@@ -1,6 +1,7 @@
 # build-v3 cutover runbook
 
-Status: `DRAFT — the rehearsal is proven, the production execution is NOT`.
+Status: `EXECUTED 2026-10-06 — the database and the API are live on main, and the Wallet switch is
+flipped and verified against a real pass. The register switch is still OFF, on purpose.` See §8.
 Last updated: 2026-10-06.
 Companion docs: [`GATED_CUTOVER_PLAN.md`](./GATED_CUTOVER_PLAN.md) (the roadmap and gates) ·
 [`BACKFILL_METHODOLOGY.md`](./BACKFILL_METHODOLOGY.md) (why snapshot-rebuild, not FDW) ·
@@ -89,7 +90,7 @@ preserved, `kind` identical to the source, the 9-visit upper tier present, the s
 override linked, 2/2 reverted redemptions carried, gate 48 structural green with the one
 acknowledged platform-MFA gap.
 
-## 4 · The production execution — the part that is NOT proven
+## 4 · The production execution (executed 2026-10-06)
 
 > ⚠️ **The runner cannot be pointed at production as written.** `00_run_backfill.sh` starts with
 > `drop database if exists $DB; create database $DB template $TEMPLATE`. That is how the
@@ -99,13 +100,17 @@ acknowledged platform-MFA gap.
 
 So the production run is the same file list, applied **in place** against the production
 database, in the same order, with the create-database line dropped and `seed_rbac.sql` given the
-real bootstrap address. This adaptation has not been executed anywhere yet; it is the single
-largest unproven step in the plan, and it deserves its own rehearsal run against a clone before
-the window. **Do that first.**
+real bootstrap address. That adaptation is what ran in the window; §8 has the measured result.
 
 What makes it safe to run in place: it is additive. The new schemas are built beside the old
 ones, and `umi-cash` keeps reading `core`/`grow`/`loyalty`/`ops` — which is why nobody loses
 access to the register on the night.
+
+⚠️ **That same property is the one open liability.** Until `CASH_API_ORIGIN` is set, the register
+still writes through its own Prisma handlers into the old schemas, while the dashboard, the
+Wallet and every new API route read the new ones. A stamp taken on the till right now is real
+money and real stamps that the new world cannot see. The split is tolerable only while the cafés
+are closed; it is not a steady state.
 
 ## 5 · The flip
 
@@ -132,9 +137,11 @@ access to the register on the night.
    # 404 = the route is not deployed; flipping now freezes every pass
    ```
 
-   On 2026-10-06 production (`main`) answers **404** there and staging (build-v3) answers
-   **401**. So the order is: API first, verify 401, then flip `WALLET_API_ORIGIN`.
-   `CASH_API_ORIGIN` (the register) flips on its own switch, by design.
+   On 2026-10-06, **before** the API cutover, production (`main`) answered **404** there; staging
+   (build-v3) answered **401**. The order therefore is: API first, verify 401, then flip
+   `WALLET_API_ORIGIN`. That order was followed; production now answers 401 and the switch is
+   on. `CASH_API_ORIGIN` (the register) flips on its own switch, by design, and has not been
+   flipped.
 
 ## 6 · Rollback
 
@@ -160,3 +167,72 @@ access to the register on the night.
   reversal, or the meaning of the upper tier. Counts and money do not check meaning.
 - **`main` has no lint workflow.** Any document merged from it arrives unformatted and fails
   `build-v3`'s required Format check.
+- **The worker's healthcheck probes the web port.** `apps/umi-api/Dockerfile` ends with
+  `HEALTHCHECK … fetch('http://127.0.0.1:3000/health/live')`, and `umi-worker` runs the same
+  image with `command: node dist/worker.js` — a Nest application context with no HTTP listener
+  at all (`src/worker.ts` says so in its first paragraph). The worker therefore reports
+  **unhealthy** from its first minute forever, whether or not it is consuming queues. It does
+  not restart (Docker does not act on health) and `deploy.sh` does not pass `--wait`, so nothing
+  breaks — but the signal is worthless, and a real worker death looks exactly like this. The
+  compose service needs its own probe or its own `disable: true`.
+
+## 8 · Execution log — 2026-10-06
+
+Everything below ran against **production**. Times are UTC.
+
+**The snapshot.** `umi_prod_snapshot_20261006T061814Z.dump`, 9 734 906 bytes, sha256
+`477ac331c89300ba76a4ff9ece3b3cff3d9e25954aa0ae8d10e5733112dfad4a` — pulled off-provider from
+the VPS with the staging Postgres container's `pg_dump` 17, because the host has none. An earlier
+dump from the same morning (`…T040136Z`, `d5ac5051…`) had already been restored into the QA
+project and is what the rehearsal ran against.
+
+**The backfill.** Applied in place as Supabase `postgres`: core DDL → data phase → `seed_rbac.sql`
+→ the 17 POS DDL files → the per-card override carry → `50`, `90`, `47`, `48`, `49`, `51`, `52`,
+`53` → `reconcile_v3.sql`. 06:18–06:21Z, **0 SQL errors**, then `01_run_post_backfill.sh`.
+
+**What the production database holds after it**, read back from the running API:
+
+| thing                                   | count |
+| --------------------------------------- | ----- |
+| `merchant.merchant`                     | 5     |
+| `merchant.customer`                     | 1048  |
+| `merchant.loyalty_card`                 | 1053  |
+| `merchant.loyalty_wallet_pass`          | 1007  |
+| of those, Apple passes carrying a token | 852   |
+
+The `reconcile_v3.sql` assertions were green on the same run: the three `kind` shapes (override 5,
+standard 18, upgrade 1), one card-level override, two reverted redemptions, 0 stamp drift. The old
+schemas are intact and were never written to by the new code.
+
+**The code.** `main` at `cb8c3ed` (PR #189), image
+`ghcr.io/umiconsulting/umi-api:sha-cb8c3edc67b67831986be094c8812ee4fbd25449`, rolled with
+`docker compose -p umi-api up -d` on the VPS. `/health` answers 200 through Caddy and the boot log
+carries `D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)`. `Caddyfile`,
+`Dockerfile` and `docker-compose.yml` on the box were compared against the merged tree and match.
+
+**The Wallet switch.** The API shipped with **no** `APPLE_*`/`GOOGLE_*` values at all, so its pass
+routes would have answered 503. Thirteen credentials were merged into `apps/umi-api/.env` and the
+containers recreated. Then, checked rather than assumed:
+
+- the signer key decrypts under `APPLE_KEY_PASSPHRASE` and the APN key parses as EC;
+- a throwaway pass signs through `passkit-generator` (magic `PK`), so the template, the WWDR copy
+  and the pass type are all usable;
+- `wallet-issuer@umi-wallet-506902.iam.gserviceaccount.com` still exchanges its key for an OAuth
+  token and `3388000000023116211.elgranribera_umicash_loyalty_v2` reads back **200** — the issuer
+  was never recreated, so the objects already in circulation are still addressable;
+- `WALLET_API_ORIGIN=https://api.umiconsulting.co` was set in Vercel (project `umi-cash`) and the
+  app **redeployed**, because `next.config.mjs` evaluates `rewrites()` at build time — setting the
+  variable alone would have changed nothing;
+- the frozen prefix on `cash.umiconsulting.co` now answers with `via: 1.1 Caddy` and no
+  `x-matched-path`, and **a real pass was rebuilt end to end**: a `merchant.loyalty_wallet_pass`
+  row for El Gran Ribera, called at `…/passes/apple/v1/passes/{passTypeId}/{serial}` with its own
+  `Authorization: ApplePass <token>`, returned **200** and an 89 948-byte `.pkpass`.
+
+**Still open, in this order.**
+
+1. Flip `CASH_API_ORIGIN` — the register — once a register session has been exercised against
+   umi-api (one login, one read). Until then the split in §4 is live.
+2. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
+3. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
+   during the cutover and must be treated as exposed.
+4. `umi-cash` → Cloudflare, once the Wallet and register switches make its database unnecessary.
