@@ -4,4 +4,11 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- A development build points at a local API over plain HTTP. Android
+         blocks cleartext by default from targetSdk 28 on, so without this the
+         app cannot reach `http://127.0.0.1:4001` or a LAN address. Scoped to
+         debug and profile only: a pilot or production build stays HTTPS-only,
+         which is what `AppConfig.validate()` already enforces with
+         `TLS_REQUIRED`. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>
