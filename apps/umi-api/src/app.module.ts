@@ -56,7 +56,6 @@ import { DashboardCatalogModule } from './modules/dashboard-catalog/dashboard-ca
 import { CsrfGuard } from './modules/auth/csrf.guard';
 import { AdministrativeCommandModule } from './modules/administrative-commands/administrative-command.module';
 import { ReleaseModule } from './shared/release/release.module';
-import { PlatformBootstrapModule } from './modules/platform-bootstrap/platform-bootstrap.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { TableOrderModule } from './modules/table-order/table-order.module';
 
@@ -131,7 +130,6 @@ import { TableOrderModule } from './modules/table-order/table-order.module';
     DashboardOperationsModule,
     DashboardCatalogModule,
     AdministrativeCommandModule,
-    PlatformBootstrapModule,
     OrdersModule,
     // §8I step 2, ADR 2026-09-13 §9: table-order INTAKE. A seated guest orders from a QR
     // at the table; the order goes through the one writer with the channel identity `web`
