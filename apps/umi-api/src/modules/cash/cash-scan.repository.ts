@@ -37,6 +37,12 @@ export interface CreditSealsInput {
   seals: number;
   note: string | null;
   idempotencyKey: string | null;
+  /**
+   * The lifecycle moment this credit leaves on the card, rendered by the service.
+   * Written on EVERY applied credit — the legacy seals route did, and the moment is
+   * the pass's only notification channel. Null clears a stale one.
+   */
+  momentMessage: string | null;
 }
 
 export interface CreditSealsResult {
@@ -284,6 +290,14 @@ export class CashScanRepository {
       );
       const replayed = inserted.rows.length === 0;
 
+      // ⚠️ THE CARD ROW IS TOUCHED ON EVERY APPLIED CREDIT, crossing or not, and that
+      // is not bookkeeping. Apple answers `passesUpdatedSince` by comparing the card
+      // row; a stamp that leaves `updated_at` alone makes the phone ask "anything
+      // new?", hear "no" (204), and show NOTHING — no stamp, and no notification,
+      // because a 204 delivers no changeMessage. Reported from a real phone:
+      // "intenté agregar un sello y me salió que sí se hizo, pero mi wallet no se
+      // actualizó y no me llegó ninguna notificación".
+      //
       // A bulk credit crosses the threshold as many times as it must — the one place
       // a single action can complete more than one cycle. Counted as a difference of
       // floors so a credit landing mid-cycle is worth exactly the crossings it added.
@@ -292,14 +306,15 @@ export class CashScanRepository {
           Math.floor(
             (before.total_visits + input.seals - before.cycle_anchor) / before.visits_required,
           ) - Math.floor((before.total_visits - before.cycle_anchor) / before.visits_required);
-        if (crossed > 0) {
-          await c.query(
-            `UPDATE merchant.loyalty_card
-                SET rewards_earned = rewards_earned + $3, updated_at = now()
-              WHERE merchant_id = $1::uuid AND id = $2::uuid`,
-            [input.merchantId, input.cardId, crossed],
-          );
-        }
+        await c.query(
+          `UPDATE merchant.loyalty_card
+              SET rewards_earned = rewards_earned + $3,
+                  lifecycle_message = $4::text,
+                  lifecycle_message_at = CASE WHEN $4 IS NULL THEN NULL ELSE now() END,
+                  updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId, crossed, input.momentMessage],
+        );
       }
 
       return {

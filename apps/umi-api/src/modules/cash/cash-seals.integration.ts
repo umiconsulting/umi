@@ -158,6 +158,7 @@ describe('cash bulk seals · the credit lands once', () => {
         seals,
         note,
         idempotencyKey,
+        momentMessage: null,
       }),
     );
 
@@ -227,6 +228,41 @@ describe('cash bulk seals · the credit lands once', () => {
   });
 
   it('refuses a card that belongs to another café', async () => {
+    // ⚠️ AND IT TOUCHES THE CARD EVEN WHEN NOTHING CROSSES. Apple's web service
+    // answers `passesUpdatedSince` by comparing this row: a credit that leaves
+    // `updated_at` alone makes the phone ask "anything new?", hear 204, and show
+    // nothing — no stamp, and no notification, because a 204 delivers no
+    // changeMessage. Reported from a real phone the night of the flip.
+    await clearVisits();
+    const before = (
+      await pg.query<{ updated_at: Date }>(
+        `SELECT updated_at FROM merchant.loyalty_card WHERE id = $1::uuid`,
+        [CARD],
+      )
+    ).rows[0].updated_at;
+    await new Promise((r) => setTimeout(r, 20));
+    await asMerchant(() =>
+      repo.creditSeals({
+        merchantId: MERCHANT,
+        cardId: CARD,
+        staffMemberId: STAFF,
+        seals: 1,
+        note: null,
+        idempotencyKey: 'touch-1',
+        momentMessage: 'Sello agregado',
+      }),
+    );
+    const after = (
+      await pg.query<{ updated_at: Date; lifecycle_message: string | null }>(
+        `SELECT updated_at, lifecycle_message FROM merchant.loyalty_card WHERE id = $1::uuid`,
+        [CARD],
+      )
+    ).rows[0];
+    expect(after.updated_at.getTime()).toBeGreaterThan(before.getTime());
+    expect(after.lifecycle_message).toBe('Sello agregado');
+  });
+
+  it('refuses a card that belongs to another café', async () => {
     await expect(
       asMerchant(() =>
         repo.creditSeals({
@@ -236,6 +272,7 @@ describe('cash bulk seals · the credit lands once', () => {
           seals: 8,
           note: null,
           idempotencyKey: 'catchup-cross',
+          momentMessage: null,
         }),
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -257,6 +294,7 @@ describe('cash bulk seals · the credit lands once', () => {
           seals: 4,
           note: null,
           idempotencyKey: 'shared-key',
+          momentMessage: null,
         }),
     );
 

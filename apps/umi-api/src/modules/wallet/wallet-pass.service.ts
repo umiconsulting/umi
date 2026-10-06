@@ -136,7 +136,14 @@ export class WalletPassService {
   async googleSaveUrl(merchantId: string, customerId: string): Promise<string> {
     const cardId = await this.repo.cardForCustomer(merchantId, customerId);
     if (!cardId) throw new NotFoundException('card_not_found');
-    const data = await this.googlePassData(merchantId, cardId);
+    // If she already has the object, the save link must carry ITS id — otherwise
+    // tapping "add to Wallet" a second time mints a duplicate pass beside the one she
+    // already holds, and the duplicate is the one that gets updated from then on.
+    const data = await this.googlePassData(
+      merchantId,
+      cardId,
+      await this.repo.googleObjectForCard(cardId),
+    );
     return this.google.saveUrl(data);
   }
 
@@ -151,11 +158,19 @@ export class WalletPassService {
     if (!this.google.isConfigured()) return;
     const merchantId = await this.repo.merchantForCard(cardId);
     if (!merchantId) return;
-    const data = await this.googlePassData(merchantId, cardId).catch(() => null);
+    // No Android pass → nothing to patch. Refreshing anyway produced a 404 per write
+    // for the ~1 850 cards whose customer never added one.
+    const objectId = await this.repo.googleObjectForCard(cardId);
+    if (!objectId) return;
+    const data = await this.googlePassData(merchantId, cardId, objectId).catch(() => null);
     if (data) await this.google.updateObject(data);
   }
 
-  private async googlePassData(merchantId: string, cardId: string): Promise<GooglePassData> {
+  private async googlePassData(
+    merchantId: string,
+    cardId: string,
+    objectId: string | null,
+  ): Promise<GooglePassData> {
     const d = await this.repo.renderData(merchantId, cardId);
     if (!d) throw new NotFoundException('card_not_found');
     const profile = profileOf(d);
@@ -180,6 +195,8 @@ export class WalletPassService {
       // Both builders read this. Drop it here and the reward line
       // disappears from the pass, with no error anywhere.
       birthdayRewardName: d.birthdayRewardName,
+      // The id the object already has. Patching the constructed one 404s.
+      objectId,
       memberSince: d.memberSince,
       topupEnabled: d.topupEnabled,
       lifecycleMessage: d.lifecycleMessage,

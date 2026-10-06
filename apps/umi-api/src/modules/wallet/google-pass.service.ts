@@ -99,7 +99,13 @@ export class GooglePassService {
    */
   async updateObject(data: GooglePassData): Promise<void> {
     if (!this.isConfigured()) return;
-    const objectId = this.objectId(data.cardId);
+    // ⚠️ THE ID THE OBJECT ACTUALLY HAS. Every object in circulation was created by
+    // umi-cash under a Prisma cuid (…card_cmnuuglu40004oyt5s8bve44e); the id a NEW
+    // object would get here is …card_<uuid>. Patching the constructed id asked Google
+    // for an object that does not exist — 404 every time, for all 155 Android passes,
+    // and the pass simply kept showing yesterday's numbers. `objectId` is the stored
+    // one; the constructed form is for CREATE only (see buildLoyaltyObject).
+    const objectId = data.objectId ?? this.objectId(data.cardId);
     try {
       const token = await this.accessToken();
       if (!token) return;
@@ -374,6 +380,12 @@ export interface GooglePassData {
   baseReward?: { visitsRequired: number; rewardName: string } | null;
   /** Banked rewards owed as the lower tier (the pre-ladder tag). */
   pendingTier1?: number;
+  /**
+   * The id the object ALREADY has in Google. Present for an existing pass, absent
+   * when creating one — the two are not the same string, and using the wrong one
+   * turns every update into a 404 nobody sees.
+   */
+  objectId?: string | null;
   memberSince: Date;
   topupEnabled: boolean;
   lifecycleMessage: string | null;

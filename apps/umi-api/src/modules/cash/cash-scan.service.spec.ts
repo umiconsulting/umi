@@ -565,6 +565,12 @@ describe('CashScanService.seals', () => {
       seals: 8,
       note: null,
       idempotencyKey: 'key-1',
+      // The moment the credit leaves on the card, rendered by the service. It is what
+      // the pass shows AND what makes Apple fetch at all — a credit that writes no
+      // message and touches no row leaves the phone asking "anything new?" forever.
+      // She was at 3 of 10 and the credit is 8: the crossing is the headline, so the
+      // moment is `reward_earned` rather than a bare "stamps added".
+      momentMessage: expect.stringContaining('Ganaste Café'),
     });
   });
 
