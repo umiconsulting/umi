@@ -32,6 +32,31 @@ asserts in CI that umi-api still sends every path in that file. Exit criterion 5
 met by construction: the test compares the port against a recording of the original,
 not against the port. Removing `slug` from `getSettings` makes it fail.
 
+**And the harness now looks at values where the shape check cannot.** A path
+comparison cannot tell `upgrade: null` from `upgrade: { visitsRequired, rewardName }` —
+they are the same path — which is precisely how a missing ladder passed a
+"green-looking" port. `scripts/lib/register-shape.mjs` (one definition of shape, three
+callers) now also reports every path where umi-cash sends a value and umi-api sends
+null, with the accepted ones named in writing. The only accepted entry is
+`recentRedemptions[].note`.
+
+### Deployed, unflipped — measured 2026-10-06 10:26–10:30Z
+
+`78_customer_pass_metadata.sql` is applied to production (`device`/`os` on 1019 of
+1048 customers; `pending_tier1 > 0` on **3** cards — 7 carried the key, 4 had counted
+down to 0) and the API image from `main@3baabca` is live and healthy. The parity
+harness against the two cafés, live, register switch still off:
+
+```text
+10 routes answer the same shape.   # kalalacafe
+10 routes answer the same shape.   # elgranribera
+```
+
+El Gran Ribera's Rewards screen answers `active` 7 → capuccino **and `upgrade` 9 →
+latte o frappe**, and `EGR-6659949340` answers `customReward: {"name":"Capuccino"}`
+with `baseReward.rewardName: "Capuccino"`. Exit criterion 1 is met for the response
+half; the switches themselves stay off until the two blockers below are settled.
+
 ### The ladder exists in the API now
 
 `resolveRewardProfile` and the tier copy are ported from umi-cash, the cycle
@@ -228,8 +253,9 @@ Status as of the update above.
 2. `device`, `os` and `pending_tier1` are recreated in the new schema — the column,
    the backfill from the old one, **and** the three writers that move the counter.
    ☑ DDL and carry in PR #191; the three writers are ported (reward-config seeds it,
-   a banked redemption decrements it, a revert increments it). ⚠️ **The DDL must be
-   applied to production BEFORE the image that reads it rolls** — see the runbook.
+   a banked redemption decrements it, a revert increments it). **Applied to
+   production 2026-10-06 10:26Z**, and the runbook now carries the step that goes with
+   it (`EXPECTED_SCHEMA_VERSION`, without which `/health` reports Unready).
 3. `admin/redemptions/:id/revert`, `admin/reward-config/resync` and `admin/messages`
    are ported, or a decision is recorded that they stop working.
    ☑ The first two are ported and on the flip list. `admin/messages` is recorded:

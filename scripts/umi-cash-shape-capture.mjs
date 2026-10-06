@@ -27,6 +27,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { shape } from './lib/register-shape.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(REPO, 'apps/umi-api/src/modules/cash/register-shapes.json');
@@ -39,29 +40,6 @@ const PASSWORD = process.env.PARITY_PASSWORD;
 if (!SLUG || !IDENTIFIER || !PASSWORD) {
   console.error('Set PARITY_SLUG, PARITY_IDENTIFIER and PARITY_PASSWORD.');
   process.exit(2);
-}
-
-/**
- * Every decided path in a JSON value, as `key` / `key[]` / `key[].child`, with the
- * leaf's type. Arrays collapse to their first element — the shape of one row is the
- * shape of the screen. Deliberately identical to the parity harness's copy: two
- * definitions of "shape" would let the recorder and the checker disagree.
- */
-function shape(value, prefix = '', out = new Set()) {
-  if (Array.isArray(value)) {
-    out.add(`${prefix}[]`);
-    if (value.length > 0) shape(value[0], `${prefix}[].`, out);
-    return out;
-  }
-  if (value && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) {
-      const path = prefix + k;
-      const type = Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v;
-      out.add(`${path}:${type}`);
-      shape(v, `${path}.`, out);
-    }
-  }
-  return out;
 }
 
 const login = await fetch(`${ORIGIN}/api/${SLUG}/auth/login`, {

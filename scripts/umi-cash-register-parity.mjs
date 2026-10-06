@@ -36,6 +36,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { missingFrom, nullGaps, shape } from './lib/register-shape.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -173,37 +174,16 @@ async function login(origin) {
 }
 
 /**
- * Every decided path in a JSON value, as `key` / `key[]` / `key[].child`, with the
- * leaf's type. Arrays collapse to their first element: the shape of one row is the
- * shape of the screen, and comparing all 1000 of them is the same answer slower.
+ * Value-vs-null differences (found by `nullGaps`, in ./lib/register-shape.mjs) that
+ * we have looked at and written down. A named list rather than a count, so a NEW
+ * one fails the run.
  */
-function shape(value, prefix = '', out = new Set()) {
-  if (Array.isArray(value)) {
-    out.add(`${prefix}[]`);
-    if (value.length > 0) shape(value[0], `${prefix}[].`, out);
-    return out;
-  }
-  if (value && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) {
-      const path = prefix + k;
-      const type = Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v;
-      out.add(`${path}:${type}`);
-      shape(v, `${path}.`, out);
-    }
-    return out;
-  }
-  return out;
-}
-
-/**
- * A key only counts as missing when the path AND its type are absent. `null` vs
- * `"x"` is a value difference and is reported separately, because `null` is a
- * legitimate answer (a café with no promo has no promo message).
- */
-function missingFrom(expected, actual) {
-  const actualPaths = new Set([...actual].map((p) => p.slice(0, p.lastIndexOf(':'))));
-  return [...expected].filter((p) => !actualPaths.has(p.slice(0, p.lastIndexOf(':'))));
-}
+const ACCEPTED_NULL_GAPS = new Map([
+  [
+    'recentRedemptions[].note',
+    'build-v3 has no note column; one production row ever carried one (the early cash-out marker)',
+  ],
+]);
 
 const get = async (origin, path, token) => {
   const r = await fetch(origin + path, { headers: { Authorization: `Bearer ${token}` } });
@@ -238,6 +218,11 @@ for (const path of ROUTES) {
   if (l.body && n.body) {
     const missing = missingFrom(shape(l.body), shape(n.body));
     if (missing.length) problems.push(`missing in umi-api: ${missing.join(', ')}`);
+
+    const gaps = nullGaps(shape(l.body), shape(n.body)).filter(
+      (path) => !ACCEPTED_NULL_GAPS.has(path),
+    );
+    if (gaps.length) problems.push(`umi-cash sent a value, umi-api sent null: ${gaps.join(', ')}`);
   }
 
   if (problems.length === 0) {
