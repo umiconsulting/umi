@@ -81,3 +81,27 @@ description = "The Centro de Caja design mockups' localStorage key names"
 regexes = [
   '''umi\.cash\.split\.v1''',
 ]
+
+[[allowlists]]
+description = "Container image references pinned to a release git SHA"
+# The runbook records the image a deployment rolled, e.g.
+# `ghcr.io/umiconsulting/umi-api:sha-cb8c3edc67b67831986be094c8812ee4fbd25449`.
+# The identifier before the colon is a repository name and the value after it is a
+# 40-character commit SHA, so `generic-api-key` reads the pair as `key: value` and
+# flags it. It authenticates nothing: the tag is the public commit the image was
+# built from, and the SHA is already in this repository's own history.
+#
+# A PATTERN here rather than the exact value on purpose — the opposite of the
+# entries above. The exact value changes with every deploy, so an exact entry would
+# need re-adding each time an image tag is written down, and the alternative
+# (nobody writes them down) costs more than it protects.
+#
+# `regexTarget` is not the default because the rule reports only the VALUE it
+# isolated, `sha-cb8c3ed…`, without the `ghcr.io/…` that identifies it as one.
+# So the pattern matches the reported secret rather than the line it came from. A
+# credential is not shaped like a `sha-` prefix and forty hex characters, and this
+# is the only shape the repository's release tags take.
+regexTarget = 'secret'
+regexes = [
+  '''sha-[0-9a-f]{40}''',
+]
