@@ -254,8 +254,21 @@ that ships with the register-parity port **reads all three**. Applying the DDL a
 rolls turns the customer list, the customer detail and every scan into a 500. So:
 
 1. **Apply `78_customer_pass_metadata.sql` to production first**, on its own, and read the carry
-   back (expected: `device`/`os` on 1019 of 1048 customers, `pending_tier1` on 7 cards). Additive
-   and inert — nothing reads the columns until the new image is up.
+   back. Additive and inert — nothing reads the columns until the new image is up.
+   ☑ **Executed 2026-10-06 10:26Z.** Measured back: `device`/`os` on **1019 of 1048** customers,
+   `pending_tier1 > 0` on **3** cards (7 carried the key; 4 had already counted down to 0 as their
+   banked rewards were handed over), ledger row `build-v3-78`.
+
+   ⚠️ **STEP 1b, WHICH IS NOT OPTIONAL: bump `EXPECTED_SCHEMA_VERSION` in
+   `apps/umi-api/.env` on the VPS to `build-v3-78` in the same breath.** `/health` compares that
+   variable against the newest `runtime.schema_migration` row, so writing 78 while the env still
+   said 77 turned the production health endpoint into `503 Unready` — `db: true, redis: true`,
+   `schema.compatible: false`. On this run the window was ~2 minutes, it was visible only to
+   `/health` (Caddy, the tills and the dashboard read their own databases and never noticed), and
+   it closed when the deploy recreated the containers with the corrected env. **A near-miss, not
+   a harmless one:** the same mismatch on a monitored or autoscaled target takes the fleet out of
+   rotation. The DDL and the env bump are one step.
+
 2. **Roll the API image** from `main` (the parity port). This is safe with the register still
    unflipped, and it fixes a live defect on its own: the dashboard's Settings → Rewards save
    reaches umi-api today, and the old `upsertRewardConfig` retired **every** active reward row —
@@ -263,6 +276,15 @@ rolls turns the customer list, the customer detail and every scan into a 500. So
    makes the ladder's cycle resolve to the upper tier, so 23 of El Gran Ribera's 592 customers
    read a different cycle number on the dashboard than they did from the till's cache. That is a
    visible change on correct data; tell the owner before it lands.
+   ☑ **Executed 2026-10-06 10:28Z.** `main` at `3baabca`, image
+   `ghcr.io/umiconsulting/umi-api:sha-3baabca214aae68cf440b476744b8090aff54d72`, `/health`
+   `{"status":"ok","state":"Healthy"}`, `schema.compatible: true`. Read back through the live API
+   with a real café credential: `elgranribera`'s Rewards screen answers `active` 7 → capuccino
+   **and `upgrade` 9 → latte o frappe** (it answered `upgrade: null` before), the per-card override
+   on `EGR-6659949340` answers `customReward` **and** `baseReward.rewardName: "Capuccino"`,
+   `device`/`os` are populated from the new columns, and `?days=7` returns a 7-day window.
+   The parity harness is green on **both** cafés — 10 of 10 comparable routes — with the register
+   switch still off.
 3. Flip `CASH_API_ORIGIN` — the register — **but only after the two blockers in
    [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md#what-still-blocks-the-flip) are settled**:
    the cycle cannot be cut short (`REDEEM_BASE` at El Gran Ribera), and the café-wide Google
