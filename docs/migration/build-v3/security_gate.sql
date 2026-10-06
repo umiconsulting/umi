@@ -248,10 +248,25 @@ select * from (values
   -- database also carries pgcrypto, uuid-ossp, pg_stat_statements and (since the
   -- location search) unaccent. A frozen allowlist rots on the first legitimate
   -- addition and then gets ignored, which is worse than no check.
+  --
+  -- ⚠️ THE PROVIDER'S OWN EXTENSIONS ARE EXCLUDED, and that exclusion is a fact
+  -- about the platform, not a concession. A managed Supabase database installs
+  -- pg_net (into public) and supabase_vault (into vault) itself. Measured on both
+  -- the QA project and production on 2026-10-06: they carry exactly those two
+  -- outside pg_catalog/extensions, and nothing else. They come back on any restore,
+  -- so a check that fails on them can never pass on a managed target — it makes the
+  -- cutover's own invariant unsatisfiable instead of safe. Everything OUR DDL
+  -- installs (vector, pgcrypto, pg_trgm, unaccent, uuid-ossp, pg_stat_statements)
+  -- stays in `extensions`, which is what this row is really asserting, and the
+  -- capability check below covers the extensions that actually matter.
+  --
+  -- Add a name here only after confirming the provider manages it. A name our DDL
+  -- could install belongs in the check, not in this list.
   ('no extension installed outside pg_catalog/extensions',
     (select case when count(*)=0 then 'PASS' else 'FAIL' end
        from pg_extension e join pg_namespace n on n.oid = e.extnamespace
-      where n.nspname not in ('pg_catalog','extensions'))),
+      where n.nspname not in ('pg_catalog','extensions')
+        and e.extname not in ('pg_net','supabase_vault'))),
   -- These reach OUT of the database — the network, the filesystem, or a shell. None
   -- has a use in build-v3, and postgres_fdw is the one P7's replay installs on
   -- purpose and must remove afterwards (D8).
