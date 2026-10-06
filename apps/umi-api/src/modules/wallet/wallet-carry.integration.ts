@@ -206,18 +206,44 @@ describe('wallet carry list · the five values the cutover must move intact', ()
   });
 
   /**
-   * 7 · the birthday reward line.
+   * 7 · the birthday reward line — WHOSE birthday it is.
    *
-   * ⚠️ A REGRESSION, not a gap. umi-cash sets `birthdayRewardName` on the Google
-   * pass today, and both builders read it — `google-pass.service.ts:249` and
-   * `apple-pass.builder.ts:265`. The ported `renderData` never selected the
-   * column, so the field arrived undefined and the reward line vanished from
-   * every Android pass. Silent: the pass still renders, one row shorter.
+   * The line belongs to the CUSTOMER, not to the café's settings. Both legacy paths
+   * said so: the bulk Google refresh passed `hasBirthday ? name : null`, the scan
+   * push passed `activeBirthdayReward ? name : null`, and the Apple pass route passed
+   * nothing at all. The first version of this port read the program's configured name
+   * unconditionally, which put "REGALO DE CUMPLEAÑOS" on every pass of a café that has
+   * the feature switched off — reported from a real pass minutes after the Wallet
+   * switch went on, which is how a test that only checked the happy path gets caught.
    */
-  it('7 · the birthday reward name reaches the pass renderer', async () => {
-    const data = await repo.renderData(MERCHANT, CARD);
-    expect(data).not.toBeNull();
-    expect(data!.birthdayRewardName).toBe(BIRTHDAY_REWARD);
+  it('7 · the birthday line appears only for a card that HOLDS an active gift', async () => {
+    // The café has the feature configured… and the customer has no gift.
+    const withoutGift = await repo.renderData(MERCHANT, CARD);
+    expect(withoutGift).not.toBeNull();
+    expect(withoutGift!.birthdayRewardName).toBeNull();
+
+    // …now she has one.
+    const grant = '9f000000-0000-4000-8000-0000000000e7';
+    await pg.query(
+      `INSERT INTO merchant.loyalty_birthday_grant (id, merchant_id, card_id, year, status, expires_at)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'active', now() + interval '30 days')`,
+      [grant, MERCHANT, CARD, new Date().getUTCFullYear()],
+    );
+    const withGift = await repo.renderData(MERCHANT, CARD);
+    expect(withGift!.birthdayRewardName).toBe(BIRTHDAY_REWARD);
+
+    // A redeemed or expired grant is not a gift any more.
+    await pg.query(
+      `UPDATE merchant.loyalty_birthday_grant SET status = 'redeemed' WHERE id = $1::uuid`,
+      [grant],
+    );
+    expect((await repo.renderData(MERCHANT, CARD))!.birthdayRewardName).toBeNull();
+    await pg.query(
+      `UPDATE merchant.loyalty_birthday_grant SET status = 'active', expires_at = now() - interval '1 day' WHERE id = $1::uuid`,
+      [grant],
+    );
+    expect((await repo.renderData(MERCHANT, CARD))!.birthdayRewardName).toBeNull();
+    await pg.query(`DELETE FROM merchant.loyalty_birthday_grant WHERE id = $1::uuid`, [grant]);
   });
 
   /**
