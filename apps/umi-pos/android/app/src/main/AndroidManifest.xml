@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- UmiPOS is a client: every read and write goes through umi-api. Without
+         this permission a release build has no network at all, so the till stops
+         on the recovery card and reports `apiUnavailable` while the API is
+         healthy. The debug and profile manifests declared it; the release one
+         did not. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="UmiPOS"
         android:name="${applicationName}"

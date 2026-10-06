@@ -122,6 +122,21 @@ final class BootstrapController extends ChangeNotifier {
 
   void _setState(BootstrapState next) {
     _state = next;
+    if (_config.developmentDiagnostics) {
+      // A failed bootstrap is otherwise an opaque card, and the card is the
+      // same for several phases. Name the phase, the category and the client's
+      // own identity so the log answers "why did it stop" without a debugger.
+      debugPrint(
+        'umi_pos.bootstrap phase=${next.phase.name} '
+        'category=${next.diagnosticCategory ?? '-'} '
+        'correlation=${next.correlationId ?? '-'} '
+        'clientContract=${_config.release.contractVersion} '
+        'clientVersion=${_config.release.version} '
+        'environment=${_config.environment.name} '
+        'api=${_config.apiBaseUri} '
+        'deviceKey=${_config.deviceKeyKind}',
+      );
+    }
     notifyListeners();
   }
 
