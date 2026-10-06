@@ -1,12 +1,52 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { WalletPassRepository, type AuthenticatedPass } from './wallet-pass.repository';
+import {
+  WalletPassRepository,
+  type AuthenticatedPass,
+  type PassRenderData,
+} from './wallet-pass.repository';
 import { ApplePassBuilder } from './apple-pass.builder';
 import { GooglePassService, type GooglePassData } from './google-pass.service';
+import { resolveRewardProfile, type RewardProfile } from '../../shared/loyalty/reward-profile';
 
 /** What the customer is called on the pass when the café recorded no name. */
 const DEFAULT_CUSTOMER_NAME = 'Cliente';
-/** The stamps threshold used when a café has published no reward. */
-const DEFAULT_REWARD_NAME = 'Recompensa';
+
+/**
+ * The card's reward profile from the rows the repository read: the café's standard
+ * reward (the lower tier a customer may cash out early), its optional upper tier, and
+ * this card's own override. One rule, shared with the scan and the register's screens —
+ * a pass that resolves a ladder differently from the till is a pass that lies.
+ */
+function profileOf(data: PassRenderData): RewardProfile {
+  const row = (r: PassRenderData['ladder']['standard']) =>
+    r && r.stamps_required !== null
+      ? {
+          id: r.id ?? '',
+          visits_required: r.stamps_required,
+          reward_name: r.name,
+          reward_description: r.description,
+        }
+      : null;
+  return resolveRewardProfile(
+    row(data.ladder.standard),
+    row(data.ladder.override),
+    row(data.ladder.upgrade),
+  );
+}
+
+/**
+ * The lower tier, as both builders take it: the reward a customer may cash out
+ * before the cycle completes. Null on a single-reward café, which is every surface
+ * that predates the ladder.
+ */
+function walletBaseReward(profile: RewardProfile) {
+  return profile.baseTier
+    ? {
+        visitsRequired: profile.baseTier.visitsRequired,
+        rewardName: profile.baseTier.rewardName,
+      }
+    : null;
+}
 
 @Injectable()
 export class WalletPassService {
@@ -118,6 +158,7 @@ export class WalletPassService {
   private async googlePassData(merchantId: string, cardId: string): Promise<GooglePassData> {
     const d = await this.repo.renderData(merchantId, cardId);
     if (!d) throw new NotFoundException('card_not_found');
+    const profile = profileOf(d);
     return {
       cardId,
       cardNumber: d.cardNumber,
@@ -126,10 +167,16 @@ export class WalletPassService {
       merchantHandle: d.merchantHandle,
       balanceCentavos: d.state.balance_cents,
       visitsThisCycle: d.state.visits_this_cycle,
-      visitsRequired: d.state.visits_required,
       pendingRewards: d.state.pending_rewards,
       totalVisits: d.state.total_visits,
-      rewardName: d.rewardName ?? DEFAULT_REWARD_NAME,
+      // THE CYCLE'S values, from the resolved profile — not the standard row's. On a
+      // ladder the cycle runs to the UPPER tier, and a pass that draws 9 slots while
+      // naming the lower reward (or vice versa) is how the ladder disappeared from
+      // the customer's phone in the first place.
+      visitsRequired: profile.visitsRequired,
+      rewardName: profile.rewardName,
+      baseReward: walletBaseReward(profile),
+      pendingTier1: d.state.pending_tier1,
       // Both builders read this. Drop it here and the reward line
       // disappears from the pass, with no error anywhere.
       birthdayRewardName: d.birthdayRewardName,
@@ -151,6 +198,7 @@ export class WalletPassService {
   async renderPass(pass: AuthenticatedPass): Promise<RenderedPass> {
     const data = await this.repo.renderData(pass.merchantId, pass.cardId);
     if (!data) throw new NotFoundException();
+    const profile = profileOf(data);
 
     const buffer = await this.builder.build({
       serial: pass.serialNumber,
@@ -163,9 +211,11 @@ export class WalletPassService {
       merchantHandle: data.merchantHandle,
       balanceCentavos: data.state.balance_cents,
       visitsThisCycle: data.state.visits_this_cycle,
-      visitsRequired: data.state.visits_required,
+      visitsRequired: profile.visitsRequired,
       totalVisits: data.state.total_visits,
-      rewardName: data.rewardName ?? DEFAULT_REWARD_NAME,
+      rewardName: profile.rewardName,
+      baseReward: walletBaseReward(profile),
+      pendingTier1: data.state.pending_tier1,
       birthdayRewardName: data.birthdayRewardName,
       passStyle: data.passStyle,
       primaryColor: data.primaryColor,

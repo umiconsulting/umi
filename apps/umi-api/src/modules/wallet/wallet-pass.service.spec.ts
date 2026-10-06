@@ -42,6 +42,18 @@ const RENDER: PassRenderData = {
   topupEnabled: true,
   rewardName: 'Café gratis',
   birthdayRewardName: 'Rebanada de pastel',
+  // A single-reward café: no upper tier, no per-card override. The ladder's own
+  // shapes are covered by reward-tiers.spec.ts and by the live rehearsal.
+  ladder: {
+    standard: {
+      id: 'rc1',
+      name: 'Café gratis',
+      stamps_required: 10,
+      description: null,
+    },
+    upgrade: null,
+    override: null,
+  },
   state: {
     card_number: 'KLC-4076462081',
     total_visits: 23,

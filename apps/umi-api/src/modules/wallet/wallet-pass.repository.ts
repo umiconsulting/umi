@@ -348,16 +348,44 @@ export class WalletPassRepository {
                 -- apple-pass.builder.ts:265). Omitting it here is why the
                 -- Android reward line was empty after the port.
                 p.birthday_reward_name    AS birthday_reward_name,
-                r.name                    AS reward_name
+                -- The café's LADDER, as rows: the standard reward (the lower tier a
+                -- customer may cash out early), the optional upper tier the cycle runs
+                -- to, and this card's own override. Resolved in the service by
+                -- resolveRewardProfile — the same resolution the scan, the register's
+                -- screens and the admin panel use, so a pass cannot disagree with the
+                -- till about what the customer is working toward.
+                std.name                  AS std_name,
+                std.id                    AS std_id,
+                std.stamps_required       AS std_required,
+                std.description           AS std_description,
+                upg.name                  AS upg_name,
+                upg.id                    AS upg_id,
+                upg.stamps_required       AS upg_required,
+                upg.description           AS upg_description,
+                ov.name                   AS ov_name,
+                ov.id::text               AS ov_id,
+                ov.stamps_required        AS ov_required,
+                ov.description            AS ov_description
          FROM merchant.loyalty_card AS c
          JOIN merchant.merchant AS m ON m.id = c.merchant_id
          LEFT JOIN merchant.customer AS cu ON cu.id = c.customer_id
          LEFT JOIN merchant.loyalty_program AS p ON p.merchant_id = c.merchant_id
          LEFT JOIN LATERAL (
-           SELECT name FROM merchant.loyalty_reward
-           WHERE merchant_id = c.merchant_id AND active AND type = 'stamps_free_item'
-           ORDER BY created_at DESC NULLS LAST LIMIT 1
-         ) AS r ON true
+           SELECT id::text, name, stamps_required, description FROM merchant.loyalty_reward
+            WHERE merchant_id = c.merchant_id AND active AND type = 'stamps_free_item'
+              AND kind = 'standard'
+            ORDER BY created_at DESC NULLS LAST LIMIT 1
+         ) AS std ON true
+         LEFT JOIN LATERAL (
+           SELECT id::text, name, stamps_required, description FROM merchant.loyalty_reward
+            WHERE merchant_id = c.merchant_id AND active AND type = 'stamps_free_item'
+              AND kind = 'upgrade'
+            ORDER BY created_at DESC NULLS LAST LIMIT 1
+         ) AS upg ON true
+         -- The per-card override is reached through the card's own column and is never
+         -- active (override rows stay inactive by design).
+         LEFT JOIN merchant.loyalty_reward AS ov
+                ON ov.merchant_id = c.merchant_id AND ov.id = c.reward_override_id
          WHERE c.merchant_id = $1::uuid AND c.id = $2::uuid`,
         [merchantId, cardId],
       ),
@@ -391,8 +419,35 @@ export class WalletPassRepository {
       stripImageUrl: h.strip_image_url,
       promoMessage: activePromo(h),
       topupEnabled: h.topup_enabled ?? true,
-      rewardName: h.reward_name,
+      rewardName: h.std_name,
       birthdayRewardName: h.birthday_reward_name,
+      /** The rows `resolveRewardProfile` needs. Plain, so the service owns the rule. */
+      ladder: {
+        standard: h.std_name
+          ? {
+              id: h.std_id,
+              name: h.std_name,
+              stamps_required: h.std_required,
+              description: h.std_description,
+            }
+          : null,
+        upgrade: h.upg_name
+          ? {
+              id: h.upg_id,
+              name: h.upg_name,
+              stamps_required: h.upg_required,
+              description: h.upg_description,
+            }
+          : null,
+        override: h.ov_name
+          ? {
+              id: h.ov_id,
+              name: h.ov_name,
+              stamps_required: h.ov_required,
+              description: h.ov_description,
+            }
+          : null,
+      },
       state: s,
       locations: locations.rows.map((l) => ({
         latitude: Number(l.lat),
@@ -442,6 +497,17 @@ export interface PassRenderData {
   topupEnabled: boolean;
   rewardName: string | null;
   birthdayRewardName: string | null;
+  /**
+   * The café's ladder plus this card's override, as plain rows. The builders receive
+   * the RESOLVED profile (the cycle's threshold and name, plus the lower tier as
+   * `baseReward`), but the rule that resolves it lives in one place and this is the
+   * data it takes — see `resolveRewardProfile`.
+   */
+  ladder: {
+    standard: LadderRow | null;
+    upgrade: LadderRow | null;
+    override: LadderRow | null;
+  };
   state: LoyaltyCardState;
   locations: { latitude: number; longitude: number }[];
 }
@@ -453,6 +519,14 @@ interface AuthenticatedPassRow {
   card_id: string;
   merchant_id: string;
   card_updated_at: Date;
+}
+
+/** One ladder row as the render reads it: the reward, its threshold, and its id. */
+interface LadderRow {
+  id: string | null;
+  name: string;
+  stamps_required: number | null;
+  description: string | null;
 }
 
 interface PassHeadRow {
@@ -475,8 +549,19 @@ interface PassHeadRow {
   promo_ends_at: Date | null;
   promo_days: string | null;
   topup_enabled: boolean | null;
-  reward_name: string | null;
   birthday_reward_name: string | null;
+  std_name: string | null;
+  std_id: string | null;
+  std_required: number | null;
+  std_description: string | null;
+  upg_name: string | null;
+  upg_id: string | null;
+  upg_required: number | null;
+  upg_description: string | null;
+  ov_name: string | null;
+  ov_id: string | null;
+  ov_required: number | null;
+  ov_description: string | null;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

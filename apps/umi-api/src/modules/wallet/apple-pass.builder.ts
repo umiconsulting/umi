@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import path from 'node:path';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { QrService } from '../../shared/auth/qr.service';
+import { appleFrontFields, profileFromWalletFields } from '../../shared/loyalty/reward-tiers';
 import { formatMxn2 } from '../../shared/format/money';
 import { generateStampStrip, loadAsset } from './stamp-strip';
 
@@ -230,18 +231,22 @@ export class ApplePassBuilder {
     }
 
     if (data.passStyle === 'stamps') {
-      pass.secondaryFields.push({
-        key: 'remaining',
-        label: 'VISITAS FALTANTES',
-        value: `${remaining} visita${remaining !== 1 ? 's' : ''}`,
-        changeMessage: 'Visitas faltantes: %@',
-      });
-      pass.secondaryFields.push({
-        key: 'rewards',
-        label: 'RECOMPENSA',
-        value: data.rewardName,
-        changeMessage: 'Recompensa: %@',
-      });
+      // THE FRONT ROW, decided by the ladder. `appleFrontFields` is ported byte-for-byte
+      // from umi-cash: two columns for a single reward, three on a ladder, with the
+      // upper tier always present as "SEGUNDO NIVEL" and "LISTO PARA CANJEAR" leading
+      // the row once the lower tier is reached. No `changeMessage` on these — a visit
+      // changes several at once and iOS collapses them into a generic notification; the
+      // lifecycle back field is the single notification channel (see the scan).
+      for (const field of appleFrontFields(
+        profileFromWalletFields({
+          visitsRequired: data.visitsRequired,
+          rewardName: data.rewardName,
+          baseReward: data.baseReward,
+        }),
+        data.visitsThisCycle,
+      )) {
+        pass.secondaryFields.push(field);
+      }
       // Néctar Café asked for the member name on the front of the stamps pass.
       if (handle === 'nectarcafe') {
         pass.secondaryFields.push({
@@ -346,6 +351,10 @@ export interface ApplePassData {
   visitsRequired: number;
   totalVisits: number;
   rewardName: string;
+  /** The ladder's LOWER tier, when the café runs one. Null otherwise. */
+  baseReward?: { visitsRequired: number; rewardName: string } | null;
+  /** Banked rewards owed as the lower tier. Only the Google object's copy uses it today. */
+  pendingTier1?: number;
   passStyle: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;

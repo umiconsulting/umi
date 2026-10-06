@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { CustomerTokenService } from '../../shared/auth/customer-token.service';
 import { WalletPassService } from './wallet-pass.service';
 import { generateStampStrip } from './stamp-strip';
+import { parseStripState } from '../../shared/loyalty/reward-tiers';
 
 /** No real loyalty program asks for more stamps than this. */
 const MAX_REQUIRED = 20;
@@ -67,14 +68,12 @@ export class GoogleWalletController {
     @Query('bg') bg: string | undefined,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const match = state.replace(/\.png$/i, '').match(/^(\d+)-(\d+)$/);
-    if (!match) return void reply.status(400).send('Invalid state');
-
-    const required = Number.parseInt(match[2], 10);
-    if (!Number.isInteger(required) || required < 1 || required > MAX_REQUIRED) {
-      return void reply.status(400).send('Invalid required');
-    }
-    const filled = Math.max(0, Math.min(Number.parseInt(match[1], 10), required));
+    // `{filled}-{required}` or `{filled}-{required}-b{base}` on a ladder. The parser is
+    // the same one the pass builder uses to BUILD the state, so a URL the builder emits
+    // is always a URL this route accepts (and rejects the same malformed ones).
+    const parsed = parseStripState(state, MAX_REQUIRED);
+    if (!parsed) return void reply.status(400).send('Invalid state');
+    const { filled, required, bonusFrom } = parsed;
 
     // Background colour, in order: an explicit override, then the café's secondary
     // colour, then transparent — which inherits the card background. The lookup is
@@ -93,6 +92,7 @@ export class GoogleWalletController {
         welcomeStampUrl: `/logos/${handle}-stamp-welcome.png`,
         backgroundColor: background,
         assetBase: this.wallet.assetOrigin(),
+        bonusFrom,
       });
       reply
         .status(200)

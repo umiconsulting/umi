@@ -38,6 +38,19 @@ function make() {
       reward_name: 'Café gratis',
       reward_description: 'Cualquier bebida del menú',
     }),
+    // A single-reward café by default: the card page's `visitsRequired`/
+    // `rewardName` come from the resolved PROFILE (the cycle's values), which is
+    // what the ladder needs and what umi-cash's own card route returned.
+    rewardProfileRows: vi.fn().mockResolvedValue({
+      defaultConfig: {
+        id: 'rc1',
+        visits_required: 10,
+        reward_name: 'Café gratis',
+        reward_description: 'Cualquier bebida del menú',
+      },
+      upgradeConfig: null,
+      overrideConfig: null,
+    }),
   };
   const qr = {
     signQRPayload: vi.fn().mockResolvedValue('signed.jwt.payload'),
@@ -67,11 +80,15 @@ describe('CashCardService.card', () => {
   });
 
   it('reads the threshold that produced the cycle, not a hardcoded ten', async () => {
-    h.scan.activeRewardConfig.mockResolvedValue({
-      id: 'rc2',
-      visits_required: 8,
-      reward_name: 'Postre',
-      reward_description: null,
+    h.scan.rewardProfileRows.mockResolvedValue({
+      defaultConfig: {
+        id: 'rc2',
+        visits_required: 8,
+        reward_name: 'Postre',
+        reward_description: null,
+      },
+      upgradeConfig: null,
+      overrideConfig: null,
     });
 
     const r = await h.svc.card('m1', 'cust-1', 'Kalala Café');
@@ -82,7 +99,11 @@ describe('CashCardService.card', () => {
   });
 
   it('falls back to the default reward when the café configured none', async () => {
-    h.scan.activeRewardConfig.mockResolvedValue(null);
+    h.scan.rewardProfileRows.mockResolvedValue({
+      defaultConfig: null,
+      upgradeConfig: null,
+      overrideConfig: null,
+    });
 
     const r = await h.svc.card('m1', 'cust-1', 'Kalala Café');
 
