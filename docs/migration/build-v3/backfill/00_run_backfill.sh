@@ -12,6 +12,19 @@
 #          LOCAL-ONLY address so a throwaway rehearsal needs no argument — always
 #          set it explicitly for anything a real operator will log in to.
 #
+#   IN-PLACE MODE (managed targets — Supabase, RDS, anything with ONE database):
+#          UMI_BACKFILL_IN_PLACE=<target_db> ./00_run_backfill.sh <target_db>
+#          Skips the drop/create-from-template step and runs the same file list
+#          against the database that already exists. The rehearsal builds an
+#          isolated target out of a snapshot, which a managed target cannot do.
+#          Everything else — the DDL order, the data order, seed_rbac, reconcile —
+#          is IDENTICAL, because every backfill statement is an INSERT … SELECT
+#          inside one database.
+#          Two guards, both deliberate: the name must match the positional target
+#          (a typo cannot silently hit the wrong database), and the run refuses if
+#          the target already carries build-v3 objects unless
+#          UMI_BACKFILL_ALLOW_REAPPLY=1 is set on purpose.
+#
 # ORDER MATTERS. Two ordering rules the hard way:
 #   1. The loyalty VERTICAL (backfill_loyalty_v3) runs FIRST — it is the only
 #      file that seeds merchant.merchant / customer / contact / loyalty_card /
@@ -29,10 +42,48 @@ BOOTSTRAP_EMAIL="${BOOTSTRAP_EMAIL:-bootstrap@localhost.invalid}"
 DDL="$(cd "$(dirname "$0")/.." && pwd)"     # docs/migration/build-v3
 BF="$(cd "$(dirname "$0")" && pwd)"         # .../backfill
 
-echo "== (re)create $DB from template $TEMPLATE =="
-psql -d postgres -tAc "select pg_terminate_backend(pid) from pg_stat_activity where datname in ('$DB','$TEMPLATE') and pid<>pg_backend_pid()" >/dev/null 2>&1 || true
-psql -d postgres -c "drop database if exists $DB"
-psql -d postgres -c "create database $DB template $TEMPLATE"
+if [ -n "${UMI_BACKFILL_IN_PLACE:-}" ]; then
+  # ---- IN PLACE: the database already exists and is the target itself. -------
+  if [ "$UMI_BACKFILL_IN_PLACE" != "$DB" ]; then
+    echo "REFUSING: UMI_BACKFILL_IN_PLACE='$UMI_BACKFILL_IN_PLACE' but the target is '$DB'." >&2
+    echo "          They must match; the guard exists so a typo cannot hit the wrong database." >&2
+    exit 2
+  fi
+  if [ "${UMI_BACKFILL_ALLOW_REAPPLY:-}" != "1" ]; then
+    applied="$(psql -d "$DB" -tAc \
+      "select (to_regclass('merchant.merchant') is not null)::int + (to_regclass('umi.user') is not null)::int")"
+    if [ "${applied:-0}" != "0" ]; then
+      echo "REFUSING: '$DB' already carries build-v3 objects (merchant.merchant / umi.user)." >&2
+      echo "          Re-running the DDL over an applied database is not idempotent." >&2
+      echo "          If that is genuinely what you want, set UMI_BACKFILL_ALLOW_REAPPLY=1." >&2
+      exit 3
+    fi
+  fi
+  cat <<BANNER
+############################################################
+# IN-PLACE BACKFILL against '$DB'
+# No drop, no template, no clone. This database is the target.
+# The legacy schemas are READ (and left intact); the new
+# schemas umi/merchant/runtime are CREATED alongside them.
+############################################################
+BANNER
+  # The source must hold still while it is read. In the rehearsal the snapshot is
+  # static by construction; here it is not, and a writer mid-run produces a target
+  # that disagrees with its source for reasons no gate can see.
+  echo "== writers currently connected (they must be stopped first) =="
+  psql -d "$DB" -tAc "
+    select coalesce(string_agg(distinct usename, ', '), '(none)')
+      from pg_stat_activity
+     where datname = current_database()
+       and pid <> pg_backend_pid()
+       and state <> 'idle'
+       and usename <> 'postgres'"
+else
+  echo "== (re)create $DB from template $TEMPLATE =="
+  psql -d postgres -tAc "select pg_terminate_backend(pid) from pg_stat_activity where datname in ('$DB','$TEMPLATE') and pid<>pg_backend_pid()" >/dev/null 2>&1 || true
+  psql -d postgres -c "drop database if exists $DB"
+  psql -d postgres -c "create database $DB template $TEMPLATE"
+fi
 
 echo "== schema: tables + touch triggers (NO cross-FK yet) =="
 for f in 00_foundation 10_umi 20_merchant 30_runtime 60_triggers; do
