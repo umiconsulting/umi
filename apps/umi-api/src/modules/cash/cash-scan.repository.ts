@@ -69,6 +69,14 @@ export interface PerformScanInput {
   newQrToken: string;
 }
 
+/** One canje, as the revert path reads it. */
+export interface RedemptionRow {
+  id: string;
+  cardId: string;
+  rewardId: string | null;
+  revertedAt: Date | null;
+}
+
 /**
  * What a scan reports back. It is the shared derived state, unchanged — the
  * register and the wallet pass must never disagree about these numbers.
@@ -314,17 +322,9 @@ export class CashScanRepository {
   }
 
   /** One canje, scoped to the café it was made at. */
-  async findRedemption(
-    merchantId: string,
-    redemptionId: string,
-  ): Promise<{
-    id: string;
-    cardId: string;
-    rewardId: string | null;
-    revertedAt: Date | null;
-  } | null> {
+  async findRedemption(merchantId: string, redemptionId: string): Promise<RedemptionRow | null> {
     const { rows } = await this.pg.withMerchant((c) =>
-      c.query<Row>(
+      c.query<RedemptionRow>(
         `SELECT id::text AS id, card_id::text AS "cardId", reward_id::text AS "rewardId",
                 reverted_at AS "revertedAt"
            FROM merchant.loyalty_redemption
@@ -332,7 +332,7 @@ export class CashScanRepository {
         [merchantId, redemptionId],
       ),
     );
-    return (rows[0] as never) ?? null;
+    return rows[0] ?? null;
   }
 
   /**
