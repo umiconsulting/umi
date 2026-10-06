@@ -1,23 +1,64 @@
 # syntax=docker/dockerfile:1
 
-# ── build stage ────────────────────────────────────────────────────────────
 FROM node:22-alpine AS build
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci
-COPY tsconfig*.json nest-cli.json ./
-COPY src ./src
-RUN npm run build
+RUN corepack enable && corepack prepare pnpm@10.29.3 --activate
+ENV npm_config_fetch_retries=5 \
+    npm_config_fetch_retry_maxtimeout=120000 \
+    npm_config_fetch_timeout=300000
+WORKDIR /repo
 
-# ── runtime stage ──────────────────────────────────────────────────────────
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+COPY apps/umi-api/package.json ./apps/umi-api/
+COPY apps/umi-dashboard/package.json ./apps/umi-dashboard/
+COPY apps/umi-landing-page/package.json ./apps/umi-landing-page/
+COPY packages/contract/package.json ./packages/contract/
+COPY packages/tokens/package.json ./packages/tokens/
+RUN --mount=type=cache,id=umipos-pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --filter @umi/api...
+
+COPY packages/contract ./packages/contract
+COPY apps/umi-api ./apps/umi-api
+RUN --mount=type=cache,id=umipos-pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm --filter @umi/contract build \
+ && pnpm --filter @umi/api build \
+ && pnpm --filter=@umi/api --config.inject-workspace-packages=true deploy --prod /out
+
 FROM node:22-alpine AS runtime
+# Release identity is baked at build time (deploy-backend.yml passes the real
+# values). The defaults are VALID placeholders — config.schema.ts regex-checks
+# each value whenever it is set, so an obviously-fake-but-well-formed default
+# keeps a local `docker compose up --build` bootable, while the old
+# `unavailable` defaults failed validation on boot.
+ARG RELEASE_VERSION=development
+ARG RELEASE_GIT_COMMIT=0000000000000000000000000000000000000000
+ARG RELEASE_BUILD_TIMESTAMP=1970-01-01T00:00:00.000Z
+ARG CONTRACT_VERSION=0.0.0
+ENV RELEASE_VERSION=$RELEASE_VERSION \
+    RELEASE_GIT_COMMIT=$RELEASE_GIT_COMMIT \
+    RELEASE_BUILD_TIMESTAMP=$RELEASE_BUILD_TIMESTAMP \
+    CONTRACT_VERSION=$CONTRACT_VERSION
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
-COPY --from=build /app/dist ./dist
-# Run as the unprivileged built-in node user, not root.
+COPY --from=build --chown=node:node /out/dist ./dist
+COPY --from=build --chown=node:node /out/node_modules ./node_modules
+COPY --from=build --chown=node:node /out/package.json ./package.json
+# The Apple pass template.
+# PKPass.from() reads it at render time. apple-pass.builder.ts resolves
+# TEMPLATE_ROOT from process.cwd(), which is /app here.
+# Without this line, /app/passes/apple/template.pass does not exist.
+# Every Apple pass render then throws, at issue time and at each refresh.
+# No test finds this, because no test signs a real pass.
+#
+# Keep this line and the "files" list in package.json together.
+# The list puts passes/ into /out. This line puts it into the image.
+COPY --from=build --chown=node:node /out/passes ./passes
 RUN chown -R node:node /app
+RUN find /app/dist -type f -name '*.map' -delete
+LABEL org.opencontainers.image.title="UMI API" \
+      org.opencontainers.image.version="$RELEASE_VERSION" \
+      org.opencontainers.image.revision="$RELEASE_GIT_COMMIT" \
+      org.opencontainers.image.created="$RELEASE_BUILD_TIMESTAMP"
 USER node
-# Default command is the web process; docker-compose overrides it for the worker.
-CMD ["node", "dist/main.js"]
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 --start-period=20s \
+  CMD node -e "fetch('http://127.0.0.1:3000/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+CMD ["node", "--require", "@opentelemetry/auto-instrumentations-node/register", "dist/main.js"]

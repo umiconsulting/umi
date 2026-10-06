@@ -48,15 +48,11 @@ describe('ZettleAdapter', () => {
         text: async () => 'unavailable',
       }),
     );
-    await expect(adapterWith(WITH_KEY).fetchProducts()).rejects.toThrow(
-      /Zettle API error: 503/,
-    );
+    await expect(adapterWith(WITH_KEY).fetchProducts()).rejects.toThrow(/Zettle API error: 503/);
   });
 
   it('propagates a network error (retryable)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNRESET')));
-    await expect(adapterWith(WITH_KEY).fetchProducts()).rejects.toThrow(
-      'ECONNRESET',
-    );
+    await expect(adapterWith(WITH_KEY).fetchProducts()).rejects.toThrow('ECONNRESET');
   });
 });

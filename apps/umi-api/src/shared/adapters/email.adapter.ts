@@ -40,11 +40,13 @@ export class EmailAdapter {
     html: string;
     text?: string;
     from?: string;
+    /** Where replies go (e.g. the prospect's address on a contact notification). */
+    replyTo?: string;
   }): Promise<{ messageId: string } | null> {
     const transporter = this.getTransporter();
     if (!transporter) return null;
 
-    // No hard-coded sender — a shared adapter must not send under a fixed tenant
+    // No hard-coded sender — a shared adapter must not send under a fixed merchant
     // identity. Require an explicit `from` or the configured EMAIL_FROM; skip
     // (best-effort null) when neither is set so a misconfig fails loud in logs
     // rather than mailing from the wrong domain.
@@ -61,6 +63,7 @@ export class EmailAdapter {
         subject: params.subject,
         html: params.html,
         text: params.text,
+        replyTo: params.replyTo,
       });
       return { messageId: info.messageId };
     } catch (err) {

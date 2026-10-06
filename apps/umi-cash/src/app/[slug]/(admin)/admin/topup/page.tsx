@@ -51,6 +51,12 @@ export default function TopUpPage() {
     success: boolean; message: string; newBalanceMXN?: string; customer?: string;
   } | null>(null);
 
+  // Stable per-top-up idempotency token: reused if the operator re-taps after a lost
+  // response (so the server dedups instead of double-crediting), and reset on success
+  // or whenever the inputs change (a different intended top-up gets a fresh key).
+  const opKeyRef = useRef<string>('');
+  useEffect(() => { opKeyRef.current = ''; }, [cardId, amount, note]);
+
   // Camera state
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -156,9 +162,11 @@ export default function TopUpPage() {
 
   // ── Customer search ───────────────────────────────────────────────────────
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    if (!search.trim()) return;
+  async function handleSearch() {
+    // Guard here, not just on the button's disabled state: the Enter key path
+    // (onKeyDown) doesn't consult it, so without this, holding Enter fires
+    // concurrent searches.
+    if (searchLoading || !search.trim()) return;
     setSearchLoading(true);
     setSearchResults([]);
     try {
@@ -200,14 +208,16 @@ export default function TopUpPage() {
 
       if (amountCentavos < 100) { setResult({ success: false, message: 'El monto mínimo es $1.00 MXN' }); return; }
 
+      if (!opKeyRef.current) opKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: cardId.trim(), amountCentavos, note }),
+        body: JSON.stringify({ cardId: cardId.trim(), amountCentavos, note, idempotencyKey: opKeyRef.current }),
       });
 
       const data = await res.json();
       if (res.ok) {
+        opKeyRef.current = '';
         setResult({ success: true, message: `Recarga exitosa: ${data.amountMXN}`, newBalanceMXN: data.newBalanceMXN, customer: data.customer });
         setCardId(''); setAmount(''); setNote(''); setSelectedCustomer(null);
       } else {
@@ -301,20 +311,24 @@ export default function TopUpPage() {
                 </button>
               )}
 
-              {/* Text search */}
-              <form onSubmit={handleSearch} className="flex gap-2 mb-2">
+              {/* Text search — a div, not a form: this lives inside the top-up form
+                  and a nested <form> is invalid HTML (breaks hydration). Enter is
+                  wired manually and must preventDefault so it doesn't submit the
+                  outer top-up form instead. */}
+              <div className="flex gap-2 mb-2">
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
                   placeholder="Buscar por nombre, teléfono o tarjeta..."
                   className="u-input flex-1"
                   autoFocus={!showCamera}
                 />
-                <button type="submit" disabled={!search.trim() || searchLoading} className="u-btn u-btn-secondary px-4 flex-shrink-0">
+                <button type="button" onClick={() => handleSearch()} disabled={!search.trim() || searchLoading} className="u-btn u-btn-secondary px-4 flex-shrink-0">
                   {searchLoading ? '...' : 'Buscar'}
                 </button>
-              </form>
+              </div>
 
               {searchResults.length > 0 && (
                 <div className="rounded-xl overflow-hidden divide-y" style={{ border: '1px solid var(--color-surface-dark)', borderColor: 'var(--color-surface-dark)' }}>

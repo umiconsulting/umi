@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from './auth.guard';
-import { TenantAccessGuard } from './tenant-access.guard';
+import { MerchantAccessGuard } from './merchant-access.guard';
+import { PlatformAdminGuard } from './platform-admin.guard';
 import { EntitlementGuard } from './entitlement.guard';
 import { RolesGuard } from './roles.guard';
 import { REQUIRE_PRODUCT } from './require-product.decorator';
@@ -24,6 +25,15 @@ function ctxFor(req: Record<string, unknown>): ExecutionContext {
 
 const ACCESS = '00000000-0000-4000-8000-000000000000';
 
+/**
+ * The till-token verifier, wired to nothing. These cases are about the DASHBOARD
+ * cookie; the register credential has its own file, `register-token.guard.spec`,
+ * where the escalation cases live.
+ */
+function noRegisterToken() {
+  return { fromHeader: vi.fn().mockResolvedValue(null) } as never;
+}
+
 describe('AuthGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
@@ -31,68 +41,125 @@ describe('AuthGuard', () => {
     (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
       (k: string) => k === IS_PUBLIC,
     );
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, noRegisterToken());
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
   it('401s when no access cookie is present', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(
-      undefined,
-    );
-    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector);
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const guard = new AuthGuard({ verifyAccess: vi.fn() } as never, reflector, noRegisterToken());
     await expect(guard.canActivate(ctxFor({ cookies: {} }))).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
   it('attaches the principal from a valid cookie', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(
-      undefined,
-    );
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const jwt = {
-      verifyAccess: vi.fn().mockResolvedValue({ sub: 'u1', email: 'a@b.co' }),
+      verifyAccess: vi.fn().mockResolvedValue({
+        sub: 'u1',
+        email: 'a@b.co',
+        sessionId: 'session-1',
+        deviceId: null,
+      }),
     };
-    const guard = new AuthGuard(jwt as never, reflector);
+    const guard = new AuthGuard(jwt as never, reflector, noRegisterToken());
     const req: Record<string, unknown> = { cookies: { umi_access: 'tok' } };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(req.authUser).toEqual({ id: 'u1', email: 'a@b.co' });
+    expect(req.authUser).toEqual({
+      id: 'u1',
+      email: 'a@b.co',
+      sessionId: 'session-1',
+      deviceId: null,
+      commandContextType: 'dashboard_administrative',
+    });
+  });
+
+  it('carries the session and device identity onto the request, with no database read', async () => {
+    // A dashboard access token is valid for its own TTL; revocation takes effect
+    // at the next refresh, where the family is checked and rotated (AB#114).
+    // The guard therefore consults no repository — the POS reads `sessionId`
+    // and `deviceId` straight off the claims.
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+    const guard = new AuthGuard(
+      {
+        verifyAccess: vi.fn().mockResolvedValue({
+          sub: 'u1',
+          email: 'a@b.co',
+          sessionId: 'session-1',
+          deviceId: null,
+        }),
+      } as never,
+      reflector,
+      noRegisterToken(),
+    );
+    const req = { cookies: { umi_access: 'tok' } } as never;
+    await expect(guard.canActivate(ctxFor(req))).resolves.toBe(true);
+    expect((req as { authUser?: unknown }).authUser).toEqual({
+      id: 'u1',
+      email: 'a@b.co',
+      sessionId: 'session-1',
+      deviceId: null,
+      commandContextType: 'dashboard_administrative',
+    });
   });
 });
 
-describe('TenantAccessGuard', () => {
+describe('MerchantAccessGuard', () => {
   it('404s when the user has no active membership', async () => {
     const repo = {
       findMembershipAccess: vi.fn().mockResolvedValue(null),
-      tenantIdForSlug: vi.fn(),
+      merchantIdForHandle: vi.fn(),
     };
-    const guard = new TenantAccessGuard(repo as never);
-    const req = { authUser: { id: 'u1' }, params: { tenantId: ACCESS } };
-    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const guard = new MerchantAccessGuard(repo as never);
+    const req = { authUser: { id: 'u1' }, params: { merchantId: ACCESS } };
+    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('resolves a slug → tenant and attaches membership access', async () => {
+  it('resolves a handle → merchant and attaches membership access', async () => {
     const repo = {
-      tenantIdForSlug: vi.fn().mockResolvedValue(ACCESS),
+      merchantIdForHandle: vi.fn().mockResolvedValue(ACCESS),
       findMembershipAccess: vi.fn().mockResolvedValue({
         membershipId: 'm1',
-        tenantId: ACCESS,
-        slug: 'kala',
+        merchantId: ACCESS,
+        handle: 'kala',
         name: 'Kala',
         timezone: 'America/Mexico_City',
         roles: ['owner'],
         permissions: ['cash.read'],
       }),
     };
-    const guard = new TenantAccessGuard(repo as never);
+    const guard = new MerchantAccessGuard(repo as never);
     const req: Record<string, unknown> = {
       authUser: { id: 'u1' },
-      params: { slug: 'kala' },
+      params: { merchantRef: 'kala' },
     };
     expect(await guard.canActivate(ctxFor(req))).toBe(true);
-    expect(repo.tenantIdForSlug).toHaveBeenCalledWith('kala');
-    expect((req.tenantAccess as { role: string }).role).toBe('owner');
+    expect(repo.merchantIdForHandle).toHaveBeenCalledWith('kala');
+    expect((req.merchantAccess as { role: string }).role).toBe('owner');
+  });
+
+  it('resolves the merchant and location from a POS request body', async () => {
+    const repo = {
+      merchantIdForHandle: vi.fn(),
+      findMembershipAccess: vi.fn().mockResolvedValue({
+        membershipId: 'm1',
+        merchantId: ACCESS,
+        handle: 'kala',
+        name: 'Kala',
+        timezone: 'America/Mexico_City',
+        roles: ['staff'],
+        permissions: ['pos.use'],
+      }),
+    };
+    const guard = new MerchantAccessGuard(repo as never);
+    const req: Record<string, unknown> = {
+      authUser: { id: 'u1' },
+      params: {},
+      body: { merchantId: ACCESS, locationId: ACCESS },
+    };
+    expect(await guard.canActivate(ctxFor(req))).toBe(true);
+    expect(repo.findMembershipAccess).toHaveBeenCalledWith('u1', ACCESS);
   });
 });
 
@@ -100,34 +167,28 @@ describe('EntitlementGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
   it('passes through when no @RequireProduct is set', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(
-      undefined,
-    );
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
     const guard = new EntitlementGuard(reflector, { productStatus: vi.fn() } as never);
     expect(await guard.canActivate(ctxFor({}))).toBe(true);
   });
 
   it('403 product_not_active when the entitlement is inactive', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === REQUIRE_PRODUCT ? 'cash' : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === REQUIRE_PRODUCT ? 'cash' : undefined,
     );
     const repo = { productStatus: vi.fn().mockResolvedValue('canceled') };
     const guard = new EntitlementGuard(reflector, repo as never);
-    const req = { tenantAccess: { tenantId: ACCESS } };
-    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const req = { merchantAccess: { merchantId: ACCESS } };
+    await expect(guard.canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('allows active/trialing entitlements', async () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === REQUIRE_PRODUCT ? 'cash' : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === REQUIRE_PRODUCT ? 'cash' : undefined,
     );
     const repo = { productStatus: vi.fn().mockResolvedValue('trialing') };
     const guard = new EntitlementGuard(reflector, repo as never);
-    expect(
-      await guard.canActivate(ctxFor({ tenantAccess: { tenantId: ACCESS } })),
-    ).toBe(true);
+    expect(await guard.canActivate(ctxFor({ merchantAccess: { merchantId: ACCESS } }))).toBe(true);
   });
 });
 
@@ -135,20 +196,50 @@ describe('RolesGuard', () => {
   const reflector = { getAllAndOverride: vi.fn() } as unknown as Reflector;
 
   it('403s when the membership lacks the required role', () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === ROLES_KEY ? ['owner'] : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === ROLES_KEY ? ['owner'] : undefined,
     );
     const guard = new RolesGuard(reflector);
-    const req = { tenantAccess: { roles: ['staff'], permissions: [] } };
+    const req = { merchantAccess: { roles: ['staff'], permissions: [] } };
     expect(() => guard.canActivate(ctxFor(req))).toThrow(ForbiddenException);
   });
 
   it('allows when a required role is present', () => {
-    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation(
-      (k: string) => (k === ROLES_KEY ? ['owner', 'admin'] : undefined),
+    (reflector.getAllAndOverride as ReturnType<typeof vi.fn>).mockImplementation((k: string) =>
+      k === ROLES_KEY ? ['owner', 'admin'] : undefined,
     );
     const guard = new RolesGuard(reflector);
-    const req = { tenantAccess: { roles: ['admin'], permissions: [] } };
+    const req = { merchantAccess: { roles: ['admin'], permissions: [] } };
     expect(guard.canActivate(ctxFor(req))).toBe(true);
+  });
+});
+
+describe('PlatformAdminGuard', () => {
+  const guard = (platformRole: string | null) =>
+    new PlatformAdminGuard({ platformRole: vi.fn().mockResolvedValue(platformRole) } as never);
+  const req = { authUser: { id: 'u1', email: 'a@b.co' } };
+
+  it('admits a super_admin — the only role that may open a café', async () => {
+    expect(await guard('super_admin').canActivate(ctxFor(req))).toBe(true);
+  });
+
+  it('REFUSES a developer, whose reach is wide and whose authority is read-only', async () => {
+    // The distinction `PLATFORM_GRANT_CTE` exists to preserve. `developer` reaches
+    // every café so debugging is quick, and changes nothing. Treating "holds a
+    // platform grant" as "may create merchants" would erase that on the one route
+    // where no membership check can catch it afterwards.
+    await expect(guard('developer').canActivate(ctxFor(req))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('refuses a login with no platform grant at all', async () => {
+    await expect(guard(null).canActivate(ctxFor(req))).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('401s rather than 403s when nothing authenticated the request', async () => {
+    await expect(guard('super_admin').canActivate(ctxFor({}))).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
   });
 });

@@ -1,0 +1,51 @@
+schemaVersion: 1
+environment: pilot
+conditions:
+  - id: api-unavailable
+    signal: http.readiness
+    condition: failures >= 3 within 2m
+    severity: critical
+  - id: database-unavailable
+    signal: dependency.postgres.ready
+    condition: value == 0 for 1m
+    severity: critical
+  - id: migration-failed
+    signal: deployment.migration.exit_code
+    condition: value != 0
+    severity: critical
+  - id: worker-restart-loop
+    signal: service.worker.restarts
+    condition: increase >= 3 within 10m
+    severity: critical
+  - id: high-api-error-rate
+    signal: http.server.error_ratio
+    condition: value >= 0.05 for 5m and requests >= 20
+    severity: warning
+  - id: redis-unavailable
+    signal: dependency.redis.ready
+    condition: value == 0 for 2m
+    severity: critical
+  - id: object-storage-unavailable
+    signal: dependency.object_storage.ready
+    condition: value == 0 for 5m when enabled
+    severity: warning
+  - id: recovery-backlog
+    signal: recovery.pending_commands
+    condition: value >= 10 for 10m
+    severity: warning
+  - id: hardware-executor-unavailable
+    signal: hardware.executor.ready
+    condition: value == 0 for 5m
+    severity: warning
+  - id: kds-disconnected
+    signal: kds.last_heartbeat_age_seconds
+    condition: value >= 60
+    severity: warning
+  - id: backup-failed
+    signal: backup.exit_code
+    condition: value != 0
+    severity: critical
+  - id: storage-threshold
+    signal: filesystem.available_ratio
+    condition: value <= 0.15 for 5m
+    severity: warning

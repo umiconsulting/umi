@@ -2,10 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ConfigService } from '@nestjs/config';
 import { buildCookieOptions, parseDurationSeconds } from './cookies';
 
-function cfg(values: Record<string, unknown>): ConfigService<
-  Record<string, unknown>,
-  true
-> {
+function cfg(values: Record<string, unknown>): ConfigService<Record<string, unknown>, true> {
   return { get: (k: string) => values[k] } as unknown as ConfigService<
     Record<string, unknown>,
     true
@@ -50,5 +47,16 @@ describe('buildCookieOptions', () => {
   it('omits domain when unset', () => {
     const opts = buildCookieOptions(cfg({ ...base, COOKIE_DOMAIN: undefined }), 'access');
     expect(opts.domain).toBeUndefined();
+  });
+
+  it('drops maxAge (session cookie) when remember is false', () => {
+    for (const kind of ['access', 'refresh', 'csrf'] as const) {
+      expect(buildCookieOptions(cfg(base), kind, false).maxAge).toBeUndefined();
+    }
+  });
+
+  it('keeps maxAge (persistent cookie) when remember is true or default', () => {
+    expect(buildCookieOptions(cfg(base), 'refresh', true).maxAge).toBe(2592000);
+    expect(buildCookieOptions(cfg(base), 'refresh').maxAge).toBe(2592000);
   });
 });

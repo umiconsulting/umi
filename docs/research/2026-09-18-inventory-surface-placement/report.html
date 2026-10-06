@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inventory: where the screen belongs</title>
+    <meta
+      name="description"
+      content="Competitor evidence for the placement of inventory UI across the till, the floor device, and the back office, with the RBAC consequence."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+    <style>
+      :root {
+        --ground: #f4f6f9;
+        --surface: #ffffff;
+        --surface-2: #eef1f6;
+        --line: #dce1e9;
+        --line-strong: #c2cad6;
+        --ink: #101725;
+        --ink-2: #3c4759;
+        --ink-3: #68758a;
+        --till: #c2701a;
+        --till-wash: #fdf1e2;
+        --floor: #0f7d6b;
+        --floor-wash: #e2f4f0;
+        --desk: #1f5fd0;
+        --desk-wash: #e6eefc;
+        --bad: #c0392f;
+        --bad-wash: #fbe9e7;
+        --shadow: 0 1px 2px rgba(16, 23, 37, 0.05), 0 10px 26px -14px rgba(16, 23, 37, 0.2);
+        --maxw: 1080px;
+        --f-display: 'Bricolage Grotesque', system-ui, sans-serif;
+        --f-body: 'IBM Plex Sans', system-ui, sans-serif;
+        --f-mono: 'IBM Plex Mono', ui-monospace, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ground: #0c1219;
+          --surface: #141c26;
+          --surface-2: #1b2531;
+          --line: #26333f;
+          --line-strong: #384856;
+          --ink: #e7edf4;
+          --ink-2: #b0bccb;
+          --ink-3: #7b8998;
+          --till: #e0a049;
+          --till-wash: #2a2013;
+          --floor: #45c2a8;
+          --floor-wash: #0f2622;
+          --desk: #74a5f0;
+          --desk-wash: #132133;
+          --bad: #ef7b70;
+          --bad-wash: #2b1512;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 14px 30px -16px rgba(0, 0, 0, 0.7);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--f-body);
+        font-size: 15.5px;
+        line-height: 1.6;
+        letter-spacing: 0;
+      }
+      .wrap {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* ---------- masthead ---------- */
+      header.masthead {
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+        padding: 56px 0 40px;
+      }
+      .eyebrow {
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin: 0 0 14px;
+      }
+      h1 {
+        font-family: var(--f-display);
+        font-weight: 700;
+        font-size: clamp(30px, 4.4vw, 46px);
+        line-height: 1.1;
+        margin: 0 0 16px;
+        max-width: 20ch;
+      }
+      .lede {
+        font-size: 17.5px;
+        color: var(--ink-2);
+        max-width: 68ch;
+        margin: 0;
+      }
+      .lede strong {
+        color: var(--ink);
+      }
+      .masthead-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 28px;
+        margin-top: 26px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        font-family: var(--f-mono);
+        font-size: 12px;
+        color: var(--ink-3);
+      }
+      .masthead-meta b {
+        color: var(--ink-2);
+        font-weight: 500;
+      }
+
+      /* ---------- sections ---------- */
+      section {
+        padding: 46px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      section:last-of-type {
+        border-bottom: 0;
+      }
+      h2 {
+        font-family: var(--f-display);
+        font-weight: 700;
+        font-size: 25px;
+        line-height: 1.2;
+        margin: 0 0 6px;
+      }
+      .h2note {
+        color: var(--ink-3);
+        font-size: 14px;
+        margin: 0 0 26px;
+        max-width: 72ch;
+      }
+      h3 {
+        font-family: var(--f-display);
+        font-weight: 500;
+        font-size: 17.5px;
+        margin: 32px 0 10px;
+      }
+      p {
+        margin: 0 0 14px;
+        max-width: 74ch;
+      }
+      a {
+        color: var(--desk);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+      }
+      code {
+        font-family: var(--f-mono);
+        font-size: 0.87em;
+        background: var(--surface-2);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* ---------- labels ---------- */
+      .tag {
+        display: inline-block;
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        padding: 2px 7px;
+        border-radius: 3px;
+        border: 1px solid var(--line-strong);
+        color: var(--ink-3);
+        white-space: nowrap;
+        vertical-align: 1px;
+      }
+      .tag.fact {
+        border-color: var(--floor);
+        color: var(--floor);
+      }
+      .tag.inf {
+        border-color: var(--desk);
+        color: var(--desk);
+      }
+      .tag.uv {
+        border-color: var(--till);
+        color: var(--till);
+      }
+
+      /* ---------- three-surface model ---------- */
+      .surfaces {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin: 8px 0 0;
+      }
+      .surface {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--line-strong);
+        border-radius: 6px;
+        padding: 18px 18px 20px;
+        box-shadow: var(--shadow);
+      }
+      .surface.till {
+        border-top-color: var(--till);
+      }
+      .surface.floor {
+        border-top-color: var(--floor);
+      }
+      .surface.desk {
+        border-top-color: var(--desk);
+      }
+      .surface h4 {
+        font-family: var(--f-display);
+        font-size: 16px;
+        margin: 0 0 3px;
+      }
+      .surface .role {
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        color: var(--ink-3);
+        margin: 0 0 14px;
+      }
+      .surface ul {
+        margin: 0 0 16px;
+        padding-left: 17px;
+        font-size: 14.5px;
+      }
+      .surface li {
+        margin-bottom: 5px;
+      }
+      .surface dl {
+        margin: 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 3px 10px;
+        font-size: 13px;
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      .surface dt {
+        color: var(--ink-3);
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+      }
+      .surface dd {
+        margin: 0;
+        color: var(--ink-2);
+      }
+
+      /* ---------- flow arrow ---------- */
+      .flow {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 18px 0 0;
+        font-family: var(--f-mono);
+        font-size: 12px;
+        color: var(--ink-3);
+        flex-wrap: wrap;
+      }
+      .flow i {
+        font-style: normal;
+        color: var(--line-strong);
+      }
+
+      /* ---------- figures ---------- */
+      figure {
+        margin: 22px 0 0;
+      }
+      figure img {
+        width: 100%;
+        height: auto;
+        display: block;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        background: var(--surface);
+      }
+      figcaption {
+        font-size: 13.5px;
+        color: var(--ink-3);
+        margin-top: 9px;
+        max-width: 78ch;
+      }
+      figcaption b {
+        color: var(--ink-2);
+        font-weight: 500;
+      }
+      .cap-label {
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        display: block;
+        margin-bottom: 3px;
+      }
+      .pair {
+        display: grid;
+        grid-template-columns: 1.05fr 1fr;
+        gap: 18px;
+        align-items: start;
+        margin-top: 22px;
+      }
+      .pair figure {
+        margin: 0;
+      }
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+        margin-top: 22px;
+      }
+      .gallery figure {
+        margin: 0;
+      }
+
+      /* ---------- callout ---------- */
+      .callout {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--desk);
+        border-radius: 6px;
+        padding: 16px 20px;
+        margin: 22px 0 0;
+      }
+      .callout.warn {
+        border-left-color: var(--bad);
+        background: var(--bad-wash);
+      }
+      .callout h5 {
+        font-family: var(--f-display);
+        font-size: 15px;
+        margin: 0 0 6px;
+      }
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+
+      /* ---------- quotes ---------- */
+      .quotes {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        margin-top: 22px;
+      }
+      blockquote {
+        margin: 0;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 16px 18px;
+        box-shadow: var(--shadow);
+      }
+      blockquote p {
+        font-size: 15px;
+        margin: 0 0 11px;
+        color: var(--ink);
+      }
+      blockquote footer {
+        font-family: var(--f-mono);
+        font-size: 11.5px;
+        color: var(--ink-3);
+        line-height: 1.5;
+      }
+
+      /* ---------- tables ---------- */
+      .tscroll {
+        overflow-x: auto;
+        margin-top: 20px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 13px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      thead th {
+        font-family: var(--f-mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        font-weight: 500;
+        background: var(--surface-2);
+        white-space: nowrap;
+      }
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      td.mono {
+        font-family: var(--f-mono);
+        font-size: 12.5px;
+        white-space: nowrap;
+      }
+      .pill {
+        display: inline-block;
+        font-family: var(--f-mono);
+        font-size: 10.5px;
+        padding: 1px 7px;
+        border-radius: 999px;
+        border: 1px solid currentColor;
+        white-space: nowrap;
+      }
+      .pill.yes {
+        color: var(--floor);
+      }
+      .pill.no {
+        color: var(--bad);
+      }
+      .pill.part {
+        color: var(--till);
+      }
+
+      /* ---------- matrix ---------- */
+      .matrix td,
+      .matrix th {
+        text-align: center;
+      }
+      .matrix td:first-child,
+      .matrix th:first-child {
+        text-align: left;
+      }
+
+      footer.pagefoot {
+        padding: 34px 0 60px;
+        font-size: 13.5px;
+        color: var(--ink-3);
+      }
+      footer.pagefoot ul {
+        padding-left: 18px;
+        margin: 8px 0 0;
+      }
+      footer.pagefoot li {
+        margin-bottom: 5px;
+        font-family: var(--f-mono);
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .surfaces,
+        .quotes,
+        .gallery,
+        .pair {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="wrap">
+        <p class="eyebrow">Umi research · 2026-09-18</p>
+        <h1>Inventory: where the screen belongs</h1>
+        <p class="lede">
+          Your instinct is correct. Nine competitors were checked, and
+          <strong>no restaurant POS puts inventory management on the till</strong>. The till gets
+          one action: mark this item out. The count happens on the floor with a phone or a tablet.
+          The setup, the cost, and the vendor work live in the back office. Umi has this inverted,
+          and the RBAC vocabulary is what holds the inversion in place.
+        </p>
+        <div class="masthead-meta">
+          <span><b>Products checked</b> 9</span>
+          <span><b>Operator quotes</b> 55</span>
+          <span><b>Official screenshots</b> 8</span>
+          <span
+            ><b>Sources</b> vendor docs, help-centre APIs, App Store, Google Play, Reddit,
+            YouTube</span
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- ================= 1 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>1. The model the market actually uses</h2>
+        <p class="h2note">
+          Inventory is three jobs, not one. Each job has its own surface, its own device, and its
+          own permission. The observed failure in this market is that "count" gets filed under
+          "configure".
+        </p>
+
+        <div class="surfaces">
+          <div class="surface till">
+            <h4>Sell</h4>
+            <p class="role">TILL · any employee</p>
+            <ul>
+              <li>Take the order and the payment</li>
+              <li>Mark an item out of stock</li>
+              <li>Adjust a quantity on hand</li>
+            </ul>
+            <dl>
+              <dt>Time</dt>
+              <dd>Seconds, mid-sale</dd>
+              <dt>Cost data</dt>
+              <dd>Never</dd>
+              <dt>Importance</dt>
+              <dd>Must never block the sale</dd>
+            </dl>
+          </div>
+          <div class="surface floor">
+            <h4>Count</h4>
+            <p class="role">FLOOR · many hands</p>
+            <ul>
+              <li>Count stock at the shelf, the freezer, the bar</li>
+              <li>Record waste</li>
+              <li>Receive a delivery</li>
+              <li>Save progress and resume later</li>
+            </ul>
+            <dl>
+              <dt>Time</dt>
+              <dd>Minutes, standing</dd>
+              <dt>Cost data</dt>
+              <dd>No</dd>
+              <dt>Device</dt>
+              <dd>Phone or tablet, camera or scanner</dd>
+            </dl>
+          </div>
+          <div class="surface desk">
+            <h4>Configure</h4>
+            <p class="role">DESK · owner and manager</p>
+            <ul>
+              <li>Item, recipe, and unit conversion</li>
+              <li>Vendor, purchase order, and invoice</li>
+              <li>Costing, variance, and margin</li>
+              <li>Count sheet and policy setup</li>
+            </ul>
+            <dl>
+              <dt>Time</dt>
+              <dd>Hours, scheduled</dd>
+              <dt>Cost data</dt>
+              <dd>Yes, this is the point</dd>
+              <dt>Device</dt>
+              <dd>Desktop browser</dd>
+            </dl>
+          </div>
+        </div>
+
+        <div class="flow">
+          <span>TILL</span><i>→</i><span>FLOOR</span><i>→</i><span>DESK</span>
+          <i>·</i>
+          <span>A person crosses the three. A permission must cross them too.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 2 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>2. The proof: the till has no inventory tab</h2>
+        <p class="h2note">
+          Lightspeed is the only vendor in the set that publishes its product screens in the open
+          help centre. The two captures below are from the same product, on the same day.
+          <span class="tag fact">Documented fact</span>
+        </p>
+
+        <div class="pair">
+          <figure>
+            <span class="cap-label">The till</span>
+            <img
+              src="assets/lightspeed-pos-order-screen.png"
+              alt="Lightspeed POS order screen. The bottom navigation holds Register, Tables, Orders, Customers, Receipts, and Settings. The left panel holds the open client, the centre holds menu groups, and the right holds the item tiles. There is no inventory destination anywhere on the screen."
+            />
+            <figcaption>
+              <b>The till order screen.</b> The bottom navigation is complete: Register, Tables,
+              Orders, Customers, Receipts, Settings. Six destinations, and inventory is not one of
+              them. The operator here sells. A count cannot start from this device without leaving
+              the sale. <br /><br />
+              Source:
+              <a
+                href="https://k-series-support.lightspeedhq.com/hc/en-us/articles/1260804657089-Understanding-discounts"
+                >Lightspeed help centre, Understanding discounts</a
+              >.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <span class="cap-label">The back office</span>
+            <img
+              src="assets/lightspeed-bo-inventory-main.png"
+              alt="Lightspeed Back Office Inventory hub. The left navigation reads Inventory, Stock management, Produce, Purchase, and Reports. A Back office link sits above them. The page body welcomes the user to the new home of Inventory."
+            />
+            <figcaption>
+              <b>The Back Office Inventory hub.</b> Five destinations, one level deep, in a
+              persistent left rail on a desktop window: Inventory, Stock management, Produce,
+              Purchase, Reports. The product's own words are "the new home of Inventory".
+              <br /><br />
+              Source:
+              <a
+                href="https://k-series-support.lightspeedhq.com/hc/en-us/articles/4407517428891-About-Inventory"
+                >Lightspeed help centre, About Inventory</a
+              >.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="callout">
+          <h5>Read the two screens together</h5>
+          <p>
+            The same vendor, the same day, two products. The till has six destinations built for
+            service. The back office has an inventory hub with five of its own. Lightspeed did not
+            put inventory on the till <em>and</em> put it in the back office. It chose one place,
+            and the place is the desk.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 3 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>3. What the desk screens look like</h2>
+        <p class="h2note">
+          Same product, back office. Note the shape: dense tables, list-detail panes, desktop
+          widths, and status as colour chips. This is an office surface, and it is built for a
+          keyboard and a mouse. <span class="tag fact">Documented fact</span>
+        </p>
+
+        <div class="gallery">
+          <figure>
+            <span class="cap-label">Stock count</span>
+            <img
+              src="assets/lightspeed-bo-stock-count-list.png"
+              alt="A stock count in progress. A list of item names with current quantity and counted quantity fills the left pane. A right pane shows one selected item, Americano, with a minus and plus stepper and a total of two units, plus a Review stock count button and a Save next item button."
+            />
+            <figcaption>
+              <b>A count, mid-flight.</b> List-detail layout. The left pane is the item list with
+              current versus counted quantity. The right pane is the stepper for one item. A
+              progress counter reads <code>6/221</code>, and the primary action is
+              <em>Save, next item</em>.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <span class="cap-label">Purchase orders</span>
+            <img
+              src="assets/lightspeed-bo-purchase-orders.png"
+              alt="The Purchase orders table. Columns are status, order number, supplier, placed on, delivery date, supplier invoice, and total. Status values include Delivered, Cancelled, Placed, Received, and Draft. The left rail holds Purchase orders, Recurring orders, Stock transfers, and Suppliers."
+            />
+            <figcaption>
+              <b>Purchase orders.</b> Seven columns of commercial data, a status chip per row, and a
+              supplier invoice column. The navigation beneath Purchase holds Purchase orders,
+              Recurring orders, Stock transfers, and Suppliers.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <span class="cap-label">Stock levels</span>
+            <img
+              src="assets/lightspeed-bo-stock-levels.png"
+              alt="The Stock levels page of Lightspeed Back Office, showing a table of stock items and their levels."
+            />
+            <figcaption>
+              <b>Stock levels.</b> The read view of what is on hand, across the whole catalogue.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <span class="cap-label">Suppliers</span>
+            <img
+              src="assets/lightspeed-bo-suppliers.png"
+              alt="The Suppliers main page of Lightspeed Back Office, listing suppliers."
+            />
+            <figcaption>
+              <b>Suppliers.</b> The vendor record. There is no reason for this to be reachable from
+              a till.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <span class="cap-label">Recipes</span>
+            <img
+              src="assets/lightspeed-bo-recipe-create.png"
+              alt="The Create recipe page of Lightspeed Back Office, with fields for the recipe and its ingredients."
+            />
+            <figcaption>
+              <b>Recipe authoring.</b> The recipe is a costing object. It belongs where the cost is.
+            </figcaption>
+          </figure>
+
+          <figure>
+            <span class="cap-label">Item detail</span>
+            <img
+              src="assets/lightspeed-bo-item-details.png"
+              alt="The Inventory item details page of Lightspeed Back Office, with the attributes of one stock item."
+            />
+            <figcaption>
+              <b>Item detail.</b> Unit, packing format, and the attributes that decide how the stock
+              is deducted.
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 4 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>4. Where each vendor puts it</h2>
+        <p class="h2note">
+          Nine products. The column that matters is the second one. Seven of the nine keep the
+          record off the till. One of the two exceptions is a retail product, and the other is
+          undocumented.
+        </p>
+
+        <div class="tscroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Where the record lives</th>
+                <th>Named screens</th>
+                <th>Device</th>
+                <th>Permission gate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Toast</b></td>
+                <td>
+                  <span class="pill no">Web + thin till</span> Real inventory is xtraCHEF, a
+                  separate product
+                </td>
+                <td>Update Stock, Food waste tracker, Bill Pay Vendors, Quick Edit on POS</td>
+                <td>Desktop web, till, phone</td>
+                <td class="mono">Inventory &amp; Quantity</td>
+              </tr>
+              <tr>
+                <td><b>Square</b></td>
+                <td>
+                  <span class="pill part">Both</span> Receiving and counts in the retail POS app;
+                  overview, orders, vendors in the Dashboard
+                </td>
+                <td>Stock overview, Receive stock, Stock counts, Purchase orders</td>
+                <td>iPad, iPhone, desktop</td>
+                <td class="mono">item and inventory permissions</td>
+              </tr>
+              <tr>
+                <td><b>Lightspeed K</b></td>
+                <td><span class="pill yes">Back Office</span> The whole Inventory module</td>
+                <td>Stock counts, Stock levels, Purchase orders, Suppliers, Recipes</td>
+                <td>Desktop web, multi-device count</td>
+                <td class="mono">Integrations and customers</td>
+              </tr>
+              <tr>
+                <td><b>Shopify</b></td>
+                <td>
+                  <span class="pill yes">Admin</span> POS reads it; Stocky adds store-side receiving
+                </td>
+                <td>Purchase orders, Transfers, Stocktake</td>
+                <td>Desktop web, tablet POS, phone app</td>
+                <td class="mono">Manage inventory (excluding transfers)</td>
+              </tr>
+              <tr>
+                <td><b>Loyverse</b></td>
+                <td>
+                  <span class="pill part">Both</span> Advanced Inventory is Back Office, and a paid
+                  tier
+                </td>
+                <td>Inventory Count, Purchase Orders, Transfers, Valuation</td>
+                <td>Mobile app plus Back Office</td>
+                <td>Tier gate, not a role</td>
+              </tr>
+              <tr>
+                <td><b>TouchBistro</b></td>
+                <td><span class="pill yes">Separate product</span></td>
+                <td>Counts, recipes, waste, suggested ordering</td>
+                <td>Multi-manager count</td>
+                <td><span class="tag uv">UNVERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><b>SpotOn</b></td>
+                <td><span class="pill yes">Back of House</span></td>
+                <td>Adjustment Reasons, Requisition Groups, Label Printing</td>
+                <td><span class="tag uv">UNVERIFIED</span></td>
+                <td><span class="tag uv">UNVERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><b>Revel</b></td>
+                <td>
+                  <span class="pill yes">Management Console</span> The POS holds one availability
+                  action
+                </td>
+                <td>Stocktake, Physical Inventory, Purchase Orders, Item Availability on POS</td>
+                <td><span class="tag uv">UNVERIFIED</span></td>
+                <td><span class="tag uv">UNVERIFIED</span></td>
+              </tr>
+              <tr>
+                <td><b>Clover</b></td>
+                <td>
+                  <span class="tag uv">UNVERIFIED</span> Item definition only, in the reachable
+                  sources
+                </td>
+                <td>Item definition</td>
+                <td>Clover devices</td>
+                <td><span class="tag uv">UNVERIFIED</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="h2note" style="margin-top: 16px">
+          Sources and per-product sections:
+          <a href="2026-09-18-inventory-ui-ux-surfaces.md">inventory UI/UX surfaces</a>.
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= 5 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>5. What the operators say</h2>
+        <p class="h2note">
+          Fifty-five distinct reviews and posts were read. The corpus names a place for the count
+          every time, and the place is never the till. These four quotes carry the whole argument.
+          <span class="tag fact">Documented fact</span>
+        </p>
+
+        <div class="quotes">
+          <blockquote>
+            <p>
+              "Our company is switching to a new inventory software that has the ability to enter
+              inventory into an iPad as you count instead of writing it down then entering it into a
+              computer… It still takes around 6 hours to count the entire building, and that won't
+              change."
+            </p>
+            <footer>
+              r/KitchenConfidential, 2023-02-01 · a general manager<br />
+              The device shortens the data entry. It does not shorten the walk.
+            </footer>
+          </blockquote>
+
+          <blockquote>
+            <p>
+              "I only moved to clover to be able to manage everything from my phone, and now I'm
+              being told I have to do everything from my laptop, who carries their laptop around all
+              day!"
+            </p>
+            <footer>Apple App Store, Clover Go, 1 star, 2020-04-22</footer>
+          </blockquote>
+
+          <blockquote>
+            <p>
+              "The app is an extension of an incredible online software. The app is almost marketman
+              light which allows us at the restaurant to handle simple task like taking inventory,
+              scanning and ordering. The software itself on the laptop does all the heavy lifting."
+            </p>
+            <footer>
+              Apple App Store, MarketMan, 5 stars, 2023-10-20<br />
+              The same product also holds a 1-star review that says the opposite. Both reviewers
+              accept the same split.
+            </footer>
+          </blockquote>
+
+          <blockquote>
+            <p>
+              "Everything's pretty great except I want staff to have access to inventory but not all
+              the reports."
+            </p>
+            <footer>
+              Apple App Store, Shopify Point of Sale, 4 stars, 2025-12-01<br />
+              This is the requirement in one sentence. Split the permission, not the person.
+            </footer>
+          </blockquote>
+        </div>
+
+        <h3>The failure mode to design against</h3>
+        <div class="quotes">
+          <blockquote>
+            <p>
+              "Always always always closes when finishing an inventory and you lose all info you
+              just spent hours counting. The app is absolute garbage. Only use on computer as it
+              won't crash."
+            </p>
+            <footer>Apple App Store, xtraCHEF, 1 star, 2023-10-16</footer>
+          </blockquote>
+          <blockquote>
+            <p>
+              "Don't use this app if you're in a rush… Unless you remember to save your counts every
+              five minutes in the app, your best bet would be walking around with a computer and
+              using the actual website."
+            </p>
+            <footer>Apple App Store, MarketMan, 1 star, 2021-11-27</footer>
+          </blockquote>
+        </div>
+
+        <div class="callout warn">
+          <h5>A lost count is the worst outcome in this category</h5>
+          <p>
+            Two vendors publish a partial save, and two reviews describe the loss of a hours-long
+            count as the reason the product failed. Umi already has the durable machinery for this:
+            the count is a command, and the stock ledger is append-only. The surface that must never
+            lose work is the floor surface.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 6 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>6. The permission names, verbatim</h2>
+        <p class="h2note">
+          Vendors name the permission, and the name states the surface. Shopify has no inventory
+          permission on the POS role at all. Toast allows exactly one inventory action on the till.
+          <span class="tag fact">Documented fact</span>
+        </p>
+
+        <div class="tscroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Vendor</th>
+                <th>Permission, exactly</th>
+                <th>What the vendor says it allows</th>
+                <th>Surface</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Shopify</b></td>
+                <td class="mono">Manage inventory (excluding transfers)</td>
+                <td>
+                  "This permission allows users to create, track, import, and export inventory.
+                  Allows users to edit inventory quantities, SKUs, and barcodes."
+                </td>
+                <td>Store (admin)</td>
+              </tr>
+              <tr>
+                <td><b>Shopify</b></td>
+                <td class="mono">Manage transfers / Manage shipments</td>
+                <td>"This permission allows users to create and update inventory transfers."</td>
+                <td>Store (admin)</td>
+              </tr>
+              <tr>
+                <td><b>Toast</b></td>
+                <td class="mono">Inventory &amp; Quantity</td>
+                <td>
+                  "Gives access to quick edit mode on the Toast POS app where the employee can mark
+                  a menu item or modifier option as In Stock or Out of Stock, or adjust the quantity
+                  on hand."
+                </td>
+                <td>POS, one action</td>
+              </tr>
+              <tr>
+                <td><b>Square</b></td>
+                <td class="mono">Standard / Enhanced / Full</td>
+                <td>
+                  "Permissions define what your team members can see or do within your Square Point
+                  of Sale, the Square Team app, Square Dashboard, and the Square Dashboard app."
+                </td>
+                <td>Both, one model</td>
+              </tr>
+              <tr>
+                <td><b>MarginEdge</b></td>
+                <td class="mono">Shared Device Mode</td>
+                <td>
+                  "allows you to set up a phone or tablet that your team can use to view recipes,
+                  upload invoices, take inventory, and record waste — all without accessing
+                  sensitive financial information."
+                </td>
+                <td>Floor device, PIN not account</td>
+              </tr>
+              <tr>
+                <td><b>Lightspeed</b></td>
+                <td class="mono">Show product costs</td>
+                <td>Separate from stock. Cost is its own permission.</td>
+                <td>Back office</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Why one dashboard role model strains</h3>
+        <p>
+          The sources name the failure directly. NIST SP 800-162 describes a static role model under
+          a changing rule set as
+          <em
+            >"numerous roles that are ad hoc and limited in membership, leading to what is often
+            termed 'role explosion'"</em
+          >, and adds that
+          <em
+            >"failure to remove or revoke access over time leads to users accumulating
+            privileges."</em
+          >
+          The OWASP Authorization Cheat Sheet goes further, with a section heading that is itself
+          the rule: <em>"Prefer Attribute and Relationship Based Access Control over RBAC."</em>
+          <span class="tag fact">Documented fact</span>
+        </p>
+
+        <div class="callout">
+          <h5>Square is the live example of the cost</h5>
+          <p>
+            One Square permission set applies to the point of sale, the Team app, the Dashboard, and
+            the Dashboard app. That is easy to explain. It is also the model that makes an owner
+            read a permission list written for two very different surfaces at once.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 7 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>7. What Umi does today, and why the RBAC holds it there</h2>
+        <p class="h2note">
+          This is the part that answers your second question. The dashboard does not merely "juggle"
+          RBAC. The permission vocabulary is shaped for a till session, so the dashboard cannot gate
+          a costing screen with an inventory key.
+        </p>
+
+        <h3>The seeded role matrix</h3>
+        <div class="tscroll">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th><code>inventory.read</code></th>
+                <th>inventory keys, total</th>
+                <th>Full count and approve</th>
+                <th><code>merchant.manage</code></th>
+                <th>Can open till Inventory</th>
+                <th>Can author in Dashboard</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>owner</b></td>
+                <td><span class="pill yes">yes</span></td>
+                <td>21</td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill yes">yes</span></td>
+              </tr>
+              <tr>
+                <td><b>manager</b></td>
+                <td><span class="pill yes">yes</span></td>
+                <td>20</td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill no">no</span></td>
+              </tr>
+              <tr>
+                <td><b>supervisor</b></td>
+                <td><span class="pill yes">yes</span></td>
+                <td>8</td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill no">no</span></td>
+              </tr>
+              <tr>
+                <td><b>cashier</b></td>
+                <td><span class="pill yes">yes</span></td>
+                <td>1</td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill no">no</span></td>
+              </tr>
+              <tr>
+                <td><b>viewer</b></td>
+                <td><span class="pill yes">yes</span></td>
+                <td>2</td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill no">no</span></td>
+                <td><span class="pill yes">yes</span></td>
+                <td><span class="pill no">no</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="h2note" style="margin-top: 14px">
+          Read from <code>docs/migration/build-v3/35_pos_pilot_rbac.sql</code> (the role grants) and
+          <code>apps/umi-dashboard/src/lib/module-registry.js</code> (the screen gates).
+          <span class="tag fact">Documented fact</span>
+        </p>
+
+        <h3>The three defects this produces</h3>
+
+        <div class="callout warn">
+          <h5>1. The manager runs inventory on the till, and cannot run it in the dashboard</h5>
+          <p>
+            The <code>manager</code> role carries <b>twenty</b> inventory permissions: count create,
+            submit, reconcile, approve, adjust up and down, waste, damage, quarantine, restock,
+            production. It does not carry <code>merchant.manage</code>. The dashboard's Inventario
+            tab is gated on <code>merchant.manage</code>. So the person whose job inventory is has
+            the full toolkit on the device built for serving guests, and no authoring screen on the
+            device built for office work.
+          </p>
+        </div>
+
+        <div class="callout warn">
+          <h5>2. Every role, including the cashier, sees an Inventory entry on the till</h5>
+          <p>
+            The till entry is <code>showInventory =&gt; permissions.allows('inventory.read')</code>,
+            and every seeded role carries <code>inventory.read</code>. A cashier opens the surface
+            and finds the read shell. Toast gives the equivalent employee one action and one
+            permission named for that action. Umi gives a whole screen and lets the permission
+            trimming happen inside it.
+          </p>
+        </div>
+
+        <div class="callout warn">
+          <h5>3. The costing screen had to abandon the inventory vocabulary</h5>
+          <p>
+            The comment on the <code>inventory-costing</code> module says it plainly: the screen
+            gates on <code>merchant.manage</code>,
+            <em>"not by an <code>inventory.*</code> key"</em>, because
+            <em
+              >"an <code>inventory.*</code> key is carried only by POS operator sessions, which
+              would make the screen unreachable from the console."</em
+            >
+            That is the role explosion in miniature. The vocabulary ran out of room, and the
+            fallback was a broader permission than the task needs.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 8 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>8. The split to move to</h2>
+        <p class="h2note">
+          Nothing here needs a new product. The pieces exist. The change is which surface owns each
+          one, and which permission names the door.
+        </p>
+
+        <div class="surfaces">
+          <div class="surface till">
+            <h4>Till — keep, and shrink</h4>
+            <p class="role">UmiPOS · any operator</p>
+            <ul>
+              <li>Mark an item out of stock</li>
+              <li>Read on-hand for the item on screen</li>
+              <li>Open a count only when the shift has no open sale</li>
+            </ul>
+            <dl>
+              <dt>New name</dt>
+              <dd><code>inventory.availability.set</code></dd>
+              <dt>Remove</dt>
+              <dd>Count approve, production, item detail, history list</dd>
+            </dl>
+          </div>
+          <div class="surface floor">
+            <h4>Floor — build this</h4>
+            <p class="role">tablet or phone · many hands</p>
+            <ul>
+              <li>Blind count, resumable, blind across devices</li>
+              <li>Waste and damage entry</li>
+              <li>Receive a delivery</li>
+              <li>Camera or barcode scan</li>
+            </ul>
+            <dl>
+              <dt>Entry</dt>
+              <dd><code>inventory.count.enter</code></dd>
+              <dt>Close</dt>
+              <dd><code>inventory.count.reconcile</code>, manager only</dd>
+            </dl>
+          </div>
+          <div class="surface desk">
+            <h4>Desk — move this in</h4>
+            <p class="role">Dashboard · owner and manager</p>
+            <ul>
+              <li>Item, recipe, conversion, allergen authoring</li>
+              <li>Vendor, purchase order, invoice</li>
+              <li>Costing, variance, margin</li>
+              <li>Count sheet and policy setup</li>
+            </ul>
+            <dl>
+              <dt>Gate</dt>
+              <dd><code>inventory.manage</code>, held by owner and manager</dd>
+              <dt>Cost</dt>
+              <dd>Its own key, <code>inventory.cost.read</code></dd>
+            </dl>
+          </div>
+        </div>
+
+        <h3>The four rules behind the split</h3>
+        <div class="tscroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  Keep the frequent action on the main surface. Do not put a workflow command in a
+                  settings page.
+                </td>
+                <td>Microsoft Windows design guidelines</td>
+              </tr>
+              <tr>
+                <td>
+                  Put the rare, infrequently changed task on its own surface, because the user must
+                  suspend the main task to reach it.
+                </td>
+                <td>Apple Human Interface Guidelines, Settings</td>
+              </tr>
+              <tr>
+                <td>
+                  Split the action, not the person: a non-manager may enter a count, and only a
+                  manager may open or close it.
+                </td>
+                <td>MarginEdge role documentation</td>
+              </tr>
+              <tr>
+                <td>Set the default to deny, and require a written reason for each grant.</td>
+                <td>OWASP Authorization Cheat Sheet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <h5>The one-line answer to your question</h5>
+          <p>
+            Inventory does not belong in the POS as a screen. It belongs in the POS as one small
+            action, "this item is out". The count belongs on the floor device. The setup, the
+            costing, and the vendor work belong in the dashboard. The permission model has to cross
+            all three, because the same manager uses more than one of them.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 9 ================= -->
+    <section>
+      <div class="wrap">
+        <h2>9. What is not verified</h2>
+        <p class="h2note">
+          These are the gaps. They are named rather than filled.
+          <span class="tag uv">UNVERIFIED</span>
+        </p>
+        <div class="tscroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Why it is open</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Clover inventory screens, device, and permission</td>
+                <td>The help centre is a custom application with redirecting article URLs</td>
+              </tr>
+              <tr>
+                <td>TouchBistro screen names and permission</td>
+                <td>Help centre returns HTTP 401 on every route</td>
+              </tr>
+              <tr>
+                <td>SpotOn and Revel screen contents</td>
+                <td>JavaScript shells, live and in the archive</td>
+              </tr>
+              <tr>
+                <td>Lightspeed L-Series inventory surface</td>
+                <td>Only the K-Series was verified</td>
+              </tr>
+              <tr>
+                <td>Square's per-level inventory label</td>
+                <td>The current support page names the levels, not the inventory toggle</td>
+              </tr>
+              <tr>
+                <td>G2 and Capterra content</td>
+                <td>
+                  IP-blocked from this workstation. The App Store and Google Play corpora were used
+                  instead
+                </td>
+              </tr>
+              <tr>
+                <td>Official inventory screenshots for eight of the nine products</td>
+                <td>
+                  Each vendor keeps the back office behind a login. Lightspeed is the exception
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="pagefoot">
+      <div class="wrap">
+        <p>
+          <b>Method.</b> Primary sources only: vendor documentation and help centres, public
+          help-centre JSON APIs, the official sitemaps, the Apple App Store and Google Play review
+          corpora, official YouTube walkthroughs, and the standards bodies. Every claim in the
+          source files carries one label: documented fact, source-backed tradeoff, inference, or
+          UNVERIFIED. Tools: <code>curl</code> 8.5.0, Obscura over CDP for JavaScript walls,
+          <code>r.jina.ai</code> as a text proxy, and the Zendesk help-centre API.
+        </p>
+        <p><b>Source files.</b></p>
+        <ul>
+          <li>
+            2026-09-18-inventory-ui-ux-surfaces.md — the per-product surface and screen evidence
+          </li>
+          <li>
+            2026-09-18-inventory-operator-evidence.md — 55 operator reviews, posts, and walkthroughs
+          </li>
+          <li>
+            2026-09-18-inventory-ux-principles-and-rbac.md — the platform, ERP, and RBAC sources
+          </li>
+          <li>assets/INDEX.md — the screenshot attribution and the capture failures</li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

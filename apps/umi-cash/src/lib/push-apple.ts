@@ -134,13 +134,18 @@ export async function sendApplePushUpdate(cardId: string): Promise<{ sent: numbe
   if (registrations.length === 0) { console.log(`[APN] No registered devices for card ${cardId}`); return { sent: 0, failed: 0 }; }
 
   console.log(`[APN] Sending push to ${registrations.length} device(s) for card ${cardId}`);
-  let sent = 0, failed = 0;
-  for (const reg of registrations) {
-    const ok = await sendPush(token, reg.push_token!, passTypeId);
-    ok ? sent++ : failed++;
-    console.log(`[APN] Push to ${reg.push_token!.slice(0, 8)}...: ${ok ? 'success' : 'failed'}`);
-  }
-  return { sent, failed };
+  // One card's devices go out concurrently: each push already carries its own 10s
+  // ceiling, so awaiting them in series made the worst case 10s × devices. sendPush
+  // resolves a boolean and never rejects, so Promise.all cannot short-circuit here.
+  const outcomes = await Promise.all(
+    registrations.map(async (reg) => {
+      const ok = await sendPush(token, reg.push_token!, passTypeId);
+      console.log(`[APN] Push to ${reg.push_token!.slice(0, 8)}...: ${ok ? 'success' : 'failed'}`);
+      return ok;
+    }),
+  );
+  const sent = outcomes.filter(Boolean).length;
+  return { sent, failed: outcomes.length - sent };
 }
 
 /**

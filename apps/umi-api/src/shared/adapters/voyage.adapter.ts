@@ -20,6 +20,11 @@ export class VoyageAdapter {
 
   constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
+  /** The embedding model these vectors were produced with (persisted alongside). */
+  get embeddingModel(): string {
+    return EMBEDDING_MODEL;
+  }
+
   /** Embed many texts in one call. Returns vectors in input order, or null. */
   async generateEmbeddings(
     texts: string[],
@@ -54,18 +59,14 @@ export class VoyageAdapter {
           if (res.status >= 500 || res.status === 429) {
             throw new Error(`Voyage ${res.status}: ${body}`);
           }
-          this.logger.error(
-            `voyage_api_error status=${res.status} ${body.slice(0, 200)}`,
-          );
+          this.logger.error(`voyage_api_error status=${res.status} ${body.slice(0, 200)}`);
           return null;
         }
         return (await res.json()) as VoyageResponse;
       });
 
       if (!data) return null;
-      return [...data.data]
-        .sort((a, b) => a.index - b.index)
-        .map((d) => d.embedding);
+      return [...data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
     } catch (err) {
       this.logger.error(
         `voyage_generate_embeddings_failed: ${(err as Error)?.message} ` +

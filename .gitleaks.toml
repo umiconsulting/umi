@@ -1,0 +1,107 @@
+# Secret scanning for CI (`lint` workflow) and for local runs.
+#
+# WHY THIS EXISTS. GitHub gives PUBLIC repositories secret scanning and push
+# protection for free; PRIVATE repositories on the free plan get neither. This
+# repository is going private, which is right — it carries the platform
+# architecture, the build-v3 DDL and the security gate — but it means the safety
+# net that would BLOCK a credential at push time disappears on the same day.
+# So the scan moves in here.
+#
+# It is not hypothetical. On 2026-08-07 the (then public) umiconsulting/umi-cash
+# repository was found to hold `passes/apple/certificates/signerKey.pem` in HEAD:
+# an unencrypted RSA private key, beside its certificate and the WWDR chain — a
+# complete, working kit for signing Apple Wallet passes as Umi. Push protection
+# is exactly the control that stops that at the moment of the push, rather than
+# months later during an unrelated audit.
+#
+# Run it the same way CI does:
+#   gitleaks git --no-banner --redact --exit-code 1 --log-opts="--all"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Allowlist. Keep this SHORT and SPECIFIC.
+#
+# Every entry is a place we have decided a match is not a secret. A broad rule
+# here (a whole directory, a whole file type) silently disarms the scanner for
+# everything that lands there later, which is how a real key gets through a
+# check that reports green. Prefer an exact value over a path, and a path over
+# a pattern.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Test fixtures that are hashes, not credentials"
+# A SHA-256 digest used as a fake `tokenHash` in an auth unit-test mock
+# (apps/umi-api/src/modules/auth/auth.service.spec.ts). It is high-entropy hex,
+# so `generic-api-key` matches it, but it authenticates nothing.
+#
+# Matched by VALUE rather than by path or commit on purpose: a path allowlist
+# would blind the scanner to a real secret pasted into that same spec file, and
+# a commit allowlist breaks the moment history is rebased.
+regexes = [
+  '''75da00f6378d098bbe2e19dd7ce73a633c0f0f56aa876e9741e37974f1e68ed9''',
+]
+
+[[allowlists]]
+description = "Test idempotency keys (UUIDs) in dashboard device specs"
+# Fixed `idempotencyKey` UUIDs asserted in
+# apps/umi-dashboard/src/data.devices.spec.jsx. The `key` in `idempotencyKey`
+# plus the high-entropy UUID trips `generic-api-key`, but these are request
+# de-duplication ids in a unit test, not credentials. Allowlisted by exact
+# value (not by path) so a real secret pasted into that same spec is still caught.
+regexes = [
+  '''38f9cfe6-4777-4e3c-b7bc-fe16522b3024''',
+  '''b0f8e0a2-9a1e-4c3e-9c1a-0d7d7a5f7f11''',
+]
+
+[[allowlists]]
+description = "Integration-test harness JWT secret"
+# `JWT_SECRET` stands up a ConfigService for the Mercado Pago Point refund suite
+# (apps/umi-api/src/modules/tender/point-refund.integration.ts). The value is a fixed,
+# obviously-fake literal that only has to clear the config schema's >= 16 character
+# floor; it authenticates nothing outside that suite's own process, and the suite
+# builds the vendor's refund against a disposable database. The word `SECRET` in the
+# variable name plus the length is what trips `generic-api-key`.
+#
+# Allowlisted by exact value, not by path, so a real credential pasted into that same
+# suite is still caught.
+regexes = [
+  '''point-refund-harness-secret-0000''',
+]
+
+[[allowlists]]
+description = "The Centro de Caja design mockups' localStorage key names"
+# `const KEY = 'umi.cash.split.v1'` in docs/design/centro-de-caja/split.html. The
+# identifier is `KEY` and the value is a namespaced `localStorage` key, so
+# `generic-api-key` matches it, but it opens nothing: the mockup writes the split
+# state to the browser it is opened in.
+#
+# Allowlisted by exact value, not by path, so a real credential pasted into that
+# same mockup is still caught.
+regexes = [
+  '''umi\.cash\.split\.v1''',
+]
+
+[[allowlists]]
+description = "Container image references pinned to a release git SHA"
+# The runbook records the image a deployment rolled, e.g.
+# `ghcr.io/umiconsulting/umi-api:sha-cb8c3edc67b67831986be094c8812ee4fbd25449`.
+# The identifier before the colon is a repository name and the value after it is a
+# 40-character commit SHA, so `generic-api-key` reads the pair as `key: value` and
+# flags it. It authenticates nothing: the tag is the public commit the image was
+# built from, and the SHA is already in this repository's own history.
+#
+# A PATTERN here rather than the exact value on purpose — the opposite of the
+# entries above. The exact value changes with every deploy, so an exact entry would
+# need re-adding each time an image tag is written down, and the alternative
+# (nobody writes them down) costs more than it protects.
+#
+# `regexTarget` is not the default because the rule reports only the VALUE it
+# isolated, `sha-cb8c3ed…`, without the `ghcr.io/…` that identifies it as one.
+# So the pattern matches the reported secret rather than the line it came from. A
+# credential is not shaped like a `sha-` prefix and forty hex characters, and this
+# is the only shape the repository's release tags take.
+regexTarget = 'secret'
+regexes = [
+  '''sha-[0-9a-f]{40}''',
+]

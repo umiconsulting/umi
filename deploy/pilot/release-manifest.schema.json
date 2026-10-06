@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://umi.example/schemas/pilot-release-manifest-v1.json",
+  "title": "UmiPOS pilot release manifest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "releaseVersion",
+    "gitCommit",
+    "buildTimestamp",
+    "environment",
+    "contractVersion",
+    "configurationSchemaVersion",
+    "migration",
+    "artifacts",
+    "compatibility"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "releaseVersion": { "type": "string", "minLength": 1 },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "buildTimestamp": { "type": "string", "format": "date-time" },
+    "environment": { "enum": ["staging", "pilot", "production"] },
+    "contractVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "configurationSchemaVersion": { "type": "string", "pattern": "^\\d+$" },
+    "migration": { "type": "object" },
+    "artifacts": { "type": "object" },
+    "compatibility": { "type": "object" }
+  },
+  "additionalProperties": false
+}

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   ArrowRight,
@@ -9,16 +9,21 @@ import {
   MonitorDot,
   Radar,
   Utensils,
-} from "lucide-react";
-import { motion } from "framer-motion";
-import Link from "next/link";
+} from 'lucide-react';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 const PRODUCTS = [
-  { name: "ConversaFlow", note: "Pedidos WhatsApp", icon: MessageSquareText, tone: "text-[#8FD2C0]" },
-  { name: "KDS", note: "Cocina en vivo", icon: ChefHat, tone: "text-[#F1C66B]" },
-  { name: "Cash", note: "Lealtad y wallet", icon: Gift, tone: "text-[#F08D74]" },
-  { name: "Dashboard", note: "Dueños y gerencia", icon: MonitorDot, tone: "text-[#BFD1F2]" },
-  { name: "Logs", note: "Observabilidad", icon: Radar, tone: "text-[#D7C7FF]" },
+  {
+    name: 'ConversaFlow',
+    note: 'Pedidos WhatsApp',
+    icon: MessageSquareText,
+    tone: 'text-[#8FD2C0]',
+  },
+  { name: 'KDS', note: 'Cocina en vivo', icon: ChefHat, tone: 'text-[#F1C66B]' },
+  { name: 'Cash', note: 'Lealtad y wallet', icon: Gift, tone: 'text-[#F08D74]' },
+  { name: 'Dashboard', note: 'Dueños y gerencia', icon: MonitorDot, tone: 'text-[#BFD1F2]' },
+  { name: 'Logs', note: 'Observabilidad', icon: Radar, tone: 'text-[#D7C7FF]' },
 ];
 
 const Hero = () => {
@@ -64,8 +69,8 @@ const Hero = () => {
             transition={{ duration: 0.8, delay: 0.55 }}
             className="text-[16px] sm:text-[17px] leading-[1.62] text-[rgba(20,33,66,0.72)] max-w-[600px] mb-8 font-semibold"
           >
-            Una suite para restaurantes que convierte conversaciones de WhatsApp en trabajo
-            visible: tickets, estados, recompensas, tableros y trazas.
+            Una suite para restaurantes que convierte conversaciones de WhatsApp en trabajo visible:
+            tickets, estados, recompensas, tableros y trazas.
           </motion.p>
 
           <motion.div
@@ -105,8 +110,8 @@ const Hero = () => {
                   <span className="live-pill">KDS</span>
                 </div>
                 <div className="pipeline">
-                  {["Recibido", "Cocina", "Listo"].map((item, index) => (
-                    <span key={item} className={index < 2 ? "active" : ""}>
+                  {['Recibido', 'Cocina', 'Listo'].map((item, index) => (
+                    <span key={item} className={index < 2 ? 'active' : ''}>
                       {item}
                     </span>
                   ))}

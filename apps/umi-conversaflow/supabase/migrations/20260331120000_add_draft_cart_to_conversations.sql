@@ -1,2 +1,0 @@
-ALTER TABLE public.conversations
-ADD COLUMN IF NOT EXISTS draft_cart JSONB DEFAULT NULL;

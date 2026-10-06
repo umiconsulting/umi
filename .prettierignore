@@ -1,0 +1,52 @@
+# Dependencies & build outputs
+**/node_modules/
+**/dist/
+**/.next/
+**/build/
+**/coverage/
+**/.turbo/
+**/.vercel/
+**/.dart_tool/
+
+# Generated / lockfiles
+pnpm-lock.yaml
+**/package-lock.json
+**/*.tsbuildinfo
+**/next-env.d.ts
+packages/contract/generated/
+
+# The contract artifact. Emitted byte-for-byte by packages/contract/scripts/generate.mjs
+# and guarded by `generate:check`, which compares exact bytes. Prettier reformatting it
+# would make the drift gate fail against its own generator.
+packages/contract/generated/
+
+# Captured evidence + generated diagrams. These are ARTIFACTS of a run, kept so a
+# past result stays auditable. Reformatting them edits the evidence, and the raw
+# audit log is a 309K single-line-heavy JSON dump nobody reads as source.
+docs/migration/build-v3/security-audit-2026-07-12.raw.json
+docs/migration/build-v3/schema_diagram.html
+
+# Per-developer local files. Untracked, so CI never sees them — but without this
+# `pnpm format:check` is red on a clean checkout for whoever has them, and a gate
+# that is red for reasons the repo cannot fix teaches people to ignore it.
+**/.claude/settings.local.json
+.mcp.json
+
+# FROZEN app — do not reformat until the dashboard cutover
+apps/umi-cash/
+
+# Agent procedure layer — AUTHORED markdown, not generated code.
+# 343 of the repo's 648 Prettier offenders (53%) live here. Prettier's Markdown
+# printer would reflow prose, tables and code fences across every skill purely to
+# satisfy a formatter that has never run on them — churn with no reader benefit,
+# and it would fight the .agents -> .claude/skills symlink invariant that
+# adapter-sync-check guards. Skills are edited as prose; leave them as written.
+# (.claude/skills is a symlink INTO this directory, so one rule covers both.)
+.agents/skills/
+
+# NOTE: Markdown IS formatted. `docs/` and the root .md files are covered by
+# Prettier like any other source. The one carve-out is `.agents/skills/` above,
+# which is excluded for the symlink invariant, not for being prose.
+
+# Lingui compiled catalogs (generated)
+apps/umi-dashboard/src/locales/**/*.mjs

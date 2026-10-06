@@ -46,11 +46,16 @@ export default function MessagesPage() {
 
   async function load() {
     setLoading(true);
-    const qs = new URLSearchParams({ page: String(page), limit: '50' });
-    if (filter) qs.set('journey', filter);
-    const res = await authedFetch(slug, `/api/${slug}/admin/messages?${qs}`);
-    if (res.ok) setData(await res.json());
-    setLoading(false);
+    try {
+      const qs = new URLSearchParams({ page: String(page), limit: '50' });
+      if (filter) qs.set('journey', filter);
+      const res = await authedFetch(slug, `/api/${slug}/admin/messages?${qs}`);
+      if (res.ok) setData(await res.json());
+    } catch {
+      // Network/parse failure — fall through so the spinner always clears.
+    } finally {
+      setLoading(false);
+    }
   }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;

@@ -1,0 +1,668 @@
+import { Injectable } from '@nestjs/common';
+import { PgService } from '../../shared/database/pg.service';
+import { HAS_PLATFORM_GRANT, PLATFORM_GRANT_CTE } from '../auth/rbac.sql';
+import type { SegmentThresholdsDto } from './dto/update-settings.dto';
+
+export interface MerchantSummary {
+  id: string;
+  /** The published URL key. Null for a café created after cutover — route by `id`. */
+  handle: string | null;
+  name: string;
+  timezone: string | null;
+  roles: string[];
+}
+
+export interface ProductInstance {
+  status: string;
+  locationId: string | null;
+  config: Record<string, unknown>;
+}
+
+export interface LocationRow {
+  id: string;
+  name: string;
+  timezone: string | null;
+  status: string;
+}
+
+/**
+ * LocationRow + the location-resolution profile fields (Phase 2) + the physical
+ * place: where the branch is and where its pin sits.
+ *
+ * `lat`/`lng` are `numeric` in the schema, which node-postgres hands back as a
+ * STRING to protect precision it cannot know is unneeded. Every read below casts
+ * to `float8` so this interface can honestly say `number` — a coordinate that
+ * arrives as "20.673600" renders in an input as text and compares wrong against
+ * a geocoder's answer.
+ */
+export interface LocationProfileRow extends LocationRow {
+  aliases: string[];
+  descriptor: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/** What `updateLocation` accepts. Absent = untouched; null = cleared. */
+export interface LocationPatch {
+  name?: string;
+  timezone?: string;
+  status?: string;
+  aliases?: string[];
+  descriptor?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/** What a new branch needs. Only the name is required; a café may not have a pin yet. */
+export interface NewLocation {
+  name: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string | null;
+}
+
+/**
+ * Merchant/location/product reads + admin writes. Merchant-scoped queries run on the
+ * request path after MerchantAccessGuard set the RLS context, so they go through
+ * `withMerchant` (umi_app, RLS) while still carrying explicit `merchant_id`
+ * predicates (defense in depth). The cross-merchant `/me/merchants` list and product
+ * ENTITLEMENTS use the worker pool — the latter is MANDATORY because entitlements
+ * live in the SEALED `umi` schema (no umi_app USAGE on `umi`).
+ *
+ * build-v3 model: core.tenants -> merchant.merchant, core.locations -> merchant.location,
+ * core.product_instances -> the entitlement cluster read via
+ * `umi.effective_entitlement` (merchant granularity — no location_id),
+ * RBAC -> the `merchant.staff` employment joined to the `umi.role` catalog. One
+ * employment per (user, merchant), so one role — roles still come back as an array,
+ * because a super_admin is tagged from a different source.
+ */
+/** The plan key named at provisioning does not exist, or is not sellable. */
+export class UnknownPlanError extends Error {
+  constructor(readonly plan: string) {
+    super(`No active plan with key '${plan}'.`);
+  }
+}
+
+/** `seed_rbac.sql` never ran, so there is no café role to make anyone a member. */
+export class MissingRoleCatalogError extends Error {
+  constructor() {
+    super('The café role catalogue is empty — run seed_rbac.sql.');
+  }
+}
+
+export interface ProvisionInput {
+  name: string;
+  city?: string;
+  timezone?: string;
+  plan: string;
+  trialEndsAt?: string;
+  cardPrefix: string;
+  primaryColor: string;
+  secondaryColor?: string;
+  adminEmail: string;
+  adminName: string;
+  passwordSalt: string;
+  passwordHash: string;
+  stampsRequired: number;
+  rewardName: string;
+  locations?: { name: string; address?: string; latitude?: number; longitude?: number }[];
+}
+
+@Injectable()
+export class MerchantsRepository {
+  constructor(private readonly pg: PgService) {}
+
+  /**
+   * OPEN A CAFÉ — nine rows, one transaction, or none of them.
+   *
+   * Replaces umi-cash `POST /api/umi/tenants`, which wrote the same shape across
+   * nine legacy tables. Two of those tables are gone: `tenant_memberships` and
+   * `membership_roles` collapsed into `merchant.staff`, which IS the membership
+   * in build-v3 — `findMembershipAccess` reads exactly that row.
+   *
+   * THE WORKER POOL, deliberately. Every RLS policy keys on
+   * `app.current_merchant`, and the merchant being created does not exist yet, so
+   * there is no scope to set. Isolation here is the `PlatformAdminGuard`, not the
+   * database.
+   *
+   * ⚠️ ENTITLEMENTS ARE NOT WRITTEN. `umi.effective_entitlement` is a VIEW over
+   * `subscription → plan_feature → feature`; the plan decides the products. A row
+   * inserted "to grant a product" would be invisible to every read.
+   */
+  async provisionMerchant(input: ProvisionInput): Promise<{ merchantId: string; userId: string }> {
+    return this.pg.workerTx(async (c) => {
+      const plan = await c.query<{ id: string }>(
+        `SELECT id::text FROM umi.plan WHERE key = $1 AND status = 'active'`,
+        [input.plan],
+      );
+      if (!plan.rows[0]) throw new UnknownPlanError(input.plan);
+
+      // The café role the owner gets. It is a CATALOGUE row, not something this
+      // route creates: `seed_rbac.sql` seeds owner/admin/staff/viewer. A build
+      // that skipped the seed has none, and a café with no role is a café nobody
+      // can administer — so say that rather than failing on a foreign key.
+      const role = await c.query<{ id: string }>(
+        `SELECT id::text FROM umi.role WHERE key = 'admin' AND NOT is_platform`,
+      );
+      if (!role.rows[0]) throw new MissingRoleCatalogError();
+
+      const merchant = await c.query<{ id: string }>(
+        `INSERT INTO merchant.merchant (name, city, timezone, brand_color, secondary_color, status)
+         VALUES ($1, $2, coalesce($3, 'America/Mexico_City'), $4, $5, 'active')
+         RETURNING id::text`,
+        [
+          input.name,
+          input.city ?? null,
+          input.timezone ?? null,
+          input.primaryColor,
+          input.secondaryColor ?? null,
+        ],
+      );
+      const merchantId = merchant.rows[0].id;
+
+      await c.query(
+        `INSERT INTO merchant.loyalty_program
+           (merchant_id, card_prefix, self_registration, stamps_per_reward,
+            primary_color, secondary_color)
+         VALUES ($1::uuid, $2, true, $3, $4, $5)`,
+        [
+          merchantId,
+          input.cardPrefix,
+          input.stampsRequired,
+          input.primaryColor,
+          input.secondaryColor ?? null,
+        ],
+      );
+
+      await c.query(
+        `INSERT INTO merchant.loyalty_reward (merchant_id, name, type, stamps_required, active)
+         VALUES ($1::uuid, $2, 'stamps_free_item', $3, true)`,
+        [merchantId, input.rewardName, input.stampsRequired],
+      );
+
+      // `trialing` until the date given, `active` with no end otherwise. The
+      // status is what `effective_entitlement` filters on, so a café whose trial
+      // is recorded any other way silently owns no products.
+      await c.query(
+        `INSERT INTO umi.subscription (merchant_id, plan_id, status, current_period_end)
+         VALUES ($1::uuid, $2::uuid, $3, $4)`,
+        [
+          merchantId,
+          plan.rows[0].id,
+          input.trialEndsAt ? 'trialing' : 'active',
+          input.trialEndsAt ?? null,
+        ],
+      );
+
+      for (const loc of input.locations ?? []) {
+        await c.query(
+          `INSERT INTO merchant.location (merchant_id, name, address, lat, lng, status)
+           VALUES ($1::uuid, $2, $3, $4, $5, 'active')`,
+          [merchantId, loc.name, loc.address ?? null, loc.latitude ?? null, loc.longitude ?? null],
+        );
+      }
+
+      const user = await c.query<{ id: string }>(
+        `INSERT INTO umi."user"
+           (email, full_name, password_salt, password_hash, password_algorithm, status)
+         VALUES ($1, $2, $3, $4, 'scrypt-sha256-v1', 'active')
+         RETURNING id::text`,
+        [input.adminEmail, input.adminName, input.passwordSalt, input.passwordHash],
+      );
+      const userId = user.rows[0].id;
+
+      // THE MEMBERSHIP. `merchant.staff` is what makes this person a member of
+      // this café — `findMembershipAccess` joins it and nothing else.
+      await c.query(
+        `INSERT INTO merchant.staff (merchant_id, user_id, role_id, name, email, status)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'active')`,
+        [merchantId, userId, role.rows[0].id, input.adminName, input.adminEmail],
+      );
+
+      return { merchantId, userId };
+    });
+  }
+
+  /**
+   * Active memberships for the authed user (the `/me/merchants` list). Single role
+   * per (login, merchant). A global super_admin (any active super_admin edge) sees
+   * EVERY active merchant, tagged with its explicit role where one exists.
+   */
+  async merchantsForUser(userId: string): Promise<MerchantSummary[]> {
+    const { rows } = await this.pg.query<MerchantSummary>(
+      `WITH ${PLATFORM_GRANT_CTE}
+       SELECT
+         t.id::text AS "id",
+         t.handle   AS "handle",
+         t.name     AS "name",
+         t.timezone AS "timezone",
+         COALESCE(array_agg(r.key) FILTER (WHERE r.key IS NOT NULL),
+                  ARRAY[(SELECT platform_role FROM sa)]) AS "roles"
+       FROM merchant.merchant AS t
+       LEFT JOIN merchant.staff AS s
+         ON s.merchant_id = t.id AND s.user_id = $1::uuid AND s.status = 'active'
+       LEFT JOIN umi.role AS r ON r.id = s.role_id
+       WHERE t.status = 'active'
+         AND (s.id IS NOT NULL OR ${HAS_PLATFORM_GRANT})
+       GROUP BY t.id, t.handle, t.name, t.timezone
+       ORDER BY t.name`,
+      [userId],
+    );
+    return rows;
+  }
+
+  /**
+   * Merchant-level product entitlements — the SINGLE SOURCE is the derived
+   * `umi.effective_entitlement` view (same source the EntitlementGuard reads), so
+   * the capabilities map and per-request gating can never disagree. Each `enabled`
+   * feature becomes a product keyed by `feature_key`, carrying the café's real
+   * subscription status (joined from `umi.subscription`). Read on the WORKER pool
+   * (BYPASSRLS): the view is `security_invoker`, so the explicit `merchant_id`
+   * predicate — not RLS — scopes it. `locationId` stays null (merchant-grained) and
+   * `config` is `{}` (build-v3 carries no per-product config in this view).
+   */
+  async loadProducts(merchantId: string): Promise<Record<string, ProductInstance>> {
+    const { rows } = await this.pg.query<{
+      productKey: string;
+      status: string;
+    }>(
+      `SELECT ee.feature_key AS "productKey", s.status
+         FROM umi.effective_entitlement AS ee
+         JOIN umi.subscription          AS s ON s.merchant_id = ee.merchant_id
+        WHERE ee.merchant_id = $1::uuid
+          AND ee.enabled
+        ORDER BY ee.feature_key`,
+      [merchantId],
+    );
+    return Object.fromEntries(
+      rows.map((r) => [r.productKey, { status: r.status, locationId: null, config: {} }]),
+    );
+  }
+
+  /**
+   * Merchant branding for the dashboard settings/theming payload. build-v3 keeps
+   * branding as TYPED columns on `merchant.merchant` (`brand_color`,
+   * `secondary_color`, `logo_url` — "add columns rather than a catch-all blob").
+   * Runs on the RLS app pool (`withMerchant`) with an explicit `merchant_id`
+   * predicate, like the other merchant reads.
+   */
+  async loadBranding(merchantId: string): Promise<{
+    brandColor: string | null;
+    secondaryColor: string | null;
+    businessDayStart: string | null;
+    segmentThresholds: Record<string, unknown>;
+  }> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{
+        brandColor: string | null;
+        secondaryColor: string | null;
+        businessDayStart: string | null;
+        segmentThresholds: Record<string, unknown> | null;
+      }>(
+        `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor",
+                business_day_start::text AS "businessDayStart",
+                segment_thresholds AS "segmentThresholds"
+         FROM merchant.merchant
+         WHERE id = $1::uuid
+         LIMIT 1`,
+        [merchantId],
+      ),
+    );
+    const row = rows[0];
+    return {
+      brandColor: row?.brandColor ?? null,
+      secondaryColor: row?.secondaryColor ?? null,
+      businessDayStart: row?.businessDayStart ?? null,
+      segmentThresholds: row?.segmentThresholds ?? {},
+    };
+  }
+
+  /**
+   * Just the owner-tuned segment cutoffs (jsonb), for the Customer-360 KPI path.
+   * Empty object when unset — the caller merges it over the code defaults.
+   */
+  async loadSegmentThresholds(merchantId: string): Promise<Record<string, unknown>> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ segmentThresholds: Record<string, unknown> | null }>(
+        `SELECT segment_thresholds AS "segmentThresholds"
+         FROM merchant.merchant WHERE id = $1::uuid LIMIT 1`,
+        [merchantId],
+      ),
+    );
+    return rows[0]?.segmentThresholds ?? {};
+  }
+
+  /** Locations with the (merchant) timezone, oldest first (merchant-neutral, deterministic). */
+  async loadLocations(merchantId: string): Promise<LocationRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<LocationRow>(
+        `SELECT l.id::text, l.name, t.timezone, l.status
+         FROM merchant.location AS l
+         JOIN merchant.merchant AS t ON t.id = l.merchant_id
+         WHERE l.merchant_id = $1::uuid
+         ORDER BY l.created_at ASC, l.id ASC`,
+        [merchantId],
+      ),
+    );
+    return rows;
+  }
+
+  /**
+   * Resolve the effective location id for a merchant: the requested active
+   * location, else the default active one — the OLDEST active location
+   * (created_at, then id). Merchant-neutral and deterministic: no hardcoded location
+   * name (locations can be renamed/deleted; the platform is multi-merchant). Null
+   * when the merchant has no active location.
+   */
+  async resolveLocationId(
+    merchantId: string,
+    requestedLocationId: string | null,
+  ): Promise<string | null> {
+    if (requestedLocationId) {
+      const loc = await this.findActiveLocation(merchantId, requestedLocationId);
+      if (loc) return loc.id;
+      // Stale/invalid requested id (renamed/deleted/wrong merchant) → fall through
+      // to the deterministic default rather than returning null (which would make
+      // hours resolve merchant-wide instead of at the canonical active location).
+    }
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ id: string }>(
+        `SELECT id::text AS id
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND status = 'active'
+         ORDER BY created_at ASC, id ASC
+         LIMIT 1`,
+        [merchantId],
+      ),
+    );
+    return rows[0]?.id ?? null;
+  }
+
+  /** Verify a location belongs to the merchant and is active. */
+  async findActiveLocation(merchantId: string, locationId: string): Promise<LocationRow | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<LocationRow>(
+        `SELECT id::text, name, NULL::text AS timezone, status
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         LIMIT 1`,
+        [merchantId, locationId],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Worker-pool (BYPASSRLS) variant of resolveLocationId — for the unauthenticated
+   * WhatsApp path, which has no member user and so can't use withMerchant. MUST use
+   * the SAME merchant-neutral resolution as the dashboard (oldest active location),
+   * so the bot reads hours at the SAME location_id the dashboard wrote.
+   */
+  async resolveLocationIdWorker(
+    merchantId: string,
+    requestedLocationId: string | null,
+  ): Promise<string | null> {
+    if (requestedLocationId) {
+      const { rows } = await this.pg.query<{ id: string }>(
+        `SELECT id::text AS id
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid AND id = $2::uuid AND status = 'active'
+         LIMIT 1`,
+        [merchantId, requestedLocationId],
+      );
+      if (rows[0]) return rows[0].id;
+      // Stale/invalid requested id → fall through to the deterministic default
+      // (must mirror resolveLocationId so the bot reads at the same location the
+      // dashboard writes).
+    }
+    const { rows } = await this.pg.query<{ id: string }>(
+      `SELECT id::text AS id
+       FROM merchant.location
+       WHERE merchant_id = $1::uuid AND status = 'active'
+       ORDER BY created_at ASC, id ASC
+       LIMIT 1`,
+      [merchantId],
+    );
+    return rows[0]?.id ?? null;
+  }
+
+  /**
+   * Worker-pool list of the merchant's ACTIVE locations (id + name), oldest-first.
+   * Feeds location resolution: the `# SUCURSALES` prompt block, `set_location`
+   * validation, and the checkout location gate.
+   */
+  async listActiveLocationsWorker(
+    merchantId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const { rows } = await this.pg.query<{ id: string; name: string }>(
+      `SELECT id::text AS id, name
+       FROM merchant.location
+       WHERE merchant_id = $1::uuid AND status = 'active'
+       ORDER BY created_at ASC, id ASC`,
+      [merchantId],
+    );
+    return rows;
+  }
+
+  /**
+   * Rank a merchant's ACTIVE locations against free customer text for location
+   * resolution (Phase 2). Returns every active location with its owner-curated
+   * `aliases` and a pg_trgm `word_similarity` score of the (accent-stripped,
+   * lowercased) query against `search_text` (= name + aliases). Worker pool
+   * (unauthenticated WhatsApp path). `set_location` combines this fuzzy score with
+   * a deterministic name/alias match to decide auto-select vs. ask.
+   */
+  async matchLocationCandidates(
+    merchantId: string,
+    query: string,
+  ): Promise<Array<{ id: string; name: string; aliases: string[]; sim: number }>> {
+    const { rows } = await this.pg.query<{
+      id: string;
+      name: string;
+      aliases: string[] | null;
+      sim: string | number;
+    }>(
+      `SELECT id::text AS id,
+              name,
+              aliases,
+              word_similarity(lower($2), search_text) AS sim
+         FROM merchant.location
+        WHERE merchant_id = $1::uuid AND status = 'active'
+        ORDER BY sim DESC, created_at ASC`,
+      [merchantId, query],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      aliases: r.aliases ?? [],
+      sim: Number(r.sim) || 0,
+    }));
+  }
+
+  /**
+   * The contact facts a customer asks for, read from ONE location. Worker pool, because
+   * the WhatsApp path has no authenticated member and so no RLS context.
+   *
+   * Both columns used to be read from the merchant, out of a config blob. That was not
+   * merely untyped, it was the wrong grain: Kalala has two locations and the blob held
+   * one address, so every customer who chose Congreso was given the Chapultepec street.
+   */
+  async locationContactWorker(
+    merchantId: string,
+    locationId: string,
+  ): Promise<{ address: string | null; paymentMethods: string[] } | null> {
+    const { rows } = await this.pg.query<{ address: string | null; paymentMethods: string[] }>(
+      `SELECT address, payment_methods AS "paymentMethods"
+         FROM merchant.location
+        WHERE merchant_id = $1::uuid AND id = $2::uuid
+        LIMIT 1`,
+      [merchantId, locationId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Worker-pool read of the merchant's canonical timezone (`merchant.merchant.timezone`). */
+  async getMerchantTimezoneWorker(merchantId: string): Promise<string | null> {
+    const { rows } = await this.pg.query<{ timezone: string | null }>(
+      `SELECT timezone FROM merchant.merchant WHERE id = $1::uuid`,
+      [merchantId],
+    );
+    return rows[0]?.timezone ?? null;
+  }
+
+  async updateMerchantSettings(
+    merchantId: string,
+    patch: {
+      name?: string;
+      timezone?: string;
+      businessDayStart?: string;
+      segmentThresholds?: SegmentThresholdsDto;
+    },
+  ): Promise<void> {
+    await this.pg.withMerchant((c) =>
+      c.query(
+        `UPDATE merchant.merchant
+         SET name = COALESCE($2, name),
+             timezone = COALESCE($3, timezone),
+             business_day_start = COALESCE($4::time, business_day_start),
+             segment_thresholds = COALESCE($5::jsonb, segment_thresholds),
+             updated_at = now()
+         WHERE id = $1::uuid`,
+        [
+          merchantId,
+          patch.name ?? null,
+          patch.timezone ?? null,
+          patch.businessDayStart ?? null,
+          patch.segmentThresholds ? JSON.stringify(patch.segmentThresholds) : null,
+        ],
+      ),
+    );
+  }
+
+  async updateLocation(
+    merchantId: string,
+    locationId: string,
+    patch: LocationPatch,
+  ): Promise<LocationProfileRow | null> {
+    // Four of these fields are CLEARABLE — a café can stop recording an address,
+    // and a pin dropped on the wrong corner has to be removable rather than only
+    // moveable. COALESCE cannot express that: it reads null as "not sent". So each
+    // clearable field carries a presence flag, and `undefined` is the only thing
+    // that leaves a column alone.
+    //
+    // ⚠️ THE FLAG TESTS FOR `undefined`, NOT FOR THE KEY. It used to be
+    // `hasOwnProperty`, and that was wrong in a way nothing failed on: this project
+    // compiles at ES2023, so `useDefineForClassFields` is on and every field
+    // DECLARED on a DTO becomes an own property whether or not the request carried
+    // it. Under that rule a patch of `{aliases}` owns `descriptor` too — set to
+    // undefined — and saving a nickname erased the branch's human hint. `undefined`
+    // means absent no matter how the object was built, which is the only test that
+    // holds for both a DTO and a plain object.
+    //
+    // `name`, `timezone` and `status` stay on COALESCE deliberately: none of the
+    // three has a meaningful empty. A branch with no name is not a branch.
+    const has = (k: keyof LocationPatch) => patch[k] !== undefined;
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<LocationProfileRow>(
+        `UPDATE merchant.location
+         SET name = COALESCE($3, name),
+             timezone = COALESCE($4, timezone),
+             status = COALESCE($5, status),
+             aliases = COALESCE($6::text[], aliases),
+             descriptor = CASE WHEN $7::boolean THEN $8 ELSE descriptor END,
+             address = CASE WHEN $9::boolean THEN $10 ELSE address END,
+             lat = CASE WHEN $11::boolean THEN $12::numeric ELSE lat END,
+             lng = CASE WHEN $13::boolean THEN $14::numeric ELSE lng END,
+             updated_at = now()
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
+         RETURNING id::text, name, timezone, status, aliases, descriptor,
+                   address, lat::float8 AS latitude, lng::float8 AS longitude`,
+        [
+          merchantId,
+          locationId,
+          patch.name ?? null,
+          patch.timezone ?? null,
+          patch.status ?? null,
+          patch.aliases ?? null,
+          has('descriptor'),
+          patch.descriptor ?? null,
+          has('address'),
+          patch.address ?? null,
+          has('latitude'),
+          patch.latitude ?? null,
+          has('longitude'),
+          patch.longitude ?? null,
+        ],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * A café's second branch, and its third.
+   *
+   * `merchant_id` is written from the guard-resolved access, never from the body,
+   * so a caller cannot name a café at all — that is the real guarantee. RLS on the
+   * umi_app pool is the second one, and it RAISES: an insert whose merchant the
+   * request context does not own comes back `42501 new row violates row-level
+   * security policy`, not a quiet zero-row write. `locations.integration.ts` pins
+   * that code, so the test cannot start passing for some other reason.
+   *
+   * The `rows[0] ?? null` below is therefore a belt, not the mechanism. It is kept
+   * because a write that returns nothing must never be reported as a success.
+   */
+  async createLocation(merchantId: string, input: NewLocation): Promise<LocationProfileRow | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<LocationProfileRow>(
+        `INSERT INTO merchant.location (merchant_id, name, address, lat, lng, timezone)
+         VALUES ($1::uuid, $2, $3, $4::numeric, $5::numeric, $6)
+         RETURNING id::text, name, timezone, status, aliases, descriptor,
+                   address, lat::float8 AS latitude, lng::float8 AS longitude`,
+        [
+          merchantId,
+          input.name,
+          input.address ?? null,
+          input.latitude ?? null,
+          input.longitude ?? null,
+          input.timezone ?? null,
+        ],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Per-location profiles for the dashboard location editor: name + owner-curated
+   * aliases + descriptor. A dedicated read (NOT folded into loadLocations /
+   * buildCapabilities) so a partial deploy only breaks the location-settings section,
+   * never the whole dashboard.
+   *
+   * EVERY location, closed ones included, and that is required rather than merely
+   * tolerated: `updateLocation` deliberately does not filter on status so a closed
+   * location can be REOPENED with `status:'active'`. A read that hid them would leave
+   * the one row you need to reopen invisible to the screen that reopens it.
+   *
+   * This used to say `AND status <> 'archived'`. build-v3 narrowed the location
+   * statuses to ('active','closed'), so that predicate could no longer exclude
+   * anything — it read as a filter and behaved as a no-op. `sql-preflight` cannot see
+   * this class of defect: 'archived' is a VALUE, and Postgres only tests a CHECK at
+   * run time (23514), never at PREPARE time. Same species as the hours comparison that
+   * made every late-night scan read as after-hours.
+   */
+  async listLocationProfiles(merchantId: string): Promise<LocationProfileRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<LocationProfileRow>(
+        `SELECT id::text, name, NULL::text AS timezone, status, aliases, descriptor,
+                address, lat::float8 AS latitude, lng::float8 AS longitude
+         FROM merchant.location
+         WHERE merchant_id = $1::uuid
+         ORDER BY created_at ASC, id ASC`,
+        [merchantId],
+      ),
+    );
+    return rows;
+  }
+}

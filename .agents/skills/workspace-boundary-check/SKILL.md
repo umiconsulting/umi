@@ -14,7 +14,9 @@ description: Verify which Umi repo, schema, and documentation layer should own a
 
 ## Default ownership map
 - Umi-wide architecture and planning: root `docs/` and root `AGENTS.md`
-- KDS app UI and client code: `apps/umi-kds`
+- KDS UI and client code: `apps/umi-pos/lib/features/kitchen/` — the kitchen board is a
+  mode inside the POS app. The separate `apps/umi-kds` Swift client was retired on
+  2026-09-16; see `docs/architecture/2026-09-16-pos-is-a-native-app.md`.
 - Shared Supabase schema work, jobs, and normalization: `apps/umi-conversaflow`
 - ConversaFlow ops/logs UI: `apps/umi-logs`
 - Static Umi owner dashboard prototype: `apps/umi-dashboard`

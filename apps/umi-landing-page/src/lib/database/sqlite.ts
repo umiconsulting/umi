@@ -1,7 +1,7 @@
 // src/lib/database/sqlite.ts
-import Database from "better-sqlite3";
-import { existsSync, mkdirSync } from "fs";
-import path from "path";
+import Database from 'better-sqlite3';
+import { existsSync, mkdirSync } from 'fs';
+import path from 'path';
 
 // AGREGAR: Interface DiagnosticData tipada
 export interface DiagnosticData {
@@ -39,7 +39,7 @@ export interface EmailLog {
   sequenceDay: number;
   sentAt?: string;
   subject?: string;
-  status: "sent" | "failed" | "pending";
+  status: 'sent' | 'failed' | 'pending';
 }
 
 export interface LeadMetrics {
@@ -58,12 +58,12 @@ export class LeadDatabase {
 
   constructor() {
     // Crear directorio data si no existe
-    const dataDir = path.join(process.cwd(), "data");
+    const dataDir = path.join(process.cwd(), 'data');
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }
 
-    this.dbPath = process.env.DATABASE_PATH || path.join(dataDir, "leads.db");
+    this.dbPath = process.env.DATABASE_PATH || path.join(dataDir, 'leads.db');
     this.db = new Database(this.dbPath);
     this.initializeDatabase();
   }
@@ -110,9 +110,9 @@ export class LeadDatabase {
         CREATE INDEX IF NOT EXISTS idx_email_logs_sent_at ON email_logs(sentAt);
       `);
 
-      console.log("✅ Base de datos SQLite inicializada correctamente");
+      console.log('✅ Base de datos SQLite inicializada correctamente');
     } catch (error) {
-      console.error("❌ Error inicializando base de datos:", error);
+      console.error('❌ Error inicializando base de datos:', error);
       throw error;
     }
   }
@@ -122,7 +122,7 @@ export class LeadDatabase {
    */
   findLeadByEmail(email: string): LeadData | null {
     try {
-      const stmt = this.db.prepare("SELECT * FROM leads WHERE email = ?");
+      const stmt = this.db.prepare('SELECT * FROM leads WHERE email = ?');
       const row = stmt.get(email) as Record<string, unknown>;
 
       if (!row) return null;
@@ -133,9 +133,9 @@ export class LeadDatabase {
         email: row.email as string,
         name: row.name as string,
         diagnosticDate: row.diagnosticDate as string,
-        emailsSent: JSON.parse((row.emailsSent as string) || "[]"),
+        emailsSent: JSON.parse((row.emailsSent as string) || '[]'),
         sequencePaused: Boolean(row.sequencePaused),
-        diagnosticData: JSON.parse((row.diagnosticData as string) || "{}"),
+        diagnosticData: JSON.parse((row.diagnosticData as string) || '{}'),
       };
 
       // Añadir propiedades opcionales solo si existen
@@ -157,7 +157,7 @@ export class LeadDatabase {
 
       return leadData;
     } catch (error) {
-      console.error("❌ Error buscando lead por email:", error);
+      console.error('❌ Error buscando lead por email:', error);
       return null;
     }
   }
@@ -182,7 +182,7 @@ export class LeadDatabase {
           leadData.company || null,
           leadData.diagnosticDate,
           JSON.stringify(leadData.diagnosticData),
-          leadData.email
+          leadData.email,
         );
       } else {
         // Crear nuevo lead
@@ -199,21 +199,19 @@ export class LeadDatabase {
           leadData.diagnosticDate,
           JSON.stringify(leadData.emailsSent || []),
           leadData.sequencePaused ? 1 : 0,
-          JSON.stringify(leadData.diagnosticData)
+          JSON.stringify(leadData.diagnosticData),
         );
       }
 
       // IMPORTANTE: Siempre retornar el lead actualizado
       const updatedLead = this.findLeadByEmail(leadData.email);
       if (!updatedLead) {
-        throw new Error(
-          "Error: No se pudo recuperar el lead después de upsert"
-        );
+        throw new Error('Error: No se pudo recuperar el lead después de upsert');
       }
 
       return updatedLead;
     } catch (error) {
-      console.error("❌ Error creando/actualizando lead:", error);
+      console.error('❌ Error creando/actualizando lead:', error);
       throw error;
     }
   }
@@ -232,7 +230,7 @@ export class LeadDatabase {
       const result = stmt.get(leadId, sequenceDay) as { count: number };
       return result.count > 0;
     } catch (error) {
-      console.error("❌ Error verificando email enviado:", error);
+      console.error('❌ Error verificando email enviado:', error);
       return false;
     }
   }
@@ -252,10 +250,10 @@ export class LeadDatabase {
         emailLog.templateName,
         emailLog.sequenceDay,
         emailLog.subject || null,
-        emailLog.status
+        emailLog.status,
       );
     } catch (error) {
-      console.error("❌ Error registrando email enviado:", error);
+      console.error('❌ Error registrando email enviado:', error);
       throw error;
     }
   }
@@ -265,9 +263,7 @@ export class LeadDatabase {
    */
   getDaysElapsed(leadId: string): number {
     try {
-      const stmt = this.db.prepare(
-        "SELECT diagnosticDate FROM leads WHERE id = ?"
-      );
+      const stmt = this.db.prepare('SELECT diagnosticDate FROM leads WHERE id = ?');
       const result = stmt.get(leadId) as { diagnosticDate: string } | undefined;
 
       if (!result) return 0;
@@ -281,7 +277,7 @@ export class LeadDatabase {
 
       return Math.max(0, diffDays); // Evitar días negativos
     } catch (error) {
-      console.error("❌ Error calculando días transcurridos:", error);
+      console.error('❌ Error calculando días transcurridos:', error);
       return 0;
     }
   }
@@ -306,9 +302,9 @@ export class LeadDatabase {
           email: row.email as string,
           name: row.name as string,
           diagnosticDate: row.diagnosticDate as string,
-          emailsSent: JSON.parse((row.emailsSent as string) || "[]"),
+          emailsSent: JSON.parse((row.emailsSent as string) || '[]'),
           sequencePaused: Boolean(row.sequencePaused),
-          diagnosticData: JSON.parse((row.diagnosticData as string) || "{}"),
+          diagnosticData: JSON.parse((row.diagnosticData as string) || '{}'),
         };
 
         // Añadir propiedades opcionales solo si existen
@@ -335,7 +331,7 @@ export class LeadDatabase {
         };
       });
     } catch (error) {
-      console.error("❌ Error obteniendo leads pendientes:", error);
+      console.error('❌ Error obteniendo leads pendientes:', error);
       return [];
     }
   }
@@ -345,29 +341,24 @@ export class LeadDatabase {
    */
   getMetrics(): LeadMetrics {
     try {
-      const totalLeadsStmt = this.db.prepare(
-        "SELECT COUNT(*) as count FROM leads"
-      );
+      const totalLeadsStmt = this.db.prepare('SELECT COUNT(*) as count FROM leads');
       const totalLeads = (totalLeadsStmt.get() as { count: number }).count;
 
       const activeSequencesStmt = this.db.prepare(
-        "SELECT COUNT(*) as count FROM leads WHERE sequencePaused = 0"
+        'SELECT COUNT(*) as count FROM leads WHERE sequencePaused = 0',
       );
-      const activeSequences = (activeSequencesStmt.get() as { count: number })
-        .count;
+      const activeSequences = (activeSequencesStmt.get() as { count: number }).count;
 
       const pausedSequencesStmt = this.db.prepare(
-        "SELECT COUNT(*) as count FROM leads WHERE sequencePaused = 1"
+        'SELECT COUNT(*) as count FROM leads WHERE sequencePaused = 1',
       );
-      const pausedSequences = (pausedSequencesStmt.get() as { count: number })
-        .count;
+      const pausedSequences = (pausedSequencesStmt.get() as { count: number }).count;
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toISOString().split('T')[0];
       const emailsTodayStmt = this.db.prepare(
-        "SELECT COUNT(*) as count FROM email_logs WHERE DATE(sentAt) = ?"
+        'SELECT COUNT(*) as count FROM email_logs WHERE DATE(sentAt) = ?',
       );
-      const emailsSentToday = (emailsTodayStmt.get(today) as { count: number })
-        .count;
+      const emailsSentToday = (emailsTodayStmt.get(today) as { count: number }).count;
 
       // Calcular emails de esta semana y mes (simplificado)
       const emailsSentThisWeek = emailsSentToday * 7; // Mock
@@ -383,7 +374,7 @@ export class LeadDatabase {
         conversionRate: 0.15, // Mock - 15%
       };
     } catch (error) {
-      console.error("❌ Error obteniendo métricas:", error);
+      console.error('❌ Error obteniendo métricas:', error);
       return {
         totalLeads: 0,
         emailsSentToday: 0,
@@ -407,9 +398,9 @@ export class LeadDatabase {
         WHERE id = ?
       `);
 
-      stmt.run(reason || "Pausado manualmente", leadId);
+      stmt.run(reason || 'Pausado manualmente', leadId);
     } catch (error) {
-      console.error("❌ Error pausando secuencia:", error);
+      console.error('❌ Error pausando secuencia:', error);
       throw error;
     }
   }
@@ -430,7 +421,7 @@ export class LeadDatabase {
       // FIX: Asegurar que pauseReason quede como null
       console.log(`✅ Secuencia reanudada para lead ${leadId}`);
     } catch (error) {
-      console.error("❌ Error reanudando secuencia:", error);
+      console.error('❌ Error reanudando secuencia:', error);
       throw error;
     }
   }
@@ -448,7 +439,7 @@ export class LeadDatabase {
 
       return stmt.all(leadId) as EmailLog[];
     } catch (error) {
-      console.error("❌ Error obteniendo logs del lead:", error);
+      console.error('❌ Error obteniendo logs del lead:', error);
       return [];
     }
   }
@@ -458,7 +449,7 @@ export class LeadDatabase {
    */
   findLeadById(id: string): LeadData | null {
     try {
-      const stmt = this.db.prepare("SELECT * FROM leads WHERE id = ?");
+      const stmt = this.db.prepare('SELECT * FROM leads WHERE id = ?');
       const row = stmt.get(id) as Record<string, unknown>;
 
       if (!row) return null;
@@ -469,9 +460,9 @@ export class LeadDatabase {
         email: row.email as string,
         name: row.name as string,
         diagnosticDate: row.diagnosticDate as string,
-        emailsSent: JSON.parse((row.emailsSent as string) || "[]"),
+        emailsSent: JSON.parse((row.emailsSent as string) || '[]'),
         sequencePaused: Boolean(row.sequencePaused),
-        diagnosticData: JSON.parse((row.diagnosticData as string) || "{}"),
+        diagnosticData: JSON.parse((row.diagnosticData as string) || '{}'),
       };
 
       // Añadir propiedades opcionales solo si existen
@@ -493,7 +484,7 @@ export class LeadDatabase {
 
       return leadData;
     } catch (error) {
-      console.error("❌ Error buscando lead por ID:", error);
+      console.error('❌ Error buscando lead por ID:', error);
       return null;
     }
   }
@@ -518,9 +509,9 @@ export class LeadDatabase {
           email: row.email as string,
           name: row.name as string,
           diagnosticDate: row.diagnosticDate as string,
-          emailsSent: JSON.parse((row.emailsSent as string) || "[]"),
+          emailsSent: JSON.parse((row.emailsSent as string) || '[]'),
           sequencePaused: Boolean(row.sequencePaused),
-          diagnosticData: JSON.parse((row.diagnosticData as string) || "{}"),
+          diagnosticData: JSON.parse((row.diagnosticData as string) || '{}'),
         };
 
         // Añadir propiedades opcionales solo si existen
@@ -543,7 +534,7 @@ export class LeadDatabase {
         return leadData;
       });
     } catch (error) {
-      console.error("❌ Error obteniendo leads activos:", error);
+      console.error('❌ Error obteniendo leads activos:', error);
       return [];
     }
   }
@@ -554,9 +545,9 @@ export class LeadDatabase {
   close(): void {
     try {
       this.db.close();
-      console.log("✅ Conexión a base de datos cerrada");
+      console.log('✅ Conexión a base de datos cerrada');
     } catch (error) {
-      console.error("❌ Error cerrando base de datos:", error);
+      console.error('❌ Error cerrando base de datos:', error);
     }
   }
 }

@@ -3,7 +3,13 @@ import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatMXN } from '@/lib/currency';
 import { getTenant } from '@/lib/tenant';
+import { normalizePhone } from '@/lib/identity';
 import type { Prisma } from '@prisma/client';
+
+// JS-side sorts (inactive/ltv) load matching cards into memory; bound that so a
+// (hypothetically) huge tenant can't OOM/timeout the function. Café-scale tenants
+// (hundreds–low thousands) are never truncated; a warning fires if the cap is hit.
+const JS_SORT_CAP = 5000;
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
   const user = await requireAuth(['STAFF', 'ADMIN'])(req);
@@ -21,16 +27,24 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   const sort = url.searchParams.get('sort') || 'recent';
   const skip = (page - 1) * limit;
 
+  // Normalize a phone-shaped search term to canonical E.164 so an operator typing
+  // "999-123-4567" / "(999) 123-4567" matches the stored "+5219991234567" (the raw
+  // `contains` alone only matched a bare-digits substring). Non-phone terms → null.
+  const normPhone = search ? await normalizePhone(search) : null;
+
   // Customers are reached card-first: cards → account → person. Each card is a customer row.
   const where: Prisma.cardsWhereInput = {
     tenant_id: tenant.id,
     ...(search
       ? {
           OR: [
-            { card_number: { contains: search } },
+            { card_number: { contains: search, mode: 'insensitive' } },
             { accounts: { people: { display_name: { contains: search, mode: 'insensitive' } } } },
             { accounts: { people: { normalized_phone: { contains: search } } } },
-            { accounts: { people: { normalized_email: { contains: search } } } },
+            ...(normPhone
+              ? [{ accounts: { people: { normalized_phone: { contains: normPhone } } } } as Prisma.cardsWhereInput]
+              : []),
+            { accounts: { people: { normalized_email: { contains: search, mode: 'insensitive' } } } },
           ],
         }
       : {}),
@@ -71,9 +85,12 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
   // Sorts that require fetching all records and sorting in JS
   if (sort === 'inactive' || sort === 'ltv') {
     const [allCards, total] = await Promise.all([
-      prisma.cards.findMany({ where, include: cardInclude }),
+      prisma.cards.findMany({ where, include: cardInclude, orderBy: { created_at: 'desc' }, take: JS_SORT_CAP }),
       prisma.cards.count({ where }),
     ]);
+    if (allCards.length === JS_SORT_CAP) {
+      console.warn(`[Customers] '${sort}' sort truncated to ${JS_SORT_CAP} of ${total} cards for tenant ${tenant.id}; move this sort into SQL.`);
+    }
 
     if (sort === 'inactive') {
       allCards.sort((a, b) => {

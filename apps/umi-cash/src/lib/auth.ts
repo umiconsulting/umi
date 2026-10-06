@@ -30,10 +30,14 @@ export function generatePassSerial(): string {
 }
 
 export async function signAccessToken(userId: string, role: string, tenantId: string): Promise<string> {
+  // Short-lived: the stateless access token carries no server-side revocation, so a
+  // 15-min TTL makes /auth/refresh (which re-derives role + membership from the DB)
+  // the effective revocation point. authedFetch refreshes transparently on 401, so
+  // this is invisible to operators but bounds a removed/compromised token to ~15 min.
   return new SignJWT({ sub: userId, role, tenantId })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('24h')
+    .setExpirationTime('15m')
     .sign(ACCESS_SECRET);
 }
 

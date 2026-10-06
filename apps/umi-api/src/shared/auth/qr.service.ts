@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import type { AppConfig } from '../config/config.schema';
 
 export interface QrResult {
@@ -43,6 +43,27 @@ export class QrService {
     return randomBytes(bytes).toString('hex');
   }
 
+  /**
+   * The in-app QR the customer shows at the counter — the inverse of the JWT
+   * branch of `verifyQRPayload`, and the claim names must stay exactly these:
+   * `sub` is read back as the card id and `tok` as the rotating nonce.
+   *
+   * FIVE MINUTES, and it is the token's own expiry that enforces it. The card
+   * page counts down from 300s and refetches, but a customer who screenshots the
+   * code is holding a JWT that stops verifying — not a picture that keeps working.
+   *
+   * Keyed on the UTF-8 bytes of `APP_QR_SECRET` (`jwtKey`), never the raw string
+   * used for wallet barcodes. See the dual-derivation warning on the class.
+   */
+  async signQRPayload(cardId: string, qrToken: string): Promise<string> {
+    if (!this.jwtKey) throw new Error('APP_QR_SECRET is not set');
+    return new SignJWT({ sub: cardId, tok: qrToken, type: 'SCAN' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(this.jwtKey);
+  }
+
   async verifyQRPayload(payload: string): Promise<QrResult | null> {
     if (!this.jwtKey || !this.hmacKey) return null;
     try {
@@ -69,6 +90,21 @@ export class QrService {
     }
   }
 
+  /**
+   * The barcode printed on a wallet pass: the card number, then a truncated
+   * HMAC so a guessed card number cannot be scanned.
+   *
+   * This is the inverse of `verifyWalletBarcode` below and MUST stay keyed the
+   * same way — the raw secret string, not the UTF-8 bytes used for the in-app
+   * JWT. See the dual-derivation warning in the class comment. A pass signed
+   * with a differently derived key produces a barcode the register rejects.
+   */
+  signWalletBarcode(cardNumber: string): string {
+    if (!this.hmacKey) throw new Error('APP_QR_SECRET is not set');
+    const tag = createHmac('sha256', this.hmacKey).update(cardNumber).digest('hex').slice(0, 16);
+    return `${cardNumber}.${tag}`;
+  }
+
   /** "<cardNumber>.<first 16 hex of HMAC-SHA256(cardNumber, rawSecret)>". */
   private verifyWalletBarcode(payload: string): string | null {
     if (!this.hmacKey) return null;
@@ -82,9 +118,7 @@ export class QrService {
       .digest('hex')
       .slice(0, 16); // 8-byte truncated tag, lowercase hex
     if (providedHmac.length !== expectedHmac.length) return null;
-    if (
-      !timingSafeEqual(Buffer.from(providedHmac), Buffer.from(expectedHmac))
-    ) {
+    if (!timingSafeEqual(Buffer.from(providedHmac), Buffer.from(expectedHmac))) {
       return null;
     }
     return cardNumber;

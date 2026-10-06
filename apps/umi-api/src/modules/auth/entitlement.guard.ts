@@ -1,20 +1,13 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { isProductStatusActive } from '@umi/contract';
 import { AuthRepository } from './auth.repository';
 import { REQUIRE_PRODUCT } from './require-product.decorator';
 import type { AuthedRequest } from './auth.types';
 
-/** Ported from server.js `PRODUCT_ACTIVE_STATUSES`. */
-export const PRODUCT_ACTIVE_STATUSES = new Set(['active', 'trialing']);
-
 /**
- * Enforces `@RequireProduct('<key>')`. Reads the tenant resolved by
- * TenantAccessGuard and 403s with the dashboard's exact `product_not_active`
+ * Enforces `@RequireProduct('<key>')`. Reads the merchant resolved by
+ * MerchantAccessGuard and 403s with the dashboard's exact `product_not_active`
  * envelope when the entitlement isn't active/trialing. No decorator ⇒ no gate.
  */
 @Injectable()
@@ -25,16 +18,16 @@ export class EntitlementGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const productKey = this.reflector.getAllAndOverride<string>(
-      REQUIRE_PRODUCT,
-      [context.getHandler(), context.getClass()],
-    );
+    const productKey = this.reflector.getAllAndOverride<string>(REQUIRE_PRODUCT, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
     if (!productKey) return true;
 
     const req = context.switchToHttp().getRequest<AuthedRequest>();
-    const tenantId = req.tenantAccess?.tenantId;
-    if (!tenantId) {
-      // TenantAccessGuard must run first; treat a missing tenant as not-active.
+    const merchantId = req.merchantAccess?.merchantId;
+    if (!merchantId) {
+      // MerchantAccessGuard must run first; treat a missing merchant as not-active.
       throw new ForbiddenException({
         error: 'product_not_active',
         product: productKey,
@@ -42,8 +35,8 @@ export class EntitlementGuard implements CanActivate {
       });
     }
 
-    const status = await this.repo.productStatus(tenantId, productKey);
-    if (!status || !PRODUCT_ACTIVE_STATUSES.has(status)) {
+    const status = await this.repo.productStatus(merchantId, productKey);
+    if (!isProductStatusActive(status)) {
       throw new ForbiddenException({
         error: 'product_not_active',
         product: productKey,

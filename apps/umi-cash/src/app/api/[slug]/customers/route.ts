@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { generateCardNumber } from '@/lib/qr';
+import { findOrCreateActiveCard } from '@/lib/cards';
+import { buildCustomerProfileData } from '@/lib/customer';
 import { createSession } from '@/lib/auth';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { resolveContact, normalizePhone, findPersonByPhone } from '@/lib/identity';
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit';
-import { createHash, randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 import { parseUserAgent } from '@/lib/user-agent';
 
 const RegisterSchema = z.object({
@@ -89,14 +90,18 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       displayName: data.name,
     });
 
-    // Persist birth_date + device/os metadata on the person.
+    // Persist profile fields on the person, incl. normalized_phone (denormalized
+    // from the contact so admin phone-search + the register fast-path work —
+    // resolve_contact only writes contact_methods, leaving people.normalized_phone NULL).
     await prisma.people.update({
       where: { id: personId },
-      data: {
-        display_name: data.name,
-        birth_date: new Date(data.birthDate + 'T00:00:00'),
-        metadata: { device, os },
-      },
+      data: buildCustomerProfileData({
+        name: data.name,
+        birthDate: data.birthDate,
+        device,
+        os,
+        normalizedPhone,
+      }),
     });
 
     const result = await prisma.$transaction(async (tx) => {
@@ -114,17 +119,12 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           },
         }));
 
-      const card = await tx.cards.create({
-        data: {
-          tenant_id: tenant.id,
-          account_id: account.id,
-          card_number: generateCardNumber(tenant.cardPrefix ?? undefined),
-          qr_token: randomBytes(16).toString('hex'),
-          qr_issued_at: new Date(),
-          status: 'active',
-          visits_this_cycle: 0,
-          total_visits: 0,
-        },
+      // Reuse the account's active card instead of minting a duplicate — the
+      // reliable stop for the duplicate-registration bug (see findOrCreateActiveCard).
+      const card = await findOrCreateActiveCard(tx, {
+        tenantId: tenant.id,
+        accountId: account.id,
+        cardPrefix: tenant.cardPrefix,
       });
 
       return { account, card };

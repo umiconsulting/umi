@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ConfigService } from '@nestjs/config';
-import {
-  OutboxRelayService,
-  OutboxRouter,
-} from './outbox-relay.service';
+import { OutboxRelayService, OutboxRouter } from './outbox-relay.service';
 import type { EnqueueService } from './enqueue.service';
 import type { OutboxEventRow, QueueRepository } from './queue.repository';
 import { QUEUES } from './queues';
@@ -12,11 +9,11 @@ import { JobPriority } from './job-options';
 function event(overrides: Partial<OutboxEventRow> = {}): OutboxEventRow {
   return {
     id: 'evt-1',
-    tenantId: 't1',
+    merchantId: 't1',
     eventType: 'turn.completed',
     aggregateId: null,
     idempotencyKey: 'idem-1',
-    payload: { tenantId: 't1', turnId: 'x' },
+    payload: { merchantId: 't1', turnId: 'x' },
     attempts: 0,
     maxAttempts: 5,
     ...overrides,
@@ -67,7 +64,7 @@ describe('OutboxRelayService', () => {
     expect(enqueue.enqueue).toHaveBeenCalledWith(
       QUEUES.outbound,
       'twilio.reply',
-      { tenantId: 't1', turnId: 'x' },
+      { merchantId: 't1', turnId: 'x' },
       expect.objectContaining({
         priority: JobPriority.Interactive,
         jobId: 'idem-1', // defaults to the row idempotency_key
@@ -123,7 +120,10 @@ describe('OutboxRelayService', () => {
       queue: QUEUES.outbound,
       jobName: 'twilio.reply',
     });
-    repo.claimPendingOutbox.mockResolvedValueOnce([event(), event({ id: 'evt-2', idempotencyKey: 'idem-2' })]);
+    repo.claimPendingOutbox.mockResolvedValueOnce([
+      event(),
+      event({ id: 'evt-2', idempotencyKey: 'idem-2' }),
+    ]);
 
     await svc.tick();
 

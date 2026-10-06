@@ -19,7 +19,7 @@ export interface EmailTemplateData {
   };
 }
 
-export const createBaseTemplate = (content: string, title: string = "") => `
+export const createBaseTemplate = (content: string, title: string = '') => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -43,7 +43,7 @@ export const createBaseTemplate = (content: string, title: string = "") => `
   <div class="container">
     <div class="header">
       <div class="logo">umi</div>
-      ${title ? `<div class="header-title">${title}</div>` : ""}
+      ${title ? `<div class="header-title">${title}</div>` : ''}
     </div>
     
     <div class="content">
@@ -64,8 +64,8 @@ const actionList = (data: EmailTemplateData) =>
   data.diagnosticData.quickWins.length
     ? data.diagnosticData.quickWins
         .map((win) => `<li><strong>${win.action}:</strong> ${win.description}</li>`)
-        .join("")
-    : "<li>Definir el primer producto Umi a activar según tu operación actual.</li>";
+        .join('')
+    : '<li>Definir el primer producto Umi a activar según tu operación actual.</li>';
 
 export const day0UrgencyTemplate = (data: EmailTemplateData): string => {
   const content = `
@@ -96,7 +96,7 @@ export const day0UrgencyTemplate = (data: EmailTemplateData): string => {
     <strong>Equipo Umi</strong></p>
   `;
 
-  return createBaseTemplate(content, "Tu ruta Umi inicial");
+  return createBaseTemplate(content, 'Tu ruta Umi inicial');
 };
 
 export const day2PressureTemplate = (data: EmailTemplateData): string => {
@@ -114,7 +114,7 @@ export const day2PressureTemplate = (data: EmailTemplateData): string => {
     <p>Equipo Umi</p>
   `;
 
-  return createBaseTemplate(content, "Seguimiento de tu diagnóstico Umi");
+  return createBaseTemplate(content, 'Seguimiento de tu diagnóstico Umi');
 };
 
 export const day5CaseStudyTemplate = (data: EmailTemplateData): string => {
@@ -138,7 +138,7 @@ export const day5CaseStudyTemplate = (data: EmailTemplateData): string => {
     <p>Saludos,<br>Equipo Umi</p>
   `;
 
-  return createBaseTemplate(content, "Cómo ordenar la activación");
+  return createBaseTemplate(content, 'Cómo ordenar la activación');
 };
 
 export const day10FreeOfferTemplate = (data: EmailTemplateData): string => {
@@ -159,7 +159,7 @@ export const day10FreeOfferTemplate = (data: EmailTemplateData): string => {
     <p>Equipo Umi</p>
   `;
 
-  return createBaseTemplate(content, "Mapeo operativo inicial");
+  return createBaseTemplate(content, 'Mapeo operativo inicial');
 };
 
 export const day30ReactivationTemplate = (data: EmailTemplateData): string => {
@@ -183,7 +183,7 @@ export const day30ReactivationTemplate = (data: EmailTemplateData): string => {
     <p>Equipo Umi</p>
   `;
 
-  return createBaseTemplate(content, "Checklist Umi de operación");
+  return createBaseTemplate(content, 'Checklist Umi de operación');
 };
 
 export const noShowTemplate = (data: EmailTemplateData): string => {
@@ -199,7 +199,7 @@ export const noShowTemplate = (data: EmailTemplateData): string => {
     <p>Equipo Umi</p>
   `;
 
-  return createBaseTemplate(content, "Reagendemos tu ruta Umi");
+  return createBaseTemplate(content, 'Reagendemos tu ruta Umi');
 };
 
 export const EmailTemplates = {
@@ -211,11 +211,8 @@ export const EmailTemplates = {
   noShow: noShowTemplate,
 };
 
-export const getTemplateByDay = (
-  day: number,
-  trigger: string = "no_response"
-) => {
-  if (trigger === "no_response") {
+export const getTemplateByDay = (day: number, trigger: string = 'no_response') => {
+  if (trigger === 'no_response') {
     switch (day) {
       case 0:
         return EmailTemplates.day0Urgency;
@@ -230,7 +227,7 @@ export const getTemplateByDay = (
       default:
         return null;
     }
-  } else if (trigger === "no_show") {
+  } else if (trigger === 'no_show') {
     return EmailTemplates.noShow;
   }
 

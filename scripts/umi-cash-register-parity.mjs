@@ -1,0 +1,242 @@
+#!/usr/bin/env node
+/**
+ * Does the register answer the same from umi-api as it does from umi-cash?
+ *
+ * `apps/umi-cash/next.config.mjs` hands 24 routes to umi-api when `CASH_API_ORIGIN`
+ * is set. `register-flip.integration.ts` proves every one of them EXISTS on the
+ * destination. Nothing proves they ANSWER the same — and a Next rewrite is a
+ * proxy, so a route that exists and returns a different shape is a café screen
+ * that renders zeros, or a reward tier that disappears, with no error anywhere.
+ *
+ * That gap was found on 2026-10-06 with the flip an hour away: four screens out of
+ * six differed, and the differences were invisible to every existing test.
+ *
+ * This compares STRUCTURE, not values. A value can legitimately differ (the two
+ * origins are two live databases a few seconds apart); a missing key cannot, and
+ * missing keys are what the frozen client trips over. Timestamps, ids and money
+ * are therefore compared as "present and the same type" only.
+ *
+ * Usage (credentials never leave the machine; nothing here reads the database):
+ *
+ *   PARITY_SLUG=kalalacafe PARITY_IDENTIFIER=admin@kalalacafe.mx \
+ *     PARITY_PASSWORD=... node scripts/umi-cash-register-parity.mjs
+ *
+ * umi-api allows five register logins per café per 15 minutes, and a run costs
+ * two of them (one per origin). To re-run inside that window, hand it tokens
+ * instead and it will not log in at all:
+ *
+ *   PARITY_LEGACY_TOKEN=... PARITY_API_TOKEN=... node scripts/umi-cash-register-parity.mjs
+ *
+ * Exit code 0 = every comparable route answers the same shape on both origins.
+ *
+ * `--routes-only` runs the static half alone and answers "which routes does the
+ * panel call that no switch will forward?" without needing credentials or network.
+ */
+
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { missingFrom, nullGaps, shape } from './lib/register-shape.mjs';
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+const LEGACY = process.env.PARITY_LEGACY_ORIGIN ?? 'https://cash.umiconsulting.co';
+const API = process.env.PARITY_API_ORIGIN ?? 'https://api.umiconsulting.co';
+const SLUG = process.env.PARITY_SLUG;
+const IDENTIFIER = process.env.PARITY_IDENTIFIER;
+const PASSWORD = process.env.PARITY_PASSWORD;
+
+/**
+ * THE OTHER HALF OF THE PROBLEM, and the half no runtime check can see.
+ *
+ * Comparing responses only ever looks at routes that ARE on the flip list. A route
+ * the panel calls that is on NO list is invisible to it — it simply stays on
+ * umi-cash, keeps reading the old schemas, and goes on working against a database
+ * nothing else writes to any more. Three of the register's routes were in that
+ * state when this was written, including the button that undoes a redemption.
+ *
+ * So: every `/api/${...}/...` the umi-cash app builds, against the flip list.
+ */
+function staticRouteCheck() {
+  const appDir = join(REPO, 'apps/umi-cash/src/app');
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (/\.(tsx|ts)$/.test(entry.name)) files.push(p);
+    }
+  };
+  walk(appDir);
+
+  const called = new Set();
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const m of source.matchAll(/[`'"]\/api\/\$\{[A-Za-z.]+\}(\/[^`'"]*)?[`'"]/g)) {
+      called.add(
+        m[0]
+          .slice(1, -1)
+          .replace(/\$\{[^}]*\}/g, ':p')
+          .split('?')[0],
+      );
+    }
+  }
+
+  const config = readFileSync(join(REPO, 'apps/umi-cash/next.config.mjs'), 'utf8');
+  const block = config.match(/const REGISTER_ROUTES = \[([\s\S]*?)\];/)?.[1] ?? '';
+  const listed = new Set(
+    [...block.replace(/\/\/[^\n]*/g, '').matchAll(/'(\/[^']+)'/g)].map((m) => m[1]),
+  );
+
+  // The pass surface belongs to the Wallet switch, not the register's: it is served
+  // by `WALLET_API_ORIGIN`, listed in the same file, and compared on its own.
+  const WALLET = /^\/api\/:p\/(passes\/(apple|google)|stamp-strip)\b/;
+  const shape = (r) => r.replace(/:[A-Za-z]+/g, ':p');
+  const listedShapes = new Set([...listed].map(shape));
+
+  /**
+   * Routes the panel calls that have NO port and NO switch, listed so the check
+   * stays green while the gap stays named. A route here is a screen that keeps
+   * reading the old schemas after a flip — an accepted, dated decision, not an
+   * oversight. Empty would be better; a silent pass would not.
+   */
+  const KNOWN_UNPORTED = new Map([
+    [
+      '/api/:p/admin/messages',
+      'AB#107 rebuilds the screen from merchant.message; the route is still on disk',
+    ],
+  ]);
+
+  const unported = [...called].filter(
+    (r) => !listedShapes.has(shape(r)) && !WALLET.test(shape(r)) && !KNOWN_UNPORTED.has(shape(r)),
+  );
+
+  console.log(`${called.size} routes the umi-cash app calls, ${listed.size} in the flip list`);
+  if (unported.length === 0) {
+    console.log('ok    every route the panel calls is forwarded, or the wallet switch has it');
+    for (const [route, why] of KNOWN_UNPORTED) {
+      if (called.has(route)) console.log(`note  ${route} is knowingly unported — ${why}`);
+    }
+  } else {
+    console.log('FAIL  called by the panel, on no flip list, served only by umi-cash:');
+    for (const route of unported.sort()) console.log(`        ${route}`);
+  }
+  return unported.length === 0;
+}
+
+const routesOk = staticRouteCheck();
+if (process.argv.includes('--routes-only')) process.exit(routesOk ? 0 : 1);
+console.log();
+
+if (!SLUG || !IDENTIFIER || !PASSWORD) {
+  if (!SLUG || !process.env.PARITY_LEGACY_TOKEN || !process.env.PARITY_API_TOKEN) {
+    console.error(
+      'Set PARITY_SLUG plus either PARITY_IDENTIFIER + PARITY_PASSWORD, or\n' +
+        'PARITY_LEGACY_TOKEN + PARITY_API_TOKEN. Optionally override\n' +
+        'PARITY_LEGACY_ORIGIN / PARITY_API_ORIGIN.',
+    );
+    process.exit(2);
+  }
+}
+
+/** Every GET the register performs. Writes are excluded: exercising them costs real money. */
+const ROUTES = [
+  `/api/${SLUG}/admin/stats`,
+  `/api/${SLUG}/admin/customers?limit=2`,
+  `/api/${SLUG}/admin/gift-cards`,
+  `/api/${SLUG}/admin/settings`,
+  `/api/${SLUG}/admin/reward-config`,
+  ...[7, 30, 90, 365].map((d) => `/api/${SLUG}/admin/analytics?days=${d}`),
+];
+
+/** One customer, by id, so the detail screen is covered too. */
+async function firstCustomerId(token) {
+  const r = await fetch(`${LEGACY}/api/${SLUG}/admin/customers?limit=1`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) return null;
+  const body = await r.json();
+  const row = Array.isArray(body?.customers) ? body.customers[0] : null;
+  return row?.id ?? null;
+}
+
+async function login(origin) {
+  const r = await fetch(`${origin}/api/${SLUG}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ identifier: IDENTIFIER, password: PASSWORD }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok || typeof body.accessToken !== 'string') {
+    throw new Error(`login failed on ${origin}: ${r.status} ${JSON.stringify(body).slice(0, 120)}`);
+  }
+  return body.accessToken;
+}
+
+/**
+ * Value-vs-null differences (found by `nullGaps`, in ./lib/register-shape.mjs) that
+ * we have looked at and written down. A named list rather than a count, so a NEW
+ * one fails the run.
+ */
+const ACCEPTED_NULL_GAPS = new Map([
+  [
+    'recentRedemptions[].note',
+    'build-v3 has no note column; one production row ever carried one (the early cash-out marker)',
+  ],
+]);
+
+const get = async (origin, path, token) => {
+  const r = await fetch(origin + path, { headers: { Authorization: `Bearer ${token}` } });
+  const contentType = (r.headers.get('content-type') ?? '').split(';')[0];
+  const body = contentType.includes('json') ? await r.json().catch(() => null) : null;
+  return { status: r.status, contentType, body };
+};
+
+const mask = (e) => String(e ?? '').replace(/^(.).*(@.*)$/, '$1***$2');
+
+const [legacyToken, apiToken] =
+  process.env.PARITY_LEGACY_TOKEN && process.env.PARITY_API_TOKEN
+    ? [process.env.PARITY_LEGACY_TOKEN, process.env.PARITY_API_TOKEN]
+    : await Promise.all([login(LEGACY), login(API)]);
+console.log(`logged in on both origins as ${mask(IDENTIFIER)}\n`);
+
+const customerId = await firstCustomerId(legacyToken);
+if (customerId) {
+  ROUTES.splice(2, 0, `/api/${SLUG}/admin/customers/${customerId}`);
+} else {
+  console.log('! no customers found — the detail route is not covered by this run\n');
+}
+
+let failures = 0;
+for (const path of ROUTES) {
+  const [l, n] = await Promise.all([get(LEGACY, path, legacyToken), get(API, path, apiToken)]);
+  const problems = [];
+  if (l.status !== n.status) problems.push(`status ${l.status} vs ${n.status}`);
+  if (l.contentType !== n.contentType)
+    problems.push(`content-type ${l.contentType} vs ${n.contentType}`);
+
+  if (l.body && n.body) {
+    const missing = missingFrom(shape(l.body), shape(n.body));
+    if (missing.length) problems.push(`missing in umi-api: ${missing.join(', ')}`);
+
+    const gaps = nullGaps(shape(l.body), shape(n.body)).filter(
+      (path) => !ACCEPTED_NULL_GAPS.has(path),
+    );
+    if (gaps.length) problems.push(`umi-cash sent a value, umi-api sent null: ${gaps.join(', ')}`);
+  }
+
+  if (problems.length === 0) {
+    console.log(`ok    ${path}`);
+  } else {
+    failures++;
+    console.log(`FAIL  ${path}`);
+    for (const p of problems) console.log(`        ${p}`);
+  }
+}
+
+console.log(
+  failures === 0
+    ? `\n${ROUTES.length} routes answer the same shape.`
+    : `\n${failures} of ${ROUTES.length} routes differ. The register flip is NOT safe.`,
+);
+process.exit(failures === 0 ? 0 : 1);

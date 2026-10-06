@@ -15,10 +15,10 @@ command in this step contacted the Cash production project.
 ## Staging replay gaps found and scripted (additive)
 
 1. `dashboard_compat` schema (13 Prisma-model-named views over `platform`/`cash`/`conversaflow`
-   + 2 local-auth tables) existed only ad hoc in the transition DB → captured as
-   `docs/migration/local-postgres/008_dashboard_compat_core.sql`. The credential seed now keys
-   on `platform.users.auth_subject = 'local-owner-1'` because backfill 030 regenerates user ids
-   per environment — the copied uuid orphaned the credential in staging (found live).
+   - 2 local-auth tables) existed only ad hoc in the transition DB → captured as
+     `docs/migration/local-postgres/008_dashboard_compat_core.sql`. The credential seed now keys
+     on `platform.users.auth_subject = 'local-owner-1'` because backfill 030 regenerates user ids
+     per environment — the copied uuid orphaned the credential in staging (found live).
 2. `kds.device_pairing_requests` (2026-05-22 pin-pairing work) was absent from
    `005_kds_core.sql` → DDL appended; `admin/devices/pairing` 500 → 200 after apply.
 

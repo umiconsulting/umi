@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
   Post,
   Req,
   Res,
@@ -10,22 +11,52 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
+import { decodeJwt } from 'jose';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../../shared/config/config.schema';
-import { AuthService, type LoginResult } from './auth.service';
+import { AuthService, isMfaChallenge, type LoginResult } from './auth.service';
 import { AuthGuard } from './auth.guard';
-import { buildCookieOptions } from './cookies';
+import { buildCookieOptions, parseDurationSeconds } from './cookies';
 import { CurrentUser } from './current-user.decorator';
 import { Public } from './public.decorator';
 import {
   ACCESS_COOKIE,
   CSRF_COOKIE,
   REFRESH_COOKIE,
+  REMEMBER_COOKIE,
   type AuthUser,
 } from './auth.types';
+import type {
+  SessionEnvelope,
+  SessionResponse,
+  MfaChallengeResponse as MfaChallenge,
+} from '@umi/contract';
+import {
+  GlobalLogoutRequest,
+  PosPinLoginRequest,
+  PosRefreshRequest,
+  type PosSessionResponse,
+} from '@umi/contract';
+import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
+
+/**
+ * Per-IP ceilings on the unauthenticated auth routes. The window matches the one
+ * cash-customer.controller.ts already uses, so there is one rate-limit idiom here.
+ *
+ * These bound an ANONYMOUS caller. The per-account ceilings that actually protect one
+ * user (MFA_OTP_MAX_PER_HOUR, and runtime.otp.attempts) live in MfaService and the
+ * database, because an attacker rotating source addresses must not collect a fresh
+ * budget with every new IP. Both layers are needed: this one stops the volume, those
+ * stop the patient attacker.
+ */
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_PER_WINDOW = 20;
+const MFA_VERIFY_MAX_PER_WINDOW = 20;
 
 /**
  * Auth ingress (D9). Issues/clears the httpOnly JWT cookies and returns the
@@ -38,17 +69,68 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: ConfigService<AppConfig, true>,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
+  /** One rate-limit bucket; on exhaustion set Retry-After and 429. */
+  private throttle(reply: FastifyReply, key: string, max: number): void {
+    const r = this.rateLimit.hit(key, max, AUTH_WINDOW_MS);
+    if (!r.allowed) {
+      void reply.header('Retry-After', String(Math.ceil((r.resetAt - Date.now()) / 1000)));
+      throw new HttpException({ error: 'Demasiados intentos. Intenta de nuevo más tarde.' }, 429);
+    }
+  }
+
+  /**
+   * Two outcomes, and the client must handle both.
+   *   - No second factor enrolled → cookies are set and a session comes back, exactly
+   *     as before.
+   *   - A second factor enrolled → NO cookies, no session. The body carries
+   *     `mfaRequired: true` and a challenge token to post back to `mfa/verify`.
+   *
+   * The shape lives in `@umi/contract` as `MfaChallengeResponse`, and the dashboard
+   * reads it. `umi.user.mfa_method` is NULL for every row today, so the second
+   * branch is unreachable until an enrolment writes it.
+   *
+   * ⚠️ Check that a client reads `mfaRequired` before you enrol its users. A client
+   * that reads only `session` stores nothing, and that account cannot sign in.
+   */
   @Public()
   @Post('local/login')
   async login(
     @Body() dto: LoginDto,
+    @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<{ session: SessionEnvelope }> {
+  ): Promise<SessionResponse | MfaChallenge> {
+    this.throttle(reply, `auth:login:${clientIp(req)}`, LOGIN_MAX_PER_WINDOW);
     const result = await this.auth.login(dto.username, dto.password);
-    this.setAuthCookies(reply, result);
-    return { session: toSession(result) };
+    if (isMfaChallenge(result)) {
+      // Deliberately no cookies. A half-authenticated caller carries the challenge in
+      // the request body, so it can never ride along on an unrelated request the way
+      // a cookie would.
+      return {
+        mfaRequired: true,
+        method: result.method,
+        challengeToken: result.challengeToken,
+        expiresInSeconds: result.expiresInSeconds,
+      };
+    }
+    this.setAuthCookies(reply, result, dto.remember ?? false);
+    return { session: toSession(result, this.accessExpiresIn()) };
+  }
+
+  /** Second half of the two-step login. Issues the cookies the first half withheld. */
+  @Public()
+  @Post('local/mfa/verify')
+  async verifyMfa(
+    @Body() dto: VerifyMfaDto,
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<SessionResponse> {
+    this.throttle(reply, `auth:mfa:${clientIp(req)}`, MFA_VERIFY_MAX_PER_WINDOW);
+    const result = await this.auth.verifyMfa(dto.challengeToken, dto.code);
+    this.setAuthCookies(reply, result, dto.remember ?? false);
+    return { session: toSession(result, this.accessExpiresIn()) };
   }
 
   @Public()
@@ -56,18 +138,24 @@ export class AuthController {
   async refresh(
     @Req() req: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<{ session: SessionEnvelope }> {
+  ): Promise<SessionResponse> {
     const token = req.cookies?.[REFRESH_COOKIE];
     if (!token) throw new UnauthorizedException('authentication_required');
     const result = await this.auth.refresh(token);
-    this.setAuthCookies(reply, result);
-    return { session: toSession(result) };
+    // Preserve the persistent-vs-session choice from login across rotations.
+    const remember = req.cookies?.[REMEMBER_COOKIE] === '1';
+    this.setAuthCookies(reply, result, remember);
+    return { session: toSession(result, this.accessExpiresIn()) };
   }
 
   @Public()
   @Post('local/logout')
-  logout(@Res({ passthrough: true }) reply: FastifyReply): { ok: true } {
-    for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE]) {
+  async logout(
+    @Req() req: FastifyRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<{ ok: true }> {
+    await this.auth.logout(req.cookies?.[REFRESH_COOKIE]);
+    for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE, REMEMBER_COOKIE]) {
       reply.clearCookie(name, { path: '/' });
     }
     return { ok: true };
@@ -75,56 +163,184 @@ export class AuthController {
 
   @Public()
   @Post('local/forgot-password')
-  async forgotPassword(
-    @Body() dto: ForgotPasswordDto,
-  ): Promise<{ ok: true }> {
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ ok: true }> {
     await this.auth.forgotPassword(dto.email);
     return { ok: true };
   }
 
   @Public()
   @Post('local/reset-password')
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-  ): Promise<{ ok: true }> {
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ ok: true }> {
     await this.auth.resetPassword(dto.token, dto.password);
     return { ok: true };
   }
 
   /** Cookie-based session bootstrap for the SPA (authed). */
   @Get('me')
-  async me(@CurrentUser() user: AuthUser): Promise<{ session: SessionEnvelope }> {
+  async me(@Req() req: FastifyRequest, @CurrentUser() user: AuthUser): Promise<SessionResponse> {
     const session = await this.auth.session(user.id);
-    return { session: { ...session, provider: 'local' } };
+    return {
+      session: {
+        ...session,
+        provider: 'local',
+        accessExpiresIn: this.remainingAccessSeconds(req),
+      },
+    };
   }
 
-  private setAuthCookies(reply: FastifyReply, result: LoginResult): void {
+  /**
+   * Full access-token lifetime in seconds. Accurate right after login/refresh,
+   * which reissue the cookie; the SPA uses it to schedule a proactive refresh
+   * just before expiry (the token is httpOnly and unreadable client-side).
+   */
+  private accessExpiresIn(): number {
+    return parseDurationSeconds(this.config.get('JWT_ACCESS_TTL', { infer: true }));
+  }
+
+  /**
+   * Remaining lifetime (seconds) of the caller's access cookie. /me does NOT
+   * reissue the cookie, so it must report the token's actual remaining `exp` —
+   * returning the full configured TTL here would let the SPA schedule its
+   * proactive refresh too late. Falls back to the configured TTL if the token
+   * can't be decoded.
+   */
+  private remainingAccessSeconds(req: FastifyRequest): number {
+    const token = req.cookies?.[ACCESS_COOKIE];
+    if (token) {
+      try {
+        const { exp } = decodeJwt(token);
+        if (typeof exp === 'number') {
+          return Math.max(0, exp - Math.floor(Date.now() / 1000));
+        }
+      } catch {
+        // malformed/unreadable — fall back to the configured TTL below
+      }
+    }
+    return this.accessExpiresIn();
+  }
+
+  private setAuthCookies(reply: FastifyReply, result: LoginResult, remember: boolean): void {
     reply.setCookie(
       ACCESS_COOKIE,
       result.accessToken,
-      buildCookieOptions(this.config, 'access'),
+      buildCookieOptions(this.config, 'access', remember),
     );
     reply.setCookie(
       REFRESH_COOKIE,
       result.refreshToken,
-      buildCookieOptions(this.config, 'refresh'),
+      buildCookieOptions(this.config, 'refresh', remember),
     );
-    // Double-submit CSRF token: readable cookie, echoed by the SPA in a header
-    // on mutations (CsrfGuard wiring is a follow-up; the token is issued now).
+    // Double-submit CSRF token. CsrfGuard validates the matching request header.
     reply.setCookie(
       CSRF_COOKIE,
       randomBytes(18).toString('hex'),
-      buildCookieOptions(this.config, 'csrf'),
+      buildCookieOptions(this.config, 'csrf', remember),
+    );
+    // Persist the choice so /refresh reissues with the same lifetime.
+    reply.setCookie(
+      REMEMBER_COOKIE,
+      remember ? '1' : '0',
+      buildCookieOptions(this.config, 'refresh', remember),
     );
   }
 }
 
-interface SessionEnvelope {
-  user: { id: string; email: string; displayName: string | null };
-  tenants: LoginResult['tenants'];
-  provider: 'local';
+@Controller('api/v1/auth')
+export class PosAuthController {
+  constructor(private readonly auth: AuthService) {}
+
+  @Public()
+  @Post('pos/pin-login')
+  async pinLogin(
+    @Body(new ZodValidationPipe(PosPinLoginRequest)) dto: PosPinLoginRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const deviceId = header(req, 'x-umi-device-id');
+    const deviceCredential = header(req, 'x-umi-device-credential');
+    const result = await this.auth.pinLogin({
+      pin: dto.pin,
+      merchantId: dto.merchantId,
+      locationId: dto.locationId,
+      installationId: dto.installationId,
+      deviceId,
+      deviceCredential,
+      deviceProof: header(req, 'x-umi-device-proof'),
+      deviceProofTimestamp: header(req, 'x-umi-device-proof-ts'),
+      deviceProofAlgorithm: header(req, 'x-umi-device-proof-alg'),
+      ip: req.ip ?? null,
+    });
+    return {
+      session: {
+        ...toSession(result, 1800),
+        sessionId: result.sessionId,
+        deviceId: result.deviceId,
+      },
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/refresh')
+  async refresh(
+    @Body(new ZodValidationPipe(PosRefreshRequest)) dto: PosRefreshRequest,
+    @Req() req: FastifyRequest,
+  ): Promise<PosSessionResponse> {
+    const result = await this.auth.posRefresh({
+      refreshToken: dto.refreshToken,
+      installationId: dto.installationId,
+      deviceCredential: header(req, 'x-umi-device-credential'),
+      deviceProof: header(req, 'x-umi-device-proof'),
+      deviceProofTimestamp: header(req, 'x-umi-device-proof-ts'),
+      deviceProofAlgorithm: header(req, 'x-umi-device-proof-alg'),
+    });
+    return {
+      session: {
+        ...toSession(result, 1800),
+        sessionId: result.sessionId,
+        deviceId: result.deviceId,
+      },
+      tokens: { accessToken: result.accessToken, refreshToken: result.refreshToken },
+    };
+  }
+
+  @Public()
+  @Post('pos/logout')
+  async logout(
+    @Body(new ZodValidationPipe(PosRefreshRequest)) dto: PosRefreshRequest,
+  ): Promise<{ ok: true }> {
+    await this.auth.posLogout(dto.refreshToken);
+    return { ok: true };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('pos/global-logout')
+  async globalLogout(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(GlobalLogoutRequest)) dto: GlobalLogoutRequest,
+  ): Promise<{ ok: true }> {
+    await this.auth.posGlobalLogout(user.id, user.sessionId, dto.exceptCurrent);
+    return { ok: true };
+  }
 }
 
-function toSession(result: LoginResult): SessionEnvelope {
-  return { user: result.user, tenants: result.tenants, provider: 'local' };
+function header(req: FastifyRequest, name: string): string | null {
+  const value = req.headers[name];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function toSession(result: LoginResult, accessExpiresIn: number): SessionEnvelope {
+  return {
+    user: result.user,
+    merchants: result.merchants,
+    platformRole: result.platformRole,
+    provider: 'local',
+    accessExpiresIn,
+  };
+}
+
+function clientIp(req: FastifyRequest): string {
+  // Fastify resolves req.ip from X-Forwarded-For using its configured trustProxy
+  // hop count (set in main.ts). Trusting the raw leftmost XFF here instead would
+  // let a caller spoof the header and rotate past the per-IP rate-limit buckets.
+  return req.ip || 'unknown';
 }

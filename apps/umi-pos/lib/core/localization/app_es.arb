@@ -1,0 +1,978 @@
+{
+  "@@locale": "es",
+  "appName": "UmiPOS",
+  "bootstrapLoadingTitle": "Preparando UmiPOS",
+  "bootstrapLoadingBody": "Verificando la configuración y el almacenamiento seguro.",
+  "readyTitle": "Listo para comenzar",
+  "readyBody": "La base de UmiPOS está preparada. La autenticación se habilitará en el siguiente paso.",
+  "configurationInvalidTitle": "Configuración incompleta",
+  "configurationInvalidBody": "UmiPOS no puede iniciar de forma segura con esta configuración.",
+  "storageUnavailableTitle": "Almacenamiento seguro no disponible",
+  "storageUnavailableBody": "No se guardarán credenciales en almacenamiento sin cifrar.",
+  "sdkUnavailableTitle": "Contrato no disponible",
+  "sdkUnavailableBody": "La aplicación no pudo verificar el contrato de la plataforma.",
+  "recoverableFailureTitle": "No pudimos terminar la preparación",
+  "unrecoverableFailureTitle": "UmiPOS necesita atención",
+  "retryAction": "Reintentar",
+  "updateAvailableTitle": "Actualización disponible",
+  "updateRequiredBody": "Esta versión de UmiPOS ya no es compatible. Actualiza para continuar.",
+  "updateAction": "Actualizar ahora",
+  "updateInProgress": "Descargando la actualización…",
+  "updateReadyTitle": "Actualización lista",
+  "updateReadyBody": "Reinicia UmiPOS para usar la versión nueva.",
+  "updateRestartAction": "Reiniciar ahora",
+  "updateFailedBody": "No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.",
+  "diagnosticsAction": "Ver diagnóstico",
+  "diagnosticsTitle": "Diagnóstico de desarrollo",
+  "unknownRouteTitle": "Ruta no disponible",
+  "unknownRouteBody": "Esta sección todavía no está habilitada.",
+  "enrollmentTitle": "Registrar este dispositivo",
+  "enrollmentBody": "Ingresa el código de configuración de ocho caracteres que muestra el administrador.",
+  "challengeIdLabel": "ID del desafío",
+  "enrollmentCodeLabel": "Código de registro",
+  "enrollmentCodeInvalid": "Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.",
+  "enrollmentCodeRejected": "El código de registro no es válido o caducó. Solicita un código nuevo al administrador.",
+  "enrollmentCodeExpired": "El código de registro caducó. Solicita un código nuevo al administrador.",
+  "enrollmentCodeAttemptsExceeded": "Esta solicitud alcanzó el límite de intentos. Solicita un código nuevo al administrador.",
+  "enrollmentCodeRateLimited": "Se hicieron demasiados intentos. Espera antes de volver a intentarlo.",
+  "enrollmentCodeUnavailable": "UmiPOS no puede verificar este código ahora. Revisa la conexión e inténtalo de nuevo.",
+  "enrollmentPendingTitle": "Se requiere la aprobación del administrador",
+  "enrollmentPendingBody": "Este dispositivo solicitó acceso. Pide a un administrador que lo revise en el Dashboard de UMI.",
+  "enrollmentPendingSecure": "La credencial de pareo está protegida en este dispositivo.",
+  "cancelEnrollmentAction": "Cancelar solicitud",
+  "continueAction": "Continuar",
+  "loginTitle": "Iniciar sesión en UmiPOS",
+  "usernameLabel": "Correo",
+  "passwordLabel": "Contraseña",
+  "signInAction": "Iniciar sesión",
+  "operatorPinTitle": "Ingresa tu PIN de operador",
+  "operatorPinBody": "Tu PIN te identifica y carga tus permisos actuales.",
+  "operatorPinLabel": "PIN de operador",
+  "operatorPinHint": "Usa de 4 a 8 dígitos.",
+  "operatorPinAction": "Continuar",
+  "operatorPinInvalid": "El PIN no es válido para esta sucursal.",
+  "operatorPinLocked": "El ingreso de PIN está bloqueado temporalmente. Intenta más tarde.",
+  "operatorPinRateLimited": "Hay demasiados intentos. Espera antes de intentar de nuevo.",
+  "operatorPinEntitlementDisabled": "UmiPOS no está habilitado para este negocio.",
+  "operatorPinBranchInvalid": "Este dispositivo no está asignado a una sucursal activa.",
+  "operatorPinLength": "Ingresa al menos cuatro dígitos.",
+  "selectTenantTitle": "Selecciona un negocio",
+  "noTenantTitle": "Sin acceso a negocios",
+  "noTenantBody": "Tu cuenta no tiene acceso activo a UmiPOS.",
+  "selectBranchTitle": "Selecciona una sucursal",
+  "noBranchBody": "No hay una sucursal activa permitida para tu usuario y dispositivo.",
+  "operatorTitle": "Iniciar sesión de operador",
+  "operatorBody": "Confirma esta sucursal para entrar al entorno protegido de POS.",
+  "startOperatorAction": "Iniciar sesión",
+  "lockAction": "Bloquear operador",
+  "logoutAction": "Cerrar sesión",
+  "deviceActiveLabel": "Dispositivo confiable",
+  "connectivityUnknownLabel": "Conectividad desconocida",
+  "shellReadyTitle": "Sesión de operador lista",
+  "catalogNotImplemented": "El catálogo todavía no está implementado.",
+  "deviceRevokedTitle": "Dispositivo revocado",
+  "deviceRevokedBody": "Esta instalación ya no es confiable. Solicita su reemplazo a un administrador.",
+  "rotationRequiredTitle": "Rotación de credencial requerida",
+  "rotationRequiredBody": "Un administrador debe rotar la credencial antes de continuar.",
+  "recoverableNetworkBody": "No fue posible contactar de forma segura el servicio de acceso.",
+  "catalogTitle": "Catálogo",
+  "catalogSearchHint": "Buscar nombre, SKU o código",
+  "allCategories": "Todo",
+  "catalogLoading": "Cargando catálogo autorizado",
+  "catalogEmpty": "No hay productos disponibles para esta sucursal.",
+  "catalogNoResults": "No hay productos para esta búsqueda.",
+  "catalogPermissionDenied": "No tienes permiso para ver este catálogo.",
+  "catalogNetworkError": "No se pudo conectar con el catálogo. Intenta de nuevo.",
+  "catalogUnexpectedError": "El catálogo no está disponible temporalmente.",
+  "unavailableLabel": "No disponible",
+  "variantsLabel": "Variantes",
+  "modifiersLabel": "Modificadores",
+  "taxIncludedLabel": "Impuesto configurado",
+  "closeAction": "Cerrar",
+  "cartTitle": "Carrito actual",
+  "cartEmpty": "Abre un producto para iniciar este carrito.",
+  "cartUnavailable": "El carrito no está disponible temporalmente.",
+  "cartNoteLabel": "Nota del operador",
+  "cartCourseLabel": "Curso",
+  "cartCoursePrevious": "Curso anterior",
+  "cartCourseNext": "Curso siguiente",
+  "cartCourseCurrent": "Curso {course}",
+  "@cartCourseCurrent": {
+    "description": "Names the course a cart line belongs to, for the operator and for a screen reader.",
+    "placeholders": {
+      "course": {
+        "type": "int"
+      }
+    }
+  },
+  "addToCartAction": "Agregar al carrito",
+  "removeFromCartAction": "Eliminar línea",
+  "increaseQuantity": "Aumentar cantidad",
+  "decreaseQuantity": "Disminuir cantidad",
+  "subtotalLabel": "Subtotal",
+  "taxLabel": "Impuestos",
+  "discountLabel": "Vista previa de descuentos",
+  "totalLabel": "Total",
+  "businessDateLabel": "Fecha operativa",
+  "checkoutNextGate": "Checkout disponible en el siguiente Gate",
+  "checkoutAction": "Cobrar",
+  "checkoutTitle": "Cobro autorizado",
+  "operatorLabel": "Operador",
+  "paymentMethodLabel": "Método de pago",
+  "cashPayment": "Efectivo",
+  "externalTerminalPayment": "Terminal externa",
+  "reviewTotalsAction": "Revisar totales autorizados",
+  "confirmAndPayAction": "Confirmar y cobrar",
+  "confirmAction": "Confirmar",
+  "confirmSaleTitle": "¿Confirmar esta venta?",
+  "confirmSaleBody": "UMI recalculó los totales mostrados. Esta confirmación inicia el pago.",
+  "totalsConfirmedBody": "UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.",
+  "paymentProcessing": "Procesando pago",
+  "paymentUnknownTitle": "Estado de pago desconocido",
+  "paymentUnknownBody": "No inicies otro pago. Consulta el estado de este pago o solicita ayuda a un gerente.",
+  "queryPaymentAction": "Consultar estado del pago",
+  "correlationLabel": "Correlación",
+  "saleCompletedTitle": "Venta completada",
+  "finishSaleAction": "Finalizar e iniciar otro carrito",
+  "checkoutFailed": "No fue posible completar el cobro de forma segura.",
+  "provisionalSalePendingTitle": "Venta pendiente de sincronización",
+  "provisionalSalePendingBody": "La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.",
+  "returnToCatalogAction": "Volver al catálogo",
+  "recoveryCenterTitle": "Centro de recuperación",
+  "recoveryWebUnsupportedTitle": "La recuperación sin conexión no está disponible en Web",
+  "recoveryWebUnsupportedBody": "La versión Web funciona en línea. Usa una aplicación nativa compatible para almacenar y recuperar ventas sin conexión de forma segura.",
+  "synchronizingPendingSales": "Sincronizando ventas pendientes…",
+  "pendingSalesSecure": "Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.",
+  "synchronizeNowAction": "Sincronizar ahora",
+  "conflictNeedsAttention": "Una venta requiere tu atención.",
+  "officialReceiptAvailable": "Recibo oficial disponible",
+  "cashReceivedLabel": "Efectivo recibido",
+  "tenderSelectionTitle": "Selección de pago",
+  "cashTenderTitle": "Efectivo aplicado",
+  "tenderAmountLabel": "Importe aplicado",
+  "exactAmountAction": "Importe exacto",
+  "manualTerminalLabel": "Terminal manual",
+  "terminalProcessingAction": "Procesando fuera del POS",
+  "terminalSuccessAction": "Confirmar éxito",
+  "terminalFailureAction": "Informar fallo",
+  "terminalUnknownAction": "Resultado desconocido",
+  "tipLabel": "Propina",
+  "noTipAction": "Sin propina",
+  "customTipPercentLabel": "Porcentaje de propina personalizado",
+  "customTipFixedLabel": "Importe de propina personalizado",
+  "discountLabel": "Descuento",
+  "percentageDiscountAction": "Porcentaje",
+  "fixedDiscountAction": "Importe fijo",
+  "discountPercentLabel": "Porcentaje de descuento",
+  "discountAmountLabel": "Importe del descuento",
+  "discountReasonLabel": "Motivo del descuento",
+  "receiptDestinationLabel": "Destino del recibo",
+  "displayReceiptAction": "Mostrar recibo",
+  "printLaterAction": "Imprimir después",
+  "noReceiptAction": "Sin recibo",
+  "managerApprovalAction": "Solicitar aprobación",
+  "managerApprovalTitle": "Se requiere aprobación del gerente",
+  "managerPinLabel": "PIN del gerente",
+  "managerApprovalDeniedMessage": "El PIN o el permiso del gerente no es válido para este cobro.",
+  "approveAction": "Aprobar",
+  "insufficientCashMessage": "El efectivo recibido no cubre el importe aplicado.",
+  "invalidTenderMessage": "Revisa la forma de pago: esta combinación no se puede cobrar. Si la terminal ya confirmó un cobro, no se puede quitar de este pedido.",
+  "remainingBalanceMessage": "Agrega un pago para cubrir el saldo pendiente.",
+  "approvalRequiredMessage": "Un gerente debe aprobar este cobro.",
+  "terminalFailureMessage": "El pago de la terminal falló. Revisa los pagos.",
+  "tipRejectedMessage": "La política de propinas rechazó esta propina.",
+  "discountRejectedMessage": "La política de descuentos rechazó este descuento.",
+  "changeDueLabel": "Cambio",
+  "appliedAmountLabel": "Importe aplicado",
+  "remainingBalanceLabel": "Saldo pendiente",
+  "offlineAdvancedTenderBlockedMessage": "Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.",
+  "recoveryQueryTitle": "Consultar resultado guardado",
+  "recoveryQueryDescription": "Pregunta a UMI si esta misma operación ya fue aceptada.",
+  "recoveryPolicyTitle": "Actualizar política sin conexión",
+  "recoveryPolicyDescription": "Reconecta para cargar el permiso vigente del servidor para ventas sin conexión.",
+  "recoveryAuthenticationTitle": "Iniciar sesión de nuevo",
+  "recoveryAuthenticationDescription": "Restablece tu sesión autorizada antes de continuar la sincronización.",
+  "recoveryBranchTitle": "Seleccionar la sucursal autorizada",
+  "recoveryBranchDescription": "Vuelve a seleccionar sucursal sin mover las ventas pendientes.",
+  "recoveryManagerTitle": "Solicitar revisión de gerente",
+  "recoveryManagerDescription": "Verifica un gerente autorizado únicamente para esta acción de recuperación.",
+  "recoveryManagerCredentialLabel": "PIN de gerente",
+  "recoveryAcknowledgeTitle": "Confirmar conciliación",
+  "recoveryAcknowledgeDescription": "Confirma la conciliación del servidor solo después de guardar la recuperación local.",
+  "recoveryReceiptTitle": "Ver estado del recibo",
+  "recoveryReceiptDescription": "Abre el estado conservado del recibo provisional u oficial.",
+  "recoveryPaymentTitle": "Consultar pago original",
+  "recoveryPaymentDescription": "Consulta únicamente el pago original. No se iniciará otro cargo.",
+  "recoveryDeviceTitle": "Verificar este dispositivo",
+  "recoveryDeviceDescription": "Este dispositivo está bloqueado. Restablece la autorización antes de reproducir.",
+  "recoveryCredentialTitle": "Recuperar credenciales rotadas",
+  "recoveryCredentialDescription": "Los comandos históricos permanecen ligados a su versión de credencial original.",
+  "recoveryStorageTitle": "Conservar almacenamiento para recuperación",
+  "recoveryStorageDescription": "Conserva intactos los datos cifrados y sigue la recuperación autorizada.",
+  "recoverySnapshotTitle": "Actualizar datos autorizados",
+  "recoverySnapshotDescription": "Reconecta para actualizar catálogo, precios e impuestos vencidos.",
+  "recoverySupportTitle": "Copiar referencia de soporte",
+  "recoverySupportDescription": "Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.",
+  "saleActionsTitle": "Acciones de venta",
+  "newSaleAction": "Nueva venta",
+  "suspendSaleAction": "Suspender venta",
+  "resumeSaleAction": "Reanudar venta",
+  "renameSaleAction": "Cambiar nombre de venta suspendida",
+  "cancelSaleAction": "Cancelar venta",
+  "suspendedSaleLabel": "Nombre de la venta suspendida",
+  "cancelSaleReasonLabel": "Motivo de cancelación",
+  "confirmCancelSaleTitle": "¿Cancelar esta venta?",
+  "confirmCancelSaleBody": "El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.",
+  "saleRestoredMessage": "Tu venta activa se restauró.",
+  "readyForNextCustomerMessage": "Listo para el siguiente cliente.",
+  "currentCustomerLabel": "Cliente actual",
+  "anonymousCustomerLabel": "Cliente anónimo",
+  "attachCustomerAction": "Asignar cliente",
+  "detachCustomerAction": "Usar cliente anónimo",
+  "searchCustomerHint": "Buscar clientes",
+  "recentCustomersAction": "Clientes recientes",
+  "saleHistoryTitle": "Ventas",
+  "incomingOrdersTitle": "Pedidos entrantes",
+  "incomingOrdersEmpty": "No hay pedidos entrantes.",
+  "incomingOrdersError": "No se pudieron cargar los pedidos.",
+  "incomingOrdersTake": "Atender",
+  "currentSaleLabel": "Venta actual",
+  "suspendedSalesLabel": "Ventas suspendidas",
+  "committedSalesLabel": "Ventas completadas recientes",
+  "cancelledSalesLabel": "Ventas canceladas",
+  "saleHistoryEmpty": "No hay ventas para esta vista.",
+  "sortNewestLabel": "Más recientes primero",
+  "sortOldestLabel": "Más antiguas primero",
+  "loadMoreSalesAction": "Cargar más ventas",
+  "saleStateBuilding": "En curso",
+  "saleStateSuspended": "Suspendida",
+  "saleStateCommitted": "Completada",
+  "saleStateCancelled": "Cancelada",
+  "saleStateRecovered": "Recuperada",
+  "openReceiptAction": "Abrir recibo",
+  "reprintReceiptAction": "Ver para reimpresión",
+  "receiptAvailableMessage": "Recibo disponible",
+  "saleLifecycleError": "No fue posible completar la acción de venta de forma segura.",
+  "saleSearchHint": "Buscar por nombre, cliente o recibo",
+  "saleNameFallback": "Venta"
+  ,"editCartLineAction": "Editar producto"
+  ,"saveCartLineAction": "Guardar cambios"
+  ,"clearCartAction": "Vaciar carrito"
+  ,"confirmClearCartTitle": "¿Vaciar este carrito?"
+  ,"confirmClearCartBody": "Se eliminarán todos los productos de la venta actual."
+  ,"cashCenterTitle": "Centro de caja"
+  ,"cashCenterAction": "Abrir Centro de caja"
+  ,"registerAvailableLabel": "Caja disponible"
+  ,"registerAssignedLabel": "Caja asignada"
+  ,"shiftRequiredMessage": "Abre un turno de caja antes de aceptar efectivo."
+  ,"adoptShiftTitle": "Tu turno sigue abierto en otra terminal"
+  ,"adoptShiftMessage": "Esta terminal perdió su identidad guardada. El turno y el dinero siguen ahí; tráelos a esta pantalla para continuar."
+  ,"adoptShiftAction": "Traer el turno a esta terminal"
+  ,"reclaimRegisterTitle": "Esta caja quedó retenida por una terminal que ya no existe"
+  ,"reclaimRegisterMessage": "Ninguna terminal activa tiene este cajón. Libéralo para poder abrir un turno con él; el dinero no se cuenta porque sigue en el cajón."
+  ,"reclaimRegisterAction": "Liberar la caja"
+  ,"cashShiftRequiredMessage": "El cobro no tiene un turno de caja al cual abonar el efectivo."
+  ,"resumeShiftAndRetryAction": "Reanudar turno y reintentar"
+  ,"reclaimRegisterAndRetryAction": "Liberar caja y reintentar"
+  ,"cashHeldByActiveTillMessage": "Otra terminal activa tiene esta caja. Pide a un gerente que cuente el cajón antes de continuar."
+  ,"openShiftAction": "Abrir turno de caja"
+  ,"invalidAmountMessage": "Escribe un monto válido, por ejemplo 1,500.00."
+  ,"openingFloatLabel": "Fondo inicial"
+  ,"denominationCountLabel": "Conteo por denominación"
+  ,"paidInAction": "Entrada de efectivo"
+  ,"paidOutAction": "Salida de efectivo"
+  ,"safeDropAction": "Retiro a caja fuerte"
+  ,"drawerCorrectionAction": "Corrección de caja"
+  ,"noSaleDrawerAction": "Solicitar apertura de cajón"
+  ,"drawerRequestRecordedMessage": "La solicitud se registró. No se verificó una operación de hardware."
+  ,"suspendShiftAction": "Suspender turno"
+  ,"resumeShiftAction": "Reanudar turno"
+  ,"handoffShiftAction": "Entregar turno"
+  ,"incomingOperatorPinLabel": "PIN del operador entrante"
+  ,"blindCountAction": "Iniciar conteo ciego"
+  ,"recountAction": "Iniciar reconteo"
+  ,"expectedCashLabel": "Efectivo esperado"
+  ,"countedCashLabel": "Efectivo contado"
+  ,"cashVarianceLabel": "Diferencia"
+  ,"cashOverageLabel": "Sobrante"
+  ,"cashShortageLabel": "Faltante"
+  ,"cashToleranceLabel": "Tolerancia"
+  ,"varianceReasonLabel": "Motivo de la diferencia"
+  ,"cashApprovalAction": "Solicitar aprobación de diferencia"
+  ,"reconcileShiftAction": "Conciliar turno"
+  ,"closeShiftAction": "Cerrar turno"
+  ,"shiftClosedMessage": "El turno de caja está cerrado."
+  ,"blockedShiftMessage": "Este turno está bloqueado. Sigue la guía de recuperación."
+  ,"pendingCashPostingMessage": "Un movimiento pendiente debe terminar antes del cierre."
+  ,"ambiguousCashEffectMessage": "Se desconoce un efecto de caja. Verifica la operación original."
+  ,"cashRecoveryMessage": "Se restauró el estado guardado de la operación de caja."
+  ,"shiftSummaryTitle": "Resumen del turno"
+  ,"cashMovementAmountLabel": "Importe del movimiento"
+  ,"cashMovementReasonLabel": "Motivo del movimiento"
+  ,"submitCashMovementAction": "Confirmar movimiento de caja"
+  ,"submitBlindCountAction": "Enviar conteo ciego"
+  ,"cashOperationFailedMessage": "No fue posible completar la operación de caja de forma segura."
+  ,"cashStatusOpen": "Turno abierto"
+  ,"cashStatusSuspended": "Turno suspendido"
+  ,"cashStatusCounting": "Conteo de efectivo en curso"
+  ,"cashStatusReconciliation": "Se requiere conciliación"
+  ,"cashStatusClosed": "Turno cerrado"
+  ,"confirmCloseShiftTitle": "¿Cerrar este turno de caja?"
+  ,"confirmCloseShiftBody": "El cierre es definitivo. Los nuevos movimientos requieren otro turno."
+  ,"confirmAction": "Confirmar"
+  ,"varianceReasonNone": "Sin diferencia"
+  ,"varianceReasonCounting": "Error de conteo"
+  ,"varianceReasonChange": "Error de cambio"
+  ,"varianceReasonHandling": "Error de manejo de efectivo"
+  ,"varianceReasonUnknown": "Diferencia operativa"
+  ,"saleExceptionAction": "Acciones posteriores a la venta"
+  ,"saleExceptionTitle": "Reembolso o anulación"
+  ,"fullRefundAction": "Reembolso total"
+  ,"partialRefundAction": "Reembolso parcial"
+  ,"voidSaleAction": "Anular venta"
+  ,"refundableAmountLabel": "Importe restante reembolsable"
+  ,"remainingRefundableQuantityLabel": "Cantidad restante"
+  ,"alreadyRefundedLabel": "Ya reembolsado"
+  ,"refundReasonLabel": "Motivo del reembolso"
+  ,"restockAction": "Reponer"
+  ,"doNotRestockAction": "No reponer"
+  ,"inspectionRequiredAction": "Requiere inspección"
+  ,"taxRefundLabel": "Reembolso de impuestos"
+  ,"discountAllocationLabel": "Asignación del descuento"
+  ,"tipRefundLabel": "Reembolso de propina"
+  ,"cashRefundLabel": "Reembolso en efectivo"
+  ,"manualTerminalRefundLabel": "Reembolso en terminal manual"
+  ,"manualTerminalRefundProviderNotice": "Procesa el reembolso en la terminal externa. UmiPOS registra tu observación. No prueba el éxito del proveedor."
+  ,"manualTerminalRefundOnCommitNotice": "El cobro se devolverá en la terminal al confirmar el reembolso."
+  ,"cardTerminalRefundLabel": "Reembolso en terminal de tarjeta"
+  ,"managerPinLabel": "PIN del gerente"
+  ,"approvalExpiredMessage": "La aprobación venció. Solicita una aprobación nueva."
+  ,"paymentOutcomeUnknownMessage": "Se desconoce el resultado de la terminal. Verifica la operación original."
+  ,"verifyTerminalAction": "Verificar resultado de la terminal"
+  ,"terminalRefundSuccessAction": "El reembolso externo tuvo éxito"
+  ,"terminalRefundFailureAction": "El reembolso externo falló"
+  ,"terminalRefundUnknownAction": "Se desconoce el resultado"
+  ,"refundBlockedMessage": "El servidor bloqueó esta acción posterior a la venta."
+  ,"refundPolicyExpiredMessage": "El periodo permitido para el reembolso venció."
+  ,"supportRequiredMessage": "Se requiere una revisión de soporte."
+  ,"compensatingReceiptTitle": "Recibo de reembolso"
+  ,"fullyRefundedLabel": "Reembolso total"
+  ,"partiallyRefundedLabel": "Reembolso parcial"
+  ,"voidedSaleLabel": "Venta anulada"
+  ,"recoveredRefundMessage": "Se restauró el resultado guardado del reembolso."
+  ,"refundCommittedMessage": "El reembolso quedó confirmado."
+  ,"refundPreviewAction": "Revisar reembolso"
+  ,"commitRefundAction": "Confirmar reembolso"
+  ,"refundConfirmationTitle": "¿Confirmar este reembolso?"
+  ,"refundConfirmationBody": "Esta acción crea ajustes permanentes. La venta original no cambia."
+  ,"originalSaleLabel": "Venta original"
+  ,"exceptionHistoryLabel": "Historial de ajustes"
+  ,"refundOperationFailedMessage": "No fue posible completar la acción de forma segura."
+  ,"selectRefundLinesMessage": "Selecciona al menos una línea reembolsable."
+  ,"refundReasonCustomerChangedMind": "El cliente cambió de opinión"
+  ,"refundReasonProductDefect": "Producto defectuoso"
+  ,"refundReasonIncorrectItem": "Producto incorrecto"
+  ,"refundReasonIncorrectQuantity": "Cantidad incorrecta"
+  ,"refundReasonDuplicateCharge": "Cobro duplicado"
+  ,"refundReasonQualityIssue": "Problema de calidad"
+  ,"refundReasonOrderPreparationError": "Error de preparación del pedido"
+  ,"refundReasonPricingError": "Error de precio"
+  ,"voidReasonOperatorError": "Error del operador"
+  ,"voidReasonDuplicateSale": "Venta duplicada"
+  ,"voidReasonIncorrectTender": "Forma de pago incorrecta"
+  ,"voidReasonSaleEnteredByMistake": "Venta registrada por error"
+  ,"otherApprovedReasonLabel": "Otro motivo aprobado"
+  ,"decreaseRefundQuantityTooltip": "Reducir cantidad del reembolso"
+  ,"increaseRefundQuantityTooltip": "Aumentar cantidad del reembolso"
+  ,"restockIntentLabel": "Decisión de reposición"
+  ,"restockNotApplicableLabel": "No aplica la reposición"
+  ,"restockInventoryReviewLabel": "Se requiere una revisión de inventario"
+  ,"sessionEndedReauth": "Tu sesión terminó. Vuelve a ingresar tu PIN."
+  ,"operatorShift": "Turno de {name}"
+  ,"@operatorShift": {
+    "description": "Label in the POS app bar naming the operator who holds the current turn.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStateOpenLabel": "Libre"
+  ,"tableStateSeatedLabel": "Ocupada"
+  ,"tableStateOrderedLabel": "Pedido tomado"
+  ,"tableStateServedLabel": "Servido"
+  ,"tableStateAwaitingPaymentLabel": "Por cobrar"
+  ,"tableStateDirtyLabel": "Por limpiar"
+  ,"tableStatePartySizeLabel": "{count} personas"
+  ,"@tableStatePartySizeLabel": {
+    "description": "Party size on a table that holds a party.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateElapsedLabel": "{duration} en mesa"
+  ,"@tableStateElapsedLabel": {
+    "description": "Turn timer of a seated table. duration is already formatted.",
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStateGroupLabel": "Grupo de {count} mesas"
+  ,"@tableStateGroupLabel": {
+    "description": "A merged table that belongs to a shared party.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateSeatAction": "Sentar"
+  ,"tableStateSeatTitle": "Sentar la mesa {table}"
+  ,"@tableStateSeatTitle": {
+    "description": "Title of the dialog that takes a party size before seating.",
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStatePartySizeField": "Personas"
+  ,"tableStateMoveAction": "Mover"
+  ,"tableStateMoveArmed": "Moviendo {table}. Toca una mesa libre."
+  ,"@tableStateMoveArmed": {
+    "description": "Hint shown while a seated party waits for its destination table.",
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tableStateSplitAction": "Dividir"
+  ,"tableStateClearAction": "Liberar mesa"
+  ,"tableStateReadyAction": "Mesa lista"
+  ,"tableStateOrderedAction": "Pedido enviado"
+  ,"tableStateServedAction": "Marcar servido"
+  ,"tableStateAwaitingPaymentAction": "Pedir la cuenta"
+  ,"tableStateSelectAction": "Seleccionar"
+  ,"tableStateMergeAction": "Combinar"
+  ,"tableStateSelectHint": "Selecciona dos o más mesas libres"
+  ,"tableStateSelectedCount": "{count} seleccionadas"
+  ,"@tableStateSelectedCount": {
+    "description": "How many free tables the operator has selected to merge.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateMergeTitle": "Combinar mesas"
+  ,"tableStateMergeSummary": "{tables} mesas · {seats} lugares"
+  ,"@tableStateMergeSummary": {
+    "description": "Combined size of the tables selected for a merge.",
+    "placeholders": {
+      "tables": {
+        "type": "int"
+      },
+      "seats": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateTargetOccupied": "Esa mesa ya tiene un grupo."
+  ,"tableStateTargetTooSmall": "Esa mesa no tiene lugar para {count} personas."
+  ,"@tableStateTargetTooSmall": {
+    "description": "Local refusal before a move that the target table cannot seat.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"tableStateFailureTitle": "No se pudo completar"
+  ,"tableStateFailureRefresh": "Actualizar plano"
+  ,"tableStateFailureAlreadyOccupiedMessage": "Esa mesa ya tiene un grupo."
+  ,"tableStateFailureAlreadyOccupiedRecovery": "Elige otra mesa, o actualiza el plano antes de volver a intentarlo."
+  ,"tableStateFailureCapacityExceededMessage": "El grupo es más grande de lo que cabe en la mesa."
+  ,"tableStateFailureCapacityExceededRecovery": "Elige una mesa más grande, o combina dos mesas."
+  ,"tableStateFailureNotOccupiedMessage": "No hay ningún grupo en esa mesa."
+  ,"tableStateFailureNotOccupiedRecovery": "Actualiza el plano: alguien más pudo haber liberado la mesa."
+  ,"tableStateFailureNotGroupedMessage": "Esa mesa no está combinada con otra."
+  ,"tableStateFailureNotGroupedRecovery": "Solo se puede dividir una mesa que está dentro de un grupo."
+  ,"tableStateFailureNotInPlanMessage": "Esa mesa no existe en el plano publicado."
+  ,"tableStateFailureNotInPlanRecovery": "Publica el plano desde el dashboard y actualiza la vista."
+  ,"tableStateFailureIdempotencyConflictMessage": "Ese cambio ya se envió antes con otro contenido."
+  ,"tableStateFailureIdempotencyConflictRecovery": "Actualiza el plano y repite la acción desde el estado actual."
+  ,"tableStateFailurePermissionDeniedMessage": "Tu rol no permite cambiar las mesas."
+  ,"tableStateFailurePermissionDeniedRecovery": "Pide a un gerente que lo haga, o entra con otro operador."
+  ,"tableStateFailurePlanNotPublishedMessage": "Esta sucursal no tiene un plano publicado."
+  ,"tableStateFailurePlanNotPublishedRecovery": "Publica el plano desde el dashboard para poder operar sus mesas."
+  ,"tableStateFailureGenericMessage": "No se pudo completar la acción en la mesa."
+  ,"tableStateFailureGenericRecovery": "Actualiza el plano y vuelve a intentarlo."
+  ,"tableStateCancelAction": "Cancelar"
+  ,"kitchenBoardTitle": "Cocina"
+  ,"kitchenBoardRefresh": "Actualizar"
+  ,"kitchenBoardLoadFailed": "No se pudo cargar la cocina."
+  ,"kitchenBoardEmpty": "Sin comandas en cocina."
+  ,"kitchenBoardTabTickets": "Comandas"
+  ,"kitchenPrepTab": "Preparación"
+  ,"kitchenPrepRefresh": "Recargar la preparación"
+  ,"kitchenPrepLoadFailed": "No se pudo cargar la preparación."
+  ,"kitchenPrepEmpty": "Aún no hay artículos con par. Define el par en Inventario."
+  ,"kitchenPrepWindow": "Uso previsto del {from} al {to}"
+  ,"@kitchenPrepWindow": {
+    "description": "The window the forecast usage covers. It comes from the response.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenPrepItemColumn": "Artículo"
+  ,"kitchenPrepUnitColumn": "Unidad"
+  ,"kitchenPrepParColumn": "Par"
+  ,"kitchenPrepOnHandColumn": "Existencia"
+  ,"kitchenPrepForecastColumn": "Uso previsto"
+  ,"kitchenPrepQuantityColumn": "Cantidad a preparar"
+  ,"kitchenPrepNoPar": "Sin par"
+  ,"kitchenStatusQueued": "En cola"
+  ,"kitchenStatusInPreparation": "En preparación"
+  ,"kitchenStatusPartiallyReady": "Parcial"
+  ,"kitchenStatusReady": "Listo"
+  ,"kitchenStatusException": "Excepción"
+  ,"kitchenPriorityUrgent": "Urgente"
+  ,"kitchenPriorityHigh": "Alta"
+  ,"kitchenElapsedNow": "ahora"
+  ,"kitchenElapsedMinutes": "{minutes} min"
+  ,"@kitchenElapsedMinutes": {
+    "description": "How long a kitchen ticket has been waiting.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenElapsedHoursMinutes": "{hours} h {minutes} min"
+  ,"@kitchenElapsedHoursMinutes": {
+    "description": "How long a kitchen ticket has been waiting, once it is over an hour.",
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  }
+  ,"kitchenElapsedDaysHours": "{days} d {hours} h"
+  ,"@kitchenElapsedDaysHours": {
+    "description": "How long a kitchen ticket has been waiting, once it is over a day. A ticket is not meant to reach this, and one that does must be readable at a glance rather than counted in minutes.",
+    "placeholders": {
+      "days": { "type": "int" },
+      "hours": { "type": "int" }
+    }
+  }
+  ,"kitchenItemMarkReady": "Marcar {item} como listo"
+  ,"@kitchenItemMarkReady": {
+    "description": "What a tap on one kitchen line does.",
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenItemAlreadyReady": "{item} ya está listo"
+  ,"@kitchenItemAlreadyReady": {
+    "description": "Read by a screen reader on a line that is already bumped.",
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenCourseGroup": "Curso {course}"
+  ,"@kitchenCourseGroup": {
+    "description": "The heading that names one course on a kitchen ticket. A ticket groups its lines by course so a dessert is not started with the starters.",
+    "placeholders": {
+      "course": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenCourseHeld": "En espera · {count}"
+  ,"@kitchenCourseHeld": {
+    "description": "The label on a course the kitchen has not been told to start. The count is how many lines it holds.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenCourseHeldNote": "No se prepara todavía"
+  ,"@kitchenCourseHeldNote": {
+    "description": "Says out loud that a held group is not work to start yet, so a cook does not begin it early."
+  }
+  ,"kitchenCourseFire": "Empezar curso {course}"
+  ,"@kitchenCourseFire": {
+    "description": "The one action that fires the next held course on a ticket.",
+    "placeholders": {
+      "course": {
+        "type": "int"
+      }
+    }
+  }
+  ,"kitchenItemHeld": "{item} aún no se prepara"
+  ,"@kitchenItemHeld": {
+    "description": "Read by a screen reader on a held line: it is not offered as work to start.",
+    "placeholders": {
+      "item": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenItemVoided": "ANULADO"
+  ,"kitchenTicketStartAction": "Empezar"
+  ,"kitchenTicketCompleteAction": "Terminar"
+  ,"kitchenTicketRecallAction": "Recuperar"
+  ,"kitchenTicketSending": "Enviando…"
+  ,"kitchenRecallTitle": "Recuperar comanda"
+  ,"kitchenRecallBody": "¿Por qué vuelve esta comanda a la cocina?"
+  ,"kitchenRecallReasonCustomerReturned": "El cliente lo devolvió"
+  ,"kitchenRecallReasonWrongItem": "Salió otro platillo"
+  ,"kitchenRecallReasonQuality": "No quedó bien"
+  ,"kitchenRecallReasonOther": "Otro motivo"
+  ,"kitchenRecallNoteLabel": "Nota (opcional)"
+  ,"kitchenRecallCancel": "Cancelar"
+  ,"kitchenFailureTitle": "La cocina no cambió"
+  ,"kitchenFailureRefresh": "Actualizar cocina"
+  ,"kitchenFailureVersionConflictMessage": "Alguien más ya movió la comanda {reference}."
+  ,"@kitchenFailureVersionConflictMessage": {
+    "description": "The ticket moved between the board read and the bump.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenFailureVersionConflictGenericMessage": "Alguien más ya movió esa comanda."
+  ,"kitchenFailureVersionConflictRecovery": "El tablero ya se actualizó. Revisa la comanda y marca lo que falte."
+  ,"kitchenFailureFingerprintMessage": "Ese cambio ya se envió antes con otro contenido, en la comanda {reference}."
+  ,"@kitchenFailureFingerprintMessage": {
+    "description": "The same command id was reused with different content.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenFailureFingerprintRecovery": "Actualiza el tablero y repite la acción desde el estado actual."
+  ,"kitchenFailureInvalidTransitionMessage": "La comanda no puede dar ese paso desde su estado actual."
+  ,"kitchenFailureInvalidTransitionRecovery": "Actualiza el tablero. Para regresar una comanda a la cocina, usa Recuperar en una comanda lista."
+  ,"kitchenFailurePermissionDeniedMessage": "Tu rol no permite mover la cocina."
+  ,"kitchenFailurePermissionDeniedRecovery": "Pide a un gerente que lo haga, o entra con otro operador."
+  ,"kitchenFailureTicketMissingMessage": "La comanda {reference} no llegó a la estación de este dispositivo."
+  ,"@kitchenFailureTicketMissingMessage": {
+    "description": "The route refused the ticket for this device: it is either gone from the board or outside this device's kitchen station scope.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenFailureTicketMissingGenericMessage": "Esa comanda no llegó a la estación de este dispositivo."
+  ,"kitchenFailureTicketMissingRecovery": "La comanda sigue en cocina. Actualiza el tablero y, si vuelve a pasar, pide a un gerente que revise que este dispositivo esté asignado a su estación."
+  ,"kitchenFailureDeviceMessage": "Este dispositivo ya no está registrado para la cocina."
+  ,"kitchenFailureDeviceRecovery": "Vuelve a registrar el dispositivo desde el dashboard."
+  ,"kitchenFailureGenericMessage": "No se pudo completar la acción en cocina."
+  ,"kitchenFailureGenericRecovery": "Actualiza el tablero y vuelve a intentarlo."
+  ,"terminalChargeTitle": "Cobro en terminal"
+  ,"terminalChargeInstruction": "Cobra {amount} en la terminal y confirma el resultado aquí."
+  ,"@terminalChargeInstruction": {
+    "description": "Read on the terminal face, above the operator declaration.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"terminalOperatorDeclaration": "La terminal es una declaración del operador: el POS no lee su resultado."
+  ,"terminalStatusLabel": "Estado"
+  ,"terminalStatusNotStarted": "Sin iniciar"
+  ,"terminalStatusProcessing": "Cobrando fuera del POS"
+  ,"terminalStatusConfirmed": "Cobro confirmado"
+  ,"terminalStatusFailed": "Fallo reportado"
+  ,"terminalStatusUnknown": "Resultado desconocido"
+  ,"terminalStatusCancelled": "Cancelado antes de cobrar"
+  ,"cardTerminalLabel": "Terminal de tarjeta"
+  ,"terminalWaitingTitle": "Esperando en la terminal…"
+  ,"terminalStopWaitingAction": "Dejar de esperar"
+  ,"terminalApprovedMessage": "La terminal aprobó el cobro."
+  ,"terminalDeclinedMessage": "La terminal rechazó el cobro ({code})."
+  ,"@terminalDeclinedMessage": {
+    "description": "The terminal's own refusal, with its own code, shown when a card charge is declined.",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  }
+  ,"terminalUnresolvedMessage": "Hay un cobro con tarjeta que nadie ha confirmado. La venta no se puede cerrar hasta resolverlo."
+  ,"terminalStoppedWaitingMessage": "Dejaste de esperar: la terminal puede seguir con el pedido. El intento queda registrado y se puede consultar."
+  ,"terminalLastAnswerLabel": "La terminal responde"
+  ,"terminalApprovedCollectMessage": "La terminal aprobó el cobro. Pulsa Cobrar para cerrar la venta."
+  ,"terminalDeclinedNoChargeMessage": "La terminal rechazó el cobro y no se cobró nada. Puedes cobrar en efectivo, o iniciar una venta nueva para reintentar con tarjeta."
+  ,"terminalUnavailableMessage": "La terminal de tarjeta no está disponible. Puedes cobrar en efectivo."
+  ,"terminalBusyMessage": "La terminal está ocupada con otro pedido. Vuelve a intentarlo."
+  ,"newSaleConfirmTitle": "¿Empezar una venta nueva?"
+  ,"newSaleConfirmBody": "Este carrito tiene {count} línea(s) sin cobrar. Se abandona y empieza una venta vacía; no se cobra nada por él."
+  ,"@newSaleConfirmBody": {
+    "description": "Asked before `Nueva venta` abandons a sale that is still in progress.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+  ,"keepCartAction": "Seguir con este carrito"
+  ,"tenderConflictTitle": "Este carrito no se puede cobrar así"
+  ,"tenderConflictBody": "Guarda un cobro dividido entre efectivo y tarjeta, y esta sucursal cobra un solo método por venta. El registro del cobro queda guardado para revisión; para seguir, empieza una venta nueva."
+  ,"splitTenderTitle": "Cobro dividido"
+  ,"splitTenderAction": "Dividir el pago"
+  ,"splitTenderCancelAction": "Un solo método"
+  ,"splitTenderPickSecond": "Elige el segundo método de pago."
+  ,"singleMethodOnlyNote": "Esta sucursal cobra con un solo método por venta."
+  ,"tenderShortBy": "Falta {amount}"
+  ,"@tenderShortBy": {
+    "description": "How much of a split payment the selected methods still do not cover.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"tenderOverBy": "Sobra {amount}"
+  ,"@tenderOverBy": {
+    "description": "How much a split payment takes beyond the bill.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"kitchenAllDayTooltip": "Pedidos de hoy: {ordered}. Pendientes de preparar: {outstanding}."
+  ,"@kitchenAllDayTooltip": {
+    "description": "What the all-day count on a kitchen item means, spoken by the tooltip and the screen reader.",
+    "placeholders": {
+      "ordered": {
+        "type": "int"
+      },
+      "outstanding": {
+        "type": "int"
+      }
+    }
+  }
+  ,"inventoryProductionAction": "Producir"
+  ,"inventoryProductionTitle": "Producir preparación"
+  ,"inventoryProductionOutputLabel": "Artículo producido"
+  ,"inventoryProductionQuantityLabel": "Cantidad que salió"
+  ,"inventoryProductionQuantityHelper": "Usa la escala y la unidad base del artículo."
+  ,"inventoryProductionLotLabel": "Lote (opcional)"
+  ,"inventoryProductionExpiryLabel": "Caducidad (opcional)"
+  ,"inventoryProductionExpiryHint": "AAAA-MM-DD"
+  ,"inventoryProductionResultTitle": "Lote producido"
+  ,"inventoryProductionLotReferenceLabel": "Lote"
+  ,"inventoryProductionExpiryReferenceLabel": "Caducidad"
+  ,"inventoryProductionProducedLabel": "Producido"
+  ,"inventoryProductionDeclaredLabel": "Rendimiento esperado"
+  ,"inventoryProductionYieldLossLabel": "Merma de rendimiento"
+  ,"inventoryProductionUnitCostLabel": "Costo unitario"
+  ,"inventoryProductionTotalCostLabel": "Costo del lote"
+  ,"inventoryProductionConsumedTitle": "Insumos consumidos"
+  ,"inventoryProductionIncompleteCostMessage": "Algunos insumos no tienen costo registrado."
+  ,"inventoryProductionNoCostLabel": "Sin costo"
+  ,"inventoryProductionRecipeRequiredMessage": "Este artículo no tiene receta de producción."
+  ,"inventoryProductionQuantityNotExactMessage": "La cantidad no se reparte de forma exacta entre los insumos de la receta."
+  ,"inventoryProductionInsufficientStockMessage": "No hay existencia suficiente de un insumo para producir este lote."
+  ,"inventoryUnitEach": "pza"
+  ,"inventoryUnitGram": "g"
+  ,"inventoryUnitKilogram": "kg"
+  ,"inventoryUnitMilliliter": "ml"
+  ,"inventoryUnitLiter": "L"
+  ,"inventoryUnitPortion": "porción"
+  ,"inventoryUnitPackage": "paquete"
+  ,"inventoryUnitBox": "caja"
+  ,"adoptShiftCardTitle": "Recuperar el turno"
+  ,"cashShiftCardTitle": "El turno"
+  ,"cashOpenedAtLabel": "Abierto"
+  ,"openingFloatRequiredHint": "El fondo inicial no puede quedar en cero."
+  ,"cashEquationLabel": "La cuenta del cajón"
+  ,"cashExpectedHiddenLabel": "Se revela al contar"
+  ,"cashExpectedHiddenHint": "El conteo ciego esconde el esperado hasta que envías tu conteo."
+  ,"cashSalesLabel": "Ventas en efectivo"
+  ,"cashPaidInLabel": "Ingresos"
+  ,"cashPaidOutLabel": "Retiros"
+  ,"cashSafeDropLabel": "Caja fuerte"
+  ,"cashAdjustmentsLabel": "Ajustes"
+  ,"cashPolicyLabel": "Política de la caja"
+  ,"cashPolicyCountLabel": "Conteo"
+  ,"cashPolicyAllowLabel": "Permitido"
+  ,"cashBlindCountOnLabel": "Conteo ciego"
+  ,"cashBlindCountOffLabel": "Conteo visible"
+  ,"cashOfflineRequiredLabel": "Requiere conexión"
+  ,"cashCloseApprovalLabel": "PIN cierre: diferencia >"
+  ,"cashMovementApprovalLabel": "PIN movimiento desde"
+  ,"cashJournalLabel": "Libro del turno"
+  ,"cashStepCountDetail": "Cuenta las denominaciones del cajón y envía el total."
+  ,"cashStepVarianceDetail": "Explica la diferencia para que quede en el historial."
+  ,"cashStepReconcileDetail": "El sistema compara el esperado contra el contado."
+  ,"cashStepCloseDetail": "El cierre es definitivo; el turno deja de aceptar efectivo."
+  ,"cashJournalEmptyMessage": "Sin movimientos todavía."
+  ,"cashCountObservationLabel": "Arqueo"
+  ,"cashVarianceResolutionLabel": "Resolución de diferencia"
+  ,"cashCloseAdjustmentLabel": "Ajuste de cierre"
+  ,"cancelCountAction": "Cancelar conteo y volver a abierto"
+  ,"cancelCountMessage": "El conteo queda en el historial. El cajón vuelve a aceptar efectivo."
+  ,"cashVarianceTitle": "Arqueo del cajón"
+  ,"cashVarianceBalancedLabel": "Sin diferencia"
+  ,"cashVarianceWithinToleranceLabel": "Dentro de tolerancia"
+  ,"cashVarianceOutsideToleranceLabel": "Fuera de tolerancia"
+  ,"cashPolicyMaxFloatLabel": "Fondo máximo"
+  ,"cashMovementReasonHint": "Ej. compra de hielo"
+  ,"cashMovementApprovalHint": "A partir de {amount} se pide el PIN del encargado."
+  ,"@cashMovementApprovalHint": {
+    "description": "States the amount above which a cash movement needs a manager PIN, shown inside the movement dialog.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"noSaleDialogHint": "Abrir el cajón sin venta queda en el historial con tu operador y el motivo."
+  ,"handoffDialogHint": "El turno pasa al operador entrante. El cajón no se mueve."
+  ,"countDialogBlindHint": "Conteo ciego: el esperado se revela cuando envías tu conteo."
+  ,"countDialogRecountHint": "Reconteo {attempt}: este conteo reemplaza al anterior en el historial."
+  ,"@countDialogRecountHint": {
+    "description": "Shown in the blind-count dialog when this count replaces an earlier one.",
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      }
+    }
+  }
+  ,"cashUnavailableTitle": "No se pudo leer el cajón"
+  ,"cashUnavailableHint": "Revisa la conexión y vuelve a intentar. Si sigue fallando, avisa al encargado antes de cobrar en efectivo."
+  ,"cashStatusReadyToClose": "Listo para cerrar"
+  ,"closeDialogApprovalHint": "Este cierre pide el PIN del encargado."
+  ,"denominationQuantityLabel": "Cantidad de {amount}"
+  ,"@denominationQuantityLabel": {
+    "description": "Accessible name of the quantity field for one cash denomination.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
+  ,"cashLastReadLabel": "Actualizado"
+  ,"cashLedgerSequenceLabel": "Secuencia del libro"
+  ,"cashReadOnlyTitle": "Solo consulta"
+  ,"cashReadOnlyMessage": "Con tus permisos actuales no hay acciones de caja para este turno. Puedes consultar la cuenta del cajón y el libro del turno; si necesitas mover efectivo o cerrar el turno, pídeselo a un encargado."
+  ,"cashDrawerUnansweredMessage": "El cajón no respondió. La operación quedó registrada; ábrelo a mano y avisa al encargado."
+  ,"cashPolicyUndefinedLabel": "Sin definir"
+  ,"cashPolicyExpiredTitle": "La política de caja venció"
+  ,"cashPolicyExpiredMessage": "Esta terminal no puede mover efectivo, contar ni cerrar hasta que el propietario publique una política vigente. El dinero del cajón no se toca."
+  ,"cashPolicyExpiresAtLabel": "Vigente hasta"
+  ,"cashPolicyVersionLabel": "Versión"
+  ,"cashOfflineLabel": "Efectivo sin conexión"
+  ,"cashOfflineUnavailableLabel": "No disponible aún"
+  ,"movementReasonRequiredMessage": "Escribe el motivo del movimiento."
+  ,"@movementReasonRequiredMessage": {
+    "description": "Error on the movement reason field when it is left empty."
+  }
+  ,"cashMovementApprovalScope": "Vas a aprobar {operation} de {amount}."
+  ,"@cashMovementApprovalScope": {
+    "description": "Says what a manager is being asked to approve: the operation and its amount.",
+    "placeholders": {
+      "operation": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "managerApprovalEyebrow": "Vas a autorizar"
+  ,"@managerApprovalEyebrow": {
+    "description": "Small label above the operation in the manager approval dialog."
+  }
+  ,"managerApprovalAction": "Autorizar"
+  ,"@managerApprovalAction": {
+    "description": "Primary button in the manager approval dialog. Names the act, not just 'confirm'."
+  }
+  ,"managerApprovalCancelAction": "Cancelar movimiento"
+  ,"@managerApprovalCancelAction": {
+    "description": "Secondary button in the manager approval dialog. Abandons the movement, not the screen."
+  }
+  ,"managerApprovalPinHint": "El encargado teclea su PIN."
+  ,"@managerApprovalPinHint": {
+    "description": "Says who is expected to enter the PIN in the approval dialog."
+  },
+  "@openShiftOnStrandedDrawerMessage": {
+    "description": "Says what opening a shift does when the chosen drawer was left behind by a terminal that no longer exists: the previous shift is blocked, uncounted, and the money stays in the drawer."
+  },
+  "openShiftOnStrandedDrawerMessage": "Esta caja quedó retenida por una terminal que ya no existe. Si abres el turno aquí, el turno anterior queda bloqueado y sin contar: el dinero sigue en el cajón.",
+  "cashVarianceNoApprovalLabel": "Sin aprobación",
+  "cashVarianceApprovalRequiredLabel": "Pide aprobación",
+  "@cashVarianceNoApprovalLabel": {
+    "description": "Says the over/short is inside the policy's tolerance, so the close will not ask a manager for a PIN."
+  },
+  "@cashVarianceApprovalRequiredLabel": {
+    "description": "Says the over/short is outside the policy's tolerance, so the close will ask a manager for a PIN."
+  },
+  "managerApprovalPinLocked": "El PIN está bloqueado en esta caja unos minutos. Ningún encargado podrá autorizar hasta que termine el bloqueo.",
+  "@managerApprovalPinLocked": {
+    "description": "The till itself is rate-limited: no credential on this device can authorize right now, so retrying is pointless."
+  },
+  "managerApprovalPinRefused": "Ese PIN no autoriza este movimiento. Prueba con otro encargado; si nadie tiene PIN en esta caja, pide a un administrador que lo dé de alta.",
+  "@managerApprovalPinRefused": {
+    "description": "The credential matched nothing. Names the two real possibilities: the wrong PIN, or a till with no manager credential enrolled at all."
+  },
+  "managerApprovalDrawerEffectTitle": "Efecto en el cajón",
+  "@managerApprovalDrawerEffectTitle": {
+    "description": "Heading over the two figures that show what the drawer holds now and what it will hold after the movement."
+  },
+  "managerApprovalDrawerNow": "En el cajón ahora",
+  "@managerApprovalDrawerNow": {
+    "description": "The expected cash in the drawer before the movement the manager is authorizing."
+  },
+  "managerApprovalDrawerAfter": "Después de este movimiento",
+  "@managerApprovalDrawerAfter": {
+    "description": "The expected cash in the drawer once the movement is booked."
+  },
+  "tableStatePanelTitle": "Mesa {table}",
+  "@tableStatePanelTitle": {
+    "description": "Heading of the persistent table detail panel. Combines the word for table with the published table label.",
+    "placeholders": {
+      "table": {
+        "type": "String"
+      }
+    }
+  },
+  "tableStatePanelEmpty": "Toca una mesa para ver su detalle.",
+  "@tableStatePanelEmpty": {
+    "description": "Shown in the persistent detail panel before any table is selected."
+  },
+  "tableStatePanelActions": "Acciones",
+  "@tableStatePanelActions": {
+    "description": "Heading over the contextual table actions in the detail panel."
+  },
+  "tableStateElapsedField": "Tiempo",
+  "@tableStateElapsedField": {
+    "description": "Label of the row that shows how long a party has held the table."
+  },
+  "tableStateGroupField": "Grupo",
+  "@tableStateGroupField": {
+    "description": "Label of the row that shows how many tables one party holds."
+  }
+}

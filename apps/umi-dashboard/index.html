@@ -1,15 +1,39 @@
 <!doctype html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=1440, initial-scale=1"/>
-  <title>Umi · Dash — Owner Console</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Let native controls (scrollbars, selects, date pickers) match the theme. -->
+    <meta name="color-scheme" content="light dark" />
+    <title>Umi · Dash — Owner Console</title>
+    <!-- Set the theme BEFORE first paint so the first frame is never the wrong
+         color. A stored value is a theme name (e.g. 'umi', 'midnight'); 'system'
+         stores nothing, so the OS preference governs through @media
+         (prefers-color-scheme) in @umi/tokens/dashboard.css. Kept inline and tiny
+         on purpose — it must run before the stylesheet applies. The name pattern
+         keeps it forward-compatible with new themes without editing this script.
+         Mirrors the storage key in src/lib/theme.js. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('umi-theme');
+          if (t && /^[a-z][a-z0-9-]*$/.test(t))
+            document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Inter Tight is the display face: Inter's tight-spaced cut, drawn for titles
+         and large figures. One variable file covers 400–700, so a 44px title and a
+         28px figure share the family without a second request. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400..700&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

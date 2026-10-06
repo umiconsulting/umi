@@ -1,0 +1,79 @@
+[
+  {
+    "file": "shopify-stocktake-desktop-br-stock-take-inventory-count.png",
+    "alt": "BR Stock Take: Inventory Count",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/icon/CITixLeg3_wCEAE=.png",
+    "bytes": 52792
+  },
+  {
+    "file": "shopify-stocktake-desktop-select-location-for-stocktake.png",
+    "alt": "Select location for stocktake",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/desktop_screenshot/CLvD0orQ7ZMDEAE=.png?height=360&width=640",
+    "bytes": 157394
+  },
+  {
+    "file": "shopify-stocktake-desktop-filter-product-variants-select-stocktake-type.png",
+    "alt": "Filter product variants & select stocktake type",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/desktop_screenshot/CKWMlZChnJQDEAE=.png?height=360&width=640",
+    "bytes": 166656
+  },
+  {
+    "file": "shopify-stocktake-desktop-scan-barcodes-or-edit-product-variant-counts.png",
+    "alt": "Scan barcodes or edit product / variant counts",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/desktop_screenshot/CNm_sdrP7ZMDEAE=.png?height=360&width=640",
+    "bytes": 194416
+  },
+  {
+    "file": "shopify-stocktake-desktop-import-export-menu.png",
+    "alt": "Import / export menu",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/desktop_screenshot/CK33uvbokJQDEAE=.png?height=720&width=1280",
+    "bytes": 685320
+  },
+  {
+    "file": "shopify-stocktake-desktop-view-stock-value-update-stock-count.png",
+    "alt": "View stock value & update stock count",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/desktop_screenshot/CM3wxOvdj5MDEAE=.png?height=720&width=1280",
+    "bytes": 946579
+  },
+  {
+    "file": "shopify-stocktake-desktop-preferences.png",
+    "alt": "Preferences",
+    "device": "desktop",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/desktop_screenshot/CPGMzuvdj5MDEAE=.png?height=720&width=1280",
+    "bytes": 966650
+  },
+  {
+    "file": "shopify-stocktake-mobile-mobile-phone-stock-list.png",
+    "alt": "Mobile phone stock list",
+    "device": "mobile",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/mobile_screenshot/CMWz8tHqo_ECEAE=.png?height=720&width=1280",
+    "bytes": 140419
+  },
+  {
+    "file": "shopify-stocktake-mobile-use-your-mobile-phone-camera-as-an-inventory-scanner.png",
+    "alt": "Use your Mobile phone camera as an inventory scanner",
+    "device": "mobile",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/mobile_screenshot/CPDq-9Hqo_ECEAE=.png?height=720&width=1280",
+    "bytes": 160656
+  },
+  {
+    "file": "shopify-stocktake-pos-ipad-camera-barcode-scanner.png",
+    "alt": "iPad camera barcode scanner",
+    "device": "pos",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/pos_screenshot/CKXs2pHqo_ECEAE=.png?height=720&width=1280",
+    "bytes": 1130510
+  },
+  {
+    "file": "shopify-stocktake-pos-detect-and-fix-inventory-data-issues.png",
+    "alt": "Detect and fix inventory data issues",
+    "device": "pos",
+    "src": "https://cdn.shopify.com/app-store/listing_images/7a0dba70e42c8cd67375b3f1623dbdbd/pos_screenshot/COD4_pHwl5YDEAE=.png?height=720&width=1280",
+    "bytes": 316171
+  }
+]

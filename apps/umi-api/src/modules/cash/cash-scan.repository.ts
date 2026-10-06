@@ -1,5 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
+import { isOpenAt, parseOpenHours } from '../business-hours/open-hours';
+import { WEEKDAY_INDEX } from '../../shared/format/weekday';
+import { LOYALTY_CARD_STATE_SQL, type LoyaltyCardState } from '../../shared/loyalty/card-state.sql';
+import {
+  ACTIVE_LADDER_ROWS_SQL,
+  CARD_OVERRIDE_ROW_SQL,
+} from '../../shared/loyalty/reward-config.sql';
+import type { RewardConfigRow } from '../../shared/loyalty/reward-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -8,23 +17,64 @@ export interface RewardConfig {
   id: string;
   visits_required: number;
   reward_name: string | null;
+  /** Café-authored copy, shown to the customer on her own card page. */
+  reward_description: string | null;
 }
 
-export interface ScanTenantConfig {
+export interface ScanMerchantConfig {
   name: string;
   timezone: string | null;
   lifecycleCopy: unknown;
   birthdayRewardName: string | null;
+  /** May staff credit more than one stamp in one action? See `seals()`. */
+  multiSealEnabled: boolean;
+}
+
+export interface CreditSealsInput {
+  merchantId: string;
+  cardId: string;
+  staffMemberId: string;
+  seals: number;
+  note: string | null;
+  idempotencyKey: string | null;
+  /**
+   * The lifecycle moment this credit leaves on the card, rendered by the service.
+   * Written on EVERY applied credit — the legacy seals route did, and the moment is
+   * the pass's only notification channel. Null clears a stale one.
+   */
+  momentMessage: string | null;
+}
+
+export interface CreditSealsResult {
+  /** The key had already been used: nothing was written this time. */
+  replayed: boolean;
+  /** Cycle position BEFORE the credit — the only input the reward maths needs. */
+  cycleBefore: number;
+  visitsRequired: number;
+  card: ScannedCard;
 }
 
 export interface PerformScanInput {
-  tenantId: string;
+  merchantId: string;
   cardId: string;
   staffMemberId: string | null;
   doBirthday: boolean;
   birthdayRewardId: string | null;
   doRedeem: boolean;
   rewardConfigId: string | null;
+  /**
+   * The redemption consumed one of the card's pre-ladder banked rewards, so the
+   * `pending_tier1` counter comes down by one with it. False when the reward handed
+   * over was the top tier (or the café runs no ladder).
+   */
+  decrementPendingTier1: boolean;
+  /**
+   * The canje was an EARLY CASH-OUT (`REDEEM_BASE`): the lower tier left the bar
+   * before the cycle completed, so the card is torn off — the cycle anchor moves to
+   * here and the canje is recorded as `cycle_reset` so it does not consume a banked
+   * reward. See 79_cycle_anchor.sql.
+   */
+  resetCycle: boolean;
   doVisit: boolean;
   earnedReward: boolean;
   newVisitsThisCycle: number;
@@ -32,48 +82,99 @@ export interface PerformScanInput {
   newQrToken: string;
 }
 
-export interface ScannedCard {
-  total_visits: number;
-  visits_this_cycle: number;
-  pending_rewards: number;
-  balance_cents: number;
-  card_number: string;
+/** One canje, as the revert path reads it. */
+export interface RedemptionRow {
+  id: string;
+  cardId: string;
+  rewardId: string | null;
+  revertedAt: Date | null;
+  /** The canje was an early cash-out (it consumed the cycle, not a banked reward). */
+  cycleReset: boolean;
 }
 
 /**
+ * What a scan reports back. It is the shared derived state, unchanged — the
+ * register and the wallet pass must never disagree about these numbers.
+ */
+export type ScannedCard = LoyaltyCardState;
+
+/**
  * Scan reads + the atomic visit/redeem/birthday mutation. Scan touches loyalty
- * STATE only (visits/rewards/birthday) — never money, so it must NOT call
- * applyWalletDelta or write points_ledger/wallet_transactions/balances.
- * Ported from umi-cash scan/route.ts; reward-cycle math is computed in the
- * service and applied here.
+ * STATE only (visits/rewards/birthday) — never money, so it must NOT write the
+ * card_ledger.
+ *
+ * DERIVED-STATE MODEL (canonical rebuild v2): `merchant.loyalty_card` is identity-only —
+ * the old total_visits / visits_this_cycle / pending_rewards / balance_cents
+ * caches are GONE. They are computed from the event tables on read:
+ *   total_visits       = COUNT(merchant.loyalty_visit)
+ *   visits_this_cycle  = total_visits % visits_required
+ *   pending_rewards    = floor(total_visits / visits_required)
+ *                          − COUNT(merchant.loyalty_redemption)
+ *   balance_cents      = COALESCE(SUM(merchant.loyalty_stored_value_ledger.delta), 0)
+ * where visits_required is the merchant's active merchant.loyalty_reward (default 10).
+ * The scan mutation therefore only appends the visit / reward_redemption rows
+ * (which it already did) and rotates the QR token — no cache to update.
  */
 @Injectable()
 export class CashScanRepository {
   constructor(private readonly pg: PgService) {}
 
-  async activeRewardConfig(tenantId: string): Promise<RewardConfig | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async activeRewardConfig(merchantId: string): Promise<RewardConfig | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<RewardConfig>(
-        `SELECT id::text, visits_required, reward_name
-         FROM loyalty.reward_configs
-         WHERE tenant_id = $1::uuid AND is_active = true
-         ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
-        [tenantId],
+        `SELECT id::text, stamps_required AS visits_required, name AS reward_name,
+                description AS reward_description
+         FROM merchant.loyalty_reward
+         WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           AND kind = 'standard'
+         ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+        [merchantId],
       ),
     );
     return rows[0] ?? null;
   }
 
-  async tenantConfig(tenantId: string): Promise<ScanTenantConfig | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  /**
+   * The three reward rows that decide what this card is working toward: the café's
+   * standard reward, the café's optional `upgrade` tier, and the card's own
+   * override. `resolveRewardProfile` turns them into one profile — the same
+   * resolution umi-cash ran, and the same one the wallet pass and the admin screens
+   * use, so the till and the customer's phone cannot disagree.
+   */
+  async rewardProfileRows(
+    merchantId: string,
+    cardId: string,
+  ): Promise<{
+    defaultConfig: RewardConfigRow | null;
+    upgradeConfig: RewardConfigRow | null;
+    overrideConfig: RewardConfigRow | null;
+  }> {
+    return this.pg.withMerchant(async (c) => {
+      const [rows, override] = await Promise.all([
+        c.query<Row>(ACTIVE_LADDER_ROWS_SQL, [merchantId]),
+        c.query<Row>(CARD_OVERRIDE_ROW_SQL, [merchantId, cardId]),
+      ]);
+      // Both statements are ordered newest-first within a kind, and a reward-config
+      // save inserts rather than updates.
+      return {
+        defaultConfig: (rows.rows.find((r) => r.kind === 'standard') as RewardConfigRow) ?? null,
+        upgradeConfig: (rows.rows.find((r) => r.kind === 'upgrade') as RewardConfigRow) ?? null,
+        overrideConfig: (override.rows[0] as RewardConfigRow) ?? null,
+      };
+    });
+  }
+
+  async merchantConfig(merchantId: string): Promise<ScanMerchantConfig | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT t.name, t.timezone,
-                p.branding->'lifecycle_copy' AS lifecycle_copy,
-                p.birthday_reward_name AS birthday_reward_name
-         FROM core.tenants AS t
-         LEFT JOIN loyalty.programs AS p ON p.tenant_id = t.id
+                s.lifecycle_copy AS lifecycle_copy,
+                s.birthday_reward_name AS birthday_reward_name,
+                s.multi_seal_enabled AS multi_seal_enabled
+         FROM merchant.merchant AS t
+         LEFT JOIN merchant.loyalty_program AS s ON s.merchant_id = t.id
          WHERE t.id = $1::uuid LIMIT 1`,
-        [tenantId],
+        [merchantId],
       ),
     );
     const r = rows[0];
@@ -83,103 +184,326 @@ export class CashScanRepository {
       timezone: r.timezone,
       lifecycleCopy: r.lifecycle_copy,
       birthdayRewardName: r.birthday_reward_name,
+      // The LEFT JOIN misses for a café with no loyalty program row at all, and
+      // a missing program is not permission to bulk-credit. OFF is the safe read.
+      multiSealEnabled: r.multi_seal_enabled === true,
     };
   }
 
   /** A visit within the last `seconds` (wallet 60s replay guard). */
-  async recentVisitWithin(
-    tenantId: string,
-    cardId: string,
-    seconds: number,
-  ): Promise<boolean> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async recentVisitWithin(merchantId: string, cardId: string, seconds: number): Promise<boolean> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query(
-        `SELECT 1 FROM loyalty.visit_events
-         WHERE tenant_id=$1::uuid AND loyalty_card_id=$2::uuid
+        `SELECT 1 FROM merchant.loyalty_visit
+         WHERE merchant_id=$1::uuid AND card_id=$2::uuid
            AND occurred_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
-        [tenantId, cardId, String(seconds)],
+        [merchantId, cardId, String(seconds)],
       ),
     );
     return rows.length > 0;
   }
 
-  /** A visit since tenant-timezone local midnight (1-per-day guard). DST-safe. */
-  async visitedToday(
-    tenantId: string,
-    cardId: string,
-    tz: string,
-  ): Promise<boolean> {
-    const { rows } = await this.pg.withTenant((c) =>
+  /** A visit since merchant-timezone local midnight (1-per-day guard). DST-safe. */
+  async visitedToday(merchantId: string, cardId: string, tz: string): Promise<boolean> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query(
-        `SELECT 1 FROM loyalty.visit_events
-         WHERE tenant_id=$1::uuid AND loyalty_card_id=$2::uuid
+        `SELECT 1 FROM merchant.loyalty_visit
+         WHERE merchant_id=$1::uuid AND card_id=$2::uuid
            AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
          LIMIT 1`,
-        [tenantId, cardId, tz],
+        [merchantId, cardId, tz],
       ),
     );
     return rows.length > 0;
+  }
+
+  /**
+   * The most recent visit today, or null. `visitedToday` answers the same
+   * question with a boolean and gates the write; preview shows staff WHEN the
+   * card was last stamped, so it needs the timestamp too.
+   */
+  async lastVisitToday(merchantId: string, cardId: string, tz: string): Promise<Date | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ occurred_at: Date }>(
+        `SELECT occurred_at FROM merchant.loyalty_visit
+         WHERE merchant_id=$1::uuid AND card_id=$2::uuid
+           AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
+         ORDER BY occurred_at DESC
+         LIMIT 1`,
+        [merchantId, cardId, tz],
+      ),
+    );
+    return rows[0]?.occurred_at ?? null;
+  }
+
+  /**
+   * Credit N stamps in ONE interaction ("Agregar sellos"): the catch-up for a
+   * customer who arrived from an external loyalty system, whose old stamps we
+   * cannot import.
+   *
+   * ONE ROW, not N. `merchant.loyalty_visit.stamps` carries the magnitude, and
+   * the derived state reads `SUM(stamps)` — so a single row worth 8 is worth 8
+   * stamps and still one visit. Writing 8 rows would fabricate 8 visits at the
+   * same microsecond, which is the history-destroying shape the backfill was
+   * corrected away from (20_merchant.sql:697).
+   *
+   * There is no cache to bump: pending rewards fall out of the same SUM.
+   *
+   * IDEMPOTENT BY INDEX, not by read-then-write. `loyalty_visit_idem_uq` is a
+   * partial unique index on (merchant_id, idempotency_key), so the database — not
+   * a prior SELECT — is what makes a double-tap land once. `DO NOTHING` returns
+   * no row, and that absence IS the replay signal.
+   *
+   * The card row is locked first so two concurrent credits on the same card read
+   * their cycle position one after the other; otherwise both could read the same
+   * "before" and both claim the reward it crossed.
+   */
+  async creditSeals(input: CreditSealsInput): Promise<CreditSealsResult> {
+    return this.pg.withMerchant(async (c) => {
+      const locked = await c.query(
+        `SELECT id FROM merchant.loyalty_card
+         WHERE merchant_id = $1::uuid AND id = $2::uuid
+         FOR UPDATE`,
+        [input.merchantId, input.cardId],
+      );
+      // No row → the card is not this merchant's, or RLS hides it. Same answer.
+      if (!locked.rows[0]) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+
+      const before = await this.cardState(c, input.merchantId, input.cardId);
+
+      const inserted = await c.query<{ id: string }>(
+        `INSERT INTO merchant.loyalty_visit
+           (merchant_id, card_id, staff_id, source, stamps, note, idempotency_key)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'manual_bulk', $4, $5, $6)
+         ON CONFLICT (merchant_id, idempotency_key) WHERE idempotency_key IS NOT NULL
+           DO NOTHING
+         RETURNING id`,
+        [
+          input.merchantId,
+          input.cardId,
+          input.staffMemberId,
+          input.seals,
+          input.note,
+          input.idempotencyKey,
+        ],
+      );
+      const replayed = inserted.rows.length === 0;
+
+      // ⚠️ THE CARD ROW IS TOUCHED ON EVERY APPLIED CREDIT, crossing or not, and that
+      // is not bookkeeping. Apple answers `passesUpdatedSince` by comparing the card
+      // row; a stamp that leaves `updated_at` alone makes the phone ask "anything
+      // new?", hear "no" (204), and show NOTHING — no stamp, and no notification,
+      // because a 204 delivers no changeMessage. Reported from a real phone:
+      // "intenté agregar un sello y me salió que sí se hizo, pero mi wallet no se
+      // actualizó y no me llegó ninguna notificación".
+      //
+      // A bulk credit crosses the threshold as many times as it must — the one place
+      // a single action can complete more than one cycle. Counted as a difference of
+      // floors so a credit landing mid-cycle is worth exactly the crossings it added.
+      if (!replayed) {
+        const crossed =
+          Math.floor(
+            (before.total_visits + input.seals - before.cycle_anchor) / before.visits_required,
+          ) - Math.floor((before.total_visits - before.cycle_anchor) / before.visits_required);
+        await c.query(
+          `UPDATE merchant.loyalty_card
+              SET rewards_earned = rewards_earned + $3,
+                  lifecycle_message = $4::text,
+                  lifecycle_message_at = CASE WHEN $4 IS NULL THEN NULL ELSE now() END,
+                  updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId, crossed, input.momentMessage],
+        );
+      }
+
+      return {
+        replayed,
+        cycleBefore: before.visits_this_cycle,
+        visitsRequired: before.visits_required,
+        card: replayed ? before : await this.cardState(c, input.merchantId, input.cardId),
+      };
+    });
+  }
+
+  /** The shared derived state, on a client already inside a transaction. */
+  private async cardState(c: PoolClient, merchantId: string, cardId: string): Promise<ScannedCard> {
+    const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [merchantId, cardId]);
+    if (!rows[0]) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+    return rows[0];
   }
 
   async recentRedemptionWithin(
-    tenantId: string,
+    merchantId: string,
     cardId: string,
     seconds: number,
   ): Promise<boolean> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query(
-        `SELECT 1 FROM loyalty.reward_redemptions
-         WHERE tenant_id=$1::uuid AND loyalty_card_id=$2::uuid
-           AND redeemed_at >= now() - ($3 || ' seconds')::interval
+        `SELECT 1 FROM merchant.loyalty_redemption
+         WHERE merchant_id=$1::uuid AND card_id=$2::uuid
+           AND occurred_at >= now() - ($3 || ' seconds')::interval
          LIMIT 1`,
-        [tenantId, cardId, String(seconds)],
+        [merchantId, cardId, String(seconds)],
       ),
     );
     return rows.length > 0;
   }
 
-  async activeBirthdayReward(
-    tenantId: string,
-    cardId: string,
-  ): Promise<{ id: string } | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async activeBirthdayReward(merchantId: string, cardId: string): Promise<{ id: string } | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<{ id: string }>(
-        `SELECT id::text FROM loyalty.birthday_rewards
-         WHERE tenant_id=$1::uuid AND loyalty_card_id=$2::uuid
+        `SELECT id::text FROM merchant.loyalty_birthday_grant
+         WHERE merchant_id=$1::uuid AND card_id=$2::uuid
            AND status='active' AND expires_at >= now()
          ORDER BY issued_at DESC LIMIT 1`,
-        [tenantId, cardId],
+        [merchantId, cardId],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /** One canje, scoped to the café it was made at. */
+  async findRedemption(merchantId: string, redemptionId: string): Promise<RedemptionRow | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<RedemptionRow>(
+        `SELECT id::text AS id, card_id::text AS "cardId", reward_id::text AS "rewardId",
+                reverted_at AS "revertedAt", cycle_reset AS "cycleReset"
+           FROM merchant.loyalty_redemption
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [merchantId, redemptionId],
       ),
     );
     return rows[0] ?? null;
   }
 
   /**
-   * Best-effort after-hours check against ops.business_hours in tenant tz.
-   * Returns true when closed/no row for the local weekday or outside opens..closes.
+   * Undo a canje: mark it reverted, and give the customer the reward back.
+   *
+   * THREE THINGS, and all three are needed for the undo to be an undo:
+   *
+   *  1. `reverted_at` + who did it. The row STAYS — the bitácora has to show that a
+   *     canje happened and was taken back, and the reversal is audited, not erased.
+   *  2. The reward comes back by itself: `pending_rewards` derives from the canjes
+   *     that still stand (card-state.sql.ts excludes reverted rows), so marking the
+   *     row is what restores it. There is no counter to increment here — which is
+   *     exactly why that filter had to exist before this route could be ported.
+   *  3. `pending_tier1` goes back up when the canje handed over the LOWER tier: the
+   *     tag is the record that this card is owed a lower-tier reward.
+   *
+   * The card row is locked for the transaction so a double-tap, or a scan landing
+   * at the same moment, cannot revert twice or credit two rewards.
    */
-  async isAfterHours(tenantId: string, tz: string): Promise<boolean> {
-    try {
-      const { rows } = await this.pg.withTenant((c) =>
-        c.query<Row>(
-          `WITH n AS (
-             SELECT (now() AT TIME ZONE $2) AS lt
-           )
-           SELECT bh.is_closed,
-                  (SELECT lt::time FROM n) AS now_time,
-                  bh.opens_at, bh.closes_at
-           FROM ops.business_hours bh, n
-           WHERE bh.tenant_id=$1::uuid
-             AND bh.day_of_week = extract(dow FROM (SELECT lt FROM n))::int
-           LIMIT 1`,
-          [tenantId, tz],
-        ),
+  async revertRedemption(input: {
+    merchantId: string;
+    redemptionId: string;
+    cardId: string;
+    staffMemberId: string | null;
+    /** The canje handed over the ladder's lower tier, so the tag comes back. */
+    restoreBaseTier: boolean;
+    /**
+     * The canje was an EARLY CASH-OUT. Reverting it hands the customer a BANKED
+     * reward back (not a cycle position: the visits it took are gone, and umi-cash
+     * made the same choice — "a banked capuccino is the honest restoration").
+     */
+    restoreEarnedReward: boolean;
+    /** The lock-screen line the customer sees: her reward is back. */
+    message: string;
+  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null }> {
+    return this.pg.withMerchant(async (c) => {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`card:${input.cardId}`]);
+
+      const fresh = await c.query<Row>(
+        `SELECT reverted_at AS "revertedAt" FROM merchant.loyalty_redemption
+          WHERE merchant_id = $1::uuid AND id = $2::uuid
+          FOR UPDATE`,
+        [input.merchantId, input.redemptionId],
       );
-      const r = rows[0];
-      if (!r) return true; // no row for today → treat as closed (matches cash)
-      if (r.is_closed) return true;
-      return r.now_time < r.opens_at || r.now_time >= r.closes_at;
+      if (!fresh.rows[0]) throw new NotFoundException('redemption_not_found');
+      if (fresh.rows[0].revertedAt) return { alreadyReverted: true, card: null };
+
+      await c.query(
+        `UPDATE merchant.loyalty_redemption
+            SET reverted_at = now(), reverted_by_staff_id = $3::uuid
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [input.merchantId, input.redemptionId, input.staffMemberId],
+      );
+      if (input.restoreBaseTier) {
+        await c.query(
+          `UPDATE merchant.loyalty_card SET pending_tier1 = pending_tier1 + 1, updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId],
+        );
+      }
+      // A reverted canje stops counting against pending_rewards by itself (the
+      // derivation excludes reverted rows). An early cash-out never counted in the
+      // first place, so undoing one has to hand a reward back explicitly.
+      if (input.restoreEarnedReward) {
+        await c.query(
+          `UPDATE merchant.loyalty_card SET rewards_earned = rewards_earned + 1, updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId],
+        );
+      }
+      await c.query(
+        `UPDATE merchant.loyalty_card
+            SET lifecycle_message = $3, lifecycle_message_at = now(), updated_at = now()
+          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        [input.merchantId, input.cardId, input.message],
+      );
+
+      const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
+        input.merchantId,
+        input.cardId,
+      ]);
+      return { alreadyReverted: false, card: rows[0] };
+    });
+  }
+
+  /**
+   * Best-effort after-hours flag for a staff scan, against `merchant.merchant.open_hours`
+   * in the café's timezone. True when the café has no hours for the local day, or the
+   * scan falls outside them.
+   *
+   * The evaluation is `open-hours.ts`, the same code the bot and the dashboard use —
+   * not a second implementation in SQL. The old version compared `now_time` against
+   * `opens_at`/`closes_at` in the query, which quietly could not represent a café open
+   * past midnight: `01:00 >= closes_at` is true for every window, so a late scan was
+   * always "after hours".
+   *
+   * SCOPE: the café's hours, not the location's. This endpoint has no location in scope —
+   * a staff scan carries a card and a merchant — so a location that keeps its own hours is
+   * not consulted here. Worth revisiting when the register carries its device's location.
+   */
+  async isAfterHours(merchantId: string, tz: string): Promise<boolean> {
+    try {
+      const rows = await this.pg.withMerchant((c) =>
+        c
+          .query<{ open_hours: unknown }>(
+            `SELECT open_hours FROM merchant.merchant WHERE id = $1::uuid`,
+            [merchantId],
+          )
+          .then((r) => r.rows),
+      );
+      if (!rows[0]) return true; // no café → treat as closed, as before
+      const hours = parseOpenHours(rows[0].open_hours);
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: tz,
+          weekday: 'long',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: 'numeric',
+          minute: 'numeric',
+          hour12: false,
+        })
+          .formatToParts(new Date())
+          .map((p) => [p.type, p.value]),
+      );
+      const dow = WEEKDAY_INDEX[parts.weekday] ?? 0;
+      const minutes = (parseInt(parts.hour, 10) % 24) * 60 + parseInt(parts.minute, 10);
+      return !isOpenAt(hours, dow, minutes, `${parts.year}-${parts.month}-${parts.day}`);
     } catch {
       return false; // non-blocking informational flag
     }
@@ -187,65 +511,121 @@ export class CashScanRepository {
 
   /**
    * Apply the selected actions in one transaction (BIRTHDAY → REDEEM → VISIT),
-   * then rotate the QR token. Returns the re-read card summary.
+   * rotate the QR token, then RE-DERIVE the card summary from the event tables
+   * (no caches on merchant.loyalty_card). The visit / reward_redemption inserts are the
+   * source of truth the derive reads back.
    */
   async performScan(input: PerformScanInput): Promise<ScannedCard> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
+      // ONE SCAN AT A TIME PER CARD. The derived numbers used to be pure functions
+      // of the events, so two concurrent scans could not corrupt anything the second
+      // one had not yet written. The card's anchors are that no longer: this is a
+      // read-modify-write, and the same lock the revert path takes keeps a
+      // double-tap, a retry and a two-device race from counting a reward twice.
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`card:${input.cardId}`]);
+
+      // State as the transaction sees it, UNDER the lock — not the copy the service
+      // read before it. Both anchors ride along in the shared query.
+      const before = await this.cardState(c, input.merchantId, input.cardId);
+
+      let cycleAnchor = before.cycle_anchor;
+      let rewardsEarned = before.rewards_earned;
+
       if (input.doBirthday && input.birthdayRewardId) {
         await c.query(
-          `UPDATE loyalty.birthday_rewards SET status='redeemed', redeemed_at=now()
-           WHERE tenant_id=$1::uuid AND id=$2::uuid`,
-          [input.tenantId, input.birthdayRewardId],
+          `UPDATE merchant.loyalty_birthday_grant SET status='redeemed', redeemed_at=now()
+           WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+          [input.merchantId, input.birthdayRewardId],
         );
       }
       if (input.doRedeem && input.rewardConfigId) {
         await c.query(
-          `INSERT INTO loyalty.reward_redemptions
-             (tenant_id, loyalty_card_id, reward_config_id, staff_member_id)
-           VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid)`,
-          [input.tenantId, input.cardId, input.rewardConfigId, input.staffMemberId],
+          `INSERT INTO merchant.loyalty_redemption
+             (merchant_id, card_id, reward_id, reason, staff_id, cycle_reset)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, 'stamps', $4::uuid, $5)`,
+          [
+            input.merchantId,
+            input.cardId,
+            input.rewardConfigId,
+            input.staffMemberId,
+            input.resetCycle,
+          ],
+        );
+      }
+      // An EARLY CASH-OUT tears the card off: the cycle restarts here, at the stamp
+      // count the customer has reached — which is why the position is not a modulo
+      // of the threshold any more, and why this anchor exists at all. Taken before
+      // the visit below, exactly as umi-cash ordered it (cycleNow = 0, then the
+      // visit lands on the fresh cycle).
+      if (input.doRedeem && input.resetCycle) {
+        cycleAnchor = before.total_visits;
+      }
+      // Handing over a pre-ladder banked reward retires one tag with it — the
+      // counter tracks exactly the rewards that are owed as the LOWER tier, so it
+      // must come down as they are handed over. GREATEST(0, …) so a counter that
+      // somehow drifted below the truth can never go negative (the column carries a
+      // CHECK for that, and a failing scan is worse than a clamped one).
+      if (input.doRedeem && input.decrementPendingTier1) {
+        await c.query(
+          `UPDATE merchant.loyalty_card
+              SET pending_tier1 = GREATEST(0, pending_tier1 - 1), updated_at = now()
+            WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+          [input.merchantId, input.cardId],
         );
       }
       if (input.doVisit) {
         await c.query(
-          `INSERT INTO loyalty.visit_events (tenant_id, loyalty_card_id, staff_member_id)
+          `INSERT INTO merchant.loyalty_visit (merchant_id, card_id, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid)`,
-          [input.tenantId, input.cardId, input.staffMemberId],
+          [input.merchantId, input.cardId, input.staffMemberId],
         );
+        // A visit that crosses the threshold COMPLETES a cycle, and nothing in the
+        // events records that: umi-cash incremented a cache. `rewards_earned` is
+        // that fact, stated. One visit is one stamp, so this is a single crossing at
+        // most, but the floor-difference form keeps it honest if the threshold ever
+        // shrank under a card.
+        const after = before.total_visits + 1;
+        rewardsEarned +=
+          Math.floor((after - cycleAnchor) / before.visits_required) -
+          Math.floor((before.total_visits - cycleAnchor) / before.visits_required);
       }
-      // One combined card update: cycle fields only on visit; pending_rewards
-      // applies BOTH deltas (−1 redeem, +1 earn) so a threshold {REDEEM,VISIT}
-      // nets to keep the freshly-earned reward; QR token always rotates.
-      const { rows } = await c.query<ScannedCard>(
-        `UPDATE loyalty.cards SET
-           total_visits = total_visits + (CASE WHEN $3 THEN 1 ELSE 0 END),
-           visits_this_cycle = CASE WHEN $3 THEN (CASE WHEN $4 THEN 0 ELSE $5 END) ELSE visits_this_cycle END,
-           pending_rewards = pending_rewards
-             - (CASE WHEN $6 THEN 1 ELSE 0 END)
-             + (CASE WHEN $3 AND $4 THEN 1 ELSE 0 END),
-           metadata = CASE WHEN $3
-             THEN COALESCE(metadata,'{}'::jsonb) || jsonb_build_object(
-               'lifecycle_message', $7::text,
-               'lifecycle_message_updated_at', $8::text)
-             ELSE metadata END,
-           qr_token = $9, qr_issued_at = now(), updated_at = now()
-         WHERE tenant_id=$1::uuid AND id=$2::uuid
-         RETURNING total_visits, visits_this_cycle, pending_rewards, balance_cents, card_number`,
+      // Rotate the QR token; stamp the lifecycle moment message on a visit. No
+      // ⚠️ THE MESSAGE IS WRITTEN ON EVERY SCAN, and it may be NULL. umi-cash wrote
+      // it unconditionally (`lifecycleMetadata(fresh.metadata, momentMessage)`), and
+      // that is what makes the field trustworthy: a scan with no moment CLEARS the
+      // previous one, so a "you earned a reward" line from this morning cannot
+      // linger on a pass through an afternoon redemption. Writing it only on visits
+      // left the redeem-only path (banked OR early cash-out — a real thing the
+      // register does) keeping whatever the last visit said. Found by the live
+      // rehearsal in REGISTER_FLIP_PARITY.md.
+      const upd = await c.query<{ card_number: string }>(
+        `UPDATE merchant.loyalty_card SET
+           lifecycle_message    = $3::text,
+           lifecycle_message_at = CASE WHEN $3 IS NULL THEN NULL ELSE now() END,
+           qr_token = $4, qr_issued_at = now(), updated_at = now(),
+           cycle_anchor = $5, rewards_earned = $6
+         WHERE merchant_id=$1::uuid AND id=$2::uuid
+         RETURNING card_number`,
         [
-          input.tenantId,
+          input.merchantId,
           input.cardId,
-          input.doVisit,
-          input.earnedReward,
-          input.newVisitsThisCycle,
-          input.doRedeem,
           input.momentMessage,
-          input.momentMessage ? new Date().toISOString() : null,
           input.newQrToken,
+          cycleAnchor,
+          rewardsEarned,
         ],
       );
       // No row → card vanished mid-scan or is RLS-filtered; surface a clear 404
       // instead of returning undefined (which callers read as ScannedCard).
-      if (!rows[0]) throw new NotFoundException('card_not_found');
+      if (!upd.rows[0]) throw new NotFoundException('card_not_found');
+
+      // Derived summary. The formula lives in one place
+      // because the wallet pass shows the same four numbers to the same customer
+      // at the same moment — see shared/loyalty/card-state.sql.ts.
+      const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
+        input.merchantId,
+        input.cardId,
+      ]);
       return rows[0];
     });
   }

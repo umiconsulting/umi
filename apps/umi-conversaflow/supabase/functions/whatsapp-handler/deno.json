@@ -1,9 +1,0 @@
-{
-  "imports": {
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
-    "@anthropic-ai/sdk": "https://esm.sh/@anthropic-ai/sdk@0.32.1"
-  },
-  "tasks": {
-    "test": "deno test --allow-env tools.test.ts"
-  }
-}

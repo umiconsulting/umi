@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Menu, X, ArrowRight } from "lucide-react";
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { Menu, X, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 const Logo = () => (
   <div className="flex items-center gap-2.5">
@@ -30,10 +30,10 @@ const Logo = () => (
 );
 
 const NAV_LINKS: Array<[string, string]> = [
-  ["Productos", "#productos"],
-  ["Sistema", "#proceso"],
-  ["Diagnóstico", "#diagnostico"],
-  ["Visión", "#testimonios"],
+  ['Productos', '#productos'],
+  ['Sistema', '#proceso'],
+  ['Diagnóstico', '#diagnostico'],
+  ['Visión', '#testimonios'],
 ];
 
 const Navbar = () => {
@@ -42,16 +42,16 @@ const Navbar = () => {
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? "py-2.5 bg-[#fffdf8]/90 backdrop-blur-xl border-b border-[var(--stroke)] shadow-[0_10px_30px_rgba(34,57,121,0.08)]"
-          : "py-4 bg-transparent"
+          ? 'py-2.5 bg-[#fffdf8]/90 backdrop-blur-xl border-b border-[var(--stroke)] shadow-[0_10px_30px_rgba(34,57,121,0.08)]'
+          : 'py-4 bg-transparent'
       }`}
     >
       <div className="container-wide flex items-center gap-10">

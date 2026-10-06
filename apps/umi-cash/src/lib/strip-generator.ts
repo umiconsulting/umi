@@ -9,6 +9,17 @@ import path from 'path';
 const STRIP_W = 1125; // @3x width
 const STRIP_H = 369;  // @3x height
 
+/**
+ * Fallback color for bonus stamps when a tenant ships no bonus art: an ice-blue
+ * tint (reads as "en las rocas" against the warm café palettes) applied to the
+ * regular stamp with sharp's LAB tint, which keeps the artwork's luminance — the
+ * cup stays a cup, the disc changes hue.
+ */
+const BONUS_TINT = { r: 120, g: 170, b: 210 };
+
+/** Slots at or above `fromIndex` are the ladder's bonus stamps, drawn in their own color. */
+export type BonusStamps = { fromIndex: number; filledUrl: string; emptyUrl: string };
+
 function hexToBg(hex?: string): { r: number; g: number; b: number; alpha: number } {
   if (!hex) return { r: 0, g: 0, b: 0, alpha: 0 }; // transparent — inherits pass primary color
   const r = parseInt(hex.slice(1, 3), 16);
@@ -46,9 +57,19 @@ async function loadStampImage(url: string): Promise<Buffer> {
   return buf;
 }
 
+/** Tenant-supplied bonus art when present; otherwise the regular stamp, tinted. */
+async function loadBonusStamp(url: string, regular: Buffer): Promise<Buffer> {
+  try {
+    return await loadStampImage(url);
+  } catch {
+    return sharp(regular).tint(BONUS_TINT).png().toBuffer();
+  }
+}
+
 /**
  * Generate a dynamic stamp-card strip image.
  * Shows filled stamps (with mascot) for completed visits, empty circles for remaining.
+ * With `bonus`, slots from `bonus.fromIndex` on use the bonus variants (two-tier ladder).
  */
 export async function generateStampStrip(
   visitsThisCycle: number,
@@ -57,13 +78,18 @@ export async function generateStampStrip(
   emptyStampUrl: string,
   stripBgColor?: string | null,
   welcomeStampUrl?: string | null,
+  bonus?: BonusStamps | null,
 ): Promise<Buffer> {
-  console.log(`[StampStrip] Generating strip: ${visitsThisCycle}/${visitsRequired} visits, bgColor=${stripBgColor}`);
+  console.log(`[StampStrip] Generating strip: ${visitsThisCycle}/${visitsRequired} visits, bgColor=${stripBgColor}, bonusFrom=${bonus?.fromIndex ?? '-'}`);
 
   const [filledBuf, emptyBuf] = await Promise.all([
     loadStampImage(filledStampUrl),
     loadStampImage(emptyStampUrl),
   ]);
+  const hasBonus = !!bonus && bonus.fromIndex > 0 && bonus.fromIndex < visitsRequired;
+  const [bonusFilledBuf, bonusEmptyBuf] = hasBonus
+    ? await Promise.all([loadBonusStamp(bonus!.filledUrl, filledBuf), loadBonusStamp(bonus!.emptyUrl, emptyBuf)])
+    : [null, null];
   // Welcome stamp is optional — only show on slot 0 when the customer hasn't used it yet
   let welcomeBuf: Buffer | null = null;
   if (welcomeStampUrl && visitsThisCycle === 0) {
@@ -93,6 +119,8 @@ export async function generateStampStrip(
   const welcomeStamp = welcomeBuf
     ? await sharp(welcomeBuf).resize(stampSize, stampSize).png().toBuffer()
     : null;
+  const bonusFilled = bonusFilledBuf ? await sharp(bonusFilledBuf).resize(stampSize, stampSize).png().toBuffer() : null;
+  const bonusEmpty = bonusEmptyBuf ? await sharp(bonusEmptyBuf).resize(stampSize, stampSize).png().toBuffer() : null;
 
   // Build composite operations
   const composites: sharp.OverlayOptions[] = [];
@@ -106,12 +134,13 @@ export async function generateStampStrip(
     const rowStartX = Math.floor((STRIP_W - rowW) / 2);
     const x = rowStartX + col * (stampSize + 10);
     const y = startY + row * (stampSize + 10);
+    const isBonus = hasBonus && i >= bonus!.fromIndex;
     const stampInput =
       i === 0 && welcomeStamp
         ? welcomeStamp
         : i < visitsThisCycle
-          ? filledStamp
-          : emptyStamp;
+          ? (isBonus && bonusFilled) || filledStamp
+          : (isBonus && bonusEmpty) || emptyStamp;
     composites.push({ input: stampInput, left: x, top: y });
   }
 

@@ -8,9 +8,7 @@ describe('RateLimitService', () => {
     const r2 = rl.hit('k', 3, 60_000);
     const r3 = rl.hit('k', 3, 60_000);
     const r4 = rl.hit('k', 3, 60_000);
-    expect([r1.allowed, r2.allowed, r3.allowed, r4.allowed]).toEqual([
-      true, true, true, false,
-    ]);
+    expect([r1.allowed, r2.allowed, r3.allowed, r4.allowed]).toEqual([true, true, true, false]);
     expect(r1.remaining).toBe(2);
     expect(r4.remaining).toBe(0);
   });

@@ -1,142 +1,406 @@
-export const PRODUCT_ACTIVE_STATUSES = new Set(['active', 'trialing'])
+// Single source of the entitlement vocabulary — @umi/contract/entitlements
+// (zero-dep, so importing it puts no validator in the shell's eager bundle;
+// resolved via the Vite source alias). Re-exported to keep this module's public
+// surface unchanged.
+//
+// The console is no longer zod-free everywhere: `@umi/contract/floor-plan`
+// is zod-aware and the floor-plan editor imports it. That screen is the one route
+// loaded with `lazy()` in `app.jsx`, so the validator lands in its own chunk and
+// not in the shared one — the reason the entry below stays on the zero-dep
+// `entitlements` entry, and the reason the laziness must not be removed.
+import { PRODUCT_ACTIVE_STATUSES } from '@umi/contract/entitlements';
+import { msg } from '@lingui/core/macro';
+export { PRODUCT_ACTIVE_STATUSES };
+
+// `label` is a Lingui message descriptor, not a string: this module runs at import
+// time, before a locale is active, so the text is resolved where it renders with
+// `i18n._(module.label)` (Sidebar, Topbar, GuardedScreen).
 
 export const MODULES = {
+  'floor-plan': {
+    id: 'floor-plan',
+    label: msg`Plano de mesas`,
+    icon: 'Layout',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    permissions: ['merchant.manage'],
+    locationScoped: true,
+  },
   overview: {
     id: 'overview',
-    label: 'Overview',
+    label: msg`Resumen`,
     icon: 'Home',
+    section: 'HOME',
+    product: 'dashboard',
+  },
+  operations: {
+    id: 'operations',
+    label: msg`Centro operativo`,
+    icon: 'Activity',
     section: 'OPERATIONS',
     product: 'dashboard',
+    permissions: [
+      'merchant.manage',
+      'audit.read',
+      'inventory.read',
+      'sale.lifecycle',
+      'sale.exception.read',
+      'cash.shift.read',
+      'customer.read',
+      'loyalty.read',
+      'wallet.read',
+      'gift_card.read',
+      'kitchen.read',
+      'device.enroll',
+      'catalog.read',
+    ],
+    locationScoped: true,
   },
   orders: {
     id: 'orders',
-    label: 'Pedidos',
+    label: msg`Pedidos`,
     icon: 'Receipt',
     section: 'OPERATIONS',
-    product: 'kds',
+    product: 'dashboard',
+    permissions: ['kitchen.read'],
     locationScoped: true,
   },
   devices: {
     id: 'devices',
-    label: 'Devices',
+    label: msg`Dispositivos`,
     icon: 'Tablet',
-    section: 'OPERATIONS',
-    product: 'kds',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    permissions: ['device.enroll'],
     locationScoped: true,
   },
   staff: {
     id: 'staff',
-    label: 'Staff & Access',
+    label: msg`Equipo y accesos`,
     icon: 'Users',
-    section: 'OPERATIONS',
+    section: 'BUSINESS',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   customers: {
     id: 'customers',
-    label: 'Customers',
+    label: msg`Clientes`,
     icon: 'Users2',
-    section: 'OPERATIONS',
+    section: 'CUSTOMERS',
     product: 'dashboard',
+    permissions: ['customer.read'],
   },
-  members: {
-    id: 'members',
-    label: 'Loyalty',
-    icon: 'CreditCard',
-    section: 'GROWTH',
-    product: 'cash',
+  triage: {
+    id: 'triage',
+    label: msg`Atención`,
+    icon: 'WhatsApp',
+    section: 'CUSTOMERS',
+    product: 'conversaflow',
+    permissions: ['customer.read'],
   },
-  'gift-cards': {
-    id: 'gift-cards',
-    label: 'Gift Cards',
-    icon: 'Gift',
-    section: 'GROWTH',
-    product: 'cash',
-  },
+  // `members` and `gift-cards` are folded into the `loyalty-value` hub. Their routes
+  // redirect there, so they no longer need their own module entries.
   hours: {
     id: 'hours',
-    label: 'Hours & Availability',
+    label: msg`Horarios`,
     icon: 'Clock',
     section: 'CONFIGURATION',
     product: 'conversaflow',
+    permissions: ['merchant.manage'],
     locationScoped: true,
   },
   settings: {
     id: 'settings',
-    label: 'Settings',
+    label: msg`Ajustes`,
     icon: 'Settings',
     section: 'CONFIGURATION',
     product: 'dashboard',
+    permissions: ['merchant.manage'],
   },
   'products-billing': {
     id: 'products-billing',
-    label: 'Products & Billing',
+    label: msg`Productos y facturación`,
     icon: 'Sparkles',
     section: 'CONFIGURATION',
     product: 'dashboard',
-    role: 'super_admin',
+    // PLATFORM, not café. This said `role: 'super_admin'`, which asks
+    // `hasRequiredRole` — and that reads `capabilities.membership.role`, a CAFÉ role
+    // of owner/admin/staff/viewer. `umi.role` marks super_admin `is_platform` and no
+    // membership carries it, so the check could only ever pass through the
+    // `permissions.includes('*')` escape hatch, and nothing produces '*' any more.
+    //
+    // REACHABLE, and today MASKED — worth stating both ways round. The one platform
+    // operator is also `staff` at Umi Cafe, and `findMembershipAccess` COALESCEs, so a
+    // café grant REPLACES the platform role in `roles`: selecting that café left her
+    // normalized role as `staff` and this screen refused her. It did not SHOW as this
+    // bug only because Umi Cafe holds no entitlements, so the product gate above
+    // refused her first. Give that café a subscription — or give any operator a job at
+    // an entitled one — and the screen starts appearing and disappearing with the
+    // switcher.
+    platform: 'super_admin',
   },
-}
+  cafes: {
+    id: 'cafes',
+    label: msg`Cafés`,
+    // Its own section because it is the one screen NOT scoped to the café in the
+    // switcher — it opens new ones. Filing it under CONFIGURATION would say it
+    // configures the selected café, which is the opposite of what it does.
+    section: 'PLATFORM',
+    icon: 'Store',
+    // No `product`: a platform screen is not entitled per café. `platform` is a
+    // different axis from `role`, which reads the CAFÉ membership.
+    platform: 'super_admin',
+  },
+  reportes: {
+    id: 'reportes',
+    label: msg`Reportes`,
+    icon: 'TrendUp',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: ['sale.lifecycle', 'sale.exception.read'],
+    locationScoped: true,
+    // A nested sidebar dropdown, not tabs. Ventas is the default page and owns the sales
+    // records, including the receipts/print-custody view reached from inside it; Reembolsos
+    // is the separate loss-prevention lens. See ADR 2026-09-08 (Reportes por trabajo, no
+    // por documento).
+    children: [
+      { id: 'reportes', label: msg`Ventas` },
+      { id: 'reportes/reembolsos', label: msg`Reembolsos` },
+    ],
+  },
+  'cash-shifts': {
+    id: 'cash-shifts',
+    label: msg`Caja y turnos`,
+    icon: 'DollarSign',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: ['cash.shift.read'],
+    locationScoped: true,
+    children: [
+      { id: 'cash-shifts', label: msg`Turnos de caja` },
+      { id: 'cash-shifts/registros', label: msg`Registros` },
+    ],
+  },
+  /*
+   * The old single hub, `catalog-inventory`, held six tabs: what the shop sells,
+   * what it names it, what it holds, how the kitchen makes it, when it prepares
+   * it, and what it buys. That is three objects wearing one name — a product is
+   * sold, an inventory item is held, and a recipe transforms one into the other.
+   * The design audit of 2026-09-18 measured 72 controls on that one screen, the
+   * highest in the dashboard, and it split the inventory domain across two
+   * top-level entries at the same time.
+   *
+   * The cut is now by object, and the count of destinations in BUSINESS is
+   * unchanged: `catalog-inventory` + `inventory-costing` become `products` +
+   * `inventory`, and costing moves in as a tab of the thing it reads.
+   *
+   * Sources: Square names one help topic "Items and inventory"; Shopify nests
+   * inventory under Products; Lightspeed, Loyverse, Fudo, and PoloTab keep them
+   * apart because their product and stock records are separate tables, as Umi's
+   * are. Both vendors in Umi's own market that document recipes file them under
+   * STOCK, not under the menu. See
+   * docs/research/2026-09-18-catalog-vs-inventory-ia.md.
+   */
+  products: {
+    id: 'products',
+    label: msg`Productos`,
+    icon: 'Package',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    permissions: ['catalog.read'],
+    locationScoped: true,
+    children: [
+      { id: 'products', label: msg`Productos` },
+      { id: 'products/categorias', label: msg`Categorías` },
+    ],
+  },
+  inventory: {
+    id: 'inventory',
+    label: msg`Inventario`,
+    icon: 'PackagePlus',
+    section: 'BUSINESS',
+    product: 'dashboard',
+    // `inventory.read` opens the hub. Each tab carries its own gate: the item list
+    // and the recipes read it, and the costing tab needs `merchant.manage` because
+    // its four reads do. The hub is the door; the tabs are the rooms.
+    permissions: ['inventory.read'],
+    locationScoped: true,
+    children: [
+      { id: 'inventory', label: msg`Artículos` },
+      { id: 'inventory/recetas', label: msg`Recetas` },
+      { id: 'inventory/preparacion', label: msg`Preparación` },
+      { id: 'inventory/costos', label: msg`Costos y márgenes` },
+      { id: 'inventory/compras', label: msg`Compras` },
+    ],
+  },
+  diagnostics: {
+    id: 'diagnostics',
+    label: msg`Diagnóstico`,
+    icon: 'Activity',
+    section: 'CONFIGURATION',
+    product: 'dashboard',
+    // Admin surface: recovery, audit, and diagnostics. Technical codes live here only.
+    permissions: ['audit.read', 'hardware.diagnostics'],
+  },
+  'loyalty-value': {
+    id: 'loyalty-value',
+    label: msg`Lealtad y valor`,
+    icon: 'CreditCard',
+    section: 'CUSTOMERS',
+    product: 'cash',
+    // Absorbs Lealtad and Tarjetas de regalo as tabs; adds rewards and wallet.
+    permissions: ['loyalty.read', 'gift_card.read', 'wallet.read'],
+  },
+  kitchen: {
+    id: 'kitchen',
+    label: msg`Cocina`,
+    icon: 'Monitor',
+    section: 'OPERATIONS',
+    product: 'dashboard',
+    permissions: ['kitchen.read'],
+    locationScoped: true,
+  },
+};
 
+// Order and grouping mirror the operator's day, not the data model. The sidebar
+// renders one section header per run of items that share a `section`, so the order
+// below must keep each section's items together. Sections in order:
+//   HOME · OPERATIONS · CUSTOMERS · BUSINESS · CONFIGURATION · PLATFORM.
+// `operations` (Centro operativo) stays as a bridge until each domain has a hub.
 export const MODULE_ORDER = [
+  // HOME — the daily cockpit.
   'overview',
+  // OPERATIONS — run the shop today. Centro operativo is dissolved from the nav; its
+  // /operations URL stays as a bridge for organization/locations/memberships until
+  // those get dedicated coverage.
   'orders',
+  'reportes',
+  'cash-shifts',
+  'kitchen',
+  // CUSTOMERS — the customer through-line. Loyalty, gift cards, rewards, and wallet
+  // are tabs of one "Lealtad y valor" hub now, not separate rows or a "Crecimiento" theme.
+  'customers',
+  'triage',
+  'loyalty-value',
+  // BUSINESS — the assets and people behind the shop.
+  'products',
+  'inventory',
+  'floor-plan',
   'devices',
   'staff',
-  'customers',
-  'members',
-  'gift-cards',
+  // CONFIGURATION — set up the business.
   'hours',
   'settings',
   'products-billing',
-]
+  'diagnostics',
+  // PLATFORM — outside the café hierarchy.
+  'cafes',
+];
 
 export function isProductActive(productKey, capabilities) {
-  const status = capabilities?.products?.[productKey]?.status
-  return PRODUCT_ACTIVE_STATUSES.has(status)
+  const status = capabilities?.products?.[productKey]?.status;
+  return PRODUCT_ACTIVE_STATUSES.has(status);
 }
 
+/**
+ * Does this login hold the PLATFORM grant the module asks for?
+ *
+ * ⚠️ A DIFFERENT AXIS FROM `hasRequiredRole`, which reads the café membership
+ * (`capabilities.membership.role`). A platform operator who also works at one
+ * café carries her CAFÉ role there, so the membership check hides a platform
+ * screen from exactly the person it is for. The session says the grant outright
+ * (`SessionEnvelope.platformRole`); this reads that.
+ */
+export function hasPlatformGrant(moduleConfig, platformRole) {
+  if (!moduleConfig?.platform) return true;
+  return platformRole === moduleConfig.platform;
+}
+
+/**
+ * The CAFÉ-role gate. Correct, and currently unused — `products-billing` was its only
+ * caller and named a PLATFORM grant, which `hasPlatformGrant` above answers instead.
+ *
+ * Kept because a café-role gate is a real thing a module may want. ⚠️ The value
+ * belongs to owner/admin/staff/viewer. A platform grant does not go here, however much
+ * the word "role" invites it.
+ */
 export function hasRequiredRole(moduleConfig, capabilities) {
-  if (!moduleConfig?.role) return true
-  const membership = capabilities?.membership
-  return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*')
+  if (!moduleConfig?.role) return true;
+  const membership = capabilities?.membership;
+  return membership?.role === moduleConfig.role || membership?.permissions?.includes?.('*');
 }
 
-export function getModuleAvailability(moduleKey, capabilities) {
-  const moduleConfig = MODULES[moduleKey]
+/**
+ * The PERMISSION gate, and the one the POS/operations modules use: a module names
+ * the `umi.permission` keys that open it, and the café membership must hold one.
+ * A third axis beside `role` (café role) and `platform` (platform grant).
+ */
+export function hasRequiredPermission(moduleConfig, capabilities) {
+  if (!moduleConfig?.permissions?.length) return true;
+  const permissions = capabilities?.membership?.permissions || [];
+  return (
+    permissions.includes('*') || moduleConfig.permissions.some((key) => permissions.includes(key))
+  );
+}
+
+export function getModuleAvailability(moduleKey, capabilities, platformRole = null) {
+  const moduleConfig = MODULES[moduleKey];
   if (!moduleConfig) {
-    return { available: false, reason: 'unknown_module' }
+    return { available: false, reason: 'unknown_module' };
   }
-  if (!isProductActive(moduleConfig.product, capabilities)) {
+  if (!hasPlatformGrant(moduleConfig, platformRole)) {
+    return { available: false, reason: 'platform_grant_required', platform: moduleConfig.platform };
+  }
+  // A platform module names no product; it is not entitled per café.
+  if (moduleConfig.product && !isProductActive(moduleConfig.product, capabilities)) {
     return {
       available: false,
       reason: 'product_missing',
       product: moduleConfig.product,
       locationScoped: !!moduleConfig.locationScoped,
-    }
+    };
   }
-  if (!hasRequiredRole(moduleConfig, capabilities)) {
+  if (!hasRequiredPermission(moduleConfig, capabilities)) {
     return {
       available: false,
-      reason: 'role_required',
-      role: moduleConfig.role,
+      reason: 'permission_required',
       locationScoped: !!moduleConfig.locationScoped,
-    }
+    };
   }
-  return { available: true, locationScoped: !!moduleConfig.locationScoped }
+  return { available: true, locationScoped: !!moduleConfig.locationScoped };
 }
 
 export function buildModuleAvailability(capabilities) {
   return Object.fromEntries(
-    MODULE_ORDER.map((moduleKey) => [moduleKey, getModuleAvailability(moduleKey, capabilities)])
-  )
+    MODULE_ORDER.map((moduleKey) => [moduleKey, getModuleAvailability(moduleKey, capabilities)]),
+  );
 }
 
-export function canShowModule(moduleKey, capabilities) {
-  return getModuleAvailability(moduleKey, capabilities).available
+export function canShowModule(moduleKey, capabilities, platformRole = null) {
+  return getModuleAvailability(moduleKey, capabilities, platformRole).available;
 }
 
-export function getVisibleModules(capabilities) {
-  return MODULE_ORDER
-    .filter((moduleKey) => canShowModule(moduleKey, capabilities))
-    .map((moduleKey) => MODULES[moduleKey])
+/**
+ * Whether a location-scoped screen has no branch to read.
+ *
+ * Being entitled to a screen and being able to fill it are different questions.
+ * Every `locationScoped` module reads its data per branch, and a café can exist
+ * with none: the backfill carried merchants across from the source system, and a
+ * merchant whose locations never came with them is a live café with no rooms to
+ * sell from. The screen then rendered an empty page under a working sidebar,
+ * which reads as a broken console rather than as a café that is not set up yet.
+ *
+ * An absent `capabilities` is a different case: the guard answers that one with
+ * "no café selected", so this leaves it alone and returns false.
+ */
+export function missingLocationFor(moduleKey, capabilities) {
+  if (!MODULES[moduleKey]?.locationScoped) return false;
+  const locations = capabilities?.locations;
+  return Array.isArray(locations) && locations.length === 0;
+}
+
+export function getVisibleModules(capabilities, platformRole = null) {
+  return MODULE_ORDER.filter((moduleKey) =>
+    canShowModule(moduleKey, capabilities, platformRole),
+  ).map((moduleKey) => MODULES[moduleKey]);
 }

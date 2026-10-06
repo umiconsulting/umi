@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 declare global {
   interface Window {
@@ -209,7 +209,7 @@ const FRAG_STRATA =
   }
 `;
 
-type PresetKey = "meridian" | "aurora" | "dither" | "mesh" | "strata";
+type PresetKey = 'meridian' | 'aurora' | 'dither' | 'mesh' | 'strata';
 
 const PRESETS: Record<PresetKey, string> = {
   meridian: FRAG_MERIDIAN,
@@ -237,7 +237,7 @@ class UmiShader {
   targetMouse: [number, number] = [0, 0];
   mouseActive = 0;
   targetMouseActive = 0;
-  currentPreset: PresetKey = "meridian";
+  currentPreset: PresetKey = 'meridian';
   programs: Partial<Record<PresetKey, ProgramInfo>> = {};
   t0 = performance.now();
   rafId = 0;
@@ -245,19 +245,24 @@ class UmiShader {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    let gl: WebGLRenderingContext | WebGL2RenderingContext | null =
-      canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false });
+    let gl: WebGLRenderingContext | WebGL2RenderingContext | null = canvas.getContext('webgl2', {
+      antialias: false,
+      premultipliedAlpha: false,
+    });
     this.isWebGL2 = !!gl;
     if (!gl) {
-      gl = canvas.getContext("webgl", { antialias: false, premultipliedAlpha: false }) as WebGLRenderingContext | null;
-      if (gl) gl.getExtension("OES_standard_derivatives");
+      gl = canvas.getContext('webgl', {
+        antialias: false,
+        premultipliedAlpha: false,
+      }) as WebGLRenderingContext | null;
+      if (gl) gl.getExtension('OES_standard_derivatives');
     }
-    if (!gl) throw new Error("WebGL not supported");
+    if (!gl) throw new Error('WebGL not supported');
     this.gl = gl;
-    this.buildProgram("meridian");
+    this.buildProgram('meridian');
     this.resize();
     this.resizeHandler = () => this.resize();
-    window.addEventListener("resize", this.resizeHandler);
+    window.addEventListener('resize', this.resizeHandler);
     this.loop = this.loop.bind(this);
     this.rafId = requestAnimationFrame(this.loop);
   }
@@ -271,13 +276,13 @@ class UmiShader {
     gl.compileShader(vs);
     let frag = PRESETS[name];
     if (!this.isWebGL2) {
-      frag = "#extension GL_OES_standard_derivatives : enable\n" + frag;
+      frag = '#extension GL_OES_standard_derivatives : enable\n' + frag;
     }
     const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
     gl.shaderSource(fs, frag);
     gl.compileShader(fs);
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-      console.error("frag error", name, gl.getShaderInfoLog(fs));
+      console.error('frag error', name, gl.getShaderInfoLog(fs));
     }
     const prog = gl.createProgram()!;
     gl.attachShader(prog, vs);
@@ -285,20 +290,16 @@ class UmiShader {
     gl.linkProgram(prog);
     const buf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(
-      gl.ARRAY_BUFFER,
-      new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
-      gl.STATIC_DRAW
-    );
-    const loc = gl.getAttribLocation(prog, "a");
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a');
     const info: ProgramInfo = {
       prog,
       buf,
       loc,
-      uRes: gl.getUniformLocation(prog, "uRes"),
-      uTime: gl.getUniformLocation(prog, "uTime"),
-      uMouse: gl.getUniformLocation(prog, "uMouse"),
-      uMouseActive: gl.getUniformLocation(prog, "uMouseActive"),
+      uRes: gl.getUniformLocation(prog, 'uRes'),
+      uTime: gl.getUniformLocation(prog, 'uTime'),
+      uMouse: gl.getUniformLocation(prog, 'uMouse'),
+      uMouseActive: gl.getUniformLocation(prog, 'uMouseActive'),
     };
     this.programs[name] = info;
     return info;
@@ -316,8 +317,8 @@ class UmiShader {
     const h = Math.floor(window.innerHeight * dpr);
     this.canvas.width = w;
     this.canvas.height = h;
-    this.canvas.style.width = window.innerWidth + "px";
-    this.canvas.style.height = window.innerHeight + "px";
+    this.canvas.style.width = window.innerWidth + 'px';
+    this.canvas.style.height = window.innerHeight + 'px';
     this.gl.viewport(0, 0, w, h);
   }
 
@@ -342,20 +343,20 @@ class UmiShader {
 
   destroy() {
     cancelAnimationFrame(this.rafId);
-    window.removeEventListener("resize", this.resizeHandler);
+    window.removeEventListener('resize', this.resizeHandler);
   }
 }
 
 export default function ShaderBackground() {
   useEffect(() => {
-    const canvas = document.getElementById("umi-shader-canvas") as HTMLCanvasElement | null;
+    const canvas = document.getElementById('umi-shader-canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
     let shader: UmiShader;
     try {
       shader = new UmiShader(canvas);
       window.__umiShader = shader;
     } catch (e) {
-      console.warn("Shader init failed", e);
+      console.warn('Shader init failed', e);
       return;
     }
     return () => {

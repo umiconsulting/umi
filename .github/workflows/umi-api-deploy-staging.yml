@@ -1,0 +1,61 @@
+# Deploys build-v3 to the VPS QA stack on every merge to build-v3. Thin caller of
+# the reusable deploy-backend workflow — see .github/workflows/deploy-backend.yml.
+#
+# This is the build-v3 twin of umi-api-deploy.yml (which ships main to prod).
+# Until now build-v3 had no deployment path at all: the QA stack was updated by
+# hand on the box, so the running image and the checkout routinely disagreed —
+# on 2026-09-25 the checkout sat at 3bf06d5 while the image running reported
+# d0cb3d3. Nothing on the box said which was true.
+#
+# It ships the same image prod does, built from this branch, into a separate
+# compose project on the same host — see deploy/staging/compose.yml.
+name: umi-api deploy (staging)
+
+on:
+  push:
+    branches: [build-v3]
+    paths:
+      - 'apps/umi-api/**'
+      - 'packages/contract/**'
+      - 'deploy/staging/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - 'turbo.json'
+      - '.github/workflows/umi-api-deploy-staging.yml'
+      - '.github/workflows/deploy-backend.yml'
+  # The QA box is also the place to re-roll after fixing something on it, without
+  # inventing a commit first.
+  workflow_dispatch:
+
+# Never run two staging deploys at once; let an in-flight one finish. Deliberately
+# a different group from prod's, so a staging roll can never cancel a prod one.
+concurrency:
+  group: deploy-umi-api-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      app_name: umi-api
+      app_dir: apps/umi-api
+      package_name: '@umi/api'
+      image: ghcr.io/umiconsulting/umi-api
+      health_url: https://api-staging.umiconsulting.co/health
+      # The build-v3 checkout on the box. deploy.sh git-resets it to the branch
+      # before rolling containers, so what runs always matches what CI built.
+      repo_dir: /home/juan/umi-buildv3
+      branch: build-v3
+      # The QA stack's compose file now lives in the repo; its .env, certs and
+      # secrets deliberately do not (gitignored state that must survive the
+      # reset). UMI_PROJECT_DIR keeps them resolving where they have always been.
+      compose_file: deploy/staging/compose.yml
+      project_dir: /home/juan/umi-api-test
+      # Never touch :latest — that tag is prod's human reference.
+      push_latest: false
+    secrets: inherit

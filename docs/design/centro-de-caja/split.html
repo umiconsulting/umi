@@ -1,0 +1,1587 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Till o back office · Centro de caja</title>
+    <meta
+      name="description"
+      content="Tablero de decisión: qué vive en el till y qué vive en el back office."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --s1: 0.25rem;
+        --s2: 0.5rem;
+        --s3: 0.75rem;
+        --s4: 1rem;
+        --s5: 1.5rem;
+        --r-ctl: 0.875rem;
+        --r-card: 1.25rem;
+        --r-pill: 999px;
+        --fs-micro: 0.6875rem;
+        --fs-xs: 0.75rem;
+        --fs-sm: 0.8125rem;
+        --fs-base: 0.875rem;
+        --fs-md: 0.9375rem;
+        --fs-lg: 1.0625rem;
+        --fs-xl: 1.375rem;
+        --font:
+          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+          sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        --t-fast: 120ms;
+        --t-base: 220ms;
+        --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --bg: #f6f6fb;
+        --surface: #fff;
+        --surface-2: #fbfbfe;
+        --surface-3: #f1f2f8;
+        --line: #e3e4ec;
+        --line-2: #ededf4;
+        --ink: #14161b;
+        --ink-2: #3d4254;
+        --ink-3: #5b6172;
+        --ink-4: #6b7280;
+        --brand: #2e7dff;
+        --brand-strong: #1f6ae8;
+        --on-brand: #fff;
+        --brand-ink: #0b4dba;
+        --brand-tint: #ecf3ff;
+        --brand-line: #c9dcff;
+        --ok: #0b6b41;
+        --ok-tint: #e8f6ee;
+        --ok-line: #bfe3ce;
+        --warn: #8a5200;
+        --warn-tint: #fdf4e3;
+        --warn-line: #f0dcae;
+        --danger: #b3261e;
+        --danger-tint: #fdecea;
+        --danger-line: #f2c5c1;
+        --shadow-1: 0 1px 2px rgba(18, 20, 28, 0.05), 0 1px 1px rgba(18, 20, 28, 0.03);
+        --shadow-2: 0 10px 28px -16px rgba(18, 20, 28, 0.24), 0 1px 2px rgba(18, 20, 28, 0.05);
+      }
+      html[data-theme='dark'] {
+        --bg: #0f1015;
+        --surface: #181a21;
+        --surface-2: #1d2029;
+        --surface-3: #232733;
+        --line: #2b2f3a;
+        --line-2: #242833;
+        --ink: #eef0f6;
+        --ink-2: #c9cedb;
+        --ink-3: #a6adbe;
+        --ink-4: #8f97aa;
+        --brand: #6aa4ff;
+        --brand-strong: #6aa4ff;
+        --on-brand: #0b1220;
+        --brand-ink: #a9c9ff;
+        --brand-tint: rgba(106, 164, 255, 0.14);
+        --brand-line: rgba(106, 164, 255, 0.34);
+        --ok: #5ad39a;
+        --ok-tint: rgba(90, 211, 154, 0.13);
+        --ok-line: rgba(90, 211, 154, 0.32);
+        --warn: #e6a94a;
+        --warn-tint: rgba(230, 169, 74, 0.13);
+        --warn-line: rgba(230, 169, 74, 0.32);
+        --danger: #ff8078;
+        --danger-tint: rgba(255, 128, 120, 0.13);
+        --danger-line: rgba(255, 128, 120, 0.34);
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+        --shadow-2: 0 12px 30px -18px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.35);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            120rem 40rem at 100% -10%,
+            color-mix(in srgb, var(--brand) 7%, transparent),
+            transparent 60%
+          ),
+          var(--bg);
+        color: var(--ink);
+        font-family: var(--font);
+        font-size: var(--fs-base);
+        line-height: 1.45;
+        padding: var(--s3);
+        display: flex;
+        flex-direction: column;
+        gap: var(--s3);
+        min-height: 100dvh;
+      }
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-weight: 600;
+        letter-spacing: -0.011em;
+      }
+      p {
+        margin: 0;
+      }
+      ul,
+      ol,
+      dl {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid var(--brand);
+        outline-offset: 2px;
+        border-radius: var(--r-ctl);
+      }
+      .sr {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      header.top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--s4);
+        flex-wrap: wrap;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r-card);
+        padding: var(--s3) var(--s4);
+        box-shadow: var(--shadow-1);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: var(--s3);
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: var(--r-ctl);
+        background: var(--brand-strong);
+        color: var(--on-brand);
+        font-weight: 700;
+        font-size: var(--fs-lg);
+      }
+      .brand h1 {
+        font-size: var(--fs-lg);
+      }
+      .brand p {
+        color: var(--ink-3);
+        font-size: var(--fs-xs);
+      }
+      .top-actions {
+        display: flex;
+        gap: var(--s2);
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        min-height: 2.75rem;
+        padding: 0 var(--s3);
+        border: 1px solid var(--line);
+        border-radius: var(--r-ctl);
+        background: var(--surface-2);
+        font-size: var(--fs-sm);
+        font-weight: 500;
+        color: var(--ink-2);
+      }
+      .btn:hover {
+        border-color: var(--ink-4);
+        color: var(--ink);
+      }
+      .btn--pri {
+        background: var(--brand-strong);
+        border-color: var(--brand-strong);
+        color: var(--on-brand);
+        font-weight: 600;
+      }
+      .btn--pri:hover {
+        color: var(--on-brand);
+        filter: brightness(1.06);
+      }
+
+      .rules {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r-card);
+        padding: var(--s3) var(--s4);
+        box-shadow: var(--shadow-1);
+      }
+      .rules h2 {
+        font-size: var(--fs-micro);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        margin-bottom: var(--s2);
+      }
+      .rules ol {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+        gap: var(--s1) var(--s4);
+      }
+      .rules li {
+        display: flex;
+        gap: var(--s2);
+        font-size: var(--fs-sm);
+        color: var(--ink-2);
+      }
+      .rid {
+        font-family: var(--mono);
+        font-size: var(--fs-micro);
+        font-weight: 600;
+        color: var(--brand-ink);
+        background: var(--brand-tint);
+        border: 1px solid var(--brand-line);
+        border-radius: 0.35rem;
+        padding: 0 0.25rem;
+        height: 1.1rem;
+        line-height: 1.1rem;
+        flex: 0 0 auto;
+      }
+
+      .summary {
+        display: flex;
+        align-items: center;
+        gap: var(--s3);
+        flex-wrap: wrap;
+        padding: var(--s2) var(--s3);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r-card);
+        box-shadow: var(--shadow-1);
+      }
+      .stat {
+        display: flex;
+        align-items: baseline;
+        gap: var(--s1);
+        font-size: var(--fs-sm);
+        color: var(--ink-3);
+      }
+      .stat b {
+        font-size: var(--fs-lg);
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+      .bar {
+        display: flex;
+        height: 0.5rem;
+        border-radius: 99px;
+        overflow: hidden;
+        background: var(--surface-3);
+        flex: 1 1 12rem;
+        min-width: 8rem;
+      }
+      .bar i {
+        display: block;
+        transition: width var(--t-base) var(--ease);
+      }
+      .bar .b-till {
+        background: var(--brand);
+      }
+      .bar .b-both {
+        background: color-mix(in srgb, var(--brand) 45%, var(--surface-3));
+      }
+      .bar .b-bo {
+        background: var(--ink-4);
+      }
+      .filters {
+        display: flex;
+        gap: var(--s1);
+        flex-wrap: wrap;
+      }
+      .chip {
+        min-height: 2.75rem;
+        padding: 0 0.7rem;
+        border-radius: var(--r-pill);
+        border: 1px solid var(--line);
+        background: var(--surface-2);
+        font-size: var(--fs-xs);
+        font-weight: 500;
+        color: var(--ink-3);
+      }
+      .chip.is-on {
+        background: var(--brand-tint);
+        border-color: var(--brand-line);
+        color: var(--brand-ink);
+      }
+      .chip .n {
+        font-variant-numeric: tabular-nums;
+        opacity: 0.7;
+        margin-left: 0.2rem;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--s3);
+        align-items: start;
+      }
+      .lane {
+        display: flex;
+        flex-direction: column;
+        gap: var(--s2);
+        min-width: 0;
+      }
+      .lane > h2 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--s2);
+        font-size: var(--fs-micro);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-3);
+        padding: var(--s2) var(--s3);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r-ctl);
+      }
+      .lane > h2 .n {
+        font-family: var(--mono);
+        color: var(--ink);
+      }
+      .lane--till > h2 {
+        border-color: var(--brand-line);
+        background: var(--brand-tint);
+        color: var(--brand-ink);
+      }
+      .lane--bo > h2 {
+        border-color: var(--ink-4);
+        color: var(--ink-2);
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r-card);
+        padding: var(--s3);
+        box-shadow: var(--shadow-1);
+        display: flex;
+        flex-direction: column;
+        gap: var(--s2);
+        animation: pop var(--t-base) var(--ease);
+      }
+      @keyframes pop {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .card {
+          animation: none;
+        }
+        .bar i {
+          transition: none;
+        }
+      }
+      .card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--s2);
+      }
+      .card h3 {
+        font-size: var(--fs-md);
+        line-height: 1.25;
+      }
+      .area {
+        font-size: var(--fs-micro);
+        color: var(--ink-4);
+        white-space: nowrap;
+      }
+      .why {
+        display: flex;
+        gap: var(--s2);
+        align-items: flex-start;
+        font-size: var(--fs-sm);
+        color: var(--ink-2);
+      }
+      .why .rid {
+        margin-top: 0.1rem;
+      }
+      .forms {
+        display: flex;
+        flex-direction: column;
+        gap: var(--s1);
+        border-top: 1px dashed var(--line-2);
+        padding-top: var(--s2);
+      }
+      .form {
+        display: grid;
+        grid-template-columns: 6.4rem minmax(0, 1fr);
+        gap: var(--s2);
+        font-size: var(--fs-xs);
+        color: var(--ink-3);
+        line-height: 1.35;
+      }
+      .form .where {
+        color: var(--ink-4);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: var(--fs-micro);
+      }
+      .form b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .own {
+        font-size: var(--fs-micro);
+        color: var(--ink-4);
+        border-left: 2px solid var(--line);
+        padding-left: var(--s2);
+      }
+      .rec {
+        font-size: var(--fs-micro);
+        color: var(--ink-4);
+      }
+      .rec b {
+        color: var(--ink-3);
+        font-weight: 600;
+      }
+      .seg {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2px;
+        background: var(--surface-3);
+        border-radius: var(--r-ctl);
+        padding: 2px;
+      }
+      .seg button {
+        min-height: 2.75rem;
+        border-radius: 0.7rem;
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        color: var(--ink-3);
+      }
+      .seg button:hover {
+        color: var(--ink);
+      }
+      .seg button[aria-pressed='true'] {
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: var(--shadow-1);
+      }
+      .seg button[data-v='till'][aria-pressed='true'] {
+        background: var(--brand-tint);
+        color: var(--brand-ink);
+        box-shadow: inset 0 0 0 1px var(--brand-line);
+      }
+      .seg button[data-v='bo'][aria-pressed='true'] {
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: inset 0 0 0 1px var(--ink-4);
+      }
+      .dev {
+        border-left: 2px solid var(--warn);
+        padding-left: var(--s2);
+        font-size: var(--fs-micro);
+        color: var(--warn);
+      }
+      .lane .empty {
+        color: var(--ink-4);
+        font-size: var(--fs-sm);
+        padding: var(--s3);
+        text-align: center;
+        border: 1px dashed var(--line);
+        border-radius: var(--r-ctl);
+      }
+
+      details.out {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--r-card);
+        padding: var(--s3) var(--s4);
+      }
+      details.out summary {
+        cursor: pointer;
+        font-size: var(--fs-sm);
+        font-weight: 600;
+        min-height: 2.75rem;
+        display: flex;
+        align-items: center;
+      }
+      textarea {
+        width: 100%;
+        min-height: 16rem;
+        margin-top: var(--s2);
+        font-family: var(--mono);
+        font-size: var(--fs-xs);
+        line-height: 1.6;
+        background: var(--surface-2);
+        color: var(--ink-2);
+        border: 1px solid var(--line);
+        border-radius: var(--r-ctl);
+        padding: var(--s3);
+      }
+      footer.note {
+        color: var(--ink-4);
+        font-size: var(--fs-micro);
+        display: flex;
+        justify-content: space-between;
+        gap: var(--s3);
+        flex-wrap: wrap;
+      }
+      @media (max-width: 1024px) {
+        .board {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">U</span>
+        <div>
+          <h1>Till o back office</h1>
+          <p>Centro de caja · el mismo dato, dos formas · 29 sept 2026</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="btn" id="btn-reset" type="button">Restaurar la recomendación</button>
+        <button class="btn" id="btn-theme" type="button">Tema</button>
+        <button class="btn btn--pri" id="btn-export" type="button">Copiar la decisión</button>
+      </div>
+    </header>
+
+    <section class="rules" aria-labelledby="rules-t">
+      <h2 id="rules-t">Las reglas que deciden</h2>
+      <ol id="rule-list"></ol>
+      <p style="margin-top: var(--s3); font-size: var(--fs-sm); color: var(--ink-2)">
+        El mismo dato puede vivir en los dos lados y no repetirse: cambia la forma. La cifra de hoy
+        con una acción al lado no es la misma pieza que esa cifra dentro de una serie de 30 días.
+        Decide <b>dónde aparece</b> y, para cada lado, <b>cómo se ve</b>.
+      </p>
+    </section>
+
+    <section class="summary" aria-label="Resumen de la decisión">
+      <span class="stat"><b id="c-till">0</b> en el till</span>
+      <span class="stat"><b id="c-both">0</b> en los dos</span>
+      <span class="stat"><b id="c-bo">0</b> en el back office</span>
+      <span class="bar" aria-hidden="true"
+        ><i class="b-till" id="bar-till"></i><i class="b-both" id="bar-both"></i
+        ><i class="b-bo" id="bar-bo"></i
+      ></span>
+      <span class="stat" id="c-both-forms">—</span>
+      <span class="stat" id="c-changed">0 cambios sobre la recomendación</span>
+      <div class="filters" id="filters"></div>
+    </section>
+
+    <main class="board" id="board">
+      <section class="lane lane--till" data-lane="till">
+        <h2>Till <span class="n" id="n-till">0</span></h2>
+        <div class="lane-body" id="lane-till"></div>
+      </section>
+      <section class="lane lane--both" data-lane="both">
+        <h2>Los dos, con otra forma <span class="n" id="n-both">0</span></h2>
+        <div class="lane-body" id="lane-both"></div>
+      </section>
+      <section class="lane lane--bo" data-lane="bo">
+        <h2>Back office <span class="n" id="n-bo">0</span></h2>
+        <div class="lane-body" id="lane-bo"></div>
+      </section>
+    </main>
+
+    <details class="out">
+      <summary>La decisión como tabla (para pegar en el documento)</summary>
+      <textarea id="out" readonly aria-label="Decisión en Markdown"></textarea>
+    </details>
+
+    <footer class="note">
+      <span id="saved">Se guarda en este navegador.</span>
+      <span>Recomendación = la regla aplicada. Tu voto manda.</span>
+    </footer>
+
+    <script>
+      (() => {
+        'use strict';
+        const RULES = [
+          ['R1', 'La acción física manda: si el dinero se mueve en el cajón, ocurre en el till.'],
+          ['R2', 'Frecuencia: lo frecuente no se esconde; lo raro puede ir al back office.'],
+          ['R3', 'Dinero: el till mueve el efectivo; el back office lo observa y lo audita.'],
+          ['R4', 'Autoridad: configuración, umbrales y permisos viven en el back office.'],
+          ['R5', 'Verdad: el till escribe los hechos; el back office lee y administra.'],
+          ['R6', 'Latencia: si hay que decidir con el cliente esperando, se decide en el till.'],
+          [
+            'R7',
+            'Volumen: lo acotado al turno vive en el till; lo que crece vive en el back office.',
+          ],
+          ['R8', 'Dignidad: el dato por persona y por sucursal es del back office.'],
+        ];
+
+        const AREAS = [
+          ['identidad', 'Identidad y política'],
+          ['cuenta', 'La cuenta del turno'],
+          ['cajones', 'Cajones y turnos'],
+          ['libro', 'Libro y trazabilidad'],
+          ['acciones', 'Acciones de efectivo'],
+          ['cierre', 'Conteo y cierre'],
+          ['custodia', 'Custodia del turno'],
+          ['control', 'Análisis y control'],
+        ];
+
+        /* Formas. La misma palabra para el mismo patrón, en los dos lados.
+     Till: cifra viva · acción directa · lista corta del turno · paso guiado · estado con acción · semáforo · ficha.
+     Back office: serie · tabla filtrable · ficha del turno · expediente de control · configuración · alerta y triaje · documento · cruce externo. */
+        const ARCH = {
+          tLive: 'Cifra viva',
+          tAct: 'Acción directa',
+          tList: 'Lista corta del turno',
+          tStep: 'Paso guiado',
+          tState: 'Estado con acción',
+          tTraffic: 'Semáforo',
+          tChip: 'Ficha breve',
+          bSeries: 'Serie y tendencia',
+          bTable: 'Tabla filtrable',
+          bSheet: 'Ficha del turno',
+          bAudit: 'Expediente de control',
+          bConfig: 'Configuración',
+          bAlert: 'Alerta y triaje',
+          bDoc: 'Documento',
+          bMatch: 'Cruce externo',
+        };
+
+        // [área, nombre, destino, regla, por qué, forma en el till, forma en el back office, se cambia en]
+        const ITEMS = [
+          [
+            'identidad',
+            'Fecha operativa y hora de inicio del día',
+            'b',
+            'R4',
+            'El till la muestra; el dueño la fija.',
+            ['tChip', 'el día operativo en la barra de identidad'],
+            ['bConfig', 'la hora de corte y su efecto sobre cada fecha'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Sucursal, caja y moneda',
+            'b',
+            'R5',
+            'Contexto del turno y del cajón.',
+            ['tChip', 'sucursal, caja y moneda junto al estado'],
+            ['bConfig', 'alta, nombre y asignación de cada caja'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Estado del turno y tiempo abierto',
+            't',
+            'R1',
+            'El operador lo necesita de un vistazo.',
+            ['tState', 'el estado y el tiempo abierto en la barra'],
+            null,
+            null,
+          ],
+          [
+            'identidad',
+            'Quién abrió, quién responde y en qué terminal',
+            'b',
+            'R5',
+            'Custodia del cajón.',
+            ['tChip', 'nombre y terminal junto al estado'],
+            ['bTable', 'operador y terminal como columnas'],
+            null,
+          ],
+          [
+            'identidad',
+            'Conteo ciego y método de conteo',
+            'b',
+            'R4',
+            'Cambia el flujo del cajero.',
+            ['tState', 'el aviso de modo antes de empezar a contar'],
+            ['bConfig', 'por sucursal y, si quieres, por rol'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Tolerancia de la diferencia',
+            'b',
+            'R4',
+            'Apetito de riesgo del dueño.',
+            ['tTraffic', 'el umbral se muestra cuando la diferencia lo cruza'],
+            ['bConfig', 'la tolerancia por sucursal'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Umbral de aprobación de movimiento',
+            'b',
+            'R4',
+            'Control del riesgo.',
+            ['tTraffic', 'el PIN se pide al cruzar el umbral'],
+            ['bConfig', 'el umbral por sucursal'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Umbral de aprobación del cierre',
+            'b',
+            'R4',
+            'Control del riesgo.',
+            ['tTraffic', 'la regla en la barra: "diferencia > $5.00"'],
+            ['bConfig', 'el umbral del cierre'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Permiso de operar sin conexión',
+            'b',
+            'R4',
+            'Decisión de riesgo del negocio.',
+            ['tState', 'si el efectivo requiere red, se dice antes de empezar'],
+            ['bConfig', 'la política de operación de la sucursal'],
+            'o',
+          ],
+          [
+            'identidad',
+            'Conexión, cajón e impresora',
+            't',
+            'R1',
+            'El operador necesita saber si puede cobrar.',
+            ['tState', 'tres señales en la barra de identidad'],
+            null,
+            null,
+          ],
+          [
+            'identidad',
+            'Comando pendiente y recuperación',
+            'b',
+            'R6',
+            'Un movimiento en duda bloquea el cierre.',
+            ['tState', 'la acción segura: "revisar el último movimiento"'],
+            ['bAudit', 'la traza completa con el correlationId'],
+            null,
+          ],
+
+          [
+            'cuenta',
+            'Fondo inicial',
+            'b',
+            'R1',
+            'Se cuenta con el cajón abierto.',
+            ['tLive', 'el fondo con su conteo por denominación'],
+            ['bSheet', 'la primera línea de la cuenta del turno'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Ventas en efectivo (recibido − cambio)',
+            'b',
+            'R3',
+            'El till las mueve; el dueño las lee.',
+            ['tLive', 'un término de la ecuación del cajón'],
+            ['bSeries', 'la porción de efectivo dentro de la mezcla de pago'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Ingresos y retiros de efectivo',
+            'b',
+            'R1',
+            'El dinero entra y sale del cajón.',
+            ['tAct', 'importe, motivo y PIN si cruza el umbral'],
+            ['bTable', 'el libro de movimientos del turno'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Retiro a caja fuerte',
+            'b',
+            'R1',
+            'Saca el exceso del cajón.',
+            ['tAct', 'una acción con motivo y aprobación'],
+            ['bTable', 'el destino, la hora y quién lo hizo'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Reembolsos en efectivo',
+            'b',
+            'R1',
+            'Sale del cajón con aprobación.',
+            ['tAct', 'la salida con su venta y su aprobador'],
+            ['bTable', 'el reembolso con su venta y su aprobador'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Ajustes y correcciones de cajón',
+            'b',
+            'R3',
+            'Corrige un hecho del libro.',
+            ['tAct', 'la corrección con motivo y aprobación'],
+            ['bAudit', 'quién corrigió, cuándo y por qué'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Propinas en efectivo por pagar',
+            'b',
+            'R1',
+            'Salen del cajón al repartir.',
+            ['tAct', 'la salida al repartir propinas'],
+            ['bSheet', 'una línea de la cuenta y del costo'],
+            null,
+          ],
+          [
+            'cuenta',
+            'Esperado, contado y diferencia',
+            'b',
+            'R1',
+            'Es el número que cierra el turno.',
+            ['tLive', 'los tres números con el color de la diferencia'],
+            ['bSeries', 'la misma diferencia en 7, 30 y 90 días'],
+            null,
+          ],
+
+          [
+            'cajones',
+            'Cajones que esta terminal puede tomar',
+            't',
+            'R1',
+            'Sólo importa el cajón que tengo enfrente.',
+            ['tList', 'los cajones que puedo abrir, con su estado'],
+            null,
+            null,
+          ],
+          [
+            'cajones',
+            'Estado de todos los cajones de la sucursal',
+            'b',
+            'R7',
+            'La lista completa no ayuda en el mostrador.',
+            ['tList', 'sólo el estado, para saber qué está ocupado'],
+            ['bTable', 'la flota completa por terminal y sucursal'],
+            'o',
+          ],
+          [
+            'cajones',
+            'Caja pausada y cajón de reemplazo',
+            'b',
+            'R1',
+            'Resuelve un momento de servicio.',
+            ['tAct', 'pausar y seguir vendiendo en la caja (2)'],
+            ['bTable', 'la caja pausada como pendiente, con su antigüedad'],
+            null,
+          ],
+          [
+            'cajones',
+            'Alta, nombre y asignación de cajas',
+            'o',
+            'R4',
+            'Es configuración.',
+            null,
+            ['bConfig', 'nombre, política de asignación y terminal'],
+            'o',
+          ],
+          [
+            'cajones',
+            'Turnos de hoy de toda la sucursal',
+            'b',
+            'R7',
+            'El till sólo necesita el suyo.',
+            ['tList', 'mi turno y el anterior de mi cajón'],
+            ['bTable', 'todos los turnos del día, ordenables por diferencia'],
+            null,
+          ],
+          [
+            'cajones',
+            'Turno anterior y discrepancia de apertura',
+            'b',
+            'R6',
+            'Afecta el fondo que acabo de contar.',
+            ['tTraffic', '"el cierre dejó $1,500 y hoy abriste $1,500"'],
+            ['bSheet', 'la discrepancia de apertura como evidencia'],
+            null,
+          ],
+          [
+            'cajones',
+            'Historial de turnos por días',
+            'o',
+            'R7',
+            'Consulta de escritorio.',
+            null,
+            ['bTable', 'rango de fechas, sucursal, cajero y exportación'],
+            null,
+          ],
+          [
+            'cajones',
+            'Cerrar un turno perdido',
+            'b',
+            'R6',
+            'Alguien debe cerrarlo.',
+            ['tStep', 'el gerente cuenta el cajón que tiene enfrente'],
+            ['bAlert', 'la salida de escritorio cuando nadie está en la tienda'],
+            null,
+          ],
+
+          [
+            'libro',
+            'Libro del turno actual',
+            't',
+            'R1',
+            'El cajero necesita ver qué movió su cajón.',
+            ['tList', 'una línea por movimiento, con su importe y su hora'],
+            null,
+            null,
+          ],
+          [
+            'libro',
+            'Libro de todos los turnos, con búsqueda y exportación',
+            'o',
+            'R7',
+            'Crece sin límite.',
+            null,
+            ['bTable', 'todos los turnos, con filtros, búsqueda y exportación'],
+            null,
+          ],
+          [
+            'libro',
+            'Filtros del libro',
+            'b',
+            'R2',
+            'Pocos en el till; todos en el escritorio.',
+            ['tList', 'cinco filtros: todo, ventas, movimientos, caja fuerte, no-sale'],
+            ['bTable', 'el juego completo, con rango de fechas y tipo'],
+            null,
+          ],
+          [
+            'libro',
+            'Detalle del movimiento con enlace a la venta',
+            'b',
+            'R5',
+            'Los dos necesitan el mismo rastro.',
+            ['tList', 'la fila se expande y muestra el rastro'],
+            ['bTable', 'el enlace a la venta y al recibo'],
+            null,
+          ],
+          [
+            'libro',
+            'Comprobantes y recibos del turno',
+            'b',
+            'R7',
+            'Volumen alto y consulta posterior.',
+            ['tAct', 'reimprimir el último'],
+            ['bDoc', 'el archivo del turno, buscable'],
+            null,
+          ],
+          [
+            'libro',
+            'Cadena de custodia',
+            'o',
+            'R7',
+            'Es auditoría, no operación.',
+            null,
+            ['bAudit', 'quién sostuvo el cajón y cuándo cambió'],
+            null,
+          ],
+          [
+            'libro',
+            'Separación de funciones: abrió, contó, aprobó, cerró',
+            'b',
+            'R8',
+            'Es control del dueño.',
+            ['tChip', 'sólo el aprobador, en el momento del PIN'],
+            ['bAudit', 'los cuatro nombres en una ficha'],
+            null,
+          ],
+          [
+            'libro',
+            'Diagnóstico técnico y correlationId',
+            'o',
+            'R4',
+            'Herramienta de soporte.',
+            null,
+            ['bAudit', 'detrás de la ficha, para soporte'],
+            null,
+          ],
+
+          [
+            'acciones',
+            'Entrada de efectivo',
+            't',
+            'R1',
+            'El dinero entra al cajón.',
+            ['tAct', 'importe, motivo y PIN sobre el umbral'],
+            null,
+            null,
+          ],
+          [
+            'acciones',
+            'Salida de efectivo (gasto, proveedor)',
+            't',
+            'R1',
+            'El dinero sale del cajón.',
+            ['tAct', 'importe, motivo y aprobación'],
+            null,
+            null,
+          ],
+          [
+            'acciones',
+            'Cobro de efectivo al operador',
+            't',
+            'R1',
+            'Movimiento físico entre personas.',
+            ['tAct', 'un botón con atajos de motivo'],
+            null,
+            null,
+          ],
+          [
+            'acciones',
+            'Propinas (tip out)',
+            't',
+            'R1',
+            'Sale del cajón en el momento.',
+            ['tAct', 'la salida al repartir'],
+            null,
+            null,
+          ],
+          [
+            'acciones',
+            'Abrir el cajón sin venta',
+            'b',
+            'R6',
+            'Ocurre con el cliente enfrente.',
+            ['tAct', 'tres motivos, PIN y límite por minuto'],
+            ['bAlert', 'el no-sale como señal de merma'],
+            null,
+          ],
+          [
+            'acciones',
+            'Corrección de cajón',
+            't',
+            'R6',
+            'Es un acto del turno.',
+            ['tAct', 'con motivo y aprobación'],
+            null,
+            null,
+          ],
+          [
+            'acciones',
+            'Libro de no-sale y retiros del turno',
+            'o',
+            'R8',
+            'Es la señal de merma.',
+            null,
+            ['bAlert', 'ordenado por riesgo, no por fecha'],
+            null,
+          ],
+
+          [
+            'cierre',
+            'Contar el cajón, por denominación',
+            't',
+            'R1',
+            'Se cuenta donde está el dinero.',
+            ['tStep', 'el teclado por denominación, con el total en el botón'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Volver a contar',
+            't',
+            'R1',
+            'Parte del mismo acto.',
+            ['tStep', 'dentro del mismo paso'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Cancelar el conteo y volver a abierto',
+            't',
+            'R1',
+            'Corrige un error del turno en curso.',
+            ['tState', 'la salida guardada por la secuencia del libro'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Motivo de la diferencia',
+            't',
+            'R1',
+            'Lo explica quien contó.',
+            ['tStep', 'la lista de motivos con nota'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Conciliar el turno',
+            't',
+            'R1',
+            'Fija el conteo con el libro.',
+            ['tStep', 'el paso que congela el conteo'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Cerrar el turno y liberar la caja',
+            't',
+            'R1',
+            'Termina la custodia.',
+            ['tStep', 'el cierre con su confirmación'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Aprobación de la diferencia con PIN',
+            't',
+            'R6',
+            'El gerente está en el mostrador.',
+            ['tState', 'el PIN en el mostrador, no en el escritorio'],
+            null,
+            null,
+          ],
+          [
+            'cierre',
+            'Depósito: fondo que se queda e importe a depositar',
+            'b',
+            'R1',
+            'El efectivo sale del cajón con una persona.',
+            ['tStep', 'el cálculo con el fondo editable'],
+            ['bMatch', 'el depósito contra el banco'],
+            null,
+          ],
+          [
+            'cierre',
+            'Arqueo: imprimir, guardar y enviar',
+            'b',
+            'R1',
+            'Documento del cierre.',
+            ['tAct', 'la impresión en el mostrador'],
+            ['bDoc', 'el envío por correo y el archivo'],
+            null,
+          ],
+          [
+            'cierre',
+            'Diferencia por turno, caja y persona',
+            'o',
+            'R8',
+            'Dato sensible y comparativo.',
+            null,
+            ['bSeries', 'por día, por caja y por persona'],
+            null,
+          ],
+
+          [
+            'custodia',
+            'Suspender y reanudar el turno',
+            't',
+            'R1',
+            'Es el estado del cajón que tengo enfrente.',
+            ['tState', 'pausar sin perder el cajón'],
+            null,
+            null,
+          ],
+          [
+            'custodia',
+            'Entregar el turno con PIN del entrante',
+            't',
+            'R1',
+            'Ocurre en el cambio de turno.',
+            ['tAct', 'el PIN del entrante y el traspaso'],
+            null,
+            null,
+          ],
+          [
+            'custodia',
+            'Traer el turno a esta terminal (adopt)',
+            't',
+            'R1',
+            'La terminal perdió su sesión.',
+            ['tState', 'una sola acción para recuperar el turno'],
+            null,
+            null,
+          ],
+          [
+            'custodia',
+            'Recuperar un turno cuyo operador no vuelve',
+            'b',
+            'R6',
+            'Alguien debe contar ese cajón.',
+            ['tStep', 'el gerente cuenta el cajón que tiene enfrente'],
+            ['bAlert', 'la recuperación desde el escritorio'],
+            null,
+          ],
+          [
+            'custodia',
+            'Liberar una caja de una terminal perdida',
+            'b',
+            'R6',
+            'Destraba la caja.',
+            ['tState', '"liberar la caja", sin conteo'],
+            ['bConfig', 'liberar desde la lista de cajas'],
+            null,
+          ],
+          [
+            'custodia',
+            'Registro de custodia por turno',
+            'o',
+            'R8',
+            'Es auditoría.',
+            null,
+            ['bAudit', 'la cadena completa en una línea de tiempo'],
+            null,
+          ],
+
+          [
+            'control',
+            'Pulso del día: cajas abiertas, efectivo esperado, diferencia neta',
+            'o',
+            'R7',
+            'Es la vista del dueño.',
+            null,
+            ['bAlert', 'cuatro cifras en la cabecera'],
+            null,
+          ],
+          [
+            'control',
+            'Turnos que requieren atención',
+            'o',
+            'R8',
+            'Triaje de gestión.',
+            null,
+            ['bAlert', 'ordenados por dinero en riesgo'],
+            null,
+          ],
+          [
+            'control',
+            'Tendencia de diferencias',
+            'o',
+            'R8',
+            'Dato por tiempo.',
+            null,
+            ['bSeries', '7, 30 y 90 días'],
+            null,
+          ],
+          [
+            'control',
+            'Diferencia por empleado',
+            'o',
+            'R8',
+            'Dato sensible.',
+            null,
+            ['bSeries', 'sólo el dueño la lee'],
+            null,
+          ],
+          [
+            'control',
+            'Comparación entre sucursales',
+            'o',
+            'R8',
+            'Nivel de negocio.',
+            null,
+            ['bSeries', 'roll-up multi-sucursal'],
+            null,
+          ],
+          [
+            'control',
+            'Alertas al dueño',
+            'o',
+            'R8',
+            'Observabilidad.',
+            null,
+            ['bAlert', 'aviso cuando la regla se cumple'],
+            'o',
+          ],
+          [
+            'control',
+            'Exportar CSV o PDF',
+            'o',
+            'R4',
+            'Herramienta de escritorio.',
+            null,
+            ['bDoc', 'exportar desde cualquier tabla'],
+            null,
+          ],
+          [
+            'control',
+            'Permisos de efectivo por rol',
+            'o',
+            'R4',
+            'Configuración.',
+            null,
+            ['bConfig', 'qué ve y qué puede cada rol'],
+            'o',
+          ],
+        ];
+
+        const V = { t: 'till', b: 'both', o: 'bo' };
+        const LABEL = { till: 'Till', both: 'Los dos', bo: 'Back office' };
+        const STATE = {};
+        ITEMS.forEach(([area, name, rec, rule, why, tf, bf, own]) => {
+          STATE[name] = {
+            area,
+            name,
+            rec: V[rec],
+            rule,
+            why,
+            tf: tf || null,
+            bf: bf || null,
+            own: own || null,
+            value: V[rec],
+          };
+        });
+
+        const KEY = 'umi.cash.split.v1';
+        try {
+          const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+          Object.keys(saved).forEach((k) => {
+            if (STATE[k]) STATE[k].value = saved[k];
+          });
+        } catch (e) {
+          /* ignore */
+        }
+
+        const $ = (s) => document.querySelector(s);
+        const el = (t, c, x) => {
+          const n = document.createElement(t);
+          if (c) n.className = c;
+          if (x != null) n.textContent = x;
+          return n;
+        };
+        let filter = 'all';
+        let onlyChanged = false;
+
+        function save() {
+          const out = {};
+          Object.values(STATE).forEach((s) => {
+            if (s.value !== s.rec) out[s.name] = s.value;
+          });
+          try {
+            localStorage.setItem(KEY, JSON.stringify(out));
+          } catch (e) {
+            /* ignore */
+          }
+          const n = Object.values(STATE).filter((s) => s.value !== s.rec).length;
+          $('#saved').textContent = n
+            ? n + ' cambios guardados en este navegador.'
+            : 'Se guarda en este navegador.';
+        }
+
+        function renderRules() {
+          const host = $('#rule-list');
+          host.textContent = '';
+          RULES.forEach(([id, text]) => {
+            const li = el('li');
+            li.append(el('span', 'rid', id), el('span', null, text));
+            host.appendChild(li);
+          });
+        }
+
+        function renderFilters() {
+          const host = $('#filters');
+          host.textContent = '';
+          const add = (id, label, n) => {
+            const b = el('button', 'chip' + (filter === id && !onlyChanged ? ' is-on' : ''));
+            b.type = 'button';
+            b.innerHTML = label + (n != null ? ' <span class="n">' + n + '</span>' : '');
+            b.addEventListener('click', () => {
+              filter = id;
+              onlyChanged = false;
+              render();
+            });
+            host.appendChild(b);
+          };
+          add('all', 'Todo', Object.keys(STATE).length);
+          AREAS.forEach(([id, name]) =>
+            add(id, name, Object.values(STATE).filter((s) => s.area === id).length),
+          );
+          const changed = Object.values(STATE).filter((s) => s.value !== s.rec).length;
+          const b = el('button', 'chip' + (onlyChanged ? ' is-on' : ''));
+          b.type = 'button';
+          b.innerHTML = 'Sólo los cambios <span class="n">' + changed + '</span>';
+          b.addEventListener('click', () => {
+            onlyChanged = true;
+            render();
+          });
+          host.appendChild(b);
+        }
+
+        function card(s) {
+          const c = el('article', 'card');
+          const head = el('div', 'card-head');
+          head.append(
+            el('h3', null, s.name),
+            el('span', 'area', (AREAS.find((a) => a[0] === s.area) || [])[1] || ''),
+          );
+          c.appendChild(head);
+          const why = el('div', 'why');
+          why.append(el('span', 'rid', s.rule), el('span', null, s.why));
+          c.appendChild(why);
+
+          const forms = el('div', 'forms');
+          const line = (where, f) => {
+            const d = el('div', 'form');
+            d.appendChild(el('span', 'where', where));
+            const body = el('span');
+            body.appendChild(el('b', null, ARCH[f[0]]));
+            body.appendChild(document.createTextNode(' — ' + f[1]));
+            d.appendChild(body);
+            return d;
+          };
+          if (s.tf) forms.appendChild(line('En el till', s.tf));
+          if (s.bf) forms.appendChild(line('En el back office', s.bf));
+          if (s.own === 'o') forms.appendChild(el('div', 'own', 'Se cambia en el back office.'));
+          c.appendChild(forms);
+
+          if (s.value !== s.rec) {
+            const d = el('div', 'dev', 'Cambiada. La recomendación era ' + LABEL[s.rec] + '.');
+            c.appendChild(d);
+          }
+          const seg = el('div', 'seg');
+          seg.setAttribute('role', 'group');
+          seg.setAttribute('aria-label', 'Destino de ' + s.name);
+          ['till', 'both', 'bo'].forEach((v) => {
+            const b = el('button', null, LABEL[v]);
+            b.type = 'button';
+            b.dataset.v = v;
+            b.setAttribute('aria-pressed', String(s.value === v));
+            b.addEventListener('click', () => {
+              s.value = v;
+              save();
+              render();
+            });
+            seg.appendChild(b);
+          });
+          c.appendChild(seg);
+          return c;
+        }
+
+        function render() {
+          const all = Object.values(STATE);
+          const shown = all.filter(
+            (s) => (filter === 'all' || s.area === filter) && (!onlyChanged || s.value !== s.rec),
+          );
+          ['till', 'both', 'bo'].forEach((v) => {
+            const host = $('#lane-' + v);
+            host.textContent = '';
+            const list = shown
+              .filter((s) => s.value === v)
+              .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+            if (!list.length) host.appendChild(el('p', 'empty', 'Nada aquí con este filtro.'));
+            list.forEach((s) => host.appendChild(card(s)));
+            $('#n-' + v).textContent = list.length;
+          });
+          const count = (v) => all.filter((s) => s.value === v).length;
+          const t = count('till'),
+            b = count('both'),
+            o = count('bo'),
+            total = all.length || 1;
+          $('#c-till').textContent = t;
+          $('#c-both').textContent = b;
+          $('#c-bo').textContent = o;
+          $('#bar-till').style.width = (t / total) * 100 + '%';
+          $('#bar-both').style.width = (b / total) * 100 + '%';
+          $('#bar-bo').style.width = (o / total) * 100 + '%';
+          const changed = all.filter((s) => s.value !== s.rec).length;
+          $('#c-changed').textContent =
+            changed === 1
+              ? '1 cambio sobre la recomendación'
+              : changed + ' cambios sobre la recomendación';
+          const bothForms = all.filter((s) => s.tf && s.bf).length;
+          $('#c-both-forms').textContent =
+            bothForms + ' datos viven en los dos lados con otra forma';
+          renderFilters();
+          renderOutput();
+        }
+
+        function renderOutput() {
+          const lines = [
+            '# Till o back office — decisión',
+            '',
+            '| Elemento | Área | Aparece | Forma en el till | Forma en el back office | Regla |',
+            '| --- | --- | --- | --- | --- | --- |',
+          ];
+          AREAS.forEach(([id, name]) => {
+            Object.values(STATE)
+              .filter((s) => s.area === id)
+              .forEach((s) => {
+                const tf = s.tf ? `**${ARCH[s.tf[0]]}** — ${s.tf[1]}` : '—';
+                const bf = s.bf ? `**${ARCH[s.bf[0]]}** — ${s.bf[1]}` : '—';
+                lines.push(
+                  `| ${s.name} | ${name} | ${LABEL[s.value]}${s.value !== s.rec ? ' *' : ''} | ${tf} | ${bf} | ${s.rule} |`,
+                );
+              });
+          });
+          const n = Object.values(STATE).filter((s) => s.value !== s.rec).length;
+          lines.push(
+            '',
+            n
+              ? `* ${n} cambios sobre la recomendación.`
+              : '* Sin cambios: se adoptó la recomendación.',
+          );
+          $('#out').value = lines.join('\n');
+        }
+
+        function setTheme(t) {
+          document.documentElement.dataset.theme = t;
+        }
+
+        $('#btn-reset').addEventListener('click', () => {
+          Object.values(STATE).forEach((s) => {
+            s.value = s.rec;
+          });
+          save();
+          render();
+        });
+        $('#btn-theme').addEventListener('click', () =>
+          setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'),
+        );
+        $('#btn-export').addEventListener('click', async () => {
+          const ta = $('#out');
+          const box = ta.closest('details');
+          box.open = true;
+          try {
+            await navigator.clipboard.writeText(ta.value);
+            $('#btn-export').textContent = 'Copiado';
+          } catch (e) {
+            ta.select();
+            document.execCommand && document.execCommand('copy');
+            $('#btn-export').textContent = 'Listo abajo';
+          }
+          setTimeout(() => {
+            $('#btn-export').textContent = 'Copiar la decisión';
+          }, 1600);
+        });
+
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+        renderRules();
+        render();
+      })();
+    </script>
+  </body>
+</html>

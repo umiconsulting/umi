@@ -1,4 +1,23 @@
-# Workspace members: JS apps only. Directories without a package.json
-# (umi-kds Swift app, umi-conversaflow Supabase functions) are skipped by pnpm.
+# Workspace members: umi-dashboard, umi-landing-page, umi-api, and shared packages/*.
+# Directories without a package.json (umi-pos, a Flutter app) are skipped by pnpm.
+#
+# umi-api joined the workspace with its Docker→pnpm migration so it can consume
+# packages/contract. Its image is now built from the repo root with pnpm (multi-stage
+# `pnpm deploy`); the VPS still only pulls the prebuilt image (never builds).
+#
+# Excluded on purpose because it keeps its own npm lockfile:
+#   - umi-cash: compatibility app with frozen public URLs and a separate npm workflow.
 packages:
-  - "apps/*"
+  - 'apps/*'
+  - '!apps/umi-cash'
+  - 'packages/*'
+
+# pnpm 10 blocks dependency install-scripts by default. These native deps
+# legitimately need theirs (esbuild → vite binary, sharp → Next image opt,
+# better-sqlite3 → native binding). Approved explicitly instead of globally.
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - better-sqlite3
+  - msgpackr-extract
+  - unrs-resolver

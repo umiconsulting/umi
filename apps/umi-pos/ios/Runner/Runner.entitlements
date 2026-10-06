@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The device key is what makes one till one till. It is generated inside the
+	     Secure Enclave and never leaves it, so the private half cannot be copied to
+	     a second device and a session cannot be duplicated on one.
+
+	     Keychain items belong to an access group. Apple documents that every app
+	     is already a member of a group containing only itself — the app ID,
+	     `$(TeamID).$(bundleID)` — and that the group needs no portal step. This
+	     entitlement names that same group explicitly, so the group the key lives
+	     in is visible here rather than implied, and so a companion app or an
+	     extension could join it by adding one string.
+
+	     There is no Keychain Sharing checkbox in Certificates, Identifiers &
+	     Profiles: the capability lives in Xcode and is this file. Apple, "Sharing
+	     access to keychain items among a collection of apps" (see
+	     docs/research/2026-10-03-ios-from-linux.md). Automatic signing carries
+	     the group into the provisioning profile. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)co.umiconsulting.umiPos</string>
+	</array>
+</dict>
+</plist>

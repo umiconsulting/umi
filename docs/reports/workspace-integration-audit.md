@@ -9,7 +9,7 @@
 
 ## Phase 9 first — Executive Summary
 
-*(Placed first for leadership readability; full evidence follows in Phases 1–8.)*
+_(Placed first for leadership readability; full evidence follows in Phases 1–8.)_
 
 ### What Umi is
 
@@ -24,20 +24,20 @@ Umi is a multi-product restaurant-operations platform for small businesses (firs
 
 ### Current maturity level
 
-**"Federated cognitive workspace, mid-migration."** The workspace has an unusually mature *knowledge architecture* (neutral agent contracts, governance docs, retrieval maps, routing ledgers — see `AGENTS.md`, `docs/governance/`) and a well-designed *target data architecture* (7-schema PostgreSQL-first platform, executed locally through migration Phase 4E). What it does not yet have is **production convergence**: the migration stalled at the final local gate (Phase 4F) around 2026-05-28, the dashboard backend has no deployment target, and Cash still runs production from a separate legacy Supabase project.
+**"Federated cognitive workspace, mid-migration."** The workspace has an unusually mature _knowledge architecture_ (neutral agent contracts, governance docs, retrieval maps, routing ledgers — see `AGENTS.md`, `docs/governance/`) and a well-designed _target data architecture_ (7-schema PostgreSQL-first platform, executed locally through migration Phase 4E). What it does not yet have is **production convergence**: the migration stalled at the final local gate (Phase 4F) around 2026-05-28, the dashboard backend has no deployment target, and Cash still runs production from a separate legacy Supabase project.
 
 ### Scores (evidence-based, 0–10)
 
-| Dimension | Score | Basis |
-|---|---|---|
-| **Integration readiness** | **5/10** | Target model designed, validated locally through Phase 4E, both blocking human decisions resolved (2026-05-23); but zero production cutover, no staging environment, 12 days of inactivity since 2026-05-28 |
+| Dimension                 | Score    | Basis                                                                                                                                                                                                                                                                          |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Integration readiness** | **5/10** | Target model designed, validated locally through Phase 4E, both blocking human decisions resolved (2026-05-23); but zero production cutover, no staging environment, 12 days of inactivity since 2026-05-28                                                                    |
 | **Backend consolidation** | **6/10** | One shared Supabase project hosts conversaflow/kds schemas; canonical edge-function runtime exists; but Cash production is still a separate project, dashboard duplicates backend logic in a 3,561-line undeployed `server.js`, and 8 scheduled jobs run outside the job queue |
-| **Monorepo readiness** | **4/10** | Physical layout is already monorepo-shaped (`apps/` + root docs), all JS apps use npm; but the **workspace root is not a git repository**, the six apps are six separate repos across three GitHub identities, and there is no shared tooling/workspace manifest |
+| **Monorepo readiness**    | **4/10** | Physical layout is already monorepo-shaped (`apps/` + root docs), all JS apps use npm; but the **workspace root is not a git repository**, the six apps are six separate repos across three GitHub identities, and there is no shared tooling/workspace manifest               |
 
 ### Major risks (top 5)
 
 1. **The root workspace is not version-controlled.** All governance docs, migration plans, migration SQL (`docs/migration/local-postgres/*.sql`), and skills live outside git. A disk failure loses the institutional memory this audit reconstructs. (Evidence: environment reports `Is a git repository: false`; no `.git` at root.)
-2. **Cash data has three divergent surfaces**: live project `rrkzhisnadfrgnhntkiz`, the stale `umi_cash` schema copy inside Umi Platform, and a *drifted* duplicate Prisma schema in the dashboard (13 models vs Cash's 14 — `LifecycleEvent` missing; `apps/umi-dashboard/prisma/schema.prisma` vs `apps/umi-cash/prisma/schema.prisma`).
+2. **Cash data has three divergent surfaces**: live project `rrkzhisnadfrgnhntkiz`, the stale `umi_cash` schema copy inside Umi Platform, and a _drifted_ duplicate Prisma schema in the dashboard (13 models vs Cash's 14 — `LifecycleEvent` missing; `apps/umi-dashboard/prisma/schema.prisma` vs `apps/umi-cash/prisma/schema.prisma`).
 3. **Migration momentum loss.** Phases 4A–4E executed locally; Phase 4F (an audit/no-import gate whose source analysis is already done) and `docs/migration/validation/001_core_validation.sql` have not been run; the entire `2026-05-23` execution checklist is unchecked.
 4. **Agent-knowledge drift between adapter layers.** Root `.agents/skills/` is 9 ledger entries and 3 skills ahead of root `.claude/skills/` (15 vs 6 routing-ledger entries; `customer-identity-resolution`, `owner-insights-migration`, `dashboard-customer-ux-validation` exist only in `.agents/`), directly violating `docs/governance/adapter-policy.md` ("Adapters must not drift").
 5. **Semantic search silently disabled in production** — `VOYAGE_API_KEY` missing from Supabase secrets; 136 products have local-only embeddings (`2026-05-23` audit §7, workspace memory).
@@ -80,16 +80,16 @@ Umi is a multi-product restaurant-operations platform for small businesses (firs
 
 The root cognition layer is complete and internally consistent in design:
 
-| Layer | Files | Role |
-|---|---|---|
-| Neutral contract | `AGENTS.md`, `WORKSPACE.md` | Workspace-wide rules, product boundaries, database ownership, research standard |
-| Operating model | `docs/architecture/agent-operating-system.md` | 3-layer model: neutral contract → procedures → tool adapters |
-| Maps | `docs/architecture/maps/{workspace,retrieval,runtime}-map.md` | Routing, bounded context loading, execution chains |
-| Governance | `docs/governance/{authority,ownership,adapter-policy,cognitive-lifecycle,agent-safe-boundaries}.md` | Authority hierarchy, federated ownership, adapter sync rules, artifact promotion lifecycle, edit-safety tiers |
-| Indexes | `docs/reports/{latest,index}.md`, `docs/evals/`, `docs/memory/`, `docs/traces/` | Default retrieval entrypoints |
-| Migration | `docs/migration/` (8 plans + `local-postgres/` SQL + `audit-output/` evidence + `validation/`) | The active platform integration program |
-| Dated architecture | `docs/architecture/2026-*.md` (7 docs) | KDS audits/specs, ConversaFlow audit prompt, refactor brief, backend centralization audit |
-| Updates | `docs/updates/2026-04-15-kds-program-update.md` | Program snapshot with 2026-04-16 execution log |
+| Layer              | Files                                                                                               | Role                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Neutral contract   | `AGENTS.md`, `WORKSPACE.md`                                                                         | Workspace-wide rules, product boundaries, database ownership, research standard                               |
+| Operating model    | `docs/architecture/agent-operating-system.md`                                                       | 3-layer model: neutral contract → procedures → tool adapters                                                  |
+| Maps               | `docs/architecture/maps/{workspace,retrieval,runtime}-map.md`                                       | Routing, bounded context loading, execution chains                                                            |
+| Governance         | `docs/governance/{authority,ownership,adapter-policy,cognitive-lifecycle,agent-safe-boundaries}.md` | Authority hierarchy, federated ownership, adapter sync rules, artifact promotion lifecycle, edit-safety tiers |
+| Indexes            | `docs/reports/{latest,index}.md`, `docs/evals/`, `docs/memory/`, `docs/traces/`                     | Default retrieval entrypoints                                                                                 |
+| Migration          | `docs/migration/` (8 plans + `local-postgres/` SQL + `audit-output/` evidence + `validation/`)      | The active platform integration program                                                                       |
+| Dated architecture | `docs/architecture/2026-*.md` (7 docs)                                                              | KDS audits/specs, ConversaFlow audit prompt, refactor brief, backend centralization audit                     |
+| Updates            | `docs/updates/2026-04-15-kds-program-update.md`                                                     | Program snapshot with 2026-04-16 execution log                                                                |
 
 No ADR directory exists; dated plans + the routing ledger serve that function de facto. **Gap:** decisions are recorded in plans, but there is no single decision log; the authority hierarchy (`docs/governance/authority.md`) compensates by ranking artifacts.
 
@@ -97,14 +97,14 @@ No ADR directory exists; dated plans + the routing ledger serve that function de
 
 Three adapter families exist at root, plus per-repo layers:
 
-| Layer | Contents | State |
-|---|---|---|
-| root `.claude/` | skills: `task-router`, `workspace-boundary-check`, `scientific-research-check`, `code-review`; `settings.local.json` | **Stale** — routing ledger last entry 2026-05-21 (6 entries); registry lists 3 skills |
-| root `.agents/` | same 3 core skills **plus** `customer-identity-resolution`, `owner-insights-migration`, `dashboard-customer-ux-validation`, `postgresql-best-practices`; `agents/agent-creator.md` | **Current** — ledger has 15 entries through 2026-05-26; registry lists 6 skills; skills carry `agents/openai.yaml` (multi-vendor intent) |
-| root `.cursor/` | `settings.json` only | Minimal |
-| `apps/umi-kds/.claude` + `.agents` | duplicated skill sets: local `task-router` copy, `create-skill`, `filesystem-structure-check`, `swiftui-kds-standards`; agents `ios-architect`, `skill-curator` | Duplicated across both adapter dirs |
-| `apps/umi-conversaflow/.agents` | role agents: `turn-integrity-agent`, `software-designer`, `problem-diagnostician`, `architect-software`, `umi-conversaflow-agent`, `agent-creator` | Repo-local judgment layer |
-| `apps/{cash,dashboard,logs}/.claude` | `settings.local.json` only | Settings only |
+| Layer                                | Contents                                                                                                                                                                           | State                                                                                                                                    |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| root `.claude/`                      | skills: `task-router`, `workspace-boundary-check`, `scientific-research-check`, `code-review`; `settings.local.json`                                                               | **Stale** — routing ledger last entry 2026-05-21 (6 entries); registry lists 3 skills                                                    |
+| root `.agents/`                      | same 3 core skills **plus** `customer-identity-resolution`, `owner-insights-migration`, `dashboard-customer-ux-validation`, `postgresql-best-practices`; `agents/agent-creator.md` | **Current** — ledger has 15 entries through 2026-05-26; registry lists 6 skills; skills carry `agents/openai.yaml` (multi-vendor intent) |
+| root `.cursor/`                      | `settings.json` only                                                                                                                                                               | Minimal                                                                                                                                  |
+| `apps/umi-kds/.claude` + `.agents`   | duplicated skill sets: local `task-router` copy, `create-skill`, `filesystem-structure-check`, `swiftui-kds-standards`; agents `ios-architect`, `skill-curator`                    | Duplicated across both adapter dirs                                                                                                      |
+| `apps/umi-conversaflow/.agents`      | role agents: `turn-integrity-agent`, `software-designer`, `problem-diagnostician`, `architect-software`, `umi-conversaflow-agent`, `agent-creator`                                 | Repo-local judgment layer                                                                                                                |
+| `apps/{cash,dashboard,logs}/.claude` | `settings.local.json` only                                                                                                                                                         | Settings only                                                                                                                            |
 
 **Drift evidence (verified by diff):**
 
@@ -141,27 +141,27 @@ apps/umi-conversaflow/.agents: role agents (turn-integrity, diagnostician, desig
 
 ### 2.1 Products
 
-| Product | Repo | Stack | Status | Business role |
-|---|---|---|---|---|
-| ConversaFlow | `apps/umi-conversaflow` | Deno / Supabase Edge Functions, 9 functions, 52 SQL migrations | **Production** (project `xbudknbimkgjjgohnjgp`); mini-harness signed off 2026-05-11 (`reports/mini-harness-signoff/`) | WhatsApp AI order-taking; owns operational truth (orders, jobs, outbox, memory, traces) |
-| KDS | `apps/umi-kds` | SwiftUI iPad, 24 Swift files, Xcode project `375.xcodeproj` | **Production on device**; live since 2026-04-16; PIN pairing (2026-05-22) and device revocation (2026-05-23) implemented per plans + migrations `20260522180000`, `20260523130000` | Kitchen ticket board; thin client over `kds` schema projections |
-| Cash | `apps/umi-cash` | Next.js 14, React 18, Prisma 5 (14 models), Vercel + 8 crons | **Production**, on *legacy separate* Supabase project `rrkzhisnadfrgnhntkiz` | Loyalty, wallet passes (Apple/Google), gift cards, OTP |
-| Dashboard | `apps/umi-dashboard` | Vite/React 18 + Express `server.js` (3,561 lines), duplicate Prisma schema | **Local-only** — no deployment target (centralization audit §2: "Not deployed") | Owner admin: 13 screens (`src/screens/`: overview, orders, members, customers, conversations, devices, staff, hours, gift-cards, settings…) |
-| Logs | `apps/umi-logs` | Next.js 16, React 19, Supabase reads | Internal tool | Trace/ops browsing: 16 route groups (`app/(dashboard)/…`: trace, jobs, outbox, memory, twilio, slack, security…) |
-| Landing | `apps/umi-landing-page` | Next.js 15, React 19, **better-sqlite3** | Staging branch; repositioned 2026-05-21 from consulting to product-suite | Lead acquisition + diagnostic quiz + email sequences |
+| Product      | Repo                    | Stack                                                                      | Status                                                                                                                                                                             | Business role                                                                                                                               |
+| ------------ | ----------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| ConversaFlow | `apps/umi-conversaflow` | Deno / Supabase Edge Functions, 9 functions, 52 SQL migrations             | **Production** (project `xbudknbimkgjjgohnjgp`); mini-harness signed off 2026-05-11 (`reports/mini-harness-signoff/`)                                                              | WhatsApp AI order-taking; owns operational truth (orders, jobs, outbox, memory, traces)                                                     |
+| KDS          | `apps/umi-kds`          | SwiftUI iPad, 24 Swift files, Xcode project `375.xcodeproj`                | **Production on device**; live since 2026-04-16; PIN pairing (2026-05-22) and device revocation (2026-05-23) implemented per plans + migrations `20260522180000`, `20260523130000` | Kitchen ticket board; thin client over `kds` schema projections                                                                             |
+| Cash         | `apps/umi-cash`         | Next.js 14, React 18, Prisma 5 (14 models), Vercel + 8 crons               | **Production**, on _legacy separate_ Supabase project `rrkzhisnadfrgnhntkiz`                                                                                                       | Loyalty, wallet passes (Apple/Google), gift cards, OTP                                                                                      |
+| Dashboard    | `apps/umi-dashboard`    | Vite/React 18 + Express `server.js` (3,561 lines), duplicate Prisma schema | **Local-only** — no deployment target (centralization audit §2: "Not deployed")                                                                                                    | Owner admin: 13 screens (`src/screens/`: overview, orders, members, customers, conversations, devices, staff, hours, gift-cards, settings…) |
+| Logs         | `apps/umi-logs`         | Next.js 16, React 19, Supabase reads                                       | Internal tool                                                                                                                                                                      | Trace/ops browsing: 16 route groups (`app/(dashboard)/…`: trace, jobs, outbox, memory, twilio, slack, security…)                            |
+| Landing      | `apps/umi-landing-page` | Next.js 15, React 19, **better-sqlite3**                                   | Staging branch; repositioned 2026-05-21 from consulting to product-suite                                                                                                           | Lead acquisition + diagnostic quiz + email sequences                                                                                        |
 
 ### 2.2 Repository boundaries and coupling
 
 Each app is an independent git repo; the root is **not** a repository:
 
-| Repo | Remote | Branch | Commits | Naming note |
-|---|---|---|---|---|
-| umi-cash | `umiconsulting/umi-cash` (alias `github.com-personal`) | main | 218 | — |
-| umi-conversaflow | `umiconsulting/supabase-edge-functions` | **architecture-v2** | **7** | repo name ≠ product name; tiny history suggests a reset/squash |
-| umi-dashboard | `umiconsulting/umi-dashboard` (alias `github.com-umi`) | main | 2 | nearly no history |
-| umi-kds | `umi-juanlopez/375` | main | 10 | product named "375" |
-| umi-landing-page | `umiconsulting/umi-landing-page` (https) | staging | 21 | package.json name `umi-consultoria` (stale) |
-| umi-logs | `juanclpzq/conversaflow-logs` | main | 5 | personal account, old product name |
+| Repo             | Remote                                                 | Branch              | Commits | Naming note                                                    |
+| ---------------- | ------------------------------------------------------ | ------------------- | ------- | -------------------------------------------------------------- |
+| umi-cash         | `umiconsulting/umi-cash` (alias `github.com-personal`) | main                | 218     | —                                                              |
+| umi-conversaflow | `umiconsulting/supabase-edge-functions`                | **architecture-v2** | **7**   | repo name ≠ product name; tiny history suggests a reset/squash |
+| umi-dashboard    | `umiconsulting/umi-dashboard` (alias `github.com-umi`) | main                | 2       | nearly no history                                              |
+| umi-kds          | `umi-juanlopez/375`                                    | main                | 10      | product named "375"                                            |
+| umi-landing-page | `umiconsulting/umi-landing-page` (https)               | staging             | 21      | package.json name `umi-consultoria` (stale)                    |
+| umi-logs         | `juanclpzq/conversaflow-logs`                          | main                | 5       | personal account, old product name                             |
 
 Three GitHub identities (`umiconsulting`, `umi-juanlopez`, `juanclpzq`) and two ssh host aliases. All six repos' last commit is **2026-05-28** (a coordinated checkpoint sweep), 12 days before this audit.
 
@@ -182,7 +182,7 @@ umi-landing-page ──writes──→ local SQLite (leads)
 
 1. **Cash Prisma schema** duplicated in dashboard, and drifted: `apps/umi-cash/prisma/schema.prisma` has 14 models incl. `LifecycleEvent`; `apps/umi-dashboard/prisma/schema.prisma` has 13 (no `LifecycleEvent`).
 2. **KDS pairing**: canonical `apps/umi-conversaflow/supabase/functions/kds-pairing/` + local reimplementation `callKdsPairingLocal` at `apps/umi-dashboard/server.js:1276` (an edge-function call path also exists at `server.js:1175` — both paths live simultaneously; which executes depends on env, uncertainty noted below).
-3. **Migration dual paths**: 41 references to `PLATFORM_TRANSITION_SCHEMA` in `server.js` (was ~2,483 lines at the 2026-05-23 audit; now 3,561 — the file grew ~43% *after* the audit that flagged it).
+3. **Migration dual paths**: 41 references to `PLATFORM_TRANSITION_SCHEMA` in `server.js` (was ~2,483 lines at the 2026-05-23 audit; now 3,561 — the file grew ~43% _after_ the audit that flagged it).
 4. **Twilio/email write paths** duplicated across conversaflow `_shared/` adapters, `umi-cash/src/lib/whatsapp.ts`, dashboard `nodemailer`, landing `nodemailer` (audit §2 item 6; dependency manifests confirm nodemailer in dashboard and landing, resend in cash).
 5. **Scheduled jobs**: 8 Vercel crons in `apps/umi-cash/vercel.json` outside the observable `workflow_jobs` queue.
 6. **Skills**: 3 copies of `task-router` (root ×2 + KDS), duplicated KDS skills across `.claude`/`.agents`.
@@ -205,16 +205,16 @@ umi-landing-page ──writes──→ local SQLite (leads)
 
 ### 3.2 Design goals, abandoned vs. successful directions
 
-| Direction | Status | Evidence |
-|---|---|---|
-| Slack as kitchen/ops surface | **Abandoned** → native KDS app | `ARCHITECTURE_TARGET.md` update note; cutover plan §validation ("slack-actions removed in favor of KDS") |
-| Deterministic planner/router conversation architecture | **Abandoned** → mini-harness (LLM owns flow, deterministic guards on irreversible actions) | `2026-05-12-overall-refactor-final-prompt.md` locked decision 1; `mini-harness-architecture.md` (canonical) |
-| Supabase Edge Functions as permanent admin API | **Abandoned** (explicit reversal) | `2026-05-23-api-backend-centralization-audit.md`: "The previous version of this audit recommended… That was wrong." |
-| Hardcoded assistant messages | **Abandoned** → all user-visible text from LLM in business voice | workspace memory `feedback_no_hardcoded_user_messages` |
-| Slug/env-based tenant lock (`VITE_BUSINESS_SLUG`) | **Being retired** → membership-resolved tenant switching | `2026-05-14` plan §Product Activation; `2026-05-17` dashboard plan |
-| KDS as projection + thin client | **Successful, stable** | KDS audit remediation; `kds-command`/`kds-pairing`; revocation plan implemented |
-| Additive, evidence-gated migration with synthetic-data quarantine | **Successful** (locally) | Phases 4A–4E results recorded inline in `2026-05-15` plan |
-| Federated agent operating system with neutral contracts | **Successful in design, drifting in practice** | governance docs vs. the `.claude`/`.agents` divergence (§1.2) |
+| Direction                                                         | Status                                                                                     | Evidence                                                                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Slack as kitchen/ops surface                                      | **Abandoned** → native KDS app                                                             | `ARCHITECTURE_TARGET.md` update note; cutover plan §validation ("slack-actions removed in favor of KDS")            |
+| Deterministic planner/router conversation architecture            | **Abandoned** → mini-harness (LLM owns flow, deterministic guards on irreversible actions) | `2026-05-12-overall-refactor-final-prompt.md` locked decision 1; `mini-harness-architecture.md` (canonical)         |
+| Supabase Edge Functions as permanent admin API                    | **Abandoned** (explicit reversal)                                                          | `2026-05-23-api-backend-centralization-audit.md`: "The previous version of this audit recommended… That was wrong." |
+| Hardcoded assistant messages                                      | **Abandoned** → all user-visible text from LLM in business voice                           | workspace memory `feedback_no_hardcoded_user_messages`                                                              |
+| Slug/env-based tenant lock (`VITE_BUSINESS_SLUG`)                 | **Being retired** → membership-resolved tenant switching                                   | `2026-05-14` plan §Product Activation; `2026-05-17` dashboard plan                                                  |
+| KDS as projection + thin client                                   | **Successful, stable**                                                                     | KDS audit remediation; `kds-command`/`kds-pairing`; revocation plan implemented                                     |
+| Additive, evidence-gated migration with synthetic-data quarantine | **Successful** (locally)                                                                   | Phases 4A–4E results recorded inline in `2026-05-15` plan                                                           |
+| Federated agent operating system with neutral contracts           | **Successful in design, drifting in practice**                                             | governance docs vs. the `.claude`/`.agents` divergence (§1.2)                                                       |
 
 ### 3.3 Boundaries (current intended state)
 
@@ -257,7 +257,7 @@ umi-landing-page ──writes──→ local SQLite (leads)
 
 **Blockers:**
 
-1. Root not a git repo — nothing to migrate *into* yet (also blocks history-preserving subtree imports).
+1. Root not a git repo — nothing to migrate _into_ yet (also blocks history-preserving subtree imports).
 2. Three GitHub identities / inconsistent remotes — pick one org first.
 3. Repo-name/product-name mismatches (`375`, `supabase-edge-functions`, `conversaflow-logs`, package `umi-consultoria`).
 4. Tooling heterogeneity: Next 14/15/16, React 18/19, npm everywhere (no workspaces), Deno (conversaflow), Xcode (KDS). None fatal: pnpm workspaces tolerate divergent Next/React versions per app; Deno and Xcode projects can sit in the monorepo outside the Node task graph.
@@ -272,38 +272,38 @@ umi-landing-page ──writes──→ local SQLite (leads)
 
 ### Critical (actively blocking integration)
 
-| # | Item | Impact | Affected | Remediation |
-|---|---|---|---|---|
-| C1 | Workspace root unversioned (no `.git` at `/Umi`) | Total loss exposure for governance, migration SQL, skills; no audit trail; blocks monorepo path | Everything at root | `git init` + initial commit; private remote under one org |
-| C2 | Migration parked at Phase 4F since 2026-05-28 | Staging and every downstream checklist phase blocked | Whole program | Run 4F + `validation/001_core_validation.sql` (source analysis already complete; expected effort: hours) |
-| C3 | Dashboard backend undeployable (`server.js`, local Express, no host) | Owner-facing product cannot ship; forces continued local-only operation | umi-dashboard | Checklist Phase 3: choose shape; recommend Next/Node API routes co-located with the dashboard frontend on Vercel-class hosting |
-| C4 | Cash triple-surface data (live `rrkzhisnadfrgnhntkiz`, stale `umi_cash` copy, drifted dashboard Prisma) | Reads from stale copy show wrong loyalty data; schema drift already real (missing `LifecycleEvent`) | umi-cash, umi-dashboard | Checklist Phases 4+6; until cutover, mark stale copy read-only and delete dashboard schema reads where possible |
-| C5 | `VOYAGE_API_KEY` missing in Supabase secrets | Production semantic product search silently degraded; 136 products' embeddings unused | ConversaFlow runtime | Set the secret (minutes); verify `embed-backfill` |
+| #   | Item                                                                                                    | Impact                                                                                              | Affected                | Remediation                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| C1  | Workspace root unversioned (no `.git` at `/Umi`)                                                        | Total loss exposure for governance, migration SQL, skills; no audit trail; blocks monorepo path     | Everything at root      | `git init` + initial commit; private remote under one org                                                                      |
+| C2  | Migration parked at Phase 4F since 2026-05-28                                                           | Staging and every downstream checklist phase blocked                                                | Whole program           | Run 4F + `validation/001_core_validation.sql` (source analysis already complete; expected effort: hours)                       |
+| C3  | Dashboard backend undeployable (`server.js`, local Express, no host)                                    | Owner-facing product cannot ship; forces continued local-only operation                             | umi-dashboard           | Checklist Phase 3: choose shape; recommend Next/Node API routes co-located with the dashboard frontend on Vercel-class hosting |
+| C4  | Cash triple-surface data (live `rrkzhisnadfrgnhntkiz`, stale `umi_cash` copy, drifted dashboard Prisma) | Reads from stale copy show wrong loyalty data; schema drift already real (missing `LifecycleEvent`) | umi-cash, umi-dashboard | Checklist Phases 4+6; until cutover, mark stale copy read-only and delete dashboard schema reads where possible                |
+| C5  | `VOYAGE_API_KEY` missing in Supabase secrets                                                            | Production semantic product search silently degraded; 136 products' embeddings unused               | ConversaFlow runtime    | Set the secret (minutes); verify `embed-backfill`                                                                              |
 
 ### High (future migration risk)
 
-| # | Item | Impact | Affected | Remediation |
-|---|---|---|---|---|
-| H1 | `.claude`/`.agents` adapter drift (§1.2) | Agents act on different rules per tool; promoted skills invisible in Claude sessions | Agent operating system | Re-converge; declare one source and generate the other; add sync check to the maintenance rule |
-| H2 | `PLATFORM_TRANSITION_SCHEMA` dual paths ×41, file grew to 3,561 lines post-audit | Undocumented business rules may hide in `false` branches (risk register item in 05-23 audit) | umi-dashboard | Delete `false` branches route-group-by-route-group after staging verification (checklist Phase 4) |
-| H3 | KDS pairing duplicate `callKdsPairingLocal` (`server.js:1276`) | Security-sensitive logic forked; fixes won't propagate | dashboard ↔ conversaflow | Checklist Phase 5: route all pairing through canonical edge function |
-| H4 | 8 Vercel crons outside job queue (`apps/umi-cash/vercel.json`) | Invisible, non-retryable scheduled business actions (incl. birthday rewards w/ timezone risk) | umi-cash | Checklist Phase 7: `pg_cron` → `workflow_jobs` → `job-worker` |
-| H5 | Landing leads in `better-sqlite3` (`src/lib/database/sqlite.ts`) | Real lead/attribution data on ephemeral serverless disk if deployed | umi-landing-page | Checklist Phase 9: `platform.leads` + `lead_events` |
-| H6 | `DEFAULT_BUSINESS_ID` single-tenant ingress (`_shared/cors.ts:7`) | Blocks second tenant onboarding to ConversaFlow | umi-conversaflow | `conversaflow.channel_accounts` number→tenant resolution (transition plan §Ingress) |
-| H7 | `public.*` legacy schema + stale `umi_cash` copy still in production project | Confusion risk; accidental reads (dashboard connectivity audit shows dashboard *was* reading `umi_cash`) | Umi Platform DB | Post-cutover manual cleanup window (checklist Phase 8); until then, document as read-only |
-| H8 | Cron-vault key rotation pending (workspace memory: KDS refactor "needs manual key rotation first") | Old credentials potentially still valid | Supabase project | Execute rotation; verify `20260512220000_replace_cron_vault_auth.sql` assumptions |
+| #   | Item                                                                                               | Impact                                                                                                   | Affected                 | Remediation                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------- |
+| H1  | `.claude`/`.agents` adapter drift (§1.2)                                                           | Agents act on different rules per tool; promoted skills invisible in Claude sessions                     | Agent operating system   | Re-converge; declare one source and generate the other; add sync check to the maintenance rule    |
+| H2  | `PLATFORM_TRANSITION_SCHEMA` dual paths ×41, file grew to 3,561 lines post-audit                   | Undocumented business rules may hide in `false` branches (risk register item in 05-23 audit)             | umi-dashboard            | Delete `false` branches route-group-by-route-group after staging verification (checklist Phase 4) |
+| H3  | KDS pairing duplicate `callKdsPairingLocal` (`server.js:1276`)                                     | Security-sensitive logic forked; fixes won't propagate                                                   | dashboard ↔ conversaflow | Checklist Phase 5: route all pairing through canonical edge function                              |
+| H4  | 8 Vercel crons outside job queue (`apps/umi-cash/vercel.json`)                                     | Invisible, non-retryable scheduled business actions (incl. birthday rewards w/ timezone risk)            | umi-cash                 | Checklist Phase 7: `pg_cron` → `workflow_jobs` → `job-worker`                                     |
+| H5  | Landing leads in `better-sqlite3` (`src/lib/database/sqlite.ts`)                                   | Real lead/attribution data on ephemeral serverless disk if deployed                                      | umi-landing-page         | Checklist Phase 9: `platform.leads` + `lead_events`                                               |
+| H6  | `DEFAULT_BUSINESS_ID` single-tenant ingress (`_shared/cors.ts:7`)                                  | Blocks second tenant onboarding to ConversaFlow                                                          | umi-conversaflow         | `conversaflow.channel_accounts` number→tenant resolution (transition plan §Ingress)               |
+| H7  | `public.*` legacy schema + stale `umi_cash` copy still in production project                       | Confusion risk; accidental reads (dashboard connectivity audit shows dashboard _was_ reading `umi_cash`) | Umi Platform DB          | Post-cutover manual cleanup window (checklist Phase 8); until then, document as read-only         |
+| H8  | Cron-vault key rotation pending (workspace memory: KDS refactor "needs manual key rotation first") | Old credentials potentially still valid                                                                  | Supabase project         | Execute rotation; verify `20260512220000_replace_cron_vault_auth.sql` assumptions                 |
 
 ### Medium (maintainability)
 
-| # | Item | Remediation |
-|---|---|---|
-| M1 | Framework sprawl: Next 14 (cash) / 15 (landing) / 16 (logs); React 18/19; Prisma 5 | Converge during monorepo adoption; not before |
-| M2 | Repo/product naming drift (`375`, `supabase-edge-functions`, `conversaflow-logs`, pkg `umi-consultoria`) | Rename during monorepo import |
-| M3 | Stale ledger references (`umi-landing-page-1`, `platform/conversaflow/docs`) | Add "superseded" annotations per `cognitive-lifecycle.md` retention rule |
-| M4 | Cash `User` model conflates customers/staff/admins/auth | Resolved by Phase 6 cutover mapping (User → `platform.contacts`/`platform.users`/`staff_members`) |
-| M5 | ConversaFlow `ARCHITECTURE_TARGET.md` self-declares stale sections (slack-actions) | Prune or mark historical; `mini-harness-architecture.md` is canonical |
-| M6 | Dashboard `Umi Dash.html` static shell as "behavior contract" | Acceptable transitional spec; replace with screen-level acceptance checklist when hardening |
-| M7 | `umi-logs` should read `observability.*` post-migration, currently reads conversaflow tables | Planned (centralization audit §2); sequence after staging |
+| #   | Item                                                                                                     | Remediation                                                                                       |
+| --- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| M1  | Framework sprawl: Next 14 (cash) / 15 (landing) / 16 (logs); React 18/19; Prisma 5                       | Converge during monorepo adoption; not before                                                     |
+| M2  | Repo/product naming drift (`375`, `supabase-edge-functions`, `conversaflow-logs`, pkg `umi-consultoria`) | Rename during monorepo import                                                                     |
+| M3  | Stale ledger references (`umi-landing-page-1`, `platform/conversaflow/docs`)                             | Add "superseded" annotations per `cognitive-lifecycle.md` retention rule                          |
+| M4  | Cash `User` model conflates customers/staff/admins/auth                                                  | Resolved by Phase 6 cutover mapping (User → `platform.contacts`/`platform.users`/`staff_members`) |
+| M5  | ConversaFlow `ARCHITECTURE_TARGET.md` self-declares stale sections (slack-actions)                       | Prune or mark historical; `mini-harness-architecture.md` is canonical                             |
+| M6  | Dashboard `Umi Dash.html` static shell as "behavior contract"                                            | Acceptable transitional spec; replace with screen-level acceptance checklist when hardening       |
+| M7  | `umi-logs` should read `observability.*` post-migration, currently reads conversaflow tables             | Planned (centralization audit §2); sequence after staging                                         |
 
 ### Low (deferrable)
 
@@ -315,13 +315,13 @@ umi-landing-page ──writes──→ local SQLite (leads)
 
 ## Phase 6 — Coordination Analysis
 
-The workspace is effectively operated by **one person** (git authors and `settings.local.json` paths all point to `juanlopez1`; the "business owner" in migration decisions is the operator of Kalala). Coordination friction is therefore *agent-coordination* and *future-team* friction, not interpersonal:
+The workspace is effectively operated by **one person** (git authors and `settings.local.json` paths all point to `juanlopez1`; the "business owner" in migration decisions is the operator of Kalala). Coordination friction is therefore _agent-coordination_ and _future-team_ friction, not interpersonal:
 
-1. **Adapter drift = knowledge silo by tool.** Sessions in Codex-style tooling accrued ledger entries and skills that Claude sessions cannot see (§1.2). Delivery effect: agents re-derive context, mis-route work, or recreate skills that already exist. *This is the workspace's #1 self-inflicted coordination tax.*
+1. **Adapter drift = knowledge silo by tool.** Sessions in Codex-style tooling accrued ledger entries and skills that Claude sessions cannot see (§1.2). Delivery effect: agents re-derive context, mis-route work, or recreate skills that already exist. _This is the workspace's #1 self-inflicted coordination tax._
 2. **Duplicated procedures** (3× task-router) mean three places to update one routing rule.
 3. **Plan/checklist sprawl in `docs/migration/`** — 8 overlapping plans where the 05-23 checklist is the real driver. The `latest.md` index mitigates this well; keep it the single entrypoint and mark 04-15/05-14 docs historical.
 4. **Three GitHub identities + two ssh aliases** — onboarding any second human (or CI) requires tribal knowledge of which alias pushes where.
-5. **Documentation duplication is mostly *managed*** (root vs repo docs have explicit ownership rules), which is unusual and good — the governance layer (`authority.md` conflict rules) is the right mechanism; it just isn't being enforced on adapters.
+5. **Documentation duplication is mostly _managed_** (root vs repo docs have explicit ownership rules), which is unusual and good — the governance layer (`authority.md` conflict rules) is the right mechanism; it just isn't being enforced on adapters.
 6. **Knowledge fragility:** the richest institutional memory (routing ledgers, migration evidence, this audit's sources) lives in the unversioned root — C1 again.
 
 ---
@@ -375,21 +375,21 @@ Follow the 2026-05-23 centralization audit — it is correct and already researc
 3. One deployed admin backend (ported `server.js`), Prisma-or-SQL over `platform.*`.
 4. `pg_cron` + `job-worker` for all scheduled business work.
 5. One Twilio adapter, one email adapter in `_shared/`.
-6. Supabase exit remains an *option*, not a project — keep contracts host-agnostic, set no date (matching the plan's stance).
+6. Supabase exit remains an _option_, not a project — keep contracts host-agnostic, set no date (matching the plan's stance).
 
 ---
 
 ## Phase 8 — Migration Roadmap
 
-| Phase | Objective | Key deliverables | Depends on | Risks | Complexity |
-|---|---|---|---|---|---|
-| **1. Stabilization** (≈1–2 wks) | Stop knowledge/data bleeding | Root git repo (C1); Phase 4F + validation run (C2); `VOYAGE_API_KEY` set (C5); cron-vault key rotation (H8); adapter re-convergence (H1) | none | minimal — all additive | Low |
-| **2. Standardization** (≈2–3 wks) | One identity, one index | Single GitHub org + remotes normalized; `docs/reports/latest.md` updated; stale plans marked historical (M3, M5); skills deduplicated to one canonical set + generated mirrors | 1 | low | Low |
-| **3. Shared Foundations** (≈3–4 wks) | Staging platform DB + first shared contract | Staged 7-schema DB (checklist Ph 2); dashboard backend deployable (Ph 3); tenant/capability API live against staging | 1 | env/secret handling outside local (audit risk register) | Medium |
-| **4. Backend Consolidation** (≈4–8 wks) | One data platform in production | Dashboard schema cutover + dual-path deletion (Ph 4); KDS pairing dedup (Ph 5); **Cash cutover with soak** (Ph 6); crons → job queue (Ph 7); adapter cleanup + legacy/public removal (Ph 8); landing → PostgreSQL leads (Ph 9) | 3 | Cash cutover is highest-risk (customer-facing loyalty); mitigations already written | High |
-| **5. Monorepo Migration** (≈1–2 wks) | One repo, preserved history | pnpm+Turborepo workspace; subtree imports; CI/deploy repointing; renames (M2) | 4 (recommended), 2 (required) | deploy rewiring | Medium |
-| **6. Platform Integration** (ongoing) | Unified product ecosystem | `packages/{db,contracts,adapters}`; Logs on `observability.*` (M7); multi-tenant ingress via `channel_accounts` (H6); second tenant onboarded end-to-end | 4–5 | multi-tenant edge cases | Medium-High |
-| **7. Optimization** (ongoing) | Reduce cost/cognitive load | Framework convergence (M1); auth provider decision executed; optional Supabase exit steps as they pay off; eval substrate from traces (`docs/traces/index.md` future-use list) | 6 | scope creep — gate via `scientific-research-check` | Variable |
+| Phase                                   | Objective                                   | Key deliverables                                                                                                                                                                                                               | Depends on                    | Risks                                                                               | Complexity  |
+| --------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | ----------------------------------------------------------------------------------- | ----------- |
+| **1. Stabilization** (≈1–2 wks)         | Stop knowledge/data bleeding                | Root git repo (C1); Phase 4F + validation run (C2); `VOYAGE_API_KEY` set (C5); cron-vault key rotation (H8); adapter re-convergence (H1)                                                                                       | none                          | minimal — all additive                                                              | Low         |
+| **2. Standardization** (≈2–3 wks)       | One identity, one index                     | Single GitHub org + remotes normalized; `docs/reports/latest.md` updated; stale plans marked historical (M3, M5); skills deduplicated to one canonical set + generated mirrors                                                 | 1                             | low                                                                                 | Low         |
+| **3. Shared Foundations** (≈3–4 wks)    | Staging platform DB + first shared contract | Staged 7-schema DB (checklist Ph 2); dashboard backend deployable (Ph 3); tenant/capability API live against staging                                                                                                           | 1                             | env/secret handling outside local (audit risk register)                             | Medium      |
+| **4. Backend Consolidation** (≈4–8 wks) | One data platform in production             | Dashboard schema cutover + dual-path deletion (Ph 4); KDS pairing dedup (Ph 5); **Cash cutover with soak** (Ph 6); crons → job queue (Ph 7); adapter cleanup + legacy/public removal (Ph 8); landing → PostgreSQL leads (Ph 9) | 3                             | Cash cutover is highest-risk (customer-facing loyalty); mitigations already written | High        |
+| **5. Monorepo Migration** (≈1–2 wks)    | One repo, preserved history                 | pnpm+Turborepo workspace; subtree imports; CI/deploy repointing; renames (M2)                                                                                                                                                  | 4 (recommended), 2 (required) | deploy rewiring                                                                     | Medium      |
+| **6. Platform Integration** (ongoing)   | Unified product ecosystem                   | `packages/{db,contracts,adapters}`; Logs on `observability.*` (M7); multi-tenant ingress via `channel_accounts` (H6); second tenant onboarded end-to-end                                                                       | 4–5                           | multi-tenant edge cases                                                             | Medium-High |
+| **7. Optimization** (ongoing)           | Reduce cost/cognitive load                  | Framework convergence (M1); auth provider decision executed; optional Supabase exit steps as they pay off; eval substrate from traces (`docs/traces/index.md` future-use list)                                                 | 6                             | scope creep — gate via `scientific-research-check`                                  | Variable    |
 
 The single most important sequencing rule, already encoded in the workspace and re-affirmed here: **finish backend/database consolidation before the monorepo move.** The monorepo is a packaging decision; the database is the product decision.
 
@@ -397,12 +397,12 @@ The single most important sequencing rule, already encoded in the workspace and 
 
 ## Uncertainties and validation steps
 
-1. **Live production state unverified.** All row counts/schema states cite documents dated 2026-04-15 → 2026-05-28. *Validate:* run the Phase-3 inventory queries from `2026-05-14-postgresql-platform-integration-plan.md` against `UMI_CURRENT_DATABASE_URL` (note: a prior attempt was blocked because that env var was unset — `.claude` ledger 2026-05-14).
-2. **Which KDS pairing path the dashboard actually executes** (edge call at `server.js:1175` vs local at `:1276`) depends on runtime env not inspected here. *Validate:* trace one pairing action locally.
-3. **Canonical adapter layer intent** (`.claude` vs `.agents`) — the `.agents` layer is newer but `CLAUDE.md` names `.claude/skills/` as "the current procedure layer." *Validate:* owner decision; then enforce via the adapter-policy sync rule.
-4. **Landing page production deployment status** (branch `staging`, no `vercel.json` in repo) — unclear whether SQLite risk H5 is latent or live. *Validate:* check Vercel project settings.
+1. **Live production state unverified.** All row counts/schema states cite documents dated 2026-04-15 → 2026-05-28. _Validate:_ run the Phase-3 inventory queries from `2026-05-14-postgresql-platform-integration-plan.md` against `UMI_CURRENT_DATABASE_URL` (note: a prior attempt was blocked because that env var was unset — `.claude` ledger 2026-05-14).
+2. **Which KDS pairing path the dashboard actually executes** (edge call at `server.js:1175` vs local at `:1276`) depends on runtime env not inspected here. _Validate:_ trace one pairing action locally.
+3. **Canonical adapter layer intent** (`.claude` vs `.agents`) — the `.agents` layer is newer but `CLAUDE.md` names `.claude/skills/` as "the current procedure layer." _Validate:_ owner decision; then enforce via the adapter-policy sync rule.
+4. **Landing page production deployment status** (branch `staging`, no `vercel.json` in repo) — unclear whether SQLite risk H5 is latent or live. _Validate:_ check Vercel project settings.
 5. **Why `umi-conversaflow` history is 7 commits on `architecture-v2`** — likely an intentional reset; if the old history exists on the remote, preserve it before monorepo import.
-6. **Cash production drift since 2026-05-15 snapshot** (counts like 214 users will have moved). *Validate:* re-dump before Phase 4 cutover; the soak-comparison step already covers this.
+6. **Cash production drift since 2026-05-15 snapshot** (counts like 214 users will have moved). _Validate:_ re-dump before Phase 4 cutover; the soak-comparison step already covers this.
 
 ---
 

@@ -35,10 +35,7 @@ describe('VoyageAdapter', () => {
         }),
       }),
     );
-    expect(await adapterWith(WITH_KEY).generateEmbeddings(['a', 'b'])).toEqual([
-      [0.1],
-      [0.2],
-    ]);
+    expect(await adapterWith(WITH_KEY).generateEmbeddings(['a', 'b'])).toEqual([[0.1], [0.2]]);
   });
 
   it('returns null on a 4xx without retrying', async () => {
@@ -79,9 +76,7 @@ describe('VoyageAdapter', () => {
       });
     vi.stubGlobal('fetch', fetchMock);
 
-    expect(await adapterWith(WITH_KEY).generateEmbeddings(['a'])).toEqual([
-      [0.5],
-    ]);
+    expect(await adapterWith(WITH_KEY).generateEmbeddings(['a'])).toEqual([[0.5]]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

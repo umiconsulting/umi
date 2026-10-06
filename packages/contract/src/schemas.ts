@@ -1,0 +1,366 @@
+// zod schemas as the single source of truth for the api<->dashboard payload
+// shapes. Each schema exports both the runtime validator and its inferred TS
+// type (z.infer), so the server and client share one definition. Mirrors the
+// live umi-api controllers/DTOs (verified against apps/umi-api/src/modules/**).
+import { z } from 'zod';
+import { nationalDigitsAreValid, phoneLengthMessage } from './phone';
+
+// ── Request bodies ────────────────────────────────────────────────────────
+
+/** POST /api/auth/local/login — mirrors umi-api LoginDto. */
+export const LoginRequest = z.object({
+  username: z.string().min(1),
+  password: z.string().min(1),
+  remember: z.boolean().optional(),
+});
+export type LoginRequest = z.infer<typeof LoginRequest>;
+
+/** POST /api/auth/local/forgot-password — mirrors umi-api ForgotPasswordDto. */
+export const ForgotPasswordRequest = z.object({
+  email: z.string().email(),
+});
+export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequest>;
+
+/** POST /api/auth/local/reset-password — mirrors umi-api ResetPasswordDto. */
+export const ResetPasswordRequest = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+});
+export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequest>;
+
+// ── Shared shapes ─────────────────────────────────────────────────────────
+
+export const SessionUser = z.object({
+  id: z.string(),
+  email: z.string(),
+  displayName: z.string().nullable(),
+});
+export type SessionUser = z.infer<typeof SessionUser>;
+
+/** Merchant membership as embedded in a session (login/refresh/me). Mirrors
+ *  auth.repository MerchantMembershipSummary.
+ *
+ *  BREAKING (v2): `slug` became `handle`, and it is NULLABLE. Route by `id`. The handle
+ *  is the café's PUBLISHED address — the one baked into issued wallet passes, umi-cash
+ *  URLs and /logos/{handle}-*.png — and a café created after cutover has none. Callers
+ *  that used `slug` to build an API path must use `id`; callers that displayed it to a
+ *  human, or built an asset URL from it, want `handle` and must handle null. */
+export const MerchantMembership = z.object({
+  id: z.string(),
+  handle: z.string().nullable(),
+  name: z.string(),
+  roles: z.array(z.string()),
+});
+export type MerchantMembership = z.infer<typeof MerchantMembership>;
+
+/** GET /api/me/merchants row — membership plus timezone. Mirrors merchants.repository
+ *  MerchantSummary. */
+export const MerchantSummary = MerchantMembership.extend({
+  timezone: z.string().nullable(),
+});
+export type MerchantSummary = z.infer<typeof MerchantSummary>;
+
+export const SessionEnvelope = z.object({
+  user: SessionUser,
+  merchants: z.array(MerchantMembership),
+  provider: z.literal('local'),
+  accessExpiresIn: z.number(),
+  /**
+   * The platform grant this login holds, or null for the great majority who hold
+   * none. `'super_admin'` may act across every café; `'developer'` may REACH
+   * every café and change nothing.
+   *
+   * ⚠️ SAID OUTRIGHT, because it could only be inferred before, and the inference
+   * was wrong. `merchants[].roles` carries the platform role only as a FALLBACK,
+   * for cafés where the user has no `merchant.staff` row — so a platform operator
+   * who also works at one café appeared as ordinary staff there, and a
+   * `developer` was indistinguishable from a `super_admin` without knowing which
+   * keys are platform keys. A client gating a platform-only screen needs the
+   * fact, not a reconstruction of it.
+   */
+  platformRole: z.enum(['super_admin', 'developer']).nullable(),
+});
+export type SessionEnvelope = z.infer<typeof SessionEnvelope>;
+
+// ── Responses ─────────────────────────────────────────────────────────────
+
+/** POST /api/auth/local/refresh + /mfa/verify, GET /api/auth/me. */
+export const SessionResponse = z.object({ session: SessionEnvelope });
+export type SessionResponse = z.infer<typeof SessionResponse>;
+
+/**
+ * The OTHER outcome of `POST /api/auth/local/login`.
+ *
+ * The account holds a second factor, so the server sets NO cookies and returns
+ * no session. The caller posts `challengeToken` and the code back to
+ * `POST /api/auth/local/mfa/verify`, which issues the cookies this step withheld.
+ *
+ * ⚠️ Handle this branch before you enrol anybody. A client that reads only
+ * `session` sees `undefined` here, and that account cannot sign in again.
+ *
+ * The challenge travels in the body, never in a cookie. A browser attaches a
+ * cookie to every request to the origin, so a half-authenticated credential in a
+ * cookie reaches endpoints that never asked for it.
+ */
+export const MfaChallengeResponse = z.object({
+  mfaRequired: z.literal(true),
+  /**
+   * `email_otp` or `totp`. BOTH ship — `10_umi.sql:75` permits the two, and
+   * `email_otp` ships FIRST because it needs no enrolment ceremony
+   * (`mfa.service.ts`). The client must read this field. A screen that names one
+   * method gives the wrong instruction to the other.
+   *
+   * The type stays a string, not an enum. An unknown method must reach the
+   * client as itself, so the client can say it cannot handle it. A zod enum
+   * would reject the whole body and the person would see a parse error.
+   */
+  method: z.string(),
+  challengeToken: z.string(),
+  expiresInSeconds: z.number(),
+});
+export type MfaChallengeResponse = z.infer<typeof MfaChallengeResponse>;
+
+/**
+ * POST /api/auth/local/login — one of two shapes.
+ *
+ * Read `mfaRequired` to tell them apart. `mfaChallenged()` does that, and it
+ * narrows the type.
+ */
+export const LoginResponse = z.union([SessionResponse, MfaChallengeResponse]);
+export type LoginResponse = z.infer<typeof LoginResponse>;
+
+/** True when the login needs a second factor. Narrows `LoginResponse`. */
+export function mfaChallenged(res: LoginResponse): res is MfaChallengeResponse {
+  return 'mfaRequired' in res && res.mfaRequired === true;
+}
+
+/** POST /api/auth/local/mfa/verify. */
+export const VerifyMfaRequest = z.object({
+  challengeToken: z.string().min(1),
+  /** Exactly six digits. The server rejects anything else at the edge. */
+  code: z.string().regex(/^\d{6}$/, 'code must be 6 digits'),
+  remember: z.boolean().optional(),
+});
+export type VerifyMfaRequest = z.infer<typeof VerifyMfaRequest>;
+
+/** GET /api/me/merchants. */
+export const MeMerchantsResponse = z.object({ merchants: z.array(MerchantSummary) });
+export type MeMerchantsResponse = z.infer<typeof MeMerchantsResponse>;
+
+/** logout / forgot-password / reset-password. */
+export const OkResponse = z.object({ ok: z.literal(true) });
+export type OkResponse = z.infer<typeof OkResponse>;
+
+/** POST .../global-logout — revoke every session of the caller. `exceptCurrent`
+ *  keeps the session that issued the request, so "sign out my other devices" does
+ *  not sign the caller out of the device they are holding. */
+export const GlobalLogoutRequest = z.object({
+  exceptCurrent: z.boolean().default(false),
+});
+export type GlobalLogoutRequest = z.infer<typeof GlobalLogoutRequest>;
+
+/** POST /api/:merchantRef/admin/staff — mirrors umi-api CreateStaffDto. */
+export const CreateStaffRequest = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    phone: z.string().trim().min(1).max(40).optional(),
+    email: z.string().trim().email().optional(),
+    role: z.enum(['ADMIN', 'STAFF']).optional(),
+    roleId: z.string().uuid().optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+    operatorPin: z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .optional(),
+  })
+  .strict()
+  .refine((value) => value.phone || value.email, {
+    message: 'phone or email is required',
+    path: ['phone'],
+  });
+export type CreateStaffRequest = z.infer<typeof CreateStaffRequest>;
+
+/** PATCH /api/:merchantRef/admin/staff/:staffId — mirrors umi-api UpdateStaffDto. */
+export const UpdateStaffRequest = z
+  .object({
+    name: z.string().trim().min(1).max(160).optional(),
+    phone: z.string().trim().max(40).nullable().optional(),
+    email: z.string().trim().email().nullable().optional(),
+    role: z.enum(['ADMIN', 'STAFF']).optional(),
+    roleId: z.string().uuid().optional(),
+    operatorPin: z
+      .string()
+      .regex(/^\d{4,8}$/)
+      .nullable()
+      .optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+  })
+  .strict();
+export type UpdateStaffRequest = z.infer<typeof UpdateStaffRequest>;
+
+// ── Cash / loyalty product-write requests ─────────────────────────────────
+// Mirror the live umi-api DTOs 1:1 (apps/umi-api/src/modules/cash/dto/*), so the
+// server (class-validator) and both clients (dashboard, umi-cash frontend) share
+// one shape. Both surfaces call these: reference-addressed `/api/:merchantRef/...` (umi-cash) and
+// merchant-scoped `/api/merchants/:merchantId/cash/...` (dashboard) — see routes.ts.
+
+/** A real YYYY-MM-DD calendar date — rejects impossible days (e.g. 2026-02-30),
+ *  matching the DTO's `@IsISO8601({ strict: true })`. */
+const isCalendarDate = (s: string): boolean => {
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+};
+
+/**
+ * Scan actions — mirrors cash/dto/scan.dto.ts `ACTIONS`, which mirrors the frozen
+ * client's `lib/constants.ts#SCAN_ACTIONS`.
+ *
+ * `REDEEM_BASE` is the early cash-out: at the ladder's LOWER threshold the barista
+ * hands that tier over and the card is torn off. It was always in the client and in
+ * umi-cash's route; it was missing here and in the DTO, so a register flipped onto
+ * umi-api refused the tap with a 400. See 79_cycle_anchor.sql for what it costs to
+ * represent: the cycle restarts at the customer's stamp count, which is not a
+ * multiple of the threshold.
+ */
+export const CASH_SCAN_ACTIONS = ['VISIT', 'REDEEM', 'REDEEM_BASE', 'BIRTHDAY_REDEEM'] as const;
+
+/** POST /api/:merchantRef/admin/scan — mirrors ScanDto. */
+export const ScanRequest = z.object({
+  qrPayload: z.string(),
+  action: z.enum(CASH_SCAN_ACTIONS).optional(),
+  actions: z.array(z.enum(CASH_SCAN_ACTIONS)).min(1).max(3).optional(),
+});
+export type ScanRequest = z.infer<typeof ScanRequest>;
+
+/** POST /api/:merchantRef/admin/scan/seals — mirrors ScanSealsDto. A manual bulk
+ *  stamp credit (catch-up for a customer migrated from another loyalty program).
+ *  The card is named by id because the operator has already identified the card;
+ *  `seals` is capped at 50, the same bound `merchant.loyalty_visit.stamps` carries. */
+export const ScanSealsRequest = z.object({
+  cardId: z.string().uuid(),
+  seals: z.number().int().min(1).max(50),
+  note: z.string().max(200).optional(),
+  idempotencyKey: z.string().min(8).max(200).optional(),
+});
+export type ScanSealsRequest = z.infer<typeof ScanSealsRequest>;
+
+/** POST /api/:merchantRef/admin/topup — mirrors TopupDto (min $1.00). */
+export const TopupRequest = z.object({
+  cardId: z.string(),
+  amountCentavos: z.number().int().min(100),
+  note: z.string().max(200).optional(),
+  idempotencyKey: z.string().max(80).optional(),
+});
+export type TopupRequest = z.infer<typeof TopupRequest>;
+
+/** POST /api/:merchantRef/admin/purchase — mirrors PurchaseDto (min $0.01). */
+export const PurchaseRequest = z.object({
+  cardId: z.string(),
+  amountCentavos: z.number().int().min(1),
+  note: z.string().max(200).optional(),
+  idempotencyKey: z.string().max(80).optional(),
+});
+export type PurchaseRequest = z.infer<typeof PurchaseRequest>;
+
+/** POST /api/:merchantRef/admin/gift-cards — mirrors GiftCardCreateDto. The two
+ *  `@ValidateIf` rules mean each recipient field is validated *only when it is the
+ *  sole channel*: email must be a valid email when no phone is given, phone must be
+ *  ≤20 chars when no email is given, and at least one is required. When both are
+ *  present the DTO validates neither — reproduced here so the contract accepts
+ *  exactly what the server accepts. */
+export const GiftCardCreateRequest = z
+  .object({
+    amountCentavos: z.number().int().min(100),
+    senderName: z.string().max(100).optional(),
+    message: z.string().max(300).optional(),
+    recipientEmail: z.string().optional(),
+    recipientPhone: z.string().optional(),
+    recipientName: z.string().max(100).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.recipientEmail && !v.recipientPhone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipientEmail'],
+        message: 'Se requiere email o teléfono del destinatario',
+      });
+      return;
+    }
+    // @ValidateIf(o => !o.recipientPhone) @IsEmail
+    if (
+      !v.recipientPhone &&
+      v.recipientEmail &&
+      !z.string().email().safeParse(v.recipientEmail).success
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipientEmail'],
+        message: 'Se requiere email o teléfono del destinatario',
+      });
+    }
+    // @ValidateIf(o => !o.recipientEmail) @MaxLength(20)
+    if (!v.recipientEmail && v.recipientPhone && v.recipientPhone.length > 20) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['recipientPhone'],
+        message: 'recipientPhone must be at most 20 characters',
+      });
+    }
+  });
+export type GiftCardCreateRequest = z.infer<typeof GiftCardCreateRequest>;
+
+/** POST /api/:merchantRef/customers — mirrors RegisterDto (member registration). */
+export const RegisterMemberRequest = z.object({
+  name: z.string().min(2).max(100),
+  // The country picker supplies the code; the customer types ONLY the national digits,
+  // and they must be the count that country actually uses. `min(7).max(20)` was a string
+  // length, not a phone rule, and it let 8-, 11- and 12-digit Mexican numbers through.
+  phone: z
+    .string()
+    .min(7)
+    .max(20)
+    .refine(nationalDigitsAreValid, (v) => ({ message: phoneLengthMessage(v) })),
+  birthDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'birthDate must be YYYY-MM-DD')
+    .refine(isCalendarDate, 'birthDate must be a real calendar date'),
+});
+export type RegisterMemberRequest = z.infer<typeof RegisterMemberRequest>;
+
+/** POST /api/:merchantRef/gift/:code — mirrors GiftRedeemDto (public gift redemption). */
+export const GiftRedeemRequest = z.object({
+  phone: z.string().optional(),
+  email: z.string().optional(),
+});
+export type GiftRedeemRequest = z.infer<typeof GiftRedeemRequest>;
+
+// ── Model catalogue ───────────────────────────────────────────────────────
+// The browser-surface half of `modelCatalog`. Names here are what `routeCatalog`
+// refers to, so a route can only name a model that exists.
+
+export const httpModels = {
+  LoginRequest,
+  ForgotPasswordRequest,
+  ResetPasswordRequest,
+  SessionUser,
+  MerchantMembership,
+  MerchantSummary,
+  SessionEnvelope,
+  SessionResponse,
+  MfaChallengeResponse,
+  LoginResponse,
+  VerifyMfaRequest,
+  MeMerchantsResponse,
+  OkResponse,
+  GlobalLogoutRequest,
+  CreateStaffRequest,
+  UpdateStaffRequest,
+  ScanRequest,
+  ScanSealsRequest,
+  TopupRequest,
+  PurchaseRequest,
+  GiftCardCreateRequest,
+  RegisterMemberRequest,
+  GiftRedeemRequest,
+} as const;

@@ -1,0 +1,994 @@
+import { z } from 'zod';
+import { MerchantDate, CorrelationId, CurrencyCode, IsoTimestamp, Money, Uuid } from './platform';
+
+const Fingerprint = z.string().regex(/^[a-f0-9]{64}$/);
+const PositiveMoney = Money.refine((value) => value.minorUnits > 0, 'Amount must be positive.');
+const NonNegativeMoney = Money.refine(
+  (value) => value.minorUnits >= 0,
+  'Amount must not be negative.',
+);
+const SafeNote = z
+  .string()
+  .trim()
+  .min(1)
+  .max(160)
+  .regex(/^[^<>]*$/)
+  .nullable();
+
+export const RegisterStatus = z.enum([
+  'available',
+  'assigned',
+  'in_use',
+  'suspended',
+  'counting',
+  'reconciliation_required',
+  'blocked',
+  'archived',
+]);
+export const CashShiftStatus = z.enum([
+  'opening',
+  'open',
+  'suspended',
+  'handoff_pending',
+  'counting',
+  'reconciliation_required',
+  'closing',
+  'closed',
+  'blocked',
+  'recovered',
+]);
+export const CashMovementType = z.enum(['paid_in', 'paid_out', 'safe_drop', 'drawer_correction']);
+export const CashLedgerEntryType = z.enum([
+  'opening_float',
+  'cash_sale',
+  'cash_refund',
+  'paid_in',
+  'paid_out',
+  'safe_drop',
+  'drawer_correction',
+  'handoff_transfer',
+  'count_observation',
+  'variance_resolution',
+  'close_adjustment',
+]);
+export const CashCountState = z.enum([
+  'not_started',
+  'counting',
+  'submitted',
+  'variance_calculated',
+  'recount_required',
+  'approval_required',
+  'resolved',
+]);
+export const CashVarianceReason = z.enum([
+  'no_variance',
+  'counting_error',
+  'change_error',
+  'unrecorded_paid_in',
+  'unrecorded_paid_out',
+  'missing_safe_drop',
+  'cash_handling_error',
+  'unknown_operational_difference',
+  'other_approved_reason',
+]);
+export const CashReconciliationOutcome = z.enum([
+  'balanced',
+  'within_tolerance',
+  'approved_variance',
+  'recount_required',
+  'approval_required',
+  'posting_pending',
+  'ambiguous_cash_effect',
+  'blocked',
+  'support_required',
+]);
+export const CashRecoveryState = z.enum([
+  'none',
+  'query_original_command',
+  'shift_required',
+  'shift_suspended',
+  'reconciliation_required',
+  'register_blocked',
+  'operator_mismatch',
+  'device_adoption_required',
+  'credential_rotated',
+  'policy_expired',
+  'posting_pending',
+  'ambiguous_cash_effect',
+  'stale_count',
+  'approval_required',
+  'support_required',
+]);
+
+export const DenominationCount = z
+  .object({
+    denomination: PositiveMoney,
+    quantity: z.number().int().min(0).max(100_000),
+    lineTotal: NonNegativeMoney,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.denomination.currency !== value.lineTotal.currency ||
+      value.denomination.minorUnits * value.quantity !== value.lineTotal.minorUnits
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'The denomination line total is invalid.',
+      });
+    }
+  });
+
+const validateDenominations = (
+  total: z.infer<typeof Money>,
+  lines: z.infer<typeof DenominationCount>[],
+  context: z.RefinementCtx,
+) => {
+  if (lines.length === 0) return;
+  const keys = lines.map((line) => `${line.denomination.currency}:${line.denomination.minorUnits}`);
+  const sum = lines.reduce((value, line) => value + line.lineTotal.minorUnits, 0);
+  if (
+    new Set(keys).size !== keys.length ||
+    lines.some((line) => line.denomination.currency !== total.currency) ||
+    sum !== total.minorUnits
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'The denomination lines must be unique and equal the declared total.',
+    });
+  }
+};
+
+export const RegisterAssignment = z
+  .object({
+    deviceId: Uuid.nullable(),
+    allowedDeviceClasses: z.array(z.string().min(1).max(40)).max(16),
+    assignedAt: IsoTimestamp.nullable(),
+  })
+  .strict();
+
+/**
+ * WHO IS HOLDING THIS DRAWER, AND MAY THE TERMINAL IN FRONT OF ME TAKE IT.
+ *
+ * `status` and `currentShiftId` on the register already say a drawer is taken;
+ * they do not say by whom, or whether that terminal can ever come back. The
+ * till needs the second half: a shifted register is either held by a till
+ * somebody is standing at — recoverable only by a manager counting the drawer —
+ * or held by a terminal that is gone, which nobody is coming back for.
+ *
+ * The four states are exhaustive on purpose (`free`, and the three ways a
+ * register can be held). The distinction is proven SERVER-SIDE from
+ * `merchant.device`: a client never asserts that a terminal is gone.
+ */
+export const RegisterHoldState = z.enum([
+  'free',
+  // Held by the terminal asking, which is the caller's own shift.
+  'held_by_this_device',
+  // Held by a terminal that is active. A live till: the drawer must be counted.
+  'held_by_active_till',
+  // Held by a terminal that is revoked, replaced, retired, or no longer there.
+  'held_by_orphaned_till',
+]);
+
+export const RegisterHold = z
+  .object({
+    state: RegisterHoldState,
+    /** The holding shift, when there is one. */
+    shiftId: Uuid.nullable(),
+    shiftStatus: CashShiftStatus.nullable(),
+    openedAt: IsoTimestamp.nullable(),
+    /** The terminal that last spoke for the shift, and what became of it. */
+    deviceId: Uuid.nullable(),
+    deviceName: z.string().min(1).max(120).nullable(),
+    deviceStatus: z.string().min(1).max(40).nullable(),
+    operatorSessionId: Uuid.nullable(),
+    /**
+     * True only for `held_by_orphaned_till`: the register can be freed by
+     * `POST /cash/registers/:registerId/reclaim` without a drawer count. False
+     * everywhere else, including `free` — nothing to reclaim.
+     */
+    reclaimable: z.boolean(),
+  })
+  .strict();
+
+export const PhysicalRegister = z
+  .object({
+    id: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
+    displayName: z.string().trim().min(1).max(80),
+    publicReference: z.string().min(1).max(80),
+    currency: CurrencyCode,
+    active: z.boolean(),
+    assignmentPolicy: z.enum(['device_required', 'operator_selects']),
+    assignment: RegisterAssignment,
+    currentShiftId: Uuid.nullable(),
+    /**
+     * Always resolved, never null: a register read by the till has to say
+     * whether the drawer is takeable, and "we did not look" is the answer that
+     * let a till show "Turno abierto" over a register it could not open.
+     */
+    hold: RegisterHold,
+    status: RegisterStatus,
+    version: z.number().int().positive(),
+    createdAt: IsoTimestamp,
+    archivedAt: IsoTimestamp.nullable(),
+  })
+  .strict();
+
+export const CashShiftPolicy = z
+  .object({
+    version: z.string().min(1).max(64),
+    issuedAt: IsoTimestamp,
+    expiresAt: IsoTimestamp,
+    fingerprint: Fingerprint,
+    cashShiftRequired: z.boolean(),
+    registerAssignmentRequired: z.boolean(),
+    oneShiftPerOperator: z.boolean(),
+    oneShiftPerRegister: z.boolean(),
+    openingFloatRequired: z.boolean(),
+    maximumOpeningFloat: NonNegativeMoney,
+    allowedMovementTypes: z.array(CashMovementType).max(4),
+    movementApprovalThreshold: NonNegativeMoney,
+    countMethod: z.enum(['total_only', 'denomination_or_total']),
+    blindCountRequired: z.boolean(),
+    handoffAllowed: z.boolean(),
+    handoffCountRequired: z.boolean(),
+    varianceTolerance: NonNegativeMoney,
+    /**
+     * The over/short above which a close needs a manager's approval — a variance
+     * rule, not a drawer-size rule. The till prints it as "PIN cierre:
+     * diferencia > …", and the API gates on `abs(counted - expected)`.
+     */
+    closeApprovalThreshold: NonNegativeMoney,
+    noSaleDrawerAllowed: z.boolean(),
+    offlineCashShiftAllowed: z.boolean(),
+    denominations: z.array(PositiveMoney).max(64),
+  })
+  .strict();
+
+export const CashShift = z
+  .object({
+    id: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
+    registerId: Uuid,
+    deviceId: Uuid,
+    deviceCredentialVersion: z.number().int().positive(),
+    /**
+     * The terminal holding the drawer right now. Equal to `deviceId` until custody
+     * moves — a replaced tablet, a rotated credential, or a web POS that lost its
+     * browser storage and came back as a new device.
+     */
+    holdingDeviceId: Uuid,
+    holdingDeviceCredentialVersion: z.number().int().positive(),
+    openingOperatorId: Uuid,
+    responsibleOperatorId: Uuid,
+    operatorSessionId: Uuid,
+    currency: CurrencyCode,
+    businessDate: MerchantDate,
+    status: CashShiftStatus,
+    openingCommandId: Uuid,
+    openedAt: IsoTimestamp,
+    suspendedAt: IsoTimestamp.nullable(),
+    closedAt: IsoTimestamp.nullable(),
+    ledgerSequence: z.number().int().min(0),
+    version: z.number().int().positive(),
+  })
+  .strict();
+
+export const OpeningFloat = z
+  .object({
+    total: NonNegativeMoney,
+    denominations: z.array(DenominationCount).max(64),
+    note: SafeNote,
+  })
+  .strict()
+  .superRefine((value, context) =>
+    validateDenominations(value.total, value.denominations, context),
+  );
+
+const CommandContext = {
+  locationId: Uuid,
+  operatorSessionId: Uuid,
+  commandId: Uuid,
+  idempotencyKey: Uuid,
+};
+
+export const OpenCashShiftRequest = z
+  .object({
+    ...CommandContext,
+    registerId: Uuid,
+    openingFloat: NonNegativeMoney,
+    denominations: z.array(DenominationCount).max(64),
+    businessDate: MerchantDate,
+    note: SafeNote,
+    expectedRegisterVersion: z.number().int().positive(),
+  })
+  .strict()
+  .superRefine((value, context) =>
+    validateDenominations(value.openingFloat, value.denominations, context),
+  );
+
+export const OpenCashShiftResult = z
+  .object({
+    register: PhysicalRegister,
+    shift: CashShift,
+    openingFloat: OpeningFloat,
+    policy: CashShiftPolicy,
+    correlationId: CorrelationId,
+    recovered: z.boolean(),
+  })
+  .strict();
+
+export const CashLedgerEntry = z
+  .object({
+    id: Uuid,
+    merchantId: Uuid,
+    locationId: Uuid,
+    registerId: Uuid,
+    shiftId: Uuid,
+    sequence: z.number().int().positive(),
+    type: CashLedgerEntryType,
+    amount: Money,
+    cashReceived: NonNegativeMoney,
+    changeGiven: NonNegativeMoney,
+    saleId: Uuid.nullable(),
+    commandId: Uuid,
+    businessDate: MerchantDate,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+
+/**
+ * One line of the drawer's journal, as the till reads it.
+ *
+ * The ledger is append-only and the expected cash is a projection of it, so the
+ * operator who sees a number they did not expect must be able to read the line
+ * that produced it. This is that line: what happened, how much, who, and the
+ * references back to the sale or the movement that caused it.
+ *
+ * `reports.ts` carries `CashLedgerLine`, which is the same table read for the
+ * owner: a signed amount and the audit references, without the sequence or the
+ * operator. Two surfaces, two projections of one append-only fact — deliberately
+ * not one shape bent to serve both.
+ */
+export const CashJournalLine = z
+  .object({
+    sequence: z.number().int().positive(),
+    type: CashLedgerEntryType,
+    amount: Money,
+    cashReceived: NonNegativeMoney,
+    changeGiven: NonNegativeMoney,
+    saleId: Uuid.nullable(),
+    receiptNumber: z.string().min(1).max(80).nullable(),
+    operatorReference: z.string().min(1).max(120).nullable(),
+    reasonCode: z.string().min(1).max(80).nullable(),
+    note: SafeNote,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+
+export const CashMovementRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    type: CashMovementType,
+    amount: PositiveMoney,
+    reasonCode: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9_.-]+$/),
+    note: SafeNote,
+    approvalId: Uuid.nullable(),
+    actionFingerprint: Fingerprint.nullable().optional(),
+    expectedShiftVersion: z.number().int().positive(),
+  })
+  .strict();
+export const CashMovement = z
+  .object({
+    id: Uuid,
+    type: CashMovementType,
+    amount: PositiveMoney,
+    reasonCode: z.string().min(1).max(80),
+    note: SafeNote,
+    operatorId: Uuid,
+    shiftId: Uuid,
+    registerId: Uuid,
+    businessDate: MerchantDate,
+    ledgerEntry: CashLedgerEntry,
+    committedAt: IsoTimestamp,
+  })
+  .strict();
+
+export const ExpectedCash = z
+  .object({
+    openingFloat: NonNegativeMoney,
+    grossCashReceived: NonNegativeMoney,
+    changeGiven: NonNegativeMoney,
+    netCashSales: Money,
+    paidIn: NonNegativeMoney,
+    paidOut: NonNegativeMoney,
+    safeDrops: NonNegativeMoney,
+    adjustments: Money,
+    expectedDrawerCash: Money,
+    currency: CurrencyCode,
+    ledgerSequence: z.number().int().min(0),
+    calculatedAt: IsoTimestamp,
+    shiftVersion: z.number().int().positive(),
+  })
+  .strict();
+
+export const SubmitBlindCountRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    countedCash: NonNegativeMoney,
+    denominations: z.array(DenominationCount).max(64),
+    expectedShiftVersion: z.number().int().positive(),
+    expectedLedgerSequence: z.number().int().min(0),
+    note: SafeNote,
+  })
+  .strict()
+  .superRefine((value, context) =>
+    validateDenominations(value.countedCash, value.denominations, context),
+  );
+
+export const BlindCount = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    attemptNumber: z.number().int().positive(),
+    state: CashCountState,
+    countedCash: NonNegativeMoney,
+    denominations: z.array(DenominationCount).max(64),
+    operatorId: Uuid,
+    ledgerSequence: z.number().int().min(0),
+    submittedAt: IsoTimestamp,
+  })
+  .strict();
+export const CashVariance = z
+  .object({
+    expectedCash: Money,
+    countedCash: Money,
+    signedVariance: Money,
+    absoluteVariance: NonNegativeMoney,
+    tolerance: NonNegativeMoney,
+    withinTolerance: z.boolean(),
+    approvalRequired: z.boolean(),
+    reasonRequired: z.boolean(),
+    outcome: CashReconciliationOutcome,
+    ledgerSequence: z.number().int().min(0),
+  })
+  .strict();
+export const CashCountSummary = z
+  .object({
+    count: BlindCount,
+    variance: CashVariance,
+    approvalFingerprint: Fingerprint.nullable(),
+  })
+  .strict();
+export const CashCountLine = DenominationCount;
+
+export const RecountRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    priorCountAttemptId: Uuid,
+    reasonCode: z.string().min(1).max(80),
+    expectedShiftVersion: z.number().int().positive(),
+  })
+  .strict();
+
+/**
+ * UNDO A COUNT THAT SHOULD NOT HAVE HAPPENED.
+ *
+ * A count moves the drawer out of `open`, and no money can be booked to a
+ * drawer under count. That is the right lock — a sale that lands while the
+ * cashier is counting belongs to neither number — but it also means one tap on
+ * the count button at the wrong moment freezes the till until somebody closes
+ * the shift.
+ *
+ * So the drawer can go back to `open`, under one condition the server proves
+ * itself: the ledger has not moved since the count. `expectedLedgerSequence` is
+ * the sequence the caller read, and the count's own recorded sequence must equal
+ * the shift's current sequence. A count followed by any cash fact is a count
+ * that has to be resolved, not erased.
+ *
+ * The count attempt stays. It is an immutable observation of a drawer at a
+ * moment, and the history is more useful with it than without it.
+ */
+export const CancelCashCountRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    expectedShiftVersion: z.number().int().positive(),
+    expectedLedgerSequence: z.number().int().min(0),
+    reasonCode: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9_.-]+$/),
+  })
+  .strict();
+
+export const CashVarianceResolution = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    countAttemptId: Uuid,
+    reason: CashVarianceReason,
+    note: SafeNote,
+    approvalId: Uuid.nullable(),
+    approvalFingerprint: Fingerprint.nullable(),
+    ledgerSequence: z.number().int().min(0),
+    resolvedAt: IsoTimestamp,
+  })
+  .strict();
+export const ResolveCashVarianceRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    countAttemptId: Uuid,
+    reason: CashVarianceReason,
+    note: SafeNote,
+    approvalId: Uuid.nullable(),
+    approvalFingerprint: Fingerprint.nullable(),
+    expectedShiftVersion: z.number().int().positive(),
+  })
+  .strict();
+
+export const CashApprovalRequest = z
+  .object({
+    locationId: Uuid,
+    shiftId: Uuid,
+    countAttemptId: Uuid,
+    variance: Money,
+    reason: CashVarianceReason,
+    ledgerSequence: z.number().int().min(0),
+    commandFingerprint: Fingerprint,
+    managerPin: z.string().regex(/^\d{4,8}$/),
+  })
+  .strict();
+export const CashApprovalResult = z
+  .object({
+    approvalId: Uuid,
+    permission: z.literal('cash.variance.approve'),
+    commandFingerprint: Fingerprint,
+    expiresAt: IsoTimestamp,
+    approvingOperatorReference: z.string().min(1).max(80),
+  })
+  .strict();
+
+export const ShiftTransitionRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    expectedShiftVersion: z.number().int().positive(),
+    reasonCode: z.string().min(1).max(80).nullable(),
+  })
+  .strict();
+export const ShiftHandoffRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    expectedShiftVersion: z.number().int().positive(),
+    incomingOperatorPin: z.string().regex(/^\d{4,8}$/),
+    fingerprint: Fingerprint,
+  })
+  .strict();
+export const ShiftHandoff = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    outgoingOperatorId: Uuid,
+    incomingOperatorId: Uuid,
+    expectedCash: ExpectedCash,
+    completedAt: IsoTimestamp,
+  })
+  .strict();
+
+export const NoSaleDrawerRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    reasonCode: z.string().min(1).max(80),
+    approvalId: Uuid,
+    approvalFingerprint: Fingerprint,
+  })
+  .strict();
+export const NoSaleDrawerEvent = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    status: z.literal('requested'),
+    verifiedHardwareResult: z.literal(false),
+    requestedAt: IsoTimestamp,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+export const ShiftReconciliation = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    countAttemptId: Uuid,
+    expectedCash: ExpectedCash,
+    selectedCount: BlindCount,
+    variance: CashVariance,
+    resolution: CashVarianceResolution.nullable(),
+    outcome: CashReconciliationOutcome,
+    ledgerSequence: z.number().int().min(0),
+    closeApprovalRequired: z.boolean(),
+    closeApprovalFingerprint: Fingerprint.nullable(),
+    reconciledAt: IsoTimestamp,
+  })
+  .strict();
+export const ReconcileCashShiftRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    countAttemptId: Uuid,
+    resolutionId: Uuid.nullable(),
+    expectedShiftVersion: z.number().int().positive(),
+  })
+  .strict();
+
+export const CashShiftSummary = z
+  .object({
+    shift: CashShift,
+    register: PhysicalRegister,
+    openingFloat: NonNegativeMoney,
+    expectedCash: ExpectedCash,
+    countedCash: Money.nullable(),
+    variance: Money.nullable(),
+    varianceReason: CashVarianceReason.nullable(),
+    reconciliationOutcome: CashReconciliationOutcome.nullable(),
+    countAttempts: z.number().int().min(0),
+    handoffCount: z.number().int().min(0),
+  })
+  .strict();
+export const ShiftCloseRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    countAttemptId: Uuid,
+    reconciliationId: Uuid,
+    approvalId: Uuid.nullable(),
+    approvalFingerprint: Fingerprint.nullable(),
+    expectedShiftVersion: z.number().int().positive(),
+  })
+  .strict();
+export const ShiftCloseResult = z
+  .object({
+    summary: CashShiftSummary,
+    reconciliation: ShiftReconciliation,
+    closedAt: IsoTimestamp,
+    correlationId: CorrelationId,
+    recovered: z.boolean(),
+  })
+  .strict();
+
+export const CashShiftCustodyEventType = z.enum([
+  'device_adoption',
+  'manager_recovery',
+  // The holding terminal is gone for good, so the register is freed and the
+  // shift is blocked. Nobody counted the drawer — see `RecoverCashShiftRequest`
+  // for the operation that DOES count it, and `ReclaimCashRegisterRequest` for
+  // this one. The constraint `cash_custody_shape` in build-v3-68 enforces the
+  // difference: an `orphan_reclaim` carries no count and no expectation.
+  'orphan_reclaim',
+]);
+
+/**
+ * One rebinding of a cash shift onto a different terminal, or onto a manager who is
+ * closing it out. Read it as the chain of custody for the drawer: both sides of the
+ * swap are named, so a reader can always say which terminal held the money when.
+ */
+export const CashShiftCustodyEvent = z
+  .object({
+    id: Uuid,
+    shiftId: Uuid,
+    registerId: Uuid,
+    eventType: CashShiftCustodyEventType,
+    previousHoldingDeviceId: Uuid,
+    newHoldingDeviceId: Uuid.nullable(),
+    actingOperatorId: Uuid,
+    responsibleOperatorId: Uuid,
+    shiftStatusBefore: CashShiftStatus,
+    shiftStatusAfter: CashShiftStatus,
+    expectedCash: Money.nullable(),
+    countedCash: Money.nullable(),
+    variance: Money.nullable(),
+    reasonCode: z.string().min(1).max(80),
+    note: SafeNote,
+    occurredAt: IsoTimestamp,
+  })
+  .strict();
+
+/**
+ * The same operator takes their own open shift back onto the terminal in front of
+ * them. No approval and no count: nothing about the drawer changes, only which device
+ * is allowed to speak for it. This is the ordinary path after a browser loses its
+ * stored identity, which on web is one clearing of site data away.
+ */
+export const AdoptCashShiftRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    expectedShiftVersion: z.number().int().positive(),
+    reasonCode: z.string().min(1).max(80),
+  })
+  .strict();
+
+export const AdoptCashShiftResult = z
+  .object({
+    shift: CashShift,
+    register: PhysicalRegister,
+    custody: CashShiftCustodyEvent,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+/**
+ * A manager closes out a shift whose operator cannot come back to close it — the
+ * terminal is gone, or the person is. The manager counts the drawer under their own
+ * name and the shift lands on `recovered`, never `closed`, so a report can always
+ * tell a counted-out shift from one its own cashier reconciled.
+ */
+export const RecoverCashShiftRequest = z
+  .object({
+    ...CommandContext,
+    shiftId: Uuid,
+    countedCash: NonNegativeMoney,
+    denominations: z.array(DenominationCount).max(64),
+    approvalId: Uuid,
+    approvalFingerprint: Fingerprint,
+    expectedShiftVersion: z.number().int().positive(),
+    reasonCode: z.string().min(1).max(80),
+    note: SafeNote,
+  })
+  .strict()
+  .superRefine((value, context) =>
+    validateDenominations(value.countedCash, value.denominations, context),
+  );
+
+export const RecoverCashShiftResult = z
+  .object({
+    summary: CashShiftSummary,
+    custody: CashShiftCustodyEvent,
+    recoveredAt: IsoTimestamp,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+/**
+ * FREE A REGISTER WHOSE HOLDING TERMINAL IS NEVER COMING BACK.
+ *
+ * The till can be standing in front of a drawer it cannot open — the shift that
+ * holds the register was opened on a terminal that has since been revoked,
+ * replaced or retired, and nothing in the product ever closed it. The operator
+ * who may open a register may also clear that hold, but only when the API itself
+ * proves the holding terminal is unusable: there is nothing here the client can
+ * assert. `expectedRegisterVersion` is the register row the caller was looking
+ * at, so a register that moved under them is refused rather than reclaimed.
+ *
+ * WHAT IT IS NOT. It is not `recover`: no approval, no count, no variance, and
+ * no money movement of any kind. The shift lands on `blocked` (a terminal status
+ * with no way out) and the ledger is untouched, because the cash in that drawer
+ * is still in that drawer. `blocked` and not `closed` or `recovered` because
+ * neither of those two may ever describe a drawer nobody counted.
+ */
+export const ReclaimCashRegisterRequest = z
+  .object({
+    ...CommandContext,
+    registerId: Uuid,
+    expectedRegisterVersion: z.number().int().positive(),
+    reasonCode: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9_.-]+$/),
+  })
+  .strict();
+
+export const ReclaimCashRegisterResult = z
+  .object({
+    register: PhysicalRegister,
+    /**
+     * The shift that was holding the register and has now been blocked. NULL
+     * when there was nothing left to reclaim — the register was already free,
+     * or its holding shift had already reached a terminal status. That is a
+     * success, not an error: the caller asked for the drawer and the drawer is
+     * free.
+     */
+    shift: CashShift.nullable(),
+    custody: CashShiftCustodyEvent.nullable(),
+    reclaimedAt: IsoTimestamp,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+export const CashCenterQuery = z
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+  })
+  .strict();
+export const CashCommandRecoveryQuery = z
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    commandId: Uuid,
+    idempotencyKey: Uuid,
+  })
+  .strict();
+export const CashCommandRecoveryResult = z
+  .object({
+    commandId: Uuid,
+    commandType: z.string().min(1).max(100).nullable(),
+    status: z.enum(['not_found', 'processing', 'succeeded', 'failed']),
+    retryable: z.boolean(),
+    failureCode: z.string().min(1).max(100).nullable(),
+    correlationId: CorrelationId.nullable(),
+  })
+  .strict();
+export const CashCenterSnapshot = z
+  .object({
+    businessDate: MerchantDate,
+    policy: CashShiftPolicy,
+    registers: z.array(PhysicalRegister).max(100),
+    currentShift: CashShift.nullable(),
+    /**
+     * The current shift's journal, in sequence order. Bounded on purpose: the
+     * till shows the shift in front of it, and the whole history belongs to the
+     * back office.
+     */
+    ledger: z.array(CashJournalLine).max(200),
+    /**
+     * The operator's own open shift, sitting on a terminal that is not this one. It
+     * appears when this device cannot find a shift of its own but the operator still
+     * has one somewhere — the ordinary shape of a web POS that lost its stored
+     * identity. `adopt_shift` moves it here.
+     */
+    adoptableShift: CashShift.nullable(),
+    expectedCash: ExpectedCash.nullable(),
+    latestCount: CashCountSummary.nullable(),
+    varianceResolution: CashVarianceResolution.nullable(),
+    reconciliation: ShiftReconciliation.nullable(),
+    recoveryState: CashRecoveryState,
+    allowedActions: z.array(z.string().min(1).max(80)).max(24),
+    summary: CashShiftSummary.nullable(),
+  })
+  .strict();
+export const CashConflict = z
+  .object({
+    code: z.string().min(1).max(100),
+    recoveryState: CashRecoveryState,
+    blocksCash: z.boolean(),
+    actionCode: z.string().min(1).max(100),
+    correlationId: CorrelationId,
+  })
+  .strict();
+export const SafeCashDiagnostic = z
+  .object({
+    registerReference: z.string().min(1).max(80).nullable(),
+    shiftReference: z.string().min(1).max(80).nullable(),
+    shiftStatus: CashShiftStatus.nullable(),
+    ledgerSequence: z.number().int().min(0),
+    recoveryState: CashRecoveryState,
+    correlationId: CorrelationId,
+  })
+  .strict();
+
+export type CashShiftPolicy = z.infer<typeof CashShiftPolicy>;
+export type RegisterStatus = z.infer<typeof RegisterStatus>;
+export type RegisterHoldState = z.infer<typeof RegisterHoldState>;
+export type RegisterHold = z.infer<typeof RegisterHold>;
+export type CashShiftStatus = z.infer<typeof CashShiftStatus>;
+export type CashMovementType = z.infer<typeof CashMovementType>;
+export type CashLedgerEntryType = z.infer<typeof CashLedgerEntryType>;
+export type CashJournalLine = z.infer<typeof CashJournalLine>;
+export type CashCountState = z.infer<typeof CashCountState>;
+export type CashVariance = z.infer<typeof CashVariance>;
+export type CashVarianceReason = z.infer<typeof CashVarianceReason>;
+export type CashReconciliationOutcome = z.infer<typeof CashReconciliationOutcome>;
+export type CashRecoveryState = z.infer<typeof CashRecoveryState>;
+export type PhysicalRegister = z.infer<typeof PhysicalRegister>;
+export type CashShift = z.infer<typeof CashShift>;
+export type OpenCashShiftRequest = z.infer<typeof OpenCashShiftRequest>;
+export type OpenCashShiftResult = z.infer<typeof OpenCashShiftResult>;
+export type CashMovementRequest = z.infer<typeof CashMovementRequest>;
+export type CashMovement = z.infer<typeof CashMovement>;
+export type ExpectedCash = z.infer<typeof ExpectedCash>;
+export type SubmitBlindCountRequest = z.infer<typeof SubmitBlindCountRequest>;
+export type CashCountSummary = z.infer<typeof CashCountSummary>;
+export type CashShiftSummary = z.infer<typeof CashShiftSummary>;
+export type ResolveCashVarianceRequest = z.infer<typeof ResolveCashVarianceRequest>;
+export type ReconcileCashShiftRequest = z.infer<typeof ReconcileCashShiftRequest>;
+export type ShiftCloseRequest = z.infer<typeof ShiftCloseRequest>;
+export type ShiftCloseResult = z.infer<typeof ShiftCloseResult>;
+export type CashCenterQuery = z.infer<typeof CashCenterQuery>;
+export type CashCommandRecoveryQuery = z.infer<typeof CashCommandRecoveryQuery>;
+export type CashCommandRecoveryResult = z.infer<typeof CashCommandRecoveryResult>;
+export type CashCenterSnapshot = z.infer<typeof CashCenterSnapshot>;
+export type ShiftTransitionRequest = z.infer<typeof ShiftTransitionRequest>;
+export type ShiftHandoffRequest = z.infer<typeof ShiftHandoffRequest>;
+export type RecountRequest = z.infer<typeof RecountRequest>;
+export type CancelCashCountRequest = z.infer<typeof CancelCashCountRequest>;
+export type NoSaleDrawerRequest = z.infer<typeof NoSaleDrawerRequest>;
+export type NoSaleDrawerEvent = z.infer<typeof NoSaleDrawerEvent>;
+export type ShiftHandoff = z.infer<typeof ShiftHandoff>;
+export type CashShiftCustodyEventType = z.infer<typeof CashShiftCustodyEventType>;
+export type CashShiftCustodyEvent = z.infer<typeof CashShiftCustodyEvent>;
+export type AdoptCashShiftRequest = z.infer<typeof AdoptCashShiftRequest>;
+export type AdoptCashShiftResult = z.infer<typeof AdoptCashShiftResult>;
+export type RecoverCashShiftRequest = z.infer<typeof RecoverCashShiftRequest>;
+export type RecoverCashShiftResult = z.infer<typeof RecoverCashShiftResult>;
+export type ReclaimCashRegisterRequest = z.infer<typeof ReclaimCashRegisterRequest>;
+export type ReclaimCashRegisterResult = z.infer<typeof ReclaimCashRegisterResult>;
+
+export const posCashModels = {
+  RegisterStatus,
+  RegisterHoldState,
+  RegisterHold,
+  RegisterAssignment,
+  PhysicalRegister,
+  CashShiftStatus,
+  CashShift,
+  CashShiftPolicy,
+  OpeningFloat,
+  OpenCashShiftRequest,
+  OpenCashShiftResult,
+  CashMovementType,
+  CashLedgerEntryType,
+  CashLedgerEntry,
+  CashJournalLine,
+  CashMovementRequest,
+  CashMovement,
+  ExpectedCash,
+  DenominationCount,
+  CashCountLine,
+  CashCountState,
+  SubmitBlindCountRequest,
+  BlindCount,
+  CashVariance,
+  CashVarianceReason,
+  CashVarianceResolution,
+  ResolveCashVarianceRequest,
+  CashCountSummary,
+  RecountRequest,
+  CancelCashCountRequest,
+  CashApprovalRequest,
+  CashApprovalResult,
+  ShiftTransitionRequest,
+  ShiftHandoffRequest,
+  ShiftHandoff,
+  NoSaleDrawerRequest,
+  NoSaleDrawerEvent,
+  CashReconciliationOutcome,
+  ShiftReconciliation,
+  ReconcileCashShiftRequest,
+  CashShiftSummary,
+  ShiftCloseRequest,
+  ShiftCloseResult,
+  CashShiftCustodyEventType,
+  CashShiftCustodyEvent,
+  AdoptCashShiftRequest,
+  AdoptCashShiftResult,
+  RecoverCashShiftRequest,
+  RecoverCashShiftResult,
+  ReclaimCashRegisterRequest,
+  ReclaimCashRegisterResult,
+  CashRecoveryState,
+  CashCenterQuery,
+  CashCommandRecoveryQuery,
+  CashCommandRecoveryResult,
+  CashCenterSnapshot,
+  CashConflict,
+  SafeCashDiagnostic,
+};

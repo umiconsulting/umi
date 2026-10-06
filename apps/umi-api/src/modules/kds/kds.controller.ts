@@ -1,0 +1,140 @@
+import { Controller, Logger, Options, Post, Req, Res } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { KdsService } from './kds.service';
+import { KdsHttpError, KDS_DEVICE_TOKEN_HEADER } from './dto/kds-contract';
+
+const PAIRING_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type, x-umi-user-id';
+const DEVICE_ALLOW_HEADERS =
+  'authorization, x-client-info, apikey, content-type, x-kds-device-token';
+
+/** The updated iPad KDS uses these canonical API routes. */
+@Controller()
+export class KdsController {
+  private readonly logger = new Logger(KdsController.name);
+
+  constructor(private readonly kds: KdsService) {}
+
+  // ── pairing (no device auth) ───────────────────────────────────────────────
+
+  @Options(['api/kds/pairing', 'kds/pairing', 'functions/v1/kds-pairing'])
+  pairingPreflight(@Res() reply: FastifyReply): void {
+    preflight(reply, PAIRING_ALLOW_HEADERS);
+  }
+
+  @Post(['api/kds/pairing', 'kds/pairing', 'functions/v1/kds-pairing'])
+  async pairing(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+    cors(reply, PAIRING_ALLOW_HEADERS);
+    const body = readJson(req);
+    if (!body) return send(reply, 400, { error: 'invalid_json' });
+    try {
+      const r = await this.kds.pairing(body, req.ip ?? null);
+      return send(reply, r.status, r.body);
+    } catch (err) {
+      // Public pairing is unauthenticated — keep the body generic (never leak
+      // DB/schema internals) and record the cause server-side.
+      this.logger.error(
+        `kds pairing error: ${errMessage(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      return send(reply, 500, { error: 'internal_error' });
+    }
+  }
+
+  // ── board (device auth) ────────────────────────────────────────────────────
+
+  @Options(['api/kds/board', 'kds/board', 'functions/v1/kds-board'])
+  boardPreflight(@Res() reply: FastifyReply): void {
+    preflight(reply, DEVICE_ALLOW_HEADERS);
+  }
+
+  @Post(['api/kds/board', 'kds/board', 'functions/v1/kds-board'])
+  async board(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+    cors(reply, DEVICE_ALLOW_HEADERS);
+    const body = readJson(req);
+    if (!body) return send(reply, 400, { error: 'invalid_json' });
+    try {
+      const session = await this.kds.verifyDevice(deviceToken(req));
+      const r = await this.kds.board(session, body);
+      return send(reply, r.status, r.body);
+    } catch (err) {
+      if (err instanceof KdsHttpError) return send(reply, err.status, err.body);
+      this.logger.error(
+        `kds board error: ${errMessage(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      return send(reply, 500, { error: 'internal_error' });
+    }
+  }
+
+  // ── command (device auth) ──────────────────────────────────────────────────
+
+  @Options(['api/kds/command', 'kds/command', 'functions/v1/kds-command'])
+  commandPreflight(@Res() reply: FastifyReply): void {
+    preflight(reply, DEVICE_ALLOW_HEADERS);
+  }
+
+  @Post(['api/kds/command', 'kds/command', 'functions/v1/kds-command'])
+  async command(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+    cors(reply, DEVICE_ALLOW_HEADERS);
+    const body = readJson(req);
+    if (!body) return send(reply, 400, { error: 'invalid_json' });
+    try {
+      const session = await this.kds.verifyDevice(deviceToken(req));
+      const r = await this.kds.command(session, body);
+      return send(reply, r.status, r.body);
+    } catch (err) {
+      if (err instanceof KdsHttpError) return send(reply, err.status, err.body);
+      this.logger.error(
+        `kds command error: ${errMessage(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      return send(reply, 500, { error: 'internal_error' });
+    }
+  }
+
+  // ── heartbeat (device auth) ────────────────────────────────────────────────
+
+  @Post('api/kds/heartbeat')
+  async heartbeat(@Req() req: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+    cors(reply, DEVICE_ALLOW_HEADERS);
+    try {
+      const session = await this.kds.verifyDevice(deviceToken(req));
+      const r = await this.kds.heartbeat(session, req.ip ?? null);
+      return send(reply, r.status, r.body);
+    } catch (err) {
+      if (err instanceof KdsHttpError) return send(reply, err.status, err.body);
+      return send(reply, 500, { error: 'internal_error' });
+    }
+  }
+}
+
+// ── reply helpers ──────────────────────────────────────────────────────────
+
+function cors(reply: FastifyReply, allowHeaders: string): void {
+  void reply.header('Access-Control-Allow-Origin', '*');
+  void reply.header('Access-Control-Allow-Headers', allowHeaders);
+}
+
+function preflight(reply: FastifyReply, allowHeaders: string): void {
+  cors(reply, allowHeaders);
+  void reply.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  void reply.status(200).send('ok');
+}
+
+function send(reply: FastifyReply, status: number, body: unknown): void {
+  void reply.status(status).send(body);
+}
+
+function readJson(req: FastifyRequest): Record<string, unknown> | null {
+  const b = req.body;
+  return b && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
+}
+
+function deviceToken(req: FastifyRequest): string | undefined {
+  const h = req.headers[KDS_DEVICE_TOKEN_HEADER];
+  return Array.isArray(h) ? h[0] : h;
+}
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : JSON.stringify(err);
+}

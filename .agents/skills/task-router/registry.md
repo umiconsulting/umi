@@ -4,7 +4,7 @@
 - `task-router`
   - scope: route work to the correct Umi owner slice, then to direct execution, an existing project skill, or a subagent.
   - trigger patterns: multi-repo tasks, root-level docs, cross-product planning, ownership uncertainty.
-  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/` is a generated mirror), then descend into the owning repo if the task becomes local.
+  - placement hints: start in root `.agents/skills/task-router/` (canonical source; `.claude/skills/` is a symlink into it), then descend into the owning repo if the task becomes local.
   - confidence: high
   - provenance: root workspace scaffold for Umi.
 - `scientific-research-check`
@@ -44,15 +44,15 @@
   - confidence: medium
   - provenance: imported reference distilled from official PostgreSQL guidance.
 - `code-review`
-  - scope: AI-powered code review using CodeRabbit for changed code, PRs, and quality/security passes.
+  - scope: two-axis code review (Standards + Spec) of a diff against a fixed point, from Matt Pocock's engineering skill set; runs the axes as parallel sub-agents.
   - trigger patterns: explicit review requests; pre-merge quality, security, or bug-hunt passes on changed code.
   - placement hints: run from the repo whose diff is under review.
   - confidence: medium
-  - provenance: adopted from the root `.claude` adapter layer during S1.5 re-convergence (2026-06-10).
+  - provenance: replaced the CodeRabbit-based adapter skill with Matt Pocock's engineering `code-review` during the engineering-skills install.
 - `adapter-sync-check`
-  - scope: verify and restore convergence between canonical `.agents/skills/` and the generated `.claude/skills/` mirror.
-  - trigger patterns: any write to a root skill/registry/ledger/seed file; workspace health checks; suspected adapter drift.
-  - placement hints: run from the workspace root; canonical writes go to `.agents/`, never the mirror.
+  - scope: verify the tool adapter paths (`.claude/skills`, plus `.cursor`/`.codex` if present) are symlinks into canonical `.agents/skills/`, and restore any link replaced by a copy.
+  - trigger patterns: after clone/checkout; any write through an adapter path; workspace health checks; suspected adapter drift.
+  - placement hints: run from the workspace root; canonical writes go to `.agents/`, the links reflect them.
   - confidence: high
   - provenance: promoted at the Phase 1 checkpoint (2026-06-10) from the `adapter-sync-check` seed — traces: 2026-06-09 audit drift diff, 2026-06-10 S1.5 re-convergence.
 - `staging-validation-runner`
@@ -61,10 +61,25 @@
   - placement hints: run from the workspace root using `docs/migration/local-postgres/**`, `docs/migration/validation/**`, and `docs/migration/audit-output/**`.
   - confidence: high
   - provenance: promoted at the Phase 3 checkpoint (2026-06-10) from traces in S1.2 local validation and S3.1 standalone staging replay.
+- `repository-cartographer`
+  - scope: build a factual architectural metadata graph of a codebase (business modules, DDD roles, data ownership, dependency cycles, coupling/centrality, transaction boundaries, bounded-context map) and report it as architectural knowledge — deterministic-first and zero-install.
+  - trigger patterns: "map/analyze/understand/reverse-engineer this repo", onboarding onto an unfamiliar codebase, architecture or DDD review, dependency cycles, coupling hotspots, layering violations, aggregate roots, data ownership, transaction boundaries, bounded contexts / context map, dead code.
+  - placement hints: run from the workspace root (whole repo) so the ownership layer sees the schema DDL under `docs/migration/**`; scripts are zero-install (Node + the repo's own TypeScript). Embeddings/LLM only narrate the already-factual `catalog.json`.
+  - confidence: high
+  - provenance: authored 2026-07-02; every structural claim primary-source-backed (`references/research-basis.md`); engine validated against ground truth and adversarially reviewed against the live monorepo (18 findings fixed). Registered 2026-07-29 — the skill shipped but its registry, seed and ledger entries stayed in a stash, so nothing routed to it for four weeks.
+
+- `triage-work-items-with-codegraph`
+  - scope: test an Azure Boards work item against the current code by combining live work-item fields with the local CodeGraph index, then return one verdict plus the file, symbol, caller, and test evidence.
+  - trigger patterns: inspect pending work items, triage a WI or a backlog, validate an Azure Boards item against code, find the code or the missing tests a WI affects, find stale or already-implemented work items, scope work-item impact with CodeGraph.
+  - placement hints: run from the workspace root so the graph spans every product; pin Azure Boards to organization `https://dev.azure.com/umiconsulting` and project `Umi Consulting`, never the global `az` defaults. Read-only on the tracker. Hand SQL, migration, and schema-compatibility questions to `sql-preflight` or database validation; read Markdown architecture docs directly.
+  - confidence: medium
+  - provenance: authored 2026-08-13 on the CodeGraph pilot in `docs/reports/2026-08-13-codegraph-evaluation.md` (CLI `1.5.0`, 689 files / 9,677 nodes). Forward-tested blind on live WIs 93, 21, 19, and 13.
 
 ## Selection rules
 - Workspace-level docs and planning: root `docs/` plus root `CLAUDE.md`.
+- Work-item triage, backlog validation, and stale-ticket detection against real code: `triage-work-items-with-codegraph`.
 - Source-sensitive technical decisions: `scientific-research-check` before locking the recommendation.
+- Codebase architecture mapping, dependency cycles, data ownership, DDD/aggregate analysis, or bounded-context/context-map questions: `repository-cartographer` (run from the repo root).
 - Database staging, promotion, and cutover validation: `staging-validation-runner`.
 - Customer identity, phone normalization, and cross-product Customer 360 matching: `customer-identity-resolution`.
 - Logs-to-Dashboard owner insight migration: `owner-insights-migration`.

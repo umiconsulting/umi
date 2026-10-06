@@ -1,13 +1,46 @@
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+import {
+  resolveDashboardBuildConfig,
+  validateDashboardBuildConfig,
+} from './src/lib/build-config.js';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const port = Number(env.VITE_DEV_PORT || 4000)
-  const apiProxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:4001'
+  const env = resolveDashboardBuildConfig(loadEnv(mode, process.cwd(), ''));
+  Object.assign(process.env, env);
+  const port = Number(env.VITE_DEV_PORT || 4000);
+  const apiProxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:4001';
+  const configurationErrors = validateDashboardBuildConfig(env);
+  if (mode !== 'test' && configurationErrors.length > 0) {
+    throw new Error(`Invalid Dashboard build configuration:\n${configurationErrors.join('\n')}`);
+  }
 
   return {
-    plugins: [react()],
+    plugins: [
+      react({
+        // Lingui macros (`t`, `Trans`, `msg`, `useLingui`) compile to plain
+        // `i18n._()` calls here. `@vitejs/plugin-react` ignores project Babel
+        // config, so the plugin is declared inline (Lingui setup-vite guide).
+        babel: { plugins: ['@lingui/babel-plugin-lingui-macro'] },
+      }),
+    ],
+    resolve: {
+      // The contract is transpiled from source, so its imports resolve from
+      // packages/contract, not from this app. `zod` is the one dependency in
+      // that graph, and it is reached only by the lazily-imported floor-plan
+      // screen. One instance, resolved here, because this app is what declares it.
+      dedupe: ['zod'],
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+        // Committed design tokens, resolved at build time (no workspace/npm
+        // dependency) so it works identically under Vercel's app-scoped npm build.
+        '@umi/tokens': fileURLToPath(new URL('../../packages/tokens/dist', import.meta.url)),
+        // Shared HTTP contract, consumed FROM SOURCE (Vite transpiles the zero-dep
+        // routes entry) — same reason: no build artifact needed for the npm build.
+        '@umi/contract': fileURLToPath(new URL('../../packages/contract/src', import.meta.url)),
+      },
+    },
     server: {
       port,
       proxy: {
@@ -15,10 +48,18 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
         },
+        // Socket.IO realtime. The dashboard connects to `/rt/dashboard`, but the
+        // engine.io transport lands on `/socket.io` (the default path); the
+        // namespace rides in the handshake payload.
+        '/socket.io': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          ws: true,
+        },
       },
     },
     build: {
       outDir: 'dist',
     },
-  }
-})
+  };
+});

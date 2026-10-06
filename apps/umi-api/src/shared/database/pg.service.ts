@@ -1,42 +1,225 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import type { AppConfig } from '../config/config.schema';
 import { getRequestContext } from './request-context';
 
+/** The connected role's D1-relevant attributes, read off `pg_roles`. */
+export interface PoolRoleAttributes {
+  role: string;
+  /** rolsuper — a superuser bypasses RLS and every grant. */
+  superuser: boolean;
+  /** rolbypassrls — reads/writes ignore RLS policies. */
+  bypassrls: boolean;
+  /**
+   * pg_has_role(current_user, <group>, 'USAGE') — the role can *use* the group's
+   * privileges without `SET ROLE`, i.e. it INHERITs them. Stronger than 'MEMBER':
+   * a NOINHERIT member holds the grant but not its privileges (D5), so USAGE
+   * catches that mis-wiring at boot instead of at the first query.
+   */
+  inheritsGroup: boolean;
+}
+
+export async function boundedStartupRetry<T>(
+  operation: () => Promise<T>,
+  attempts: number,
+  delayMs: number,
+  onRetry?: (attempt: number) => void,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      onRetry?.(attempt);
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Pure D1 boot-guard decision (SECURITY_GATE.md §4). Given the role a pool
+ * actually connected as, return a human-readable problem, or `null` when the
+ * pool is wired correctly. Role ATTRIBUTES (super/bypassrls) never inherit
+ * through membership, so they are read off `current_user` itself; `inheritsGroup`
+ * uses `pg_has_role(...,'USAGE')`, true only when the role INHERITs the group's
+ * privileges (prod/D5 wiring: `api_login IN ROLE api`) — so a correctly-wired
+ * login role passes and cutover stays an env change, not a code change. Exported
+ * so the guard is unit-testable without a DB.
+ */
+export function poolRoleProblem(
+  pool: 'app' | 'worker',
+  group: 'api' | 'worker',
+  wantBypassRls: boolean,
+  attrs: PoolRoleAttributes | undefined,
+): string | null {
+  if (!attrs) {
+    return `${pool} pool: current_user has no row in pg_roles (cannot verify D1).`;
+  }
+  const issues: string[] = [];
+  if (attrs.superuser) issues.push('role is SUPERUSER');
+  if (attrs.bypassrls !== wantBypassRls) {
+    issues.push(`rolbypassrls=${attrs.bypassrls} (expected ${wantBypassRls})`);
+  }
+  if (!attrs.inheritsGroup) {
+    issues.push(
+      `role does not inherit "${group}" (needs INHERIT membership so its grants are active)`,
+    );
+  }
+  if (issues.length === 0) return null;
+  return (
+    `${pool} pool role "${attrs.role}" is misconfigured: ${issues.join('; ')}. ` +
+    `The ${pool} pool must connect as "${group}" (or an INHERIT member of it) — ` +
+    `see SECURITY_GATE.md §4 D1 and test/integration/harness-roles.sql.`
+  );
+}
+
+/** The EFFECTIVE logging settings of the role a pool actually connected as. */
+export interface PoolLoggingPosture {
+  role: string;
+  /** none | ddl | mod | all */
+  logStatement: string;
+  /** milliseconds; -1 = duration logging off */
+  logMinDurationStatement: number;
+  /** bytes; -1 = log bind parameters IN FULL, 0 = never log them */
+  logParameterMaxLength: number;
+}
+
+/**
+ * D10 boot check (SECURITY_GATE.md §4) — can this pool's role leak a bound
+ * parameter into a log file?
+ *
+ * WHY IT LIVES HERE AND NOT IN `security_gate.sql`. The gate is SQL, so it can only
+ * judge a hardcoded list of role names. It cannot see which role a pool actually
+ * connects as — and that is exactly where the truth hid: production's worker pool
+ * connects as `postgres`, not `umi_worker`, so a gate that checked `umi_worker`
+ * reported D10 covered while the AUTH SUBSTRATE — every session token, password-reset
+ * token and OTP, all bound parameters, all worker-pool by design (D11) — ran on a role
+ * nobody had checked. Only the process holding the connection string knows the truth,
+ * so the check belongs next to the connection string.
+ *
+ * THE CONDITION IS PRECISE, NOT BLUNT. A parameter can only be written to a log if a
+ * statement carrying it is logged at all. Two independent triggers do that:
+ *   - `log_statement` in ('all','mod')  — by category
+ *   - `log_min_duration_statement` >= 0 — by duration
+ * `log_statement = 'ddl'` is NOT one of them: the request path executes no DDL, so it
+ * logs none of its statements. That distinction matters — production runs `ddl` on
+ * purpose to keep an audit trail of schema changes, and a check demanding `none`
+ * would push someone into destroying it for no security gain.
+ *
+ * And if neither trigger fires, or `log_parameter_max_length` is 0, nothing leaks.
+ */
+export function poolLoggingProblem(
+  pool: 'app' | 'worker',
+  posture: PoolLoggingPosture | undefined,
+): string | null {
+  if (!posture) return `${pool} pool: could not read logging settings (cannot verify D10).`;
+  const byCategory = posture.logStatement === 'all' || posture.logStatement === 'mod';
+  const byDuration = posture.logMinDurationStatement >= 0;
+  // No statement is logged → no parameter can ride along.
+  if (!byCategory && !byDuration) return null;
+  // Statements are logged, but parameters are never recorded with them.
+  if (posture.logParameterMaxLength === 0) return null;
+  const triggers = [
+    byCategory ? `log_statement=${posture.logStatement}` : null,
+    byDuration ? `log_min_duration_statement=${posture.logMinDurationStatement}ms` : null,
+  ].filter(Boolean);
+  return (
+    `D10: ${pool} pool role "${posture.role}" can write BOUND PARAMETERS to the Postgres log ` +
+    `(${triggers.join(' and ')}, log_parameter_max_length=${posture.logParameterMaxLength}). ` +
+    `Session tokens, OTP hashes and password-reset tokens all travel as bound parameters. ` +
+    `Fix with: ALTER ROLE "${posture.role}" SET log_min_duration_statement = -1; ` +
+    `ALTER ROLE "${posture.role}" SET log_statement = 'none'; — see SECURITY_GATE.md §4 D10.`
+  );
+}
+
+/** The TLS option both pools receive, or nothing at all. */
+export interface PoolSslOption {
+  ca: string | Buffer;
+  rejectUnauthorized: true;
+}
+
+/**
+ * Turn `PGSSLROOTCERT` into the `ssl` option for both pools.
+ *
+ * The variable holds one of two things, and this tells them apart: the PEM
+ * itself, or a path to it on disk.
+ *
+ * `rejectUnauthorized: true` is the enforcement. Node then checks the
+ * certificate chain AND the hostname. A wrong CA, or a wrong host, fails the
+ * handshake at connect.
+ *
+ * ⚠️ Do not remove that flag. Without it the connection is encrypted but
+ * unauthenticated. That is what `sslmode=require` gives, and this control exists
+ * to prevent it.
+ *
+ * No value gives no option, which is plaintext. That case is LOCAL DEVELOPMENT
+ * only: `config.schema.ts` refuses a production boot without the variable.
+ *
+ * `readFile` is a parameter so a test can supply the file content.
+ */
+export function resolveSslOption(
+  caValue: string | undefined,
+  readFile: (path: string) => string | Buffer = readFileSync,
+): PoolSslOption | undefined {
+  if (!caValue) return undefined;
+  if (caValue.includes('BEGIN CERTIFICATE')) return { ca: caValue, rejectUnauthorized: true };
+  try {
+    return { ca: readFile(caValue), rejectUnauthorized: true };
+  } catch (err) {
+    // A bare ENOENT does not say which setting is wrong, and this one aborts the
+    // boot. Name the variable and the value.
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`PGSSLROOTCERT points at a file that cannot be read: ${reason}`, {
+      cause: err,
+    });
+  }
+}
+
 /**
  * The single data-access primitive. No ORM (D8) — raw parameterized SQL.
- * Two pools, one per Postgres role (§11.2):
- *   - `app`    → umi_app    (RLS-enforced; web request path)
- *   - `worker` → umi_worker (BYPASSRLS; background + queue/observability/grow)
+ * Two pools, one per Postgres role — the role is embedded in each connection
+ * string (env), so cutover is an env change, not a code change:
+ *   - `app`    → RLS-enforced request path   (current: umi_app;   build-v3: api)
+ *   - `worker` → BYPASSRLS background/queue   (current: umi_worker; build-v3: worker)
  *
  * Repositories own their SQL; they call `query()` for service work, or
- * `withTenant()` for RLS-scoped reads/writes on the request path.
+ * `withMerchant()` for RLS-scoped reads/writes on the request path.
  */
 @Injectable()
 export class PgService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PgService.name);
+  private readonly tlsEnforced: boolean;
+  private readonly startupRetryAttempts: number;
+  private readonly startupRetryDelayMs: number;
   readonly app: Pool;
   readonly worker: Pool;
 
   constructor(config: ConfigService<AppConfig, true>) {
+    this.startupRetryAttempts = config.get('STARTUP_RETRY_ATTEMPTS', { infer: true }) ?? 5;
+    this.startupRetryDelayMs = config.get('STARTUP_RETRY_DELAY_MS', { infer: true }) ?? 1000;
+    // verify-full TLS when a CA is provisioned (prod/Supabase); plaintext otherwise
+    // (local dev against localhost). A production boot without the CA is refused by
+    // the config schema. Do not set sslmode in the URL; this option governs TLS.
+    const ssl = resolveSslOption(config.get('PGSSLROOTCERT', { infer: true }));
+    this.tlsEnforced = ssl !== undefined;
+
     this.app = new Pool({
       connectionString: config.get('DATABASE_URL_APP', { infer: true }),
+      ssl,
     });
     this.worker = new Pool({
       connectionString: config.get('DATABASE_URL_WORKER', { infer: true }),
+      ssl,
     });
     // pg.Pool emits 'error' for idle clients (DB restart, network drop). Without
     // a listener, that unhandled event would crash the process — log and let the
     // pool replace the client.
-    this.app.on('error', (err) =>
-      this.logger.error(`app pool error: ${err.message}`, err.stack),
-    );
+    this.app.on('error', (err) => this.logger.error(`app pool error: ${err.message}`, err.stack));
     this.worker.on('error', (err) =>
       this.logger.error(`worker pool error: ${err.message}`, err.stack),
     );
@@ -45,23 +228,158 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     // Fail fast if either pool can't reach Postgres (don't claim both are
     // ready when only one was verified).
-    await Promise.all([
-      this.app.query('SELECT 1'),
-      this.worker.query('SELECT 1'),
+    await boundedStartupRetry(
+      () => Promise.all([this.app.query('SELECT 1'), this.worker.query('SELECT 1')]),
+      this.startupRetryAttempts,
+      this.startupRetryDelayMs,
+      (attempt) => this.logger.warn(`Postgres startup check failed at attempt ${attempt}.`),
+    );
+
+    // D1 boot guard (SECURITY_GATE.md §4) — refuse to boot on a mis-wired
+    // DATABASE_URL_*. Runs on every boot (independent of TLS): a role that is
+    // superuser or wrongly (non-)BYPASSRLS is a silent privilege escalation the
+    // request path would run under, so we assert it here rather than assume it.
+    await this.assertPoolRoles();
+
+    if (!this.tlsEnforced) {
+      this.logger.log('Postgres pools ready (app + worker roles, no TLS — local/dev)');
+      return;
+    }
+    // TLS is enforced at connect by rejectUnauthorized (a wrong CA/hostname already
+    // threw above). Confirm the server also reports SSL on each pool so a silent
+    // misconfig surfaces at boot. Through a transaction pooler, pg_stat_ssl can
+    // reflect the pooler→db leg, so a false report is a WARNING, not a boot failure —
+    // the client→endpoint leg is already verified by the handshake.
+    for (const [name, pool] of [
+      ['app', this.app],
+      ['worker', this.worker],
+    ] as const) {
+      const { rows } = await pool.query<{ ssl: boolean }>(
+        'SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()',
+      );
+      if (!rows[0]?.ssl) {
+        this.logger.warn(
+          `${name} pool: server reports no SSL on this backend (pooler leg?); ` +
+            'client→endpoint TLS is still verified by rejectUnauthorized.',
+        );
+      }
+    }
+    this.logger.log('Postgres pools ready (app + worker roles, TLS verify-full)');
+  }
+
+  /**
+   * D1 boot guard — assert each pool connects as the role build-v3 intends, so a
+   * mis-wired `DATABASE_URL_*` aborts boot instead of silently over-privileging
+   * the request path:
+   *   - app pool    → NOT superuser, NOT BYPASSRLS, member of `api` (RLS confines it).
+   *   - worker pool → BYPASSRLS, NOT superuser, member of `worker` (the one machinery pool).
+   * `pg_has_role(current_user, <group>, 'USAGE')` on a role that doesn't exist
+   * throws — a DB without the `api`/`worker` roles is not build-v3 and must not boot.
+   */
+  private async assertPoolRoles(): Promise<void> {
+    const read = async (
+      pool: Pool,
+      group: 'api' | 'worker',
+    ): Promise<(PoolRoleAttributes & PoolLoggingPosture) | undefined> => {
+      const { rows } = await pool.query<PoolRoleAttributes & PoolLoggingPosture>(
+        `SELECT current_user::text AS role,
+                rolsuper           AS superuser,
+                rolbypassrls       AS bypassrls,
+                pg_has_role(current_user, $1, 'USAGE') AS "inheritsGroup",
+                -- pg_settings reflects THIS session, so a per-role ALTER ROLE ... SET
+                -- is already folded in. That is the point: we want what this pool's
+                -- role actually gets, not the cluster default.
+                (select setting      from pg_settings where name='log_statement')
+                  AS "logStatement",
+                (select setting::int from pg_settings where name='log_min_duration_statement')
+                  AS "logMinDurationStatement",
+                (select setting::int from pg_settings where name='log_parameter_max_length')
+                  AS "logParameterMaxLength"
+         FROM pg_roles WHERE rolname = current_user`,
+        [group],
+      );
+      return rows[0];
+    };
+    const [appAttrs, workerAttrs] = await Promise.all([
+      read(this.app, 'api'),
+      read(this.worker, 'worker'),
     ]);
-    this.logger.log('Postgres pools ready (umi_app, umi_worker)');
+    const problems = [
+      poolRoleProblem('app', 'api', false, appAttrs),
+      poolRoleProblem('worker', 'worker', true, workerAttrs),
+    ].filter((p): p is string => p !== null);
+    if (problems.length > 0) {
+      throw new Error(`D1 boot guard — refusing to boot. ${problems.join(' | ')}`);
+    }
+    this.logger.log('D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)');
+
+    // D10 — reported, NOT fatal, and the distinction is deliberate. A logging
+    // misconfiguration does not make the process unsafe to run: it widens what a
+    // LATER incident could expose. Refusing to boot over it would let a console
+    // setting change take a café's till offline at opening time, which is a worse
+    // outcome than the risk it prevents. Logged at ERROR (not warn) so it is
+    // alertable and greppable, because "the gate didn't flag it" is not evidence
+    // that it is fine — and a warning nobody reads is a failure that was renamed.
+    for (const [name, posture] of [
+      ['app', appAttrs],
+      ['worker', workerAttrs],
+    ] as const) {
+      const problem = poolLoggingProblem(name, posture);
+      if (problem) this.logger.error(problem);
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
     await Promise.allSettled([this.app.end(), this.worker.end()]);
   }
 
-  /** Service/background query on the BYPASSRLS worker pool. */
+  /**
+   * Service/background query on the BYPASSRLS worker pool.
+   *
+   * ⚠️ RLS DOES NOT APPLY HERE. The only thing separating merchants on this pool is
+   * the `merchant_id` predicate you remember to write, and nothing in the database
+   * will catch you if you forget — an omitted predicate returns every merchant's rows
+   * rather than none. Prefer `tquery` whenever the merchant is known at the call
+   * site (it almost always is: it is usually the method's first argument).
+   *
+   * Legitimate uses are narrow: work that RESOLVES which merchant a request belongs
+   * to (merchant-by-handle at login, inbound WhatsApp number -> merchant), work that
+   * is genuinely cross-merchant (outbox draining, cron enumerating active merchants,
+   * reconciliation), and the sealed auth substrate.
+   */
   query<T extends QueryResultRow = QueryResultRow>(
     text: string,
     params: unknown[] = [],
   ): Promise<{ rows: T[]; rowCount: number | null }> {
-    return this.worker.query<T>(text, params as unknown[]);
+    return this.worker.query<T>(text, params);
+  }
+
+  /**
+   * Merchant-scoped query on the RLS-ENFORCED app pool — the default for anything
+   * that already knows its merchant.
+   *
+   * This is the structural half of merchant isolation, as opposed to the remembered
+   * half. The merchant id becomes the transaction's RLS scope (`SET LOCAL`, so it
+   * cannot leak across pooled reuse), which means a query that forgets its
+   * `merchant_id` predicate returns ZERO rows instead of another merchant's — and an
+   * id-keyed statement like `UPDATE merchant.customer ... WHERE id = $1` stops
+   * trusting an unguessable uuid as its security boundary, because the row is not
+   * visible in the first place unless it belongs to this merchant.
+   *
+   * Keep the explicit predicate anyway (defence in depth, per OWASP's multi-merchant
+   * guidance); the difference is that forgetting it now fails closed.
+   */
+  tquery<T extends QueryResultRow = QueryResultRow>(
+    merchantId: string,
+    text: string,
+    params: unknown[] = [],
+  ): Promise<{ rows: T[]; rowCount: number | null }> {
+    return this.runWithMerchant(merchantId, null, async (client) => {
+      // No `as unknown[]` here, unlike `query` above: PoolClient.query resolves to the
+      // overload that already accepts unknown[], so the assertion would be a no-op.
+      const r = await client.query<T>(text, params);
+      return { rows: r.rows, rowCount: r.rowCount };
+    });
   }
 
   /**
@@ -69,33 +387,39 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
    * from the current request (AsyncLocalStorage). `set_config(..., true)` is
    * transaction-scoped, mirroring `SET LOCAL` but parameterized.
    */
-  async withTenant<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  async withMerchant<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     const ctx = getRequestContext();
-    if (!ctx?.tenantId) {
-      throw new Error(
-        'withTenant() requires a request tenant context (set by AuthGuard).',
-      );
+    if (!ctx?.merchantId) {
+      throw new Error('withMerchant() requires a request merchant context (set by AuthGuard).');
     }
-    return this.runWithTenant(ctx.tenantId, ctx.userId, work);
+    return this.runWithMerchant(ctx.merchantId, ctx.userId, work, ctx.locationId ?? null);
   }
 
-  /** Explicit-tenant variant (for jobs/tests that aren't on the request path). */
-  async runWithTenant<T>(
-    tenantId: string,
+  /** Explicit-merchant variant (for jobs/tests that aren't on the request path). */
+  async runWithMerchant<T>(
+    merchantId: string,
     userId: string | null,
     work: (client: PoolClient) => Promise<T>,
+    locationId: string | null = null,
   ): Promise<T> {
     const client = await this.app.connect();
     try {
       await client.query('BEGIN');
-      await client.query('SELECT set_config($1, $2, true)', [
-        'app.tenant_id',
-        tenantId,
-      ]);
-      await client.query('SELECT set_config($1, $2, true)', [
-        'app.user_id',
-        userId ?? '',
-      ]);
+      // RLS merchant scope. We set BOTH GUC names through the build-v3 transition
+      // (expand-contract): `app.tenant_id` is read by the CURRENT prod schema
+      // (core.rls_merchant_check), `app.current_merchant` by build-v3's RLS policies.
+      // Setting both keeps the request path correct against either schema; drop
+      // app.tenant_id after the build-v3 cutover. Both are transaction-scoped
+      // (set_config(..., true) == SET LOCAL), so nothing leaks across pooled reuse.
+      await client.query(
+        "SELECT set_config('app.tenant_id', $1, true), set_config('app.current_merchant', $1, true)",
+        [merchantId],
+      );
+      await client.query(
+        "SELECT set_config('app.current_location', $1, true), set_config('app.current_device', $2, true)",
+        [locationId ?? '', getRequestContext()?.deviceId ?? ''],
+      );
+      await client.query('SELECT set_config($1, $2, true)', ['app.user_id', userId ?? '']);
       const result = await work(client);
       await client.query('COMMIT');
       return result;
@@ -119,8 +443,8 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   /**
    * Transaction on the BYPASSRLS worker pool — for service/public operations
    * that have no authenticated member user and so can't satisfy the RLS
-   * `can_access_tenant` check (customer self-service: registration, gift
-   * redemption). Isolation is enforced by the explicit `tenant_id = $1`
+   * `can_access_merchant` check (customer self-service: registration, gift
+   * redemption). Isolation is enforced by the explicit `merchant_id = $1`
    * predicate in every query, not by RLS. Never sets app.tenant_id/user_id.
    */
   async workerTx<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -148,5 +472,16 @@ export class PgService implements OnModuleInit, OnModuleDestroy {
   async healthCheck(): Promise<boolean> {
     const res = await this.worker.query<{ ok: number }>('SELECT 1 AS ok');
     return res.rows[0]?.ok === 1;
+  }
+
+  async schemaVersion(): Promise<string | null> {
+    const result = await this.worker.query<{ version: string }>(
+      `SELECT version
+         FROM runtime.schema_migration
+        WHERE status = 'applied'
+        ORDER BY applied_at DESC, version DESC
+        LIMIT 1`,
+    );
+    return result.rows[0]?.version ?? null;
   }
 }

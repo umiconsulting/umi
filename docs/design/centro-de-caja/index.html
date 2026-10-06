@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Centro de caja · UmiPOS</title>
+    <meta
+      name="description"
+      content="Centro de caja — el cajón, su custodia y su cierre en una sola pantalla."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#trabajo">Saltar al contenido</a>
+
+    <!-- ─────────────────────────── Barra de identidad ─────────────────────────── -->
+    <header class="topbar" role="banner">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">U</span>
+        <div class="brand-text">
+          <h1>Centro de caja</h1>
+          <p>
+            <span id="loc-name">Kalala Chapultepec</span> ·
+            <span id="reg-name">Caja principal</span> · <span id="currency">MXN</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="shift" id="shift-block">
+        <span class="state state--open" id="shift-state"
+          ><i class="dot" aria-hidden="true"></i
+          ><span id="shift-state-text">Turno abierto</span></span
+        >
+        <dl class="shift-meta">
+          <div>
+            <dt>Apertura</dt>
+            <dd id="shift-opened">07:12</dd>
+          </div>
+          <div>
+            <dt>Tiempo</dt>
+            <dd id="shift-elapsed">6 h 41 min</dd>
+          </div>
+          <div>
+            <dt>Responsable</dt>
+            <dd id="shift-owner">Luis M.</dd>
+          </div>
+          <div>
+            <dt>Terminal</dt>
+            <dd id="shift-terminal">POS-01</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="topbar-right">
+        <div class="topbar-actions">
+          <button
+            class="icon-btn"
+            id="btn-scenarios"
+            type="button"
+            aria-haspopup="dialog"
+            title="Escenarios de revisión"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 6h16M4 12h10M4 18h7" />
+              <circle cx="18" cy="12" r="2" />
+              <circle cx="15" cy="18" r="2" />
+            </svg>
+            <span class="sr">Escenarios</span>
+          </button>
+          <button
+            class="icon-btn"
+            id="btn-theme"
+            type="button"
+            aria-pressed="false"
+            title="Cambiar tema"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path
+                d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"
+              />
+            </svg>
+            <span class="sr">Tema</span>
+          </button>
+          <button class="ghost-btn" id="btn-close-center" type="button">Cerrar</button>
+        </div>
+      </div>
+      <div class="pills" id="policy-pills" aria-label="Política de la caja"></div>
+    </header>
+
+    <!-- ─────────────────────────── La ecuación del efectivo ─────────────────────────── -->
+    <section class="equation" aria-labelledby="eq-title">
+      <h2 class="sr" id="eq-title">Ecuación del efectivo del cajón</h2>
+      <div class="eq-scroll">
+        <ol class="eq" id="eq"></ol>
+      </div>
+      <div class="answer" id="answer"></div>
+    </section>
+
+    <p class="notice notice--hidden" id="notice" role="status" aria-live="polite"></p>
+
+    <!-- ─────────────────────────── Trabajo ─────────────────────────── -->
+    <nav class="views" id="views" aria-label="Vistas">
+      <button type="button" class="seg is-on" data-view="todo">Todo</button>
+      <button type="button" class="seg" data-view="cajon">Cajón</button>
+      <button type="button" class="seg" data-view="libro">Libro</button>
+      <button type="button" class="seg" data-view="cierre">Cierre</button>
+    </nav>
+
+    <main class="grid" id="trabajo">
+      <!-- ── Columna 1 · cajones, turnos, depósito ── -->
+      <div class="col col--rail" data-area="cajon">
+        <section class="panel" aria-labelledby="t-drawers">
+          <header class="panel-head">
+            <h2 id="t-drawers">Cajones de la sucursal</h2>
+            <span class="hint" id="drawers-hint"></span>
+          </header>
+          <ul class="drawers" id="drawers"></ul>
+        </section>
+
+        <section class="panel" aria-labelledby="t-shifts">
+          <header class="panel-head">
+            <h2 id="t-shifts">Turnos de hoy</h2>
+            <span class="hint">un día, varios turnos</span>
+          </header>
+          <ul class="shifts" id="shifts"></ul>
+        </section>
+
+        <section class="panel" aria-labelledby="t-deposit">
+          <header class="panel-head">
+            <h2 id="t-deposit">Depósito</h2>
+            <span class="hint" id="deposit-hint"></span>
+          </header>
+          <div id="deposit-body"></div>
+        </section>
+      </div>
+
+      <!-- ── Columna 2 · libro y conciliación ── -->
+      <div class="col col--main" data-area="libro">
+        <section class="panel panel--grow" aria-labelledby="t-ledger">
+          <header class="panel-head">
+            <h2 id="t-ledger">Libro del turno</h2>
+            <div class="head-tools">
+              <span class="hint" id="ledger-count"></span>
+              <button class="ghost-btn ghost-btn--sm" id="btn-export" type="button">
+                Exportar
+              </button>
+            </div>
+          </header>
+
+          <div class="filters" role="group" aria-label="Filtros del libro">
+            <div class="chips" id="ledger-filters"></div>
+            <label class="search">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-3.5-3.5" />
+              </svg>
+              <span class="sr">Buscar en el libro</span>
+              <input
+                id="ledger-search"
+                type="search"
+                placeholder="Buscar importe, nota, operador…"
+                autocomplete="off"
+              />
+              <kbd>/</kbd>
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table class="ledger">
+              <caption class="sr">
+                Movimientos del turno, en orden de secuencia
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="c-seq">Sec.</th>
+                  <th scope="col" class="c-type">Tipo</th>
+                  <th scope="col">Detalle</th>
+                  <th scope="col" class="c-amt">Importe</th>
+                </tr>
+              </thead>
+              <tbody id="ledger-body"></tbody>
+            </table>
+            <p class="empty" id="ledger-empty" hidden>Ningún movimiento coincide con el filtro.</p>
+          </div>
+
+          <footer class="ledger-foot" id="ledger-foot"></footer>
+        </section>
+
+        <section class="panel" aria-labelledby="t-recon">
+          <header class="panel-head">
+            <h2 id="t-recon">Conteos y conciliación</h2>
+            <span class="hint">una observación no corrige el esperado</span>
+          </header>
+          <div class="recon" id="recon"></div>
+        </section>
+      </div>
+
+      <!-- ── Columna 3 · acciones y custodia ── -->
+      <div class="col col--right" data-area="cajon">
+        <section class="panel" aria-labelledby="t-quick">
+          <header class="panel-head">
+            <h2 id="t-quick">Acciones</h2>
+            <span class="hint">lo frecuente</span>
+          </header>
+          <div class="actions" id="quick-actions"></div>
+        </section>
+
+        <section class="panel" aria-labelledby="t-custody">
+          <header class="panel-head">
+            <h2 id="t-custody">Custodia del turno</h2>
+            <span class="hint">quién sostiene el cajón</span>
+          </header>
+          <div class="actions actions--soft" id="custody-actions"></div>
+        </section>
+
+        <section class="panel panel--grow" aria-labelledby="t-trace">
+          <header class="panel-head">
+            <h2 id="t-trace">Trazabilidad</h2>
+            <span class="hint">cadena de custodia</span>
+          </header>
+          <ol class="trace" id="trace"></ol>
+        </section>
+      </div>
+
+      <!-- ── Columna 4 · cierre ── -->
+      <div class="col col--close" data-area="cierre">
+        <section class="panel panel--accent" aria-labelledby="t-close">
+          <header class="panel-head">
+            <h2 id="t-close">Cierre de turno</h2>
+            <span class="hint" id="close-hint"></span>
+          </header>
+          <ol class="steps" id="steps"></ol>
+          <div class="close-actions" id="close-actions"></div>
+        </section>
+
+        <section class="panel panel--grow" aria-labelledby="t-approvals">
+          <header class="panel-head">
+            <h2 id="t-approvals">Aprobaciones</h2>
+            <span class="hint">ligadas a la acción</span>
+          </header>
+          <div id="count-summary"></div>
+          <dl class="kv" id="approvals"></dl>
+          <div class="approval-tools" id="approval-tools"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="foot">
+      <p id="foot-note">Cada importe sale del libro. El libro no se edita; se agrega.</p>
+      <p class="foot-links"><kbd>⌘K</kbd> acciones · <kbd>/</kbd> buscar · <kbd>Esc</kbd> cerrar</p>
+    </footer>
+
+    <!-- ─────────────────────────── Diálogos ─────────────────────────── -->
+
+    <dialog class="sheet" id="dlg-count" aria-labelledby="dlg-count-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-count-t">Contar el cajón</h2>
+            <p class="sheet-sub">Cuenta billetes y monedas. El sistema totaliza.</p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <div class="blind-banner">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" />
+              <path d="M4 4l16 16" />
+            </svg>
+            <p>
+              <strong>Conteo ciego.</strong> El esperado se revela cuando envías el conteo. Así el
+              conteo es honesto.
+            </p>
+          </div>
+          <div class="denoms" id="denoms"></div>
+          <aside class="tally" aria-live="polite">
+            <span class="tally-label">Total contado</span>
+            <output class="tally-value" id="tally-value">$0.00</output>
+            <span class="tally-sub" id="tally-sub">0 denominaciones</span>
+          </aside>
+        </div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cancelar</button>
+          <button class="primary-btn" id="btn-submit-count" value="default" disabled>
+            Confirmar conteo · $0.00
+          </button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet sheet--sm" id="dlg-variance" aria-labelledby="dlg-var-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-var-t">Motivo de la diferencia</h2>
+            <p class="sheet-sub" id="dlg-var-sub"></p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body" id="dlg-var-body"></div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cancelar</button>
+          <button class="primary-btn" id="btn-submit-variance" value="default">
+            Registrar motivo
+          </button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet sheet--sm" id="dlg-pin" aria-labelledby="dlg-pin-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-pin-t">Aprobación de gerente</h2>
+            <p class="sheet-sub" id="dlg-pin-sub"></p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <div class="operation" id="dlg-pin-op"></div>
+          <label class="field">
+            <span>PIN del gerente</span>
+            <input
+              id="pin-input"
+              type="password"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="8"
+              placeholder="••••"
+            />
+          </label>
+          <p class="field-error" id="pin-error" hidden></p>
+        </div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cancelar</button>
+          <button class="primary-btn" id="btn-submit-pin" value="default">Autorizar</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet sheet--sm" id="dlg-move" aria-labelledby="dlg-move-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-move-t">Movimiento</h2>
+            <p class="sheet-sub" id="dlg-move-sub"></p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <div class="presets" id="move-presets" role="group" aria-label="Motivos frecuentes"></div>
+          <label class="field"
+            ><span>Importe</span>
+            <input
+              id="move-amount"
+              class="money-input"
+              inputmode="decimal"
+              placeholder="$0.00"
+              autocomplete="off"
+          /></label>
+          <label class="field"
+            ><span>Motivo</span>
+            <input
+              id="move-reason"
+              maxlength="80"
+              placeholder="Ej. compra de hielo"
+              autocomplete="off"
+          /></label>
+          <p class="field-help" id="move-help"></p>
+        </div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cancelar</button>
+          <button class="primary-btn" id="btn-submit-move" value="default">Registrar</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet sheet--sm" id="dlg-nosale" aria-labelledby="dlg-ns-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-ns-t">Abrir el cajón sin venta</h2>
+            <p class="sheet-sub">No cambia el saldo. Queda registrado con motivo y aprobación.</p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <fieldset class="reasons" id="ns-reasons"><legend class="sr">Motivo</legend></fieldset>
+          <p class="field-help">
+            Máximo tres solicitudes por minuto. El sistema no afirma que el cajón se abrió.
+          </p>
+        </div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cancelar</button>
+          <button class="primary-btn" id="btn-submit-ns" value="default">Solicitar apertura</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet" id="dlg-deposit" aria-labelledby="dlg-dep-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-dep-t">Crear depósito</h2>
+            <p class="sheet-sub">El fondo se queda. El resto sale hacia el banco.</p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body" id="deposit-form"></div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cancelar</button>
+          <button class="primary-btn" id="btn-submit-deposit" value="default">
+            Crear depósito
+          </button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet" id="dlg-print" aria-labelledby="dlg-print-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-print-t">Arqueo del turno</h2>
+            <p class="sheet-sub" id="dlg-print-sub"></p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <pre class="receipt" id="receipt"></pre>
+        </div>
+        <footer class="sheet-foot">
+          <button class="ghost-btn" value="cancel">Cerrar</button>
+          <button class="ghost-btn" id="btn-email" value="default">Enviar por correo</button>
+          <button class="primary-btn" id="btn-print" value="default">Imprimir</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet sheet--palette" id="dlg-palette" aria-labelledby="dlg-pal-t">
+      <div class="sheet-inner">
+        <header class="palette-head">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-3.5-3.5" />
+          </svg>
+          <input
+            id="palette-input"
+            type="text"
+            placeholder="Buscar una acción…"
+            autocomplete="off"
+            aria-labelledby="dlg-pal-t"
+          />
+          <kbd>Esc</kbd>
+        </header>
+        <h2 class="sr" id="dlg-pal-t">Acciones</h2>
+        <ul
+          class="palette-list"
+          id="palette-list"
+          role="listbox"
+          aria-label="Acciones disponibles"
+        ></ul>
+      </div>
+    </dialog>
+
+    <dialog class="sheet sheet--sm" id="dlg-scenarios" aria-labelledby="dlg-sc-t">
+      <form method="dialog" class="sheet-inner">
+        <header class="sheet-head">
+          <div>
+            <h2 id="dlg-sc-t">Escenarios de revisión</h2>
+            <p class="sheet-sub">Muestra cada estado del turno sin tocar datos reales.</p>
+          </div>
+          <button class="icon-btn" value="cancel" aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </header>
+        <div class="sheet-body">
+          <fieldset class="reasons" id="scenarios"><legend class="sr">Escenario</legend></fieldset>
+        </div>
+        <footer class="sheet-foot"><button class="ghost-btn" value="cancel">Listo</button></footer>
+      </form>
+    </dialog>
+
+    <div class="veil" id="veil" hidden></div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -53,21 +53,21 @@ Add a small pairing table owned by the KDS backend contract:
 
 `kds.device_pairing_requests`
 
-| Column | Purpose |
-|---|---|
-| `id uuid primary key` | Pairing request ID returned to dashboard/KDS as needed. |
-| `tenant_id uuid not null` | Tenant scope. |
-| `location_id uuid null` | Optional selected dashboard location scope. |
-| `station_id uuid null` | Station selected by admin. |
-| `device_name text not null` | Friendly KDS name from admin or iPad. |
-| `pin_hash text not null` | Hash of the six-digit PIN, never stored plaintext. |
-| `status text not null` | `pending`, `approved`, `denied`, `expired`, `used`. |
-| `attempt_count int not null default 0` | Guess throttling. |
-| `expires_at timestamptz not null` | Short validity window. |
-| `approved_by text null` | Dashboard/admin actor, if available. |
-| `approved_at timestamptz null` | Approval time. |
-| `created_at timestamptz not null default now()` | Audit. |
-| `used_at timestamptz null` | When KDS claimed the durable token. |
+| Column                                          | Purpose                                                 |
+| ----------------------------------------------- | ------------------------------------------------------- |
+| `id uuid primary key`                           | Pairing request ID returned to dashboard/KDS as needed. |
+| `tenant_id uuid not null`                       | Tenant scope.                                           |
+| `location_id uuid null`                         | Optional selected dashboard location scope.             |
+| `station_id uuid null`                          | Station selected by admin.                              |
+| `device_name text not null`                     | Friendly KDS name from admin or iPad.                   |
+| `pin_hash text not null`                        | Hash of the six-digit PIN, never stored plaintext.      |
+| `status text not null`                          | `pending`, `approved`, `denied`, `expired`, `used`.     |
+| `attempt_count int not null default 0`          | Guess throttling.                                       |
+| `expires_at timestamptz not null`               | Short validity window.                                  |
+| `approved_by text null`                         | Dashboard/admin actor, if available.                    |
+| `approved_at timestamptz null`                  | Approval time.                                          |
+| `created_at timestamptz not null default now()` | Audit.                                                  |
+| `used_at timestamptz null`                      | When KDS claimed the durable token.                     |
 
 Keep existing `kds.device_sessions` for paired devices. Do not move order state or projection ownership.
 

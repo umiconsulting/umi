@@ -37,6 +37,7 @@ export default async function TenantLayout({
     secondaryColor: tenant.secondaryColor,
     cardPrefix: tenant.cardPrefix ?? 'LYL',
     topupEnabled: tenant.topupEnabled,
+    multiSealEnabled: tenant.multiSealEnabled,
   };
 
   return (

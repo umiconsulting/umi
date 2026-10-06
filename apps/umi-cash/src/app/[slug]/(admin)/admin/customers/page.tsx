@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import type { AdminCustomer } from '@/types/api';
@@ -31,22 +31,56 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('recent');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  // Track the page we actually asked for. `page` state only advances on success,
+  // so on a failed load "Reintentar" must retry this, not the last good page.
+  const lastRequestedPage = useRef(1);
+  // Live search fires a request per (debounced) keystroke, so responses can land
+  // out of order — only the newest request may write state, or a slow "Mar"
+  // response would clobber the results for "Marco" (same race the analytics
+  // range chips had).
+  const requestSeq = useRef(0);
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function loadCustomers(p = 1, q = search, s = sort) {
+    const seq = ++requestSeq.current;
+    lastRequestedPage.current = p;
     setLoading(true);
-    const params = new URLSearchParams({ page: String(p), limit: '20', search: q, sort: s });
-    const res = await authedFetch(slug, `/api/${slug}/admin/customers?${params}`);
-    const data = await res.json();
-    setCustomers(data.customers || []);
-    setTotal(data.total || 0);
-    setTotalPages(data.totalPages || 1);
-    setPage(p);
-    setLoading(false);
+    setLoadError(false);
+    try {
+      const params = new URLSearchParams({ page: String(p), limit: '20', search: q, sort: s });
+      const res = await authedFetch(slug, `/api/${slug}/admin/customers?${params}`);
+      const data = await res.json();
+      if (seq !== requestSeq.current) return;
+      setCustomers(data.customers || []);
+      setTotal(data.total || 0);
+      setTotalPages(data.totalPages || 1);
+      setPage(p);
+    } catch {
+      if (seq !== requestSeq.current) return;
+      // Network/parse failure — show an error+retry instead of an infinite skeleton.
+      setLoadError(true);
+      setCustomers([]);
+    } finally {
+      if (seq === requestSeq.current) setLoading(false);
+    }
   }
 
   useEffect(() => { loadCustomers(); }, [slug]);
+  useEffect(() => () => { if (searchDebounce.current) clearTimeout(searchDebounce.current); }, []);
 
-  function handleSearch(e: React.FormEvent) { e.preventDefault(); loadCustomers(1, search, sort); }
+  // Search-as-you-type: debounce keystrokes; Enter searches immediately.
+  function handleSearchInput(value: string) {
+    setSearch(value);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    searchDebounce.current = setTimeout(() => loadCustomers(1, value, sort), 300);
+  }
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    loadCustomers(1, search, sort);
+  }
 
   async function handleExport() {
     const res = await authedFetch(slug, `/api/${slug}/admin/export`);
@@ -83,9 +117,24 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSearch} className="u-fade-up d1 flex gap-2 mb-4">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar nombre, teléfono..." className="u-input flex-1" />
-        <button type="submit" className="u-btn u-btn-primary px-4">Buscar</button>
+      <form onSubmit={handleSearch} className="u-fade-up d1 relative mb-4">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => handleSearchInput(e.target.value)}
+          placeholder="Buscar nombre, teléfono..."
+          className="u-input w-full pr-10"
+          autoComplete="off"
+        />
+        {loading && search && (
+          <svg
+            className="animate-spin absolute right-3 top-1/2 -mt-2"
+            width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink-light)" strokeWidth="2.5"
+          >
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+            <path d="M12 2a10 10 0 0110 10" strokeLinecap="round" />
+          </svg>
+        )}
       </form>
 
       <div className="u-fade-up d2 flex gap-2 mb-4 overflow-x-auto pb-1">
@@ -109,12 +158,17 @@ export default function CustomersPage() {
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: 'var(--color-surface-dark)' }} />)}
         </div>
+      ) : loadError ? (
+        <div className="text-center py-12 space-y-3" style={{ color: 'var(--color-ink-light)' }}>
+          <p>No se pudieron cargar los clientes.</p>
+          <button onClick={() => loadCustomers(lastRequestedPage.current)} className="u-btn u-btn-secondary">Reintentar</button>
+        </div>
       ) : customers.length === 0 ? (
         <div className="text-center py-12" style={{ color: 'var(--color-ink-light)' }}><p>No se encontraron clientes</p></div>
       ) : (
         <div className="space-y-2 u-fade-up d3">
           {customers.map((c) => (
-            <Link key={c.id} href={`/${slug}/admin/customers/${c.id}`}
+            <Link key={c.cardId} href={`/${slug}/admin/customers/${c.id}`}
               className="u-surface p-4 flex items-center justify-between hover:shadow-md transition-shadow">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

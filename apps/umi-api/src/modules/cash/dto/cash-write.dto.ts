@@ -1,12 +1,4 @@
-import {
-  IsEmail,
-  IsInt,
-  IsOptional,
-  IsString,
-  MaxLength,
-  Min,
-  ValidateIf,
-} from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class TopupDto {
   @IsString()

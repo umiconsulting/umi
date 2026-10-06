@@ -1,51 +1,90 @@
 # umi-api on a VPS: web + worker (one image, two commands) + redis + caddy.
-# `docker compose up -d --build` after creating .env from .env.example.
+#
+# Local dev:  docker compose up -d --build   (builds the image locally)
+# VPS deploy: handled by CI. The GitHub Actions pipeline builds & pushes the
+#   image to GHCR, then the VPS runs `docker compose pull && up -d` — no build
+#   on the box. The deployed tag is pinned via UMI_API_TAG in .env.
+#   See docs/deploy-pipeline.md.
 
 services:
   umi-api:
-    build: .
+    # `image` is what the VPS pulls from GHCR; `build` is the local-dev fallback.
+    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:?Set UMI_API_TAG to an immutable release tag}
+    build:
+      context: ../..
+      dockerfile: apps/umi-api/Dockerfile
     command: node dist/main.js
     env_file: .env
-    environment:
-      - NODE_ENV=production
+    volumes:
+      # D4 (SECURITY_GATE.md §4) — the CA that verifies the Postgres endpoint.
+      # Read-only, and mounted rather than baked into the image: a certificate
+      # rotates on the provider's schedule, not on ours, and rebuilding the image
+      # to replace one would tie a TLS renewal to a deploy.
+      #
+      # WHY ./certs AND NOT /etc/umi: deploy.sh runs `git reset --hard` on the
+      # checkout before every `compose up`, so a host path outside the repo is
+      # invisible to the container and a path inside a TRACKED directory is wiped.
+      # ./certs is gitignored, so it survives the reset, and it sits beside the
+      # .env that names it.
+      #
+      # The directory must exist on the host before `compose up` — Docker silently
+      # creates a DIRECTORY at a missing bind-mount source, and readFileSync on a
+      # directory fails the boot with EISDIR.
+      - ./certs:/certs:ro
     expose:
-      - "3000"
+      - '3000'
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
 
   umi-worker:
-    build: .
+    # Same image as umi-api — one build, two commands.
+    image: ghcr.io/umiconsulting/umi-api:${UMI_API_TAG:?Set UMI_API_TAG to an immutable release tag}
+    build:
+      context: ../..
+      dockerfile: apps/umi-api/Dockerfile
     command: node dist/worker.js
     env_file: .env
-    environment:
-      - NODE_ENV=production
+    volumes:
+      # Same CA. The worker opens its own pools from the same PGSSLROOTCERT, so
+      # mounting it on only one service would boot the web container and fail the
+      # worker — with the queue silently not draining.
+      - ./certs:/certs:ro
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    image: redis:7.4.10-alpine3.21
+    command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 3s
       retries: 5
     restart: unless-stopped
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.10.2-alpine
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     environment:
       # Set API_DOMAIN in .env to a real hostname on the VPS for automatic TLS.
       - API_DOMAIN=${API_DOMAIN:-:80}
+      # Set PLANE_DOMAIN in .env to route that hostname to the self-hosted Plane
+      # stack in /opt/plane. Left unset (local dev) the site falls back to an
+      # unpublished port and does nothing.
+      - PLANE_DOMAIN=${PLANE_DOMAIN:-:8081}
+    extra_hosts:
+      # Plane runs as a separate compose project, so its proxy is not reachable
+      # by service name from here. It publishes on the Docker bridge IP and this
+      # gives Caddy the route back out to the host.
+      - 'host.docker.internal:host-gateway'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

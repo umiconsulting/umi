@@ -7,7 +7,7 @@ Observation ledger for **potential** skills. A seed is a pattern observed too fe
 - Plant a seed the moment a pattern is observed, not at phase end.
 - A seed needs evidence: cite the ledger entry, audit section, or plan step where it appeared.
 - At every phase checkpoint of the active program plan, review all seeds: promote what now passes the gate, update counts, and **prune seeds that turned out to be one-offs** — a pruned seed is recorded as pruned, not deleted, so the negative result is kept.
-- Seeds are written to `.agents/` (canonical source, per the S1.5 decision of 2026-06-10); `.claude/` is a generated mirror — never hand-edit it.
+- Seeds are written to `.agents/` (canonical source, per the S1.5 decision of 2026-06-10); `.claude/skills/` is a symlink into `.agents/skills/` — write only under `.agents/`.
 
 ## Entry template
 
@@ -49,6 +49,14 @@ Observation ledger for **potential** skills. A seed is a pattern observed too fe
 - expected maturation: done; use the promoted skill for S4.1/S4.3 cutover rehearsals.
 - 2026-06-10 update: S1.2 trace recorded — validation SQL + per-schema row-count export ran cleanly against the local transition DB (`audit-output/2026-06-10-phase-4f-execution.md`); one wrinkle worth keeping: FDW server ports had drifted (5432→5233) and needed `ALTER SERVER` before the gate could run. Awaiting the S3.1 staging trace.
 - 2026-06-10 update: S3.1 trace recorded — standalone staging replay caught the `010`/`030` Kalala slug conflict and missing local-owner Kalala membership; both were fixed in replay scripts before validation. Row-count diff now records an intentional synthetic-family cleanup delta against the older local transition target.
+
+### repository-cartographer
+- status: **promoted** (2026-07-02 → `.agents/skills/repository-cartographer/`) — authored directly on request, not seed-derived; recorded here for provenance. Registry + ledger entries landed 2026-07-29 (they had sat in a stash, so the skill existed but nothing routed to it).
+- observed: 2026-07-02 — a request to build a "Repository Cartographer" that maps a codebase as a factual metadata graph (the pg-catalog analogy) across 7 layers. Built a deterministic zero-install engine (Node + the repo's own TypeScript Compiler API + SQL/Prisma/Swift parsers), validated against ground truth (21 NestJS modules, 0 `forwardRef`, 111/32 cascade/set-null, `loyalty.cards` as an aggregate root, 3 append-only ledgers) and a synthetic Tarjan/Johnson check; adversarially reviewed (18 findings, all fixed).
+- trigger pattern: map/analyze/understand a codebase's real structure; architecture or DDD review; dependency cycles, coupling, ownership, transaction boundaries, bounded contexts, dead code.
+- procedure sketch: walk → build the import graph (TS Compiler API) + SQL FK ownership + Prisma/Swift/Deno parsers → Tarjan/Johnson/coupling/centrality → DDD + context-map classification → 9-section report + `catalog.json`; the LLM only narrates the catalog.
+- promotion gate: n/a — promoted on authorship; every structural claim primary-source-backed (`references/research-basis.md`).
+- expected maturation: exercise it on onboarding and architecture-review tasks; extend adapters per `references/language-adapters.md`.
 
 ### cutover-soak-comparison
 - status: seed

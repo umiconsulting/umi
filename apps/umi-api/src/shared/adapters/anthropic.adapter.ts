@@ -8,7 +8,12 @@ import type { AppConfig } from '../config/config.schema';
 // right tier for a high-frequency WhatsApp loop), so that stays the default
 // here. `temperature` defaults to 0 (valid on Haiku 4.5); omit it for Opus
 // 4.7+/Fable models, which reject sampling params.
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+/**
+ * The Haiku 4.5 snapshot the single-shot seam and the pre-cutover turn loop
+ * run on. Exported so the usage billing rows name the same model as the call
+ * (`shared/usage/ai-usage.repository.ts`) instead of a third copy of the string.
+ */
+export const ANTHROPIC_DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 const DEFAULT_MAX_TOKENS = 1024;
 
 export interface CompletionResult {
@@ -51,7 +56,7 @@ export class AnthropicAdapter {
     explicit?: number,
   ): { temperature: number } | Record<string, never> {
     if (explicit !== undefined) return { temperature: explicit };
-    if (model === DEFAULT_MODEL) return { temperature: 0 };
+    if (model === ANTHROPIC_DEFAULT_MODEL) return { temperature: 0 };
     return {};
   }
 
@@ -63,7 +68,7 @@ export class AnthropicAdapter {
     maxTokens?: number;
     temperature?: number;
   }): Promise<CompletionResult | null> {
-    const model = params.model ?? DEFAULT_MODEL;
+    const model = params.model ?? ANTHROPIC_DEFAULT_MODEL;
     try {
       const response = await this.getClient().messages.create({
         model,
@@ -97,7 +102,7 @@ export class AnthropicAdapter {
     maxTokens?: number;
     temperature?: number;
   }): Promise<MessageResult | null> {
-    const model = params.model ?? DEFAULT_MODEL;
+    const model = params.model ?? ANTHROPIC_DEFAULT_MODEL;
     try {
       const response = await this.getClient().messages.create({
         model,

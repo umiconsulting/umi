@@ -171,7 +171,8 @@ Sin configuración, el botón "Apple Wallet" devuelve error 503 — el resto del
 Requiere:
 - Google Cloud project
 - Google Wallet API habilitada
-- Service account con rol "Google Wallet Object Issuer"
+- Service account (sin rol de IAM) invitada como "Developer" en
+  Google Pay & Wallet Console → Users → Invite a user
 - Solicitar acceso de issuer en https://pay.google.com/business/console
 
 Editar `.env.local` con las credenciales del service account.

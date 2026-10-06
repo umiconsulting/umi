@@ -1,0 +1,134 @@
+name: lint
+
+# Runs `pnpm lint` — the same command CONVENTIONS.md tells a developer to run.
+#
+# PR #55 made that command real (an ESLint suppressions ratchet that fails on any
+# NEW violation), but no workflow ran it, so the ratchet only caught anything if
+# someone remembered to run it locally. A gate nobody runs is not a gate.
+#
+# `turbo run lint` is used rather than a per-package filter so that any package
+# which later adds a `lint` script is covered the day it adds it, with no edit here.
+# Today that is @umi/dashboard and @umi/landing.
+#
+# `pnpm format:check` runs here too, as a STEP rather than its own workflow. It was
+# held back until the format pass landed, so it goes green on arrival instead of
+# red — a gate that is red the day it ships teaches people to ignore it.
+#
+# It is deliberately NOT a separate job: the check name `lint` is REQUIRED by branch
+# protection, and a new job would mean a new context that protection does not know
+# about (unenforced), while renaming this one would mean the required `lint` context
+# never reports again — the Pending-forever deadlock described below. Adding a step
+# changes neither the job name nor the contexts, so nothing has to be re-approved.
+#
+# Pushes to `build-v3` are checked too: it has no deploy workflow, so a merge into
+# it would otherwise run nothing. `main` is covered by its PR gate plus the deploy.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed. A path filter would therefore not make
+# a docs-only PR faster; it would make it UNMERGEABLE, with no failing check to fix
+# and (because protection is enforced for admins) no way to click through it. The
+# filters this workflow used to carry were removed for exactly that reason.
+# Unconditional is what makes "required" safe. The job is ~30s.
+on:
+  pull_request:
+  push:
+    branches: [build-v3]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+          # Full history — the secret scan below reads every commit, not just the
+          # tip. A secret that was committed and then "removed" in a later commit
+          # is still in the pack and still clonable; a depth-1 checkout would
+          # report the repository clean while the credential sits one commit back.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      # Full install, not a --filter: turbo discovers the lint task across every
+      # workspace member, so every member's devDependencies must be present.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # Fast Refresh has a reviewed, file-and-rule-scoped warning baseline.
+      # A new warning category or a count increase fails this step.
+      - name: Lint warning baseline
+        if: '!cancelled()'
+        run: pnpm check:lint-warnings
+
+      # Runs even when lint fails, so one CI round reports BOTH problems rather
+      # than hiding the formatting behind the first error.
+      - name: Format check
+        if: '!cancelled()'
+        run: pnpm format:check
+
+      # Secret scan. A STEP in this job, not a job of its own — the `lint` context
+      # is REQUIRED by branch protection, and a new job would add a context that
+      # protection does not know about, i.e. an unenforced check (see the header).
+      #
+      # WHY IT IS HERE AT ALL: GitHub gives PUBLIC repositories secret scanning and
+      # push protection free; PRIVATE repositories on the free plan get neither.
+      # The repository has been private once and is public again today, because a
+      # Vercel Hobby project cannot deploy a private ORG repository. Treat the free
+      # control as borrowed, not owned: this scan is what survives the next flip.
+      #
+      # It also does something push protection does not. Push protection blocks a
+      # known pattern at the moment of the push; this reads EVERY commit on EVERY
+      # ref, so it still finds a credential that was committed and later "removed".
+      #
+      # NOT HYPOTHETICAL. On 2026-08-07 the then-public umiconsulting/umi-cash held
+      # `passes/apple/certificates/signerKey.pem` in HEAD: an unencrypted RSA private
+      # key beside its certificate and the WWDR chain — a complete working kit for
+      # signing Apple Wallet passes as Umi.
+      #
+      # THIS IS THE ONLY COPY OF THE SCAN. `main` carried a standalone
+      # `secret-scan.yml` because `main` has no `lint` workflow. That file arrived
+      # here in the main→build-v3 merge and was deleted in the same pull request:
+      # it made gitleaks run twice per PR, and its own header said to fold rather
+      # than duplicate. Deleting the step below therefore removes the control
+      # outright — restore the standalone workflow in the same commit if you ever do.
+      #
+      # The binary is installed directly instead of using gitleaks/gitleaks-action:
+      # that action requires a paid GITLEAKS_LICENSE for repositories owned by an
+      # ORGANIZATION, and umiconsulting is one. The CLI is the same scanner with no
+      # such condition.
+      #
+      # Pinned by version and verified by checksum — an unpinned installer in a
+      # security check is its own supply-chain hole.
+      #
+      # `!cancelled()` for the same reason as the format check: one CI round should
+      # report every problem, not just the first.
+      - name: Secret scan (gitleaks)
+        if: '!cancelled()'
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          curl -sSLo gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks version
+          # --log-opts="--all" scans every ref, so a secret on a side branch or in
+          # rewritten history is caught too. --redact keeps the finding out of the
+          # CI log, which is itself readable by anyone who can see the run.
+          ./gitleaks git --no-banner --redact --exit-code 1 --log-opts="--all"

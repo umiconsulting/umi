@@ -1,0 +1,9 @@
+# Signing material never enters git. The leak of 2026-08-07 was exactly this
+# directory in another repository: an unencrypted signerKey.pem committed to HEAD.
+# Production reads the three PEMs from base64 env vars; these paths are a local
+# development convenience only.
+certificates/
+*.pem
+*.p12
+*.p8
+*.cer

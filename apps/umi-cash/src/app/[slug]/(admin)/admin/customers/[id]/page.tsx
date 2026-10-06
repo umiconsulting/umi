@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { formatMXN, COMMON_TOPUP_AMOUNTS, centavosFromPesos } from '@/lib/currency';
 import { useTenant } from '@/context/TenantContext';
@@ -10,12 +10,19 @@ import { authedFetch } from '@/lib/authed-fetch';
 interface CustomerDetail {
   id: string; name: string | null; phone: string | null; email: string | null; device: string | null; os: string | null; birthDate: string | null;
   cardNumber: string; cardId: string; balanceMXN: string; balanceCentavos: number;
-  totalVisits: number; visitsThisCycle: number; visitsRequired: number; pendingRewards: number;
+  totalVisits: number; visitsThisCycle: number; visitsRequired: number; pendingRewards: number; rewardsRedeemed: number;
   lastVisit: string | null; createdAt: string;
   ltvCentavos: number; ltvMXN: string;
   totalTopupCentavos: number; totalTopupMXN: string;
   recentVisits: { id: string; scannedAt: string }[];
+  recentRedemptions: { id: string; redeemedAt: string; note: string | null; revertedAt: string | null }[];
   recentTransactions: { id: string; type: string; amountCentavos: number; description: string | null; createdAt: string }[];
+  viewerIsAdmin: boolean;
+  rewardName: string;
+  /** Two-tier ladder (null = single reward). */
+  baseReward?: { visitsRequired: number; rewardName: string; ready: boolean } | null;
+  pendingRewardName?: string;
+  customReward: { name: string; description: string | null } | null;
 }
 
 function initialsFrom(name: string | null) {
@@ -33,9 +40,21 @@ export default function CustomerDetailPage() {
   const [topupAmount, setTopupAmount] = useState('');
   const [topupLoading, setTopupLoading] = useState(false);
   const [redeemLoading, setRedeemLoading] = useState(false);
+
+  // Stable per-top-up idempotency token: reused on a re-tap after a lost response
+  // (server dedups), reset on success or when the amount changes.
+  const topupKeyRef = useRef<string>('');
+  useEffect(() => { topupKeyRef.current = ''; }, [topupAmount]);
   const [message, setMessage] = useState('');
   const [messageIsSuccess, setMessageIsSuccess] = useState(false);
   const [confirmRedeem, setConfirmRedeem] = useState(false);
+  // Two-tap revert (same pattern as confirmRedeem): first tap arms one row, second executes.
+  const [revertArmedId, setRevertArmedId] = useState<string | null>(null);
+  const [revertLoadingId, setRevertLoadingId] = useState<string | null>(null);
+  const [showRewardEdit, setShowRewardEdit] = useState(false);
+  const [rewardNameInput, setRewardNameInput] = useState('');
+  const [rewardDescInput, setRewardDescInput] = useState('');
+  const [savingReward, setSavingReward] = useState(false);
 
   async function loadCustomer() {
     const res = await authedFetch(slug, `/api/${slug}/admin/customers/${id}`);
@@ -53,13 +72,15 @@ export default function CustomerDetailPage() {
 
     try {
       const centavos = centavosFromPesos(topupAmount);
+      if (!topupKeyRef.current) topupKeyRef.current = crypto.randomUUID();
       const res = await authedFetch(slug, `/api/${slug}/admin/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: customer.cardId, amountCentavos: centavos }),
+        body: JSON.stringify({ cardId: customer.cardId, amountCentavos: centavos, idempotencyKey: topupKeyRef.current }),
       });
       const data = await res.json();
       if (res.ok) {
+        topupKeyRef.current = '';
         setMessage(`Recarga de ${data.amountMXN}. Nuevo saldo: ${data.newBalanceMXN}`);
         setMessageIsSuccess(true);
         setTopupAmount('');
@@ -76,15 +97,64 @@ export default function CustomerDetailPage() {
     setRedeemLoading(true);
     setMessage('');
 
-    const res = await authedFetch(slug, `/api/${slug}/admin/scan`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ qrPayload: customer.cardNumber, action: 'REDEEM' }),
-    });
-    const data = await res.json();
-    if (res.ok) { setMessage(data.message); setMessageIsSuccess(true); loadCustomer(); }
-    else { setMessage(data.error || data.message); setMessageIsSuccess(false); }
-    setRedeemLoading(false);
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qrPayload: customer.cardNumber, action: 'REDEEM' }),
+      });
+      const data = await res.json();
+      if (res.ok) { setMessage(data.message); setMessageIsSuccess(true); loadCustomer(); }
+      else { setMessage(data.error || data.message); setMessageIsSuccess(false); }
+    } catch {
+      setMessage('Error de conexión'); setMessageIsSuccess(false);
+    } finally {
+      // Always clear the loading flag so the button can never get stuck disabled.
+      setRedeemLoading(false);
+    }
+  }
+
+  async function handleRevert(redemptionId: string) {
+    setRevertLoadingId(redemptionId);
+    setMessage('');
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/redemptions/${redemptionId}/revert`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) { setMessage(data.message); setMessageIsSuccess(true); loadCustomer(); }
+      else { setMessage(data.error || 'No se pudo revertir el canje'); setMessageIsSuccess(false); }
+    } catch {
+      setMessage('Error de conexión'); setMessageIsSuccess(false);
+    } finally {
+      setRevertLoadingId(null);
+      setRevertArmedId(null);
+    }
+  }
+
+  async function saveCustomReward(clear: boolean) {
+    setSavingReward(true);
+    setMessage('');
+    try {
+      const res = await authedFetch(slug, `/api/${slug}/admin/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customReward: clear ? null : { name: rewardNameInput.trim(), description: rewardDescInput.trim() || null },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setShowRewardEdit(false);
+        await loadCustomer();
+      } else {
+        setMessage(data.error || 'Error al actualizar la recompensa'); setMessageIsSuccess(false);
+      }
+    } catch {
+      setMessage('Error de conexión'); setMessageIsSuccess(false);
+    } finally {
+      setSavingReward(false);
+    }
   }
 
   if (loading) {
@@ -140,27 +210,93 @@ export default function CustomerDetailPage() {
 
       <div className="u-fade-up d1 u-surface p-5 mb-4">
         <div className="u-eyebrow mb-2">Progreso de visitas</div>
-        <div className="flex items-baseline justify-between mb-2">
+        <div className="mb-2">
           <span className="u-stat-num" style={{ color: 'var(--color-ink)' }}>
             {customer.visitsThisCycle}/{customer.visitsRequired}
           </span>
-          {customer.pendingRewards > 0 && (
-            <span className="u-badge u-badge-accent">{customer.pendingRewards} recompensa{customer.pendingRewards > 1 ? 's' : ''}</span>
-          )}
         </div>
         <div className="u-progress-track">
           <div className="u-progress-fill" style={{ width: `${progressPct}%` }} />
         </div>
       </div>
 
-      <div className={`u-fade-up d2 grid gap-3 mb-4 ${tenant.topupEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <div className="u-surface p-4 mt-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="u-eyebrow" style={{ fontSize: 10 }}>Recompensa</span>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-ink)' }}>
+              {customer.baseReward
+                ? `${customer.baseReward.visitsRequired} visitas: ${customer.baseReward.rewardName} · ${customer.visitsRequired} visitas: ${customer.rewardName}`
+                : customer.rewardName}
+              {customer.customReward && (
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Personalizada</span>
+              )}
+            </p>
+            {customer.baseReward?.ready && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-brand)' }}>
+                Puede canjear {customer.baseReward.rewardName} ya, o seguir hasta {customer.visitsRequired} visitas.
+              </p>
+            )}
+            {customer.customReward?.description && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-ink-light)' }}>{customer.customReward.description}</p>
+            )}
+          </div>
+          {customer.viewerIsAdmin && !showRewardEdit && (
+            <button
+              className="u-btn u-btn-secondary px-3"
+              onClick={() => {
+                setRewardNameInput(customer.customReward?.name ?? '');
+                setRewardDescInput(customer.customReward?.description ?? '');
+                setShowRewardEdit(true);
+              }}
+            >
+              Editar
+            </button>
+          )}
+        </div>
+        {customer.viewerIsAdmin && showRewardEdit && (
+          <div className="mt-3 space-y-2">
+            <input
+              type="text" value={rewardNameInput} onChange={(e) => setRewardNameInput(e.target.value)}
+              placeholder="Nombre de la recompensa" className="u-input" maxLength={80} autoFocus
+            />
+            <input
+              type="text" value={rewardDescInput} onChange={(e) => setRewardDescInput(e.target.value)}
+              placeholder="Descripción (opcional)" className="u-input" maxLength={200}
+            />
+            <div className="flex gap-2">
+              <button className="u-btn u-btn-secondary flex-1" onClick={() => setShowRewardEdit(false)} disabled={savingReward}>
+                Cancelar
+              </button>
+              {customer.customReward && (
+                <button className="u-btn u-btn-secondary flex-1" onClick={() => saveCustomReward(true)} disabled={savingReward}>
+                  Quitar personalizada
+                </button>
+              )}
+              <button
+                className="u-btn u-btn-primary flex-1"
+                onClick={() => saveCustomReward(false)}
+                disabled={savingReward || !rewardNameInput.trim()}
+              >
+                {savingReward ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={`u-fade-up d2 grid gap-3 mb-4 ${tenant.topupEnabled ? 'grid-cols-2' : 'grid-cols-3'}`}>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.totalVisits}</p>
-          <p className="u-eyebrow mt-1">Visitas</p>
+          <p className="u-eyebrow mt-1">Visitas totales</p>
         </div>
         <div className="u-surface p-4 text-center">
           <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.pendingRewards}</p>
-          <p className="u-eyebrow mt-1">Premios</p>
+          <p className="u-eyebrow mt-1">Recompensas pendientes</p>
+        </div>
+        <div className="u-surface p-4 text-center">
+          <p className="u-stat-num" style={{ fontSize: 22, color: 'var(--color-ink)' }}>{customer.rewardsRedeemed}</p>
+          <p className="u-eyebrow mt-1">Recompensas canjeadas</p>
         </div>
         {tenant.topupEnabled && (
           <div className="u-surface p-4 text-center">
@@ -199,6 +335,7 @@ export default function CustomerDetailPage() {
           <div className="u-eyebrow mb-2" style={{ color: 'var(--color-brand)' }}>Recompensa disponible</div>
           <p className="u-display mb-3" style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-ink)', margin: 0 }}>
             {customer.pendingRewards} recompensa{customer.pendingRewards > 1 ? 's' : ''} pendiente{customer.pendingRewards > 1 ? 's' : ''}
+            {customer.pendingRewardName && ` · ${customer.pendingRewardName}`}
           </p>
           {confirmRedeem ? (
             <div className="space-y-2 mt-3">
@@ -285,6 +422,70 @@ export default function CustomerDetailPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {customer.recentRedemptions?.length > 0 && (
+        <div className="u-surface p-5 mb-4">
+          <div className="u-eyebrow mb-3">Últimos canjes</div>
+          <div className="space-y-2">
+            {customer.recentRedemptions.map((r) => (
+              <div key={r.id} className="flex items-center justify-between text-sm gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0"
+                    style={{
+                      background: 'color-mix(in oklab, var(--color-brand) 15%, white)',
+                      color: 'var(--color-brand-dark)',
+                    }}
+                  >
+                    ★
+                  </span>
+                  <span
+                    className="truncate"
+                    style={{
+                      color: r.revertedAt ? 'var(--color-ink-light)' : 'var(--color-ink)',
+                      textDecoration: r.revertedAt ? 'line-through' : undefined,
+                    }}
+                  >
+                    {r.note || 'Recompensa canjeada'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span style={{ color: 'var(--color-ink-light)' }}>
+                    {formatDateTimeMX(new Date(r.redeemedAt))}
+                  </span>
+                  {r.revertedAt ? (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: 'var(--color-surface-dark)', color: 'var(--color-ink-light)' }}
+                    >
+                      Revertido · {formatDateShortMX(new Date(r.revertedAt))}
+                    </span>
+                  ) : customer.viewerIsAdmin ? (
+                    <button
+                      onClick={() =>
+                        revertArmedId === r.id ? handleRevert(r.id) : setRevertArmedId(r.id)
+                      }
+                      disabled={revertLoadingId !== null}
+                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: revertArmedId === r.id ? 'var(--color-danger-soft)' : 'var(--color-surface-dark)',
+                        color: revertArmedId === r.id ? 'var(--color-danger)' : 'var(--color-ink)',
+                      }}
+                    >
+                      {revertLoadingId === r.id ? '…' : revertArmedId === r.id ? '¿Confirmar?' : 'Revertir'}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+          {customer.rewardsRedeemed > customer.recentRedemptions.length && (
+            <p className="text-xs mt-3" style={{ color: 'var(--color-ink-light)' }}>
+              Se muestran las últimas {customer.recentRedemptions.length} de {customer.rewardsRedeemed}.
+            </p>
+          )}
         </div>
       )}
 

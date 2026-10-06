@@ -1,0 +1,170 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { EnqueueService } from '../../jobs/enqueue.service';
+import { JobPriority } from '../../jobs/job-options';
+import { QUEUES } from '../../jobs/queues';
+import { LoggingService } from '../../shared/logging/logging.service';
+import { ConversationsRepository } from './conversations.repository';
+import { ConversationTurnsRepository } from './conversation-turns.repository';
+import { decideTurnIntegrity } from './turn-integrity.logic';
+
+/** Job payloads for the turns queue. */
+export interface TurnIntegrityPayload {
+  conversation_id: string;
+  person_id: string;
+  merchant_id: string;
+  /** Resolved merchant location (channel_account), threaded from ingress for
+   *  location-aware tools (hours, order persistence). Null when unresolved. */
+  location_id?: string | null;
+  request_id?: string;
+}
+export interface TurnProcessPayload extends TurnIntegrityPayload {
+  turn_id: string;
+}
+
+/** Per-RELEASE-unique job id for turn.process. Stable within a single release
+ *  (idempotent against duplicate integrity fires for the same released turn) but
+ *  DISTINCT across re-releases — so a dead-lettered, still-retained turn.process
+ *  (removeOnFail retention, lazily evicted ≈ never at prod volume) can't dedupe
+ *  and silently drop the re-released turn (bug #5). The ':' are sanitized to '_'
+ *  by EnqueueService; the uuid+ISO form is never all-digit, so it stays BullMQ-safe.
+ *  A missing release timestamp falls back to the stable per-turn id rather than a
+ *  collision-prone empty suffix (the enqueue is only reached on the released path,
+ *  so in practice `releasedAt` is always set). */
+export function turnProcessJobId(turnId: string, releasedAt: string | null | undefined): string {
+  return releasedAt ? `turn_process:${turnId}:${releasedAt}` : `turn_process:${turnId}`;
+}
+
+/**
+ * Turn integrity (multi-bubble debounce). Port of `processors/turn-integrity.ts`.
+ * Rebound to canonical `comms.*` + BullMQ. The legacy inline `setTimeout` hold +
+ * recursion is replaced by a BullMQ **delayed re-enqueue** of `turn.integrity`
+ * (doesn't tie up a worker slot for the hold window). Released turns enqueue
+ * `turn.process`.
+ */
+@Injectable()
+export class TurnIntegrityService {
+  private readonly logger = new Logger(TurnIntegrityService.name);
+
+  constructor(
+    private readonly conversations: ConversationsRepository,
+    private readonly turns: ConversationTurnsRepository,
+    private readonly enqueue: EnqueueService,
+    private readonly log: LoggingService,
+  ) {}
+
+  async process(payload: TurnIntegrityPayload): Promise<void> {
+    const traceId = payload.request_id ?? payload.conversation_id;
+    const conversation = await this.conversations.loadById(payload.conversation_id);
+    if (!conversation) {
+      this.log.log('pipeline_trace', {
+        trace_id: traceId,
+        conversation_id: payload.conversation_id,
+        merchant_id: payload.merchant_id,
+        stage: 'integrity',
+        event: 'failed',
+        error: 'conversation_missing',
+      });
+      return;
+    }
+
+    const messages = await this.turns.getTrailingUserRun(payload.conversation_id);
+    if (!messages.length) {
+      this.log.log('pipeline_trace', {
+        trace_id: traceId,
+        conversation_id: payload.conversation_id,
+        merchant_id: payload.merchant_id,
+        stage: 'integrity',
+        event: 'failed',
+        error: 'no_trailing_user_messages',
+      });
+      return;
+    }
+
+    const decision = decideTurnIntegrity({
+      messages,
+      // Dialog-state label DERIVED from cart-presence (no stored FSM); the open
+      // question is inferred by the LLM from the buffer, not tracked here.
+      currentState: conversation.draftCart?.items?.length ? 'awaiting_confirmation' : 'initial',
+      pendingClarification: null,
+    });
+    if (!decision) return;
+
+    const existingTurn = await this.turns.findActiveTurn(payload.conversation_id);
+    const sameMessages =
+      JSON.stringify(existingTurn?.sourceMessageIds ?? []) ===
+      JSON.stringify(decision.sourceMessageIds);
+    const existingReleasedOrProcessing =
+      !!existingTurn &&
+      (existingTurn.status === 'processing' ||
+        (existingTurn.status === 'pending' && existingTurn.releasedAt != null));
+
+    if (
+      existingTurn &&
+      sameMessages &&
+      existingReleasedOrProcessing &&
+      decision.decision !== 'hold' &&
+      decision.decision !== 'merge'
+    ) {
+      this.log.log('pipeline_trace', {
+        trace_id: traceId,
+        conversation_id: payload.conversation_id,
+        merchant_id: payload.merchant_id,
+        stage: 'integrity',
+        event: 'skipped',
+        detail: { reason: 'turn_already_in_progress', existing_turn_id: existingTurn.id },
+      });
+      return;
+    }
+
+    const released = decision.decision === 'release' || decision.decision === 'replace';
+    // Generate the release timestamp ONCE and thread the same value into both the
+    // persisted turn and the per-release job id below, so the dedupe key can never
+    // diverge from (or collapse without) what was written.
+    const releasedAt = released ? new Date().toISOString() : null;
+    // Canonical status: both buffering + released map to 'pending'; released_at
+    // (set only when released) distinguishes them.
+    const turn = await this.turns.upsertTurn({
+      existingTurnId: existingTurn?.id ?? null,
+      merchantId: payload.merchant_id,
+      conversationId: payload.conversation_id,
+      status: 'pending',
+      sourceMessageIds: decision.sourceMessageIds,
+      mergedUserText: decision.mergedText,
+      firstMessageAt: decision.firstMessageAt,
+      lastMessageAt: decision.lastMessageAt,
+      holdUntil: released ? null : decision.holdUntil,
+      releasedAt,
+    });
+
+    if (!released && decision.holdUntil) {
+      // Re-evaluate after the hold window via a delayed re-enqueue (no inline sleep).
+      const waitMs = Math.max(0, new Date(decision.holdUntil).getTime() - Date.now());
+      await this.enqueue.enqueue(QUEUES.turns, 'turn.integrity', payload, {
+        priority: JobPriority.Interactive,
+        delayMs: waitMs,
+      });
+      this.logger.log(
+        `integrity buffering conv=${payload.conversation_id} turn=${turn.id} wait=${waitMs}ms`,
+      );
+      return;
+    }
+
+    await this.turns.supersedeOtherTurns(payload.conversation_id, turn.id);
+
+    const processPayload: TurnProcessPayload = { ...payload, turn_id: turn.id };
+    await this.enqueue.enqueue(QUEUES.turns, 'turn.process', processPayload, {
+      priority: JobPriority.Interactive,
+      jobId: turnProcessJobId(turn.id, releasedAt),
+    });
+
+    this.log.log('pipeline_trace', {
+      trace_id: traceId,
+      conversation_id: payload.conversation_id,
+      turn_id: turn.id,
+      merchant_id: payload.merchant_id,
+      stage: 'integrity',
+      event: 'completed',
+      detail: { decision: decision.decision, reason: decision.reason },
+    });
+  }
+}
