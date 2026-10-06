@@ -109,8 +109,6 @@ describe('validateConfig', () => {
       MFA_OTP_PEPPER: 'm'.repeat(32),
       CUSTOMER_VALUE_SECRET: 'c'.repeat(32),
       OPERATIONS_TOKEN: 'o'.repeat(32),
-      PILOT_BOOTSTRAP_TOKEN: 'b'.repeat(32),
-      PILOT_BOOTSTRAP_EXPIRES_AT: '2026-12-31T23:59:59.000Z',
       RELEASE_VERSION: '6.0.0-pilot.1',
       RELEASE_GIT_COMMIT: 'a'.repeat(40),
       RELEASE_BUILD_TIMESTAMP: '2026-08-11T12:00:00.000Z',
