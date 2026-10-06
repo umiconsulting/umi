@@ -248,12 +248,28 @@ magic `PK`.
 
 **Still open, in this order.**
 
-1. Flip `CASH_API_ORIGIN` — the register — but not yet: the ported routes answer a different
-   shape than the frozen panel reads, on four of its screens. The full inventory, the harness that
-   measures it and the exit criteria are in
-   [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md). Until it flips, the split in §4 is live
-   — and so the Wallet switch has to stay off with it.
-2. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
-3. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
+⚠️ **Order matters more than it did on the night.** `78_customer_pass_metadata.sql` adds
+`merchant.customer.device`/`os` and `merchant.loyalty_card.pending_tier1`, and the API image
+that ships with the register-parity port **reads all three**. Applying the DDL after the image
+rolls turns the customer list, the customer detail and every scan into a 500. So:
+
+1. **Apply `78_customer_pass_metadata.sql` to production first**, on its own, and read the carry
+   back (expected: `device`/`os` on 1019 of 1048 customers, `pending_tier1` on 7 cards). Additive
+   and inert — nothing reads the columns until the new image is up.
+2. **Roll the API image** from `main` (the parity port). This is safe with the register still
+   unflipped, and it fixes a live defect on its own: the dashboard's Settings → Rewards save
+   reaches umi-api today, and the old `upsertRewardConfig` retired **every** active reward row —
+   at El Gran Ribera, saving that screen silently deleted the café's 9-visit tier. The port also
+   makes the ladder's cycle resolve to the upper tier, so 23 of El Gran Ribera's 592 customers
+   read a different cycle number on the dashboard than they did from the till's cache. That is a
+   visible change on correct data; tell the owner before it lands.
+3. Flip `CASH_API_ORIGIN` — the register — **but only after the two blockers in
+   [`REGISTER_FLIP_PARITY.md`](./REGISTER_FLIP_PARITY.md#what-still-blocks-the-flip) are settled**:
+   the cycle cannot be cut short (`REDEEM_BASE` at El Gran Ribera), and the café-wide Google
+   resync is not ported. Until then the split in §4 is live, and so the Wallet switch stays off
+   with it. The shapes themselves are done and are tested against a recording of the original in
+   CI.
+4. Revoke `INSERT`/`UPDATE`/`DELETE` on the old schemas. Read-only, never dropped, in this window.
+5. Rotate `DATABASE_URL_APP` / `DATABASE_URL_WORKER`. Those role passwords were printed in full
    during the cutover and must be treated as exposed.
-4. `umi-cash` → Cloudflare, once the Wallet and register switches make its database unnecessary.
+6. `umi-cash` → Cloudflare, once the Wallet and register switches make its database unnecessary.
