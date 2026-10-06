@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { effectiveVisitsRequiredSql } from '../../shared/loyalty/card-state.sql';
 
 export interface CustomerListQuery {
   limit: number;
@@ -336,9 +337,7 @@ export class CustomersRepository {
         // Loyalty state DERIVED (no account layer): the customer's active card +
         // balance=SUM(card_ledger), visits=COUNT(visit), cycle/pending vs the rule.
         `WITH vr AS (
-           SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
-             WHERE merchant_id = $2::uuid AND active AND type = 'stamps_free_item'
-             ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+           SELECT COALESCE(${effectiveVisitsRequiredSql('$2::uuid')}, 10) AS n
          )
          SELECT
            lc.customer_id::text AS "loyaltyAccountId",

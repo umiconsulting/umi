@@ -276,12 +276,14 @@ export class CashReadService {
   }
 
   async getRewardConfig(merchantId: string): Promise<Row> {
-    const { active, history } = await this.repo.rewardConfig(merchantId);
-    return { active: active[0] || null, history };
+    // `upgrade` is the second rung of the café's ladder, and the Rewards screen
+    // reads `data.upgrade` to draw it. See CashRepository.rewardConfig.
+    const { active, upgrade, history } = await this.repo.rewardConfig(merchantId);
+    return { active: active[0] || null, upgrade: upgrade[0] || null, history };
   }
 
   async updateRewardConfig(merchantId: string, body: Row): Promise<Row> {
-    const { visitsRequired, rewardName, rewardDescription, rewardCostCentavos } = body;
+    const { visitsRequired, rewardName, rewardDescription, rewardCostCentavos, upgrade } = body;
     if (!visitsRequired || !rewardName) {
       throw new BadRequestException('visitsRequired and rewardName are required');
     }
@@ -291,13 +293,46 @@ export class CashReadService {
     if (!Number.isInteger(visits) || visits <= 0) {
       throw new BadRequestException('visitsRequired must be a positive integer');
     }
+
+    // The optional upper tier. `null`/absent means a single reward, which is how a
+    // café turns an existing ladder off, so its absence is meaningful and is passed
+    // through rather than defaulted.
+    let upgradeTier: {
+      visitsRequired: number;
+      rewardName: string;
+      rewardDescription: string | null;
+      rewardCostCentavos: number;
+    } | null = null;
+    if (upgrade !== null && upgrade !== undefined) {
+      if (!upgrade || typeof upgrade !== 'object' || !upgrade.rewardName) {
+        throw new BadRequestException('upgrade.rewardName is required');
+      }
+      const upgradeVisits = parseInt(upgrade.visitsRequired, 10);
+      if (!Number.isInteger(upgradeVisits) || upgradeVisits <= 0) {
+        throw new BadRequestException('upgrade.visitsRequired must be a positive integer');
+      }
+      // The ladder only has a lower rung to cash out early against when the upper
+      // one sits above it. umi-cash rejected this with 400 and the Rewards screen
+      // renders that message verbatim.
+      if (upgradeVisits <= visits) {
+        throw new BadRequestException('El segundo nivel debe requerir más visitas que el primero');
+      }
+      upgradeTier = {
+        visitsRequired: upgradeVisits,
+        rewardName: upgrade.rewardName,
+        rewardDescription: upgrade.rewardDescription ?? null,
+        rewardCostCentavos: Number(upgrade.rewardCostCentavos ?? 0),
+      };
+    }
+
     const programId = await this.programId(merchantId);
     if (!programId) throw new BadRequestException('merchant has no loyalty program');
     const newConfig = await this.repo.upsertRewardConfig(merchantId, programId, {
       visitsRequired: visits,
       rewardName,
       rewardDescription: rewardDescription ?? null,
-      rewardCostCentavos: rewardCostCentavos ?? 0,
+      rewardCostCentavos: Number(rewardCostCentavos ?? 0),
+      upgrade: upgradeTier,
     });
     return { ok: true, newConfig };
   }

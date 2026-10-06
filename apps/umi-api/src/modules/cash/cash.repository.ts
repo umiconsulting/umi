@@ -1,5 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
+import { EFFECTIVE_VISITS_REQUIRED_SQL } from '../../shared/loyalty/card-state.sql';
+import {
+  ACTIVE_LADDER_ROWS_SQL,
+  CARD_OVERRIDE_ROW_SQL,
+} from '../../shared/loyalty/reward-config.sql';
+import {
+  resolveRewardProfile,
+  type RewardConfigRow,
+  type RewardProfile,
+} from '../../shared/loyalty/reward-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -32,9 +42,7 @@ export interface AnalyticsWindows {
  */
 const CUST_CTE = `
       vr AS (
-        SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
-          WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
-          ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+        SELECT COALESCE(${EFFECTIVE_VISITS_REQUIRED_SQL}, 10) AS n
       ),
       cust AS (
         SELECT
@@ -171,9 +179,7 @@ export class CashRepository {
         // pending rewards across all active cards = Σ max(visits/n − redemptions, 0)
         c.query<Row>(
           `WITH vr AS (
-             SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
-               WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
-               ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+             SELECT COALESCE(${EFFECTIVE_VISITS_REQUIRED_SQL}, 10) AS n
            )
            SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
              SELECT (
@@ -361,7 +367,26 @@ export class CashRepository {
     });
   }
 
-  async rewardConfig(merchantId: string): Promise<{ active: Row[]; history: Row[] }> {
+  /**
+   * The café's reward ladder, in the shape the frozen umi-cash Rewards screen reads.
+   *
+   * THREE ANSWERS, NOT ONE. umi-cash kept a ladder as two active rows of
+   * `loyalty.reward_configs` distinguished by `kind`: the standard reward (the lower
+   * tier, e.g. capuccino at 7) and the optional `upgrade` tier above it (bebida en
+   * las rocas at 9). build-v3 carried `kind` verbatim into `merchant.loyalty_reward`
+   * and this reader used to ignore it, so the panel drew a ladder as one reward and
+   * the second tier was invisible. El Gran Ribera sells that second tier.
+   *
+   * `history` stays standard-only, exactly as umi-cash's read did: it is the
+   * "previous single rewards" list, and retired `upgrade` rows were never in it.
+   *
+   * `rewardCostCentavos` is cast to a NUMBER here. `value` is a bigint column, so
+   * node-postgres hands it back as a string ("0") — umi-cash sent the number 0, and
+   * the panel's cost field reads it numerically.
+   */
+  async rewardConfig(
+    merchantId: string,
+  ): Promise<{ active: Row[]; upgrade: Row[]; history: Row[] }> {
     // Maps build-v3's loyalty_reward onto the frozen umi-cash response names.
     // activated_at was dropped — each config save inserts a NEW row, so created_at
     // IS the activation moment; both "activatedAt" and "createdAt" read from it.
@@ -370,26 +395,93 @@ export class CashRepository {
       stamps_required AS "visitsRequired", name AS "rewardName",
       description AS "rewardDescription", value AS "rewardCostCentavos",
       active AS "isActive", created_at AS "activatedAt", created_at AS "createdAt"`;
+    const toApi = (r: Row): Row => ({
+      ...r,
+      rewardCostCentavos: Number(r.rewardCostCentavos ?? 0),
+    });
     return this.pg.withMerchant(async (c) => {
-      const [active, history] = await Promise.all([
+      const [active, upgrade, history] = await Promise.all([
         c.query<Row>(
           `SELECT ${select} FROM merchant.loyalty_reward
            WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+             AND kind = 'standard'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+          [merchantId],
+        ),
+        c.query<Row>(
+          `SELECT ${select} FROM merchant.loyalty_reward
+           WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+             AND kind = 'upgrade'
            ORDER BY created_at DESC NULLS LAST LIMIT 1`,
           [merchantId],
         ),
         c.query<Row>(
           `SELECT ${select} FROM merchant.loyalty_reward
            WHERE merchant_id = $1::uuid AND active = false AND type = 'stamps_free_item'
+             AND kind = 'standard'
            ORDER BY created_at DESC NULLS LAST LIMIT 10`,
           [merchantId],
         ),
       ]);
-      return { active: active.rows, history: history.rows };
+      return {
+        active: active.rows.map(toApi),
+        upgrade: upgrade.rows.map(toApi),
+        history: history.rows.map(toApi),
+      };
     });
   }
 
-  /** Admin-config write (not the inert customer-facing path) — see preflight §4. */
+  /**
+   * The three rows `resolveRewardProfile` needs for one card: the café's active
+   * standard reward, the café's active `upgrade` tier, and this card's own override.
+   *
+   * All three live in `merchant.loyalty_reward`, so the ladder and the per-card
+   * override are one shape of query rather than three code paths.
+   */
+  async rewardProfileRows(
+    merchantId: string,
+    cardId: string | null,
+  ): Promise<{
+    defaultConfig: Row | null;
+    upgradeConfig: Row | null;
+    overrideConfig: Row | null;
+  }> {
+    return this.pg.withMerchant(async (c) => {
+      const [rows, override] = await Promise.all([
+        c.query<Row>(ACTIVE_LADDER_ROWS_SQL, [merchantId]),
+        cardId
+          ? c.query<Row>(CARD_OVERRIDE_ROW_SQL, [merchantId, cardId])
+          : Promise.resolve({ rows: [] as Row[] }),
+      ]);
+      // Newest row wins within a kind: this query is already ordered by created_at
+      // DESC, and a save inserts rather than updates.
+      return {
+        defaultConfig: rows.rows.find((r) => r.kind === 'standard') ?? null,
+        upgradeConfig: rows.rows.find((r) => r.kind === 'upgrade') ?? null,
+        overrideConfig: override.rows[0] ?? null,
+      };
+    });
+  }
+
+  /**
+   * Admin-config write (not the inert customer-facing path) — see preflight §4.
+   *
+   * ⚠️ THE `kind` FILTER IS THE POINT OF THIS FUNCTION. Its first version retired
+   * EVERY active reward row and inserted one `kind='standard'` row, so saving the
+   * Rewards screen at a café with a ladder silently deleted the upper tier: El Gran
+   * Ribera runs 7 = capuccino / 9 = latte o frappe, and a manager opening
+   * Settings → Rewards and pressing save would have turned a sold two-tier program
+   * into a single one, with no error and no audit. `kind IN ('standard','upgrade')`
+   * retires exactly the rows this write replaces and leaves `kind='override'` rows
+   * (per-card rewards) alone — they are inactive by design and must survive a
+   * café-level save.
+   *
+   * Ported from umi-cash `admin/reward-config/route.ts` PUT, including the
+   * pending-tier tag: turning a ladder ON tags every card that already holds a
+   * banked reward, because those rewards were earned under the old single threshold
+   * and must be handed over as the LOWER tier first (see
+   * shared/loyalty/reward-tiers.ts, `bankedReward`).
+   */
   async upsertRewardConfig(
     merchantId: string,
     _programId: string,
@@ -398,34 +490,109 @@ export class CashRepository {
       rewardName: string;
       rewardDescription: string | null;
       rewardCostCentavos: number;
+      upgrade: {
+        visitsRequired: number;
+        rewardName: string;
+        rewardDescription: string | null;
+        rewardCostCentavos: number;
+      } | null;
     },
   ): Promise<Row> {
+    const insert = (kind: string) => ({
+      text: `INSERT INTO merchant.loyalty_reward
+               (merchant_id, type, kind, stamps_required, name, description, value, active)
+             VALUES ($1::uuid, 'stamps_free_item', $2, $3, $4, $5, $6, true)
+             RETURNING id::text, merchant_id::text AS "merchantId", NULL::text AS "programId",
+                       stamps_required AS "visitsRequired", name AS "rewardName",
+                       description AS "rewardDescription", value AS "rewardCostCentavos",
+                       active AS "isActive", created_at AS "activatedAt"`,
+      kind,
+    });
     return this.pg.withMerchant(async (c) => {
       // Serialize concurrent reward-rule saves per merchant so the
-      // deactivate-then-insert can't interleave into two is_active=true rows.
+      // deactivate-then-insert can't interleave into two active rows of one kind.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${merchantId}`]);
-      await c.query(
-        `UPDATE merchant.loyalty_reward SET active = false
-         WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'`,
+
+      // Read the state the save is replacing BEFORE it is retired: the threshold in
+      // force (which sizes the pending-tier tag below) and whether a ladder was
+      // already on (an OFF→ON flip is the only time cards get tagged).
+      const before = await c.query<Row>(
+        `SELECT
+           (SELECT stamps_required FROM merchant.loyalty_reward
+             WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+               AND kind = 'standard'
+             ORDER BY created_at DESC NULLS LAST LIMIT 1) AS n,
+           EXISTS (SELECT 1 FROM merchant.loyalty_reward
+             WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+               AND kind = 'upgrade') AS "hadUpgrade"`,
         [merchantId],
       );
-      const { rows } = await c.query<Row>(
-        `INSERT INTO merchant.loyalty_reward
-           (merchant_id, type, stamps_required, name, description, value, active)
-         VALUES ($1::uuid, 'stamps_free_item', $2, $3, $4, $5, true)
-         RETURNING id::text, merchant_id::text AS "merchantId", NULL::text AS "programId",
-                   stamps_required AS "visitsRequired", name AS "rewardName",
-                   description AS "rewardDescription", value AS "rewardCostCentavos",
-                   active AS "isActive", created_at AS "activatedAt"`,
-        [
-          merchantId,
-          data.visitsRequired,
-          data.rewardName,
-          data.rewardDescription,
-          data.rewardCostCentavos,
-        ],
+      const previousThreshold = Number(before.rows[0]?.n ?? 0);
+      const hadUpgrade = before.rows[0]?.hadUpgrade === true;
+
+      // Retire the running tiers — every active STANDARD and UPGRADE row. Per-card
+      // overrides are inactive and are deliberately not matched here.
+      await c.query(
+        `UPDATE merchant.loyalty_reward SET active = false, updated_at = now()
+         WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           AND kind IN ('standard','upgrade')`,
+        [merchantId],
       );
-      return rows[0];
+
+      const standard = insert('standard');
+      const { rows } = await c.query<Row>(standard.text, [
+        merchantId,
+        standard.kind,
+        data.visitsRequired,
+        data.rewardName,
+        data.rewardDescription,
+        data.rewardCostCentavos,
+      ]);
+
+      if (data.upgrade) {
+        const upgrade = insert('upgrade');
+        await c.query(upgrade.text, [
+          merchantId,
+          upgrade.kind,
+          data.upgrade.visitsRequired,
+          data.upgrade.rewardName,
+          data.upgrade.rewardDescription,
+          data.upgrade.rewardCostCentavos,
+        ]);
+
+        // Switching a ladder ON: every reward banked so far was earned under the
+        // single standard threshold, so it must keep being handed over as the
+        // standard reward — not the new upper tier the cycle banks from now on.
+        // Re-tagging on a later OFF→ON flip is right too: while the ladder was off
+        // every banked reward was, again, the standard one.
+        if (!hadUpgrade && previousThreshold > 0) {
+          // pending_rewards, derived the way LOYALTY_CARD_STATE_SQL derives it:
+          // rewards earned under the threshold that was in force, minus the ones
+          // already handed over. umi-cash read this off a cache column; build-v3 has
+          // no cache, so it is computed here.
+          await c.query(
+            `UPDATE merchant.loyalty_card ca
+                SET pending_tier1 = d.pending, updated_at = now()
+               FROM (
+                 SELECT c.id,
+                        COALESCE((SELECT SUM(v.stamps) FROM merchant.loyalty_visit v
+                                   WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id), 0)::int
+                          / $2::int
+                        - (SELECT COUNT(*) FROM merchant.loyalty_redemption r
+                            WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id) AS pending
+                   FROM merchant.loyalty_card c
+                  WHERE c.merchant_id = $1::uuid
+               ) AS d
+              WHERE ca.merchant_id = $1::uuid AND ca.id = d.id AND d.pending > 0`,
+            [merchantId, previousThreshold],
+          );
+        }
+      }
+
+      return {
+        ...rows[0],
+        rewardCostCentavos: Number(rows[0]?.rewardCostCentavos ?? 0),
+      };
     });
   }
 

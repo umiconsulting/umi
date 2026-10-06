@@ -49,6 +49,7 @@ const RENDER: PassRenderData = {
     pending_rewards: 2,
     balance_cents: 15000,
     visits_required: 10,
+    pending_tier1: 0,
   },
   locations: [{ latitude: 20.6736, longitude: -103.344 }],
 };

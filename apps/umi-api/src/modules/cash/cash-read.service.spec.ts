@@ -123,8 +123,45 @@ describe('CashReadService.updateRewardConfig', () => {
       rewardName: 'Free coffee',
       rewardDescription: null,
       rewardCostCentavos: 0,
+      // No `upgrade` in the body means a single reward: the row that turns a
+      // café's existing ladder OFF, so the absence is passed through as null.
+      upgrade: null,
     });
     expect(r.ok).toBe(true);
+  });
+
+  it('carries the second rung of a ladder through to the writer', async () => {
+    h.repo.branding.mockResolvedValue({ programId: 'prog1' });
+    h.repo.upsertRewardConfig.mockResolvedValue({ id: 'rc2', isActive: true });
+    await h.svc.updateRewardConfig('t1', {
+      visitsRequired: 7,
+      rewardName: 'Capuccino',
+      upgrade: { visitsRequired: 9, rewardName: 'Latte rocas' },
+    });
+    expect(h.repo.upsertRewardConfig).toHaveBeenCalledWith(
+      't1',
+      'prog1',
+      expect.objectContaining({
+        visitsRequired: 7,
+        upgrade: {
+          visitsRequired: 9,
+          rewardName: 'Latte rocas',
+          rewardDescription: null,
+          rewardCostCentavos: 0,
+        },
+      }),
+    );
+  });
+
+  it('refuses a second rung that is not above the first', async () => {
+    h.repo.branding.mockResolvedValue({ programId: 'prog1' });
+    await expect(
+      h.svc.updateRewardConfig('t1', {
+        visitsRequired: 9,
+        rewardName: 'Capuccino',
+        upgrade: { visitsRequired: 7, rewardName: 'Latte rocas' },
+      }),
+    ).rejects.toThrow('El segundo nivel debe requerir más visitas que el primero');
   });
 });
 
