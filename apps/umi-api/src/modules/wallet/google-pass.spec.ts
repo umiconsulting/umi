@@ -19,6 +19,25 @@ function walker(patched: (objectId: string) => boolean) {
 }
 
 describe('GooglePassService.refreshMerchantObjects', () => {
+  /**
+   * THE BODY'S ID IS THE URL'S ID, or Google rejects the PATCH.
+   *
+   * Found in the recovery from the flip: the URL had been corrected to the object's
+   * stored cuid while the body still constructed a uuid, and Google's error names the
+   * BODY's id — so one log line carried two different ids and neither looked wrong in
+   * isolation.
+   */
+  it('builds the object with the id it already has, for an update', () => {
+    const stored = '3388000000023116211.card_cmqc0om4q0004117mjd7h985i';
+    const obj = build({ objectId: stored }) as { id: string };
+    expect(obj.id).toBe(stored);
+  });
+
+  it('mints an id only when creating one', () => {
+    const obj = build({ objectId: null }) as { id: string };
+    expect(obj.id).toBe('3388000000022.card_card-1');
+  });
+
   it('walks every object, counts what landed, and keeps going past a failure', async () => {
     const { svc, seen } = walker((objectId) => objectId !== 'object-2');
     const result = await svc.refreshMerchantObjects(
