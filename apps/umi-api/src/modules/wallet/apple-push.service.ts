@@ -166,12 +166,27 @@ export class ApplePushService {
       let status = 0;
       let body = '';
       let settled = false;
+      // ⚠️ A HARD CEILING ON THE WHOLE ATTEMPT, not just on the request. `req.setTimeout`
+      // only arms once the request has a stream; a connection that never establishes
+      // leaves it unarmed, the promise never settles, and `pushCard`'s `Promise.all`
+      // waits forever. That is not hypothetical: it stalled a café-wide resync for
+      // eight minutes with the API idle, and the operator's request never answered.
+      // A push is a SIGNAL — losing one costs a notification, and a phone that never
+      // gets it still fetches on open — so giving up is always the right answer here.
+      // Held in an object so `finish` can cancel a timer declared after it without a
+      // reassigned `let` (which the lint config refuses).
+      const deadline: { id?: ReturnType<typeof setTimeout> } = {};
       const finish = (ok: boolean) => {
         if (settled) return;
         settled = true;
+        if (deadline.id) clearTimeout(deadline.id);
         client.close();
         resolve(ok);
       };
+      deadline.id = setTimeout(() => {
+        this.logger.warn('apn_deadline (connection never settled)');
+        finish(false);
+      }, PUSH_TIMEOUT_MS + 5_000);
 
       client.on('error', (err) => {
         this.logger.warn(`apn_connection_error: ${err.message}`);
