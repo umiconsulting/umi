@@ -18,6 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import { formatMXN } from './currency';
 import { generateStampStrip } from './strip-generator';
+import { appleFrontFields, ladderSummary, profileFromWalletFields } from './reward-tiers';
 import { generatePassSerial, generateRandomToken, signWalletBarcode } from './auth';
 
 const PASSES_DIR = path.join(process.cwd(), 'passes', 'apple');
@@ -59,6 +60,10 @@ export interface PassData {
   visitsRequired: number;
   pendingRewards: number;
   rewardName: string;
+  /** Two-tier ladder: the lower tier the customer may cash out early (see reward-tiers.ts). */
+  baseReward?: { visitsRequired: number; rewardName: string } | null;
+  /** Banked rewards that must be honored as the lower tier (cards.metadata.pending_tier1). */
+  pendingTier1?: number;
   totalVisits: number;
   authToken?: string;
   serial?: string;
@@ -92,6 +97,7 @@ export async function generateApplePass(data: PassData): Promise<{
   const authToken = data.authToken || generateRandomToken();
   const tenantName = data.tenantName || 'Umi Cash';
   const tenantSlug = data.tenantSlug || 'app';
+  const profile = profileFromWalletFields(data);
 
   // Convert hex color to rgb() string for Apple Wallet
   function hexToRgb(hex: string): string {
@@ -201,6 +207,16 @@ export async function generateApplePass(data: PassData): Promise<{
       const filledUrl = data.stampFilledUrl || `/logos/${slug}-stamp-filled.png`;
       const emptyUrl = data.stampEmptyUrl || `/logos/${slug}-stamp-empty.png`;
       const welcomeUrl = `/logos/${slug}-stamp-welcome.png`;
+      // Ladder: the slots above the lower tier are "bonus" stamps in their own color —
+      // /logos/{slug}-stamp-bonus-{filled,empty}.png, tinted from the regular art when
+      // a tenant hasn't supplied any.
+      const bonus = profile.baseTier
+        ? {
+            fromIndex: profile.baseTier.visitsRequired,
+            filledUrl: `/logos/${slug}-stamp-bonus-filled.png`,
+            emptyUrl: `/logos/${slug}-stamp-bonus-empty.png`,
+          }
+        : null;
       const stripBuf = await generateStampStrip(
         data.visitsThisCycle,
         data.visitsRequired,
@@ -208,6 +224,7 @@ export async function generateApplePass(data: PassData): Promise<{
         emptyUrl,
         data.secondaryColor,
         welcomeUrl,
+        bonus,
       );
       pass.addBuffer('strip@2x.png', stripBuf);
     } catch (err) {
@@ -227,8 +244,6 @@ export async function generateApplePass(data: PassData): Promise<{
     altText: data.cardNumber,
   });
 
-  const remaining = data.visitsRequired - data.visitsThisCycle;
-
   // Balance header — only shown when topup/monedero is enabled
   if (data.topupEnabled !== false) {
     pass.headerFields.push({ key: 'balance', label: 'SALDO', value: formatMXN(data.balanceCentavos), textAlignment: 'PKTextAlignmentRight', changeMessage: 'Tu saldo cambió a %@' });
@@ -238,18 +253,18 @@ export async function generateApplePass(data: PassData): Promise<{
     // 'stamps' passStyle — used by all seeded tenants (Ribera, Kalala, Néctar).
     // Pairs with the dynamic image strip generated above; text fields show
     // the count remaining and reward type.
-    pass.secondaryFields.push({
-      key: 'remaining',
-      label: 'VISITAS FALTANTES',
-      value: `${remaining} visita${remaining !== 1 ? 's' : ''}`,
-      changeMessage: 'Visitas faltantes: %@',
-    });
-    pass.secondaryFields.push({
-      key: 'rewards',
-      label: 'RECOMPENSA',
-      value: data.rewardName,
-      changeMessage: 'Recompensa: %@',
-    });
+    // No changeMessage on the progress fields: a visit changes several of them at
+    // once, and iOS collapses multiple changed fields with changeMessage into the
+    // generic "Store Card changed" notification. The lifecycle back field (below)
+    // is the single notification channel — the scan writes a moment there on
+    // EVERY visit, so its changeMessage carries the real copy alone.
+    // Two columns for a single reward; three on a ladder (reward-tiers.ts decides the
+    // order: the upper tier is always on the front as "SEGUNDO NIVEL", and once the
+    // lower tier is reached "LISTO PARA CANJEAR" leads the row). All secondary so the
+    // order is deterministic — Apple merges secondary + auxiliary into this one row.
+    for (const field of appleFrontFields(profile, data.visitsThisCycle)) {
+      pass.secondaryFields.push(field);
+    }
     // Néctar Café shows the member name on the front of the stamps pass.
     if (data.tenantSlug === 'nectarcafe') {
       pass.secondaryFields.push({ key: 'memberName', label: 'MIEMBRO', value: data.customerName });
@@ -260,7 +275,8 @@ export async function generateApplePass(data: PassData): Promise<{
     const filled = '●'.repeat(data.visitsThisCycle);
     const empty = '○'.repeat(data.visitsRequired - data.visitsThisCycle);
     pass.secondaryFields.push({ key: 'memberName', label: 'MIEMBRO', value: data.customerName });
-    pass.secondaryFields.push({ key: 'stamps', label: data.rewardName.toUpperCase(), value: `${filled}${empty} (${data.visitsThisCycle}/${data.visitsRequired})`, changeMessage: 'Progreso actualizado: %@' });
+    // No changeMessage — same single-notification-channel rule as the stamps style.
+    pass.secondaryFields.push({ key: 'stamps', label: data.rewardName.toUpperCase(), value: `${filled}${empty} (${data.visitsThisCycle}/${data.visitsRequired})` });
   }
 
   // Birthday reward — shown on front of pass with lock-screen notification
@@ -274,9 +290,10 @@ export async function generateApplePass(data: PassData): Promise<{
   }
 
   // Back fields
-  // Lifecycle message (welcome/winback/expiring) — placed first so it's the first thing
-  // a customer sees when flipping the pass. Always present so Apple reliably fires
-  // changeMessage when cron updates it from "" → text.
+  // Lifecycle message — the pass's ONE notification channel: scan moments (every
+  // visit writes one) and cron nudges (welcome/winback/expiring) both land here.
+  // Placed first so it's the first thing a customer sees when flipping the pass;
+  // always present so Apple reliably fires changeMessage on "" → text updates.
   pass.backFields.push({
     key: 'lifecycleMessage',
     label: 'Mensaje',
@@ -290,6 +307,11 @@ export async function generateApplePass(data: PassData): Promise<{
     value: data.promoMessage || 'Sin promoción activa',
     changeMessage: '%@',
   });
+  // Ladder tenants spell out both tiers on the back.
+  const ladder = ladderSummary(profile);
+  if (ladder) {
+    pass.backFields.push({ key: 'ladder', label: 'Recompensas', value: ladder });
+  }
   pass.backFields.push({ key: 'totalVisits', label: 'Visitas totales', value: String(data.totalVisits) });
   pass.backFields.push({ key: 'cardNumber', label: 'Número de tarjeta', value: data.cardNumber });
   pass.backFields.push({

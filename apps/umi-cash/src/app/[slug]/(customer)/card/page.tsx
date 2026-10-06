@@ -7,6 +7,7 @@ import { useTenant } from '@/context/TenantContext';
 import { formatDateTimeMX, formatDateShortMX } from '@/lib/intl';
 import { isTokenValid } from '@/lib/token';
 import type { CardState } from '@/types/api';
+import { profileFromWalletFields, progressLine } from '@/lib/reward-tiers';
 
 function useAuth() {
   const [token, setToken] = useState<string | null>(null);
@@ -17,19 +18,28 @@ function useAuth() {
   return token;
 }
 
-function LoyaltyProgressDots({ current, total }: { current: number; total: number }) {
+/**
+ * Stamp dots. On a two-tier ladder the slots from `bonusFrom` on are the extra
+ * stamps toward the upper tier and get their own (ice-blue) color, matching the
+ * wallet strip.
+ */
+function LoyaltyProgressDots({ current, total, bonusFrom }: { current: number; total: number; bonusFrom?: number | null }) {
   return (
     <div className="flex gap-2 flex-wrap justify-center">
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className={`w-5 h-5 rounded-full border-2 transition-all duration-300 ${
-            i < current
-              ? 'bg-white border-white scale-110'
-              : 'border-white/40 bg-transparent'
-          }`}
-        />
-      ))}
+      {Array.from({ length: total }).map((_, i) => {
+        const bonus = bonusFrom != null && i >= bonusFrom;
+        const filled = i < current;
+        const cls = bonus
+          ? filled ? 'bg-sky-200 border-sky-200 scale-110' : 'border-sky-200/60 bg-transparent'
+          : filled ? 'bg-white border-white scale-110' : 'border-white/40 bg-transparent';
+        return (
+          <div
+            key={i}
+            className={`w-5 h-5 rounded-full border-2 transition-all duration-300 ${cls}`}
+            aria-label={bonus ? 'Sello extra' : 'Sello'}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -282,7 +292,8 @@ export default function CardPage() {
   }
 
   const firstName = card.customerName?.split(' ')[0] ?? 'Hola';
-  const remaining = card.visitsRequired - card.visitsThisCycle;
+  // Same copy the wallet passes use (reward-tiers.ts) — ladder-aware.
+  const progressCopy = progressLine(profileFromWalletFields(card), card.visitsThisCycle);
 
   return (
     <main className="min-h-screen bg-coffee-cream pb-8">
@@ -312,7 +323,7 @@ export default function CardPage() {
                 {card.pendingRewards === 1 ? 'Tienes una recompensa lista' : `${card.pendingRewards} recompensas listas`}
               </p>
               <p className="text-white/60 text-xs text-center mt-0.5">
-                Pídele al barista: {card.rewardName}
+                Pídele al barista: {card.pendingRewardName ?? card.rewardName}
               </p>
             </div>
           )}
@@ -324,14 +335,21 @@ export default function CardPage() {
                 {card.visitsThisCycle}/{card.visitsRequired} visitas
               </span>
             </div>
-            <LoyaltyProgressDots current={card.visitsThisCycle} total={card.visitsRequired} />
+            <LoyaltyProgressDots
+              current={card.visitsThisCycle}
+              total={card.visitsRequired}
+              bonusFrom={card.baseReward?.visitsRequired ?? null}
+            />
           </div>
 
           <p className="text-coffee-pale/50 text-xs text-center">
-            {remaining > 0
-              ? `${remaining} visita${remaining !== 1 ? 's' : ''} más para: ${card.rewardName}`
-              : `¡Listo para canjear: ${card.rewardName}!`}
+            {progressCopy}
           </p>
+          {card.baseReward?.ready && (
+            <p className="text-white text-xs text-center font-semibold mt-1">
+              Pídele al barista tu {card.baseReward.rewardName}, o sigue sumando sellos.
+            </p>
+          )}
 
           <p className="card-number text-coffee-pale/20 text-[10px] mt-5">{card.cardNumber}</p>
         </div>

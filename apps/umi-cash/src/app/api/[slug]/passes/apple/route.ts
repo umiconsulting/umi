@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateApplePass, isAppleWalletConfigured } from '@/lib/pass-apple';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
+import { walletRewardFields } from '@/lib/reward-tiers';
 import { getActivePromo } from '@/lib/tenant';
 import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
 import { getTenant } from '@/lib/tenant';
@@ -25,18 +26,17 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
     }
 
     // CUSTOMER session subject is a core.people id → resolve the card via account.
-    const [card, rewardConfig, locations] = await Promise.all([
+    const [card, locations] = await Promise.all([
       prisma.cards.findFirst({
         where: { tenant_id: tenant.id, accounts: { person_id: user.sub } },
         include: { accounts: { include: { people: true } } },
       }),
-      getActiveRewardConfig(tenant.id),
       prisma.locations.findMany({ where: { tenant_id: tenant.id, status: 'active', lat: { not: null }, lng: { not: null } } }),
     ]);
 
     if (!card) return NextResponse.json({ error: 'Tarjeta no encontrada' }, { status: 404 });
 
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const rewardProfile = await getRewardProfileForCard(tenant.id, card);
     const customerName = card.accounts?.people?.display_name || DEFAULT_CUSTOMER_NAME;
     const cardMeta = (card.metadata as Record<string, unknown>) ?? {};
     const lifecycleMessage = (cardMeta.lifecycle_message as string) ?? null;
@@ -53,9 +53,8 @@ export async function GET(req: NextRequest, { params }: { params: { slug: string
       customerName,
       balanceCentavos: card.balance_cents,
       visitsThisCycle: card.visits_this_cycle,
-      visitsRequired,
       pendingRewards: card.pending_rewards,
-      rewardName,
+      ...walletRewardFields(rewardProfile, card.metadata),
       totalVisits: card.total_visits,
       serial: existingPass?.serial_number ?? undefined,
       authToken: existingPass?.auth_token ?? undefined,

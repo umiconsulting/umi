@@ -196,7 +196,7 @@ In the Vercel import screen, expand **Environment Variables** and add each varia
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | `wallet@your-project.iam.gserviceaccount.com` |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Full private key from service account JSON (include `-----BEGIN...END-----`) |
 | `GOOGLE_WALLET_ISSUER_ID` | Your issuer ID from Google Wallet Console |
-| `GOOGLE_WALLET_CLASS_ID` | `umicash_loyalty_v1` |
+| `GOOGLE_WALLET_CLASS_ID` | `umicash_loyalty_v2` |
 
 #### Email — needed for gift card and welcome emails
 
@@ -398,7 +398,8 @@ Google Wallet requires approval from Google, which can take 1–5 business days.
 
 1. **IAM & Admin** → **Service Accounts** → **Create Service Account**
 2. Name: `wallet-service` → **Create and Continue**
-3. Role: **Editor** → Done
+3. **Skip** "Grant this service account access to project" — no Cloud IAM role is
+   needed. Wallet access is granted in the Pay & Wallet Console (§9.4), not by IAM.
 4. Click the service account → **Keys** tab → **Add Key** → **JSON** → **Create**
 5. A JSON file downloads. Open it and copy:
    - `client_email` → `GOOGLE_SERVICE_ACCOUNT_EMAIL`
@@ -410,7 +411,12 @@ Google Wallet requires approval from Google, which can take 1–5 business days.
 2. Sign in and register as an issuer
 3. Fill in business details and submit for approval
 4. Once approved, your **Issuer ID** is shown in the console → `GOOGLE_WALLET_ISSUER_ID`
-5. Set `GOOGLE_WALLET_CLASS_ID` to `umicash_loyalty_v1`
+5. **Authorize the service account:** in the same console, go to **Users** →
+   **Invite a user**, paste the service account email from §9.3, and set the access
+   level to **Developer**. Without this every API call returns 403, no matter how the
+   Cloud project is configured. The invite may stay in a pending state — service
+   accounts have no mailbox to accept it — and access works regardless.
+6. Set `GOOGLE_WALLET_CLASS_ID` to `umicash_loyalty_v2`
 
 ### 9.5 Update environment variables
 
