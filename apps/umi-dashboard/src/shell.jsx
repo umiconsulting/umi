@@ -1,49 +1,277 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { I, UmiX } from './icons.jsx'
+import React from 'react';
+import { msg } from '@lingui/core/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
+import { I } from './icons.jsx';
+import { Select } from '@/components/select.jsx';
+import { Menu } from '@/components/menu.jsx';
+import { LOCALES, activateLocale } from '@/lib/i18n.js';
+import { formatDate, formatTime } from '@/lib/format.js';
+import { initialsFrom } from '@/screens/profile-format.js';
+import {
+  getThemePreference,
+  setThemePreference,
+  resolveTheme,
+  subscribeTheme,
+} from '@/lib/theme.js';
 
-const NAV = [
-  { id: 'overview', label: 'Overview',            icon: 'Home',       section: 'OPERATIONS'    },
-  { id: 'orders',   label: 'Pedidos',              icon: 'Receipt',    section: 'OPERATIONS'    },
-  { id: 'devices',  label: 'Devices',              icon: 'Tablet',     section: 'OPERATIONS', badge: '4' },
-  { id: 'staff',    label: 'Staff & Access',       icon: 'Users',      section: 'OPERATIONS'    },
-  { id: 'customers', label: 'Customers',            icon: 'Users2',     section: 'OPERATIONS'    },
-  { id: 'members',  label: 'Loyalty',               icon: 'CreditCard', section: 'GROWTH'        },
-  { id: 'gift-cards', label: 'Gift Cards',          icon: 'Gift',       section: 'GROWTH'        },
-  { id: 'hours',    label: 'Hours & Availability', icon: 'Clock',      section: 'CONFIGURATION', badge: 'PAUSED', badgeKind: 'warn' },
-  { id: 'settings', label: 'Settings',             icon: 'Settings',   section: 'CONFIGURATION' },
-];
+// Layout effect on the client, plain effect on the server — matches the isomorphic
+// pattern in components/select.jsx so measuring never warns during SSR (tests).
+const useIsoLayoutEffect =
+  typeof document !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
+// Fan one node out to several refs (object or callback). Used to give the profile
+// pill both the menu's trigger ref and our own measuring ref.
+const setRefs =
+  (...refs) =>
+  (node) => {
+    for (const r of refs) {
+      if (typeof r === 'function') r(node);
+      else if (r) r.current = node;
+    }
+  };
+
+// ThemeMenu — the console theme picker in the topbar. Three NAMED themes: Umi (the
+// light default), Oscuro (the deep "ocean at night" dark) and Midnight (all black).
+// It is a small menu, not a two-state toggle: three themes need a real pick. The
+// trigger shows a sun for the light theme and a moon for either dark one; the menu
+// marks the active theme with a check. There is no 'System' stop — a person who
+// never picked follows the OS (resolveTheme), and picking a theme pins it (data-
+// theme wins over the OS). State lives in src/lib/theme.js — this only subscribes so
+// it re-renders when the OS preference flips or another tab changes the choice.
+// Theme names are fixed labels, not localized.
+const THEME_ICON = { umi: I.Sun, dark: I.Moon, midnight: I.Moon };
+const THEME_NAME = { umi: 'Umi', dark: 'Oscuro', midnight: 'Midnight' };
+const THEME_ORDER = ['umi', 'dark', 'midnight'];
+// A blank leading slot, so the unselected rows align with the checked one.
+const Blank = () => null;
+
+const ThemeMenu = () => {
+  const { t } = useLingui();
+  const [pref, setPref] = React.useState(getThemePreference);
+  React.useEffect(() => subscribeTheme(setPref), []);
+  const resolved = resolveTheme(pref); // concrete theme on screen
+  const Glyph = THEME_ICON[resolved] || I.Moon;
+  const items = THEME_ORDER.map((name) => ({
+    key: name,
+    label: THEME_NAME[name],
+    icon: name === resolved ? I.Check : Blank,
+    onSelect: () => setThemePreference(name),
+  }));
+  return (
+    <Menu
+      align="end"
+      label={t`Tema`}
+      items={items}
+      renderTrigger={({ ref, open, props }) => (
+        <button
+          type="button"
+          ref={ref}
+          className={'btn btn-ghost btn-sm theme-toggle focusable' + (open ? ' active' : '')}
+          title={t`Tema: ${THEME_NAME[resolved]}`}
+          aria-label={t`Tema: ${THEME_NAME[resolved]}`}
+          {...props}
+        >
+          <Glyph size={18} aria-hidden="true" />
+        </button>
+      )}
+    />
+  );
+};
+
+// ProfileButton — the account pill in the topbar, set beside the theme toggle. It
+// wears the operator's initials, the same monogram the sidebar avatar uses, so a
+// person recognizes their own account at a glance, and it carries a caret so it
+// reads as a menu, not a link. It is the trigger for `ProfileMenu`: it forwards its
+// ref and spreads the menu's click/aria props, and `open` tints it while the menu
+// is down. `active` keeps it lit while the profile screen itself is showing.
+const ProfileButton = React.forwardRef(function ProfileButton(
+  { name, email, open = false, active = false, ...rest },
+  ref,
+) {
+  const { t } = useLingui();
+  const initials = initialsFrom(name, email);
+  return (
+    <button
+      type="button"
+      ref={ref}
+      className={
+        'btn btn-ghost btn-sm profile-toggle focusable' + (open || active ? ' active' : '')
+      }
+      title={t`Cuenta`}
+      aria-label={t`Cuenta`}
+      {...rest}
+    >
+      <span className="profile-toggle-avatar" aria-hidden="true">
+        {initials}
+      </span>
+      {name ? <span className="profile-toggle-name">{name}</span> : null}
+      <I.ChevronDown size={14} className="profile-toggle-caret" aria-hidden="true" />
+    </button>
+  );
+});
+
+// ProfileMenu — the account dropdown in the topbar. The profile pill opens our
+// custom Menu with two commands: "Mi perfil" (open the profile screen) and "Cerrar
+// sesión". It folds the old standalone logout icon into this one control, so a
+// person's identity and the two things they do with it read as one place.
+const ProfileMenu = ({ name, email, active = false, onProfile, onSignOut }) => {
+  const { t } = useLingui();
+  const pillRef = React.useRef(null);
+  const [pillWidth, setPillWidth] = React.useState();
+
+  // Measure the pill at its natural (content) width, then pin it 15% longer so it
+  // reads as roomy as the menu it opens. The Menu copies the trigger's width exactly
+  // (widthFactor 1), so the button and its dropdown end up the SAME length. Re-runs
+  // when the name changes: reset to auto first so the old fixed width does not skew
+  // the measurement.
+  useIsoLayoutEffect(() => {
+    const el = pillRef.current;
+    if (!el) return;
+    el.style.width = 'auto';
+    const natural = el.getBoundingClientRect().width;
+    setPillWidth(Math.round(natural * 1.15));
+  }, [name, email]);
+
+  const items = [
+    onProfile && { key: 'profile', label: t`Mi perfil`, onSelect: onProfile },
+    onSignOut && { key: 'signout', label: t`Cerrar sesión`, onSelect: onSignOut, danger: true },
+  ].filter(Boolean);
+  return (
+    <Menu
+      align="end"
+      label={t`Cuenta`}
+      items={items}
+      widthFactor={1}
+      renderTrigger={({ ref, open, props }) => (
+        <ProfileButton
+          ref={setRefs(ref, pillRef)}
+          name={name}
+          email={email}
+          open={open}
+          active={active}
+          style={pillWidth ? { width: pillWidth } : undefined}
+          {...props}
+        />
+      )}
+    />
+  );
+};
+
+/** Section keys as an operator reads them. The key itself is the storage form. */
+const SECTION_LABELS = {
+  HOME: msg`HOY`,
+  OPERATIONS: msg`OPERACIÓN`,
+  CUSTOMERS: msg`CLIENTES`,
+  BUSINESS: msg`NEGOCIO`,
+  CONFIGURATION: msg`CONFIGURACIÓN`,
+  PLATFORM: msg`PLATAFORMA`,
+};
+
+/** Screen titles for the masthead. Resolved at render, so they follow the locale. */
+const SCREEN_TITLES = {
+  'floor-plan': msg`Plano de mesas`,
+  overview: msg`Panorama`,
+  operations: msg`Centro operativo`,
+  reportes: msg`Reportes`,
+  'cash-shifts': msg`Caja y turnos`,
+  products: msg`Productos`,
+  inventory: msg`Inventario`,
+  'loyalty-value': msg`Lealtad y valor`,
+  kitchen: msg`Cocina`,
+  orders: msg`Pedidos`,
+  devices: msg`Dispositivos`,
+  staff: msg`Equipo y permisos`,
+  customers: msg`Clientes`,
+  triage: msg`Atención`,
+  members: msg`Lealtad`,
+  'gift-cards': msg`Tarjetas de regalo`,
+  hours: msg`Horario y disponibilidad`,
+  settings: msg`Ajustes`,
+  'products-billing': msg`Productos y facturación`,
+  diagnostics: msg`Diagnóstico`,
+  cafes: msg`Cafés`,
+  profile: msg`Tu perfil`,
+};
+
+/**
+ * The language control. The choice belongs to the person, not to a screen, so it
+ * lives in the topbar's upper-right corner beside the profile and theme controls
+ * (`variant="topbar"`). The login screen still renders the full-width `panel`
+ * form. The change is immediate and it persists in the browser.
+ */
+const LocaleSelect = ({ variant = 'panel' }) => {
+  const { t, i18n } = useLingui();
+  const topbar = variant === 'topbar';
+  // The login variant keeps the small type and the tight radius, but not a small
+  // height: the box comes from the `.select` rule (--control-min). A language
+  // control the operator taps is a pointer target like any other, on every screen.
+  return (
+    <Select
+      className={'select locale-select' + (topbar ? ' topbar-select' : '')}
+      value={i18n.locale}
+      onChange={(e) => activateLocale(e.target.value)}
+      hideCheck
+      aria-label={t`Idioma`}
+      title={t`Idioma`}
+      style={topbar ? undefined : { width: '100%', borderRadius: 8, fontSize: 12 }}
+    >
+      {LOCALES.map((l) => (
+        <option key={l.tag} value={l.tag}>
+          {l.label}
+        </option>
+      ))}
+    </Select>
+  );
+};
 
 // Tiny X separator — the brand glyph as connective tissue between metadata bits
 const XSep = ({ dark = false, size = 7 }) => (
-  <span className="x-sep" aria-hidden="true" style={{width: size, height: size, opacity: dark ? 0.4 : 0.55}}>
-    <svg viewBox="0 0 24 24" fill="none" stroke={dark ? "#f0f4ff" : "currentColor"} strokeWidth="3" strokeLinecap="round">
-      <line x1="4" y1="4" x2="20" y2="20"/>
-      <line x1="20" y1="4" x2="4" y2="20"/>
+  <span
+    className="x-sep"
+    aria-hidden="true"
+    style={{ width: size, height: size, opacity: dark ? 0.4 : 0.55 }}
+  >
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={dark ? '#f0f4ff' : 'currentColor'}
+      strokeWidth="3"
+      strokeLinecap="round"
+    >
+      <line x1="4" y1="4" x2="20" y2="20" />
+      <line x1="20" y1="4" x2="4" y2="20" />
     </svg>
   </span>
 );
 
-const formatTenantGreetingName = (tenantName, maxLength = 30) => {
-  const name = String(tenantName || '').trim().replace(/\s+/g, ' ');
+const formatMerchantGreetingName = (merchantName, maxLength = 30) => {
+  const name = String(merchantName || '')
+    .trim()
+    .replace(/\s+/g, ' ');
   return name.length > maxLength ? name.slice(0, maxLength) : name;
 };
 
 const Sidebar = ({
   active,
+  activeFull,
   onChange,
   collapsed,
   onToggleCollapse,
-  tenantName,
   navItems,
-  tenants,
-  selectedTenantId,
-  onTenantChange,
-  onSignOut,
+  merchants,
+  selectedMerchantId,
+  onMerchantChange,
 }) => {
+  const { t, i18n } = useLingui();
+  // Per-group open/closed override. A parent group is a pure disclosure toggle: clicking it
+  // opens or closes its nested items and never navigates — only the nested items navigate.
+  // Value `true`/`false` is an explicit user choice; `undefined` falls back to the route
+  // (a group shows open while you are inside it). This is what lets the dropdown close again.
+  const [openGroups, setOpenGroups] = React.useState({});
   const sections = [];
   let current = null;
-  const items = navItems?.length ? navItems : NAV;
-  items.forEach(item => {
+  const items = navItems || [];
+  items.forEach((item) => {
     if (item.section !== current) {
       current = item.section;
       sections.push({ name: current, items: [] });
@@ -53,259 +281,397 @@ const Sidebar = ({
 
   return (
     <aside className="side">
-      <button className="collapse-btn focusable" onClick={onToggleCollapse} aria-label="Toggle sidebar">
-        {collapsed ? <I.ChevronRight size={14}/> : <I.ChevronLeft size={14}/>}
+      <button
+        className="collapse-btn focusable"
+        onClick={onToggleCollapse}
+        aria-label={t`Mostrar u ocultar el menú`}
+      >
+        {collapsed ? <I.ChevronRight size={14} /> : <I.ChevronLeft size={14} />}
       </button>
 
       <div className="side-head">
-        <UmiX size={32} color="#7692CB" />
         {!collapsed && (
-          <div>
-            <div className="side-brand-name">umi<em>· dash</em></div>
-            <div className="side-brand-sub">Owner Console</div>
+          <div className="side-brand-name">
+            umi<em>dash</em>
           </div>
         )}
       </div>
 
-      {sections.map((sec, si) => (
-        <React.Fragment key={sec.name}>
-          {!collapsed && (
-            <div className="side-section" style={{display:'flex', alignItems:'baseline', gap:8}}>
-              <span style={{fontFamily:'var(--font-mono)', color:'var(--umi-blue)'}}>0{si+1}</span>
-              <span>/</span>
-              <span>{sec.name}</span>
-            </div>
-          )}
-          {sec.items.map(item => {
-            const Ic = I[item.icon] || I.Settings;
-            return (
-              <div
-                key={item.id}
-                className={"side-item focusable x-active" + (active === item.id ? " active" : "")}
-                onClick={() => onChange(item.id)}
-                tabIndex={0}
-                role="button"
-                aria-current={active === item.id ? 'page' : undefined}
-              >
-                <span className="ic"><Ic /></span>
-                <span className="label">{item.label}</span>
-                {item.badge && <span className={"badge-side" + (item.badgeKind === 'warn' ? ' warn' : '')}>{item.badge}</span>}
+      {/* Only the nav list scrolls: the brand stays pinned at the top and the
+          account foot at the bottom, so a long menu on a short phone never buries
+          them. `.side` clips; this is the one scroll region. */}
+      <nav className="side-nav">
+        {sections.map((sec) => (
+          <React.Fragment key={sec.name}>
+            {/* No `0{si+1} /`. The groups are not a sequence — Configuración does not
+              follow Crecimiento, and reordering the nav would not renumber
+              anything. The number was there to look considered. */}
+            {!collapsed && (
+              <div className="side-section">
+                {SECTION_LABELS[sec.name] ? i18n._(SECTION_LABELS[sec.name]) : sec.name}
               </div>
-            );
-          })}
-        </React.Fragment>
-      ))}
+            )}
+            {sec.items.map((item) => {
+              const Ic = I[item.icon] || I.Settings;
+              const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+              // Open when explicitly toggled open; otherwise default to the route (open while
+              // you are inside the group). An explicit `false` keeps it closed even inside.
+              const expanded = hasChildren && (openGroups[item.id] ?? active === item.id);
+              return (
+                <React.Fragment key={item.id}>
+                  <button
+                    type="button"
+                    className={
+                      'side-item focusable x-active' + (active === item.id ? ' active' : '')
+                    }
+                    onClick={() => {
+                      if (hasChildren) {
+                        // A parent group is a pure dropdown: toggle its nested items open/shut
+                        // and never navigate. Only the nested items below change the screen.
+                        setOpenGroups((prev) => ({ ...prev, [item.id]: !expanded }));
+                        return;
+                      }
+                      onChange(item.id);
+                    }}
+                    aria-current={active === item.id ? 'page' : undefined}
+                    aria-expanded={hasChildren ? expanded : undefined}
+                    title={collapsed ? i18n._(item.label) : undefined}
+                  >
+                    <span className="ic">
+                      <Ic />
+                    </span>
+                    <span className="label">{i18n._(item.label)}</span>
+                    {hasChildren && !collapsed && (
+                      <span
+                        className="ic"
+                        style={{ marginLeft: 'auto', opacity: 0.55 }}
+                        aria-hidden="true"
+                      >
+                        {expanded ? <I.ChevronDown size={14} /> : <I.ChevronRight size={14} />}
+                      </span>
+                    )}
+                    {item.badge && (
+                      <span className={'badge-side' + (item.badgeKind === 'warn' ? ' warn' : '')}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                  {expanded &&
+                    !collapsed &&
+                    item.children.map((child) => (
+                      <button
+                        key={child.id}
+                        type="button"
+                        className={
+                          'side-item side-subitem focusable x-active' +
+                          (activeFull === child.id ? ' active' : '')
+                        }
+                        onClick={() => onChange(child.id)}
+                        aria-current={activeFull === child.id ? 'page' : undefined}
+                        style={{ paddingLeft: 34, fontSize: 13 }}
+                      >
+                        <span className="label">{i18n._(child.label)}</span>
+                      </button>
+                    ))}
+                </React.Fragment>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </nav>
 
-      <div className="side-foot" style={{flexDirection:'column', gap:8}}>
-        <div style={{display:'flex', alignItems:'center', gap:10, width:'100%'}}>
-          <div className="avatar">OW</div>
-          {!collapsed && (
-            <div className="uname" style={{flex:1}}>
-              <div>Owner</div>
-              <div className="sm">Admin <XSep dark/> {tenantName || '—'}</div>
-            </div>
-          )}
-          {!collapsed && onSignOut && (
-            <button
-              className="btn-icon"
-              onClick={onSignOut}
-              aria-label="Sign out"
-              title="Cerrar sesión"
-              style={{opacity:0.6}}
-            >
-              <I.Power size={14}/>
-            </button>
-          )}
-        </div>
-        {!collapsed && tenants?.length > 1 && (
-          <select
+      <div className="side-foot" style={{ flexDirection: 'column', gap: 8 }}>
+        {!collapsed && merchants?.length > 1 && (
+          <Select
             className="select"
-            value={selectedTenantId || ''}
-            onChange={e => onTenantChange?.(e.target.value)}
-            aria-label="Tenant"
-            style={{width:'100%', height:34, borderRadius:8, fontSize:12}}
+            value={selectedMerchantId || ''}
+            onChange={(e) => onMerchantChange?.(e.target.value)}
+            aria-label={t`Negocio`}
+            style={{ width: '100%', height: 34, borderRadius: 8, fontSize: 12 }}
           >
-            {tenants.map(tenant => (
-              <option key={tenant.id} value={tenant.id}>{tenant.name}</option>
+            {merchants.map((merchant) => (
+              <option key={merchant.id} value={merchant.id}>
+                {merchant.name}
+              </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
-      {!collapsed && (
-        <div style={{paddingTop:10, marginTop:6, borderTop:'1px solid var(--side-line)'}}>
-          <div style={{fontSize:9, letterSpacing:'0.2em', textTransform:'uppercase', color:'var(--side-text-3)', marginBottom:6}}>
-            v1.0 <XSep dark/> Abril 2026
-          </div>
-          <div className="brand-mod" aria-hidden="true">
-            {Array.from({length: 24}).map((_, i) => (
-              <span key={i} className={[2,5,8,11,14,17,20].includes(i) ? 'lit' : ''}/>
-            ))}
-          </div>
-        </div>
-      )}
     </aside>
   );
 };
 
 // Network connectivity indicator — shows API health and allows manual retry.
-const NetIndicator = ({ status, latency, onRetry }) => {
-  const [spinning, setSpinning] = useState(false)
-  const timerRef = useRef(null)
 
-  // Brief spin animation when retrying
-  function handleRetry() {
-    setSpinning(true)
-    clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => setSpinning(false), 1200)
-    onRetry?.()
-  }
-
-  useEffect(() => () => clearTimeout(timerRef.current), [])
-
-  const isOnline    = status === 'online'
-  const isChecking  = status === 'connecting'
-
-  const bg    = isOnline ? 'var(--success-soft)' : isChecking ? 'var(--canvas-2)' : 'var(--danger-soft)'
-  const color  = isOnline ? 'var(--success)'      : isChecking ? 'var(--ink-3)'    : 'var(--danger)'
-  const label  = isOnline
-    ? (latency != null ? `${latency} ms` : 'Online')
-    : isChecking ? 'Conectando…' : 'Sin conexión'
-  const title  = isOnline
-    ? `API responde en ${latency} ms`
-    : isChecking ? 'Verificando conexión con el servidor…'
-    : 'Sin conexión al servidor — click para reintentar'
-
-  return (
-    <button
-      onClick={!isOnline ? handleRetry : undefined}
-      title={title}
-      aria-label={title}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 5,
-        padding: '4px 10px', borderRadius: 20,
-        fontSize: 11.5, fontWeight: 500, letterSpacing: '0.01em',
-        background: bg, color,
-        border: 'none', cursor: isOnline ? 'default' : 'pointer',
-        transition: 'background 0.2s, color 0.2s',
-        flexShrink: 0,
-      }}
-    >
-      {isChecking || spinning
-        ? <span style={{width:7, height:7, borderRadius:'50%', background: color, opacity:0.55, animation:'pulse-kds-check 1s ease-in-out infinite'}}/>
-        : <span className={'s-dot ' + (isOnline ? 'live' : 'offline')} style={{flexShrink:0}}/>
-      }
-      {label}
-      {!isOnline && !isChecking && (
-        <I.Refresh size={11} style={{marginLeft:1, opacity: spinning ? 0.4 : 0.8, transition:'opacity 0.2s'}}/>
-      )}
-    </button>
-  )
-}
-
-const Topbar = ({ business, status, onMenu, screen, tenantName, locations = [], selectedLocationId, onLocationChange, connection = {} }) => {
+/**
+ * The masthead.
+ *
+ * One shape for every screen: the page's name, its actions, and — between two
+ * hairlines beneath — THE DATELINE. Which café, which branch, whether the till
+ * is answering, today's date, the clock. Every field is live.
+ *
+ * It replaces three separate devices: the `01 / OPERACIONES` ordinal that opened
+ * every screen without ever being a sequence, the uppercase English gloss under
+ * every Spanish title, and the status chips that floated loose in the bar. The
+ * operator now reads their whole context on one line, in one place, always the
+ * same place.
+ */
+const Topbar = ({
+  merchant,
+  onMenu,
+  screen,
+  merchantName,
+  locations = [],
+  canSwitchLocations = false,
+  selectedLocationId,
+  onLocationChange,
+  connection = {},
+  onProfile,
+  profileActive = false,
+  userName,
+  userEmail,
+  onSignOut,
+}) => {
+  const { t, i18n } = useLingui();
   const hour = new Date().getHours();
-  const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
-  const greetingName = formatTenantGreetingName(tenantName);
-  const titles = {
-    overview:  { eyebrow: '01 / OPERACIONES',    title: 'Panorama',                  en: 'Overview'           },
-    orders:    { eyebrow: '02 / OPERACIONES',    title: 'Pedidos WhatsApp',          en: 'KDS tickets'        },
-    devices:   { eyebrow: '03 / OPERACIONES',    title: 'Dispositivos KDS',          en: 'Kitchen displays'   },
-    staff:     { eyebrow: '04 / OPERACIONES',    title: 'Equipo y permisos',         en: 'Staff & Access'     },
-    customers: { eyebrow: '05 / OPERACIONES',    title: 'Customers',                 en: 'Customer platform'  },
-    members:   { eyebrow: '06 / GROWTH',         title: 'Loyalty',                   en: 'Umi Cash members'   },
-    'gift-cards': { eyebrow: '07 / GROWTH',      title: 'Gift cards',                en: 'Umi Cash cards'     },
-    hours:     { eyebrow: '08 / CONFIGURACIÓN',  title: 'Horario y disponibilidad',  en: 'Hours & Availability' },
-    settings:  { eyebrow: '09 / CONFIGURACIÓN',  title: 'Ajustes',                   en: 'Settings'           },
-    'products-billing': { eyebrow: '10 / CONFIGURACIÓN', title: 'Products & Billing', en: 'Subscription'       },
-  };
+  const greet = hour < 12 ? t`Buenos días` : hour < 19 ? t`Buenas tardes` : t`Buenas noches`;
+  const greetingName = formatMerchantGreetingName(merchantName);
 
-  const branchScoped = ['orders', 'devices', 'hours'].includes(screen);
-  const showLocationSelect = branchScoped && locations.length > 1;
-  const LocationSelect = () => showLocationSelect ? (
-    <select
-      className="select"
-      value={selectedLocationId || ''}
-      onChange={e => onLocationChange?.(e.target.value)}
-      aria-label="Branch"
-      style={{height:42, borderRadius:10, minWidth:170, fontSize:13}}
-    >
-      {locations.filter(l => l.status === 'active').map(location => (
-        <option key={location.id} value={location.id}>{location.name}</option>
-      ))}
-    </select>
-  ) : null;
+  // Titles only. The ordinal and the English gloss are gone: neither told the
+  // operator anything the title did not already say.
+  // ⚠️ FALLS BACK, and it did not before. A route with no entry here read
+  // `undefined.eyebrow` and took the WHOLE shell down — sidebar, topbar and
+  // screen — not merely its own header. A missing title is a small omission;
+  // a white page is not.
+  const title = SCREEN_TITLES[screen] ? i18n._(SCREEN_TITLES[screen]) : screen;
 
-  if (screen === 'overview') {
-    return (
-      <header className="topbar fade-up" style={{alignItems:'flex-end', paddingBottom:12, borderBottom:'1px solid var(--ink-1)'}}>
-        <div className="greet">
-          <div className="sec-index" style={{marginBottom:14}}>
-            <span className="nn">01</span>
-            <span>/</span>
-            <span>OPERACIONES <XSep/> PANORAMA <XSep/> {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}</span>
-          </div>
-          <h1 className="edit-display" style={{fontSize:54}}>{greet}{greetingName ? <>, <b title={tenantName}>{greetingName}</b></> : ''}.</h1>
-          <div className="meta" style={{marginTop:14, fontSize:13.5}}>
-            <span>{business}</span>
-            <XSep/>
-            <span className="sub-pill"><span className="sd"></span> {status}</span>
-            <XSep/>
-            <span style={{fontFamily:'var(--font-mono)', fontSize:12, color:'var(--ink-3)'}}>{new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit'})} CST</span>
-          </div>
-        </div>
-        <div className="top-actions">
-          <LocationSelect/>
-          <NetIndicator status={connection.status || 'connecting'} latency={connection.latency} onRetry={connection.retry}/>
-          <button className="btn-icon focusable" aria-label="Search"><I.Search size={18}/></button>
-          <button className="btn-icon focusable" aria-label="Notifications" style={{position:'relative'}}>
-            <I.Bell size={18}/>
-            <span style={{position:'absolute', top:6, right:6, width:6, height:6, borderRadius:'50%', background:'var(--danger)'}}></span>
-          </button>
-        </div>
-      </header>
-    );
-  }
+  const locationScoped = [
+    'orders',
+    'reportes',
+    'devices',
+    'hours',
+    'cash-shifts',
+    'products',
+    'inventory',
+    'kitchen',
+    'floor-plan',
+  ].includes(screen);
+  const activeLocations = locations.filter((l) => l.status === 'active');
+  // The floor plan is the one screen where the branch is part of the content:
+  // the editor draws THAT branch's dining room and publishes it to THAT branch's
+  // tills. So it always names the location — read-only when the operator cannot
+  // switch — where every other screen shows the picker only when there is a
+  // choice to make.
+  const canChooseLocation = canSwitchLocations && activeLocations.length > 1;
+  const showLocationSelect =
+    locationScoped && activeLocations.length > 0 && (screen === 'floor-plan' || canChooseLocation);
+  const branchName =
+    activeLocations.find((l) => l.id === selectedLocationId)?.name ||
+    (activeLocations.length === 1 ? activeLocations[0].name : null);
 
-  const t = titles[screen];
+  const netStatus = connection.status || 'connecting';
+  const isOnline = netStatus === 'online';
+  const isChecking = netStatus === 'connecting';
+  const netWord = isOnline ? t`En línea` : isChecking ? t`Conectando` : t`Sin conexión`;
+  const netTone = isOnline ? 'ok' : isChecking ? 'warn' : 'bad';
+
+  const today = new Date();
+  const dateWord = formatDate(today, { weekday: 'short', day: 'numeric', month: 'short' });
+  const clock = formatTime(today);
+
   return (
-    <header className="topbar fade-up" style={{alignItems:'flex-end', paddingBottom:12, borderBottom:'1px solid var(--ink-1)'}}>
-      <div className="greet">
-        <div className="sec-index" style={{marginBottom:10}}>
-          <span className="nn">{t.eyebrow.split(' / ')[0]}</span>
-          <span>/</span>
-          <span>{t.eyebrow.split(' / ')[1]} <XSep/> {t.en.toUpperCase()}</span>
+    <header className="topbar">
+      <div className="masthead">
+        <div className="masthead-row">
+          {/* The drawer trigger. It is the FIRST child so CSS can put it hard left
+              on a phone with the action cluster pushed right. It is icon-only, so
+              the accessible name is explicit — a bare hamburger announces nothing.
+              It reuses the already-extracted `Menú` msgid: a new string would need
+              `lingui extract` plus an English translation, and `compile --strict`
+              runs in the build. */}
+          {onMenu ? (
+            <button
+              className="btn btn-icon focusable nav-toggle"
+              onClick={onMenu}
+              aria-label={t`Menú`}
+            >
+              <I.Menu size={18} />
+            </button>
+          ) : null}
+          <h1 className="h-page">
+            {screen === 'overview' ? (
+              <>
+                {greet}
+                {greetingName ? (
+                  <>
+                    , <b title={merchantName}>{greetingName}</b>
+                  </>
+                ) : (
+                  ''
+                )}
+                .
+              </>
+            ) : (
+              title
+            )}
+          </h1>
+          <div className="top-actions">
+            <ThemeMenu />
+            <LocaleSelect variant="topbar" />
+            {showLocationSelect ? (
+              <Select
+                className="select topbar-select"
+                value={selectedLocationId || ''}
+                disabled={!canChooseLocation}
+                onChange={(e) => onLocationChange?.(e.target.value)}
+                aria-label={t`Sucursal`}
+              >
+                {activeLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </Select>
+            ) : null}
+            {onProfile || onSignOut ? (
+              <ProfileMenu
+                name={userName}
+                email={userEmail}
+                active={profileActive}
+                onProfile={onProfile}
+                onSignOut={onSignOut}
+              />
+            ) : null}
+          </div>
         </div>
-        <h1 className="edit-display" style={{fontSize:44}}>{t.title}</h1>
-      </div>
-      <div className="top-actions">
-        <LocationSelect/>
-        <NetIndicator status={connection.status || 'connecting'} latency={connection.latency} onRetry={connection.retry}/>
-        <button className="btn-icon focusable" aria-label="Search"><I.Search size={18}/></button>
-        <button className="btn-icon focusable" aria-label="Notifications"><I.Bell size={18}/></button>
+
+        {/* The dateline. */}
+        <div className="dateline">
+          {/* The state is a button only when there is something to do about it,
+              so the operator never clicks a control that cannot act. */}
+          {isOnline || isChecking ? (
+            <span
+              title={
+                isOnline && connection.latency != null ? `${connection.latency} ms` : undefined
+              }
+            >
+              <span className={'dot ' + netTone} />
+              {netWord}
+            </span>
+          ) : (
+            <button
+              className="as-text focusable"
+              onClick={connection.retry}
+              title={t`Reintentar la conexión`}
+            >
+              <span className={'dot ' + netTone} />
+              {netWord} · <Trans>reintentar</Trans>
+            </button>
+          )}
+          {/* The café's name, or nothing. This slot used to render whatever it
+              was handed, and the shell handed it the literal "Umi Dash" when
+              there was no café at all — so a missing session or a failed read
+              appeared as a real, differently-named tenant. A separator with
+              nothing after it is a smaller lie than a name nobody chose. */}
+          {merchantName || merchant ? (
+            <>
+              <span className="sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="live" title={merchantName || merchant}>
+                {merchantName || merchant}
+              </span>
+            </>
+          ) : null}
+          {branchName ? (
+            <>
+              <span className="sep" aria-hidden="true">
+                ·
+              </span>
+              <span>{branchName}</span>
+            </>
+          ) : null}
+          <span className="sep" aria-hidden="true">
+            ·
+          </span>
+          <span>{dateWord}</span>
+          <span className="clock">{clock}</span>
+        </div>
       </div>
     </header>
   );
 };
 
+/**
+ * The head of a region inside a screen.
+ *
+ * Every region used to open with an ordinal — `A /`, `B /`, `E /` — above its
+ * title, and an English gloss beneath. Twenty-one of them, and the ordinals were
+ * never a sequence: nothing followed A to B, and reordering the page would not
+ * have changed a letter. A label that appears on everything ranks nothing.
+ *
+ * So this component has no slot for one. What a region gets is its name, one
+ * plain line when the name is not enough, the live figure that region is about,
+ * and its actions. If a caller wants an ordinal back, it has to add the slot —
+ * which is the point.
+ *
+ *   title    the region's name
+ *   note     one sentence, only when it says something the title does not
+ *   count    { value, label } — a live figure, set in mono on the figure axis
+ *   actions  the region's controls
+ */
+const RegionHead = ({ title, note, count, actions, children }) => (
+  <div className="ed-head">
+    <div className="titles">
+      <h2>{title}</h2>
+      {note ? <div className="en">{note}</div> : null}
+      {children}
+    </div>
+    {count || actions ? (
+      <div className="actions">
+        {count ? (
+          <span className="head-count">
+            <b>{count.value}</b> {count.label}
+          </span>
+        ) : null}
+        {actions}
+      </div>
+    ) : null}
+  </div>
+);
+
 // Tiny sparkline component
 const Spark = ({ data, up = true, width = 96, height = 28 }) => {
-  const max = Math.max(...data), min = Math.min(...data);
+  const max = Math.max(...data),
+    min = Math.min(...data);
   const range = max - min || 1;
   const stepX = width / (data.length - 1);
-  const path = data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${(i*stepX).toFixed(1)} ${(height - ((v - min)/range) * height).toFixed(1)}`).join(' ');
+  const path = data
+    .map(
+      (v, i) =>
+        `${i === 0 ? 'M' : 'L'} ${(i * stepX).toFixed(1)} ${(height - ((v - min) / range) * height).toFixed(1)}`,
+    )
+    .join(' ');
   // area fill
   const areaPath = path + ` L ${width} ${height} L 0 ${height} Z`;
   const color = up ? 'var(--success)' : 'var(--danger)';
   return (
     <svg className="spark" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
       <defs>
-        <linearGradient id={`g-${up?'u':'d'}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.22"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        <linearGradient id={`g-${up ? 'u' : 'd'}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={areaPath} fill={`url(#g-${up?'u':'d'})`} />
-      <path d={path} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d={areaPath} fill={`url(#g-${up ? 'u' : 'd'})`} />
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 };
@@ -314,17 +680,56 @@ const Spark = ({ data, up = true, width = 96, height = 28 }) => {
 const MiniBars = ({ data, accent = 'var(--info)' }) => {
   const max = Math.max(...data);
   return (
-    <div style={{display:'flex', gap:3, alignItems:'flex-end', height:28}}>
+    <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 28 }}>
       {data.map((v, i) => (
-        <div key={i} style={{
-          width: 6,
-          height: `${(v/max)*100}%`,
-          background: i === data.length - 1 ? accent : 'rgba(118,146,203,0.35)',
-          borderRadius: 2,
-        }}/>
+        <div
+          key={i}
+          style={{
+            width: 6,
+            height: `${(v / max) * 100}%`,
+            background: i === data.length - 1 ? accent : 'rgba(118,146,203,0.35)',
+            borderRadius: 2,
+          }}
+        />
       ))}
     </div>
   );
 };
 
-export { Sidebar, Topbar, Spark, MiniBars, XSep }
+/**
+ * HubTabs — the second level of the two-tier IA. A hub screen groups several
+ * operational domains and shows one at a time. The tabs are the in-page navigation
+ * that keeps the sidebar flat: a new feature becomes a tab here, not a sidebar row.
+ */
+const HubTabs = ({ tabs, active, onChange, ariaLabel }) => {
+  const { t } = useLingui();
+  return (
+    <div className="hub-tabs" role="tablist" aria-label={ariaLabel || t`Secciones`}>
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={active === tab.id}
+          className={'hub-tab focusable' + (active === tab.id ? ' active' : '')}
+          onClick={() => onChange(tab.id)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+export {
+  Sidebar,
+  Topbar,
+  RegionHead,
+  Spark,
+  MiniBars,
+  XSep,
+  HubTabs,
+  LocaleSelect,
+  ProfileButton,
+  ProfileMenu,
+};

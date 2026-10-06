@@ -32,21 +32,3 @@ export function blockUnverifiedOrderConfirmation(params: {
   }
   return 'Ocurrió un error con tu orden. Intenta después.';
 }
-
-export function deriveNextConversationState(params: {
-  pendingClarification: Record<string, unknown> | null;
-  orderConfirmed: boolean;
-  orderCancelled: boolean;
-  orderChangesConfirmed: boolean;
-  cartUpdated: boolean;
-  searchPerformed: boolean;
-  fallbackState: string;
-}): string {
-  if (params.pendingClarification) return 'awaiting_clarification';
-  if (params.orderConfirmed || params.orderCancelled || params.orderChangesConfirmed) {
-    return 'initial';
-  }
-  if (params.cartUpdated) return 'awaiting_confirmation';
-  if (params.searchPerformed) return 'menu';
-  return params.fallbackState || 'initial';
-}

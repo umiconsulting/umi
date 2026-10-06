@@ -1,0 +1,44 @@
+{
+  "cardTemplateOverride": {
+    "cardRowTemplateInfos": [
+      {
+        "twoItems": {
+          "startItem": {
+            "firstValue": {
+              "fields": [
+                {
+                  "fieldPath": "object.loyaltyPoints.balance"
+                }
+              ]
+            }
+          },
+          "endItem": {
+            "firstValue": {
+              "fields": [
+                {
+                  "fieldPath": "object.secondaryLoyaltyPoints.balance"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "oneItem": {
+          "item": {
+            "firstValue": {
+              "fields": [
+                {
+                  "fieldPath": "object.textModulesData['pending_rewards']"
+                },
+                {
+                  "fieldPath": "object.textModulesData['next_reward']"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

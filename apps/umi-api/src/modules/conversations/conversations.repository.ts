@@ -3,46 +3,44 @@ import { PgService } from '../../shared/database/pg.service';
 import type { ConversationRecord, DraftCart } from './conversation.types';
 
 /**
- * Queries for `comms.conversations` — the per-conversation state machine.
- * Rebound to canonical columns (preflight §2): `customer_id → person_id`,
- * `business_id → tenant_id`, `opened_at → created_at`,
- * `updated_at → last_message_at`. `state_version` / `draft_cart_version` are the
- * optimistic-lock (CAS) cursors.
+ * The per-conversation store. A conversation is the DURABLE thread
+ * (`merchant.conversation` — customer_id, status, summary, last_message_at) plus its
+ * IN-FLIGHT cart (`runtime.conversation_cart` — the DraftCart + selected location,
+ * last-write-wins). The FSM is gone: no `current_state`, no version cursors, no CAS.
  *
- * Worker pool (unauthenticated WhatsApp path), explicit tenant predicates.
+ * Read/written here on the worker pool because the WhatsApp path is unauthenticated.
+ * The `personId` field carries `merchant.conversation.customer_id`.
  */
 
 interface ConversationRow {
   id: string;
-  tenant_id: string;
+  merchant_id: string;
   person_id: string;
-  order_id: string | null;
   status: string;
-  current_state: string;
   summary: string | null;
   draft_cart: DraftCart | null;
-  draft_cart_version: string;
-  pending_clarification: Record<string, unknown> | null;
-  state_version: string;
 }
 
-const SELECT_COLUMNS = `id::text, tenant_id::text, person_id::text, order_id::text,
-  status, current_state, summary, draft_cart, draft_cart_version::text,
-  pending_clarification, state_version::text`;
+// Durable columns off `merchant.conversation c`; the in-flight cart off
+// `runtime.conversation_cart k` (LEFT JOIN so a thread with no cart maps cleanly).
+const SELECT_FIELDS = `c.id::text            AS id,
+  c.merchant_id::text  AS merchant_id,
+  c.customer_id::text  AS person_id,
+  c.status             AS status,
+  c.summary            AS summary,
+  k.cart               AS draft_cart`;
+
+const FROM_JOIN = `FROM merchant.conversation c
+  LEFT JOIN runtime.conversation_cart k ON k.conversation_id = c.id`;
 
 function mapRow(row: ConversationRow): ConversationRecord {
   return {
     id: row.id,
-    tenantId: row.tenant_id,
+    merchantId: row.merchant_id,
     personId: row.person_id,
-    orderId: row.order_id,
     status: row.status,
-    currentState: row.current_state,
     summary: row.summary,
     draftCart: row.draft_cart,
-    draftCartVersion: Number(row.draft_cart_version),
-    pendingClarification: row.pending_clarification,
-    stateVersion: Number(row.state_version),
   };
 }
 
@@ -51,50 +49,61 @@ export class ConversationsRepository {
   constructor(private readonly pg: PgService) {}
 
   /**
-   * Find the most recent non-closed conversation for a person, or create one.
-   * New conversations start at `current_state='initial'`, `status='open'`,
-   * version cursors at 0. Returns the record + total message count.
+   * Find the most recent non-closed conversation for a customer, or create one.
+   * A new conversation is a single INSERT into the durable `merchant.conversation`
+   * thread — the `runtime.conversation_cart` row is created lazily on the first
+   * cart write. Returns the joined record + total message count.
    */
   async getOrCreateConversation(
-    tenantId: string,
+    merchantId: string,
     personId: string,
   ): Promise<{ conversation: ConversationRecord; messageCount: number }> {
-    // There is no partial-unique on open conversations (a person legitimately has
-    // many closed ones + at most one open), so a plain SELECT-then-INSERT races:
-    // two simultaneous inbound messages could each create a new open conversation.
-    // A transaction-scoped advisory lock keyed on (tenant, person) makes the
-    // find-or-create atomic without a schema change.
+    // There is no partial-unique on open conversations (a customer legitimately
+    // has many closed ones + at most one open), so a plain SELECT-then-INSERT
+    // races: two simultaneous inbound messages could each create a new open
+    // conversation. A transaction-scoped advisory lock keyed on (merchant, customer)
+    // makes the find-or-create atomic without a schema change.
     return this.pg.workerTx(async (client) => {
       await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, [
-        `conv:${tenantId}:${personId}`,
+        `conv:${merchantId}:${personId}`,
       ]);
 
       const existing = await client.query<ConversationRow>(
-        `SELECT ${SELECT_COLUMNS}
-           FROM comms.conversations
-          WHERE person_id = $1
-            AND tenant_id = $2
-            AND status IN ('open', 'active', 'pending')
-          ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+        `SELECT ${SELECT_FIELDS}
+           ${FROM_JOIN}
+          WHERE c.customer_id = $1
+            AND c.merchant_id = $2
+            AND c.status IN ('open', 'active', 'pending')
+          ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
           LIMIT 1`,
-        [personId, tenantId],
+        [personId, merchantId],
       );
 
       if (existing.rows[0]) {
         const conversation = mapRow(existing.rows[0]);
         const count = await client.query<{ n: string }>(
-          `SELECT count(*)::text AS n FROM comms.messages WHERE conversation_id = $1`,
+          `SELECT count(*)::text AS n FROM merchant.message WHERE conversation_id = $1`,
           [conversation.id],
         );
         return { conversation, messageCount: Number(count.rows[0]?.n ?? 0) };
       }
 
+      const conv = await client.query<{ id: string }>(
+        `INSERT INTO merchant.conversation
+           (merchant_id, customer_id, channel_id, status, last_message_at)
+         VALUES ($1, $2, (SELECT id FROM umi.channel_type WHERE key = 'whatsapp'), 'open', now())
+         RETURNING id::text AS id`,
+        [merchantId, personId],
+      );
+      const conversationId = conv.rows[0]?.id;
+      if (!conversationId) {
+        throw new Error('Failed to create conversation');
+      }
+
       const created = await client.query<ConversationRow>(
-        `INSERT INTO comms.conversations
-           (tenant_id, person_id, current_state, status, state_version, draft_cart_version, last_message_at)
-         VALUES ($1, $2, 'initial', 'open', 0, 0, now())
-         RETURNING ${SELECT_COLUMNS}`,
-        [tenantId, personId],
+        `SELECT ${SELECT_FIELDS} ${FROM_JOIN}
+          WHERE c.id = $1 AND c.merchant_id = $2 LIMIT 1`,
+        [conversationId, merchantId],
       );
       if (!created.rows[0]) {
         throw new Error('Failed to create conversation');
@@ -105,123 +114,66 @@ export class ConversationsRepository {
 
   async loadById(conversationId: string): Promise<ConversationRecord | null> {
     const { rows } = await this.pg.query<ConversationRow>(
-      `SELECT ${SELECT_COLUMNS} FROM comms.conversations WHERE id = $1`,
+      `SELECT ${SELECT_FIELDS} ${FROM_JOIN} WHERE c.id = $1`,
       [conversationId],
     );
     return rows[0] ? mapRow(rows[0]) : null;
   }
 
   /**
-   * Read the durable branch selection for a conversation (worker pool — the
-   * WhatsApp path is unauthenticated). Deliberately kept OUT of the hot-path
-   * SELECT_COLUMNS so a flag-off / pre-migration deploy never references the
-   * `selected_location_id` column: only called when BRANCH_RESOLUTION_ENABLED is
-   * on and the tenant is multi-branch (Phase 1 branch resolution).
+   * Read the location chosen for the in-flight order (worker pool). Lives on
+   * `runtime.conversation_cart` — it is an attribute of the order being built, asked
+   * at checkout and captured onto `customer_order` at confirmation.
    */
-  async getSelectedLocationWorker(
-    conversationId: string,
-  ): Promise<string | null> {
+  async getSelectedLocationWorker(conversationId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ selected_location_id: string | null }>(
       `SELECT selected_location_id::text AS selected_location_id
-         FROM comms.conversations WHERE id = $1`,
+         FROM runtime.conversation_cart WHERE conversation_id = $1`,
       [conversationId],
     );
     return rows[0]?.selected_location_id ?? null;
   }
 
-  /** Persist the customer's chosen branch for the in-flight order (worker pool). */
+  /** Persist the customer's chosen location for the in-flight order (worker pool).
+   *  merchant_id is derived from the conversation, so callers pass only the location. */
   async setSelectedLocationWorker(
     conversationId: string,
     locationId: string | null,
   ): Promise<void> {
     await this.pg.query(
-      `UPDATE comms.conversations
-          SET selected_location_id = $2::uuid,
-              last_message_at = now()
-        WHERE id = $1`,
+      `INSERT INTO runtime.conversation_cart (conversation_id, merchant_id, selected_location_id)
+       SELECT $1, cv.merchant_id, $2::uuid FROM merchant.conversation cv WHERE cv.id = $1
+       ON CONFLICT (conversation_id) DO UPDATE
+         SET selected_location_id = EXCLUDED.selected_location_id, updated_at = now()`,
       [conversationId, locationId],
     );
   }
 
   /**
-   * Optimistic-lock state update (CAS on `state_version`). Patches any of
-   * current_state / summary / pending_clarification / status / order_id, bumps
-   * the version, and touches `last_message_at`. Returns the new version, or null
-   * if another writer advanced the version first (the caller retries/rebases).
+   * Last-write-wins cart write (replaces the old CAS). Upserts the in-flight cart;
+   * merchant_id is derived from the conversation. Pass `null` to clear the cart
+   * (e.g. at confirmation, once it has materialized into a `customer_order`).
    */
-  async updateStateCas(
-    conversationId: string,
-    expectedStateVersion: number,
-    patch: {
-      currentState?: string;
-      summary?: string | null;
-      pendingClarification?: Record<string, unknown> | null;
-      status?: string;
-      orderId?: string | null;
-    },
-  ): Promise<number | null> {
-    const { rows } = await this.pg.query<{ state_version: string }>(
-      `UPDATE comms.conversations
-          SET current_state         = COALESCE($3, current_state),
-              summary               = CASE WHEN $4::boolean THEN $5 ELSE summary END,
-              pending_clarification = CASE WHEN $6::boolean THEN $7::jsonb ELSE pending_clarification END,
-              status                = COALESCE($8, status),
-              order_id              = CASE WHEN $9::boolean THEN $10::uuid ELSE order_id END,
-              state_version         = state_version + 1,
-              last_message_at       = now()
-        WHERE id = $1 AND state_version = $2
-        RETURNING state_version::text`,
-      [
-        conversationId,
-        expectedStateVersion,
-        patch.currentState ?? null,
-        Object.prototype.hasOwnProperty.call(patch, 'summary'),
-        patch.summary ?? null,
-        Object.prototype.hasOwnProperty.call(patch, 'pendingClarification'),
-        patch.pendingClarification != null
-          ? JSON.stringify(patch.pendingClarification)
-          : null,
-        patch.status ?? null,
-        Object.prototype.hasOwnProperty.call(patch, 'orderId'),
-        patch.orderId ?? null,
-      ],
+  async setDraftCart(conversationId: string, draftCart: DraftCart | null): Promise<void> {
+    await this.pg.query(
+      `INSERT INTO runtime.conversation_cart (conversation_id, merchant_id, cart)
+       SELECT $1, cv.merchant_id, $2::jsonb FROM merchant.conversation cv WHERE cv.id = $1
+       ON CONFLICT (conversation_id) DO UPDATE
+         SET cart = EXCLUDED.cart, updated_at = now()`,
+      [conversationId, draftCart != null ? JSON.stringify(draftCart) : null],
     );
-    return rows[0] ? Number(rows[0].state_version) : null;
-  }
-
-  /** Optimistic-lock draft-cart update (CAS on `draft_cart_version`). */
-  async updateDraftCartCas(
-    conversationId: string,
-    expectedCartVersion: number,
-    draftCart: DraftCart | null,
-  ): Promise<number | null> {
-    const { rows } = await this.pg.query<{ draft_cart_version: string }>(
-      `UPDATE comms.conversations
-          SET draft_cart         = $3::jsonb,
-              draft_cart_version = draft_cart_version + 1,
-              last_message_at    = now()
-        WHERE id = $1 AND draft_cart_version = $2
-        RETURNING draft_cart_version::text`,
-      [
-        conversationId,
-        expectedCartVersion,
-        draftCart != null ? JSON.stringify(draftCart) : null,
-      ],
-    );
-    return rows[0] ? Number(rows[0].draft_cart_version) : null;
   }
 
   async setSummary(conversationId: string, summary: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE comms.conversations SET summary = $2 WHERE id = $1`,
-      [conversationId, summary],
-    );
+    await this.pg.query(`UPDATE merchant.conversation SET summary = $2 WHERE id = $1`, [
+      conversationId,
+      summary,
+    ]);
   }
 
   async touch(conversationId: string): Promise<void> {
-    await this.pg.query(
-      `UPDATE comms.conversations SET last_message_at = now() WHERE id = $1`,
-      [conversationId],
-    );
+    await this.pg.query(`UPDATE merchant.conversation SET last_message_at = now() WHERE id = $1`, [
+      conversationId,
+    ]);
   }
 }

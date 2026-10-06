@@ -1,10 +1,10 @@
 // 🔄 ACTUALIZACIÓN DE: src/app/api/email/email-test/route.ts
 // Mejorando el archivo existente con funcionalidad completa
 
-import { NextRequest, NextResponse } from "next/server";
-import { getEmailService } from "@/lib/email/email-service";
-import { getSequenceManager } from "@/lib/email/sequence-manager";
-import { EmailTemplates } from "@/lib/email/templates";
+import { NextRequest, NextResponse } from 'next/server';
+import { getEmailService } from '@/lib/email/email-service';
+import { getSequenceManager } from '@/lib/email/sequence-manager';
+import { EmailTemplates } from '@/lib/email/templates';
 
 // Interfaces para type safety
 interface TestRequest {
@@ -16,15 +16,14 @@ interface TestRequest {
 // Mantener compatibilidad con función existente
 export async function testEmailSystem(request: NextRequest) {
   try {
-    const { email, type = "connection" } = await request.json();
+    const { email, type = 'connection' } = await request.json();
     return await handleTest(type, email);
   } catch (error) {
-    console.error("❌ Error en test de email:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+    console.error('❌ Error en test de email:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json(
-      { error: "Error ejecutando test", details: errorMessage },
-      { status: 500 }
+      { error: 'Error ejecutando test', details: errorMessage },
+      { status: 500 },
     );
   }
 }
@@ -35,12 +34,11 @@ export async function POST(request: NextRequest) {
     const { type, email, templateName }: TestRequest = await request.json();
     return await handleTest(type, email, templateName);
   } catch (error) {
-    console.error("❌ Error en testing:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+    console.error('❌ Error en testing:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
     return NextResponse.json(
-      { error: "Error ejecutando test", details: errorMessage },
-      { status: 500 }
+      { error: 'Error ejecutando test', details: errorMessage },
+      { status: 500 },
     );
   }
 }
@@ -48,73 +46,61 @@ export async function POST(request: NextRequest) {
 // Función unificada para manejar tests
 async function handleTest(type: string, email?: string, templateName?: string) {
   switch (type) {
-    case "connection":
+    case 'connection':
       return await testConnection();
 
-    case "send_test":
+    case 'send_test':
       if (!email) {
-        return NextResponse.json(
-          { error: "Email de destino requerido" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Email de destino requerido' }, { status: 400 });
       }
       return await testSendEmail(email);
 
-    case "template_test":
+    case 'template_test':
       if (!email) {
-        return NextResponse.json(
-          { error: "Email de destino requerido" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Email de destino requerido' }, { status: 400 });
       }
       if (!templateName) {
-        return NextResponse.json(
-          { error: "Nombre de template requerido" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Nombre de template requerido' }, { status: 400 });
       }
       return await testTemplate(email, templateName);
 
-    case "sequence_test":
+    case 'sequence_test':
       if (!email) {
-        return NextResponse.json(
-          { error: "Email de destino requerido" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Email de destino requerido' }, { status: 400 });
       }
       return await testSequence(email);
 
-    case "system_health":
+    case 'system_health':
       return await testSystemHealth();
 
     default:
       return NextResponse.json(
         {
-          error: "Tipo de test inválido",
+          error: 'Tipo de test inválido',
           validTypes: [
-            "connection",
-            "send_test",
-            "template_test",
-            "sequence_test",
-            "system_health",
+            'connection',
+            'send_test',
+            'template_test',
+            'sequence_test',
+            'system_health',
           ],
         },
-        { status: 400 }
+        { status: 400 },
       );
   }
 }
 
 // Funciones de testing
 async function testConnection() {
-  console.log("🔍 Testing conexión de email...");
+  console.log('🔍 Testing conexión de email...');
 
   const emailService = getEmailService();
   const isConnected = await emailService.testConnection();
 
   return NextResponse.json({
     success: isConnected,
-    test: "connection",
-    message: isConnected ? "✅ Conexión exitosa" : "❌ Error de conexión",
+    test: 'connection',
+    message: isConnected ? '✅ Conexión exitosa' : '❌ Error de conexión',
     timestamp: new Date().toISOString(),
   });
 }
@@ -127,9 +113,9 @@ async function testSendEmail(testEmail: string) {
 
   return NextResponse.json({
     success,
-    test: "send_test",
+    test: 'send_test',
     recipient: testEmail,
-    message: success ? "✅ Email de prueba enviado" : "❌ Error enviando email",
+    message: success ? '✅ Email de prueba enviado' : '❌ Error enviando email',
     timestamp: new Date().toISOString(),
   });
 }
@@ -139,10 +125,10 @@ async function testTemplate(testEmail: string, templateName: string) {
   if (!template) {
     return NextResponse.json(
       {
-        error: "Template no encontrado",
+        error: 'Template no encontrado',
         availableTemplates: Object.keys(EmailTemplates),
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -151,18 +137,18 @@ async function testTemplate(testEmail: string, templateName: string) {
   // Datos de prueba para el template
   const testData = {
     contactInfo: {
-      name: "Usuario de Prueba",
+      name: 'Usuario de Prueba',
       email: testEmail,
-      company: "Empresa Test",
+      company: 'Empresa Test',
     },
     diagnosticData: {
       score: 5,
-      level: "Intermedio",
-      primaryChallenge: "Organización de datos",
+      level: 'Intermedio',
+      primaryChallenge: 'Organización de datos',
       quickWins: [
         {
-          action: "Dashboard básico",
-          description: "Implementar KPIs principales",
+          action: 'Dashboard básico',
+          description: 'Implementar KPIs principales',
         },
       ],
       estimatedROI: {
@@ -179,18 +165,16 @@ async function testTemplate(testEmail: string, templateName: string) {
     to: testEmail,
     subject: `🧪 Test Template: ${templateName}`,
     html,
-    campaign: "template_test",
-    priority: "normal",
+    campaign: 'template_test',
+    priority: 'normal',
   });
 
   return NextResponse.json({
     success,
-    test: "template_test",
+    test: 'template_test',
     template: templateName,
     recipient: testEmail,
-    message: success
-      ? `✅ Template '${templateName}' enviado`
-      : "❌ Error enviando template",
+    message: success ? `✅ Template '${templateName}' enviado` : '❌ Error enviando template',
     timestamp: new Date().toISOString(),
   });
 }
@@ -203,17 +187,15 @@ async function testSequence(testEmail: string) {
 
   return NextResponse.json({
     success,
-    test: "sequence_test",
+    test: 'sequence_test',
     recipient: testEmail,
-    message: success
-      ? "✅ Secuencia de prueba ejecutada"
-      : "❌ Error en secuencia",
+    message: success ? '✅ Secuencia de prueba ejecutada' : '❌ Error en secuencia',
     timestamp: new Date().toISOString(),
   });
 }
 
 async function testSystemHealth() {
-  console.log("🏥 Testing salud del sistema...");
+  console.log('🏥 Testing salud del sistema...');
 
   const emailService = getEmailService();
   const sequenceManager = getSequenceManager();
@@ -232,12 +214,11 @@ async function testSystemHealth() {
     NODE_ENV: process.env.NODE_ENV,
   };
 
-  const allHealthy =
-    connectionOk && envVars.EMAIL_USER && envVars.EMAIL_PASSWORD;
+  const allHealthy = connectionOk && envVars.EMAIL_USER && envVars.EMAIL_PASSWORD;
 
   return NextResponse.json({
     success: allHealthy,
-    test: "system_health",
+    test: 'system_health',
     results: {
       connection: connectionOk,
       environment: envVars,
@@ -245,7 +226,7 @@ async function testSystemHealth() {
       sequenceMetrics,
       lastCheck: new Date().toISOString(),
     },
-    message: allHealthy ? "✅ Sistema saludable" : "⚠️ Problemas detectados",
+    message: allHealthy ? '✅ Sistema saludable' : '⚠️ Problemas detectados',
     timestamp: new Date().toISOString(),
   });
 }

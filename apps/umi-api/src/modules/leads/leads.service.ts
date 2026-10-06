@@ -4,10 +4,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import { SequencesService } from './sequences.service';
-import {
-  contactAutoReplyTemplate,
-  contactInternalTemplate,
-} from './leads.templates';
+import { contactAutoReplyTemplate, contactInternalTemplate } from './leads.templates';
 import type { ContactDto } from './dto/contact.dto';
 import type { EmailResponseWebhookDto } from './dto/webhook.dto';
 

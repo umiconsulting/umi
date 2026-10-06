@@ -83,7 +83,9 @@ export class EnrichmentProcessor extends BaseProcessor {
     const model = this.voyage.embeddingModel;
     await Promise.all(
       targets.map((t, i) =>
-        embeddings[i] ? this.messages.updateEmbedding(t.id, embeddings[i], model) : Promise.resolve(),
+        embeddings[i]
+          ? this.messages.updateEmbedding(t.id, embeddings[i], model)
+          : Promise.resolve(),
       ),
     );
   }
@@ -99,38 +101,51 @@ export class EnrichmentProcessor extends BaseProcessor {
     const older = await this.messages.getOlderMessages(conversationId, 8, batch);
     if (!older.length) return;
     const chronological = [...older].reverse();
-    const summary = await this.memory.generateSummary(chronological, conv.summary);
+    const summary = await this.memory.generateSummary(chronological, conv.summary, {
+      merchantId: conv.merchantId,
+      conversationId,
+    });
     if (summary) await this.conversations.setSummary(conversationId, summary);
   }
 
   private async extractFacts(p: Record<string, unknown>): Promise<void> {
-    const tenantId = String(p.tenant_id ?? '');
+    const merchantId = String(p.merchant_id ?? '');
     const personId = String(p.person_id ?? '');
     const conversationId = p.conversation_id as string | undefined;
-    if (!tenantId || !personId || !conversationId) return;
+    if (!merchantId || !personId || !conversationId) return;
     const recent = await this.messages.getRecentMessages(conversationId, 12);
     if (!recent.length) return;
     const chronological = [...recent].reverse();
-    const existing = (await this.memoryRepo.getCustomerFacts(tenantId, personId)) as
-      | CustomerFacts
-      | null;
-    const facts = await this.memory.extractCustomerFacts(chronological, existing);
+    const existing = (await this.memoryRepo.getCustomerFacts(
+      merchantId,
+      personId,
+    )) as CustomerFacts | null;
+    const facts = await this.memory.extractCustomerFacts(chronological, existing, {
+      merchantId,
+      conversationId,
+    });
     if (!facts) return;
-    await this.memoryRepo.upsertCustomerFacts(tenantId, personId, facts as unknown as Record<string, unknown>);
+    await this.memoryRepo.upsertCustomerFacts(
+      merchantId,
+      personId,
+      facts as unknown as Record<string, unknown>,
+    );
   }
 
   private async productEmbed(p: Record<string, unknown>): Promise<void> {
-    const tenantId = String(p.tenant_id ?? '');
-    if (!tenantId) throw new Error('product.embed requires tenant_id');
+    const merchantId = String(p.merchant_id ?? '');
+    if (!merchantId) throw new Error('product.embed requires merchant_id');
     const batchSize = (p.batch_size as number) ?? PRODUCT_EMBED_BATCH;
-    const rows = await this.products.listNeedingEmbedding(tenantId, batchSize);
+    const rows = await this.products.listNeedingEmbedding(merchantId, batchSize);
     if (!rows.length) return;
     const embeddings = await this.voyage.generateEmbeddings(rows.map(buildProductEmbedText));
     if (!embeddings) throw new Error('voyage batch failed — retry');
     const model = this.voyage.embeddingModel;
     await Promise.all(
       rows.map((row, i) =>
-        embeddings[i] ? this.products.updateNameEmbedding(row.id, embeddings[i], model) : Promise.resolve(),
+        embeddings[i]
+          ? this.products.updateNameEmbedding(row.id, embeddings[i], model)
+          : Promise.resolve(),
       ),
     );
     if (rows.length === batchSize) {
@@ -142,15 +157,17 @@ export class EnrichmentProcessor extends BaseProcessor {
 
   private async embedBackfill(p: Record<string, unknown>): Promise<void> {
     const batchSize = (p.batch_size as number) ?? BACKFILL_BATCH;
-    const tenantId = p.tenant_id as string | undefined;
-    const msgs = await this.messages.listNeedingEmbedding(batchSize, tenantId);
+    const merchantId = p.merchant_id as string | undefined;
+    const msgs = await this.messages.listNeedingEmbedding(batchSize, merchantId);
     if (!msgs.length) return;
     const embeddings = await this.voyage.generateEmbeddings(msgs.map((m) => m.content));
     if (!embeddings) throw new Error('voyage batch failed — retry');
     const model = this.voyage.embeddingModel;
     await Promise.all(
       msgs.map((m, i) =>
-        embeddings[i] ? this.messages.updateEmbedding(m.id, embeddings[i], model) : Promise.resolve(),
+        embeddings[i]
+          ? this.messages.updateEmbedding(m.id, embeddings[i], model)
+          : Promise.resolve(),
       ),
     );
     if (msgs.length === batchSize) {

@@ -35,11 +35,7 @@ export class StubToolsService extends ToolsService {
     return [];
   }
 
-  execute(
-    name: string,
-    _input: Record<string, unknown>,
-    _ctx: ToolContext,
-  ): Promise<ToolResult> {
+  execute(name: string, _input: Record<string, unknown>, _ctx: ToolContext): Promise<ToolResult> {
     this.logger.warn(`tool "${name}" called but tools are not implemented yet (Phase 3c)`);
     return Promise.resolve({
       success: false,

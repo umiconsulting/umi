@@ -1,20 +1,11 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 
 /**
- * FROZEN KDS contract (spec §8.1). The iPad Swift client depends on these exact
- * header names, enum values, constants, and error bodies. They are ported
- * byte-for-byte from the legacy Deno edge functions
- * (`supabase/functions/kds-{pairing,board,command}` + `_shared/kds-device-auth.ts`)
- * and are contract-tested (`kds-contract.spec.ts`). Do NOT paraphrase — the app
- * keys off these strings (e.g. it clears Keychain on `device_revoked`).
- *
- * Underneath the frozen JSON the module reads/writes the CANONICAL model
- * (`ops.*` via `v_kds_tickets`, `device.*`, `kitchen.stations`) — there is no
- * `kds.*` schema and no canonical transition RPC, so the logic lives in
- * `KdsService`/`KdsRepository`, not in the database.
+ * This compatibility contract keeps the existing iPad pairing and device session.
+ * The canonical kitchen projection and command models are in `@umi/contract`.
  */
 
-// ── Device auth (frozen) ───────────────────────────────────────────────────
+// Device authentication compatibility
 
 export const KDS_DEVICE_TOKEN_HEADER = 'x-kds-device-token';
 
@@ -24,11 +15,10 @@ export const KDS_DEVICE_TOKEN_HEADER = 'x-kds-device-token';
  */
 export const DEVICE_REVOKED_BODY = {
   error: 'device_revoked',
-  message:
-    'This KDS device has been removed. Pair it again from the dashboard.',
+  message: 'This KDS device has been removed. Pair it again from the dashboard.',
 } as const;
 
-// ── Pairing constants (frozen) ─────────────────────────────────────────────
+// Pairing compatibility
 
 export const PIN_TTL_MINUTES = 10;
 export const POLL_AFTER_SECONDS = 5;
@@ -38,28 +28,17 @@ export const PIN_SCAN_LIMIT = 50;
 /** kds_pairing admin_list page size. */
 export const PAIRING_LIST_LIMIT = 20;
 
-// ── Device liveness thresholds (heartbeat folded into device.sessions) ──────
+// ── Device liveness thresholds (heartbeat folded into runtime.session) ──────
 
 export const DEVICE_LIVE_MS = 10_000; // < 10s since last_used_at → live
 export const DEVICE_OFFLINE_MS = 20_000; // < 20s → slow; else offline
 
-// ── Enums (frozen) ─────────────────────────────────────────────────────────
+// KDS status compatibility
 
-export type PairingStatus =
-  | 'pending'
-  | 'approved'
-  | 'denied'
-  | 'expired'
-  | 'used';
+export type PairingStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'used';
 
 export type KitchenStatus =
-  | 'new'
-  | 'accepted'
-  | 'preparing'
-  | 'ready'
-  | 'completed'
-  | 'cancelled'
-  | 'partial_cancelled';
+  'new' | 'accepted' | 'preparing' | 'ready' | 'completed' | 'cancelled' | 'partial_cancelled';
 
 /** Statuses that keep a ticket on the live kitchen board (snapshot view). */
 export const BOARD_ACTIVE_STATUSES: KitchenStatus[] = [
@@ -87,21 +66,54 @@ export const STATUS_TRANSITIONS: Record<KitchenStatus, KitchenStatus[]> = {
   cancelled: [],
 };
 
-/** Map a KDS `kitchen_status` to the `ops.orders.status` lifecycle value. */
-export function mapKitchenToOrderStatus(k: KitchenStatus): string {
+/** Map the commercial order status to the KDS compatibility status. */
+
+/**
+ * Statuses `merchant.customer_order.status` may hold — the CHECK, in code.
+ *
+ * An ARRAY with the type derived from it, not a bare union, because a union has no
+ * runtime form and a claim about the database that cannot be read at run time cannot
+ * be checked against the database. `check-values.integration.ts` compares this list
+ * to the live CHECK on every CI round.
+ */
+export const ORDER_STATUSES = ['placed', 'preparing', 'ready', 'completed', 'canceled'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/** Map a KDS compatibility status to the commercial order status. */
+export function mapKitchenToOrderStatus(k: KitchenStatus): OrderStatus {
   switch (k) {
     case 'new':
-      return 'pending';
+      return 'placed';
     case 'accepted':
     case 'preparing':
     case 'partial_cancelled':
-      return 'in_progress';
+      return 'preparing';
     case 'ready':
       return 'ready';
     case 'completed':
       return 'completed';
     case 'cancelled':
+      return 'canceled';
+  }
+}
+
+/** Map a commercial order status to the KDS compatibility status. */
+export function mapOrderToKitchenStatus(s: string): KitchenStatus {
+  switch (s) {
+    case 'placed':
+      return 'new';
+    case 'preparing':
+      return 'preparing';
+    case 'ready':
+      return 'ready';
+    case 'completed':
+      return 'completed';
+    case 'canceled':
       return 'cancelled';
+    default:
+      // Unreachable while the CHECK and this switch agree. Falling back to a value the
+      // iPad CAN decode is the safe failure: a mislabelled ticket beats a blank board.
+      return 'new';
   }
 }
 
@@ -120,10 +132,7 @@ const KITCHEN_STATUS_SET = new Set<KitchenStatus>([
  * in the contract module so both the service (pre-check) and the repository
  * (authoritative re-check inside the locked transaction) share one matrix.
  */
-export function validateTransition(
-  from: KitchenStatus | null,
-  to: KitchenStatus,
-): string | null {
+export function validateTransition(from: KitchenStatus | null, to: KitchenStatus): string | null {
   if (!KITCHEN_STATUS_SET.has(to)) return `invalid_target_status: ${to}`;
   const current = from ?? 'new';
   if (!STATUS_TRANSITIONS[current].includes(to)) {
@@ -132,16 +141,15 @@ export function validateTransition(
   return null;
 }
 
-// ── Device session (normalized from device.sessions) ───────────────────────
+// ── Device session (normalized from runtime.session) ───────────────────────
 
 export interface KdsDeviceSession {
   deviceId: string;
-  tenantId: string;
-  /** Legacy field — equals tenantId in the canonical model. */
-  businessId: string;
+  merchantId: string;
   locationId: string | null;
   stationId: string | null;
   deviceName: string | null;
+  permissions: string[];
 }
 
 // ── Result envelope for the byte-exact iPad responses ──────────────────────
@@ -188,8 +196,7 @@ export function hashPin(pin: string, salt: string): string {
 
 // ── Small validators (mirror the Deno helpers) ─────────────────────────────
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function asText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';

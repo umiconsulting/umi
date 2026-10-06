@@ -3,11 +3,22 @@ name: contract CI
 # Gates the @umi/contract package: types compile, the dual build succeeds, and the
 # route literals stay byte-exact to the controllers. dist/ is git-ignored (umi-api
 # builds it in-workspace; the dashboard uses the source), so CI builds it here.
+#
+# Also runs on pushes to `build-v3`, which has no deploy workflow to re-check a
+# merge. Note that umi-api-deploy.yml does NOT cover this gate on main either:
+# it builds @umi/contract as a dependency, but never runs the route-literal tests.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed — so a filter would make every PR that
+# misses it UNMERGEABLE, not faster. Unconditional is what makes "required" safe.
+# There is also a correctness argument here: this gate proves the route literals
+# still match the controllers, and a controller edit lives OUTSIDE packages/contract.
+# The old filter could not see the change most likely to break it.
 on:
   pull_request:
-    paths:
-      - "packages/contract/**"
-      - ".github/workflows/contract-ci.yml"
+  push:
+    branches: [build-v3]
 
 permissions:
   contents: read
@@ -22,7 +33,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"
+          node-version: '22'
 
       - name: Enable pnpm (corepack)
         run: |
@@ -34,6 +45,23 @@ jobs:
 
       - name: Typecheck
         run: pnpm --filter @umi/contract typecheck
+
+      - name: Generated artifact drift
+        run: pnpm --filter @umi/contract generate:check
+
+      - name: Generated TypeScript SDK
+        run: >-
+          packages/contract/node_modules/.bin/tsc --noEmit --strict --skipLibCheck
+          --target ES2022 --module ESNext
+          packages/contract/generated/typescript/umi_contract.ts
+
+      - name: Generated Dart SDK
+        run: >-
+          docker run --rm
+          -v "$PWD/packages/contract/generated/dart:/contract:ro"
+          -w /contract
+          dart@sha256:13140e26d84f4fda57cea31942222112aeb2eec10e5e6874c1c0f70beed189ab
+          dart analyze --no-fatal-warnings lib/umi_contract.dart
 
       - name: Build (tsup dual CJS+ESM+dts)
         run: pnpm --filter @umi/contract build

@@ -15,28 +15,28 @@ on:
   workflow_call:
     inputs:
       app_name:
-        description: "Service name, also the apps/<app_name> dir on the VPS (e.g. umi-api)"
+        description: 'Service name, also the apps/<app_name> dir on the VPS (e.g. umi-api)'
         type: string
         required: true
       app_dir:
-        description: "Path to the app in this repo (e.g. apps/umi-api)"
+        description: 'Path to the app in this repo (e.g. apps/umi-api)'
         type: string
         required: true
       package_name:
-        description: "pnpm workspace package name for --filter (e.g. @umi/api)"
+        description: 'pnpm workspace package name for --filter (e.g. @umi/api)'
         type: string
         required: true
       image:
-        description: "GHCR image name without tag (e.g. ghcr.io/umiconsulting/umi-api)"
+        description: 'GHCR image name without tag (e.g. ghcr.io/umiconsulting/umi-api)'
         type: string
         required: true
       node_version:
         type: string
-        default: "22"
+        default: '22'
       health_url:
-        description: "Optional URL to curl after deploy; empty disables the check"
+        description: 'Optional URL to curl after deploy; empty disables the check'
         type: string
-        default: ""
+        default: ''
       repo_dir:
         description: >-
           Repo checkout to deploy from on the VPS (passed through as UMI_REPO_DIR
@@ -44,14 +44,14 @@ on:
           for a second, isolated environment (e.g. a staging checkout) on the same
           box.
         type: string
-        default: ""
+        default: ''
       branch:
         description: >-
           Branch that checkout tracks (passed through as UMI_DEPLOY_BRANCH to
           deploy.sh, which git-resets the checkout to it before rolling
           containers). Empty uses deploy.sh's own default (main).
         type: string
-        default: ""
+        default: ''
       push_latest:
         description: >-
           Also tag+push the image as ":latest". Prod relies on this as a human
@@ -59,6 +59,22 @@ on:
           leave false for a non-prod caller so it can never shadow prod's tag.
         type: boolean
         default: true
+      compose_file:
+        description: >-
+          Compose file to roll on the VPS (passed through as UMI_COMPOSE_FILE).
+          Absolute, or relative to the deploy checkout. Empty uses deploy.sh's
+          own default of apps/<app_name>/docker-compose.yml.
+        type: string
+        default: ''
+      project_dir:
+        description: >-
+          Compose project directory on the VPS (passed through as
+          UMI_PROJECT_DIR): where `.env`, certs and secrets resolve, and where
+          the default project name comes from. Empty uses the compose file's own
+          directory. Set this for an environment whose compose file lives in the
+          repo but whose state (gitignored .env/certs/secrets) lives elsewhere.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -106,11 +122,20 @@ jobs:
           PUSH_LATEST: ${{ inputs.push_latest }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          # Bake the immutable release identity into the image (config.schema.ts
+          # requires all four in staging/pilot/production; /health/live reports them).
+          # CONTRACT_VERSION's source of truth is packages/contract/src/catalog.ts.
+          CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
+          test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
           TAGS=(-t "$IMAGE:sha-${{ github.sha }}")
           if [ "$PUSH_LATEST" = "true" ]; then
             TAGS+=(-t "$IMAGE:latest")
           fi
           docker build \
+            --build-arg RELEASE_VERSION="$(git describe --tags --always)" \
+            --build-arg RELEASE_GIT_COMMIT="${{ github.sha }}" \
+            --build-arg RELEASE_BUILD_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" \
+            --build-arg CONTRACT_VERSION="$CONTRACT_VERSION" \
             "${TAGS[@]}" \
             -f "$DIR/Dockerfile" .
           docker push "$IMAGE:sha-${{ github.sha }}"
@@ -127,6 +152,8 @@ jobs:
           APP_NAME: ${{ inputs.app_name }}
           UMI_REPO_DIR: ${{ inputs.repo_dir }}
           UMI_DEPLOY_BRANCH: ${{ inputs.branch }}
+          UMI_COMPOSE_FILE: ${{ inputs.compose_file }}
+          UMI_PROJECT_DIR: ${{ inputs.project_dir }}
           DEPLOY_SCRIPT: ${{ inputs.app_dir }}/deploy/deploy.sh
         run: |
           mkdir -p ~/.ssh
@@ -138,13 +165,15 @@ jobs:
           # breaks: deploy.sh's own `git fetch` spawns an ssh-to-GitHub that
           # drains the very stdin the script is being read from, so bash hits
           # EOF mid-script and dies silently. cat-to-file + /dev/null avoids it.
-          # UMI_REPO_DIR/UMI_DEPLOY_BRANCH, when set, redirect deploy.sh at a
-          # second, isolated checkout/branch (e.g. a staging environment)
-          # instead of its $HOME/umi + main default.
+          # UMI_REPO_DIR, when set, redirects deploy.sh at a second, isolated
+          # checkout (e.g. a staging environment) instead of its $HOME/umi default.
+          # UMI_COMPOSE_FILE/UMI_PROJECT_DIR likewise let that environment keep a
+          # repo-tracked compose file apart from its state directory — see
+          # deploy/staging/compose.yml and apps/umi-api/deploy/deploy.sh.
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes \
             -o BatchMode=yes -o ConnectTimeout=15 -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
+            "cat > /tmp/$APP_NAME-deploy.sh && APP_NAME='$APP_NAME' UMI_REPO_DIR='$UMI_REPO_DIR' UMI_DEPLOY_BRANCH='$UMI_DEPLOY_BRANCH' UMI_COMPOSE_FILE='$UMI_COMPOSE_FILE' UMI_PROJECT_DIR='$UMI_PROJECT_DIR' bash /tmp/$APP_NAME-deploy.sh 'sha-${{ github.sha }}' < /dev/null" \
             < "$DEPLOY_SCRIPT"
 
       - name: Health check

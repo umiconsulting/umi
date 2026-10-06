@@ -10,209 +10,258 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { TenantAccessGuard } from '../auth/tenant-access.guard';
+import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
-import { CurrentUser, Tenant } from '../auth/current-user.decorator';
-import type { AuthUser, TenantAccess } from '../auth/auth.types';
+import { RequirePermission } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { CurrentUser, Merchant } from '../auth/current-user.decorator';
+import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { KdsService } from './kds.service';
+import { KdsLocationGuard } from './kds-location.guard';
 
-/**
- * Owner-facing KDS surface the dashboard SPA calls
- * (`/api/tenants/:tenantId/kds/*`). Cookie-authed + membership-checked +
- * `kds`-entitlement gated by the shared guard stack (same trust model as the
- * cash admin routes — no extra per-action permission). This replaces the legacy
- * `server.js` `callKdsPairingBackend` proxy: it dispatches to the in-process
- * `KdsService` directly. All routes honor `?locationId=`.
- */
-@UseGuards(AuthGuard, TenantAccessGuard, EntitlementGuard)
+/** The Dashboard uses this permission-controlled KDS surface. */
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard, KdsLocationGuard)
 @RequireProduct('kds')
-@Controller('api/tenants/:tenantId/kds')
+@RequirePermission('kitchen.read')
+@Controller('api/merchants/:merchantId/kds')
 export class KdsDashboardController {
   constructor(private readonly kds: KdsService) {}
 
   @Get('devices')
-  listDevices(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
-    return this.kds.listDevicesForDashboard(t.tenantId, locationId ?? null);
+  @RequirePermission('kitchen.diagnostics')
+  listDevices(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.kds.listDevicesForDashboard(t.merchantId, locationId ?? null);
   }
 
   @Get('orders')
   listOrders(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Query('filter') filter?: string,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.listOrdersForDashboard(
-      t.tenantId,
-      filter,
-      locationId ?? null,
-    );
+    return this.kds.listOrdersForDashboard(t.merchantId, filter, locationId ?? null);
   }
 
   @Get('ticker')
-  ticker(@Tenant() t: TenantAccess) {
-    return this.kds.tickerForDashboard(t.tenantId);
+  ticker(@Merchant() t: MerchantAccess) {
+    return this.kds.tickerForDashboard(t.merchantId);
   }
 
   @Get('stations')
-  listStations(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
-    return this.kds.listStationsForDashboard(t.tenantId, locationId ?? null);
+  @RequirePermission('kitchen.station.read')
+  listStations(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.kds.listStationsForDashboard(t.merchantId, locationId ?? null);
   }
 
   @Post('stations')
+  @RequirePermission('kitchen.station.manage')
   createStation(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Body() body: Record<string, unknown>,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.createStation(t.tenantId, locationId ?? null, body);
+    return this.kds.createStation(t.merchantId, locationId ?? null, body);
   }
 
   @Patch('stations/:stationId')
+  @RequirePermission('kitchen.station.manage')
   updateStation(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Param('stationId') stationId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.updateStation(t.tenantId, stationId, body);
+    return this.kds.updateStation(t.merchantId, stationId, body);
   }
 
   @Delete('stations/:stationId')
-  archiveStation(
-    @Tenant() t: TenantAccess,
-    @Param('stationId') stationId: string,
+  @RequirePermission('kitchen.station.manage')
+  archiveStation(@Merchant() t: MerchantAccess, @Param('stationId') stationId: string) {
+    return this.kds.archiveStation(t.merchantId, stationId);
+  }
+
+  @Get('routes')
+  @RequirePermission('kitchen.station.read')
+  listRoutes(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.kds.listRoutes(t.merchantId, locationId ?? null);
+  }
+
+  @Post('routes')
+  @RequirePermission('kitchen.station.manage')
+  createRoute(
+    @Merchant() t: MerchantAccess,
+    @Query('locationId') locationId: string | undefined,
+    @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.archiveStation(t.tenantId, stationId);
+    return this.kds.createRoute(t.merchantId, locationId ?? null, body);
+  }
+
+  @Patch('routes/:routeId')
+  @RequirePermission('kitchen.station.manage')
+  updateRoute(
+    @Merchant() t: MerchantAccess,
+    @Param('routeId') routeId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.updateRoute(t.merchantId, routeId, body);
   }
 
   @Get('devices/pairing')
-  listPairings(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
-    return this.kds.listPairingsForDashboard(t.tenantId, locationId ?? null);
+  @RequirePermission('kitchen.station.manage')
+  listPairings(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.kds.listPairingsForDashboard(t.merchantId, locationId ?? null);
   }
 
-  // provision + pairing-pin both create a pairing PIN (the SPA's "add device").
+  // Both routes create one pairing PIN.
   @Post('devices/provision')
+  @RequirePermission('kitchen.station.manage')
   provision(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Body() body: Record<string, unknown>,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.createPairing(t.tenantId, locationId ?? null, body);
+    return this.kds.createPairing(t.merchantId, locationId ?? null, body);
   }
 
   @Post('devices/pairing-pin')
+  @RequirePermission('kitchen.station.manage')
   pairingPin(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Body() body: Record<string, unknown>,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.createPairing(t.tenantId, locationId ?? null, body);
+    return this.kds.createPairing(t.merchantId, locationId ?? null, body);
   }
 
   @Post('devices/pairing/:pairingId/approve')
+  @RequirePermission('kitchen.station.manage')
   approvePairing(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('pairingId') pairingId: string,
   ) {
-    return this.kds.approvePairing(t.tenantId, pairingId, user?.id ?? null);
+    return this.kds.approvePairing(t.merchantId, pairingId, user?.id ?? null);
   }
 
   @Post('devices/pairing/:pairingId/deny')
-  denyPairing(
-    @Tenant() t: TenantAccess,
-    @Param('pairingId') pairingId: string,
-  ) {
-    return this.kds.denyPairing(t.tenantId, pairingId);
+  @RequirePermission('kitchen.station.manage')
+  denyPairing(@Merchant() t: MerchantAccess, @Param('pairingId') pairingId: string) {
+    return this.kds.denyPairing(t.merchantId, pairingId);
   }
 
   @Patch('devices/:deviceId')
+  @RequirePermission('kitchen.station.manage')
   updateDevice(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Param('deviceId') deviceId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.updateDevice(t.tenantId, deviceId, body);
+    return this.kds.updateDevice(t.merchantId, deviceId, body);
   }
 
   @Post('devices/:deviceId/revoke')
-  revokeDevice(
-    @Tenant() t: TenantAccess,
-    @Param('deviceId') deviceId: string,
-  ) {
-    return this.kds.revokeDevice(t.tenantId, deviceId);
+  @RequirePermission('kitchen.station.manage')
+  revokeDevice(@Merchant() t: MerchantAccess, @Param('deviceId') deviceId: string) {
+    return this.kds.revokeDevice(t.merchantId, deviceId);
   }
 
   @Post('orders/:ticketId/transition')
+  @RequirePermission('kitchen.recall')
   transition(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('ticketId') ticketId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.transitionFromDashboard(
-      t.tenantId,
+    return this.kds.transitionFromDashboard(t.merchantId, user?.id ?? null, ticketId, body);
+  }
+
+  // Forward advance from a permission-guarded staff session (not the device-token path).
+  // One endpoint per action so each carries its own fine-grained permission; all three
+  // reuse the same executeKitchenCommand the device command uses.
+  @Post('orders/:ticketId/prepare')
+  @RequirePermission('kitchen.prepare')
+  prepare(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.advanceFromDashboard(
+      t.merchantId,
       user?.id ?? null,
       ticketId,
+      'start_preparation',
+      body,
+    );
+  }
+
+  @Post('orders/:ticketId/ready')
+  @RequirePermission('kitchen.ready')
+  ready(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.advanceFromDashboard(
+      t.merchantId,
+      user?.id ?? null,
+      ticketId,
+      'mark_order_ready',
+      body,
+    );
+  }
+
+  @Post('orders/:ticketId/complete')
+  @RequirePermission('kitchen.complete')
+  complete(
+    @Merchant() t: MerchantAccess,
+    @CurrentUser() user: AuthUser,
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.kds.advanceFromDashboard(
+      t.merchantId,
+      user?.id ?? null,
+      ticketId,
+      'complete',
       body,
     );
   }
 }
 
-/**
- * Legacy slug alias surface (`/api/:slug/admin/devices`, `/orders`,
- * `/orders/:ticketId/transition`) so the dashboard's `/api/:slug/admin/*`
- * device/order calls stop 404ing. Same service, same guard stack; slug→tenantId
- * is resolved by TenantAccessGuard.
- */
-@UseGuards(AuthGuard, TenantAccessGuard, EntitlementGuard)
+/** These aliases keep the current Dashboard routes operational. */
+@UseGuards(AuthGuard, MerchantAccessGuard, EntitlementGuard, RolesGuard, KdsLocationGuard)
 @RequireProduct('kds')
-@Controller('api/:slug/admin')
+@RequirePermission('kitchen.read')
+@Controller('api/:merchantRef/admin')
 export class KdsAdminController {
   constructor(private readonly kds: KdsService) {}
 
   @Get('devices')
-  listDevices(
-    @Tenant() t: TenantAccess,
-    @Query('locationId') locationId?: string,
-  ) {
-    return this.kds.listDevicesForDashboard(t.tenantId, locationId ?? null);
+  @RequirePermission('kitchen.diagnostics')
+  listDevices(@Merchant() t: MerchantAccess, @Query('locationId') locationId?: string) {
+    return this.kds.listDevicesForDashboard(t.merchantId, locationId ?? null);
   }
 
   @Get('orders')
   listOrders(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @Query('filter') filter?: string,
     @Query('locationId') locationId?: string,
   ) {
-    return this.kds.listOrdersForDashboard(
-      t.tenantId,
-      filter,
-      locationId ?? null,
-    );
+    return this.kds.listOrdersForDashboard(t.merchantId, filter, locationId ?? null);
   }
 
   @Post('orders/:ticketId/transition')
+  @RequirePermission('kitchen.recall')
   transition(
-    @Tenant() t: TenantAccess,
+    @Merchant() t: MerchantAccess,
     @CurrentUser() user: AuthUser,
     @Param('ticketId') ticketId: string,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.kds.transitionFromDashboard(
-      t.tenantId,
-      user?.id ?? null,
-      ticketId,
-      body,
-    );
+    return this.kds.transitionFromDashboard(t.merchantId, user?.id ?? null, ticketId, body);
   }
 }

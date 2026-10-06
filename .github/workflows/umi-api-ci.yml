@@ -1,22 +1,26 @@
 name: umi-api CI
 
-# PR gate only. Pushes to main are checked + built + deployed by
-# umi-api-deploy.yml (which re-runs these same checks before shipping),
-# so running on `push` here too would just double the work on every merge.
+# Runs on every PR, and on pushes to `build-v3`.
+#
+# `main` is deliberately absent from the push list: umi-api-deploy.yml runs this
+# same typecheck + build + test gate before it ships, so a push trigger here
+# would double the work on every merge to main. `build-v3` has no deploy
+# workflow, so until this trigger existed a merge into it ran NO job at all —
+# the PR was tested, the merge result never was.
 #
 # umi-api is a pnpm workspace member: install/build/test run from the repo root
 # with pnpm --filter. Workspace-level files are watched too, since they affect
 # the umi-api build.
+#
+# ⚠️ NO `paths:` FILTER — DO NOT ADD ONE. This check is REQUIRED by branch
+# protection on `build-v3`, and GitHub leaves a required-but-skipped check Pending
+# forever rather than treating it as passed — so a filter would make every PR that
+# misses it UNMERGEABLE, not faster. Unconditional is what makes "required" safe.
+# The job is ~35s, which is not worth a deadlock.
 on:
   pull_request:
-    paths:
-      - "apps/umi-api/**"
-      - "packages/contract/**"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "package.json"
-      - "turbo.json"
-      - ".github/workflows/umi-api-ci.yml"
+  push:
+    branches: [build-v3]
 
 permissions:
   contents: read
@@ -31,7 +35,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "22"
+          node-version: '22'
 
       - name: Enable pnpm (corepack)
         run: |
@@ -51,3 +55,266 @@ jobs:
 
       - name: Test
         run: pnpm --filter @umi/api test
+
+  # ==========================================================================
+  # THE SCHEMA GATE — builds build-v3 from scratch and runs every instrument
+  # that a pristine schema can prove.
+  #
+  # WHY THIS JOB EXISTS. Seven integration suites and security_gate.sql decide
+  # whether the cutover is safe, and until now NO workflow ran any of them.
+  # `vitest run` matches `.spec.` and `.test.` only, so `.integration.ts` never
+  # executed in CI. Every green result in this program was a person's memory of
+  # a command they ran once — which is the same shape as the 2026-07-12 audit,
+  # where three gates reported green while ~89% of the SQL did not resolve.
+  #
+  # THE INSTRUMENTS ARE TWO FAMILIES. Measured 2026-08-14 against a pristine
+  # build. Do not conflate them:
+  #
+  #   SCHEMA instruments — provable against DDL alone, and run here:
+  #     sql-preflight · check-values · schema-parity · wallet-carry
+  #     loyalty-stamps · cash-seals · cash-logout · cash-login · credential-upgrade
+  #     security_gate.sql (structural half — 43 checks)
+  #
+  #   A suite belongs in this family when it SEEDS ITS OWN ROWS and removes them.
+  #   cash-seals and cash-logout do, and both sat outside this list until 2026-08-18
+  #   — written to prove a contract, then never run by anything but a person's
+  #   terminal. THE LIST IS AN ALLOWLIST, so a new `.integration.ts` file runs
+  #   NOWHERE until its path is added here. Add it in the same PR that adds it.
+  #
+  #   MIGRATION instruments — assert production-derived facts and CANNOT run
+  #   here. They need a backfilled target, and they belong to the P7 rehearsal:
+  #     rls.integration.ts            hardcodes id('Kalala Café')
+  #     pooler-isolation.integration  needs >= 2 seeded merchants
+  #     identity-normalization        pins against the legacy core.* snapshot
+  #     security_gate.sql behavioral  hardcodes two merchants AND exact counts
+  #     reconcile_v3.sql              compares source against target
+  #
+  # Excluding them is a stated limit, not a silent skip: security_gate.sql now
+  # prints "SKIPPED: fixture merchants absent" and names every unmeasured check,
+  # and the preflight prints UNCOVERED next to UNRESOLVED. A check nobody ran is
+  # unmeasured, never approved.
+  #
+  # ⚠️ NO `paths:` FILTER — the workflow-level trigger governs. A schema change
+  # can arrive from docs/migration/build-v3/**, and a backend SQL change from
+  # apps/umi-api/**; either can break the other, which is the entire point.
+  # ==========================================================================
+  gate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # pgvector, NOT stock postgres: 00_foundation.sql:24 creates the `vector`
+        # extension for runtime.*_embedding, and stock postgres:17 cannot.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      # Redis for the realtime family (pairing handshake + nudge). The schema
+      # family below does NOT touch it; only the "Realtime instruments" step does.
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      GATE_DB: umi_build_v3_ci
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm (corepack)
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.29.3 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --filter @umi/api...
+
+      - name: Build workspace deps
+        run: pnpm --filter @umi/api... build
+
+      # A pristine build, every time. No production snapshot, so no customer PII
+      # ever reaches CI — and the run proves the DDL applies to an EMPTY database,
+      # which is the mode the cutover itself uses (AB#14).
+      - name: Apply build-v3 from scratch
+        run: |
+          set -euo pipefail
+          createdb "$GATE_DB"
+          bash docs/migration/build-v3/00_run.sh "$GATE_DB"
+
+      # Seeds the permission catalogue only — 8 permission keys and 2 rows. It
+      # creates NO user and NO merchant, so it cannot make a data-dependent check
+      # pass by accident. Without it, "super_admin holds every permission key"
+      # fails against an empty catalogue and reports a defect that does not exist.
+      - name: Seed the RBAC catalogue
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -v bootstrap_email=ci@umi.invalid \
+            -f docs/migration/build-v3/backfill/seed_rbac.sql
+
+      # api_login / worker_login. build-v3 ships api/worker as NOLOGIN GROUP roles,
+      # so nothing can connect as them. worker_login must carry the BYPASSRLS
+      # ATTRIBUTE ITSELF — attributes are never inherited through membership, and
+      # the D1 boot guard checks the attribute, not the grant.
+      - name: Provision the harness login roles
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -f apps/umi-api/test/integration/harness-roles.sql
+
+      # The file the CUTOVER runs, on the same roles the harness just made. It
+      # carries no password, so it does not disturb the harness ones. It repairs
+      # the attributes and applies the D10 per-role log posture.
+      #
+      # This step exercises the cutover file on every CI round. A file that first
+      # runs at the cutover is a file nobody has tested.
+      #
+      # ⚠️ Do not read the gate's D10 PASS as proof that a target without this
+      # file fails. The same round applies the pin and then measures it. The
+      # red-green proof is in the pull request, not here.
+      - name: Apply the build-v3 role provisioning file (D1 · D5 · D10)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -f apps/umi-api/db/roles/004_buildv3_login_roles.sql
+
+      - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login · creds)
+        working-directory: apps/umi-api
+        env:
+          DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
+          DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
+          # Declared because the config schema requires it. No suite in this
+          # family opens a Redis connection — verified by running them all with
+          # no Redis process at all.
+          REDIS_URL: redis://localhost:6379
+        # The file list lives in ONE place — `test:integration:schema` in
+        # package.json — so a new schema-family suite is added once and runs
+        # both here and on a laptop. It used to be written out twice, and a
+        # suite that CI does not name runs nowhere at all.
+        #
+        # The MIGRATION family (`test:integration:migration`) is deliberately
+        # absent: it needs a backfilled clone of production, which CI has not
+        # got and must never have. It belongs to the P7 rehearsal.
+        run: pnpm run test:integration:schema
+
+      # The REALTIME family runs against the same from-scratch schema but needs
+      # Redis (device-pairing nudges go over pub/sub), so it is its own step with
+      # the `redis` service wired in — kept out of the schema family above, which
+      # is deliberately Redis-free.
+      - name: Realtime instruments (pairing handshake · nudge)
+        working-directory: apps/umi-api
+        env:
+          DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
+          DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
+          REDIS_URL: redis://localhost:6379
+        # Device pairing HMACs its secret with JWT_SECRET (config requires >=16
+        # chars). Generate an ephemeral one per run instead of committing a
+        # secret-shaped literal — it only has to be self-consistent within this
+        # job's throwaway database.
+        run: JWT_SECRET="$(openssl rand -hex 24)" pnpm run test:integration:realtime
+
+      # THE RE-RUNNABLE RULE, proven rather than written down.
+      #
+      # After the cutover a schema change arrives as a file in migrations/, and it
+      # runs by hand against the database that holds the customers. A file that
+      # half-applies leaves a person reading a failed transcript.
+      #
+      # `90_rls.sql` is why this step exists. It carried 21 `create policy` and no
+      # `drop policy`, so a second apply died with `policy "merchant_isolation"
+      # for table "merchant" already exists`. Nothing tested a second apply.
+      #
+      # This runs as the DDL owner, which is why it is a CI step and not an
+      # integration test: the harness roles are least-privileged and cannot
+      # create a function in `umi`.
+      # The DDL freeze. Silent before the cutover, when there is no stamp and the
+      # numbered files are edited freely. After `freeze.sh freeze` it fails on any
+      # edit to a numbered file and names it. See `freeze.sh`.
+      - name: DDL freeze
+        run: docs/migration/build-v3/freeze.sh check
+
+      - name: Migrations and 90_rls apply TWICE (the re-runnable rule)
+        run: |
+          set -euo pipefail
+          before=$(psql -At -d "$GATE_DB" -c "select count(*) from pg_policies")
+
+          # ROWS. An empty database accepts a `not null` column with no default,
+          # and a populated one does not — so a migration tested only against an
+          # empty target passes here and fails in production. These are the
+          # smallest rows that exercise a merchant, a card and a money ledger.
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" <<'SEED'
+          insert into merchant.merchant (id, name, handle)
+            values ('11111111-1111-1111-1111-111111111111','CI Rehearsal','ci-rehearsal')
+            on conflict (id) do nothing;
+          insert into merchant.customer (id, merchant_id, name)
+            values ('33333333-3333-3333-3333-333333333333','11111111-1111-1111-1111-111111111111','CI')
+            on conflict (id) do nothing;
+          insert into merchant.loyalty_card (id, merchant_id, customer_id)
+            values ('44444444-4444-4444-4444-444444444444','11111111-1111-1111-1111-111111111111','33333333-3333-3333-3333-333333333333')
+            on conflict (id) do nothing;
+          insert into merchant.loyalty_stored_value_ledger (merchant_id, card_id, delta, reason)
+            values ('11111111-1111-1111-1111-111111111111','44444444-4444-4444-4444-444444444444',500,'topup');
+          SEED
+
+          echo "== 90_rls.sql, second apply =="
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f docs/migration/build-v3/90_rls.sql
+
+          # No --single-transaction: every statement in a migration is guarded, so
+          # the file does not need one, and `create index concurrently` cannot run
+          # inside a transaction.
+          for f in docs/migration/build-v3/migrations/*.sql; do
+            [ -e "$f" ] || { echo "no forward migrations yet"; break; }
+            echo "== $(basename "$f") =="
+            psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f "$f"
+            psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f "$f"
+          done
+
+          # A guarded re-apply REPLACES every policy and LOSES none.
+          #
+          # ⚠️ Count the policies; do not look for duplicates. `pg_policy` is
+          # unique on (polrelid, polname), so a duplicate cannot exist and a
+          # duplicate check can never fail. The real risk points the other way: a
+          # drop that names the wrong table removes a LIVE policy, and the count
+          # falls. That is a silent hole in merchant isolation.
+          after=$(psql -At -d "$GATE_DB" -c "select count(*) from pg_policies")
+          test "$after" = "$before" || {
+            echo "policy count changed across the re-apply: $before -> $after"
+            psql -d "$GATE_DB" -c "select schemaname, tablename, policyname from pg_policies order by 1,2,3"
+            exit 1
+          }
+          echo "policies stable across the re-apply: $after"
+
+          psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f docs/migration/build-v3/99_verify.sql
+
+      # Runs LAST and unconditionally: one CI round should report every problem,
+      # not stop at the first. A structural FAIL raises and exits non-zero; the
+      # behavioral half prints SKIPPED with its reason and does not abort the file.
+      - name: Security gate (structural)
+        if: '!cancelled()'
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
+            -f docs/migration/build-v3/security_gate.sql

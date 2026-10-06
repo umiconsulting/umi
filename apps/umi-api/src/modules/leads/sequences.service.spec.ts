@@ -73,7 +73,10 @@ describe('SequencesService.sendDueEmails', () => {
   it('skips a step already in emails_sent (idempotent)', async () => {
     const sixDaysAgo = new Date(Date.now() - 6 * 86400000).toISOString();
     h.repo.listActive.mockResolvedValue([
-      lead({ diagnosticDate: sixDaysAgo, emailsSent: ['diagnostic_followup_day_0', 'diagnostic_followup_day_2'] }),
+      lead({
+        diagnosticDate: sixDaysAgo,
+        emailsSent: ['diagnostic_followup_day_0', 'diagnostic_followup_day_2'],
+      }),
     ]);
     const r = await h.svc.sendDueEmails();
     expect(r.sent).toBe(1); // only day 5 remains
@@ -170,7 +173,11 @@ describe('SequencesService actions', () => {
     const h = make();
     await h.svc.pauseSequence('lead-1', 'meeting_scheduled');
     expect(h.repo.setPaused).toHaveBeenCalledWith(
-      'lead-1', true, 'meeting_scheduled', 'sequence_paused', { reason: 'meeting_scheduled' },
+      'lead-1',
+      true,
+      'meeting_scheduled',
+      'sequence_paused',
+      { reason: 'meeting_scheduled' },
     );
   });
 
@@ -178,7 +185,11 @@ describe('SequencesService actions', () => {
     const h = make();
     await h.svc.markResponded('lead-1', 'phone');
     expect(h.repo.setPaused).toHaveBeenCalledWith(
-      'lead-1', true, 'Lead responded via phone', 'responded', { response_type: 'phone' },
+      'lead-1',
+      true,
+      'Lead responded via phone',
+      'responded',
+      { response_type: 'phone' },
     );
   });
 

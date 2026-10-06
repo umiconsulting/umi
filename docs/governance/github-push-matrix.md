@@ -1,8 +1,19 @@
 # GitHub Push Matrix
 
-Status: current as of 2026-06-10.
+Status: historical. The build-v3 monorepo superseded this S2.1 matrix.
 
-## Decision
+## Current decision
+
+The workspace uses one Git repository:
+
+```text
+git@github.com:umiconsulting/umi.git
+```
+
+The `apps/*` directories are not separate Git repositories.
+Run Git commands from the workspace root.
+
+## Historical S2.1 decision
 
 Umi uses `umiconsulting` as the single GitHub organization and `github.com-umi` as the single SSH host alias for app repositories.
 
@@ -20,22 +31,22 @@ Keep repo remote URLs in this shape:
 git@github.com-umi:umiconsulting/<repo>.git
 ```
 
-## App Repositories
+## Historical app repositories
 
-| Local path | Branch during S2.1 | Remote |
-| --- | --- | --- |
-| `apps/umi-cash` | `main` | `git@github.com-umi:umiconsulting/umi-cash.git` |
-| `apps/umi-conversaflow` | `architecture-v2` | `git@github.com-umi:umiconsulting/supabase-edge-functions.git` |
-| `apps/umi-dashboard` | `main` | `git@github.com-umi:umiconsulting/umi-dashboard.git` |
-| `apps/umi-kds` | `main` | `git@github.com-umi:umiconsulting/umi-kds.git` |
-| `apps/umi-landing-page` | `staging` | `git@github.com-umi:umiconsulting/umi-landing-page.git` |
-| `apps/umi-logs` | `main` | `git@github.com-umi:umiconsulting/conversaflow-logs.git` |
+| Local path              | Branch during S2.1 | Remote                                                         |
+| ----------------------- | ------------------ | -------------------------------------------------------------- |
+| `apps/umi-cash`         | `main`             | `git@github.com-umi:umiconsulting/umi-cash.git`                |
+| `apps/umi-conversaflow` | `architecture-v2`  | `git@github.com-umi:umiconsulting/supabase-edge-functions.git` |
+| `apps/umi-dashboard`    | `main`             | `git@github.com-umi:umiconsulting/umi-dashboard.git`           |
+| `apps/umi-kds`          | `main`             | `git@github.com-umi:umiconsulting/umi-kds.git`                 |
+| `apps/umi-landing-page` | `staging`          | `git@github.com-umi:umiconsulting/umi-landing-page.git`        |
+| `apps/umi-logs`         | `main`             | `git@github.com-umi:umiconsulting/conversaflow-logs.git`       |
 
-## Root Workspace
+## Historical root workspace
 
 The root workspace is versioned locally. No matching `umiconsulting` root workspace repository existed during S2.1 under `Umi`, `umi`, or `umi-workspace`; create one intentionally before adding a root `origin`.
 
-## Verification
+## Historical verification
 
 From the workspace root:
 

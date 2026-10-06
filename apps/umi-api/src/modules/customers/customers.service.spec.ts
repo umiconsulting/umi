@@ -9,9 +9,23 @@ function make() {
     orders: vi.fn(),
     cash: vi.fn(),
     identity: vi.fn(),
+    messages: vi.fn(),
+    triage: vi.fn(),
+    kpis: vi.fn(),
+    factsFor: vi.fn(),
+    conversationSummaries: vi.fn(),
   };
-  const tenants = { loadProducts: vi.fn() };
-  return { svc: new CustomersService(repo as never, tenants as never), repo, tenants };
+  const merchants = { loadProducts: vi.fn(), loadSegmentThresholds: vi.fn().mockResolvedValue({}) };
+  const anthropic = { createCompletion: vi.fn() };
+  // The usage writer is out of scope here; the real one never rejects.
+  const usage = { record: vi.fn().mockResolvedValue(undefined) };
+  return {
+    svc: new CustomersService(repo as never, merchants as never, anthropic, usage as never),
+    repo,
+    merchants,
+    anthropic,
+    usage,
+  };
 }
 
 const PRODUCTS = {
@@ -46,23 +60,23 @@ describe('CustomersService.list → customerDto', () => {
           identities: [{ identity_type: 'whatsapp' }],
         },
       ],
-      total: 1,
+      nextCursor: null,
     });
 
-    const res = await h.svc.list('t1', PRODUCTS, { page: '1', limit: '20' });
+    const res = await h.svc.list('t1', PRODUCTS, { limit: '20' });
     const dto = res.customers[0];
     expect(dto.status).toBe('active');
     expect(dto.products.cash.active).toBe(true);
     expect(dto.products.whatsapp.active).toBe(true);
     expect(dto.value.walletBalance).toContain('123'); // 12345 centavos → $123
     expect(dto.memory.embeddingHealth).toBe('context_ready');
-    expect(res.totalPages).toBe(1);
+    expect(res.nextCursor).toBeNull();
   });
 
   it('flags needs_review when there are merge candidates', async () => {
     h.repo.listCustomers.mockResolvedValue({
       rows: [{ id: 'p2', display_name: 'B', merge_candidate_count: 1, identities: [] }],
-      total: 1,
+      nextCursor: null,
     });
     const res = await h.svc.list('t1', PRODUCTS, {});
     expect(res.customers[0].status).toBe('needs_review');
@@ -70,11 +84,11 @@ describe('CustomersService.list → customerDto', () => {
   });
 
   it('clamps limit to 100 and caps contactUuid for non-uuid contactId', async () => {
-    h.repo.listCustomers.mockResolvedValue({ rows: [], total: 0 });
+    h.repo.listCustomers.mockResolvedValue({ rows: [], nextCursor: null });
     await h.svc.list('t1', PRODUCTS, { limit: '500', contactId: 'not-a-uuid' });
     const q = h.repo.listCustomers.mock.calls[0][1];
     expect(q.limit).toBe(100);
-    expect(q.contactUuid).toBe('t1'); // falls back to tenant id → matches nobody
+    expect(q.contactUuid).toBe('t1'); // falls back to merchant id → matches nobody
   });
 });
 
@@ -93,5 +107,300 @@ describe('CustomersService.cash', () => {
     h.repo.cash.mockResolvedValue(null);
     const r = await h.svc.cash('t1', PRODUCTS, '00000000-0000-4000-8000-000000000000');
     expect(r).toEqual({ available: true, source: 'cash', account: null });
+  });
+});
+
+describe('CustomersService.messages', () => {
+  const CID = '00000000-0000-4000-8000-000000000001';
+  const CONV = '00000000-0000-4000-8000-000000000002';
+
+  const row = (id: string, iso: string, over: Record<string, unknown> = {}) => ({
+    id,
+    direction: 'inbound',
+    sender: 'customer',
+    body: id,
+    delivery_status: null,
+    occurred_at: new Date(iso),
+    occurred_cursor: iso,
+    created_at: new Date(iso),
+    ...over,
+  });
+
+  it('returns empty for non-uuid ids without touching the repo', async () => {
+    const h = make();
+    const r = await h.svc.messages('t1', 'nope', 'nope', {});
+    expect(r).toEqual({ messages: [], nextCursor: null });
+    expect(h.repo.messages).not.toHaveBeenCalled();
+  });
+
+  it('asks the repo for limit + 1, reverses to oldest-first, and emits a nextCursor', async () => {
+    const h = make();
+    // repo yields newest-first; three rows for a page of two → a further page exists
+    h.repo.messages.mockResolvedValue([
+      row('m3', '2026-01-03T00:00:00.000Z', { sender: 'bot', direction: 'outbound' }),
+      row('m2', '2026-01-02T00:00:00.000Z'),
+      row('m1', '2026-01-01T00:00:00.000Z'),
+    ]);
+    const r = await h.svc.messages('t1', CID, CONV, { limit: '2' });
+    expect(h.repo.messages).toHaveBeenCalledWith('t1', CID, CONV, null, 3);
+    expect(r.messages.map((m) => m.id)).toEqual(['m2', 'm3']); // page [m3,m2] reversed
+    expect(r.nextCursor).toBeTruthy();
+    // the cursor encodes the OLDEST row of the page (m2), so the next page continues below it
+    const decoded = JSON.parse(Buffer.from(r.nextCursor as string, 'base64url').toString('utf8'));
+    expect(decoded.id).toBe('m2');
+    expect(decoded.occurredAt).toBe('2026-01-02T00:00:00.000Z');
+  });
+
+  it('has no nextCursor when the thread fits in one page', async () => {
+    const h = make();
+    h.repo.messages.mockResolvedValue([row('m1', '2026-01-01T00:00:00.000Z')]);
+    const r = await h.svc.messages('t1', CID, CONV, { limit: '2' });
+    expect(r.nextCursor).toBeNull();
+    expect(r.messages).toHaveLength(1);
+  });
+
+  it('round-trips a cursor back to the repo as {occurredAt,id}', async () => {
+    const h = make();
+    h.repo.messages.mockResolvedValue([]);
+    const cursor = Buffer.from(
+      JSON.stringify({ occurredAt: '2026-01-02T00:00:00.000Z', id: CID }),
+      'utf8',
+    ).toString('base64url');
+    await h.svc.messages('t1', CID, CONV, { cursor });
+    expect(h.repo.messages).toHaveBeenCalledWith(
+      't1',
+      CID,
+      CONV,
+      {
+        occurredAt: '2026-01-02T00:00:00.000Z',
+        id: CID,
+      },
+      31,
+    );
+  });
+});
+
+describe('CustomersService.kpis → kpisDto', () => {
+  const CID = '00000000-0000-4000-8000-000000000010';
+
+  it('derives average ticket, frequency, segment, channel mix and the money rates', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 6,
+        visit_days: 6,
+        total_spend_cents: 60_000,
+        gross_cents: 66_000,
+        discount_cents: 6_000,
+        first_order_at: new Date(Date.now() - 120 * 86_400_000),
+        last_order_at: new Date(Date.now() - 5 * 86_400_000),
+        dine_in_orders: 4,
+        pickup_orders: 2,
+        delivery_orders: 0,
+        unspecified_orders: 0,
+        tip_total_cents: 3_000,
+        tipped_receipts: 3,
+        refunded_orders: 1,
+      },
+      favorites: [{ name: 'Latte', units: 10, times_ordered: 8 }],
+      category: { category: 'Café', units: 12 },
+      daypart: { daypart_bucket: 1, dow_local: 2 },
+    });
+
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.spend.avgTicketCents).toBe(10_000); // 60000 / 6
+    expect(kpi.frequencyPerMonth).toBe(1.5); // 6 visits over ~4 months
+    expect(kpi.segment).toBe('regular'); // 6 visits, last seen 5d ago → current
+    expect(kpi.channelMix.dominant).toBe('dine_in');
+    expect(kpi.refunds.rate).toBeCloseTo(1 / 6, 5);
+    expect(kpi.discounts.rate).toBeCloseTo(6_000 / 66_000, 5);
+    expect(kpi.tips.attributed).toBe(true);
+    expect(kpi.tips.avgWhenTippedCents).toBe(1_000); // 3000 / 3
+    expect(kpi.favorites[0].name).toBe('Latte');
+    expect(kpi.topCategory?.name).toBe('Café');
+    expect(kpi.daypart).toEqual({ bucket: 1, dow: 2 });
+  });
+
+  it('handles a buyer-less customer without dividing by zero', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: { orders_count: 0, visit_days: 0, total_spend_cents: 0, gross_cents: 0 },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.segment).toBe('prospect');
+    expect(kpi.spend.avgTicketCents).toBe(0);
+    expect(kpi.refunds.rate).toBe(0);
+    expect(kpi.discounts.rate).toBe(0);
+    expect(kpi.channelMix.dominant).toBeNull();
+    expect(kpi.tips.attributed).toBe(false);
+  });
+
+  it('reports the dominant channel as unspecified when most orders lack a fulfillment type', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 33,
+        visit_days: 13,
+        total_spend_cents: 372_600,
+        gross_cents: 372_600,
+        first_order_at: new Date(Date.now() - 180 * 86_400_000),
+        last_order_at: new Date(Date.now() - 2 * 86_400_000),
+        dine_in_orders: 1,
+        pickup_orders: 0,
+        delivery_orders: 0,
+        unspecified_orders: 32,
+      },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.channelMix.dominant).toBe('unspecified'); // not "dine_in" at 3%
+  });
+
+  it('applies owner-configured thresholds (an override flips regular → VIP)', async () => {
+    const h = make();
+    // Lower the VIP floors below this customer's 6 visits / $600 lifetime.
+    h.merchants.loadSegmentThresholds.mockResolvedValue({
+      vipMinVisits: 5,
+      vipMinSpendCents: 50_000,
+    });
+    h.repo.kpis.mockResolvedValue({
+      agg: {
+        orders_count: 6,
+        visit_days: 6,
+        total_spend_cents: 60_000,
+        gross_cents: 66_000,
+        first_order_at: new Date(Date.now() - 120 * 86_400_000),
+        last_order_at: new Date(Date.now() - 5 * 86_400_000),
+      },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    const kpi = await h.svc.kpis('t1', CID);
+    expect(kpi.segment).toBe('vip'); // would be 'regular' under the default $1k / 8-visit floors
+  });
+});
+
+describe('CustomersService.describe (AI portrait)', () => {
+  const CID = '00000000-0000-4000-8000-000000000011';
+
+  const withOrders = () => ({
+    agg: {
+      orders_count: 4,
+      visit_days: 4,
+      total_spend_cents: 40_000,
+      gross_cents: 40_000,
+      first_order_at: new Date(Date.now() - 60 * 86_400_000),
+      last_order_at: new Date(Date.now() - 3 * 86_400_000),
+    },
+    favorites: [{ name: 'Latte', units: 6, times_ordered: 4 }],
+    category: null,
+    daypart: { daypart_bucket: 1, dow_local: 2 },
+  });
+
+  it('returns null without touching the repo for a non-uuid id', async () => {
+    const h = make();
+    const r = await h.svc.describe('t1', 'nope');
+    expect(r).toEqual({ description: null, generated: false, segment: null });
+    expect(h.repo.kpis).not.toHaveBeenCalled();
+  });
+
+  it('skips the model when there is nothing to describe', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue({
+      agg: { orders_count: 0 },
+      favorites: [],
+      category: null,
+      daypart: null,
+    });
+    h.repo.factsFor.mockResolvedValue([]);
+    h.repo.conversationSummaries.mockResolvedValue([]);
+
+    const r = await h.svc.describe('t1', CID);
+    expect(r.description).toBeNull();
+    expect(r.generated).toBe(false);
+    expect(r.segment).toBe('prospect');
+    expect(h.anthropic.createCompletion).not.toHaveBeenCalled();
+  });
+
+  it('synthesises a portrait and caches it (no second model call for the same inputs)', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue(withOrders());
+    h.repo.factsFor.mockResolvedValue([
+      { source: 'preferences', key: 'typical_order', value: 'Latte grande' },
+    ]);
+    h.repo.conversationSummaries.mockResolvedValue([{ summary: 'Preguntó por el menú.' }]);
+    h.anthropic.createCompletion.mockResolvedValue({
+      text: '  Cliente frecuente de mañanas. Casi siempre pide un latte.  ',
+    });
+
+    const first = await h.svc.describe('t1', CID);
+    expect(first.generated).toBe(true);
+    expect(first.description).toBe('Cliente frecuente de mañanas. Casi siempre pide un latte.');
+    expect(h.anthropic.createCompletion).toHaveBeenCalledTimes(1);
+    // The model gets the facts + summaries in the user payload.
+    const payload = h.anthropic.createCompletion.mock.calls[0][0].userMessage as string;
+    expect(payload).toContain('typical_order');
+    expect(payload).toContain('Preguntó por el menú.');
+
+    const second = await h.svc.describe('t1', CID);
+    expect(second.description).toBe(first.description);
+    expect(second.generated).toBe(false); // served from cache
+    expect(h.anthropic.createCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('degrades to null when the model is unavailable (e.g. no API key)', async () => {
+    const h = make();
+    h.repo.kpis.mockResolvedValue(withOrders());
+    h.repo.factsFor.mockResolvedValue([]);
+    h.repo.conversationSummaries.mockResolvedValue([]);
+    h.anthropic.createCompletion.mockResolvedValue(null);
+
+    const r = await h.svc.describe('t1', CID);
+    expect(r.description).toBeNull();
+    expect(r.generated).toBe(false);
+    expect(r.segment).toBe('regular');
+  });
+});
+
+describe('CustomersService.triage', () => {
+  it('maps waiting conversations and clamps the limit', async () => {
+    const h = make();
+    h.repo.triage.mockResolvedValue([
+      {
+        id: 'cv1',
+        customer_id: 'cust1',
+        customer_name: 'Ana',
+        customer_phone: '+5219999',
+        status: 'open',
+        summary: 'pedido',
+        last_sender: 'customer',
+        last_message: '¿ya está?',
+        waiting_since: new Date('2026-01-01T00:00:00Z'),
+      },
+    ]);
+    const r = await h.svc.triage('t1', { limit: '500' });
+    expect(h.repo.triage).toHaveBeenCalledWith('t1', 100); // clamped to the cap
+    expect(r.total).toBe(1);
+    expect(r.conversations[0]).toMatchObject({
+      id: 'cv1',
+      customerId: 'cust1',
+      customerName: 'Ana',
+      lastSender: 'customer',
+      lastMessage: '¿ya está?',
+    });
+    expect(r.conversations[0].waitingSince).toBeTruthy();
+  });
+
+  it('defaults to a limit of 50', async () => {
+    const h = make();
+    h.repo.triage.mockResolvedValue([]);
+    await h.svc.triage('t1', {});
+    expect(h.repo.triage).toHaveBeenCalledWith('t1', 50);
   });
 });

@@ -21,7 +21,7 @@ outright). This directory is kept as a **reserved slot** so a future rebuild has
 
 - **Audience:** internal Umi staff only — traces, invocations, token accounting, queue/outbox
   health. Never a tenant surface. Access-gated (super-admin / SSO), on its own subdomain.
-- **Data access:** **no direct DB from the browser, ever.** Read *only* through **umi-api
+- **Data access:** **no direct DB from the browser, ever.** Read _only_ through **umi-api
   observability endpoints** (a `modules/observability` surface / `TraceService` rebind) against
   the **canonical schema** (`observability.*`, `queue.*`, `comms.*`). No `service_role`, no
   Management token in the app — it is a typed client of umi-api like every other frontend.

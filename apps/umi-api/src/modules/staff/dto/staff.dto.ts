@@ -21,11 +21,19 @@ export class CreateStaffDto {
 
   @IsOptional()
   @IsString()
+  roleId?: string;
+
+  @IsOptional()
+  @IsString()
   status?: string;
 
   @IsOptional()
   @IsObject()
   permissions?: Record<string, boolean>;
+
+  @IsOptional()
+  @IsString()
+  operatorPin?: string | null;
 }
 
 export class UpdateStaffDto extends CreateStaffDto {}

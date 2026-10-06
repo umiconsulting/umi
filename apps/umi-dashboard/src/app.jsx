@@ -1,165 +1,657 @@
-import React, { useState, useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Trans, useLingui } from '@lingui/react/macro';
+import { msg } from '@lingui/core/macro';
+import { applyMerchantLocale, activateLocale } from '@/lib/i18n.js';
 
-import { useAuth, signOut } from '@/lib/auth.jsx'
-import { TenantProvider, useTenant } from '@/lib/tenant-context.jsx'
-import { useTweaks, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle } from './tweaks-panel.jsx'
-import { useTenantData, useKdsConnection } from './data.jsx'
-import { Sidebar, Topbar } from './shell.jsx'
+import { useAuth, signOut } from '@/lib/auth.jsx';
+import { MerchantProvider, useMerchant } from '@/lib/merchant-context.jsx';
+import { MODULES, missingLocationFor } from '@/lib/module-registry.js';
+import { landingRouteFor } from '@/lib/role-landing.js';
+import { I } from '@/icons.jsx';
+import {
+  useTweaks,
+  TweaksPanel,
+  TweakSection,
+  TweakColor,
+  TweakRadio,
+  TweakToggle,
+} from './tweaks-panel.jsx';
+import { useMerchantData, useKdsConnection } from './data.jsx';
+import { CFG } from './lib/config.js';
+import { Sidebar, Topbar } from './shell.jsx';
 
-import LoginScreen         from '@/screens/login.jsx'
-import ResetPasswordScreen from '@/screens/reset-password.jsx'
-import OverviewScreen from '@/screens/overview.jsx'
-import OrdersScreen   from '@/screens/orders.jsx'
-import DevicesScreen  from '@/screens/devices.jsx'
-import StaffScreen    from '@/screens/staff.jsx'
-import MembersScreen  from '@/screens/members.jsx'
-import GiftCardsScreen from '@/screens/gift-cards.jsx'
-import CustomersScreen from '@/screens/customers.jsx'
-import HoursScreen    from '@/screens/hours.jsx'
-import SettingsScreen from '@/screens/settings.jsx'
-import ProductsBillingScreen from '@/screens/products-billing.jsx'
+import LoginScreen from '@/screens/login.jsx';
+import ResetPasswordScreen from '@/screens/reset-password.jsx';
+import OverviewScreen from '@/screens/overview.jsx';
+import OrdersScreen from '@/screens/orders.jsx';
+import DevicesScreen from '@/screens/devices.jsx';
+import StaffScreen from '@/screens/staff.jsx';
+import LoyaltyValueScreen from '@/screens/loyalty-value.jsx';
+import CustomersScreen from '@/screens/customers.jsx';
+import TriageScreen from '@/screens/conversations.jsx';
+import HoursScreen from '@/screens/hours.jsx';
+import SettingsScreen from '@/screens/settings.jsx';
+import ProductsBillingScreen from '@/screens/products-billing.jsx';
+import CafesScreen from '@/screens/cafes.jsx';
+import OperationsScreen from '@/screens/operations.jsx';
+import CashShiftsScreen from '@/screens/cash-shifts.jsx';
+import ReportesScreen from '@/screens/reportes.jsx';
+import ProductsHub from '@/screens/products-hub.jsx';
+import InventoryHub from '@/screens/inventory-hub.jsx';
+import DiagnosticsScreen from '@/screens/diagnostics.jsx';
+import CocinaScreen from '@/screens/cocina.jsx';
+import ProfileScreen from '@/screens/profile.jsx';
 
-const TWEAK_DEFAULTS = { tenantHue: '#1A5632', density: 'comfy', lang: 'es' }
+// The floor-plan editor is the one screen the shell loads lazily, and the only
+// one that pulls zod (through `@umi/contract/floor-plan`'s document schema) into
+// the browser. Keeping it a separate chunk is what keeps the console's own
+// bundle zod-free — see the node in `lib/module-registry.js`.
+const FloorPlanScreen = lazy(() => import('@/screens/floor-plan.jsx'));
 
-function ProductUnavailable({ moduleName = 'Modulo', product = 'producto' }) {
+const TWEAK_DEFAULTS = { merchantHue: '#1A5632', density: 'comfy' };
+
+const msgCloseMenu = msg`Cerrar el menú`;
+
+/** Product keys as an operator reads them, not as the entitlement table stores them. */
+const PRODUCT_LABELS = {
+  dashboard: 'Umi Dashboard',
+  kds: 'KDS',
+  cash: 'Umi Cash',
+  conversaflow: 'ConversaFlow',
+};
+
+/** Refusal for a screen the café does not own the product for. */
+function ProductUnavailable({ moduleName, product }) {
+  const { t } = useLingui();
+  const name = moduleName || t`Módulo`;
+  const productName = product || t`producto`;
   return (
-    <div className="card fade-up" style={{padding:'38px 34px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:24}}>
+    <div
+      className="card"
+      style={{
+        padding: '38px 34px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+      }}
+    >
       <div>
-        <div className="sec-index" style={{marginBottom:12}}><span className="nn">OFF</span><span>/</span><span>PRODUCTO NO ACTIVO</span></div>
-        <h2 style={{margin:'0 0 8px', fontSize:24}}>{moduleName} no esta activo para este tenant</h2>
-        <div style={{fontSize:14, color:'var(--ink-3)', maxWidth:620}}>
-          Este modulo depende de {product}. El super admin puede revisarlo en Products & Billing, pero no hay controles operativos hasta activar el producto.
+        <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
+          <Trans>{name} no está activo en este café</Trans>
+        </h2>
+        <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
+          <Trans>
+            Esta sección necesita {productName}. El super admin lo puede revisar en Productos y
+            facturación; no hay controles hasta activar el producto.
+          </Trans>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function GuardedScreen({ moduleKey, moduleName, product, children }) {
-  const tenantState = useTenant()
-  if (!tenantState?.canShowModule?.(moduleKey)) {
-    return <ProductUnavailable moduleName={moduleName} product={product}/>
+/** Refusal for a screen that needs a platform grant — an axis cafés do not carry. */
+function PlatformOnly({ moduleName }) {
+  const { t } = useLingui();
+  const name = moduleName || t`Esta pantalla`;
+  return (
+    <div className="alert danger">
+      <span className="strip" />
+      <I.AlertTriangle className="ico" size={18} />
+      <div className="body">
+        <div className="ttl">
+          <Trans>Acceso de plataforma requerido</Trans>
+        </div>
+        <div className="sub">
+          <Trans>{name} es para operadores de Umi.</Trans>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Says why the console has no café to show.
+ *
+ * `ProductUnavailable` below answers "this café does not have that product".
+ * It was also answering three other questions, because a screen guard only ever
+ * asked `canShowModule` — and that is false just as much when there is no café
+ * at all as when the café lacks the entitlement. So a signed-out session, or a
+ * read that never landed, produced "Resumen no está activo en este café" over an
+ * empty shell, which reads as a configuration problem at a business nobody
+ * selected. Different causes, different sentences, and only one of them is about
+ * products.
+ */
+function MerchantUnavailable({ state }) {
+  const { t } = useLingui();
+  const loading = state?.loading === true;
+  const failed = !loading && Boolean(state?.error);
+  const noMerchants = !loading && !failed && (state?.merchants?.length ?? 0) === 0;
+  const title = loading
+    ? t`Cargando el negocio`
+    : failed
+      ? t`No se pudo cargar el negocio`
+      : noMerchants
+        ? t`Esta cuenta no tiene negocios`
+        : t`Sin negocio seleccionado`;
+  const body = loading
+    ? t`Un momento.`
+    : failed
+      ? t`La consola no pudo leer tus negocios. Revisa la conexión y vuelve a cargar.`
+      : noMerchants
+        ? t`La cuenta con la que entraste no tiene acceso a ningún negocio todavía.`
+        : t`Elige un negocio en la barra lateral.`;
+  return (
+    <div className="card" style={{ padding: '38px 34px' }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>{title}</h2>
+      <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>{body}</div>
+      {loading ? null : (
+        <button
+          className="btn btn-ghost"
+          style={{ marginTop: 18 }}
+          onClick={() => window.location.reload()}
+        >
+          {t`Recargar`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Says why a screen that reads per branch has nothing to read.
+ *
+ * The café is entitled to the screen and the sidebar is working, so nothing is
+ * broken — the café simply has no locations yet. Saying so is the whole point:
+ * without it the operator got an empty page under a working shell.
+ */
+function LocationUnavailable({ state }) {
+  const { t } = useLingui();
+  const name = state?.capabilities?.merchant?.name;
+  return (
+    <div className="card" style={{ padding: '38px 34px' }}>
+      <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>
+        {name
+          ? t`${name} todavía no tiene sucursales`
+          : t`Este negocio todavía no tiene sucursales`}
+      </h2>
+      <div style={{ fontSize: 14, color: 'var(--ink-3)', maxWidth: 620 }}>
+        {t`Los planos, el catálogo y las ventas se guardan por sucursal, así que esta pantalla necesita una. Crea la primera sucursal para este negocio y vuelve aquí.`}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Refuses a screen the selected café is not entitled to.
+ *
+ * The label and the product name come from MODULES, not from the route: they were
+ * hand-copied at each call site, which is a second place for them to drift from the
+ * registry that actually decides. A route now names only its module key.
+ */
+function GuardedScreen({ moduleKey, children }) {
+  const merchantState = useMerchant();
+  const { i18n } = useLingui();
+  if (!merchantState?.canShowModule?.(moduleKey)) {
+    // No café, no product information: this is not the product card's question.
+    if (!merchantState?.capabilities) {
+      return <MerchantUnavailable state={merchantState} />;
+    }
+    const mod = MODULES[moduleKey] || {};
+    const label = mod.label ? i18n._(mod.label) : moduleKey;
+    return mod.platform && !mod.product ? (
+      <PlatformOnly moduleName={label} />
+    ) : (
+      <ProductUnavailable
+        moduleName={label}
+        product={PRODUCT_LABELS[mod.product] || mod.product || undefined}
+      />
+    );
   }
-  return children
+  // Entitled, but a screen that reads per branch has no branch to read.
+  if (missingLocationFor(moduleKey, merchantState?.capabilities)) {
+    return <LocationUnavailable state={merchantState} />;
+  }
+  return children;
 }
 
 function DashboardLayout() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const [collapsed, setCollapsed] = useState(false)
-  const [ordersPaused, setOrdersPaused] = useState(false)
-  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS)
-  const tenantState = useTenant()
-  const { data: tenant } = useTenantData()
-  const tenantName = tenantState?.selectedTenant?.name || tenant?.name
-  const connection = useKdsConnection()
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [ordersPaused, setOrdersPaused] = useState(false);
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const { i18n } = useLingui();
+  const { session } = useAuth();
+  const merchantState = useMerchant();
+  const { data: merchant } = useMerchantData();
+  const merchantName = merchantState?.selectedMerchant?.name || merchant?.name;
+  const connection = useKdsConnection();
 
-  const rawScreen = location.pathname.split('/').filter(Boolean)[0] || 'overview'
-  const screen = rawScreen === 'conversations' || rawScreen === 'insights' ? 'customers' : rawScreen
+  const rawScreen = location.pathname.split('/').filter(Boolean)[0] || 'overview';
+  const screen =
+    rawScreen === 'conversations' || rawScreen === 'insights' ? 'customers' : rawScreen;
+  // The full path (e.g. "reportes/recibos") drives nested-nav sub-item highlighting.
+  const activeFull = location.pathname.replace(/^\/+/, '').split('?')[0] || 'overview';
 
   useEffect(() => {
-    if (tenant?.primaryColor) document.documentElement.style.setProperty('--tenant-brand', tenant.primaryColor)
-  }, [tenant?.primaryColor])
+    if (merchant?.primaryColor)
+      document.documentElement.style.setProperty('--merchant-brand', merchant.primaryColor);
+  }, [merchant?.primaryColor]);
+
+  // The café record carries a locale ("es-MX"). It only speaks when the owner has
+  // not picked a language in this browser; a saved choice always wins.
+  const merchantLocale = merchantState?.selectedMerchant?.locale || merchant?.locale;
+  useEffect(() => {
+    if (merchantLocale) applyMerchantLocale(merchantLocale);
+  }, [merchantLocale]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--density-pad', tweaks.density === 'cozy' ? '0.92' : '1')
-  }, [tweaks.density])
+    document.documentElement.style.setProperty(
+      '--density-pad',
+      tweaks.density === 'cozy' ? '0.92' : '1',
+    );
+  }, [tweaks.density]);
 
-  const nav = (id) => navigate('/' + (id === 'overview' ? '' : id))
+  // -------------------------------------------------------------------------
+  // ROLE LANDING — plan §8C: "Every role opens the screen that role needs, not
+  // the owner screen with fewer buttons". `role-landing.js` decides which screen.
+  //
+  // WHERE A SESSION BEGINS, both ways in: the login screen navigates to `/`, and
+  // a cold load of an already-signed-in shell starts here. Both land through
+  // this effect, so there is one implementation and no second copy in login.jsx.
+  //
+  // LAND ONCE. The ref flips on the first render that has a resolved merchant,
+  // whether or not it navigated, and it is never cleared. An operator who then
+  // clicks `Resumen` lands on `/` and STAYS there: the shell does not fight the
+  // person it is showing. For the same reason an explicit destination is left
+  // alone — a deep link or a bookmark (`/orders`, `/settings`) is a request, and
+  // only the root path is treated as "no destination chosen yet".
+  //
+  // The resolver asks THIS context (`canShowModule`, the registry gate that
+  // already reads permissions, product entitlement and the platform grant), so a
+  // landing can never name a screen `GuardedScreen` would refuse.
+  // -------------------------------------------------------------------------
+  const landedRef = useRef(false);
+  const capabilities = merchantState?.capabilities;
+  useEffect(() => {
+    if (landedRef.current || !capabilities) return;
+    landedRef.current = true;
+    if (location.pathname !== '/') return;
+    const route = landingRouteFor({
+      roleKey: capabilities.membership?.role,
+      permissions: capabilities.membership?.permissions,
+      canShow: (moduleKey) => merchantState.canShowModule(moduleKey),
+    });
+    if (route && route !== location.pathname) navigate(route, { replace: true });
+  }, [capabilities, location.pathname, merchantState, navigate]);
 
-  if (tenantState?.loading && !tenantState?.capabilities) {
+  const nav = (id) => {
+    setNavOpen(false);
+    navigate('/' + (id === 'overview' ? '' : id));
+  };
+
+  if (merchantState?.loading && !merchantState?.capabilities) {
     return (
-      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--ink-3)', fontSize:14 }}>
-        Cargando tenant...
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--ink-3)',
+          fontSize: 14,
+        }}
+      >
+        <Trans>Cargando negocio…</Trans>
       </div>
-    )
+    );
   }
 
   return (
-    <div className={'app' + (collapsed ? ' collapsed' : '')}>
+    <div className={'app' + (collapsed ? ' collapsed' : '') + (navOpen ? ' nav-open' : '')}>
+      {/* Below 1080 the sidebar leaves the grid and becomes a drawer. The scrim
+          both dims the page and gives the drawer a dismiss target — a drawer you
+          can only close from its own button is a trap on a touch screen. */}
+      <div
+        className="side-scrim"
+        onClick={() => setNavOpen(false)}
+        role="button"
+        tabIndex={-1}
+        aria-label={i18n._(msgCloseMenu)}
+      />
       <Sidebar
         active={screen}
+        activeFull={activeFull}
         onChange={nav}
         collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed(c => !c)}
-        tenantName={tenantName}
-        navItems={tenantState?.visibleModules}
-        tenants={tenantState?.tenants}
-        selectedTenantId={tenantState?.selectedTenantId}
-        onTenantChange={tenantState?.setSelectedTenantId}
-        onSignOut={signOut}
+        onToggleCollapse={() => setCollapsed((c) => !c)}
+        merchantName={merchantName}
+        navItems={merchantState?.visibleModules}
+        merchants={merchantState?.merchants}
+        selectedMerchantId={merchantState?.selectedMerchantId}
+        onMerchantChange={merchantState?.setSelectedMerchantId}
       />
       <main className="main">
         <Topbar
-          business={tenantName || 'Umi Dash'}
-          status="ACTIVE"
+          merchant={merchantName}
+          onMenu={() => setNavOpen(true)}
           screen={screen}
-          tenantName={tenantName}
-          locations={tenantState?.capabilities?.locations || []}
-          selectedLocationId={tenantState?.selectedLocationId}
-          onLocationChange={tenantState?.setSelectedLocationId}
+          merchantName={merchantName}
+          locations={merchantState?.capabilities?.locations || []}
+          canSwitchLocations={merchantState?.capabilities?.canSwitchLocations === true}
+          selectedLocationId={
+            merchantState?.selectedLocationId || merchantState?.capabilities?.selectedLocation?.id
+          }
+          onLocationChange={merchantState?.setSelectedLocationId}
           connection={connection}
+          onProfile={() => nav('profile')}
+          profileActive={screen === 'profile'}
+          userName={session?.user?.displayName}
+          userEmail={session?.user?.email}
+          onSignOut={signOut}
         />
         <div className="screen-body" key={screen}>
           <Routes>
-            <Route index element={<OverviewScreen onNavigate={nav} ordersPaused={ordersPaused} setOrdersPaused={setOrdersPaused}/>}/>
-            <Route path="orders"   element={<GuardedScreen moduleKey="orders" moduleName="Pedidos" product="KDS"><OrdersScreen/></GuardedScreen>}/>
-            <Route path="devices"  element={<GuardedScreen moduleKey="devices" moduleName="Devices" product="KDS"><DevicesScreen/></GuardedScreen>}/>
-            <Route path="staff"    element={<StaffScreen/>}/>
-            <Route path="customers/*" element={<GuardedScreen moduleKey="customers" moduleName="Customers" product="Dashboard"><CustomersScreen/></GuardedScreen>}/>
-            <Route path="members"  element={<GuardedScreen moduleKey="members" moduleName="Loyalty" product="Umi Cash"><MembersScreen/></GuardedScreen>}/>
-            <Route path="gift-cards" element={<GuardedScreen moduleKey="gift-cards" moduleName="Gift Cards" product="Umi Cash"><GiftCardsScreen/></GuardedScreen>}/>
-            <Route path="insights" element={<Navigate to="/customers" replace/>}/>
-            <Route path="conversations/*" element={<Navigate to="/customers?filter=whatsapp" replace/>}/>
-            <Route path="hours"    element={<GuardedScreen moduleKey="hours" moduleName="Hours" product="ConversaFlow"><HoursScreen ordersPaused={ordersPaused} setOrdersPaused={setOrdersPaused}/></GuardedScreen>}/>
-            <Route path="settings" element={<SettingsScreen/>}/>
-            <Route path="products-billing" element={<ProductsBillingScreen/>}/>
-            <Route path="*"        element={<Navigate to="/" replace/>}/>
+            {/* `index` was the ONE route with no guard. An un-entitled café landed
+                on a live-looking Overview — "EN VIVO · UMI CASH" over empty dashes —
+                which reads as "no activity today" rather than "you do not have this
+                product". `staff` and `settings` had the same hole. */}
+            <Route
+              index
+              element={
+                <GuardedScreen moduleKey="overview">
+                  <OverviewScreen
+                    onNavigate={nav}
+                    ordersPaused={ordersPaused}
+                    setOrdersPaused={setOrdersPaused}
+                  />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="operations"
+              element={
+                <GuardedScreen moduleKey="operations">
+                  <OperationsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="reportes"
+              element={
+                <GuardedScreen moduleKey="reportes">
+                  <ReportesScreen view="sales" />
+                </GuardedScreen>
+              }
+            />
+            {/* Recibos dissolved into the Ventas view (ADR 2026-09-08). Redirect old
+                links and bookmarks to Reportes → Ventas, where the receipts view now lives. */}
+            <Route path="reportes/recibos" element={<Navigate to="/reportes" replace />} />
+            <Route
+              path="reportes/reembolsos"
+              element={
+                <GuardedScreen moduleKey="reportes">
+                  <ReportesScreen view="refunds_voids" />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="cash-shifts"
+              element={
+                <GuardedScreen moduleKey="cash-shifts">
+                  <CashShiftsScreen view="cash_shifts" />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="cash-shifts/registros"
+              element={
+                <GuardedScreen moduleKey="cash-shifts">
+                  <CashShiftsScreen view="registers" />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="products/:tab?"
+              element={
+                <GuardedScreen moduleKey="products">
+                  <ProductsHub />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="inventory/:tab?"
+              element={
+                <GuardedScreen moduleKey="inventory">
+                  <InventoryHub />
+                </GuardedScreen>
+              }
+            />
+            {/*
+              The two routes the audit of 2026-09-18 replaced. They redirect rather
+              than 404, because a bookmark, a printed runbook, and every link in an
+              older doc still point at them.
+            */}
+            <Route path="catalog-inventory" element={<Navigate to="/products" replace />} />
+            <Route path="inventory-costing" element={<Navigate to="/inventory/costos" replace />} />
+            <Route
+              path="diagnostics"
+              element={
+                <GuardedScreen moduleKey="diagnostics">
+                  <DiagnosticsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="orders"
+              element={
+                <GuardedScreen moduleKey="orders">
+                  <OrdersScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="floor-plan"
+              element={
+                <GuardedScreen moduleKey="floor-plan">
+                  <Suspense fallback={<div role="status">…</div>}>
+                    <FloorPlanScreen />
+                  </Suspense>
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="kitchen"
+              element={
+                <GuardedScreen moduleKey="kitchen">
+                  <CocinaScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="devices"
+              element={
+                <GuardedScreen moduleKey="devices">
+                  <DevicesScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="staff"
+              element={
+                <GuardedScreen moduleKey="staff">
+                  <StaffScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="customers/*"
+              element={
+                <GuardedScreen moduleKey="customers">
+                  <CustomersScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="triage"
+              element={
+                <GuardedScreen moduleKey="triage">
+                  <TriageScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="loyalty-value"
+              element={
+                <GuardedScreen moduleKey="loyalty-value">
+                  <LoyaltyValueScreen />
+                </GuardedScreen>
+              }
+            />
+            {/* Old single-domain routes fold into the Lealtad y valor hub. Keep the
+                paths as redirects so no bookmark 404s. */}
+            <Route path="members" element={<Navigate to="/loyalty-value" replace />} />
+            <Route path="gift-cards" element={<Navigate to="/loyalty-value" replace />} />
+            <Route path="insights" element={<Navigate to="/customers" replace />} />
+            <Route
+              path="conversations/*"
+              element={<Navigate to="/customers?filter=whatsapp" replace />}
+            />
+            <Route
+              path="hours"
+              element={
+                <GuardedScreen moduleKey="hours">
+                  <HoursScreen ordersPaused={ordersPaused} setOrdersPaused={setOrdersPaused} />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <GuardedScreen moduleKey="settings">
+                  <SettingsScreen />
+                </GuardedScreen>
+              }
+            />
+            <Route
+              path="products-billing"
+              element={
+                <GuardedScreen moduleKey="products-billing">
+                  <ProductsBillingScreen />
+                </GuardedScreen>
+              }
+            />
+            {/* Platform, not café. The screen also re-checks the grant itself: a route
+                is reachable by URL whether or not the sidebar offers it, and the two
+                checks read the same `platformRole`. */}
+            <Route
+              path="cafes"
+              element={
+                <GuardedScreen moduleKey="cafes">
+                  <CafesScreen />
+                </GuardedScreen>
+              }
+            />
+            {/* Personal, not café-scoped: every signed-in operator reaches their
+                own profile, whatever product the selected café owns. RequireAuth
+                already gates it, so it needs no GuardedScreen. */}
+            <Route path="profile" element={<ProfileScreen />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
       </main>
 
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Wallet card brand">
-          <TweakColor label="Quick tenant" value={tweaks.tenantHue}
-            options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
-            onChange={(v) => { setTweak('tenantHue', v); document.documentElement.style.setProperty('--tenant-brand', v) }}/>
-        </TweakSection>
-        <TweakSection title="Density">
-          <TweakRadio label="Spacing" value={tweaks.density} options={['cozy', 'comfy']} onChange={(v) => setTweak('density', v)}/>
-        </TweakSection>
-        <TweakSection title="Language">
-          <TweakRadio label="Greeting" value={tweaks.lang} options={['es', 'en']} onChange={(v) => setTweak('lang', v)}/>
-        </TweakSection>
-        <TweakSection title="Sidebar">
-          <TweakToggle label="Collapsed" value={collapsed} onChange={() => setCollapsed(c => !c)}/>
-        </TweakSection>
-        <TweakSection title="Operations">
-          <TweakToggle label="WhatsApp orders paused" value={ordersPaused} onChange={() => setOrdersPaused(p => !p)}/>
-        </TweakSection>
-      </TweaksPanel>
+      {/* Developer-only panel: its labels are not owner copy, so they stay in English. */}
+      {/* eslint-disable lingui/no-unlocalized-strings */}
+      {CFG.environment === 'development' && (
+        <TweaksPanel title="Ajustes de desarrollo">
+          <TweakSection title="Wallet card brand">
+            <TweakColor
+              label="Quick merchant"
+              value={tweaks.merchantHue}
+              options={['#B5605A', '#223979', '#5B7A4C', '#B5812A', '#7692CB', '#1F1410']}
+              onChange={(v) => {
+                setTweak('merchantHue', v);
+                document.documentElement.style.setProperty('--merchant-brand', v);
+              }}
+            />
+          </TweakSection>
+          <TweakSection title="Density">
+            <TweakRadio
+              label="Spacing"
+              value={tweaks.density}
+              options={['cozy', 'comfy']}
+              onChange={(v) => setTweak('density', v)}
+            />
+          </TweakSection>
+          <TweakSection title="Language">
+            <TweakRadio
+              label="Locale"
+              value={i18n.locale}
+              options={['es', 'en']}
+              onChange={(v) => activateLocale(v)}
+            />
+          </TweakSection>
+          <TweakSection title="Sidebar">
+            <TweakToggle
+              label="Collapsed"
+              value={collapsed}
+              onChange={() => setCollapsed((c) => !c)}
+            />
+          </TweakSection>
+          <TweakSection title="Operations">
+            <TweakToggle
+              label="WhatsApp orders paused"
+              value={ordersPaused}
+              onChange={() => setOrdersPaused((p) => !p)}
+            />
+          </TweakSection>
+        </TweaksPanel>
+      )}
+      {/* eslint-enable lingui/no-unlocalized-strings */}
     </div>
-  )
+  );
 }
 
 function RequireAuth({ children }) {
-  const { session, loading, needsPasswordReset } = useAuth()
-  if (loading) return (
-    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--ink-3)', fontSize:14 }}>
-      Cargando…
-    </div>
-  )
-  if (needsPasswordReset) return <ResetPasswordScreen/>
-  return session ? children : <Navigate to="/login" replace/>
+  const { session, loading } = useAuth();
+  if (loading)
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--ink-3)',
+          fontSize: 14,
+        }}
+      >
+        <Trans>Cargando…</Trans>
+      </div>
+    );
+  return session ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login"          element={<LoginScreen/>}/>
-      <Route path="/reset-password" element={<ResetPasswordScreen/>}/>
-      <Route path="/*" element={<RequireAuth><TenantProvider><DashboardLayout/></TenantProvider></RequireAuth>}/>
+      <Route path="/login" element={<LoginScreen />} />
+      <Route path="/reset-password" element={<ResetPasswordScreen />} />
+      <Route
+        path="/*"
+        element={
+          <RequireAuth>
+            <MerchantProvider>
+              <DashboardLayout />
+            </MerchantProvider>
+          </RequireAuth>
+        }
+      />
     </Routes>
-  )
+  );
 }

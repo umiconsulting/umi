@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=UmiPOS
+Comment=Punto de venta UmiPOS
+Exec=umi_pos
+Icon=umi_pos
+Categories=Office;Finance;
+Terminal=false
+StartupWMClass=umi_pos

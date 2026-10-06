@@ -5,7 +5,7 @@ import type { ProductRecord } from './product-search';
 import type { ToolContext } from '../turn.types';
 
 const CTX: ToolContext = {
-  tenantId: 't1',
+  merchantId: 't1',
   personId: 'p1',
   conversationId: 'c1',
   turnId: 'turn-9',
@@ -32,15 +32,15 @@ describe('CartTools.addToCart', () => {
     };
     const conversations = {
       loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
-      updateDraftCartCas: vi.fn().mockResolvedValue(1),
+      setDraftCart: vi.fn().mockResolvedValue(1),
     };
     const cart = new CartTools(products as never, conversations as never);
 
     const r = await cart.addToCart(CTX, { query: 'latte grande', quantity: 1 });
     expect(r.success).toBe(true);
     expect(r.total).toBe(60); // GDE variant, pesos
-    expect(conversations.updateDraftCartCas).toHaveBeenCalledTimes(1);
-    const writtenCart = conversations.updateDraftCartCas.mock.calls[0][2];
+    expect(conversations.setDraftCart).toHaveBeenCalledTimes(1);
+    const writtenCart = conversations.setDraftCart.mock.calls[0][1];
     expect(writtenCart.items[0]).toMatchObject({
       product_id: 'p-latte',
       variant_name: 'GDE, CALIENTE',
@@ -48,40 +48,129 @@ describe('CartTools.addToCart', () => {
       unit_price: 60,
     });
   });
+
+  // `presented_at` is what lets the next turn read a bare "ya" as a yes to a KNOWN
+  // order, so it must mean "the customer saw this priced" and nothing looser.
+  it('stamps presented_at when the write is followed by the priced summary', async () => {
+    const products = {
+      searchByQuery: vi.fn().mockResolvedValue([latte]),
+      categorySuggestions: vi.fn().mockResolvedValue([]),
+    };
+    const conversations = {
+      loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
+      setDraftCart: vi.fn().mockResolvedValue(1),
+    };
+    const cart = new CartTools(products as never, conversations as never);
+
+    const r = await cart.addToCart(CTX, { query: 'latte grande', quantity: 1 });
+    expect(r.summary_text).toContain('Total');
+    expect(conversations.setDraftCart.mock.calls[0][1].presented_at).toEqual(expect.any(String));
+  });
+
+  it('does NOT stamp presented_at when the edit answers with a question, not a total', async () => {
+    // editCart with an unresolved "keep only X" writes the cart and then replies with
+    // a clarification. Stamping there would have the confirmation frame tell the model
+    // the customer saw a price they were never shown.
+    const products = {
+      searchByQuery: vi.fn().mockResolvedValue([latte]),
+      categorySuggestions: vi.fn().mockResolvedValue([]),
+    };
+    const conversations = {
+      loadById: vi.fn().mockResolvedValue({
+        draftCart: {
+          items: [
+            {
+              product_id: 'p-latte',
+              product_name: 'Latte',
+              variant_name: null,
+              quantity: 1,
+              unit_price: 50,
+            },
+            {
+              product_id: 'p-tea',
+              product_name: 'Té',
+              variant_name: null,
+              quantity: 1,
+              unit_price: 40,
+            },
+          ],
+          updated_at: '2026-08-15T00:00:00Z',
+        },
+        draftCartVersion: 0,
+      }),
+      setDraftCart: vi.fn().mockResolvedValue(1),
+    };
+    const cart = new CartTools(products as never, conversations as never);
+
+    const r = await cart.editCart(CTX, { keep_query: 'capuchino' });
+
+    // The branch must actually be the clarification one, or this proves nothing.
+    expect(r.needs_clarification).toContain('capuchino');
+    expect(conversations.setDraftCart).toHaveBeenCalledTimes(1);
+    expect(conversations.setDraftCart.mock.calls[0][1]?.presented_at).toBeUndefined();
+  });
 });
 
 describe('CheckoutTools.confirmOrder', () => {
   let orders: { createOrder: ReturnType<typeof vi.fn> };
   let products: { getByIds: ReturnType<typeof vi.fn> };
-  let conversations: { loadById: ReturnType<typeof vi.fn>; updateDraftCartCas: ReturnType<typeof vi.fn> };
-  let hours: { checkOrderingEnabled: ReturnType<typeof vi.fn>; isWithinOrderHours: ReturnType<typeof vi.fn>; getOrdersClosedMessage: ReturnType<typeof vi.fn> };
+  let conversations: {
+    loadById: ReturnType<typeof vi.fn>;
+    setDraftCart: ReturnType<typeof vi.fn>;
+  };
+  let hours: {
+    checkOrderingEnabled: ReturnType<typeof vi.fn>;
+    isWithinOrderHours: ReturnType<typeof vi.fn>;
+    getOrdersClosedMessage: ReturnType<typeof vi.fn>;
+  };
   let locations: { resolve: ReturnType<typeof vi.fn> };
 
   const build = () =>
-    new CheckoutTools(orders as never, products as never, conversations as never, hours as never, locations as never);
+    new CheckoutTools(
+      orders as never,
+      products as never,
+      conversations as never,
+      hours as never,
+      locations as never,
+    );
 
   beforeEach(() => {
-    orders = { createOrder: vi.fn().mockResolvedValue({ orderId: 'o-1', total: 60, created: true }) };
+    orders = {
+      createOrder: vi.fn().mockResolvedValue({ orderId: 'o-1', total: 60, created: true }),
+    };
     products = { getByIds: vi.fn().mockResolvedValue(new Map([['p-latte', latte]])) };
     conversations = {
       loadById: vi.fn().mockResolvedValue({
         draftCart: {
-          items: [{ product_id: 'p-latte', product_name: 'Latte', variant_name: 'GDE, CALIENTE', quantity: 1, unit_price: 60 }],
+          items: [
+            {
+              product_id: 'p-latte',
+              product_name: 'Latte',
+              variant_name: 'GDE, CALIENTE',
+              quantity: 1,
+              unit_price: 60,
+            },
+          ],
           updated_at: new Date(0).toISOString(),
           customer_note: null,
         },
         draftCartVersion: 3,
       }),
-      updateDraftCartCas: vi.fn().mockResolvedValue(4),
+      setDraftCart: vi.fn().mockResolvedValue(4),
     };
     hours = {
       checkOrderingEnabled: vi.fn().mockResolvedValue({ enabled: true, disabledMessage: null }),
       isWithinOrderHours: vi.fn().mockResolvedValue(true),
       getOrdersClosedMessage: vi.fn().mockResolvedValue('cerrado'),
     };
-    // Default: a single-branch tenant that resolves to its sole location.
+    // Default: a single-location merchant that resolves to its sole location.
     locations = {
-      resolve: vi.fn().mockResolvedValue({ kind: 'resolved', locationId: 'loc-sole', source: 'sole', name: 'Centro' }),
+      resolve: vi.fn().mockResolvedValue({
+        kind: 'resolved',
+        locationId: 'loc-sole',
+        source: 'sole',
+        name: 'Centro',
+      }),
     };
   });
 
@@ -91,31 +180,41 @@ describe('CheckoutTools.confirmOrder', () => {
     expect(r.order_id).toBe('o-1');
     expect(orders.createOrder).toHaveBeenCalledTimes(1);
     // The bug fix: idempotency key is the turn, not a fresh UUID.
-    expect(orders.createOrder.mock.calls[0][0].sourceTransactionId).toBe('conversaflow:turn:turn-9');
+    expect(orders.createOrder.mock.calls[0][0].sourceTransactionId).toBe(
+      'conversaflow:turn:turn-9',
+    );
     // Draft cart cleared at the version it was read at.
-    expect(conversations.updateDraftCartCas).toHaveBeenCalledWith('c1', 3, null);
+    expect(conversations.setDraftCart).toHaveBeenCalledWith('c1', null);
   });
 
-  it('writes the branch the fulfillment policy resolved', async () => {
-    locations.resolve.mockResolvedValue({ kind: 'resolved', locationId: 'loc-b', source: 'selection', name: 'Condesa' });
+  it('writes the location the fulfillment policy resolved', async () => {
+    locations.resolve.mockResolvedValue({
+      kind: 'resolved',
+      locationId: 'loc-b',
+      source: 'selection',
+      name: 'Condesa',
+    });
     await build().confirmOrder(CTX, {});
     expect(orders.createOrder.mock.calls[0][0].locationId).toBe('loc-b');
   });
 
-  it('asks which branch (needs_input) when the policy needs a selection, without writing or losing the order', async () => {
+  it('asks which location (needs_input) when the policy needs a selection, without writing or losing the order', async () => {
     locations.resolve.mockResolvedValue({
       kind: 'needs_selection',
-      branches: [{ id: 'loc-a', name: 'Roma' }, { id: 'loc-b', name: 'Condesa' }],
+      locations: [
+        { id: 'loc-a', name: 'Roma' },
+        { id: 'loc-b', name: 'Condesa' },
+      ],
     });
     const r = await build().confirmOrder(CTX, {});
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(orders.createOrder).not.toHaveBeenCalled();
-    // Order preserved: the draft cart is NOT cleared while we ask for the branch.
-    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+    // Order preserved: the draft cart is NOT cleared while we ask for the location.
+    expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 
-  it('degrades to a NULL location (never blocks the order) when the tenant has no active branch', async () => {
+  it('degrades to a NULL location (never blocks the order) when the merchant has no active location', async () => {
     locations.resolve.mockResolvedValue({ kind: 'none' });
     const r = await build().confirmOrder(CTX, {});
     expect(r.success).toBe(true);
@@ -133,12 +232,25 @@ describe('CheckoutTools.confirmOrder', () => {
 describe('CheckoutTools.reorderLastOrder', () => {
   let orders: { createOrder: ReturnType<typeof vi.fn>; recentOrders: ReturnType<typeof vi.fn> };
   let products: { getByIds: ReturnType<typeof vi.fn> };
-  let conversations: { loadById: ReturnType<typeof vi.fn>; updateDraftCartCas: ReturnType<typeof vi.fn> };
-  let hours: { checkOrderingEnabled: ReturnType<typeof vi.fn>; isWithinOrderHours: ReturnType<typeof vi.fn>; getOrdersClosedMessage: ReturnType<typeof vi.fn> };
+  let conversations: {
+    loadById: ReturnType<typeof vi.fn>;
+    setDraftCart: ReturnType<typeof vi.fn>;
+  };
+  let hours: {
+    checkOrderingEnabled: ReturnType<typeof vi.fn>;
+    isWithinOrderHours: ReturnType<typeof vi.fn>;
+    getOrdersClosedMessage: ReturnType<typeof vi.fn>;
+  };
   let locations: { resolve: ReturnType<typeof vi.fn> };
 
   const build = () =>
-    new CheckoutTools(orders as never, products as never, conversations as never, hours as never, locations as never);
+    new CheckoutTools(
+      orders as never,
+      products as never,
+      conversations as never,
+      hours as never,
+      locations as never,
+    );
 
   beforeEach(() => {
     orders = {
@@ -147,56 +259,77 @@ describe('CheckoutTools.reorderLastOrder', () => {
         {
           id: 'o-prev',
           status: 'completed',
-          kitchenStatus: 'completed',
-          items: [{ product_id: 'p-latte', product_name: 'Latte', variant_name: 'GDE, CALIENTE', quantity: 1, unit_price: 60 }],
+          items: [
+            {
+              product_id: 'p-latte',
+              product_name: 'Latte',
+              variant_name: 'GDE, CALIENTE',
+              quantity: 1,
+              unit_price: 60,
+            },
+          ],
           customerNote: null,
           pickupPerson: null,
-          personalMessage: null,
         },
       ]),
     };
     products = { getByIds: vi.fn().mockResolvedValue(new Map([['p-latte', latte]])) };
     // reorder never touches the draft cart; these must stay untouched.
-    conversations = { loadById: vi.fn(), updateDraftCartCas: vi.fn() };
+    conversations = { loadById: vi.fn(), setDraftCart: vi.fn() };
     hours = {
       checkOrderingEnabled: vi.fn().mockResolvedValue({ enabled: true, disabledMessage: null }),
       isWithinOrderHours: vi.fn().mockResolvedValue(true),
       getOrdersClosedMessage: vi.fn().mockResolvedValue('cerrado'),
     };
-    // Default: a single-branch tenant that resolves to its sole location.
+    // Default: a single-location merchant that resolves to its sole location.
     locations = {
-      resolve: vi.fn().mockResolvedValue({ kind: 'resolved', locationId: 'loc-sole', source: 'sole', name: 'Centro' }),
+      resolve: vi.fn().mockResolvedValue({
+        kind: 'resolved',
+        locationId: 'loc-sole',
+        source: 'sole',
+        name: 'Centro',
+      }),
     };
   });
 
-  it('stamps the sole location for a single-branch tenant', async () => {
+  it('stamps the sole location for a single-location merchant', async () => {
     const r = await build().reorderLastOrder(CTX, {});
     expect(r.success).toBe(true);
     expect(orders.createOrder).toHaveBeenCalledTimes(1);
     expect(orders.createOrder.mock.calls[0][0].locationId).toBe('loc-sole');
     // Same per-turn idempotency key the confirm path uses.
-    expect(orders.createOrder.mock.calls[0][0].sourceTransactionId).toBe('conversaflow:turn:turn-9');
+    expect(orders.createOrder.mock.calls[0][0].sourceTransactionId).toBe(
+      'conversaflow:turn:turn-9',
+    );
   });
 
-  it('writes the branch the fulfillment policy resolved', async () => {
-    locations.resolve.mockResolvedValue({ kind: 'resolved', locationId: 'loc-b', source: 'selection', name: 'Condesa' });
+  it('writes the location the fulfillment policy resolved', async () => {
+    locations.resolve.mockResolvedValue({
+      kind: 'resolved',
+      locationId: 'loc-b',
+      source: 'selection',
+      name: 'Condesa',
+    });
     await build().reorderLastOrder(CTX, {});
     expect(orders.createOrder.mock.calls[0][0].locationId).toBe('loc-b');
   });
 
-  it('asks which branch (needs_input) when the policy needs a selection, without recreating the order', async () => {
+  it('asks which location (needs_input) when the policy needs a selection, without recreating the order', async () => {
     locations.resolve.mockResolvedValue({
       kind: 'needs_selection',
-      branches: [{ id: 'loc-a', name: 'Roma' }, { id: 'loc-b', name: 'Condesa' }],
+      locations: [
+        { id: 'loc-a', name: 'Roma' },
+        { id: 'loc-b', name: 'Condesa' },
+      ],
     });
     const r = await build().reorderLastOrder(CTX, {});
     expect(r.success).toBe(false);
     expect(r.error_type).toBe('needs_input');
     expect(orders.createOrder).not.toHaveBeenCalled();
-    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+    expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 
-  it('degrades to a NULL location (never blocks the reorder) when the tenant has no active branch', async () => {
+  it('degrades to a NULL location (never blocks the reorder) when the merchant has no active location', async () => {
     locations.resolve.mockResolvedValue({ kind: 'none' });
     const r = await build().reorderLastOrder(CTX, {});
     expect(r.success).toBe(true);
@@ -206,7 +339,15 @@ describe('CheckoutTools.reorderLastOrder', () => {
 
 describe('CheckoutTools.cancelOrder', () => {
   const draftCart = {
-    items: [{ product_id: 'p-latte', product_name: 'Latte', variant_name: 'GDE, CALIENTE', quantity: 1, unit_price: 60 }],
+    items: [
+      {
+        product_id: 'p-latte',
+        product_name: 'Latte',
+        variant_name: 'GDE, CALIENTE',
+        quantity: 1,
+        unit_price: 60,
+      },
+    ],
     updated_at: new Date(0).toISOString(),
     customer_note: null,
   };
@@ -215,33 +356,45 @@ describe('CheckoutTools.cancelOrder', () => {
     const orders = { recentOrders: vi.fn(), markCancelled: vi.fn() };
     const conversations = {
       loadById: vi.fn().mockResolvedValue({ draftCart, draftCartVersion: 7 }),
-      updateDraftCartCas: vi.fn().mockResolvedValue(8),
+      setDraftCart: vi.fn().mockResolvedValue(8),
     };
-    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never, {} as never);
+    const checkout = new CheckoutTools(
+      orders as never,
+      {} as never,
+      conversations as never,
+      {} as never,
+      {} as never,
+    );
 
     const r = await checkout.cancelOrder(CTX, 'ya no quiero');
     expect(r.success).toBe(true);
     // Draft cart emptied at the read version; ops.orders never consulted.
-    expect(conversations.updateDraftCartCas).toHaveBeenCalledWith('c1', 7, null);
+    expect(conversations.setDraftCart).toHaveBeenCalledWith('c1', null);
     expect(orders.recentOrders).not.toHaveBeenCalled();
     expect(orders.markCancelled).not.toHaveBeenCalled();
   });
 
   it('falls back to cancelling a confirmed, not-yet-started order when no draft cart', async () => {
     const orders = {
-      recentOrders: vi.fn().mockResolvedValue([{ id: 'o-9', status: 'pending', kitchenStatus: 'new', items: [{}] }]),
+      recentOrders: vi.fn().mockResolvedValue([{ id: 'o-9', status: 'placed', items: [{}] }]),
       markCancelled: vi.fn().mockResolvedValue(undefined),
     };
     const conversations = {
       loadById: vi.fn().mockResolvedValue({ draftCart: null, draftCartVersion: 0 }),
-      updateDraftCartCas: vi.fn(),
+      setDraftCart: vi.fn(),
     };
-    const checkout = new CheckoutTools(orders as never, {} as never, conversations as never, {} as never, {} as never);
+    const checkout = new CheckoutTools(
+      orders as never,
+      {} as never,
+      conversations as never,
+      {} as never,
+      {} as never,
+    );
 
     const r = await checkout.cancelOrder(CTX, 'me arrepentí');
     expect(r.success).toBe(true);
     expect(r.order_id).toBe('o-9');
     expect(orders.markCancelled).toHaveBeenCalledWith('t1', 'o-9', 'me arrepentí');
-    expect(conversations.updateDraftCartCas).not.toHaveBeenCalled();
+    expect(conversations.setDraftCart).not.toHaveBeenCalled();
   });
 });

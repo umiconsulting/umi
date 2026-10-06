@@ -14,13 +14,13 @@ We shipped partial cancellation in two passes (`20260422010000_kds_partial_cance
 ticket `ecab9cb5-2236-4c7a-85b5-b6b828c45d28` (customer `+5216671518408`, 2026-04-19) shows
 the failure mode in production:
 
-| t (UTC)   | Actor          | Action                                                | Outcome / Twilio body                              |
-|-----------|----------------|-------------------------------------------------------|----------------------------------------------------|
-| 01:20:21  | trigger        | order_upserted ×3 then status_changed `cancelled`     | (no message — ignored, see §3.4)                   |
-| 01:28:39  | Kitchen iPad   | partial_cancel_items, reason "No hay leche"           | Outbox queued (delivered 01:35:43)                 |
-| 01:35:43  | outbox→Twilio  | "Se modificó tu pedido… ¿Deseas aceptar…?"            | Customer reads, **never replies**                  |
-| 18:24:38  | Kitchen iPad   | transition_ticket → `accepted` (from partial_cancelled)| "Tu pedido fue aceptado y está en cola en cocina." |
-| 18:24:50  | Kitchen iPad   | transition_ticket → `cancelled`, reason "Niggga"      | "Tu pedido fue cancelado. Motivo: Niggga"          |
+| t (UTC)  | Actor         | Action                                                  | Outcome / Twilio body                              |
+| -------- | ------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| 01:20:21 | trigger       | order_upserted ×3 then status_changed `cancelled`       | (no message — ignored, see §3.4)                   |
+| 01:28:39 | Kitchen iPad  | partial_cancel_items, reason "No hay leche"             | Outbox queued (delivered 01:35:43)                 |
+| 01:35:43 | outbox→Twilio | "Se modificó tu pedido… ¿Deseas aceptar…?"              | Customer reads, **never replies**                  |
+| 18:24:38 | Kitchen iPad  | transition_ticket → `accepted` (from partial_cancelled) | "Tu pedido fue aceptado y está en cola en cocina." |
+| 18:24:50 | Kitchen iPad  | transition_ticket → `cancelled`, reason "Niggga"        | "Tu pedido fue cancelado. Motivo: Niggga"          |
 
 In 12 seconds the customer received contradictory "accepted" then "cancelled" notifications,
 the cancellation reason was an unfiltered slur from operator free-text, and the ticket had
@@ -28,8 +28,8 @@ already been auto-cancelled by the trigger 17 hours earlier — yet the KDS app 
 keep transitioning it. That single timeline contains every defect we need to fix.
 
 > **Steve Jobs lens.** A KDS is a back-of-house safety-critical surface: high tempo, gloved
-> hands, oblique angles, distractions. Each interaction must be *unambiguous, reversible-for-30s,
-> then irreversible*, and the customer-facing surface must never contradict itself. Anything
+> hands, oblique angles, distractions. Each interaction must be _unambiguous, reversible-for-30s,
+> then irreversible_, and the customer-facing surface must never contradict itself. Anything
 > else is friction the operator pays for in mistakes and the customer pays for in trust.
 
 ---
@@ -40,8 +40,8 @@ We organise the work around six personas/situations. Each story is the acceptanc
 
 ### 2.1 Operator — "Pending confirmation" should not be mutable
 
-> *As a barista, when an order has just landed and I haven't accepted it yet, I should not be
-> able to mark it Preparing or Ready. The only verbs available are **Accept** or **Reject**.*
+> _As a barista, when an order has just landed and I haven't accepted it yet, I should not be
+> able to mark it Preparing or Ready. The only verbs available are **Accept** or **Reject**._
 
 **Why it matters.** Today the KDS lets the operator skip from `new` → `preparing` (or even
 `ready`) because `kds.transition_ticket` has no source-state guard. The customer is told
@@ -49,45 +49,45 @@ We organise the work around six personas/situations. Each story is the acceptanc
 
 ### 2.2 Operator — A Ready order is irrevocable
 
-> *Once I tap Ready, the only follow-up is Completed. There is no "cancel" button on a ready
-> order, because the food already exists and the customer is on their way to pick it up.*
+> _Once I tap Ready, the only follow-up is Completed. There is no "cancel" button on a ready
+> order, because the food already exists and the customer is on their way to pick it up._
 
 **Why it matters.** Trace #1 above shows a `ready→cancelled` path that should be impossible.
 Cancelling a Ready order destroys inventory, mis-bills the till, and confuses the customer.
 
-### 2.3 Operator — Partial cancellation is a *proposal*, not a commit
+### 2.3 Operator — Partial cancellation is a _proposal_, not a commit
 
-> *When I cancel some items I am proposing a change. The ticket waits in **Awaiting customer
+> _When I cancel some items I am proposing a change. The ticket waits in **Awaiting customer
 > confirmation** until the customer says yes / counter-proposes / cancels. I cannot prepare
-> these items and I cannot accept on the customer's behalf without a written override.*
+> these items and I cannot accept on the customer's behalf without a written override._
 
 **Why it matters.** The 18:24 events on ticket `ecab9cb5` were the operator pressing buttons
 on a ticket the customer had not responded to. The system silently committed.
 
 ### 2.4 Operator — Cancellation reasons come from a controlled vocabulary
 
-> *When I cancel or partially cancel I pick from a short list (out-of-stock, kitchen overload,
+> _When I cancel or partially cancel I pick from a short list (out-of-stock, kitchen overload,
 > closing soon, customer no-show, other). "Other" requires a typed reason ≥ 3 chars and is
-> redacted before the customer sees it.*
+> redacted before the customer sees it._
 
 **Why it matters.** "Niggga" reached the customer's phone verbatim. There is no validation,
 no profanity filter, and no template.
 
 ### 2.5 Customer — The conversation never contradicts itself
 
-> *As a customer on WhatsApp, the messages I receive form one coherent narrative. If I am
+> _As a customer on WhatsApp, the messages I receive form one coherent narrative. If I am
 > told the order is being prepared, I will not subsequently be told it was cancelled by the
 > kitchen 12 seconds later. If a partial cancel is pending my answer, the bot does not start
-> a new order with me until I respond.*
+> a new order with me until I respond._
 
 **Why it matters.** Trace #1: the customer received "aceptado" + "cancelado" within 12 s.
 This is not just embarrassing — it is the kind of incident that ends a business relationship.
 
 ### 2.6 Customer — Pending change has a deadline
 
-> *If I do not reply to a "¿Deseas aceptar estos cambios?" prompt within N minutes, the
+> _If I do not reply to a "¿Deseas aceptar estos cambios?" prompt within N minutes, the
 > kitchen is told and the ticket auto-resolves to a deterministic state (default: full
-> cancellation with refund), and I receive one final "no recibimos respuesta" message.*
+> cancellation with refund), and I receive one final "no recibimos respuesta" message._
 
 **Why it matters.** Today an unanswered partial cancel sits forever; the operator eventually
 decides for the customer. Either side is unhappy.
@@ -103,14 +103,14 @@ short-circuits when `target == current`, but never validates that `current → t
 legal edge. Anything goes from anywhere. The Swift `KitchenStatus.nextActionStatuses` in
 `apps/umi-kds/Sources/Domain/KitchenModels.swift:30-43` is the only enforcement.
 
-| From \ To       | accepted | preparing | ready | completed | cancelled | partial_cancelled |
-|-----------------|:--------:|:---------:|:-----:|:---------:|:---------:|:-----------------:|
-| **new**         | ✅        | ❌         | ❌     | ❌         | ✅         | ✅ (sheet only)    |
-| **accepted**    | —        | ✅         | ❌     | ❌         | ✅         | ✅                 |
-| **preparing**   | ❌        | —         | ✅     | ❌         | ✅         | ✅                 |
-| **ready**       | ❌        | ❌         | —     | ✅         | **❌**     | ❌                 |
-| **partial_cancelled** | ✅ (= confirm changes) | ❌ | ❌ | ❌ | ✅ (escalate to full) | — |
-| **completed / cancelled** | ❌ all (terminal) |||||  |
+| From \ To                 |        accepted        | preparing | ready | completed |       cancelled       | partial_cancelled |
+| ------------------------- | :--------------------: | :-------: | :---: | :-------: | :-------------------: | :---------------: |
+| **new**                   |           ✅           |    ❌     |  ❌   |    ❌     |          ✅           |  ✅ (sheet only)  |
+| **accepted**              |           —            |    ✅     |  ❌   |    ❌     |          ✅           |        ✅         |
+| **preparing**             |           ❌           |     —     |  ✅   |    ❌     |          ✅           |        ✅         |
+| **ready**                 |           ❌           |    ❌     |   —   |    ✅     |        **❌**         |        ❌         |
+| **partial_cancelled**     | ✅ (= confirm changes) |    ❌     |  ❌   |    ❌     | ✅ (escalate to full) |         —         |
+| **completed / cancelled** |   ❌ all (terminal)    |           |       |           |                       |                   |
 
 Where the table disagrees with `nextActionStatuses` today: the **backend permits everything**.
 
@@ -134,14 +134,14 @@ still noisy and breaks subscribers that key off `(ticket_id, sequence)`.
 
 ### 3.5 Outbox copy is generic
 
-`twilio.status_notification` for status `accepted` always sends *"Tu pedido fue aceptado y
-está en cola en cocina"* — even when the prior message was a partial-cancel proposal. The
-context (we are accepting *the modified order*) is lost.
+`twilio.status_notification` for status `accepted` always sends _"Tu pedido fue aceptado y
+está en cola en cocina"_ — even when the prior message was a partial-cancel proposal. The
+context (we are accepting _the modified order_) is lost.
 
 ### 3.6 LLM context for "awaiting confirmation"
 
 `getActivePartialCancelledOrder` + `effectiveCurrentState = 'awaiting_order_changes_confirmation'`
-in `turn-process.ts` are wired correctly, and `prompts.ts` adds the *CAMBIOS PENDIENTES* block.
+in `turn-process.ts` are wired correctly, and `prompts.ts` adds the _CAMBIOS PENDIENTES_ block.
 But the bot still relies on the LLM to honour the instruction; we have no programmatic gate
 preventing a fresh draft cart while a partial cancel is pending. `confirmOrderChanges`
 exists (`tools.ts:1683`) but the model can avoid calling it.
@@ -191,21 +191,21 @@ CREATE TYPE kds.cancel_reason_code AS ENUM (
 `reason_note` is required, length-limited, and runs through a profanity scrub before being
 embedded in customer-facing copy. Internal logs keep the raw note.
 
-### 4.3 Partial cancellation as a *pending proposal*
+### 4.3 Partial cancellation as a _pending proposal_
 
 Today `partial_cancelled` is a leaf state the operator can leave however they want. Target:
 
-* Add `kds.tickets.pending_change_id UUID` referencing a new `kds.ticket_change_proposals`
+- Add `kds.tickets.pending_change_id UUID` referencing a new `kds.ticket_change_proposals`
   row that holds `{cancelled_display_orders, reason_code, reason_note, proposed_at,
-  proposed_by, expires_at, decision, decided_at}`.
-* `partial_cancel_items` creates the proposal and locks the ticket: while a proposal exists,
+proposed_by, expires_at, decision, decided_at}`.
+- `partial_cancel_items` creates the proposal and locks the ticket: while a proposal exists,
   `transition_ticket` only accepts `accepted` (= confirm) or `cancelled` (= escalate full
   cancel). Both clear `pending_change_id` and write `decision`.
-* Add `kds.expire_pending_changes()` cron (every minute via pg_cron). When `expires_at <
-  now()`, decision defaults to the business policy in `conversaflow.business_settings.
-  partial_cancel_expiry_action` (default `escalate_full_cancel`). Cron emits the appropriate
+- Add `kds.expire_pending_changes()` cron (every minute via pg_cron). When `expires_at <
+now()`, decision defaults to the business policy in `conversaflow.business_settings.
+partial_cancel_expiry_action` (default `escalate_full_cancel`). Cron emits the appropriate
   event and outbox message.
-* Customer reply path (`confirmOrderChanges`, `cancelOrder` partial branch in `tools.ts`)
+- Customer reply path (`confirmOrderChanges`, `cancelOrder` partial branch in `tools.ts`)
   also writes the decision via the same RPC — single ledger.
 
 ### 4.4 Customer copy & narrative coherence
@@ -213,13 +213,13 @@ Today `partial_cancelled` is a leaf state the operator can leave however they wa
 Replace the static "Tu pedido fue aceptado..." string with a context-aware template chosen
 inside `kds.enqueue_whatsapp_status_notification`:
 
-| From → To                          | Template                                           |
-|------------------------------------|----------------------------------------------------|
-| new → accepted                     | "Tu pedido fue aceptado y está en cola en cocina." |
-| partial_cancelled → accepted       | "Confirmamos los cambios en tu pedido. Total actualizado: $X. Lo estamos preparando." |
-| partial_cancelled → cancelled      | "Cancelamos por completo tu pedido. Si quieres, podemos empezar uno nuevo." |
-| (cron) partial expiry → cancelled  | "No recibimos respuesta a la propuesta de cambio. Cancelamos el pedido. Cuando gustes, lo retomamos." |
-| ready → completed                  | "Tu pedido fue completado. ¡Gracias!"             |
+| From → To                         | Template                                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| new → accepted                    | "Tu pedido fue aceptado y está en cola en cocina."                                                    |
+| partial_cancelled → accepted      | "Confirmamos los cambios en tu pedido. Total actualizado: $X. Lo estamos preparando."                 |
+| partial_cancelled → cancelled     | "Cancelamos por completo tu pedido. Si quieres, podemos empezar uno nuevo."                           |
+| (cron) partial expiry → cancelled | "No recibimos respuesta a la propuesta de cambio. Cancelamos el pedido. Cuando gustes, lo retomamos." |
+| ready → completed                 | "Tu pedido fue completado. ¡Gracias!"                                                                 |
 
 Every status email/whatsapp message must be deterministic from `(from_status, to_status,
 reason_code)`. The operator never types into the customer-facing field.
@@ -229,30 +229,30 @@ reason_code)`. The operator never types into the customer-facing field.
 In `turn-process.ts`, after reading `effectiveCurrentState`, if state ==
 `awaiting_order_changes_confirmation`:
 
-* Strip `add_to_cart` / `create_order` from the available tool list before invoking the LLM
+- Strip `add_to_cart` / `create_order` from the available tool list before invoking the LLM
   for that turn.
-* Force-include `confirmOrderChanges`, `cancelOrder`, `requestModification` in the tool list.
-* Append a hard system instruction: "Do not start a new order until the customer has
+- Force-include `confirmOrderChanges`, `cancelOrder`, `requestModification` in the tool list.
+- Append a hard system instruction: "Do not start a new order until the customer has
   responded to the pending changes."
 
 This makes the LLM physically unable to side-step the proposal.
 
 ### 4.6 KDS app changes
 
-| File                                                          | Change                                                                                  |
-|---------------------------------------------------------------|------------------------------------------------------------------------------------------|
-| `Sources/Domain/KitchenModels.swift`                          | Match `nextActionStatuses` to backend table; add `.partialCancelled.cancel` ⇒ "Escalar a cancelación total". Reject `.ready.cancelled`. |
-| `Sources/Features/TicketDetail/TicketDetailView.swift`        | Block partial-cancel sheet when status ∈ `{completed, cancelled, partialCancelled, ready}`. Add a banner *"Esperando confirmación del cliente · expira en mm:ss"* when `pendingChangeId` is set. |
-| `Sources/Features/TicketDetail/PartialCancellationSheet.swift`| Replace free-text reason with `Picker<CancelReasonCode>` + `TextField` that's only enabled when "Otro". Validate ≥ 3 chars. |
-| `Sources/Data/OrderRepository.swift`                          | New `confirmPendingChange(orderID:)` and `escalatePendingChange(orderID:)` methods that call dedicated RPCs (not generic `transition_ticket`). |
-| `Sources/Data/KDSAPIClient.swift`                             | Add the two RPCs; accept `cancelReasonCode` everywhere we currently take `reason`. |
-| `Sources/Features/Tickets/TicketsListView.swift`              | Render an "Esperando cliente" pill on tickets with `pendingChangeId`; sort them at top under the new-orders bucket. |
+| File                                                           | Change                                                                                                                                                                                           |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Sources/Domain/KitchenModels.swift`                           | Match `nextActionStatuses` to backend table; add `.partialCancelled.cancel` ⇒ "Escalar a cancelación total". Reject `.ready.cancelled`.                                                          |
+| `Sources/Features/TicketDetail/TicketDetailView.swift`         | Block partial-cancel sheet when status ∈ `{completed, cancelled, partialCancelled, ready}`. Add a banner _"Esperando confirmación del cliente · expira en mm:ss"_ when `pendingChangeId` is set. |
+| `Sources/Features/TicketDetail/PartialCancellationSheet.swift` | Replace free-text reason with `Picker<CancelReasonCode>` + `TextField` that's only enabled when "Otro". Validate ≥ 3 chars.                                                                      |
+| `Sources/Data/OrderRepository.swift`                           | New `confirmPendingChange(orderID:)` and `escalatePendingChange(orderID:)` methods that call dedicated RPCs (not generic `transition_ticket`).                                                   |
+| `Sources/Data/KDSAPIClient.swift`                              | Add the two RPCs; accept `cancelReasonCode` everywhere we currently take `reason`.                                                                                                               |
+| `Sources/Features/Tickets/TicketsListView.swift`               | Render an "Esperando cliente" pill on tickets with `pendingChangeId`; sort them at top under the new-orders bucket.                                                                              |
 
 ### 4.7 Aging & visual hierarchy (HCI investment)
 
 Adopt the published KDS norm of color-coded aging tiers on every ticket (green ≤ N₁s,
 yellow ≤ N₂s, red > N₂s, configurable per business). For `partial_cancelled` tickets, age
-the *pending change* (time since proposal) instead of the ticket itself — this is the actual
+the _pending change_ (time since proposal) instead of the ticket itself — this is the actual
 SLA the operator and customer are racing.
 
 ---
@@ -295,7 +295,7 @@ outbound payload. The reason picker is the only path in the iPad UI.
 3. New RPCs `kds.confirm_pending_change`, `kds.escalate_pending_change` (the only two
    verbs allowed when a pending change exists).
 4. Cron `kds.expire_pending_changes()` + `business_settings.partial_cancel_expiry_action`
-   + matching outbox template.
+   - matching outbox template.
 5. KDS app: pending-change banner with countdown, list pill, blocked status menu.
 6. WhatsApp turn-process: tool gating per §4.5.
 
@@ -317,13 +317,13 @@ proposals age independently.
 
 ## 6. Risks & mitigations
 
-| Risk                                                      | Mitigation                                           |
-|-----------------------------------------------------------|------------------------------------------------------|
+| Risk                                                      | Mitigation                                                                                                      |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Phase 1 guardrail rejects an in-flight legacy call        | Deploy migration + edge fn + iPad bundle in lockstep; keep one release of soft-warn logging before hard-reject. |
-| Existing tickets stuck in invalid states                  | One-shot script normalises to nearest legal state; documented in migration. |
-| Cron drift on expiry creates "almost expired" UX glitches | UI shows server-time countdown; cron runs at 60s but UI re-fetches every 15s. |
-| Free-text reason removal breaks existing CSV exports      | Export pipeline reads `reason_code` + `reason_note` separately; legacy column kept (deprecated). |
-| LLM ignores the gating prompt                              | Tool list is gated *programmatically* in `turn-process.ts` — the model cannot call what it isn't given. |
+| Existing tickets stuck in invalid states                  | One-shot script normalises to nearest legal state; documented in migration.                                     |
+| Cron drift on expiry creates "almost expired" UX glitches | UI shows server-time countdown; cron runs at 60s but UI re-fetches every 15s.                                   |
+| Free-text reason removal breaks existing CSV exports      | Export pipeline reads `reason_code` + `reason_note` separately; legacy column kept (deprecated).                |
+| LLM ignores the gating prompt                             | Tool list is gated _programmatically_ in `turn-process.ts` — the model cannot call what it isn't given.         |
 
 ---
 
@@ -342,28 +342,28 @@ proposals age independently.
 
 ## 8. References (engineering & HCI)
 
-* [Microsoft Learn — Event Sourcing pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing)
-* [microservices.io — Event sourcing](https://microservices.io/patterns/data/event-sourcing.html)
-* [event-driven.io — Idempotent Command Handling](https://event-driven.io/en/idempotent_command_handling/)
-* [DEV — Idempotency in CQRS and Event Sourcing (commands, projections, outbox)](https://dev.to/ohugonnot/idempotency-in-cqrs-and-event-sourcing-part-2-commands-projections-and-outbox-4ei)
-* [Cockroach Labs — Idempotency and ordering in event-driven systems](https://www.cockroachlabs.com/blog/idempotency-and-ordering-in-event-driven-systems/)
-* [domaincentric — Projection deduplication strategies](https://domaincentric.net/blog/event-sourcing-projection-patterns-deduplication-strategies)
-* [commercetools — State machines for business modelling](https://docs.commercetools.com/learning-model-your-business-structure/state-machines/state-machines-page)
-* [Oracle — Kitchen Display Systems for Restaurants](https://www.oracle.com/food-beverage/restaurant-pos-systems/kds-kitchen-display-systems/)
-* [Rezku — How Restaurants Use a KDS](https://rezku.com/blog/restaurant-kitchen-display-system/)
-* [Restaurant365 — KDS guide](https://www.restaurant365.com/blog/kitchen-display-system/)
-* [Ordering Stack — KDS guide](https://orderingstack.com/blog/a-guide-to-kitchen-display-system-kds-in-restaurant)
-* [MDPI — UI/UX & Visual Ergonomics for Reducing Human Error in Industrial Settings](https://www.mdpi.com/2411-9660/10/1/8)
-* [ILO Encyclopedia — Ergonomic Aspects of Human-Computer Interaction](https://www.iloencyclopaedia.org/part-vi-16255/visual-display-units/item/784-ergonomic-aspects-of-human-computer-interaction)
-* [SAGE — Touchscreens for Aircraft Navigation: Fitts' Law (transferable to gloved iPad use)](https://journals.sagepub.com/doi/10.1177/0018720819862146)
-* [iMotions — Human Factors guide](https://imotions.com/blog/insights/what-is-human-factors/)
+- [Microsoft Learn — Event Sourcing pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing)
+- [microservices.io — Event sourcing](https://microservices.io/patterns/data/event-sourcing.html)
+- [event-driven.io — Idempotent Command Handling](https://event-driven.io/en/idempotent_command_handling/)
+- [DEV — Idempotency in CQRS and Event Sourcing (commands, projections, outbox)](https://dev.to/ohugonnot/idempotency-in-cqrs-and-event-sourcing-part-2-commands-projections-and-outbox-4ei)
+- [Cockroach Labs — Idempotency and ordering in event-driven systems](https://www.cockroachlabs.com/blog/idempotency-and-ordering-in-event-driven-systems/)
+- [domaincentric — Projection deduplication strategies](https://domaincentric.net/blog/event-sourcing-projection-patterns-deduplication-strategies)
+- [commercetools — State machines for business modelling](https://docs.commercetools.com/learning-model-your-business-structure/state-machines/state-machines-page)
+- [Oracle — Kitchen Display Systems for Restaurants](https://www.oracle.com/food-beverage/restaurant-pos-systems/kds-kitchen-display-systems/)
+- [Rezku — How Restaurants Use a KDS](https://rezku.com/blog/restaurant-kitchen-display-system/)
+- [Restaurant365 — KDS guide](https://www.restaurant365.com/blog/kitchen-display-system/)
+- [Ordering Stack — KDS guide](https://orderingstack.com/blog/a-guide-to-kitchen-display-system-kds-in-restaurant)
+- [MDPI — UI/UX & Visual Ergonomics for Reducing Human Error in Industrial Settings](https://www.mdpi.com/2411-9660/10/1/8)
+- [ILO Encyclopedia — Ergonomic Aspects of Human-Computer Interaction](https://www.iloencyclopaedia.org/part-vi-16255/visual-display-units/item/784-ergonomic-aspects-of-human-computer-interaction)
+- [SAGE — Touchscreens for Aircraft Navigation: Fitts' Law (transferable to gloved iPad use)](https://journals.sagepub.com/doi/10.1177/0018720819862146)
+- [iMotions — Human Factors guide](https://imotions.com/blog/insights/what-is-human-factors/)
 
 ---
 
 ## 9. Tracking
 
-* Linear / GitHub issue: *(create — link here)*
-* Owner: Juan + Claude pairing
-* Review: Café Kalala Chapule ops walkthrough before Phase 3 deploy
-* Rollback: each phase is gated behind `business_settings.partial_cancel_v2_enabled`
+- Linear / GitHub issue: _(create — link here)_
+- Owner: Juan + Claude pairing
+- Review: Café Kalala Chapule ops walkthrough before Phase 3 deploy
+- Rollback: each phase is gated behind `business_settings.partial_cancel_v2_enabled`
   for the first 7 days post-deploy.

@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Centro de caja — superset v1 (cram)</title>
+    <!--
+  ARTIFACT, NOT PRODUCT CODE.
+  A deliberately over-full inventory of every cash-centre element found in
+  Toast, Square, Lightspeed, Clover, Shopify, Fudo, and the Umi backend.
+  Reference viewport: 1280 x 720 logical, the till's design target.
+  Every block carries a source tag: [UM] [T] [SQ] [LS] [CL] [SH] [FU].
+  This is the input to real design work, not the design.
+-->
+    <style>
+      :root {
+        --brand: #2e7dff;
+        --ink: #14161b;
+        --ink2: #3a3f4a;
+        --ink3: #6b7280;
+        --line: #d8dae2;
+        --line2: #e8eaf0;
+        --bg: #f7f6fb;
+        --card: #ffffff;
+        --ok: #0f8a52;
+        --warn: #b26b00;
+        --bad: #b3261e;
+        --safe: #0d6efd;
+        --r: 10px;
+        --r2: 14px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1280px;
+        height: 720px;
+        overflow: hidden;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          10.5px/1.28 -apple-system,
+          'Segoe UI',
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        padding: 9px;
+        display: grid;
+        grid-template-rows: 60px 54px 1fr 11px;
+        gap: 6px;
+      }
+      .tag {
+        font:
+          9px/1 ui-monospace,
+          Menlo,
+          monospace;
+        font-weight: 700;
+        padding: 1px 3px;
+        border-radius: 4px;
+        color: #fff;
+        background: #6b7280;
+        vertical-align: 1px;
+      }
+      .UM {
+        background: #111827;
+      }
+      .T {
+        background: #c2410c;
+      }
+      .SQ {
+        background: #166534;
+      }
+      .LS {
+        background: #4f46e5;
+      }
+      .CL {
+        background: #0e7490;
+      }
+      .SH {
+        background: #5b21b6;
+      }
+      .FU {
+        background: #b91c1c;
+      }
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--r2);
+        overflow: hidden;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .panel > h3 {
+        font:
+          600 9.5px/1 ui-monospace,
+          monospace;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--ink3);
+        padding: 4px 7px;
+        border-bottom: 1px solid var(--line2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+      .panel > h3 .hint {
+        font: 9px/1 sans-serif;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--ink3);
+        font-weight: 400;
+      }
+      .body {
+        padding: 5px 7px;
+        min-height: 0;
+      }
+      .muted {
+        color: var(--ink3);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .bad {
+        color: var(--bad);
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 999px;
+        padding: 1px 6px;
+        font-size: 9.5px;
+        white-space: nowrap;
+      }
+      .chip.on {
+        border-color: #bcd3ff;
+        background: #eaf1ff;
+        color: #14418f;
+      }
+      .chip.off {
+        opacity: 0.55;
+      }
+      .chip.g {
+        border-color: #bfe3cd;
+        background: #eaf7f0;
+        color: #0d6b40;
+      }
+      .chip.y {
+        border-color: #f0dcae;
+        background: #fdf6e6;
+        color: #8a5200;
+      }
+      .chip.r {
+        border-color: #f0c3c0;
+        background: #fdecea;
+        color: #8c1d18;
+      }
+      .kv {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 2px 0;
+        border-bottom: 1px dashed var(--line2);
+      }
+      .kv:last-child {
+        border-bottom: 0;
+      }
+      .kv b {
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .between {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* 1 · identity bar */
+      #top {
+        display: grid;
+        grid-template-columns: 200px 250px minmax(0, 1fr);
+        gap: 9px;
+        align-items: center;
+        background: linear-gradient(180deg, #fff, #fbfbff);
+        border: 1px solid var(--line);
+        border-radius: var(--r2);
+        padding: 5px 9px;
+        overflow: hidden;
+      }
+      #top .who {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #top .who b {
+        font-size: 12.5px;
+      }
+      #top .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        justify-content: flex-end;
+        max-height: 44px;
+        overflow: hidden;
+      }
+
+      /* 2 · money strip */
+      #money {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 210px;
+        gap: 7px;
+        min-height: 0;
+      }
+      #eq {
+        display: grid;
+        grid-template-columns: repeat(9, 1fr);
+        gap: 1px;
+        background: var(--line2);
+        border-radius: var(--r2);
+        overflow: hidden;
+        border: 1px solid var(--line);
+      }
+      #eq .cell {
+        background: #fff;
+        padding: 3px 5px;
+      }
+      #eq .cell small {
+        display: block;
+        color: var(--ink3);
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      #eq .cell b {
+        font-size: 11.5px;
+        font-family: ui-monospace, Menlo, monospace;
+      }
+      #eq .cell.neg b {
+        color: var(--bad);
+      }
+      #answer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 4px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: var(--r2);
+        padding: 5px 7px;
+        overflow: hidden;
+      }
+      #answer .big {
+        font:
+          700 15px/1.05 ui-monospace,
+          Menlo,
+          monospace;
+      }
+      #answer .lbl {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--ink3);
+      }
+      #answer .var {
+        grid-column: 1/-1;
+        border-top: 1px solid var(--line2);
+        padding-top: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+
+      /* 3 · main grid */
+      #main {
+        display: grid;
+        grid-template-columns: 200px minmax(0, 1fr) 236px 244px;
+        gap: 6px;
+        min-height: 0;
+      }
+      #main > * {
+        min-width: 0;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .grow {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .grow .body {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* left: drawers + shifts */
+      .drawer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1px 6px;
+        padding: 4px 6px;
+        border: 1px solid var(--line2);
+        border-radius: 8px;
+        margin-bottom: 3px;
+      }
+      .drawer.sel {
+        border-color: #bcd3ff;
+        background: #f5f8ff;
+      }
+      .drawer .nm {
+        font-weight: 600;
+      }
+      .drawer .amt {
+        font-family: ui-monospace, Menlo, monospace;
+        font-weight: 700;
+      }
+      .drawer .sub {
+        grid-column: 1/-1;
+        color: var(--ink3);
+        font-size: 9.5px;
+      }
+      .mini {
+        height: 34px;
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+      }
+      .mini i {
+        flex: 1;
+        background: #c7d7ff;
+        border-radius: 2px 2px 0 0;
+      }
+      .mini i.bad {
+        background: #f3b6b2;
+      }
+
+      /* center: journal */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        font:
+          600 8.5px/1.15 ui-monospace,
+          monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--ink3);
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        padding: 2px 4px;
+        background: #fbfbfe;
+      }
+      td {
+        padding: 2px 4px;
+        border-bottom: 1px solid var(--line2);
+        vertical-align: top;
+      }
+      td.n {
+        text-align: right;
+        font-family: ui-monospace, Menlo, monospace;
+        white-space: nowrap;
+      }
+      tr.dim td {
+        color: var(--ink3);
+      }
+      .tchip {
+        font:
+          9px/1.5 ui-monospace,
+          monospace;
+        padding: 0 4px;
+        border-radius: 4px;
+        background: #eef0f6;
+        white-space: nowrap;
+      }
+
+      /* right: actions */
+      .acts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3px;
+      }
+      .btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 8px;
+        padding: 4px 5px;
+        font-size: 9.5px;
+        text-align: left;
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        min-height: 23px;
+      }
+      .btn b {
+        font-weight: 600;
+      }
+      .btn.pri {
+        background: var(--brand);
+        border-color: var(--brand);
+        color: #fff;
+      }
+      .btn.wide {
+        grid-column: 1/-1;
+      }
+      .btn.warnb {
+        border-color: #f0dcae;
+        background: #fdf6e6;
+      }
+      .steps {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 15px 1fr auto;
+        gap: 4px;
+        align-items: center;
+        padding: 2px 4px;
+        border: 1px solid var(--line2);
+        border-radius: 7px;
+        font-size: 9.5px;
+      }
+      .step .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #e6e8ef;
+        color: #fff;
+        font: 700 9px/14px sans-serif;
+        text-align: center;
+      }
+      .step.done .dot {
+        background: var(--ok);
+      }
+      .step.now {
+        border-color: #bcd3ff;
+        background: #f5f8ff;
+      }
+      .step.now .dot {
+        background: var(--brand);
+      }
+      .tl {
+        border-left: 2px solid var(--line2);
+        margin-left: 4px;
+        padding-left: 7px;
+      }
+      .tl div {
+        position: relative;
+        padding: 2px 0;
+      }
+      .tl div:before {
+        content: '';
+        position: absolute;
+        left: -11px;
+        top: 6px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand);
+      }
+      footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink3);
+        font-size: 9px;
+        overflow: hidden;
+      }
+      footer .legend {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══ 1 · IDENTITY, STATE, POLICY, CONNECTIVITY ═══ -->
+    <header id="top">
+      <div class="who">
+        <b>Centro de caja <span class="tag UM">UM</span></b>
+        <span class="muted"
+          >Kalala Chapultepec · <b>Caja principal</b> · MXN · público CAJA-LOCAL-01</span
+        >
+      </div>
+      <div class="who">
+        <span
+          ><b>Turno abierto</b> <span class="tag UM">UM</span> · 07:12 · hace 6 h 41 min
+          <span class="tag SQ">SQ</span></span
+        >
+        <span class="muted"
+          >Abrió <b>Ana R.</b> · resp. <b>Luis M.</b> · terminal <b>POS-01</b> (activa) · sesión
+          op-7f3c</span
+        >
+      </div>
+      <div class="chips">
+        <span class="chip on"
+          >Fecha operativa 2026-09-29 · inicio 04:00 <span class="tag UM">UM</span></span
+        >
+        <span class="chip g">Política pilot-1 v…c0 exp. 30 d <span class="tag UM">UM</span></span>
+        <span class="chip y"
+          >Conteo <b>ciego</b> <span class="tag T">T</span><span class="tag FU">FU</span></span
+        >
+        <span class="chip on">No-sale permitido <span class="tag T">T</span></span>
+        <span class="chip off">Offline: no permitido <span class="tag UM">UM</span></span>
+        <span class="chip">Tolerancia $1.00</span>
+        <span class="chip r"
+          >Aprob. cierre: diferencia &gt; $5.00 <span class="tag UM">UM</span></span
+        >
+        <span class="chip g">En línea · sync 2 s</span>
+        <span class="chip g">Cajón OK · impresora OK <span class="tag SQ">SQ</span></span>
+        <span class="chip">Cerrar</span>
+      </div>
+    </header>
+
+    <!-- ═══ 2 · THE MONEY EQUATION AND THE ANSWER ═══ -->
+    <section id="money">
+      <div id="eq">
+        <div class="cell">
+          <small>Fondo inicial <i class="tag UM">UM</i></small
+          ><b>$1,500.00</b>
+        </div>
+        <div class="cell">
+          <small>Recibido <i class="tag SQ">SQ</i></small
+          ><b>$4,820.00</b>
+        </div>
+        <div class="cell neg">
+          <small>Cambio <i class="tag SQ">SQ</i></small
+          ><b>−$620.00</b>
+        </div>
+        <div class="cell">
+          <small>Ventas efectivo <i class="tag T">T</i></small
+          ><b>$4,200.00</b>
+        </div>
+        <div class="cell neg">
+          <small>Reembolsos <i class="tag SQ">SQ</i></small
+          ><b>−$120.00</b>
+        </div>
+        <div class="cell">
+          <small>Ingresos <i class="tag T">T</i></small
+          ><b>+$200.00</b>
+        </div>
+        <div class="cell neg">
+          <small>Retiros <i class="tag T">T</i></small
+          ><b>−$350.00</b>
+        </div>
+        <div class="cell neg">
+          <small>Caja fuerte <i class="tag T">T</i></small
+          ><b>−$2,000.00</b>
+        </div>
+        <div class="cell">
+          <small>Ajustes <i class="tag UM">UM</i></small
+          ><b>$0.00</b>
+        </div>
+      </div>
+      <div id="answer">
+        <div>
+          <div class="lbl">
+            Esperado en cajón <span class="tag T">T</span><span class="tag UM">UM</span>
+          </div>
+          <div class="big">$3,430.00</div>
+        </div>
+        <div>
+          <div class="lbl">Contado (intento 1) <span class="tag LS">LS</span></div>
+          <div class="big">$3,428.50</div>
+        </div>
+        <div class="var">
+          <span
+            ><span class="lbl">Diferencia</span>
+            <b class="bad mono" style="font-size: 14px">−$1.50</b>
+            <span class="chip y">Faltante</span></span
+          >
+          <span class="chip r">Tol. $1.00 · PIN <span class="tag T">T</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 3 · FOUR COLUMNS ═══ -->
+    <section id="main">
+      <!-- ── LEFT · drawers, shifts, deposit, trend, non-cash ── -->
+      <div class="col">
+        <div class="panel" style="flex: 0 0 168px">
+          <h3>
+            Cajones de la sucursal
+            <span class="hint"><span class="tag T">T</span> activo/pausado</span>
+          </h3>
+          <div class="body">
+            <div class="drawer sel">
+              <span class="nm">Caja principal</span><span class="amt">$3,430.00</span>
+              <span class="sub">En uso · esta terminal · abierto 07:12</span>
+            </div>
+            <div class="drawer">
+              <span class="nm">Caja barra</span><span class="amt">$1,066.94</span>
+              <span class="sub">En uso · POS-02 · abierto 08:40</span>
+            </div>
+            <div class="drawer">
+              <span class="nm">Caja barra (2)</span><span class="amt">$500.00</span>
+              <span class="sub"
+                ><span class="chip y">POR CONTAR</span> pausada 12:10 → reemplazo
+                <span class="tag T">T</span></span
+              >
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="flex: 0 0 92px">
+          <h3>
+            Turnos de hoy
+            <span class="hint"
+              >multi-turno en un día <span class="tag T">T</span
+              ><span class="tag SQ">SQ</span></span
+            >
+          </h3>
+          <div class="body">
+            <div class="kv">
+              <span>07:12– ahora · <b>Luis M.</b></span
+              ><span class="chip on">Abierto</span>
+            </div>
+            <div class="kv">
+              <span>07:12–11:40 · Ana R.</span
+              ><span class="mono">+$0.00 <span class="chip g">Cuadró</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="flex: 0 0 93px">
+          <h3>
+            Turno anterior en esta caja
+            <span class="hint"><span class="tag SH">SH</span> doble discrepancia</span>
+          </h3>
+          <div class="body">
+            <div class="kv"><span>Cierre anterior</span><b class="mono">$1,500.00</b></div>
+            <div class="kv"><span>Apertura de hoy</span><b class="mono">$1,500.00</b></div>
+            <div class="kv">
+              <span>Discrepancia de apertura <span class="tag SH">SH</span></span
+              ><b class="ok mono">$0.00</b>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="flex: 1 1 auto; min-height: 0">
+          <h3>
+            Caja a depositar
+            <span class="hint"
+              ><span class="tag T">T</span> depósito <span class="tag SQ">SQ</span> float</span
+            >
+          </h3>
+          <div class="body">
+            <div class="kv">
+              <span>Depositar <span class="muted">(fondo $1,500)</span></span
+              ><b class="mono">$1,928.50</b>
+            </div>
+            <div class="kv">
+              <span>Depósitos de hoy <span class="tag T">T</span></span
+              ><b class="mono">$2,000.00</b>
+            </div>
+            <div class="between" style="margin-top: 4px">
+              <span class="muted" style="font-size: 9px"
+                >Δ neto 7 días <span class="tag SQ">SQ</span></span
+              >
+              <span class="mono" style="font-size: 9px"
+                ><span class="ok">+$4</span> <span class="bad">−$21.5</span>
+                <span class="ok">+$0.5</span> <span class="bad">−$3</span>
+                <span class="ok">+$1</span></span
+              >
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="flex: 0 0 64px">
+          <h3>
+            Otros medios <span class="hint">solo lectura <span class="tag FU">FU</span></span>
+          </h3>
+          <div class="body">
+            <div class="kv">
+              <span>Tarjeta <span class="tag FU">FU</span></span
+              ><b class="mono">$8,940.00</b>
+            </div>
+            <div class="kv"><span>Monedero + gift</span><b class="mono">$1,220.00</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CENTER · journal + counts ── -->
+      <div class="col">
+        <div class="panel grow">
+          <h3>
+            Libro del turno · secuencia 1–8
+            <span class="hint"
+              >inmutable · trazable <span class="tag T">T</span><span class="tag LS">LS</span></span
+            >
+          </h3>
+          <div class="body" style="display: flex; flex-direction: column; gap: 5px">
+            <div class="row" style="flex-wrap: wrap">
+              <span class="chip on">Todo</span><span class="chip">Ventas</span
+              ><span class="chip">Ingresos/retiros</span> <span class="chip">Caja fuerte</span
+              ><span class="chip">Reembolsos</span><span class="chip">No-sale</span>
+              <span class="chip">Conteos</span><span class="chip">Custodia</span>
+              <span class="chip" style="margin-left: auto">Buscar…</span
+              ><span class="chip">Exportar CSV <span class="tag CL">CL</span></span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 22px">#</th>
+                  <th>Tipo</th>
+                  <th>Detalle</th>
+                  <th>Venta / enlace</th>
+                  <th>Operador · medio</th>
+                  <th style="width: 64px">Hora</th>
+                  <th style="width: 78px">Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">1</td>
+                  <td><span class="tchip">Fondo</span></td>
+                  <td>Fondo de apertura · 10 denominaciones</td>
+                  <td class="muted">—</td>
+                  <td>Ana R. · POS-01</td>
+                  <td class="mono">07:12</td>
+                  <td class="n">$1,500.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">2</td>
+                  <td><span class="tchip">Venta</span></td>
+                  <td>Recibido $500.00 · cambio $190.00</td>
+                  <td class="muted">Venta #1042 →</td>
+                  <td>Luis M. · POS-01</td>
+                  <td class="mono">09:04</td>
+                  <td class="n">+$310.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">3</td>
+                  <td><span class="tchip">Ingreso</span></td>
+                  <td>Ingreso para cambio · «fondo de monedas»</td>
+                  <td class="muted">—</td>
+                  <td>Ana R. · aprobó Gerardo P.</td>
+                  <td class="mono">10:22</td>
+                  <td class="n">+$200.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">4</td>
+                  <td><span class="tchip">Venta</span></td>
+                  <td>Recibido $200.00 · cambio $20.00</td>
+                  <td class="muted">Venta #1047 →</td>
+                  <td>Luis M. · POS-01</td>
+                  <td class="mono">11:15</td>
+                  <td class="n">+$180.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">5</td>
+                  <td><span class="tchip">Retiro</span></td>
+                  <td>Compra de hielo · «pago a proveedor» <span class="tag T">T</span></td>
+                  <td class="muted">—</td>
+                  <td>Luis M. · aprobó Gerardo P.</td>
+                  <td class="mono">11:48</td>
+                  <td class="n">−$350.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">6</td>
+                  <td><span class="tchip">Reembolso</span></td>
+                  <td>Reembolso en efectivo · «producto frío»</td>
+                  <td class="muted">Venta #1038 →</td>
+                  <td>Luis M. · aprobó Gerardo P.</td>
+                  <td class="mono">12:31</td>
+                  <td class="n">−$120.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">7</td>
+                  <td><span class="tchip">Caja fuerte</span></td>
+                  <td>Retiro a caja fuerte <span class="tag T">T</span></td>
+                  <td class="muted">—</td>
+                  <td>Luis M.</td>
+                  <td class="mono">12:55</td>
+                  <td class="n">−$2,000.00</td>
+                </tr>
+                <tr class="dim">
+                  <td class="mono">8</td>
+                  <td><span class="tchip">No-sale</span></td>
+                  <td>
+                    Abrir cajón · «cambio» · hardware no verificado <span class="tag T">T</span>
+                  </td>
+                  <td class="muted">—</td>
+                  <td>Ana R. · aprobó Gerardo P.</td>
+                  <td class="mono">13:20</td>
+                  <td class="n">$0.00</td>
+                </tr>
+              </tbody>
+            </table>
+            <div
+              class="between muted"
+              style="margin-top: auto; padding-top: 4px; border-top: 1px solid var(--line2)"
+            >
+              <span
+                >8 movimientos · 2 ventas en efectivo · 1 reembolso · 1 no-sale · 0 comandos
+                pendientes</span
+              >
+              <span>Total del libro = esperado <b class="ok">$3,430.00 ✓</b></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="height: 164px">
+          <h3>
+            Conteos y conciliación
+            <span class="hint">observación ≠ corrección <span class="tag UM">UM</span></span>
+          </h3>
+          <div class="body" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px">
+            <div>
+              <div class="lbl muted">INTENTOS (máx. 10)</div>
+              <div class="kv"><span>#1 · Luis M. · 13:51</span><b class="mono">$3,428.50</b></div>
+              <div class="muted" style="font-size: 9.5px">
+                secuencia 8 · 10 líneas · nota: «conté dos veces»
+              </div>
+              <div class="row" style="margin-top: 5px">
+                <span class="chip">Volver a contar <span class="tag T">T</span></span
+                ><span class="chip y"
+                  >Cancelar conteo y volver a abierto <span class="tag UM">UM</span></span
+                >
+              </div>
+            </div>
+            <div>
+              <div class="lbl muted">
+                DENOMINACIONES <span class="tag LS">LS</span><span class="tag FU">FU</span>
+              </div>
+              <div class="kv">
+                <span>$1,000 × 2 · $500 × 2 · $100 × 3</span><b class="mono">$3,300.00</b>
+              </div>
+              <div class="kv">
+                <span>$50 × 2 · $20 × 1 · $5 × 1</span><b class="mono">$125.00</b>
+              </div>
+              <div class="kv">
+                <span>$2 × 1 · $1 × 1 · $0.50 × 1</span><b class="mono">$3.50</b>
+              </div>
+            </div>
+            <div>
+              <div class="lbl muted">
+                SEPARACIÓN DE FUNCIONES <span class="tag SQ">SQ</span><span class="tag T">T</span>
+              </div>
+              <div class="kv"><span>Abrió</span><b>Ana R.</b></div>
+              <div class="kv"><span>Contó</span><b>Luis M.</b></div>
+              <div class="kv"><span>Aprobó</span><b>Gerardo P. (PIN)</b></div>
+              <div class="kv"><span>Cerrará</span><b>—</b></div>
+              <div class="kv"><span>Motivo de diferencia</span><b class="muted">pendiente</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RIGHT-1 · actions ── -->
+      <div class="col">
+        <div class="panel">
+          <h3>
+            Acciones rápidas
+            <span class="hint"
+              ><span class="tag T">T</span> cambio de saldo <span class="tag LS">LS</span></span
+            >
+          </h3>
+          <div class="body">
+            <div class="acts">
+              <button class="btn"><b>+ Entrada</b> de efectivo</button>
+              <button class="btn"><b>− Salida</b> de efectivo</button>
+              <button class="btn"><b>Retiro</b> a caja fuerte</button>
+              <button class="btn">
+                <b>Cobro</b> de efectivo al operador <span class="tag T">T</span>
+              </button>
+              <button class="btn">
+                <b>Pago</b> a proveedor / gasto <span class="tag T">T</span>
+              </button>
+              <button class="btn"><b>Propinas</b> (tip out) <span class="tag T">T</span></button>
+              <button class="btn wide">
+                <b>Abrir cajón</b> sin venta · motivo: cambio cajón / cambio cliente / conteo
+                <span class="tag T">T</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>
+            Custodia del turno <span class="hint"><span class="tag UM">UM</span></span>
+          </h3>
+          <div class="body">
+            <div class="acts">
+              <button class="btn">Suspender turno</button>
+              <button class="btn">Reanudar</button>
+              <button class="btn">Entregar turno <span class="tag T">T</span></button>
+              <button class="btn">Traer turno (adopt)</button>
+              <button class="btn">Recuperar (gerente)</button>
+              <button class="btn">Liberar caja (reclaim)</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel grow">
+          <h3>
+            Trazabilidad <span class="hint">cadena de custodia <span class="tag UM">UM</span></span>
+          </h3>
+          <div class="body">
+            <div class="tl">
+              <div><b>07:12</b> Apertura · Ana R. · POS-01 · fondo $1,500.00</div>
+              <div><b>12:10</b> Pausa de caja barra → reemplazo <span class="tag T">T</span></div>
+              <div><b>13:51</b> Conteo #1 · Luis M. · $3,428.50</div>
+              <div class="muted" style="padding-left: 0">
+                <b>Pendiente</b> · motivo, conciliación, cierre, depósito
+              </div>
+            </div>
+            <div class="row" style="margin-top: 6px; flex-wrap: wrap">
+              <span class="chip">Sin adopciones</span><span class="chip">Sin recuperaciones</span
+              ><span class="chip">Sin liberaciones</span>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>
+            Diagnóstico <span class="hint"><span class="tag UM">UM</span></span>
+          </h3>
+          <div class="body">
+            <div class="kv"><span>Recovery state</span><b class="mono">none</b></div>
+            <div class="kv"><span>Comando pendiente</span><b class="mono">—</b></div>
+            <div class="kv"><span>correlationId</span><b class="mono">9f2c…41ab</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── RIGHT-2 · close path ── -->
+      <div class="col">
+        <div class="panel" style="flex: 0 0 232px">
+          <h3>
+            Cierre de turno <span class="hint">guía paso a paso <span class="tag T">T</span></span>
+          </h3>
+          <div class="body">
+            <div class="steps">
+              <div class="step done">
+                <span class="dot">✓</span
+                ><span><b>1 · Contar la caja</b> <span class="muted">(ciego)</span></span
+                ><span class="chip g">Hecho</span>
+              </div>
+              <div class="step now">
+                <span class="dot">2</span
+                ><span
+                  ><b>2 · Registrar la diferencia</b><br /><span class="muted"
+                    >−$1.50 · fuera de tolerancia</span
+                  ></span
+                ><span class="chip y">PIN</span>
+              </div>
+              <div class="step">
+                <span class="dot">3</span><span><b>3 · Conciliar el turno</b></span
+                ><span class="chip off">—</span>
+              </div>
+              <div class="step">
+                <span class="dot">4</span><span><b>4 · Cerrar y liberar la caja</b></span
+                ><span class="chip r">PIN</span>
+              </div>
+              <div class="step">
+                <span class="dot">5</span
+                ><span><b>5 · Crear depósito</b> <span class="muted">$1,928.50</span></span
+                ><span class="chip off">—</span>
+              </div>
+            </div>
+            <div class="acts" style="margin-top: 6px">
+              <button class="btn warnb">Motivo de la diferencia</button>
+              <button class="btn">Conciliar</button>
+              <button class="btn pri wide">Cerrar turno · requiere PIN de gerente</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="flex: 0 0 164px">
+          <h3>
+            Contar (ciego)
+            <span class="hint"><span class="tag LS">LS</span> la tecla lleva el total</span>
+          </h3>
+          <div class="body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Denominación</th>
+                  <th style="width: 38px">Cant.</th>
+                  <th style="width: 56px">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono">$1,000</td>
+                  <td class="mono">×2</td>
+                  <td class="n">$2,000.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">$500</td>
+                  <td class="mono">×2</td>
+                  <td class="n">$1,000.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">$100</td>
+                  <td class="mono">×3</td>
+                  <td class="n">$300.00</td>
+                </tr>
+                <tr>
+                  <td class="mono">$50 · $20 · $5 · $2 · $1 · $0.50</td>
+                  <td class="mono">×6</td>
+                  <td class="n">$128.50</td>
+                </tr>
+              </tbody>
+            </table>
+            <button class="btn pri wide" style="margin-top: 5px; justify-content: center">
+              Confirmar conteo · $3,428.50
+            </button>
+          </div>
+        </div>
+        <div class="panel" style="flex: 1 1 auto">
+          <h3>
+            Aprobaciones
+            <span class="hint">huella ligada a la acción <span class="tag UM">UM</span></span>
+          </h3>
+          <div class="body">
+            <div class="kv"><span>Umbral de movimiento</span><b class="mono">≥ $50.00</b></div>
+            <div class="kv">
+              <span>Umbral de cierre (diferencia)</span><b class="mono">&gt; $5.00</b>
+            </div>
+            <div class="kv"><span>Aprob. usada · Gerardo P.</span><b class="mono">1</b></div>
+            <div class="kv"><span>Requerida (cierre)</span><b class="bad mono">sí</b></div>
+            <div class="row" style="margin-top: 5px; flex-wrap: wrap">
+              <span class="chip"
+                >Imprimir arqueo <span class="tag T">T</span><span class="tag FU">FU</span></span
+              >
+              <span class="chip">Enviar por correo <span class="tag FU">FU</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <span class="legend">
+        <span class="tag UM">UM</span> Umi hoy · <span class="tag T">T</span> Toast ·
+        <span class="tag SQ">SQ</span> Square · <span class="tag LS">LS</span> Lightspeed ·
+        <span class="tag CL">CL</span> Clover · <span class="tag SH">SH</span> Shopify ·
+        <span class="tag FU">FU</span> Fudo
+      </span>
+      <span
+        >Superset v1 · inventario, no diseño final · 1280×720 · cada bloque muestra su origen para
+        que el recorte sea una decisión, no un accidente</span
+      >
+    </footer>
+  </body>
+</html>

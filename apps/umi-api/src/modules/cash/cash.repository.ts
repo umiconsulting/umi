@@ -11,97 +11,181 @@ export interface AnalyticsWindows {
 }
 
 /**
- * Cash read surface + admin-config writes (loyalty.reward_configs, branding).
- * Customer-facing wallet/ledger writes live in cash-write.repository. All
- * tenant-scoped → withTenant. SQL ported from server.js; `wallet_transactions.type`
- * is lowercase (`topup`/`purchase`) to match the live data (umi-cash convention).
+ * Cash read surface + admin-config writes (build-v2). All merchant-scoped →
+ * withMerchant. DERIVE MODEL: there are no `balance_cents` / `total_visits` /
+ * `visits_this_cycle` / `pending_rewards` caches — balance = SUM(card_ledger.delta),
+ * visits = COUNT(visit), cycle = visits % visits_required, pending = visits /
+ * visits_required − redemptions. The old `loyalty.wallet_transactions` (topup /
+ * purchase) is gone: topups = card_ledger reason='topup', revenue = |delta| where
+ * reason='purchase'. Loyalty is program-less (config in `merchant.loyalty_program`,
+ * one reward threshold in `merchant.loyalty_reward`). Identity phone/email come from
+ * `merchant.contact` (flat: channel_id + normalized_value -> customer).
  */
+/**
+ * The per-customer derived projection: balance / stamps / cycle / pending / LTV
+ * from the ledgers, phone and email from the identity spine. One active card per
+ * customer.
+ *
+ * SHARED by the customer LIST and the CSV EXPORT, because they are the same
+ * report at two sizes. Two copies would let the file a cafe downloads disagree
+ * with the screen it was downloaded from.
+ */
+const CUST_CTE = `
+      vr AS (
+        SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
+          WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
+          ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+      ),
+      cust AS (
+        SELECT
+          cu.id, cu.name, cu.created_at,
+          c.id AS card_id, c.card_number,
+          COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
+            WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id), 0)::bigint          AS balance_cents,
+          (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
+            WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)::int                 AS total_visits,
+          (SELECT count(*) FROM merchant.loyalty_redemption r
+            WHERE r.merchant_id = cu.merchant_id AND r.card_id = c.id)::int                 AS redemptions,
+          (SELECT max(v.occurred_at) FROM merchant.loyalty_visit v
+            WHERE v.merchant_id = cu.merchant_id AND v.card_id = c.id)                       AS last_visit,
+          COALESCE((SELECT sum(abs(l.delta)) FROM merchant.loyalty_stored_value_ledger l
+            WHERE l.merchant_id = cu.merchant_id AND l.card_id = c.id AND l.reason = 'purchase'), 0)::bigint AS ltv_centavos,
+          (SELECT ct.normalized_value FROM merchant.contact ct
+             JOIN umi.channel_type ch ON ch.id = ct.channel_id
+            WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+              AND ch.key IN ('phone', 'whatsapp', 'sms')
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS phone,
+          (SELECT ct.normalized_value FROM merchant.contact ct
+             JOIN umi.channel_type ch ON ch.id = ct.channel_id
+            WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+              AND ch.key = 'email'
+            ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1)                     AS email
+        FROM merchant.customer cu
+        LEFT JOIN merchant.loyalty_card c
+          ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
+        WHERE cu.merchant_id = $1::uuid
+      )`;
+
 @Injectable()
 export class CashRepository {
   constructor(private readonly pg: PgService) {}
 
-  /** Branding/program composite for settings (server.js getTenant), by id. */
-  async branding(tenantId: string): Promise<Row | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+  /** Branding/program composite for settings (server.js getMerchant), by id. */
+  async branding(merchantId: string): Promise<Row | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<Row>(
         `SELECT
-           t.id::text, t.slug, t.name, t.timezone, t.status,
-           ob.city,
-           p.id::text                     AS "programId",
+           t.id::text, t.handle, t.name, t.timezone, t.status,
+           t.city,
+           -- The program is keyed BY the merchant (merchant_id is its primary key), so
+           -- the merchant id IS the program id. Callers only test it for null — "does
+           -- this café run loyalty at all" — and the LEFT JOIN keeps that answer honest.
+           p.merchant_id::text            AS "programId",
            p.card_prefix                  AS "cardPrefix",
            p.pass_style                   AS "passStyle",
            p.self_registration            AS "selfRegistration",
            p.topup_enabled                AS "topupEnabled",
            p.birthday_reward_enabled      AS "birthdayRewardEnabled",
            p.birthday_reward_name         AS "birthdayRewardName",
-           p.branding->>'primary_color'   AS "primaryColor",
-           p.branding->>'secondary_color' AS "secondaryColor",
-           p.branding->>'logo_url'        AS "logoUrl",
-           p.branding->>'strip_image_url' AS "stripImageUrl",
-           p.branding->>'promo_message'   AS "promoMessage",
-           p.branding->>'promo_starts_at' AS "promoStartsAt",
-           p.branding->>'promo_ends_at'   AS "promoEndsAt",
-           p.branding->>'promo_days'      AS "promoDays"
-         FROM core.tenants AS t
-         LEFT JOIN loyalty.programs AS p  ON p.tenant_id = t.id
-         LEFT JOIN ops.businesses   AS ob ON ob.tenant_id = t.id
+           -- Typed columns, not a branding jsonb blob. The blob was replaced when the
+           -- program branding layer landed; this reader kept addressing the old shape
+           -- and no gate could see it, because a statement reports only its FIRST
+           -- unresolved name and a dead join upstream was answering first.
+           p.primary_color                AS "primaryColor",
+           p.secondary_color              AS "secondaryColor",
+           p.logo_url                     AS "logoUrl",
+           p.strip_image_url              AS "stripImageUrl",
+           p.promo_message                AS "promoMessage",
+           p.promo_starts_at              AS "promoStartsAt",
+           p.promo_ends_at                AS "promoEndsAt",
+           p.promo_days                   AS "promoDays"
+         -- city used to come from a second table: ops.businesses, the CHILD row that
+         -- carried a tenant's trading details. build-v3 dissolved that child into the
+         -- merchant itself, and the rename sweep turned the join into merchant.merchant
+         -- joined to merchant.merchant on a column that never existed. Read t.city.
+         FROM merchant.merchant AS t
+         LEFT JOIN merchant.loyalty_program AS p ON p.merchant_id = t.id
          WHERE t.id = $1::uuid
          LIMIT 1`,
-        [tenantId],
+        [merchantId],
       ),
     );
     return rows[0] ?? null;
   }
 
-  async updateTenantName(tenantId: string, name: string): Promise<void> {
-    await this.pg.withTenant((c) =>
+  async updateMerchantName(merchantId: string, name: string): Promise<void> {
+    await this.pg.withMerchant((c) =>
+      c.query(`UPDATE merchant.merchant SET name = $2, updated_at = now() WHERE id = $1::uuid`, [
+        merchantId,
+        name,
+      ]),
+    );
+  }
+
+  async updateProgram(merchantId: string, patch: Record<string, unknown>): Promise<void> {
+    // One column-keyed jsonb patch, fixed columns: a key PRESENT in the patch is written
+    // (present-but-null clears the column), an ABSENT key is left untouched. The statement
+    // stays STATIC (preflight can PREPARE it) while preserving the settings form's
+    // partial-update + clear-a-field semantics the old branding jsonb merge had.
+    await this.pg.withMerchant((c) =>
       c.query(
-        `UPDATE core.tenants SET name = $2, updated_at = now() WHERE id = $1::uuid`,
-        [tenantId, name],
+        `UPDATE merchant.loyalty_program p SET
+           card_prefix             = CASE WHEN pt.j ? 'card_prefix'             THEN pt.j->>'card_prefix'                     ELSE p.card_prefix END,
+           pass_style              = CASE WHEN pt.j ? 'pass_style'              THEN pt.j->>'pass_style'                      ELSE p.pass_style END,
+           birthday_reward_enabled = CASE WHEN pt.j ? 'birthday_reward_enabled' THEN (pt.j->>'birthday_reward_enabled')::boolean ELSE p.birthday_reward_enabled END,
+           birthday_reward_name    = CASE WHEN pt.j ? 'birthday_reward_name'    THEN pt.j->>'birthday_reward_name'            ELSE p.birthday_reward_name END,
+           primary_color           = CASE WHEN pt.j ? 'primary_color'           THEN pt.j->>'primary_color'                   ELSE p.primary_color END,
+           secondary_color         = CASE WHEN pt.j ? 'secondary_color'         THEN pt.j->>'secondary_color'                 ELSE p.secondary_color END,
+           logo_url                = CASE WHEN pt.j ? 'logo_url'                THEN pt.j->>'logo_url'                        ELSE p.logo_url END,
+           strip_image_url         = CASE WHEN pt.j ? 'strip_image_url'         THEN pt.j->>'strip_image_url'                 ELSE p.strip_image_url END,
+           promo_message           = CASE WHEN pt.j ? 'promo_message'           THEN pt.j->>'promo_message'                   ELSE p.promo_message END,
+           promo_starts_at         = CASE WHEN pt.j ? 'promo_starts_at'         THEN (pt.j->>'promo_starts_at')::timestamptz  ELSE p.promo_starts_at END,
+           promo_ends_at           = CASE WHEN pt.j ? 'promo_ends_at'           THEN (pt.j->>'promo_ends_at')::timestamptz    ELSE p.promo_ends_at END,
+           promo_days              = CASE WHEN pt.j ? 'promo_days'              THEN pt.j->>'promo_days'                      ELSE p.promo_days END,
+           lifecycle_copy          = CASE WHEN pt.j ? 'lifecycle_copy'          THEN pt.j->'lifecycle_copy'                   ELSE p.lifecycle_copy END,
+           updated_at              = now()
+         FROM (SELECT $2::jsonb AS j) pt
+         WHERE p.merchant_id = $1::uuid`,
+        [merchantId, JSON.stringify(patch)],
       ),
     );
   }
 
-  async updateProgram(
-    tenantId: string,
-    patch: { cardPrefix?: string; passStyle?: string; brandingPatch: Record<string, unknown> },
-  ): Promise<void> {
-    await this.pg.withTenant((c) =>
-      c.query(
-        `UPDATE loyalty.programs
-         SET card_prefix = COALESCE($2, card_prefix),
-             pass_style  = COALESCE($3, pass_style),
-             branding    = COALESCE(branding, '{}'::jsonb) || $4::jsonb,
-             updated_at  = now()
-         WHERE tenant_id = $1::uuid`,
-        [
-          tenantId,
-          patch.cardPrefix ?? null,
-          patch.passStyle ?? null,
-          JSON.stringify(patch.brandingPatch),
-        ],
-      ),
-    );
-  }
-
-  async stats(tenantId: string, dayStart: Date): Promise<Row> {
-    return this.pg.withTenant(async (c) => {
+  async stats(merchantId: string, dayStart: Date): Promise<Row> {
+    return this.pg.withMerchant(async (c) => {
       const [visits, topups, pending] = await Promise.all([
         c.query<Row>(
-          `SELECT count(*)::int AS n FROM loyalty.visit_events
-           WHERE tenant_id = $1::uuid AND occurred_at >= $2`,
-          [tenantId, dayStart],
+          // count(*), NOT sum(stamps): this is "how many times did someone come
+          // in today", an activity counter. A bulk catch-up credit is ONE
+          // interaction worth many stamps. Card progress reads sum(stamps).
+          `SELECT count(*)::int AS n FROM merchant.loyalty_visit
+           WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
+          [merchantId, dayStart],
         ),
         c.query<Row>(
-          `SELECT count(*)::int AS n, COALESCE(sum(amount_cents), 0)::bigint AS sum
-           FROM loyalty.wallet_transactions
-           WHERE tenant_id = $1::uuid AND type = 'topup' AND created_at >= $2`,
-          [tenantId, dayStart],
+          `SELECT count(*)::int AS n, COALESCE(sum(delta), 0)::bigint AS sum
+           FROM merchant.loyalty_stored_value_ledger
+           WHERE merchant_id = $1::uuid AND reason = 'topup' AND created_at >= $2`,
+          [merchantId, dayStart],
         ),
+        // pending rewards across all active cards = Σ max(visits/n − redemptions, 0)
         c.query<Row>(
-          `SELECT COALESCE(sum(pending_rewards), 0)::int AS sum FROM loyalty.cards
-           WHERE tenant_id = $1::uuid AND pending_rewards > 0`,
-          [tenantId],
+          `WITH vr AS (
+             SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward
+               WHERE merchant_id = $1::uuid AND active AND type = 'stamps_free_item'
+               ORDER BY created_at DESC NULLS LAST LIMIT 1), 10) AS n
+           )
+           SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
+             SELECT (
+               (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
+                 WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id) / (SELECT n FROM vr)
+               - (SELECT count(*) FROM merchant.loyalty_redemption r
+                   WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id)
+             ) AS pend
+             FROM merchant.loyalty_card c
+             WHERE c.merchant_id = $1::uuid AND c.status = 'active'
+           ) s WHERE pend > 0`,
+          [merchantId],
         ),
       ]);
       return {
@@ -112,68 +196,109 @@ export class CashRepository {
     });
   }
 
-  async analytics(tenantId: string, w: AnalyticsWindows): Promise<Row> {
-    return this.pg.withTenant(async (c) => {
+  async analytics(merchantId: string, w: AnalyticsWindows): Promise<Row> {
+    return this.pg.withMerchant(async (c) => {
       const [
-        recentVisits, topCards, recentUsers, balanceRow,
-        topupsRow, rewardsRow, activeRow, totalsRow, activeRewardConfigRow,
+        recentVisits,
+        topCards,
+        recentUsers,
+        balanceRow,
+        topupsRow,
+        rewardsRow,
+        activeRow,
+        totalsRow,
+        activeRewardConfigRow,
+        highBalanceRow,
+        birthdayRow,
       ] = await Promise.all([
         c.query<Row>(
-          `SELECT occurred_at AS "scannedAt" FROM loyalty.visit_events
-           WHERE tenant_id = $1::uuid AND occurred_at >= $2`,
-          [tenantId, w.thirtyDaysAgo],
+          `SELECT occurred_at AS "scannedAt" FROM merchant.loyalty_visit
+           WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
+          [merchantId, w.thirtyDaysAgo],
         ),
         c.query<Row>(
-          `SELECT a.person_id::text AS "userId", pe.display_name AS name,
-                  ca.card_number AS "cardNumber", ca.total_visits AS "totalVisits",
-                  ca.balance_cents AS "balanceCentavos"
-           FROM loyalty.cards AS ca
-           JOIN loyalty.accounts AS a ON a.id = ca.account_id
-           LEFT JOIN core.people AS pe ON pe.id = a.person_id
-           WHERE ca.tenant_id = $1::uuid
-           ORDER BY ca.total_visits DESC NULLS LAST LIMIT 10`,
-          [tenantId],
+          `SELECT ca.customer_id::text AS "userId", cu.name AS name,
+                  ca.card_number AS "cardNumber",
+                  agg.total_visits::int   AS "totalVisits",
+                  agg.balance_cents::int  AS "balanceCentavos"
+           FROM merchant.loyalty_card AS ca
+           LEFT JOIN merchant.customer AS cu ON cu.merchant_id = ca.merchant_id AND cu.id = ca.customer_id
+           CROSS JOIN LATERAL (
+             SELECT
+               (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
+                 WHERE v.merchant_id = ca.merchant_id AND v.card_id = ca.id) AS total_visits,
+               COALESCE((SELECT sum(l.delta) FROM merchant.loyalty_stored_value_ledger l
+                 WHERE l.merchant_id = ca.merchant_id AND l.card_id = ca.id), 0) AS balance_cents
+           ) AS agg
+           WHERE ca.merchant_id = $1::uuid
+           ORDER BY agg.total_visits DESC NULLS LAST LIMIT 10`,
+          [merchantId],
         ),
         c.query<Row>(
-          `SELECT created_at AS "createdAt" FROM core.people
-           WHERE tenant_id = $1::uuid AND created_at >= $2`,
-          [tenantId, w.eightWeeksAgo],
+          `SELECT created_at AS "createdAt" FROM merchant.customer
+           WHERE merchant_id = $1::uuid AND created_at >= $2`,
+          [merchantId, w.eightWeeksAgo],
         ),
         c.query<Row>(
-          `SELECT COALESCE(sum(balance_cents), 0)::bigint AS sum FROM loyalty.cards
-           WHERE tenant_id = $1::uuid`,
-          [tenantId],
+          `SELECT COALESCE(sum(delta), 0)::bigint AS sum FROM merchant.loyalty_stored_value_ledger
+           WHERE merchant_id = $1::uuid`,
+          [merchantId],
         ),
         c.query<Row>(
-          `SELECT COALESCE(sum(amount_cents), 0)::bigint AS sum FROM loyalty.wallet_transactions
-           WHERE tenant_id = $1::uuid AND type = 'topup' AND created_at >= $2`,
-          [tenantId, w.monthStart],
+          `SELECT COALESCE(sum(delta), 0)::bigint AS sum FROM merchant.loyalty_stored_value_ledger
+           WHERE merchant_id = $1::uuid AND reason = 'topup' AND created_at >= $2`,
+          [merchantId, w.monthStart],
         ),
         c.query<Row>(
-          `SELECT count(*)::int AS n FROM loyalty.reward_redemptions
-           WHERE tenant_id = $1::uuid AND redeemed_at >= $2`,
-          [tenantId, w.monthStart],
+          `SELECT count(*)::int AS n FROM merchant.loyalty_redemption
+           WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
+          [merchantId, w.monthStart],
         ),
         c.query<Row>(
-          `SELECT count(DISTINCT loyalty_card_id)::int AS n FROM loyalty.visit_events
-           WHERE tenant_id = $1::uuid AND occurred_at >= $2`,
-          [tenantId, w.thirtyDaysAgo],
+          `SELECT count(DISTINCT card_id)::int AS n FROM merchant.loyalty_visit
+           WHERE merchant_id = $1::uuid AND occurred_at >= $2`,
+          [merchantId, w.thirtyDaysAgo],
         ),
         c.query<Row>(
           `SELECT
-             (SELECT count(*)::int FROM core.people WHERE tenant_id = $1::uuid) AS "totalCustomers",
-             (SELECT COALESCE(sum(abs(amount_cents)), 0)::bigint FROM loyalty.wallet_transactions
-                WHERE tenant_id = $1::uuid AND type = 'purchase') AS "totalRevenueCentavos",
-             (SELECT COALESCE(sum(total_visits), 0)::bigint FROM loyalty.cards
-                WHERE tenant_id = $1::uuid) AS "totalAllTimeVisits"`,
-          [tenantId],
+             (SELECT count(*)::int FROM merchant.customer WHERE merchant_id = $1::uuid) AS "totalCustomers",
+             (SELECT COALESCE(sum(abs(delta)), 0)::bigint FROM merchant.loyalty_stored_value_ledger
+                WHERE merchant_id = $1::uuid AND reason = 'purchase') AS "totalRevenueCentavos",
+             -- count(*), NOT sum(stamps): all-time INTERACTIONS. ⚠ This number
+             -- changes at the cutover, and the new one is the true one: the old
+             -- backfill invented 87 synthetic rows so that count(*) matched a
+             -- stamp total, so this read 624 where the customers had actually
+             -- come in 537 times.
+             (SELECT count(*)::bigint FROM merchant.loyalty_visit
+                WHERE merchant_id = $1::uuid) AS "totalAllTimeVisits"`,
+          [merchantId],
         ),
         c.query<Row>(
-          `SELECT visits_required AS "visitsRequired", reward_cost_cents AS "rewardCostCentavos"
-           FROM loyalty.reward_configs
-           WHERE tenant_id = $1::uuid AND is_active = true
-           ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
-          [tenantId],
+          `SELECT stamps_required AS "visitsRequired", value AS "rewardCostCentavos"
+           FROM merchant.loyalty_reward
+           WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+          [merchantId],
+        ),
+        // Cards whose wallet balance (SUM of the value ledger) is over $1,000.
+        // Grouped per card, then counted, so a card with many ledger rows counts once.
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM (
+             SELECT ca.id, COALESCE(sum(l.delta), 0) AS bal
+             FROM merchant.loyalty_card AS ca
+             LEFT JOIN merchant.loyalty_stored_value_ledger AS l
+               ON l.merchant_id = ca.merchant_id AND l.card_id = ca.id
+             WHERE ca.merchant_id = $1::uuid
+             GROUP BY ca.id
+           ) AS t WHERE t.bal > 100000`,
+          [merchantId],
+        ),
+        // Birthday rewards a customer can still redeem: an 'active' grant whose
+        // window has not closed. 'redeemed'/'expired' and past-window grants drop out.
+        c.query<Row>(
+          `SELECT count(*)::int AS n FROM merchant.loyalty_birthday_grant
+           WHERE merchant_id = $1::uuid AND status = 'active' AND expires_at > now()`,
+          [merchantId],
         ),
       ]);
       return {
@@ -186,89 +311,78 @@ export class CashRepository {
         activeRow: activeRow.rows,
         totalsRow: totalsRow.rows,
         activeRewardConfigRow: activeRewardConfigRow.rows,
+        highBalanceRow: highBalanceRow.rows,
+        birthdayRow: birthdayRow.rows,
       };
     });
   }
 
   async adminCustomers(
-    tenantId: string,
+    merchantId: string,
     opts: { search: string; sort: string; limit: number; skip: number },
   ): Promise<{ rows: Row[]; total: number }> {
     const like = `%${opts.search}%`;
     const order =
-      opts.sort === 'visits' ? 'c.total_visits DESC NULLS LAST'
-      : opts.sort === 'balance' ? 'c.balance_cents DESC NULLS LAST'
-      : opts.sort === 'inactive' ? 'lv.last_visit ASC NULLS FIRST'
-      : opts.sort === 'ltv' ? 'ltv.ltv_centavos DESC NULLS LAST'
-      : 'pe.created_at DESC';
-    return this.pg.withTenant(async (c) => {
+      opts.sort === 'visits'
+        ? 'total_visits DESC NULLS LAST'
+        : opts.sort === 'balance'
+          ? 'balance_cents DESC NULLS LAST'
+          : opts.sort === 'inactive'
+            ? 'last_visit ASC NULLS FIRST'
+            : opts.sort === 'ltv'
+              ? 'ltv_centavos DESC NULLS LAST'
+              : 'created_at DESC';
+    const filter = `($2 = '' OR name ILIKE $3 OR phone ILIKE $3 OR email ILIKE $3 OR card_number ILIKE $3)`;
+    return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
-          `SELECT
-             pe.id::text AS id, pe.display_name AS name,
-             pe.normalized_phone AS phone, pe.normalized_email AS email,
-             pe.created_at AS "createdAt",
-             c.id::text AS "cardId", c.card_number AS "cardNumber",
-             c.balance_cents AS "balanceCentavos", c.total_visits AS "totalVisits",
-             c.visits_this_cycle AS "visitsThisCycle", c.pending_rewards AS "pendingRewards",
-             lv.last_visit AS "lastVisit",
-             COALESCE(ltv.ltv_centavos, 0)::bigint AS "ltvCentavos"
-           FROM core.people AS pe
-           LEFT JOIN loyalty.accounts AS a ON a.person_id = pe.id AND a.tenant_id = pe.tenant_id
-           LEFT JOIN loyalty.cards    AS c ON c.account_id = a.id
-           LEFT JOIN LATERAL (
-             SELECT max(occurred_at) AS last_visit
-             FROM loyalty.visit_events ve WHERE ve.loyalty_card_id = c.id
-           ) AS lv ON true
-           LEFT JOIN LATERAL (
-             SELECT COALESCE(sum(abs(amount_cents)), 0) AS ltv_centavos
-             FROM loyalty.wallet_transactions wt WHERE wt.loyalty_card_id = c.id AND wt.type = 'purchase'
-           ) AS ltv ON true
-           WHERE pe.tenant_id = $1::uuid AND (
-             $2 = '' OR pe.display_name ILIKE $3 OR pe.normalized_phone ILIKE $3
-             OR pe.normalized_email ILIKE $3 OR c.card_number ILIKE $3
-           )
+          `WITH ${CUST_CTE}, vr_n AS (SELECT n FROM vr)
+           SELECT id::text AS id, name, phone, email, created_at AS "createdAt",
+                  card_id::text AS "cardId", card_number AS "cardNumber",
+                  balance_cents AS "balanceCentavos", total_visits AS "totalVisits",
+                  (total_visits % (SELECT n FROM vr_n))::int                       AS "visitsThisCycle",
+                  (total_visits / (SELECT n FROM vr_n) - redemptions)::int         AS "pendingRewards",
+                  last_visit AS "lastVisit", ltv_centavos AS "ltvCentavos"
+           FROM cust
+           WHERE ${filter}
            ORDER BY ${order}
            LIMIT $4 OFFSET $5`,
-          [tenantId, opts.search, like, opts.limit, opts.skip],
+          [merchantId, opts.search, like, opts.limit, opts.skip],
         )
       ).rows;
       const total = (
         await c.query<Row>(
-          `SELECT count(DISTINCT pe.id)::int AS n
-           FROM core.people AS pe
-           LEFT JOIN loyalty.accounts AS a ON a.person_id = pe.id AND a.tenant_id = pe.tenant_id
-           LEFT JOIN loyalty.cards    AS c ON c.account_id = a.id
-           WHERE pe.tenant_id = $1::uuid AND (
-             $2 = '' OR pe.display_name ILIKE $3 OR pe.normalized_phone ILIKE $3
-             OR pe.normalized_email ILIKE $3 OR c.card_number ILIKE $3
-           )`,
-          [tenantId, opts.search, like],
+          `WITH ${CUST_CTE}
+           SELECT count(*)::int AS n FROM cust WHERE ${filter}`,
+          [merchantId, opts.search, like],
         )
       ).rows[0]?.n;
       return { rows, total: Number(total ?? 0) };
     });
   }
 
-  async rewardConfig(tenantId: string): Promise<{ active: Row[]; history: Row[] }> {
+  async rewardConfig(merchantId: string): Promise<{ active: Row[]; history: Row[] }> {
+    // Maps build-v3's loyalty_reward onto the frozen umi-cash response names.
+    // activated_at was dropped — each config save inserts a NEW row, so created_at
+    // IS the activation moment; both "activatedAt" and "createdAt" read from it.
     const select = `
-      id::text, tenant_id::text AS "tenantId", program_id::text AS "programId",
-      visits_required AS "visitsRequired", reward_name AS "rewardName",
-      reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
-      is_active AS "isActive", activated_at AS "activatedAt", created_at AS "createdAt"`;
-    return this.pg.withTenant(async (c) => {
+      id::text, merchant_id::text AS "merchantId", NULL::text AS "programId",
+      stamps_required AS "visitsRequired", name AS "rewardName",
+      description AS "rewardDescription", value AS "rewardCostCentavos",
+      active AS "isActive", created_at AS "activatedAt", created_at AS "createdAt"`;
+    return this.pg.withMerchant(async (c) => {
       const [active, history] = await Promise.all([
         c.query<Row>(
-          `SELECT ${select} FROM loyalty.reward_configs
-           WHERE tenant_id = $1::uuid AND is_active = true
-           ORDER BY activated_at DESC NULLS LAST LIMIT 1`,
-          [tenantId],
+          `SELECT ${select} FROM merchant.loyalty_reward
+           WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 1`,
+          [merchantId],
         ),
         c.query<Row>(
-          `SELECT ${select} FROM loyalty.reward_configs
-           WHERE tenant_id = $1::uuid AND is_active = false
-           ORDER BY activated_at DESC NULLS LAST LIMIT 10`,
-          [tenantId],
+          `SELECT ${select} FROM merchant.loyalty_reward
+           WHERE merchant_id = $1::uuid AND active = false AND type = 'stamps_free_item'
+           ORDER BY created_at DESC NULLS LAST LIMIT 10`,
+          [merchantId],
         ),
       ]);
       return { active: active.rows, history: history.rows };
@@ -277,62 +391,157 @@ export class CashRepository {
 
   /** Admin-config write (not the inert customer-facing path) — see preflight §4. */
   async upsertRewardConfig(
-    tenantId: string,
-    programId: string,
-    data: { visitsRequired: number; rewardName: string; rewardDescription: string | null; rewardCostCentavos: number },
+    merchantId: string,
+    _programId: string,
+    data: {
+      visitsRequired: number;
+      rewardName: string;
+      rewardDescription: string | null;
+      rewardCostCentavos: number;
+    },
   ): Promise<Row> {
-    return this.pg.withTenant(async (c) => {
-      // Serialize concurrent reward-config saves per tenant so the
+    return this.pg.withMerchant(async (c) => {
+      // Serialize concurrent reward-rule saves per merchant so the
       // deactivate-then-insert can't interleave into two is_active=true rows.
-      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `reward_config:${tenantId}`,
-      ]);
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`reward_config:${merchantId}`]);
       await c.query(
-        `UPDATE loyalty.reward_configs SET is_active = false
-         WHERE tenant_id = $1::uuid AND is_active = true`,
-        [tenantId],
+        `UPDATE merchant.loyalty_reward SET active = false
+         WHERE merchant_id = $1::uuid AND active = true AND type = 'stamps_free_item'`,
+        [merchantId],
       );
       const { rows } = await c.query<Row>(
-        `INSERT INTO loyalty.reward_configs
-           (tenant_id, program_id, visits_required, reward_name, reward_description, reward_cost_cents, is_active, activated_at)
-         VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, true, now())
-         RETURNING id::text, tenant_id::text AS "tenantId", program_id::text AS "programId",
-                   visits_required AS "visitsRequired", reward_name AS "rewardName",
-                   reward_description AS "rewardDescription", reward_cost_cents AS "rewardCostCentavos",
-                   is_active AS "isActive", activated_at AS "activatedAt"`,
-        [tenantId, programId, data.visitsRequired, data.rewardName, data.rewardDescription, data.rewardCostCentavos],
+        `INSERT INTO merchant.loyalty_reward
+           (merchant_id, type, stamps_required, name, description, value, active)
+         VALUES ($1::uuid, 'stamps_free_item', $2, $3, $4, $5, true)
+         RETURNING id::text, merchant_id::text AS "merchantId", NULL::text AS "programId",
+                   stamps_required AS "visitsRequired", name AS "rewardName",
+                   description AS "rewardDescription", value AS "rewardCostCentavos",
+                   active AS "isActive", created_at AS "activatedAt"`,
+        [
+          merchantId,
+          data.visitsRequired,
+          data.rewardName,
+          data.rewardDescription,
+          data.rewardCostCentavos,
+        ],
       );
       return rows[0];
     });
   }
 
   async giftCards(
-    tenantId: string,
+    merchantId: string,
     limit: number,
     skip: number,
   ): Promise<{ rows: Row[]; total: number }> {
-    return this.pg.withTenant(async (c) => {
+    return this.pg.withMerchant(async (c) => {
       const rows = (
         await c.query<Row>(
-          `SELECT id::text, code, amount_cents AS "amountCentavos", sender_name AS "senderName",
+          `SELECT id::text, masked_code AS code,
+                  amount_cents AS "amountCentavos", sender_name AS "senderName",
                   recipient_name AS "recipientName", recipient_email AS "recipientEmail",
                   recipient_phone AS "recipientPhone", message,
                   (redeemed_at IS NOT NULL) AS "isRedeemed",
                   redeemed_at AS "redeemedAt", expires_at AS "expiresAt", created_at AS "createdAt"
-           FROM loyalty.gift_cards
-           WHERE tenant_id = $1::uuid
+           FROM merchant.loyalty_gift_card
+           WHERE merchant_id = $1::uuid
            ORDER BY created_at DESC
            LIMIT $2 OFFSET $3`,
-          [tenantId, limit, skip],
+          [merchantId, limit, skip],
         )
       ).rows;
       const total = (
         await c.query<Row>(
-          `SELECT count(*)::int AS n FROM loyalty.gift_cards WHERE tenant_id = $1::uuid`,
-          [tenantId],
+          `SELECT count(*)::int AS n FROM merchant.loyalty_gift_card WHERE merchant_id = $1::uuid`,
+          [merchantId],
         )
       ).rows[0]?.n;
       return { rows, total: Number(total ?? 0) };
     });
+  }
+
+  /**
+   * One customer, for the staff detail screen. The identity spine holds the
+   * phone and the email — `merchant.customer` carries neither — and the same
+   * primary-then-newest rule the list uses picks which one to show.
+   *
+   * The card is the customer's ACTIVE card, newest first. A customer with no
+   * card reads as not found: umi-cash answers `Cliente no encontrado` for both,
+   * because a customer without a card has nothing this screen can show.
+   */
+  async adminCustomerDetail(merchantId: string, customerId: string): Promise<Row | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT cu.id::text AS id, cu.name, cu.birthday, cu.created_at AS "createdAt",
+                c.id::text AS "cardId", c.card_number AS "cardNumber",
+                c.created_at AS "cardCreatedAt",
+                (SELECT ct.normalized_value FROM merchant.contact ct
+                   JOIN umi.channel_type ch ON ch.id = ct.channel_id
+                  WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+                    AND ch.key IN ('phone', 'whatsapp', 'sms')
+                  ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1) AS phone,
+                (SELECT ct.normalized_value FROM merchant.contact ct
+                   JOIN umi.channel_type ch ON ch.id = ct.channel_id
+                  WHERE ct.merchant_id = cu.merchant_id AND ct.customer_id = cu.id
+                    AND ch.key = 'email'
+                  ORDER BY ct.is_primary DESC, ct.updated_at DESC LIMIT 1) AS email
+           FROM merchant.customer cu
+           JOIN merchant.loyalty_card c
+             ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
+          WHERE cu.merchant_id = $1::uuid AND cu.id = $2::uuid
+          ORDER BY c.created_at DESC
+          LIMIT 1`,
+        [merchantId, customerId],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * What she has spent here, and what she has loaded.
+   *
+   * Spend is stored as a NEGATIVE delta, so it is summed as an absolute value —
+   * the screen shows "lifetime value", not "how far the balance fell".
+   */
+  async cardMoneyTotals(merchantId: string, cardId: string): Promise<Row> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `SELECT COALESCE(sum(abs(delta)) FILTER (WHERE reason = 'purchase'), 0)::bigint AS "ltvCentavos",
+                COALESCE(sum(delta)      FILTER (WHERE reason = 'topup'),    0)::bigint AS "topupCentavos"
+           FROM merchant.loyalty_stored_value_ledger
+          WHERE merchant_id = $1::uuid AND card_id = $2::uuid`,
+        [merchantId, cardId],
+      ),
+    );
+    return rows[0] ?? { ltvCentavos: 0, topupCentavos: 0 };
+  }
+
+  /**
+   * Every customer at this cafe, for the CSV. Same projection as the list — no
+   * paging, no search, and the registration date already rendered in the cafe's
+   * own timezone.
+   *
+   * FORMATTED IN SQL on purpose. `toLocaleDateString('es-MX')` in Node renders
+   * against the SERVER's clock, so a card created late in the evening in Mexico
+   * City exports with the next day's date. `AT TIME ZONE` puts the date in the
+   * zone the cafe actually keeps, and `FMDD/FMMM/YYYY` is the unpadded d/m/yyyy
+   * that es-MX produces.
+   */
+  async adminExportRows(merchantId: string, timezone: string): Promise<Row[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<Row>(
+        `WITH ${CUST_CTE}, vr_n AS (SELECT n FROM vr)
+         SELECT name, phone, email, card_number AS "cardNumber",
+                balance_cents AS "balanceCentavos",
+                total_visits AS "totalVisits",
+                (total_visits % (SELECT n FROM vr_n))::int               AS "visitsThisCycle",
+                (total_visits / (SELECT n FROM vr_n) - redemptions)::int AS "pendingRewards",
+                to_char(created_at AT TIME ZONE $2, 'FMDD/FMMM/YYYY')    AS "registeredOn"
+           FROM cust
+          ORDER BY created_at DESC`,
+        [merchantId, timezone],
+      ),
+    );
+    return rows;
   }
 }

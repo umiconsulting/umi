@@ -1,5 +1,12 @@
 {
-  "$description": "umi-dashboard (Vite/React operator console) design tokens, captured verbatim from apps/umi-dashboard/src/styles.css :root. Token keys ARE the exact CSS custom-property names (minus the leading --), so the generator reproduces --umi-navy … --ease 1:1. Divergent-from-landing values live here on purpose; convergence is an explicit owner commit (see README drift register). Non-color $type values (shadow, cubicBezier) are stored as raw CSS strings rather than DTCG composites.",
+  "$description": "umi-dashboard (Vite/React operator console) design tokens. Token keys ARE the exact CSS custom-property names (minus the leading --), so the generator reproduces --umi-navy … --ease 1:1. The :root block is the default 'Umi' theme (the original light palette, captured verbatim from apps/umi-dashboard/src/styles.css :root). Alternate NAMED themes live on each leaf under $themes: { <theme>: <value> }; the generator emits one [data-theme=\"<theme>\"] block per theme name. A token with no $themes entry keeps its Umi value in every theme — brand hues, radii, fonts and motion are theme-invariant on purpose. Divergent-from-landing values live here on purpose; convergence is an explicit owner commit (see README drift register). Non-color $type values (shadow, cubicBezier) are stored as raw CSS strings rather than DTCG composites.",
+  "$themeMeta": {
+    "$description": "Theme registry. default is the :root theme; order drives the theme picker; prefersDark names the theme applied under an OS dark preference when the operator has made no explicit choice.",
+    "default": "umi",
+    "order": ["umi", "dark", "midnight"],
+    "prefersDark": "dark",
+    "labels": { "umi": "Umi", "dark": "Oscuro", "midnight": "Midnight" }
+  },
   "brand": {
     "$description": "Brand",
     "umi-navy": { "$type": "color", "$value": "{color.navy}" },
@@ -11,24 +18,80 @@
     "umi-white": { "$type": "color", "$value": "#ffffff" }
   },
   "surface": {
-    "$description": "Surfaces (light shell)",
-    "canvas": { "$type": "color", "$value": "#EEF1F8" },
-    "canvas-2": { "$type": "color", "$value": "#E4E9F3" },
-    "surface": { "$type": "color", "$value": "#ffffff" },
-    "surface-warm": { "$type": "color", "$value": "#FAF4EC" },
-    "surface-warm-border": { "$type": "color", "$value": "#EAE0D3" },
-    "sidebar-bg": { "$type": "color", "$value": "#1a2952" },
-    "sidebar-bg-deep": { "$type": "color", "$value": "#131f44" }
+    "$description": "Surfaces (Umi light shell)",
+    "canvas": {
+      "$type": "color",
+      "$value": "#EEF1F8",
+      "$themes": { "dark": "#070C18", "midnight": "#000000" }
+    },
+    "canvas-2": {
+      "$type": "color",
+      "$value": "#E4E9F3",
+      "$themes": { "dark": "#0C1322", "midnight": "#0D0D0D" }
+    },
+    "surface": {
+      "$type": "color",
+      "$value": "#ffffff",
+      "$themes": { "dark": "#0F1728", "midnight": "#000000" }
+    },
+    "surface-warm": {
+      "$type": "color",
+      "$value": "#FAF4EC",
+      "$themes": { "dark": "#0F1626", "midnight": "#000000" }
+    },
+    "surface-warm-border": {
+      "$type": "color",
+      "$value": "#EAE0D3",
+      "$themes": { "dark": "#273150", "midnight": "#2A2A2A" }
+    },
+    "sidebar-bg": {
+      "$type": "color",
+      "$value": "#1a2952",
+      "$themes": { "dark": "#070C16", "midnight": "#000000" }
+    },
+    "sidebar-bg-deep": {
+      "$type": "color",
+      "$value": "#131f44",
+      "$themes": { "dark": "#04070E", "midnight": "#000000" }
+    }
   },
   "ink": {
     "$description": "Ink",
-    "ink-1": { "$type": "color", "$value": "#131f44" },
-    "ink-2": { "$type": "color", "$value": "#4a5680" },
-    "ink-3": { "$type": "color", "$value": "#8892b3" },
-    "ink-4": { "$type": "color", "$value": "#b9c0d3" },
-    "ink-warm": { "$type": "color", "$value": "#1F1410" },
-    "ink-warm-soft": { "$type": "color", "$value": "#6e5a4a" },
-    "ink-warm-mute": { "$type": "color", "$value": "#C4A882" }
+    "ink-1": {
+      "$type": "color",
+      "$value": "#131f44",
+      "$themes": { "dark": "#EDF1F8", "midnight": "#F2F2F2" }
+    },
+    "ink-2": {
+      "$type": "color",
+      "$value": "#4a5680",
+      "$themes": { "dark": "#99A2B5", "midnight": "#B0B0B0" }
+    },
+    "ink-3": {
+      "$type": "color",
+      "$value": "#5C678F",
+      "$themes": { "dark": "#727B8F", "midnight": "#8A8A8A" }
+    },
+    "ink-4": {
+      "$type": "color",
+      "$value": "#7D8AAE",
+      "$themes": { "dark": "#565E70", "midnight": "#6A6A6A" }
+    },
+    "ink-warm": {
+      "$type": "color",
+      "$value": "#1F1410",
+      "$themes": { "dark": "#EDEDED", "midnight": "#EDEDED" }
+    },
+    "ink-warm-soft": {
+      "$type": "color",
+      "$value": "#6e5a4a",
+      "$themes": { "dark": "#A0A0A0", "midnight": "#A0A0A0" }
+    },
+    "ink-warm-mute": {
+      "$type": "color",
+      "$value": "#C4A882",
+      "$themes": { "dark": "#6E6E6E", "midnight": "#6E6E6E" }
+    }
   },
   "sidebar-text": {
     "$description": "Sidebar text",
@@ -39,24 +102,72 @@
   },
   "line": {
     "$description": "Lines",
-    "line": { "$type": "color", "$value": "#DDE3F0" },
-    "line-soft": { "$type": "color", "$value": "#E8ECF5" },
-    "line-strong": { "$type": "color", "$value": "#C8D1E5" }
+    "line": {
+      "$type": "color",
+      "$value": "#DDE3F0",
+      "$themes": { "dark": "#1E273D", "midnight": "#2A2A2A" }
+    },
+    "line-soft": {
+      "$type": "color",
+      "$value": "#E8ECF5",
+      "$themes": { "dark": "#151C2E", "midnight": "#1C1C1C" }
+    },
+    "line-strong": {
+      "$type": "color",
+      "$value": "#C8D1E5",
+      "$themes": { "dark": "#2D3854", "midnight": "#3A3A3A" }
+    }
   },
   "status": {
     "$description": "Status",
-    "success": { "$type": "color", "$value": "#4F8A4F" },
-    "success-soft": { "$type": "color", "$value": "#E4F0E1" },
-    "danger": { "$type": "color", "$value": "#B33A35" },
-    "danger-soft": { "$type": "color", "$value": "#F4DEDB" },
-    "warning": { "$type": "color", "$value": "#B5812A" },
-    "warning-soft": { "$type": "color", "$value": "#F6E9D0" },
-    "info": { "$type": "color", "$value": "{color.blue}" },
-    "info-soft": { "$type": "color", "$value": "#DEE6F4" }
+    "success": {
+      "$type": "color",
+      "$value": "#287C42",
+      "$themes": { "dark": "#7CD591", "midnight": "#7CD591" }
+    },
+    "success-soft": {
+      "$type": "color",
+      "$value": "#D8F9DD",
+      "$themes": { "dark": "#102816", "midnight": "#102816" }
+    },
+    "danger": {
+      "$type": "color",
+      "$value": "#AC312A",
+      "$themes": { "dark": "#ED7668", "midnight": "#ED7668" }
+    },
+    "danger-soft": {
+      "$type": "color",
+      "$value": "#FDE9E6",
+      "$themes": { "dark": "#331511", "midnight": "#331511" }
+    },
+    "warning": {
+      "$type": "color",
+      "$value": "#8A5F18",
+      "$themes": { "dark": "#FCBE62", "midnight": "#FCBE62" }
+    },
+    "warning-soft": {
+      "$type": "color",
+      "$value": "#FAE4C7",
+      "$themes": { "dark": "#2E1E06", "midnight": "#2E1E06" }
+    },
+    "info": {
+      "$type": "color",
+      "$value": "#1F6CB0",
+      "$themes": { "dark": "#67AAED", "midnight": "#67AAED" }
+    },
+    "info-soft": {
+      "$type": "color",
+      "$value": "#E5F0FC",
+      "$themes": { "dark": "#0D2034", "midnight": "#0D2034" }
+    }
   },
   "tenant": {
     "$description": "Tenant brand default (warm)",
-    "tenant-brand": { "$type": "color", "$value": "#B5605A" }
+    "tenant-brand": {
+      "$type": "color",
+      "$value": "#B5605A",
+      "$themes": { "dark": "#C77B72", "midnight": "#C77B72" }
+    }
   },
   "radius": {
     "$description": "Radii",
@@ -66,20 +177,59 @@
     "r-card": { "$type": "dimension", "$value": "20px" },
     "r-shell": { "$type": "dimension", "$value": "28px" }
   },
+  "size": {
+    "$description": "Pointer-target sizes. control-min is the floor every actionable control in the shell and the screens must clear; it resolves from core.json so the two clients cannot drift. Theme-invariant on purpose (a 44 px control is 44 px in every theme).",
+    "control-min": { "$type": "dimension", "$value": "{size.control-min}" },
+    "control-tap": { "$type": "dimension", "$value": "{size.control-tap}" }
+  },
   "shadow": {
     "$description": "Shadows",
-    "shadow-card": { "$type": "shadow", "$value": "0 1px 0 rgba(19, 31, 68, 0.04), 0 8px 32px -16px rgba(19, 31, 68, 0.18)" },
-    "shadow-pop": { "$type": "shadow", "$value": "0 12px 40px -12px rgba(19, 31, 68, 0.25)" },
-    "shadow-inner": { "$type": "shadow", "$value": "inset 0 0 0 1px rgba(19, 31, 68, 0.05)" }
+    "shadow-card": {
+      "$type": "shadow",
+      "$value": "0 1px 2px rgba(19, 31, 68, 0.04)",
+      "$themes": {
+        "dark": "0 1px 2px rgba(0, 0, 0, 0.5)",
+        "midnight": "0 1px 2px rgba(0, 0, 0, 0.5)"
+      }
+    },
+    "shadow-pop": {
+      "$type": "shadow",
+      "$value": "0 24px 60px -24px rgba(19, 31, 68, 0.32), 0 2px 8px rgba(19, 31, 68, 0.06)",
+      "$themes": {
+        "dark": "0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)",
+        "midnight": "0 24px 60px -24px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.5)"
+      }
+    },
+    "shadow-inner": {
+      "$type": "shadow",
+      "$value": "inset 0 0 0 1px rgba(19, 31, 68, 0.05)",
+      "$themes": {
+        "dark": "inset 0 0 0 1px rgba(255, 255, 255, 0.06)",
+        "midnight": "inset 0 0 0 1px rgba(255, 255, 255, 0.06)"
+      }
+    }
   },
   "typography": {
     "$description": "Typography",
-    "font-display": { "$type": "fontFamily", "$value": "\"Source Sans 3\", \"Domus\", Georgia, serif" },
-    "font-body": { "$type": "fontFamily", "$value": "\"Source Sans 3\", \"Source Sans Pro\", system-ui, sans-serif" },
-    "font-mono": { "$type": "fontFamily", "$value": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", monospace" }
+    "font-display": {
+      "$type": "fontFamily",
+      "$value": "\"Inter Tight\", \"Inter\", system-ui, sans-serif"
+    },
+    "font-body": {
+      "$type": "fontFamily",
+      "$value": "\"Source Sans 3\", \"Source Sans Pro\", system-ui, sans-serif"
+    },
+    "font-mono": {
+      "$type": "fontFamily",
+      "$value": "\"JetBrains Mono\", ui-monospace, \"SF Mono\", monospace"
+    }
   },
   "motion": {
     "$description": "Motion",
-    "ease": { "$type": "cubicBezier", "$value": "cubic-bezier(.2,.7,.2,1)" }
+    "ease": { "$type": "cubicBezier", "$value": "cubic-bezier(.2,.7,.2,1)" },
+    "ease-out": { "$type": "cubicBezier", "$value": "cubic-bezier(.16,1,.3,1)" },
+    "dur-1": { "$type": "duration", "$value": "120ms" },
+    "dur-2": { "$type": "duration", "$value": "220ms" },
+    "dur-3": { "$type": "duration", "$value": "320ms" }
   }
 }

@@ -29,12 +29,12 @@ Optional future behavior:
 
 ## Ownership
 
-| Area | Owner | Reason |
-|---|---|---|
-| Revocation schema and token verification | `apps/umi-conversaflow` | Owns KDS backend contracts, Supabase functions, and schema-qualified `kds` migrations. |
-| Dashboard remove/revoke UX | `apps/umi-dashboard` | Owns owner dashboard device screen and admin interactions. |
-| iPad revoked-session UX | `apps/umi-kds` | Owns SwiftUI client behavior, Keychain credential storage, and pairing screen. |
-| Architecture plan | root `docs/architecture` | Cross-product behavior decision across dashboard, backend, and native client. |
+| Area                                     | Owner                    | Reason                                                                                 |
+| ---------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------- |
+| Revocation schema and token verification | `apps/umi-conversaflow`  | Owns KDS backend contracts, Supabase functions, and schema-qualified `kds` migrations. |
+| Dashboard remove/revoke UX               | `apps/umi-dashboard`     | Owns owner dashboard device screen and admin interactions.                             |
+| iPad revoked-session UX                  | `apps/umi-kds`           | Owns SwiftUI client behavior, Keychain credential storage, and pairing screen.         |
+| Architecture plan                        | root `docs/architecture` | Cross-product behavior decision across dashboard, backend, and native client.          |
 
 No new repo or service is needed. Existing KDS command/pairing edge functions and `kds.device_sessions` are the narrowest current owners.
 
@@ -113,12 +113,12 @@ Recommended request shape:
 
 Protect these surfaces with device-token verification:
 
-| Surface | Current path | Required behavior |
-|---|---|---|
-| Commands | `kds-command` edge function | Require active device token before `transition_ticket` and `partial_cancel_items`. |
-| Snapshot reads | `get_board_snapshot` through PostgREST today | Move behind a device-aware backend function or add a narrow edge-function read endpoint. |
-| Event polling | `get_ticket_events` through PostgREST today | Move behind the same device-aware read endpoint or require a verified device read contract. |
-| Heartbeat | dashboard local `/api/kds/heartbeat` today | Keep as liveness only; optionally reject revoked device IDs once backend check is available. |
+| Surface        | Current path                                 | Required behavior                                                                            |
+| -------------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Commands       | `kds-command` edge function                  | Require active device token before `transition_ticket` and `partial_cancel_items`.           |
+| Snapshot reads | `get_board_snapshot` through PostgREST today | Move behind a device-aware backend function or add a narrow edge-function read endpoint.     |
+| Event polling  | `get_ticket_events` through PostgREST today  | Move behind the same device-aware read endpoint or require a verified device read contract.  |
+| Heartbeat      | dashboard local `/api/kds/heartbeat` today   | Keep as liveness only; optionally reject revoked device IDs once backend check is available. |
 
 For v1, commands must be enforced first because they mutate operational state. Reads should be enforced before treating revocation as complete.
 
@@ -397,14 +397,14 @@ Exit criterion:
 
 ## Risks And Mitigations
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Direct PostgREST reads remain in the iPad | Revoked device can still view orders | Treat read enforcement as required before shipping revocation as complete. |
-| Commands only use anon key | Revoked device can still mutate tickets | Enforce device token in `kds-command` before UI claims revocation. |
-| Heartbeat makes revoked device look live | Dashboard confusion | Merge heartbeats only for active devices, or ignore heartbeats for revoked IDs. |
-| iPad clears Keychain on temporary outage | Kitchen disruption | Only clear credential on typed `device_revoked`, not generic transport errors. |
-| Legacy and platform schemas diverge | Inconsistent behavior | Prefer platform-transition path; document any legacy limitation explicitly. |
-| Token appears in logs | Credential leak | Use header transport and redact token-bearing headers/body in logs. |
+| Risk                                      | Impact                                  | Mitigation                                                                      |
+| ----------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------- |
+| Direct PostgREST reads remain in the iPad | Revoked device can still view orders    | Treat read enforcement as required before shipping revocation as complete.      |
+| Commands only use anon key                | Revoked device can still mutate tickets | Enforce device token in `kds-command` before UI claims revocation.              |
+| Heartbeat makes revoked device look live  | Dashboard confusion                     | Merge heartbeats only for active devices, or ignore heartbeats for revoked IDs. |
+| iPad clears Keychain on temporary outage  | Kitchen disruption                      | Only clear credential on typed `device_revoked`, not generic transport errors.  |
+| Legacy and platform schemas diverge       | Inconsistent behavior                   | Prefer platform-transition path; document any legacy limitation explicitly.     |
+| Token appears in logs                     | Credential leak                         | Use header transport and redact token-bearing headers/body in logs.             |
 
 ## Non-Goals
 

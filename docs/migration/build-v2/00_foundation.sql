@@ -161,9 +161,12 @@ returns boolean language sql stable security definer
 set search_path = tenant, pg_temp as $$
   select target_tenant_id is not null and exists (
     select 1 from tenant.tenant_access ta
-    where ta.tenant_id = target_tenant_id
-      and ta.login_id  = tenant.current_user_id()
-      and ta.status    = 'active'
+    where ta.login_id = tenant.current_user_id()
+      and ta.status   = 'active'
+      and (
+        ta.tenant_id = target_tenant_id     -- explicit edge in this tenant
+        or ta.role   = 'super_admin'         -- global super_admin: any tenant (hola@)
+      )
   )
 $$;
 

@@ -1,8 +1,8 @@
 // Servicio de Email Centralizado
 // src/lib/email/emailService.ts
 
-import * as nodemailer from "nodemailer";
-import { EmailTemplateData } from "./templates";
+import * as nodemailer from 'nodemailer';
+import { EmailTemplateData } from './templates';
 
 export interface EmailConfig {
   from: string;
@@ -23,7 +23,7 @@ export interface SendEmailOptions {
   html: string;
   text?: string;
   replyTo?: string;
-  priority?: "high" | "normal" | "low";
+  priority?: 'high' | 'normal' | 'low';
   campaign?: string;
   leadId?: string;
   sequenceDay?: number;
@@ -46,7 +46,7 @@ export interface EmailMetrics {
 interface EmailLogData {
   to: string;
   subject: string;
-  status: "sent" | "failed";
+  status: 'sent' | 'failed';
   messageId?: string;
   error?: string;
   campaign?: string | undefined;
@@ -71,31 +71,25 @@ export const getInternalEmail = (): string =>
   process.env.ADMIN_EMAIL ||
   process.env.TEST_EMAIL ||
   process.env.EMAIL_USER ||
-  "hola@umiconsulting.co";
+  'hola@umiconsulting.co';
 
 const getEmailConfig = (): EmailConfig => {
   const smtpHost = process.env.SMTP_HOST;
   const smtpUser = process.env.SMTP_USER;
   const smtpPassword = process.env.SMTP_PASSWORD;
 
-  if (
-    smtpHost &&
-    smtpPassword &&
-    !smtpPassword.trim().startsWith("xsmtpsib-")
-  ) {
+  if (smtpHost && smtpPassword && !smtpPassword.trim().startsWith('xsmtpsib-')) {
     console.warn(
-      "⚠️ SMTP_PASSWORD no parece ser una clave SMTP Standard de Brevo. Debe empezar con xsmtpsib-, no con una API key ni contraseña de cuenta."
+      '⚠️ SMTP_PASSWORD no parece ser una clave SMTP Standard de Brevo. Debe empezar con xsmtpsib-, no con una API key ni contraseña de cuenta.',
     );
   }
 
   const config: EmailConfig = {
-    from: `"Umi" <${
-      process.env.EMAIL_FROM || process.env.EMAIL_USER || "hola@umiconsulting.co"
-    }>`,
+    from: `"Umi" <${process.env.EMAIL_FROM || process.env.EMAIL_USER || 'hola@umiconsulting.co'}>`,
     replyTo: getInternalEmail(),
     auth: {
-      user: smtpUser || process.env.EMAIL_USER || "",
-      pass: smtpPassword || process.env.EMAIL_PASSWORD || "",
+      user: smtpUser || process.env.EMAIL_USER || '',
+      pass: smtpPassword || process.env.EMAIL_PASSWORD || '',
     },
   };
 
@@ -106,7 +100,7 @@ const getEmailConfig = (): EmailConfig => {
     return config;
   }
 
-  config.service = process.env.EMAIL_SERVICE || "gmail";
+  config.service = process.env.EMAIL_SERVICE || 'gmail';
   return config;
 };
 
@@ -144,12 +138,12 @@ export class EmailService {
       rateLimit: 5, // máximo 5 emails por rateDelta
     });
 
-    if (process.env.NODE_ENV !== "test") {
+    if (process.env.NODE_ENV !== 'test') {
       transporter.verify((error: Error | null) => {
         if (error) {
-          console.error("❌ Error de configuración de email:", error);
+          console.error('❌ Error de configuración de email:', error);
         } else {
-          console.log("✅ Servidor de email configurado correctamente");
+          console.log('✅ Servidor de email configurado correctamente');
         }
       });
     }
@@ -161,7 +155,7 @@ export class EmailService {
     try {
       if (!this.config.auth.user || !this.config.auth.pass) {
         throw new Error(
-          "Missing email credentials. Configure SMTP_USER/SMTP_PASSWORD or EMAIL_USER/EMAIL_PASSWORD."
+          'Missing email credentials. Configure SMTP_USER/SMTP_PASSWORD or EMAIL_USER/EMAIL_PASSWORD.',
         );
       }
 
@@ -176,13 +170,13 @@ export class EmailService {
 
         // Headers para tracking y deliverability
         headers: {
-          "X-Campaign": options.campaign || "general",
-          "X-Priority": this.getPriorityValue(options.priority),
-          "X-Lead-ID": options.leadId || "unknown",
-          "X-Sequence-Day": options.sequenceDay?.toString() || "none",
-          "List-Unsubscribe": `<mailto:${this.config.replyTo}?subject=Unsubscribe_${options.leadId}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          "Message-ID": this.generateMessageId(),
+          'X-Campaign': options.campaign || 'general',
+          'X-Priority': this.getPriorityValue(options.priority),
+          'X-Lead-ID': options.leadId || 'unknown',
+          'X-Sequence-Day': options.sequenceDay?.toString() || 'none',
+          'List-Unsubscribe': `<mailto:${this.config.replyTo}?subject=Unsubscribe_${options.leadId}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          'Message-ID': this.generateMessageId(),
         },
       };
 
@@ -199,9 +193,7 @@ export class EmailService {
     }
   }
 
-  async sendBulkEmails(
-    emailList: SendEmailOptions[]
-  ): Promise<{ sent: number; failed: number }> {
+  async sendBulkEmails(emailList: SendEmailOptions[]): Promise<{ sent: number; failed: number }> {
     let sent = 0;
     let failed = 0;
 
@@ -232,7 +224,7 @@ export class EmailService {
     templateData: EmailTemplateData,
     templateFunction: (data: EmailTemplateData) => string,
     subject: string,
-    options?: Partial<SendEmailOptions>
+    options?: Partial<SendEmailOptions>,
   ): Promise<boolean> {
     const html = templateFunction(templateData);
 
@@ -240,8 +232,8 @@ export class EmailService {
       to: templateData.contactInfo.email,
       subject: this.personalizeSubject(subject, templateData),
       html,
-      campaign: "diagnostic_sequence",
-      leadId: `${templateData.contactInfo.email.split("@")[0]}_${Date.now()}`,
+      campaign: 'diagnostic_sequence',
+      leadId: `${templateData.contactInfo.email.split('@')[0]}_${Date.now()}`,
       ...options,
     });
   }
@@ -249,12 +241,12 @@ export class EmailService {
   // Métodos de utilidad
   private htmlToText(html: string): string {
     return html
-      .replace(/<[^>]*>/g, "") // Remover tags HTML
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/\s+/g, " ")
+      .replace(/<[^>]*>/g, '') // Remover tags HTML
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
@@ -265,14 +257,14 @@ export class EmailService {
       .replace(/\$\{level\}/g, data.diagnosticData.level);
   }
 
-  private getPriorityValue(priority?: "high" | "normal" | "low"): string {
+  private getPriorityValue(priority?: 'high' | 'normal' | 'low'): string {
     switch (priority) {
-      case "high":
-        return "1";
-      case "low":
-        return "5";
+      case 'high':
+        return '1';
+      case 'low':
+        return '5';
       default:
-        return "3";
+        return '3';
     }
   }
 
@@ -290,7 +282,7 @@ export class EmailService {
     this.saveEmailLog({
       to: options.to,
       subject: options.subject,
-      status: "sent",
+      status: 'sent',
       messageId: info.messageId,
       campaign: options.campaign || undefined,
       leadId: options.leadId || undefined,
@@ -305,7 +297,7 @@ export class EmailService {
     this.saveEmailLog({
       to: options.to,
       subject: options.subject,
-      status: "failed",
+      status: 'failed',
       error: error.message,
       campaign: options.campaign || undefined,
       leadId: options.leadId || undefined,
@@ -316,7 +308,7 @@ export class EmailService {
   private async saveEmailLog(logData: EmailLogData) {
     // En producción, implementar guardado en base de datos
     // Por ahora, solo console.log para debugging
-    console.log("📊 Email log:", JSON.stringify(logData, null, 2));
+    console.log('📊 Email log:', JSON.stringify(logData, null, 2));
   }
 
   private delay(ms: number): Promise<void> {
@@ -335,10 +327,10 @@ export class EmailService {
   async testConnection(): Promise<boolean> {
     try {
       await this.transporter.verify();
-      console.log("✅ Conexión de email verificada exitosamente");
+      console.log('✅ Conexión de email verificada exitosamente');
       return true;
     } catch (error) {
-      console.error("❌ Error verificando conexión de email:", error);
+      console.error('❌ Error verificando conexión de email:', error);
       return false;
     }
   }
@@ -346,18 +338,18 @@ export class EmailService {
   async sendTestEmail(toEmail: string): Promise<boolean> {
     const testData: EmailTemplateData = {
       contactInfo: {
-        name: "Usuario de Prueba",
+        name: 'Usuario de Prueba',
         email: toEmail,
-        company: "Empresa Test",
+        company: 'Empresa Test',
       },
       diagnosticData: {
         score: 5,
-        level: "Intermedio",
-        primaryChallenge: "Operación desconectada",
+        level: 'Intermedio',
+        primaryChallenge: 'Operación desconectada',
         quickWins: [
           {
-            action: "Mapa operativo",
-            description: "Definir entrada de pedido, cocina y cliente",
+            action: 'Mapa operativo',
+            description: 'Definir entrada de pedido, cocina y cliente',
           },
         ],
         estimatedROI: {
@@ -369,7 +361,7 @@ export class EmailService {
 
     return this.sendEmail({
       to: toEmail,
-      subject: "Email de prueba - Sistema Umi",
+      subject: 'Email de prueba - Sistema Umi',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #223979;">Test Email - Sistema funcionando</h2>
@@ -386,8 +378,8 @@ export class EmailService {
           <p style="font-size: 12px; color: #666;">Umi - Sistema de email automatizado</p>
         </div>
       `,
-      campaign: "test",
-      priority: "normal",
+      campaign: 'test',
+      priority: 'normal',
     });
   }
 
@@ -395,7 +387,7 @@ export class EmailService {
   close() {
     if (this.transporter) {
       this.transporter.close();
-      console.log("📤 Conexiones de email cerradas");
+      console.log('📤 Conexiones de email cerradas');
     }
   }
 }
@@ -403,9 +395,7 @@ export class EmailService {
 // Instancia singleton para usar en toda la aplicación
 let emailServiceInstance: EmailService | null = null;
 
-export const getEmailService = (
-  config?: Partial<EmailConfig>
-): EmailService => {
+export const getEmailService = (config?: Partial<EmailConfig>): EmailService => {
   if (!emailServiceInstance) {
     emailServiceInstance = new EmailService(config);
   }
@@ -413,8 +403,6 @@ export const getEmailService = (
 };
 
 // Para usar en Next.js API routes
-export const createEmailService = (
-  config?: Partial<EmailConfig>
-): EmailService => {
+export const createEmailService = (config?: Partial<EmailConfig>): EmailService => {
   return new EmailService(config);
 };

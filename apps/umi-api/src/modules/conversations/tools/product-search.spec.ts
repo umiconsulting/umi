@@ -98,9 +98,9 @@ describe('variant filter inference', () => {
   });
 
   it('strips variant tokens from a query', () => {
-    expect(buildStrippedSearchQuery('latte grande con leche de coco', 'GDE', undefined, 'COCO')).toBe(
-      'latte',
-    );
+    expect(
+      buildStrippedSearchQuery('latte grande con leche de coco', 'GDE', undefined, 'COCO'),
+    ).toBe('latte');
   });
 });
 
@@ -112,7 +112,13 @@ describe('money + cart summary (pesos)', () => {
   it('summarizes a cart with line + total', () => {
     const summary = formatCartSummary({
       items: [
-        { product_id: 'p-latte', product_name: 'Latte', variant_name: 'GDE, CALIENTE', quantity: 2, unit_price: 60 },
+        {
+          product_id: 'p-latte',
+          product_name: 'Latte',
+          variant_name: 'GDE, CALIENTE',
+          quantity: 2,
+          unit_price: 60,
+        },
       ],
       updated_at: new Date(0).toISOString(),
       customer_note: null,

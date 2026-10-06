@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import ProgressBar from "./ProgressBar";
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import ProgressBar from './ProgressBar';
 
 interface ContactFormProps {
   onSubmit: (contactInfo: ContactInfo) => void;
@@ -15,37 +15,31 @@ export interface ContactInfo {
   phone: string;
 }
 
-const ContactForm = ({
-  onSubmit,
-  isLoading = false,
-  errorMessage,
-}: ContactFormProps) => {
+const ContactForm = ({ onSubmit, isLoading = false, errorMessage }: ContactFormProps) => {
   const [contactInfo, setContactInfo] = useState<ContactInfo>({
-    name: "",
-    email: "",
-    company: "",
-    phone: "",
+    name: '',
+    email: '',
+    company: '',
+    phone: '',
   });
 
-  const [validationErrors, setValidationErrors] = useState<
-    Partial<ContactInfo>
-  >({});
+  const [validationErrors, setValidationErrors] = useState<Partial<ContactInfo>>({});
 
   const validateForm = (): boolean => {
     const errors: Partial<ContactInfo> = {};
 
     if (!contactInfo.name.trim()) {
-      errors.name = "El nombre es requerido";
+      errors.name = 'El nombre es requerido';
     }
 
     if (!contactInfo.email.trim()) {
-      errors.email = "El email es requerido";
+      errors.email = 'El email es requerido';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email)) {
-      errors.email = "Formato de email inválido";
+      errors.email = 'Formato de email inválido';
     }
 
     if (!contactInfo.company.trim()) {
-      errors.company = "La empresa es requerida";
+      errors.company = 'La empresa es requerida';
     }
 
     setValidationErrors(errors);
@@ -83,7 +77,7 @@ const ContactForm = ({
         currentStep={5}
         totalSteps={5}
         messages={{
-          5: "Paso final - Datos de contacto",
+          5: 'Paso final - Datos de contacto',
         }}
       />
 
@@ -102,9 +96,7 @@ const ContactForm = ({
                 1
               </div>
               <div>
-                <h4 className="mb-1 font-extrabold text-umi-blue-deep">
-                  Lectura por producto
-                </h4>
+                <h4 className="mb-1 font-extrabold text-umi-blue-deep">Lectura por producto</h4>
                 <p className="text-sm font-semibold leading-[1.45] text-[rgba(20,33,66,0.62)]">
                   Dónde entra ConversaFlow, KDS, Cash, Dashboard o Logs
                 </p>
@@ -116,9 +108,7 @@ const ContactForm = ({
                 2
               </div>
               <div>
-                <h4 className="mb-1 font-extrabold text-umi-blue-deep">
-                  Orden de activación
-                </h4>
+                <h4 className="mb-1 font-extrabold text-umi-blue-deep">Orden de activación</h4>
                 <p className="text-sm font-semibold leading-[1.45] text-[rgba(20,33,66,0.62)]">
                   Qué conviene resolver primero para no inflar alcance
                 </p>
@@ -130,9 +120,7 @@ const ContactForm = ({
                 3
               </div>
               <div>
-                <h4 className="mb-1 font-extrabold text-umi-blue-deep">
-                  Riesgos de operación
-                </h4>
+                <h4 className="mb-1 font-extrabold text-umi-blue-deep">Riesgos de operación</h4>
                 <p className="text-sm font-semibold leading-[1.45] text-[rgba(20,33,66,0.62)]">
                   Qué puede romperse si se automatiza sin trazabilidad
                 </p>
@@ -169,15 +157,13 @@ const ContactForm = ({
                 value={contactInfo.name}
                 onChange={handleChange}
                 className={`w-full rounded-2xl border bg-[#fffdf8] px-4 py-3 font-semibold text-umi-blue-deep outline-none focus:border-umi-blue-dark ${
-                  validationErrors.name ? "border-red-300" : "border-gray-300"
+                  validationErrors.name ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="Tu nombre completo"
                 disabled={isLoading}
               />
               {validationErrors.name && (
-                <p className="text-sm text-red-600 mt-1">
-                  {validationErrors.name}
-                </p>
+                <p className="text-sm text-red-600 mt-1">{validationErrors.name}</p>
               )}
             </div>
 
@@ -195,15 +181,13 @@ const ContactForm = ({
                 value={contactInfo.email}
                 onChange={handleChange}
                 className={`w-full rounded-2xl border bg-[#fffdf8] px-4 py-3 font-semibold text-umi-blue-deep outline-none focus:border-umi-blue-dark ${
-                  validationErrors.email ? "border-red-300" : "border-gray-300"
+                  validationErrors.email ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="tu@empresa.com"
                 disabled={isLoading}
               />
               {validationErrors.email && (
-                <p className="text-sm text-red-600 mt-1">
-                  {validationErrors.email}
-                </p>
+                <p className="text-sm text-red-600 mt-1">{validationErrors.email}</p>
               )}
             </div>
 
@@ -221,17 +205,13 @@ const ContactForm = ({
                 value={contactInfo.company}
                 onChange={handleChange}
                 className={`w-full rounded-2xl border bg-[#fffdf8] px-4 py-3 font-semibold text-umi-blue-deep outline-none focus:border-umi-blue-dark ${
-                  validationErrors.company
-                    ? "border-red-300"
-                    : "border-gray-300"
+                  validationErrors.company ? 'border-red-300' : 'border-gray-300'
                 }`}
                 placeholder="Nombre de tu empresa"
                 disabled={isLoading}
               />
               {validationErrors.company && (
-                <p className="text-sm text-red-600 mt-1">
-                  {validationErrors.company}
-                </p>
+                <p className="text-sm text-red-600 mt-1">{validationErrors.company}</p>
               )}
             </div>
 
@@ -259,8 +239,8 @@ const ContactForm = ({
               disabled={isLoading}
               className={`w-full rounded-full px-4 py-3 font-extrabold text-white transition-colors ${
                 isLoading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-umi-blue-dark hover:bg-umi-light-blue"
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-umi-blue-dark hover:bg-umi-light-blue'
               }`}
             >
               {isLoading ? (
@@ -269,14 +249,14 @@ const ContactForm = ({
                   Enviando ruta...
                 </div>
               ) : (
-                "Recibir mi ruta Umi"
+                'Recibir mi ruta Umi'
               )}
             </button>
           </form>
 
           <p className="mt-4 text-center text-xs font-semibold text-[rgba(20,33,66,0.48)]">
-            Al enviar este formulario aceptas recibir comunicaciones de Umi.
-            No compartiremos tu información con terceros.
+            Al enviar este formulario aceptas recibir comunicaciones de Umi. No compartiremos tu
+            información con terceros.
           </p>
         </div>
       </div>

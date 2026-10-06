@@ -47,7 +47,9 @@ export class ConversationLockService {
   async acquire(conversationId: string, ttlMs: number): Promise<string | null> {
     const token = randomUUID();
     try {
-      const res = await (await this.client()).set(this.key(conversationId), token, 'PX', ttlMs, 'NX');
+      const res = await (
+        await this.client()
+      ).set(this.key(conversationId), token, 'PX', ttlMs, 'NX');
       return res === 'OK' ? token : null;
     } catch (err) {
       this.logger.warn(

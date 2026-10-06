@@ -1,0 +1,3944 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/intl.dart' as intl;
+
+import 'app_localizations_en.dart';
+import 'app_localizations_es.dart';
+
+// ignore_for_file: type=lint
+
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
+///
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
+///
+/// ```dart
+/// import 'localization/app_localizations.dart';
+///
+/// return MaterialApp(
+///   localizationsDelegates: AppLocalizations.localizationsDelegates,
+///   supportedLocales: AppLocalizations.supportedLocales,
+///   home: MyApplicationHome(),
+/// );
+/// ```
+///
+/// ## Update pubspec.yaml
+///
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
+///
+/// ```yaml
+/// dependencies:
+///   # Internationalization support.
+///   flutter_localizations:
+///     sdk: flutter
+///   intl: any # Use the pinned version from flutter_localizations
+///
+///   # Rest of dependencies
+/// ```
+///
+/// ## iOS Applications
+///
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
+///
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
+///
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
+///
+/// Select and expand the newly-created Localizations item then, for each
+/// locale your application supports, add a new item and select the locale
+/// you wish to add from the pop-up menu in the Value field. This list should
+/// be consistent with the languages listed in the AppLocalizations.supportedLocales
+/// property.
+abstract class AppLocalizations {
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+
+  final String localeName;
+
+  static AppLocalizations of(BuildContext context) {
+    return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+  }
+
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
+
+  /// A list of this localizations delegate along with the default localizations
+  /// delegates.
+  ///
+  /// Returns a list of localizations delegates containing this delegate along with
+  /// GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate,
+  /// and GlobalWidgetsLocalizations.delegate.
+  ///
+  /// Additional delegates can be added by appending to this list in
+  /// MaterialApp. This list does not have to be used at all if a custom list
+  /// of delegates is preferred or required.
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
+
+  /// A list of this localizations delegate's supported locales.
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('en'),
+    Locale('es'),
+  ];
+
+  /// No description provided for @appName.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS'**
+  String get appName;
+
+  /// No description provided for @bootstrapLoadingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Preparando UmiPOS'**
+  String get bootstrapLoadingTitle;
+
+  /// No description provided for @bootstrapLoadingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificando la configuración y el almacenamiento seguro.'**
+  String get bootstrapLoadingBody;
+
+  /// No description provided for @readyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Listo para comenzar'**
+  String get readyTitle;
+
+  /// No description provided for @readyBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La base de UmiPOS está preparada. La autenticación se habilitará en el siguiente paso.'**
+  String get readyBody;
+
+  /// No description provided for @configurationInvalidTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Configuración incompleta'**
+  String get configurationInvalidTitle;
+
+  /// No description provided for @configurationInvalidBody.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS no puede iniciar de forma segura con esta configuración.'**
+  String get configurationInvalidBody;
+
+  /// No description provided for @storageUnavailableTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Almacenamiento seguro no disponible'**
+  String get storageUnavailableTitle;
+
+  /// No description provided for @storageUnavailableBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No se guardarán credenciales en almacenamiento sin cifrar.'**
+  String get storageUnavailableBody;
+
+  /// No description provided for @sdkUnavailableTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Contrato no disponible'**
+  String get sdkUnavailableTitle;
+
+  /// No description provided for @sdkUnavailableBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La aplicación no pudo verificar el contrato de la plataforma.'**
+  String get sdkUnavailableBody;
+
+  /// No description provided for @recoverableFailureTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'No pudimos terminar la preparación'**
+  String get recoverableFailureTitle;
+
+  /// No description provided for @unrecoverableFailureTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS necesita atención'**
+  String get unrecoverableFailureTitle;
+
+  /// No description provided for @retryAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reintentar'**
+  String get retryAction;
+
+  /// No description provided for @updateAvailableTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualización disponible'**
+  String get updateAvailableTitle;
+
+  /// No description provided for @updateRequiredBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta versión de UmiPOS ya no es compatible. Actualiza para continuar.'**
+  String get updateRequiredBody;
+
+  /// No description provided for @updateAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar ahora'**
+  String get updateAction;
+
+  /// No description provided for @updateInProgress.
+  ///
+  /// In es, this message translates to:
+  /// **'Descargando la actualización…'**
+  String get updateInProgress;
+
+  /// No description provided for @updateReadyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualización lista'**
+  String get updateReadyTitle;
+
+  /// No description provided for @updateReadyBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Reinicia UmiPOS para usar la versión nueva.'**
+  String get updateReadyBody;
+
+  /// No description provided for @updateRestartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reiniciar ahora'**
+  String get updateRestartAction;
+
+  /// No description provided for @updateFailedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo actualizar. Revisa tu conexión e inténtalo de nuevo.'**
+  String get updateFailedBody;
+
+  /// No description provided for @diagnosticsAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver diagnóstico'**
+  String get diagnosticsAction;
+
+  /// No description provided for @diagnosticsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Diagnóstico de desarrollo'**
+  String get diagnosticsTitle;
+
+  /// No description provided for @unknownRouteTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ruta no disponible'**
+  String get unknownRouteTitle;
+
+  /// No description provided for @unknownRouteBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta sección todavía no está habilitada.'**
+  String get unknownRouteBody;
+
+  /// No description provided for @enrollmentTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Registrar este dispositivo'**
+  String get enrollmentTitle;
+
+  /// No description provided for @enrollmentBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa el código de configuración de ocho caracteres que muestra el administrador.'**
+  String get enrollmentBody;
+
+  /// No description provided for @challengeIdLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'ID del desafío'**
+  String get challengeIdLabel;
+
+  /// No description provided for @enrollmentCodeLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Código de registro'**
+  String get enrollmentCodeLabel;
+
+  /// No description provided for @enrollmentCodeInvalid.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa el código completo de ocho caracteres. Usa tu PIN de operador después de aprobar el dispositivo.'**
+  String get enrollmentCodeInvalid;
+
+  /// No description provided for @enrollmentCodeRejected.
+  ///
+  /// In es, this message translates to:
+  /// **'El código de registro no es válido o caducó. Solicita un código nuevo al administrador.'**
+  String get enrollmentCodeRejected;
+
+  /// No description provided for @enrollmentCodeExpired.
+  ///
+  /// In es, this message translates to:
+  /// **'El código de registro caducó. Solicita un código nuevo al administrador.'**
+  String get enrollmentCodeExpired;
+
+  /// No description provided for @enrollmentCodeAttemptsExceeded.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta solicitud alcanzó el límite de intentos. Solicita un código nuevo al administrador.'**
+  String get enrollmentCodeAttemptsExceeded;
+
+  /// No description provided for @enrollmentCodeRateLimited.
+  ///
+  /// In es, this message translates to:
+  /// **'Se hicieron demasiados intentos. Espera antes de volver a intentarlo.'**
+  String get enrollmentCodeRateLimited;
+
+  /// No description provided for @enrollmentCodeUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS no puede verificar este código ahora. Revisa la conexión e inténtalo de nuevo.'**
+  String get enrollmentCodeUnavailable;
+
+  /// No description provided for @enrollmentPendingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere la aprobación del administrador'**
+  String get enrollmentPendingTitle;
+
+  /// No description provided for @enrollmentPendingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo solicitó acceso. Pide a un administrador que lo revise en el Dashboard de UMI.'**
+  String get enrollmentPendingBody;
+
+  /// No description provided for @enrollmentPendingSecure.
+  ///
+  /// In es, this message translates to:
+  /// **'La credencial de pareo está protegida en este dispositivo.'**
+  String get enrollmentPendingSecure;
+
+  /// No description provided for @cancelEnrollmentAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar solicitud'**
+  String get cancelEnrollmentAction;
+
+  /// No description provided for @continueAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Continuar'**
+  String get continueAction;
+
+  /// No description provided for @loginTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión en UmiPOS'**
+  String get loginTitle;
+
+  /// No description provided for @usernameLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Correo'**
+  String get usernameLabel;
+
+  /// No description provided for @passwordLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Contraseña'**
+  String get passwordLabel;
+
+  /// No description provided for @signInAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión'**
+  String get signInAction;
+
+  /// No description provided for @operatorPinTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa tu PIN de operador'**
+  String get operatorPinTitle;
+
+  /// No description provided for @operatorPinBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu PIN te identifica y carga tus permisos actuales.'**
+  String get operatorPinBody;
+
+  /// No description provided for @operatorPinLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN de operador'**
+  String get operatorPinLabel;
+
+  /// No description provided for @operatorPinHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Usa de 4 a 8 dígitos.'**
+  String get operatorPinHint;
+
+  /// No description provided for @operatorPinAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Continuar'**
+  String get operatorPinAction;
+
+  /// No description provided for @operatorPinInvalid.
+  ///
+  /// In es, this message translates to:
+  /// **'El PIN no es válido para esta sucursal.'**
+  String get operatorPinInvalid;
+
+  /// No description provided for @operatorPinLocked.
+  ///
+  /// In es, this message translates to:
+  /// **'El ingreso de PIN está bloqueado temporalmente. Intenta más tarde.'**
+  String get operatorPinLocked;
+
+  /// No description provided for @operatorPinRateLimited.
+  ///
+  /// In es, this message translates to:
+  /// **'Hay demasiados intentos. Espera antes de intentar de nuevo.'**
+  String get operatorPinRateLimited;
+
+  /// No description provided for @operatorPinEntitlementDisabled.
+  ///
+  /// In es, this message translates to:
+  /// **'UmiPOS no está habilitado para este negocio.'**
+  String get operatorPinEntitlementDisabled;
+
+  /// No description provided for @operatorPinBranchInvalid.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo no está asignado a una sucursal activa.'**
+  String get operatorPinBranchInvalid;
+
+  /// No description provided for @operatorPinLength.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresa al menos cuatro dígitos.'**
+  String get operatorPinLength;
+
+  /// No description provided for @selectTenantTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona un negocio'**
+  String get selectTenantTitle;
+
+  /// No description provided for @noTenantTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin acceso a negocios'**
+  String get noTenantTitle;
+
+  /// No description provided for @noTenantBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu cuenta no tiene acceso activo a UmiPOS.'**
+  String get noTenantBody;
+
+  /// No description provided for @selectBranchTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona una sucursal'**
+  String get selectBranchTitle;
+
+  /// No description provided for @noBranchBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay una sucursal activa permitida para tu usuario y dispositivo.'**
+  String get noBranchBody;
+
+  /// No description provided for @operatorTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión de operador'**
+  String get operatorTitle;
+
+  /// No description provided for @operatorBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirma esta sucursal para entrar al entorno protegido de POS.'**
+  String get operatorBody;
+
+  /// No description provided for @startOperatorAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión'**
+  String get startOperatorAction;
+
+  /// No description provided for @lockAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Bloquear operador'**
+  String get lockAction;
+
+  /// No description provided for @logoutAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar sesión'**
+  String get logoutAction;
+
+  /// No description provided for @deviceActiveLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo confiable'**
+  String get deviceActiveLabel;
+
+  /// No description provided for @connectivityUnknownLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conectividad desconocida'**
+  String get connectivityUnknownLabel;
+
+  /// No description provided for @shellReadyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Sesión de operador lista'**
+  String get shellReadyTitle;
+
+  /// No description provided for @catalogNotImplemented.
+  ///
+  /// In es, this message translates to:
+  /// **'El catálogo todavía no está implementado.'**
+  String get catalogNotImplemented;
+
+  /// No description provided for @deviceRevokedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Dispositivo revocado'**
+  String get deviceRevokedTitle;
+
+  /// No description provided for @deviceRevokedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta instalación ya no es confiable. Solicita su reemplazo a un administrador.'**
+  String get deviceRevokedBody;
+
+  /// No description provided for @rotationRequiredTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Rotación de credencial requerida'**
+  String get rotationRequiredTitle;
+
+  /// No description provided for @rotationRequiredBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Un administrador debe rotar la credencial antes de continuar.'**
+  String get rotationRequiredBody;
+
+  /// No description provided for @recoverableNetworkBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible contactar de forma segura el servicio de acceso.'**
+  String get recoverableNetworkBody;
+
+  /// No description provided for @catalogTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Catálogo'**
+  String get catalogTitle;
+
+  /// No description provided for @catalogSearchHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar nombre, SKU o código'**
+  String get catalogSearchHint;
+
+  /// No description provided for @allCategories.
+  ///
+  /// In es, this message translates to:
+  /// **'Todo'**
+  String get allCategories;
+
+  /// No description provided for @catalogLoading.
+  ///
+  /// In es, this message translates to:
+  /// **'Cargando catálogo autorizado'**
+  String get catalogLoading;
+
+  /// No description provided for @catalogEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay productos disponibles para esta sucursal.'**
+  String get catalogEmpty;
+
+  /// No description provided for @catalogNoResults.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay productos para esta búsqueda.'**
+  String get catalogNoResults;
+
+  /// No description provided for @catalogPermissionDenied.
+  ///
+  /// In es, this message translates to:
+  /// **'No tienes permiso para ver este catálogo.'**
+  String get catalogPermissionDenied;
+
+  /// No description provided for @catalogNetworkError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo conectar con el catálogo. Intenta de nuevo.'**
+  String get catalogNetworkError;
+
+  /// No description provided for @catalogUnexpectedError.
+  ///
+  /// In es, this message translates to:
+  /// **'El catálogo no está disponible temporalmente.'**
+  String get catalogUnexpectedError;
+
+  /// No description provided for @unavailableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'No disponible'**
+  String get unavailableLabel;
+
+  /// No description provided for @variantsLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Variantes'**
+  String get variantsLabel;
+
+  /// No description provided for @modifiersLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Modificadores'**
+  String get modifiersLabel;
+
+  /// No description provided for @taxIncludedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Impuesto configurado'**
+  String get taxIncludedLabel;
+
+  /// No description provided for @closeAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar'**
+  String get closeAction;
+
+  /// No description provided for @cartTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Carrito actual'**
+  String get cartTitle;
+
+  /// No description provided for @cartEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre un producto para iniciar este carrito.'**
+  String get cartEmpty;
+
+  /// No description provided for @cartUnavailable.
+  ///
+  /// In es, this message translates to:
+  /// **'El carrito no está disponible temporalmente.'**
+  String get cartUnavailable;
+
+  /// No description provided for @cartNoteLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nota del operador'**
+  String get cartNoteLabel;
+
+  /// No description provided for @cartCourseLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Curso'**
+  String get cartCourseLabel;
+
+  /// No description provided for @cartCoursePrevious.
+  ///
+  /// In es, this message translates to:
+  /// **'Curso anterior'**
+  String get cartCoursePrevious;
+
+  /// No description provided for @cartCourseNext.
+  ///
+  /// In es, this message translates to:
+  /// **'Curso siguiente'**
+  String get cartCourseNext;
+
+  /// Names the course a cart line belongs to, for the operator and for a screen reader.
+  ///
+  /// In es, this message translates to:
+  /// **'Curso {course}'**
+  String cartCourseCurrent(int course);
+
+  /// No description provided for @addToCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Agregar al carrito'**
+  String get addToCartAction;
+
+  /// No description provided for @removeFromCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Eliminar línea'**
+  String get removeFromCartAction;
+
+  /// No description provided for @increaseQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Aumentar cantidad'**
+  String get increaseQuantity;
+
+  /// No description provided for @decreaseQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Disminuir cantidad'**
+  String get decreaseQuantity;
+
+  /// No description provided for @subtotalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Subtotal'**
+  String get subtotalLabel;
+
+  /// No description provided for @taxLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Impuestos'**
+  String get taxLabel;
+
+  /// No description provided for @discountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Descuento'**
+  String get discountLabel;
+
+  /// No description provided for @totalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Total'**
+  String get totalLabel;
+
+  /// No description provided for @businessDateLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fecha operativa'**
+  String get businessDateLabel;
+
+  /// No description provided for @checkoutNextGate.
+  ///
+  /// In es, this message translates to:
+  /// **'Checkout disponible en el siguiente Gate'**
+  String get checkoutNextGate;
+
+  /// No description provided for @checkoutAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobrar'**
+  String get checkoutAction;
+
+  /// No description provided for @checkoutTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro autorizado'**
+  String get checkoutTitle;
+
+  /// No description provided for @operatorLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Operador'**
+  String get operatorLabel;
+
+  /// No description provided for @paymentMethodLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Método de pago'**
+  String get paymentMethodLabel;
+
+  /// No description provided for @cashPayment.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo'**
+  String get cashPayment;
+
+  /// No description provided for @externalTerminalPayment.
+  ///
+  /// In es, this message translates to:
+  /// **'Terminal externa'**
+  String get externalTerminalPayment;
+
+  /// No description provided for @reviewTotalsAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisar totales autorizados'**
+  String get reviewTotalsAction;
+
+  /// No description provided for @confirmAndPayAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar y cobrar'**
+  String get confirmAndPayAction;
+
+  /// No description provided for @confirmAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar'**
+  String get confirmAction;
+
+  /// No description provided for @confirmSaleTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Confirmar esta venta?'**
+  String get confirmSaleTitle;
+
+  /// No description provided for @confirmSaleBody.
+  ///
+  /// In es, this message translates to:
+  /// **'UMI recalculó los totales mostrados. Esta confirmación inicia el pago.'**
+  String get confirmSaleBody;
+
+  /// No description provided for @totalsConfirmedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.'**
+  String get totalsConfirmedBody;
+
+  /// No description provided for @paymentProcessing.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesando pago'**
+  String get paymentProcessing;
+
+  /// No description provided for @paymentUnknownTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Estado de pago desconocido'**
+  String get paymentUnknownTitle;
+
+  /// No description provided for @paymentUnknownBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No inicies otro pago. Consulta el estado de este pago o solicita ayuda a un gerente.'**
+  String get paymentUnknownBody;
+
+  /// No description provided for @queryPaymentAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultar estado del pago'**
+  String get queryPaymentAction;
+
+  /// No description provided for @correlationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Correlación'**
+  String get correlationLabel;
+
+  /// No description provided for @saleCompletedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta completada'**
+  String get saleCompletedTitle;
+
+  /// No description provided for @finishSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Finalizar e iniciar otro carrito'**
+  String get finishSaleAction;
+
+  /// No description provided for @checkoutFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar el cobro de forma segura.'**
+  String get checkoutFailed;
+
+  /// No description provided for @provisionalSalePendingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta pendiente de sincronización'**
+  String get provisionalSalePendingTitle;
+
+  /// No description provided for @provisionalSalePendingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La venta se guardó de forma segura en este dispositivo y está pendiente de sincronización. Los datos oficiales del recibo se asignarán cuando el servidor la acepte.'**
+  String get provisionalSalePendingBody;
+
+  /// No description provided for @returnToCatalogAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver al catálogo'**
+  String get returnToCatalogAction;
+
+  /// No description provided for @recoveryCenterTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Centro de recuperación'**
+  String get recoveryCenterTitle;
+
+  /// No description provided for @recoveryWebUnsupportedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'La recuperación sin conexión no está disponible en Web'**
+  String get recoveryWebUnsupportedTitle;
+
+  /// No description provided for @recoveryWebUnsupportedBody.
+  ///
+  /// In es, this message translates to:
+  /// **'La versión Web funciona en línea. Usa una aplicación nativa compatible para almacenar y recuperar ventas sin conexión de forma segura.'**
+  String get recoveryWebUnsupportedBody;
+
+  /// No description provided for @synchronizingPendingSales.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizando ventas pendientes…'**
+  String get synchronizingPendingSales;
+
+  /// No description provided for @pendingSalesSecure.
+  ///
+  /// In es, this message translates to:
+  /// **'Tus ventas pendientes permanecen almacenadas de forma segura en este dispositivo.'**
+  String get pendingSalesSecure;
+
+  /// No description provided for @synchronizeNowAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sincronizar ahora'**
+  String get synchronizeNowAction;
+
+  /// No description provided for @conflictNeedsAttention.
+  ///
+  /// In es, this message translates to:
+  /// **'Una venta requiere tu atención.'**
+  String get conflictNeedsAttention;
+
+  /// No description provided for @officialReceiptAvailable.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo oficial disponible'**
+  String get officialReceiptAvailable;
+
+  /// No description provided for @cashReceivedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo recibido'**
+  String get cashReceivedLabel;
+
+  /// No description provided for @tenderSelectionTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Selección de pago'**
+  String get tenderSelectionTitle;
+
+  /// No description provided for @cashTenderTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo aplicado'**
+  String get cashTenderTitle;
+
+  /// No description provided for @tenderAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe aplicado'**
+  String get tenderAmountLabel;
+
+  /// No description provided for @exactAmountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe exacto'**
+  String get exactAmountAction;
+
+  /// No description provided for @manualTerminalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Terminal manual'**
+  String get manualTerminalLabel;
+
+  /// No description provided for @terminalProcessingAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesando fuera del POS'**
+  String get terminalProcessingAction;
+
+  /// No description provided for @terminalSuccessAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar éxito'**
+  String get terminalSuccessAction;
+
+  /// No description provided for @terminalFailureAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Informar fallo'**
+  String get terminalFailureAction;
+
+  /// No description provided for @terminalUnknownAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Resultado desconocido'**
+  String get terminalUnknownAction;
+
+  /// No description provided for @tipLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Propina'**
+  String get tipLabel;
+
+  /// No description provided for @noTipAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin propina'**
+  String get noTipAction;
+
+  /// No description provided for @customTipPercentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Porcentaje de propina personalizado'**
+  String get customTipPercentLabel;
+
+  /// No description provided for @customTipFixedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe de propina personalizado'**
+  String get customTipFixedLabel;
+
+  /// No description provided for @percentageDiscountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Porcentaje'**
+  String get percentageDiscountAction;
+
+  /// No description provided for @fixedDiscountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe fijo'**
+  String get fixedDiscountAction;
+
+  /// No description provided for @discountPercentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Porcentaje de descuento'**
+  String get discountPercentLabel;
+
+  /// No description provided for @discountAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe del descuento'**
+  String get discountAmountLabel;
+
+  /// No description provided for @discountReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo del descuento'**
+  String get discountReasonLabel;
+
+  /// No description provided for @receiptDestinationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Destino del recibo'**
+  String get receiptDestinationLabel;
+
+  /// No description provided for @displayReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Mostrar recibo'**
+  String get displayReceiptAction;
+
+  /// No description provided for @printLaterAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Imprimir después'**
+  String get printLaterAction;
+
+  /// No description provided for @noReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin recibo'**
+  String get noReceiptAction;
+
+  /// Primary button in the manager approval dialog. Names the act, not just 'confirm'.
+  ///
+  /// In es, this message translates to:
+  /// **'Autorizar'**
+  String get managerApprovalAction;
+
+  /// No description provided for @managerApprovalTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere aprobación del gerente'**
+  String get managerApprovalTitle;
+
+  /// No description provided for @managerPinLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN del gerente'**
+  String get managerPinLabel;
+
+  /// No description provided for @managerApprovalDeniedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El PIN o el permiso del gerente no es válido para este cobro.'**
+  String get managerApprovalDeniedMessage;
+
+  /// No description provided for @approveAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Aprobar'**
+  String get approveAction;
+
+  /// No description provided for @insufficientCashMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El efectivo recibido no cubre el importe aplicado.'**
+  String get insufficientCashMessage;
+
+  /// No description provided for @invalidTenderMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisa la forma de pago: esta combinación no se puede cobrar. Si la terminal ya confirmó un cobro, no se puede quitar de este pedido.'**
+  String get invalidTenderMessage;
+
+  /// No description provided for @remainingBalanceMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Agrega un pago para cubrir el saldo pendiente.'**
+  String get remainingBalanceMessage;
+
+  /// No description provided for @approvalRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Un gerente debe aprobar este cobro.'**
+  String get approvalRequiredMessage;
+
+  /// No description provided for @terminalFailureMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El pago de la terminal falló. Revisa los pagos.'**
+  String get terminalFailureMessage;
+
+  /// No description provided for @tipRejectedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La política de propinas rechazó esta propina.'**
+  String get tipRejectedMessage;
+
+  /// No description provided for @discountRejectedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La política de descuentos rechazó este descuento.'**
+  String get discountRejectedMessage;
+
+  /// No description provided for @changeDueLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cambio'**
+  String get changeDueLabel;
+
+  /// No description provided for @appliedAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe aplicado'**
+  String get appliedAmountLabel;
+
+  /// No description provided for @remainingBalanceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Saldo pendiente'**
+  String get remainingBalanceLabel;
+
+  /// No description provided for @offlineAdvancedTenderBlockedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.'**
+  String get offlineAdvancedTenderBlockedMessage;
+
+  /// No description provided for @recoveryQueryTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultar resultado guardado'**
+  String get recoveryQueryTitle;
+
+  /// No description provided for @recoveryQueryDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Pregunta a UMI si esta misma operación ya fue aceptada.'**
+  String get recoveryQueryDescription;
+
+  /// No description provided for @recoveryPolicyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar política sin conexión'**
+  String get recoveryPolicyTitle;
+
+  /// No description provided for @recoveryPolicyDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconecta para cargar el permiso vigente del servidor para ventas sin conexión.'**
+  String get recoveryPolicyDescription;
+
+  /// No description provided for @recoveryAuthenticationTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar sesión de nuevo'**
+  String get recoveryAuthenticationTitle;
+
+  /// No description provided for @recoveryAuthenticationDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Restablece tu sesión autorizada antes de continuar la sincronización.'**
+  String get recoveryAuthenticationDescription;
+
+  /// No description provided for @recoveryBranchTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Seleccionar la sucursal autorizada'**
+  String get recoveryBranchTitle;
+
+  /// No description provided for @recoveryBranchDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Vuelve a seleccionar sucursal sin mover las ventas pendientes.'**
+  String get recoveryBranchDescription;
+
+  /// No description provided for @recoveryManagerTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar revisión de gerente'**
+  String get recoveryManagerTitle;
+
+  /// No description provided for @recoveryManagerDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Verifica un gerente autorizado únicamente para esta acción de recuperación.'**
+  String get recoveryManagerDescription;
+
+  /// No description provided for @recoveryManagerCredentialLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN de gerente'**
+  String get recoveryManagerCredentialLabel;
+
+  /// No description provided for @recoveryAcknowledgeTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar conciliación'**
+  String get recoveryAcknowledgeTitle;
+
+  /// No description provided for @recoveryAcknowledgeDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirma la conciliación del servidor solo después de guardar la recuperación local.'**
+  String get recoveryAcknowledgeDescription;
+
+  /// No description provided for @recoveryReceiptTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver estado del recibo'**
+  String get recoveryReceiptTitle;
+
+  /// No description provided for @recoveryReceiptDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre el estado conservado del recibo provisional u oficial.'**
+  String get recoveryReceiptDescription;
+
+  /// No description provided for @recoveryPaymentTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultar pago original'**
+  String get recoveryPaymentTitle;
+
+  /// No description provided for @recoveryPaymentDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Consulta únicamente el pago original. No se iniciará otro cargo.'**
+  String get recoveryPaymentDescription;
+
+  /// No description provided for @recoveryDeviceTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificar este dispositivo'**
+  String get recoveryDeviceTitle;
+
+  /// No description provided for @recoveryDeviceDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo está bloqueado. Restablece la autorización antes de reproducir.'**
+  String get recoveryDeviceDescription;
+
+  /// No description provided for @recoveryCredentialTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperar credenciales rotadas'**
+  String get recoveryCredentialTitle;
+
+  /// No description provided for @recoveryCredentialDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Los comandos históricos permanecen ligados a su versión de credencial original.'**
+  String get recoveryCredentialDescription;
+
+  /// No description provided for @recoveryStorageTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Conservar almacenamiento para recuperación'**
+  String get recoveryStorageTitle;
+
+  /// No description provided for @recoveryStorageDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Conserva intactos los datos cifrados y sigue la recuperación autorizada.'**
+  String get recoveryStorageDescription;
+
+  /// No description provided for @recoverySnapshotTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar datos autorizados'**
+  String get recoverySnapshotTitle;
+
+  /// No description provided for @recoverySnapshotDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconecta para actualizar catálogo, precios e impuestos vencidos.'**
+  String get recoverySnapshotDescription;
+
+  /// No description provided for @recoverySupportTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Copiar referencia de soporte'**
+  String get recoverySupportTitle;
+
+  /// No description provided for @recoverySupportDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.'**
+  String get recoverySupportDescription;
+
+  /// No description provided for @saleActionsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Acciones de venta'**
+  String get saleActionsTitle;
+
+  /// No description provided for @newSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Nueva venta'**
+  String get newSaleAction;
+
+  /// No description provided for @suspendSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Suspender venta'**
+  String get suspendSaleAction;
+
+  /// No description provided for @resumeSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reanudar venta'**
+  String get resumeSaleAction;
+
+  /// No description provided for @renameSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cambiar nombre de venta suspendida'**
+  String get renameSaleAction;
+
+  /// No description provided for @cancelSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar venta'**
+  String get cancelSaleAction;
+
+  /// No description provided for @suspendedSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nombre de la venta suspendida'**
+  String get suspendedSaleLabel;
+
+  /// No description provided for @cancelSaleReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo de cancelación'**
+  String get cancelSaleReasonLabel;
+
+  /// No description provided for @confirmCancelSaleTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Cancelar esta venta?'**
+  String get confirmCancelSaleTitle;
+
+  /// No description provided for @confirmCancelSaleBody.
+  ///
+  /// In es, this message translates to:
+  /// **'El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.'**
+  String get confirmCancelSaleBody;
+
+  /// No description provided for @saleRestoredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu venta activa se restauró.'**
+  String get saleRestoredMessage;
+
+  /// No description provided for @readyForNextCustomerMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Listo para el siguiente cliente.'**
+  String get readyForNextCustomerMessage;
+
+  /// No description provided for @currentCustomerLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cliente actual'**
+  String get currentCustomerLabel;
+
+  /// No description provided for @anonymousCustomerLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cliente anónimo'**
+  String get anonymousCustomerLabel;
+
+  /// No description provided for @attachCustomerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Asignar cliente'**
+  String get attachCustomerAction;
+
+  /// No description provided for @detachCustomerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Usar cliente anónimo'**
+  String get detachCustomerAction;
+
+  /// No description provided for @searchCustomerHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar clientes'**
+  String get searchCustomerHint;
+
+  /// No description provided for @recentCustomersAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Clientes recientes'**
+  String get recentCustomersAction;
+
+  /// No description provided for @saleHistoryTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas'**
+  String get saleHistoryTitle;
+
+  /// No description provided for @incomingOrdersTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Pedidos entrantes'**
+  String get incomingOrdersTitle;
+
+  /// No description provided for @incomingOrdersEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay pedidos entrantes.'**
+  String get incomingOrdersEmpty;
+
+  /// No description provided for @incomingOrdersError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron cargar los pedidos.'**
+  String get incomingOrdersError;
+
+  /// No description provided for @incomingOrdersTake.
+  ///
+  /// In es, this message translates to:
+  /// **'Atender'**
+  String get incomingOrdersTake;
+
+  /// No description provided for @currentSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta actual'**
+  String get currentSaleLabel;
+
+  /// No description provided for @suspendedSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas suspendidas'**
+  String get suspendedSalesLabel;
+
+  /// No description provided for @committedSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas completadas recientes'**
+  String get committedSalesLabel;
+
+  /// No description provided for @cancelledSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas canceladas'**
+  String get cancelledSalesLabel;
+
+  /// No description provided for @saleHistoryEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ventas para esta vista.'**
+  String get saleHistoryEmpty;
+
+  /// No description provided for @sortNewestLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Más recientes primero'**
+  String get sortNewestLabel;
+
+  /// No description provided for @sortOldestLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Más antiguas primero'**
+  String get sortOldestLabel;
+
+  /// No description provided for @loadMoreSalesAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cargar más ventas'**
+  String get loadMoreSalesAction;
+
+  /// No description provided for @saleStateBuilding.
+  ///
+  /// In es, this message translates to:
+  /// **'En curso'**
+  String get saleStateBuilding;
+
+  /// No description provided for @saleStateSuspended.
+  ///
+  /// In es, this message translates to:
+  /// **'Suspendida'**
+  String get saleStateSuspended;
+
+  /// No description provided for @saleStateCommitted.
+  ///
+  /// In es, this message translates to:
+  /// **'Completada'**
+  String get saleStateCommitted;
+
+  /// No description provided for @saleStateCancelled.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelada'**
+  String get saleStateCancelled;
+
+  /// No description provided for @saleStateRecovered.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperada'**
+  String get saleStateRecovered;
+
+  /// No description provided for @openReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir recibo'**
+  String get openReceiptAction;
+
+  /// No description provided for @reprintReceiptAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver para reimpresión'**
+  String get reprintReceiptAction;
+
+  /// No description provided for @receiptAvailableMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo disponible'**
+  String get receiptAvailableMessage;
+
+  /// No description provided for @saleLifecycleError.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar la acción de venta de forma segura.'**
+  String get saleLifecycleError;
+
+  /// No description provided for @saleSearchHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscar por nombre, cliente o recibo'**
+  String get saleSearchHint;
+
+  /// No description provided for @saleNameFallback.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta'**
+  String get saleNameFallback;
+
+  /// No description provided for @editCartLineAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Editar producto'**
+  String get editCartLineAction;
+
+  /// No description provided for @saveCartLineAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardar cambios'**
+  String get saveCartLineAction;
+
+  /// No description provided for @clearCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Vaciar carrito'**
+  String get clearCartAction;
+
+  /// No description provided for @confirmClearCartTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Vaciar este carrito?'**
+  String get confirmClearCartTitle;
+
+  /// No description provided for @confirmClearCartBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Se eliminarán todos los productos de la venta actual.'**
+  String get confirmClearCartBody;
+
+  /// No description provided for @cashCenterTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Centro de caja'**
+  String get cashCenterTitle;
+
+  /// No description provided for @cashCenterAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir Centro de caja'**
+  String get cashCenterAction;
+
+  /// No description provided for @registerAvailableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja disponible'**
+  String get registerAvailableLabel;
+
+  /// No description provided for @registerAssignedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja asignada'**
+  String get registerAssignedLabel;
+
+  /// No description provided for @shiftRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre un turno de caja antes de aceptar efectivo.'**
+  String get shiftRequiredMessage;
+
+  /// No description provided for @adoptShiftTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu turno sigue abierto en otra terminal'**
+  String get adoptShiftTitle;
+
+  /// No description provided for @adoptShiftMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta terminal perdió su identidad guardada. El turno y el dinero siguen ahí; tráelos a esta pantalla para continuar.'**
+  String get adoptShiftMessage;
+
+  /// No description provided for @adoptShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Traer el turno a esta terminal'**
+  String get adoptShiftAction;
+
+  /// No description provided for @reclaimRegisterTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta caja quedó retenida por una terminal que ya no existe'**
+  String get reclaimRegisterTitle;
+
+  /// No description provided for @reclaimRegisterMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Ninguna terminal activa tiene este cajón. Libéralo para poder abrir un turno con él; el dinero no se cuenta porque sigue en el cajón.'**
+  String get reclaimRegisterMessage;
+
+  /// No description provided for @reclaimRegisterAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Liberar la caja'**
+  String get reclaimRegisterAction;
+
+  /// No description provided for @cashShiftRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El cobro no tiene un turno de caja al cual abonar el efectivo.'**
+  String get cashShiftRequiredMessage;
+
+  /// No description provided for @resumeShiftAndRetryAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reanudar turno y reintentar'**
+  String get resumeShiftAndRetryAction;
+
+  /// No description provided for @reclaimRegisterAndRetryAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Liberar caja y reintentar'**
+  String get reclaimRegisterAndRetryAction;
+
+  /// No description provided for @cashHeldByActiveTillMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Otra terminal activa tiene esta caja. Pide a un gerente que cuente el cajón antes de continuar.'**
+  String get cashHeldByActiveTillMessage;
+
+  /// No description provided for @openShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir turno de caja'**
+  String get openShiftAction;
+
+  /// No description provided for @invalidAmountMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Escribe un monto válido, por ejemplo 1,500.00.'**
+  String get invalidAmountMessage;
+
+  /// No description provided for @openingFloatLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fondo inicial'**
+  String get openingFloatLabel;
+
+  /// No description provided for @denominationCountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo por denominación'**
+  String get denominationCountLabel;
+
+  /// No description provided for @paidInAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Entrada de efectivo'**
+  String get paidInAction;
+
+  /// No description provided for @paidOutAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Salida de efectivo'**
+  String get paidOutAction;
+
+  /// No description provided for @safeDropAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Retiro a caja fuerte'**
+  String get safeDropAction;
+
+  /// No description provided for @drawerCorrectionAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Corrección de caja'**
+  String get drawerCorrectionAction;
+
+  /// No description provided for @noSaleDrawerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar apertura de cajón'**
+  String get noSaleDrawerAction;
+
+  /// No description provided for @drawerRequestRecordedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La solicitud se registró. No se verificó una operación de hardware.'**
+  String get drawerRequestRecordedMessage;
+
+  /// No description provided for @suspendShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Suspender turno'**
+  String get suspendShiftAction;
+
+  /// No description provided for @resumeShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reanudar turno'**
+  String get resumeShiftAction;
+
+  /// No description provided for @handoffShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Entregar turno'**
+  String get handoffShiftAction;
+
+  /// No description provided for @incomingOperatorPinLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN del operador entrante'**
+  String get incomingOperatorPinLabel;
+
+  /// No description provided for @blindCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar conteo ciego'**
+  String get blindCountAction;
+
+  /// No description provided for @recountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Iniciar reconteo'**
+  String get recountAction;
+
+  /// No description provided for @expectedCashLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo esperado'**
+  String get expectedCashLabel;
+
+  /// No description provided for @countedCashLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo contado'**
+  String get countedCashLabel;
+
+  /// No description provided for @cashVarianceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Diferencia'**
+  String get cashVarianceLabel;
+
+  /// No description provided for @cashOverageLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sobrante'**
+  String get cashOverageLabel;
+
+  /// No description provided for @cashShortageLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Faltante'**
+  String get cashShortageLabel;
+
+  /// No description provided for @cashToleranceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Tolerancia'**
+  String get cashToleranceLabel;
+
+  /// No description provided for @varianceReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo de la diferencia'**
+  String get varianceReasonLabel;
+
+  /// No description provided for @cashApprovalAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Solicitar aprobación de diferencia'**
+  String get cashApprovalAction;
+
+  /// No description provided for @reconcileShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Conciliar turno'**
+  String get reconcileShiftAction;
+
+  /// No description provided for @closeShiftAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar turno'**
+  String get closeShiftAction;
+
+  /// No description provided for @shiftClosedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El turno de caja está cerrado.'**
+  String get shiftClosedMessage;
+
+  /// No description provided for @blockedShiftMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Este turno está bloqueado. Sigue la guía de recuperación.'**
+  String get blockedShiftMessage;
+
+  /// No description provided for @pendingCashPostingMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Un movimiento pendiente debe terminar antes del cierre.'**
+  String get pendingCashPostingMessage;
+
+  /// No description provided for @ambiguousCashEffectMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconoce un efecto de caja. Verifica la operación original.'**
+  String get ambiguousCashEffectMessage;
+
+  /// No description provided for @cashRecoveryMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se restauró el estado guardado de la operación de caja.'**
+  String get cashRecoveryMessage;
+
+  /// No description provided for @shiftSummaryTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Resumen del turno'**
+  String get shiftSummaryTitle;
+
+  /// No description provided for @cashMovementAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe del movimiento'**
+  String get cashMovementAmountLabel;
+
+  /// No description provided for @cashMovementReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo del movimiento'**
+  String get cashMovementReasonLabel;
+
+  /// No description provided for @submitCashMovementAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar movimiento de caja'**
+  String get submitCashMovementAction;
+
+  /// No description provided for @submitBlindCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Enviar conteo ciego'**
+  String get submitBlindCountAction;
+
+  /// No description provided for @cashOperationFailedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar la operación de caja de forma segura.'**
+  String get cashOperationFailedMessage;
+
+  /// No description provided for @cashStatusOpen.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno abierto'**
+  String get cashStatusOpen;
+
+  /// No description provided for @cashStatusSuspended.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno suspendido'**
+  String get cashStatusSuspended;
+
+  /// No description provided for @cashStatusCounting.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo de efectivo en curso'**
+  String get cashStatusCounting;
+
+  /// No description provided for @cashStatusReconciliation.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere conciliación'**
+  String get cashStatusReconciliation;
+
+  /// No description provided for @cashStatusClosed.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno cerrado'**
+  String get cashStatusClosed;
+
+  /// No description provided for @confirmCloseShiftTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Cerrar este turno de caja?'**
+  String get confirmCloseShiftTitle;
+
+  /// No description provided for @confirmCloseShiftBody.
+  ///
+  /// In es, this message translates to:
+  /// **'El cierre es definitivo. Los nuevos movimientos requieren otro turno.'**
+  String get confirmCloseShiftBody;
+
+  /// No description provided for @varianceReasonNone.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin diferencia'**
+  String get varianceReasonNone;
+
+  /// No description provided for @varianceReasonCounting.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de conteo'**
+  String get varianceReasonCounting;
+
+  /// No description provided for @varianceReasonChange.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de cambio'**
+  String get varianceReasonChange;
+
+  /// No description provided for @varianceReasonHandling.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de manejo de efectivo'**
+  String get varianceReasonHandling;
+
+  /// No description provided for @varianceReasonUnknown.
+  ///
+  /// In es, this message translates to:
+  /// **'Diferencia operativa'**
+  String get varianceReasonUnknown;
+
+  /// No description provided for @saleExceptionAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Acciones posteriores a la venta'**
+  String get saleExceptionAction;
+
+  /// No description provided for @saleExceptionTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso o anulación'**
+  String get saleExceptionTitle;
+
+  /// No description provided for @fullRefundAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso total'**
+  String get fullRefundAction;
+
+  /// No description provided for @partialRefundAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso parcial'**
+  String get partialRefundAction;
+
+  /// No description provided for @voidSaleAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Anular venta'**
+  String get voidSaleAction;
+
+  /// No description provided for @refundableAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe restante reembolsable'**
+  String get refundableAmountLabel;
+
+  /// No description provided for @remainingRefundableQuantityLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad restante'**
+  String get remainingRefundableQuantityLabel;
+
+  /// No description provided for @alreadyRefundedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ya reembolsado'**
+  String get alreadyRefundedLabel;
+
+  /// No description provided for @refundReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo del reembolso'**
+  String get refundReasonLabel;
+
+  /// No description provided for @restockAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Reponer'**
+  String get restockAction;
+
+  /// No description provided for @doNotRestockAction.
+  ///
+  /// In es, this message translates to:
+  /// **'No reponer'**
+  String get doNotRestockAction;
+
+  /// No description provided for @inspectionRequiredAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Requiere inspección'**
+  String get inspectionRequiredAction;
+
+  /// No description provided for @taxRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso de impuestos'**
+  String get taxRefundLabel;
+
+  /// No description provided for @discountAllocationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Asignación del descuento'**
+  String get discountAllocationLabel;
+
+  /// No description provided for @tipRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso de propina'**
+  String get tipRefundLabel;
+
+  /// No description provided for @cashRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso en efectivo'**
+  String get cashRefundLabel;
+
+  /// No description provided for @manualTerminalRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso en terminal manual'**
+  String get manualTerminalRefundLabel;
+
+  /// No description provided for @manualTerminalRefundProviderNotice.
+  ///
+  /// In es, this message translates to:
+  /// **'Procesa el reembolso en la terminal externa. UmiPOS registra tu observación. No prueba el éxito del proveedor.'**
+  String get manualTerminalRefundProviderNotice;
+
+  /// No description provided for @manualTerminalRefundOnCommitNotice.
+  ///
+  /// In es, this message translates to:
+  /// **'El cobro se devolverá en la terminal al confirmar el reembolso.'**
+  String get manualTerminalRefundOnCommitNotice;
+
+  /// No description provided for @cardTerminalRefundLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso en terminal de tarjeta'**
+  String get cardTerminalRefundLabel;
+
+  /// No description provided for @approvalExpiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La aprobación venció. Solicita una aprobación nueva.'**
+  String get approvalExpiredMessage;
+
+  /// No description provided for @paymentOutcomeUnknownMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconoce el resultado de la terminal. Verifica la operación original.'**
+  String get paymentOutcomeUnknownMessage;
+
+  /// No description provided for @verifyTerminalAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificar resultado de la terminal'**
+  String get verifyTerminalAction;
+
+  /// No description provided for @terminalRefundSuccessAction.
+  ///
+  /// In es, this message translates to:
+  /// **'El reembolso externo tuvo éxito'**
+  String get terminalRefundSuccessAction;
+
+  /// No description provided for @terminalRefundFailureAction.
+  ///
+  /// In es, this message translates to:
+  /// **'El reembolso externo falló'**
+  String get terminalRefundFailureAction;
+
+  /// No description provided for @terminalRefundUnknownAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Se desconoce el resultado'**
+  String get terminalRefundUnknownAction;
+
+  /// No description provided for @refundBlockedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El servidor bloqueó esta acción posterior a la venta.'**
+  String get refundBlockedMessage;
+
+  /// No description provided for @refundPolicyExpiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El periodo permitido para el reembolso venció.'**
+  String get refundPolicyExpiredMessage;
+
+  /// No description provided for @supportRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere una revisión de soporte.'**
+  String get supportRequiredMessage;
+
+  /// No description provided for @compensatingReceiptTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo de reembolso'**
+  String get compensatingReceiptTitle;
+
+  /// No description provided for @fullyRefundedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso total'**
+  String get fullyRefundedLabel;
+
+  /// No description provided for @partiallyRefundedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reembolso parcial'**
+  String get partiallyRefundedLabel;
+
+  /// No description provided for @voidedSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta anulada'**
+  String get voidedSaleLabel;
+
+  /// No description provided for @recoveredRefundMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Se restauró el resultado guardado del reembolso.'**
+  String get recoveredRefundMessage;
+
+  /// No description provided for @refundCommittedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El reembolso quedó confirmado.'**
+  String get refundCommittedMessage;
+
+  /// No description provided for @refundPreviewAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisar reembolso'**
+  String get refundPreviewAction;
+
+  /// No description provided for @commitRefundAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar reembolso'**
+  String get commitRefundAction;
+
+  /// No description provided for @refundConfirmationTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Confirmar este reembolso?'**
+  String get refundConfirmationTitle;
+
+  /// No description provided for @refundConfirmationBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta acción crea ajustes permanentes. La venta original no cambia.'**
+  String get refundConfirmationBody;
+
+  /// No description provided for @originalSaleLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta original'**
+  String get originalSaleLabel;
+
+  /// No description provided for @exceptionHistoryLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Historial de ajustes'**
+  String get exceptionHistoryLabel;
+
+  /// No description provided for @refundOperationFailedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No fue posible completar la acción de forma segura.'**
+  String get refundOperationFailedMessage;
+
+  /// No description provided for @selectRefundLinesMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona al menos una línea reembolsable.'**
+  String get selectRefundLinesMessage;
+
+  /// No description provided for @refundReasonCustomerChangedMind.
+  ///
+  /// In es, this message translates to:
+  /// **'El cliente cambió de opinión'**
+  String get refundReasonCustomerChangedMind;
+
+  /// No description provided for @refundReasonProductDefect.
+  ///
+  /// In es, this message translates to:
+  /// **'Producto defectuoso'**
+  String get refundReasonProductDefect;
+
+  /// No description provided for @refundReasonIncorrectItem.
+  ///
+  /// In es, this message translates to:
+  /// **'Producto incorrecto'**
+  String get refundReasonIncorrectItem;
+
+  /// No description provided for @refundReasonIncorrectQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad incorrecta'**
+  String get refundReasonIncorrectQuantity;
+
+  /// No description provided for @refundReasonDuplicateCharge.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro duplicado'**
+  String get refundReasonDuplicateCharge;
+
+  /// No description provided for @refundReasonQualityIssue.
+  ///
+  /// In es, this message translates to:
+  /// **'Problema de calidad'**
+  String get refundReasonQualityIssue;
+
+  /// No description provided for @refundReasonOrderPreparationError.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de preparación del pedido'**
+  String get refundReasonOrderPreparationError;
+
+  /// No description provided for @refundReasonPricingError.
+  ///
+  /// In es, this message translates to:
+  /// **'Error de precio'**
+  String get refundReasonPricingError;
+
+  /// No description provided for @voidReasonOperatorError.
+  ///
+  /// In es, this message translates to:
+  /// **'Error del operador'**
+  String get voidReasonOperatorError;
+
+  /// No description provided for @voidReasonDuplicateSale.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta duplicada'**
+  String get voidReasonDuplicateSale;
+
+  /// No description provided for @voidReasonIncorrectTender.
+  ///
+  /// In es, this message translates to:
+  /// **'Forma de pago incorrecta'**
+  String get voidReasonIncorrectTender;
+
+  /// No description provided for @voidReasonSaleEnteredByMistake.
+  ///
+  /// In es, this message translates to:
+  /// **'Venta registrada por error'**
+  String get voidReasonSaleEnteredByMistake;
+
+  /// No description provided for @otherApprovedReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Otro motivo aprobado'**
+  String get otherApprovedReasonLabel;
+
+  /// No description provided for @decreaseRefundQuantityTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Reducir cantidad del reembolso'**
+  String get decreaseRefundQuantityTooltip;
+
+  /// No description provided for @increaseRefundQuantityTooltip.
+  ///
+  /// In es, this message translates to:
+  /// **'Aumentar cantidad del reembolso'**
+  String get increaseRefundQuantityTooltip;
+
+  /// No description provided for @restockIntentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Decisión de reposición'**
+  String get restockIntentLabel;
+
+  /// No description provided for @restockNotApplicableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'No aplica la reposición'**
+  String get restockNotApplicableLabel;
+
+  /// No description provided for @restockInventoryReviewLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Se requiere una revisión de inventario'**
+  String get restockInventoryReviewLabel;
+
+  /// No description provided for @sessionEndedReauth.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu sesión terminó. Vuelve a ingresar tu PIN.'**
+  String get sessionEndedReauth;
+
+  /// Label in the POS app bar naming the operator who holds the current turn.
+  ///
+  /// In es, this message translates to:
+  /// **'Turno de {name}'**
+  String operatorShift(String name);
+
+  /// No description provided for @tableStateOpenLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Libre'**
+  String get tableStateOpenLabel;
+
+  /// No description provided for @tableStateSeatedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ocupada'**
+  String get tableStateSeatedLabel;
+
+  /// No description provided for @tableStateOrderedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Pedido tomado'**
+  String get tableStateOrderedLabel;
+
+  /// No description provided for @tableStateServedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Servido'**
+  String get tableStateServedLabel;
+
+  /// No description provided for @tableStateAwaitingPaymentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Por cobrar'**
+  String get tableStateAwaitingPaymentLabel;
+
+  /// No description provided for @tableStateDirtyLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Por limpiar'**
+  String get tableStateDirtyLabel;
+
+  /// Party size on a table that holds a party.
+  ///
+  /// In es, this message translates to:
+  /// **'{count} personas'**
+  String tableStatePartySizeLabel(int count);
+
+  /// Turn timer of a seated table. duration is already formatted.
+  ///
+  /// In es, this message translates to:
+  /// **'{duration} en mesa'**
+  String tableStateElapsedLabel(String duration);
+
+  /// A merged table that belongs to a shared party.
+  ///
+  /// In es, this message translates to:
+  /// **'Grupo de {count} mesas'**
+  String tableStateGroupLabel(int count);
+
+  /// No description provided for @tableStateSeatAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Sentar'**
+  String get tableStateSeatAction;
+
+  /// Title of the dialog that takes a party size before seating.
+  ///
+  /// In es, this message translates to:
+  /// **'Sentar la mesa {table}'**
+  String tableStateSeatTitle(String table);
+
+  /// No description provided for @tableStatePartySizeField.
+  ///
+  /// In es, this message translates to:
+  /// **'Personas'**
+  String get tableStatePartySizeField;
+
+  /// No description provided for @tableStateMoveAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Mover'**
+  String get tableStateMoveAction;
+
+  /// Hint shown while a seated party waits for its destination table.
+  ///
+  /// In es, this message translates to:
+  /// **'Moviendo {table}. Toca una mesa libre.'**
+  String tableStateMoveArmed(String table);
+
+  /// No description provided for @tableStateSplitAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Dividir'**
+  String get tableStateSplitAction;
+
+  /// No description provided for @tableStateClearAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Liberar mesa'**
+  String get tableStateClearAction;
+
+  /// No description provided for @tableStateReadyAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Mesa lista'**
+  String get tableStateReadyAction;
+
+  /// No description provided for @tableStateOrderedAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Pedido enviado'**
+  String get tableStateOrderedAction;
+
+  /// No description provided for @tableStateServedAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar servido'**
+  String get tableStateServedAction;
+
+  /// No description provided for @tableStateAwaitingPaymentAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Pedir la cuenta'**
+  String get tableStateAwaitingPaymentAction;
+
+  /// No description provided for @tableStateSelectAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Seleccionar'**
+  String get tableStateSelectAction;
+
+  /// No description provided for @tableStateMergeAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Combinar'**
+  String get tableStateMergeAction;
+
+  /// No description provided for @tableStateSelectHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Selecciona dos o más mesas libres'**
+  String get tableStateSelectHint;
+
+  /// How many free tables the operator has selected to merge.
+  ///
+  /// In es, this message translates to:
+  /// **'{count} seleccionadas'**
+  String tableStateSelectedCount(int count);
+
+  /// No description provided for @tableStateMergeTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Combinar mesas'**
+  String get tableStateMergeTitle;
+
+  /// Combined size of the tables selected for a merge.
+  ///
+  /// In es, this message translates to:
+  /// **'{tables} mesas · {seats} lugares'**
+  String tableStateMergeSummary(int tables, int seats);
+
+  /// No description provided for @tableStateTargetOccupied.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa mesa ya tiene un grupo.'**
+  String get tableStateTargetOccupied;
+
+  /// Local refusal before a move that the target table cannot seat.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa mesa no tiene lugar para {count} personas.'**
+  String tableStateTargetTooSmall(int count);
+
+  /// No description provided for @tableStateFailureTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo completar'**
+  String get tableStateFailureTitle;
+
+  /// No description provided for @tableStateFailureRefresh.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar plano'**
+  String get tableStateFailureRefresh;
+
+  /// No description provided for @tableStateFailureAlreadyOccupiedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa mesa ya tiene un grupo.'**
+  String get tableStateFailureAlreadyOccupiedMessage;
+
+  /// No description provided for @tableStateFailureAlreadyOccupiedRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige otra mesa, o actualiza el plano antes de volver a intentarlo.'**
+  String get tableStateFailureAlreadyOccupiedRecovery;
+
+  /// No description provided for @tableStateFailureCapacityExceededMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El grupo es más grande de lo que cabe en la mesa.'**
+  String get tableStateFailureCapacityExceededMessage;
+
+  /// No description provided for @tableStateFailureCapacityExceededRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige una mesa más grande, o combina dos mesas.'**
+  String get tableStateFailureCapacityExceededRecovery;
+
+  /// No description provided for @tableStateFailureNotOccupiedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ningún grupo en esa mesa.'**
+  String get tableStateFailureNotOccupiedMessage;
+
+  /// No description provided for @tableStateFailureNotOccupiedRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualiza el plano: alguien más pudo haber liberado la mesa.'**
+  String get tableStateFailureNotOccupiedRecovery;
+
+  /// No description provided for @tableStateFailureNotGroupedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa mesa no está combinada con otra.'**
+  String get tableStateFailureNotGroupedMessage;
+
+  /// No description provided for @tableStateFailureNotGroupedRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo se puede dividir una mesa que está dentro de un grupo.'**
+  String get tableStateFailureNotGroupedRecovery;
+
+  /// No description provided for @tableStateFailureNotInPlanMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa mesa no existe en el plano publicado.'**
+  String get tableStateFailureNotInPlanMessage;
+
+  /// No description provided for @tableStateFailureNotInPlanRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Publica el plano desde el dashboard y actualiza la vista.'**
+  String get tableStateFailureNotInPlanRecovery;
+
+  /// No description provided for @tableStateFailureIdempotencyConflictMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Ese cambio ya se envió antes con otro contenido.'**
+  String get tableStateFailureIdempotencyConflictMessage;
+
+  /// No description provided for @tableStateFailureIdempotencyConflictRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualiza el plano y repite la acción desde el estado actual.'**
+  String get tableStateFailureIdempotencyConflictRecovery;
+
+  /// No description provided for @tableStateFailurePermissionDeniedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu rol no permite cambiar las mesas.'**
+  String get tableStateFailurePermissionDeniedMessage;
+
+  /// No description provided for @tableStateFailurePermissionDeniedRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Pide a un gerente que lo haga, o entra con otro operador.'**
+  String get tableStateFailurePermissionDeniedRecovery;
+
+  /// No description provided for @tableStateFailurePlanNotPublishedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta sucursal no tiene un plano publicado.'**
+  String get tableStateFailurePlanNotPublishedMessage;
+
+  /// No description provided for @tableStateFailurePlanNotPublishedRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Publica el plano desde el dashboard para poder operar sus mesas.'**
+  String get tableStateFailurePlanNotPublishedRecovery;
+
+  /// No description provided for @tableStateFailureGenericMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo completar la acción en la mesa.'**
+  String get tableStateFailureGenericMessage;
+
+  /// No description provided for @tableStateFailureGenericRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualiza el plano y vuelve a intentarlo.'**
+  String get tableStateFailureGenericRecovery;
+
+  /// No description provided for @tableStateCancelAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get tableStateCancelAction;
+
+  /// No description provided for @kitchenBoardTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cocina'**
+  String get kitchenBoardTitle;
+
+  /// No description provided for @kitchenBoardRefresh.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar'**
+  String get kitchenBoardRefresh;
+
+  /// No description provided for @kitchenBoardLoadFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cargar la cocina.'**
+  String get kitchenBoardLoadFailed;
+
+  /// No description provided for @kitchenBoardEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin comandas en cocina.'**
+  String get kitchenBoardEmpty;
+
+  /// No description provided for @kitchenBoardTabTickets.
+  ///
+  /// In es, this message translates to:
+  /// **'Comandas'**
+  String get kitchenBoardTabTickets;
+
+  /// No description provided for @kitchenPrepTab.
+  ///
+  /// In es, this message translates to:
+  /// **'Preparación'**
+  String get kitchenPrepTab;
+
+  /// No description provided for @kitchenPrepRefresh.
+  ///
+  /// In es, this message translates to:
+  /// **'Recargar la preparación'**
+  String get kitchenPrepRefresh;
+
+  /// No description provided for @kitchenPrepLoadFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cargar la preparación.'**
+  String get kitchenPrepLoadFailed;
+
+  /// No description provided for @kitchenPrepEmpty.
+  ///
+  /// In es, this message translates to:
+  /// **'Aún no hay artículos con par. Define el par en Inventario.'**
+  String get kitchenPrepEmpty;
+
+  /// The window the forecast usage covers. It comes from the response.
+  ///
+  /// In es, this message translates to:
+  /// **'Uso previsto del {from} al {to}'**
+  String kitchenPrepWindow(String from, String to);
+
+  /// No description provided for @kitchenPrepItemColumn.
+  ///
+  /// In es, this message translates to:
+  /// **'Artículo'**
+  String get kitchenPrepItemColumn;
+
+  /// No description provided for @kitchenPrepUnitColumn.
+  ///
+  /// In es, this message translates to:
+  /// **'Unidad'**
+  String get kitchenPrepUnitColumn;
+
+  /// No description provided for @kitchenPrepParColumn.
+  ///
+  /// In es, this message translates to:
+  /// **'Par'**
+  String get kitchenPrepParColumn;
+
+  /// No description provided for @kitchenPrepOnHandColumn.
+  ///
+  /// In es, this message translates to:
+  /// **'Existencia'**
+  String get kitchenPrepOnHandColumn;
+
+  /// No description provided for @kitchenPrepForecastColumn.
+  ///
+  /// In es, this message translates to:
+  /// **'Uso previsto'**
+  String get kitchenPrepForecastColumn;
+
+  /// No description provided for @kitchenPrepQuantityColumn.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad a preparar'**
+  String get kitchenPrepQuantityColumn;
+
+  /// No description provided for @kitchenPrepNoPar.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin par'**
+  String get kitchenPrepNoPar;
+
+  /// No description provided for @kitchenStatusQueued.
+  ///
+  /// In es, this message translates to:
+  /// **'En cola'**
+  String get kitchenStatusQueued;
+
+  /// No description provided for @kitchenStatusInPreparation.
+  ///
+  /// In es, this message translates to:
+  /// **'En preparación'**
+  String get kitchenStatusInPreparation;
+
+  /// No description provided for @kitchenStatusPartiallyReady.
+  ///
+  /// In es, this message translates to:
+  /// **'Parcial'**
+  String get kitchenStatusPartiallyReady;
+
+  /// No description provided for @kitchenStatusReady.
+  ///
+  /// In es, this message translates to:
+  /// **'Listo'**
+  String get kitchenStatusReady;
+
+  /// No description provided for @kitchenStatusException.
+  ///
+  /// In es, this message translates to:
+  /// **'Excepción'**
+  String get kitchenStatusException;
+
+  /// No description provided for @kitchenPriorityUrgent.
+  ///
+  /// In es, this message translates to:
+  /// **'Urgente'**
+  String get kitchenPriorityUrgent;
+
+  /// No description provided for @kitchenPriorityHigh.
+  ///
+  /// In es, this message translates to:
+  /// **'Alta'**
+  String get kitchenPriorityHigh;
+
+  /// No description provided for @kitchenElapsedNow.
+  ///
+  /// In es, this message translates to:
+  /// **'ahora'**
+  String get kitchenElapsedNow;
+
+  /// How long a kitchen ticket has been waiting.
+  ///
+  /// In es, this message translates to:
+  /// **'{minutes} min'**
+  String kitchenElapsedMinutes(int minutes);
+
+  /// How long a kitchen ticket has been waiting, once it is over an hour.
+  ///
+  /// In es, this message translates to:
+  /// **'{hours} h {minutes} min'**
+  String kitchenElapsedHoursMinutes(int hours, int minutes);
+
+  /// How long a kitchen ticket has been waiting, once it is over a day. A ticket is not meant to reach this, and one that does must be readable at a glance rather than counted in minutes.
+  ///
+  /// In es, this message translates to:
+  /// **'{days} d {hours} h'**
+  String kitchenElapsedDaysHours(int days, int hours);
+
+  /// What a tap on one kitchen line does.
+  ///
+  /// In es, this message translates to:
+  /// **'Marcar {item} como listo'**
+  String kitchenItemMarkReady(String item);
+
+  /// Read by a screen reader on a line that is already bumped.
+  ///
+  /// In es, this message translates to:
+  /// **'{item} ya está listo'**
+  String kitchenItemAlreadyReady(String item);
+
+  /// The heading that names one course on a kitchen ticket. A ticket groups its lines by course so a dessert is not started with the starters.
+  ///
+  /// In es, this message translates to:
+  /// **'Curso {course}'**
+  String kitchenCourseGroup(int course);
+
+  /// The label on a course the kitchen has not been told to start. The count is how many lines it holds.
+  ///
+  /// In es, this message translates to:
+  /// **'En espera · {count}'**
+  String kitchenCourseHeld(int count);
+
+  /// Says out loud that a held group is not work to start yet, so a cook does not begin it early.
+  ///
+  /// In es, this message translates to:
+  /// **'No se prepara todavía'**
+  String get kitchenCourseHeldNote;
+
+  /// The one action that fires the next held course on a ticket.
+  ///
+  /// In es, this message translates to:
+  /// **'Empezar curso {course}'**
+  String kitchenCourseFire(int course);
+
+  /// Read by a screen reader on a held line: it is not offered as work to start.
+  ///
+  /// In es, this message translates to:
+  /// **'{item} aún no se prepara'**
+  String kitchenItemHeld(String item);
+
+  /// No description provided for @kitchenItemVoided.
+  ///
+  /// In es, this message translates to:
+  /// **'ANULADO'**
+  String get kitchenItemVoided;
+
+  /// No description provided for @kitchenTicketStartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Empezar'**
+  String get kitchenTicketStartAction;
+
+  /// No description provided for @kitchenTicketCompleteAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Terminar'**
+  String get kitchenTicketCompleteAction;
+
+  /// No description provided for @kitchenTicketRecallAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperar'**
+  String get kitchenTicketRecallAction;
+
+  /// No description provided for @kitchenTicketSending.
+  ///
+  /// In es, this message translates to:
+  /// **'Enviando…'**
+  String get kitchenTicketSending;
+
+  /// No description provided for @kitchenRecallTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperar comanda'**
+  String get kitchenRecallTitle;
+
+  /// No description provided for @kitchenRecallBody.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Por qué vuelve esta comanda a la cocina?'**
+  String get kitchenRecallBody;
+
+  /// No description provided for @kitchenRecallReasonCustomerReturned.
+  ///
+  /// In es, this message translates to:
+  /// **'El cliente lo devolvió'**
+  String get kitchenRecallReasonCustomerReturned;
+
+  /// No description provided for @kitchenRecallReasonWrongItem.
+  ///
+  /// In es, this message translates to:
+  /// **'Salió otro platillo'**
+  String get kitchenRecallReasonWrongItem;
+
+  /// No description provided for @kitchenRecallReasonQuality.
+  ///
+  /// In es, this message translates to:
+  /// **'No quedó bien'**
+  String get kitchenRecallReasonQuality;
+
+  /// No description provided for @kitchenRecallReasonOther.
+  ///
+  /// In es, this message translates to:
+  /// **'Otro motivo'**
+  String get kitchenRecallReasonOther;
+
+  /// No description provided for @kitchenRecallNoteLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Nota (opcional)'**
+  String get kitchenRecallNoteLabel;
+
+  /// No description provided for @kitchenRecallCancel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar'**
+  String get kitchenRecallCancel;
+
+  /// No description provided for @kitchenFailureTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'La cocina no cambió'**
+  String get kitchenFailureTitle;
+
+  /// No description provided for @kitchenFailureRefresh.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar cocina'**
+  String get kitchenFailureRefresh;
+
+  /// The ticket moved between the board read and the bump.
+  ///
+  /// In es, this message translates to:
+  /// **'Alguien más ya movió la comanda {reference}.'**
+  String kitchenFailureVersionConflictMessage(String reference);
+
+  /// No description provided for @kitchenFailureVersionConflictGenericMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Alguien más ya movió esa comanda.'**
+  String get kitchenFailureVersionConflictGenericMessage;
+
+  /// No description provided for @kitchenFailureVersionConflictRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'El tablero ya se actualizó. Revisa la comanda y marca lo que falte.'**
+  String get kitchenFailureVersionConflictRecovery;
+
+  /// The same command id was reused with different content.
+  ///
+  /// In es, this message translates to:
+  /// **'Ese cambio ya se envió antes con otro contenido, en la comanda {reference}.'**
+  String kitchenFailureFingerprintMessage(String reference);
+
+  /// No description provided for @kitchenFailureFingerprintRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualiza el tablero y repite la acción desde el estado actual.'**
+  String get kitchenFailureFingerprintRecovery;
+
+  /// No description provided for @kitchenFailureInvalidTransitionMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La comanda no puede dar ese paso desde su estado actual.'**
+  String get kitchenFailureInvalidTransitionMessage;
+
+  /// No description provided for @kitchenFailureInvalidTransitionRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualiza el tablero. Para regresar una comanda a la cocina, usa Recuperar en una comanda lista.'**
+  String get kitchenFailureInvalidTransitionRecovery;
+
+  /// No description provided for @kitchenFailurePermissionDeniedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu rol no permite mover la cocina.'**
+  String get kitchenFailurePermissionDeniedMessage;
+
+  /// No description provided for @kitchenFailurePermissionDeniedRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Pide a un gerente que lo haga, o entra con otro operador.'**
+  String get kitchenFailurePermissionDeniedRecovery;
+
+  /// The route refused the ticket for this device: it is either gone from the board or outside this device's kitchen station scope.
+  ///
+  /// In es, this message translates to:
+  /// **'La comanda {reference} no llegó a la estación de este dispositivo.'**
+  String kitchenFailureTicketMissingMessage(String reference);
+
+  /// No description provided for @kitchenFailureTicketMissingGenericMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esa comanda no llegó a la estación de este dispositivo.'**
+  String get kitchenFailureTicketMissingGenericMessage;
+
+  /// No description provided for @kitchenFailureTicketMissingRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'La comanda sigue en cocina. Actualiza el tablero y, si vuelve a pasar, pide a un gerente que revise que este dispositivo esté asignado a su estación.'**
+  String get kitchenFailureTicketMissingRecovery;
+
+  /// No description provided for @kitchenFailureDeviceMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Este dispositivo ya no está registrado para la cocina.'**
+  String get kitchenFailureDeviceMessage;
+
+  /// No description provided for @kitchenFailureDeviceRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Vuelve a registrar el dispositivo desde el dashboard.'**
+  String get kitchenFailureDeviceRecovery;
+
+  /// No description provided for @kitchenFailureGenericMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo completar la acción en cocina.'**
+  String get kitchenFailureGenericMessage;
+
+  /// No description provided for @kitchenFailureGenericRecovery.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualiza el tablero y vuelve a intentarlo.'**
+  String get kitchenFailureGenericRecovery;
+
+  /// No description provided for @terminalChargeTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro en terminal'**
+  String get terminalChargeTitle;
+
+  /// Read on the terminal face, above the operator declaration.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobra {amount} en la terminal y confirma el resultado aquí.'**
+  String terminalChargeInstruction(String amount);
+
+  /// No description provided for @terminalOperatorDeclaration.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal es una declaración del operador: el POS no lee su resultado.'**
+  String get terminalOperatorDeclaration;
+
+  /// No description provided for @terminalStatusLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Estado'**
+  String get terminalStatusLabel;
+
+  /// No description provided for @terminalStatusNotStarted.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin iniciar'**
+  String get terminalStatusNotStarted;
+
+  /// No description provided for @terminalStatusProcessing.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobrando fuera del POS'**
+  String get terminalStatusProcessing;
+
+  /// No description provided for @terminalStatusConfirmed.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro confirmado'**
+  String get terminalStatusConfirmed;
+
+  /// No description provided for @terminalStatusFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'Fallo reportado'**
+  String get terminalStatusFailed;
+
+  /// No description provided for @terminalStatusUnknown.
+  ///
+  /// In es, this message translates to:
+  /// **'Resultado desconocido'**
+  String get terminalStatusUnknown;
+
+  /// No description provided for @terminalStatusCancelled.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelado antes de cobrar'**
+  String get terminalStatusCancelled;
+
+  /// No description provided for @cardTerminalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Terminal de tarjeta'**
+  String get cardTerminalLabel;
+
+  /// No description provided for @terminalWaitingTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Esperando en la terminal…'**
+  String get terminalWaitingTitle;
+
+  /// No description provided for @terminalStopWaitingAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Dejar de esperar'**
+  String get terminalStopWaitingAction;
+
+  /// No description provided for @terminalApprovedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal aprobó el cobro.'**
+  String get terminalApprovedMessage;
+
+  /// The terminal's own refusal, with its own code, shown when a card charge is declined.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal rechazó el cobro ({code}).'**
+  String terminalDeclinedMessage(String code);
+
+  /// No description provided for @terminalUnresolvedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Hay un cobro con tarjeta que nadie ha confirmado. La venta no se puede cerrar hasta resolverlo.'**
+  String get terminalUnresolvedMessage;
+
+  /// No description provided for @terminalStoppedWaitingMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Dejaste de esperar: la terminal puede seguir con el pedido. El intento queda registrado y se puede consultar.'**
+  String get terminalStoppedWaitingMessage;
+
+  /// No description provided for @terminalLastAnswerLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal responde'**
+  String get terminalLastAnswerLabel;
+
+  /// No description provided for @terminalApprovedCollectMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal aprobó el cobro. Pulsa Cobrar para cerrar la venta.'**
+  String get terminalApprovedCollectMessage;
+
+  /// No description provided for @terminalDeclinedNoChargeMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal rechazó el cobro y no se cobró nada. Puedes cobrar en efectivo, o iniciar una venta nueva para reintentar con tarjeta.'**
+  String get terminalDeclinedNoChargeMessage;
+
+  /// No description provided for @terminalUnavailableMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal de tarjeta no está disponible. Puedes cobrar en efectivo.'**
+  String get terminalUnavailableMessage;
+
+  /// No description provided for @terminalBusyMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La terminal está ocupada con otro pedido. Vuelve a intentarlo.'**
+  String get terminalBusyMessage;
+
+  /// No description provided for @newSaleConfirmTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'¿Empezar una venta nueva?'**
+  String get newSaleConfirmTitle;
+
+  /// Asked before `Nueva venta` abandons a sale that is still in progress.
+  ///
+  /// In es, this message translates to:
+  /// **'Este carrito tiene {count} línea(s) sin cobrar. Se abandona y empieza una venta vacía; no se cobra nada por él.'**
+  String newSaleConfirmBody(int count);
+
+  /// No description provided for @keepCartAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Seguir con este carrito'**
+  String get keepCartAction;
+
+  /// No description provided for @tenderConflictTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Este carrito no se puede cobrar así'**
+  String get tenderConflictTitle;
+
+  /// No description provided for @tenderConflictBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Guarda un cobro dividido entre efectivo y tarjeta, y esta sucursal cobra un solo método por venta. El registro del cobro queda guardado para revisión; para seguir, empieza una venta nueva.'**
+  String get tenderConflictBody;
+
+  /// No description provided for @splitTenderTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cobro dividido'**
+  String get splitTenderTitle;
+
+  /// No description provided for @splitTenderAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Dividir el pago'**
+  String get splitTenderAction;
+
+  /// No description provided for @splitTenderCancelAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Un solo método'**
+  String get splitTenderCancelAction;
+
+  /// No description provided for @splitTenderPickSecond.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige el segundo método de pago.'**
+  String get splitTenderPickSecond;
+
+  /// No description provided for @singleMethodOnlyNote.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta sucursal cobra con un solo método por venta.'**
+  String get singleMethodOnlyNote;
+
+  /// How much of a split payment the selected methods still do not cover.
+  ///
+  /// In es, this message translates to:
+  /// **'Falta {amount}'**
+  String tenderShortBy(String amount);
+
+  /// How much a split payment takes beyond the bill.
+  ///
+  /// In es, this message translates to:
+  /// **'Sobra {amount}'**
+  String tenderOverBy(String amount);
+
+  /// What the all-day count on a kitchen item means, spoken by the tooltip and the screen reader.
+  ///
+  /// In es, this message translates to:
+  /// **'Pedidos de hoy: {ordered}. Pendientes de preparar: {outstanding}.'**
+  String kitchenAllDayTooltip(int ordered, int outstanding);
+
+  /// No description provided for @inventoryProductionAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Producir'**
+  String get inventoryProductionAction;
+
+  /// No description provided for @inventoryProductionTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Producir preparación'**
+  String get inventoryProductionTitle;
+
+  /// No description provided for @inventoryProductionOutputLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Artículo producido'**
+  String get inventoryProductionOutputLabel;
+
+  /// No description provided for @inventoryProductionQuantityLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad que salió'**
+  String get inventoryProductionQuantityLabel;
+
+  /// No description provided for @inventoryProductionQuantityHelper.
+  ///
+  /// In es, this message translates to:
+  /// **'Usa la escala y la unidad base del artículo.'**
+  String get inventoryProductionQuantityHelper;
+
+  /// No description provided for @inventoryProductionLotLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Lote (opcional)'**
+  String get inventoryProductionLotLabel;
+
+  /// No description provided for @inventoryProductionExpiryLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caducidad (opcional)'**
+  String get inventoryProductionExpiryLabel;
+
+  /// No description provided for @inventoryProductionExpiryHint.
+  ///
+  /// In es, this message translates to:
+  /// **'AAAA-MM-DD'**
+  String get inventoryProductionExpiryHint;
+
+  /// No description provided for @inventoryProductionResultTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Lote producido'**
+  String get inventoryProductionResultTitle;
+
+  /// No description provided for @inventoryProductionLotReferenceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Lote'**
+  String get inventoryProductionLotReferenceLabel;
+
+  /// No description provided for @inventoryProductionExpiryReferenceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caducidad'**
+  String get inventoryProductionExpiryReferenceLabel;
+
+  /// No description provided for @inventoryProductionProducedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Producido'**
+  String get inventoryProductionProducedLabel;
+
+  /// No description provided for @inventoryProductionDeclaredLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Rendimiento esperado'**
+  String get inventoryProductionDeclaredLabel;
+
+  /// No description provided for @inventoryProductionYieldLossLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Merma de rendimiento'**
+  String get inventoryProductionYieldLossLabel;
+
+  /// No description provided for @inventoryProductionUnitCostLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Costo unitario'**
+  String get inventoryProductionUnitCostLabel;
+
+  /// No description provided for @inventoryProductionTotalCostLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Costo del lote'**
+  String get inventoryProductionTotalCostLabel;
+
+  /// No description provided for @inventoryProductionConsumedTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Insumos consumidos'**
+  String get inventoryProductionConsumedTitle;
+
+  /// No description provided for @inventoryProductionIncompleteCostMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Algunos insumos no tienen costo registrado.'**
+  String get inventoryProductionIncompleteCostMessage;
+
+  /// No description provided for @inventoryProductionNoCostLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin costo'**
+  String get inventoryProductionNoCostLabel;
+
+  /// No description provided for @inventoryProductionRecipeRequiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Este artículo no tiene receta de producción.'**
+  String get inventoryProductionRecipeRequiredMessage;
+
+  /// No description provided for @inventoryProductionQuantityNotExactMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'La cantidad no se reparte de forma exacta entre los insumos de la receta.'**
+  String get inventoryProductionQuantityNotExactMessage;
+
+  /// No description provided for @inventoryProductionInsufficientStockMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay existencia suficiente de un insumo para producir este lote.'**
+  String get inventoryProductionInsufficientStockMessage;
+
+  /// No description provided for @inventoryUnitEach.
+  ///
+  /// In es, this message translates to:
+  /// **'pza'**
+  String get inventoryUnitEach;
+
+  /// No description provided for @inventoryUnitGram.
+  ///
+  /// In es, this message translates to:
+  /// **'g'**
+  String get inventoryUnitGram;
+
+  /// No description provided for @inventoryUnitKilogram.
+  ///
+  /// In es, this message translates to:
+  /// **'kg'**
+  String get inventoryUnitKilogram;
+
+  /// No description provided for @inventoryUnitMilliliter.
+  ///
+  /// In es, this message translates to:
+  /// **'ml'**
+  String get inventoryUnitMilliliter;
+
+  /// No description provided for @inventoryUnitLiter.
+  ///
+  /// In es, this message translates to:
+  /// **'L'**
+  String get inventoryUnitLiter;
+
+  /// No description provided for @inventoryUnitPortion.
+  ///
+  /// In es, this message translates to:
+  /// **'porción'**
+  String get inventoryUnitPortion;
+
+  /// No description provided for @inventoryUnitPackage.
+  ///
+  /// In es, this message translates to:
+  /// **'paquete'**
+  String get inventoryUnitPackage;
+
+  /// No description provided for @inventoryUnitBox.
+  ///
+  /// In es, this message translates to:
+  /// **'caja'**
+  String get inventoryUnitBox;
+
+  /// No description provided for @adoptShiftCardTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperar el turno'**
+  String get adoptShiftCardTitle;
+
+  /// No description provided for @cashShiftCardTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'El turno'**
+  String get cashShiftCardTitle;
+
+  /// No description provided for @cashOpenedAtLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Abierto'**
+  String get cashOpenedAtLabel;
+
+  /// No description provided for @openingFloatRequiredHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El fondo inicial no puede quedar en cero.'**
+  String get openingFloatRequiredHint;
+
+  /// No description provided for @cashEquationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'La cuenta del cajón'**
+  String get cashEquationLabel;
+
+  /// No description provided for @cashExpectedHiddenLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Se revela al contar'**
+  String get cashExpectedHiddenLabel;
+
+  /// No description provided for @cashExpectedHiddenHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El conteo ciego esconde el esperado hasta que envías tu conteo.'**
+  String get cashExpectedHiddenHint;
+
+  /// No description provided for @cashSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ventas en efectivo'**
+  String get cashSalesLabel;
+
+  /// No description provided for @cashPaidInLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ingresos'**
+  String get cashPaidInLabel;
+
+  /// No description provided for @cashPaidOutLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Retiros'**
+  String get cashPaidOutLabel;
+
+  /// No description provided for @cashSafeDropLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Caja fuerte'**
+  String get cashSafeDropLabel;
+
+  /// No description provided for @cashAdjustmentsLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get cashAdjustmentsLabel;
+
+  /// No description provided for @cashPolicyLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Política de la caja'**
+  String get cashPolicyLabel;
+
+  /// No description provided for @cashPolicyCountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo'**
+  String get cashPolicyCountLabel;
+
+  /// No description provided for @cashPolicyAllowLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Permitido'**
+  String get cashPolicyAllowLabel;
+
+  /// No description provided for @cashBlindCountOnLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo ciego'**
+  String get cashBlindCountOnLabel;
+
+  /// No description provided for @cashBlindCountOffLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo visible'**
+  String get cashBlindCountOffLabel;
+
+  /// No description provided for @cashOfflineRequiredLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Requiere conexión'**
+  String get cashOfflineRequiredLabel;
+
+  /// No description provided for @cashCloseApprovalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN cierre: diferencia >'**
+  String get cashCloseApprovalLabel;
+
+  /// No description provided for @cashMovementApprovalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'PIN movimiento desde'**
+  String get cashMovementApprovalLabel;
+
+  /// No description provided for @cashJournalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Libro del turno'**
+  String get cashJournalLabel;
+
+  /// No description provided for @cashStepCountDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'Cuenta las denominaciones del cajón y envía el total.'**
+  String get cashStepCountDetail;
+
+  /// No description provided for @cashStepVarianceDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'Explica la diferencia para que quede en el historial.'**
+  String get cashStepVarianceDetail;
+
+  /// No description provided for @cashStepReconcileDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'El sistema compara el esperado contra el contado.'**
+  String get cashStepReconcileDetail;
+
+  /// No description provided for @cashStepCloseDetail.
+  ///
+  /// In es, this message translates to:
+  /// **'El cierre es definitivo; el turno deja de aceptar efectivo.'**
+  String get cashStepCloseDetail;
+
+  /// No description provided for @cashJournalEmptyMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin movimientos todavía.'**
+  String get cashJournalEmptyMessage;
+
+  /// No description provided for @cashCountObservationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Arqueo'**
+  String get cashCountObservationLabel;
+
+  /// No description provided for @cashVarianceResolutionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Resolución de diferencia'**
+  String get cashVarianceResolutionLabel;
+
+  /// No description provided for @cashCloseAdjustmentLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajuste de cierre'**
+  String get cashCloseAdjustmentLabel;
+
+  /// No description provided for @cancelCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar conteo y volver a abierto'**
+  String get cancelCountAction;
+
+  /// No description provided for @cancelCountMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El conteo queda en el historial. El cajón vuelve a aceptar efectivo.'**
+  String get cancelCountMessage;
+
+  /// No description provided for @cashVarianceTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Arqueo del cajón'**
+  String get cashVarianceTitle;
+
+  /// No description provided for @cashVarianceBalancedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin diferencia'**
+  String get cashVarianceBalancedLabel;
+
+  /// No description provided for @cashVarianceWithinToleranceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Dentro de tolerancia'**
+  String get cashVarianceWithinToleranceLabel;
+
+  /// No description provided for @cashVarianceOutsideToleranceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fuera de tolerancia'**
+  String get cashVarianceOutsideToleranceLabel;
+
+  /// No description provided for @cashPolicyMaxFloatLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Fondo máximo'**
+  String get cashPolicyMaxFloatLabel;
+
+  /// No description provided for @cashMovementReasonHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Ej. compra de hielo'**
+  String get cashMovementReasonHint;
+
+  /// States the amount above which a cash movement needs a manager PIN, shown inside the movement dialog.
+  ///
+  /// In es, this message translates to:
+  /// **'A partir de {amount} se pide el PIN del encargado.'**
+  String cashMovementApprovalHint(String amount);
+
+  /// No description provided for @noSaleDialogHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir el cajón sin venta queda en el historial con tu operador y el motivo.'**
+  String get noSaleDialogHint;
+
+  /// No description provided for @handoffDialogHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El turno pasa al operador entrante. El cajón no se mueve.'**
+  String get handoffDialogHint;
+
+  /// No description provided for @countDialogBlindHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Conteo ciego: el esperado se revela cuando envías tu conteo.'**
+  String get countDialogBlindHint;
+
+  /// Shown in the blind-count dialog when this count replaces an earlier one.
+  ///
+  /// In es, this message translates to:
+  /// **'Reconteo {attempt}: este conteo reemplaza al anterior en el historial.'**
+  String countDialogRecountHint(int attempt);
+
+  /// No description provided for @cashUnavailableTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo leer el cajón'**
+  String get cashUnavailableTitle;
+
+  /// No description provided for @cashUnavailableHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Revisa la conexión y vuelve a intentar. Si sigue fallando, avisa al encargado antes de cobrar en efectivo.'**
+  String get cashUnavailableHint;
+
+  /// No description provided for @cashStatusReadyToClose.
+  ///
+  /// In es, this message translates to:
+  /// **'Listo para cerrar'**
+  String get cashStatusReadyToClose;
+
+  /// No description provided for @closeDialogApprovalHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Este cierre pide el PIN del encargado.'**
+  String get closeDialogApprovalHint;
+
+  /// Accessible name of the quantity field for one cash denomination.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad de {amount}'**
+  String denominationQuantityLabel(String amount);
+
+  /// No description provided for @cashLastReadLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizado'**
+  String get cashLastReadLabel;
+
+  /// No description provided for @cashLedgerSequenceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Secuencia del libro'**
+  String get cashLedgerSequenceLabel;
+
+  /// No description provided for @cashReadOnlyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Solo consulta'**
+  String get cashReadOnlyTitle;
+
+  /// No description provided for @cashReadOnlyMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Con tus permisos actuales no hay acciones de caja para este turno. Puedes consultar la cuenta del cajón y el libro del turno; si necesitas mover efectivo o cerrar el turno, pídeselo a un encargado.'**
+  String get cashReadOnlyMessage;
+
+  /// No description provided for @cashDrawerUnansweredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El cajón no respondió. La operación quedó registrada; ábrelo a mano y avisa al encargado.'**
+  String get cashDrawerUnansweredMessage;
+
+  /// No description provided for @cashPolicyUndefinedLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin definir'**
+  String get cashPolicyUndefinedLabel;
+
+  /// No description provided for @cashPolicyExpiredTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'La política de caja venció'**
+  String get cashPolicyExpiredTitle;
+
+  /// No description provided for @cashPolicyExpiredMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta terminal no puede mover efectivo, contar ni cerrar hasta que el propietario publique una política vigente. El dinero del cajón no se toca.'**
+  String get cashPolicyExpiredMessage;
+
+  /// No description provided for @cashPolicyExpiresAtLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Vigente hasta'**
+  String get cashPolicyExpiresAtLabel;
+
+  /// No description provided for @cashPolicyVersionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Versión'**
+  String get cashPolicyVersionLabel;
+
+  /// No description provided for @cashOfflineLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Efectivo sin conexión'**
+  String get cashOfflineLabel;
+
+  /// No description provided for @cashOfflineUnavailableLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'No disponible aún'**
+  String get cashOfflineUnavailableLabel;
+
+  /// Error on the movement reason field when it is left empty.
+  ///
+  /// In es, this message translates to:
+  /// **'Escribe el motivo del movimiento.'**
+  String get movementReasonRequiredMessage;
+
+  /// Says what a manager is being asked to approve: the operation and its amount.
+  ///
+  /// In es, this message translates to:
+  /// **'Vas a aprobar {operation} de {amount}.'**
+  String cashMovementApprovalScope(String operation, String amount);
+
+  /// Small label above the operation in the manager approval dialog.
+  ///
+  /// In es, this message translates to:
+  /// **'Vas a autorizar'**
+  String get managerApprovalEyebrow;
+
+  /// Secondary button in the manager approval dialog. Abandons the movement, not the screen.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar movimiento'**
+  String get managerApprovalCancelAction;
+
+  /// Says who is expected to enter the PIN in the approval dialog.
+  ///
+  /// In es, this message translates to:
+  /// **'El encargado teclea su PIN.'**
+  String get managerApprovalPinHint;
+
+  /// Says what opening a shift does when the chosen drawer was left behind by a terminal that no longer exists: the previous shift is blocked, uncounted, and the money stays in the drawer.
+  ///
+  /// In es, this message translates to:
+  /// **'Esta caja quedó retenida por una terminal que ya no existe. Si abres el turno aquí, el turno anterior queda bloqueado y sin contar: el dinero sigue en el cajón.'**
+  String get openShiftOnStrandedDrawerMessage;
+
+  /// Says the over/short is inside the policy's tolerance, so the close will not ask a manager for a PIN.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin aprobación'**
+  String get cashVarianceNoApprovalLabel;
+
+  /// Says the over/short is outside the policy's tolerance, so the close will ask a manager for a PIN.
+  ///
+  /// In es, this message translates to:
+  /// **'Pide aprobación'**
+  String get cashVarianceApprovalRequiredLabel;
+
+  /// The till itself is rate-limited: no credential on this device can authorize right now, so retrying is pointless.
+  ///
+  /// In es, this message translates to:
+  /// **'El PIN está bloqueado en esta caja unos minutos. Ningún encargado podrá autorizar hasta que termine el bloqueo.'**
+  String get managerApprovalPinLocked;
+
+  /// The credential matched nothing. Names the two real possibilities: the wrong PIN, or a till with no manager credential enrolled at all.
+  ///
+  /// In es, this message translates to:
+  /// **'Ese PIN no autoriza este movimiento. Prueba con otro encargado; si nadie tiene PIN en esta caja, pide a un administrador que lo dé de alta.'**
+  String get managerApprovalPinRefused;
+
+  /// Heading over the two figures that show what the drawer holds now and what it will hold after the movement.
+  ///
+  /// In es, this message translates to:
+  /// **'Efecto en el cajón'**
+  String get managerApprovalDrawerEffectTitle;
+
+  /// The expected cash in the drawer before the movement the manager is authorizing.
+  ///
+  /// In es, this message translates to:
+  /// **'En el cajón ahora'**
+  String get managerApprovalDrawerNow;
+
+  /// The expected cash in the drawer once the movement is booked.
+  ///
+  /// In es, this message translates to:
+  /// **'Después de este movimiento'**
+  String get managerApprovalDrawerAfter;
+
+  /// Heading of the persistent table detail panel. Combines the word for table with the published table label.
+  ///
+  /// In es, this message translates to:
+  /// **'Mesa {table}'**
+  String tableStatePanelTitle(String table);
+
+  /// Shown in the persistent detail panel before any table is selected.
+  ///
+  /// In es, this message translates to:
+  /// **'Toca una mesa para ver su detalle.'**
+  String get tableStatePanelEmpty;
+
+  /// Heading over the contextual table actions in the detail panel.
+  ///
+  /// In es, this message translates to:
+  /// **'Acciones'**
+  String get tableStatePanelActions;
+
+  /// Label of the row that shows how long a party has held the table.
+  ///
+  /// In es, this message translates to:
+  /// **'Tiempo'**
+  String get tableStateElapsedField;
+
+  /// Label of the row that shows how many tables one party holds.
+  ///
+  /// In es, this message translates to:
+  /// **'Grupo'**
+  String get tableStateGroupField;
+}
+
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
+  const _AppLocalizationsDelegate();
+
+  @override
+  Future<AppLocalizations> load(Locale locale) {
+    return SynchronousFuture<AppLocalizations>(lookupAppLocalizations(locale));
+  }
+
+  @override
+  bool isSupported(Locale locale) =>
+      <String>['en', 'es'].contains(locale.languageCode);
+
+  @override
+  bool shouldReload(_AppLocalizationsDelegate old) => false;
+}
+
+AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when only language code is specified.
+  switch (locale.languageCode) {
+    case 'en':
+      return AppLocalizationsEn();
+    case 'es':
+      return AppLocalizationsEs();
+  }
+
+  throw FlutterError(
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
+}

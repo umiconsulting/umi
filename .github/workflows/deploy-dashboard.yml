@@ -5,9 +5,15 @@
 # Cloudflare on the real domain until the `dashboard` CNAME is cut over in
 # Squarespace DNS — so this workflow is safe to land before the cutover.
 #
-#   push to main   -> production deployment  (umi-dashboard.pages.dev, then the
-#                     custom domain once the CNAME points here)
-#   pull_request   -> preview deployment     (<branch>.umi-dashboard.pages.dev)
+#   push to main     -> production deployment  (umi-dashboard.pages.dev, then the
+#                       custom domain once the CNAME points here)
+#   push to build-v3 -> staging preview        (build-v3.umi-dashboard.pages.dev,
+#                       built against api-staging.umiconsulting.co)
+#   pull_request     -> preview deployment     (<branch>.umi-dashboard.pages.dev)
+#
+# NOTE: GitHub runs the copy of this workflow that lives ON the pushed branch, so
+# the `build-v3` trigger below only takes effect once this file is merged INTO
+# build-v3 — not from main alone.
 #
 # The dashboard is a static Vite SPA. Every config value is a VITE_* variable
 # baked in AT BUILD TIME — there are no runtime server secrets. The only secret
@@ -27,7 +33,7 @@ on:
   # Manual redeploy of current main (e.g. an env/variable change, no code change).
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, build-v3]
     paths:
       - 'apps/umi-dashboard/**'
       - 'packages/tokens/**'
@@ -80,21 +86,44 @@ jobs:
 
       - name: Write build env
         run: |
+          # The deploy target branch selects the environment. Production (main)
+          # calls the API directly — it is already same-site with the dashboard.
+          # Every preview (build-v3 and per-PR) instead ships VITE_API_BASE=""
+          # so the SPA calls the API SAME-ORIGIN through public/_worker.js; that
+          # keeps the session cookie first-party, which Safari iOS ITP requires
+          # (…pages.dev and …umiconsulting.co are different sites). The preview
+          # backend is chosen at runtime by the Pages "Preview" env var
+          # API_ORIGIN. All values here are public build-time config.
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [ "$BRANCH" = "main" ]; then
+            ENVIRONMENT=production
+            API_BASE=https://api.umiconsulting.co
+            PUBLIC_URL=https://dashboard.umiconsulting.co
+            CONTRACT_VERSION=2.13.0
+          else
+            ENVIRONMENT=staging
+            API_BASE=
+            PUBLIC_URL=https://build-v3.umi-dashboard.pages.dev
+            CONTRACT_VERSION=2.18.0
+          fi
+          echo "Build env: branch=$BRANCH environment=$ENVIRONMENT api=${API_BASE:-(same-origin)}"
           cat > apps/umi-dashboard/.env.production.local <<EOF
-          VITE_UMI_ENVIRONMENT=production
+          VITE_UMI_ENVIRONMENT=$ENVIRONMENT
           VITE_AUTH_MODE=cookie
-          VITE_API_BASE=https://api.umiconsulting.co
-          VITE_PUBLIC_URL=https://dashboard.umiconsulting.co
+          VITE_API_BASE=$API_BASE
+          VITE_PUBLIC_URL=$PUBLIC_URL
           VITE_BUSINESS_SLUG=elgranribera
+          VITE_CONTRACT_VERSION=$CONTRACT_VERSION
           # main still uses @supabase/supabase-js for auth + password reset
-          # (lib/auth.jsx, screens/reset-password.jsx), so the client needs these
-          # or createClient() throws "supabaseUrl is required" at load and the app
-          # white-screens. The anon key is a public client key, but it is a JWT, so
-          # it lives in an Actions variable to keep gitleaks quiet — not inlined.
+          # (lib/auth.jsx, screens/reset-password.jsx), so the production client
+          # needs these or createClient() throws "supabaseUrl is required" at load
+          # and the app white-screens. The anon key is a public client key, but it
+          # is a JWT, so it lives in an Actions variable to keep gitleaks quiet.
           # build-v3 removes Supabase from the dashboard; drop these when it ships.
+          # They are written on every branch so a preview cannot white-screen
+          # either; only the production origin is used by the main build.
           VITE_SUPABASE_URL=https://xbudknbimkgjjgohnjgp.supabase.co
           VITE_SUPABASE_ANON_KEY=${{ vars.VITE_SUPABASE_ANON_KEY }}
-          VITE_CONTRACT_VERSION=2.13.0
           VITE_CONFIG_SCHEMA_VERSION=1
           VITE_RELEASE_VERSION=${{ github.ref_name }}
           VITE_RELEASE_GIT_COMMIT=${{ github.sha }}

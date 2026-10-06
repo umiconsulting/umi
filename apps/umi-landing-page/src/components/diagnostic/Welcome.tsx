@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/Button";
-import { ArrowRight, ClipboardList } from "lucide-react";
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/Button';
+import { ArrowRight, ClipboardList } from 'lucide-react';
 
 interface WelcomeProps {
   onStart: () => void;
@@ -24,15 +24,11 @@ const Welcome = ({ onStart }: WelcomeProps) => (
           Diagnóstico de operación conectada
         </h3>
         <p className="mb-7 max-w-xl text-[17px] font-semibold leading-[1.6] text-[rgba(20,33,66,0.68)]">
-          En menos de 3 minutos ubicamos qué producto Umi conviene activar primero
-          según tu flujo de pedidos, cocina, clientes y visibilidad.
+          En menos de 3 minutos ubicamos qué producto Umi conviene activar primero según tu flujo de
+          pedidos, cocina, clientes y visibilidad.
         </p>
 
-        <Button
-          onClick={onStart}
-          variant="primary"
-          className="px-8"
-        >
+        <Button onClick={onStart} variant="primary" className="px-8">
           Comenzar diagnóstico
           <ArrowRight size={18} strokeWidth={1.8} />
         </Button>
@@ -44,14 +40,12 @@ const Welcome = ({ onStart }: WelcomeProps) => (
 
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
         {[
-          ["01", "puerta de entrada para pedidos y atención"],
-          ["05", "superficies de producto conectadas"],
-          ["3 min", "para sugerir una ruta inicial"],
+          ['01', 'puerta de entrada para pedidos y atención'],
+          ['05', 'superficies de producto conectadas'],
+          ['3 min', 'para sugerir una ruta inicial'],
         ].map(([num, label]) => (
           <div key={num} className="rounded-[22px] border border-[var(--stroke)] bg-[#fbf7ef] p-5">
-            <p className="mb-1 text-[36px] font-extrabold leading-none text-umi-blue-dark">
-              {num}
-            </p>
+            <p className="mb-1 text-[36px] font-extrabold leading-none text-umi-blue-dark">{num}</p>
             <p className="text-sm font-semibold leading-[1.45] text-[rgba(20,33,66,0.62)]">
               {label}
             </p>

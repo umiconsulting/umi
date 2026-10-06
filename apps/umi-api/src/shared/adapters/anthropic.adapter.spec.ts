@@ -71,16 +71,19 @@ describe('AnthropicAdapter', () => {
     });
     withClient(adapter, create);
 
-    await adapter.createCompletion({ system: 's', userMessage: 'u', model: 'claude-opus-4-8', temperature: 0.7 });
+    await adapter.createCompletion({
+      system: 's',
+      userMessage: 'u',
+      model: 'claude-opus-4-8',
+      temperature: 0.7,
+    });
     expect(create.mock.calls[0][0]).toMatchObject({ temperature: 0.7 });
   });
 
   it('createCompletion returns null when the SDK throws', async () => {
     const adapter = adapterWith(WITH_KEY);
     withClient(adapter, vi.fn().mockRejectedValue(new Error('rate_limit')));
-    expect(
-      await adapter.createCompletion({ system: 's', userMessage: 'u' }),
-    ).toBeNull();
+    expect(await adapter.createCompletion({ system: 's', userMessage: 'u' })).toBeNull();
   });
 
   it('createMessage forwards tools and returns the raw response + usage', async () => {

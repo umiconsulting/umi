@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { AnthropicAdapter } from '../../shared/adapters/anthropic.adapter';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { LLM_COMPLETION, type LlmCompletionProvider } from '../../shared/adapters/llm-completion';
 import { VoyageAdapter } from '../../shared/adapters/voyage.adapter';
+import { AiUsageRepository } from '../../shared/usage/ai-usage.repository';
 import { MemoryRepository, type SemanticRow } from './memory.repository';
 import { MessagesRepository } from './messages.repository';
 
@@ -52,15 +53,25 @@ export interface WorkingMemory {
   } | null;
 }
 
+/**
+ * The merchant and conversation a background LLM call belongs to. Both
+ * enrichment callers hold them already, and the billing row needs them.
+ */
+export interface MemoryCallContext {
+  merchantId: string;
+  conversationId?: string | null;
+}
+
 @Injectable()
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
 
   constructor(
-    private readonly anthropic: AnthropicAdapter,
+    @Inject(LLM_COMPLETION) private readonly llm: LlmCompletionProvider,
     private readonly voyage: VoyageAdapter,
     private readonly memory: MemoryRepository,
     private readonly messages: MessagesRepository,
+    private readonly usage: AiUsageRepository,
   ) {}
 
   // ── Working memory ─────────────────────────────────────────────────────────
@@ -69,7 +80,7 @@ export class MemoryService {
   async buildWorkingMemory(params: {
     conversationId: string;
     personId: string;
-    tenantId: string;
+    merchantId: string;
     currentMessage: string;
     totalMsgCount: number;
     summary: string | null;
@@ -85,7 +96,7 @@ export class MemoryService {
 
     const [recent, rawFacts] = await Promise.all([
       this.messages.getRecentMessages(params.conversationId, 8),
-      this.memory.getCustomerFacts(params.tenantId, params.personId),
+      this.memory.getCustomerFacts(params.merchantId, params.personId),
     ]);
 
     const recentMessages = recent
@@ -93,9 +104,7 @@ export class MemoryService {
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
     const facts: CustomerFacts | null =
-      rawFacts && Object.keys(rawFacts).length > 0
-        ? (rawFacts as unknown as CustomerFacts)
-        : null;
+      rawFacts && Object.keys(rawFacts).length > 0 ? (rawFacts as unknown as CustomerFacts) : null;
 
     let semanticContext: SemanticResult[] | null = null;
     let semanticStats: WorkingMemory['semanticStats'] = null;
@@ -106,13 +115,13 @@ export class MemoryService {
         try {
           let sourceScope: 'customer' | 'conversation' = 'customer';
           let similarMsgs: SemanticRow[] = await this.memory.searchCustomerMessages({
-            tenantId: params.tenantId,
+            merchantId: params.merchantId,
             personId: params.personId,
             currentConversationId: params.conversationId,
             embedding: queryEmbedding,
             limit: 5,
             excludeRecent: 8,
-            roles: ['user'],
+            roles: ['customer'], // DB sender vocabulary (was LLM 'user'); see message-vocab.ts
           });
 
           if (similarMsgs.length === 0) {
@@ -130,31 +139,22 @@ export class MemoryService {
 
           if (filtered.length > 0) {
             const now = new Date();
-            const intentCounts = filtered.reduce<Record<string, number>>(
-              (acc, m) => {
-                const signature = normalizeIntentSignature(m.content ?? '');
-                acc[signature] = (acc[signature] ?? 0) + 1;
-                return acc;
-              },
-              {},
-            );
+            const intentCounts = filtered.reduce<Record<string, number>>((acc, m) => {
+              const signature = normalizeIntentSignature(m.content ?? '');
+              acc[signature] = (acc[signature] ?? 0) + 1;
+              return acc;
+            }, {});
 
             const ranked: SemanticResult[] = filtered
               .map((m) => {
                 const intentSignature = normalizeIntentSignature(m.content ?? '');
                 const recencyWeight = computeRecencyWeight(m.created_at, now);
-                const noveltyWeight = computeNoveltyWeight(
-                  intentCounts[intentSignature] ?? 1,
-                );
+                const noveltyWeight = computeNoveltyWeight(intentCounts[intentSignature] ?? 1);
                 return {
                   role: m.role,
                   content: m.content,
                   similarity: m.similarity,
-                  ponderingScore: computePonderingScore(
-                    m.similarity,
-                    recencyWeight,
-                    noveltyWeight,
-                  ),
+                  ponderingScore: computePonderingScore(m.similarity, recencyWeight, noveltyWeight),
                   intentSignature,
                   conversationId: m.conversation_id ?? null,
                   sourceScope,
@@ -171,8 +171,7 @@ export class MemoryService {
               min: Math.min(...scores),
               max: Math.max(...scores),
               avg: scores.reduce((s, v) => s + v, 0) / scores.length,
-              pondering_avg:
-                ponderingScores.reduce((s, v) => s + v, 0) / ponderingScores.length,
+              pondering_avg: ponderingScores.reduce((s, v) => s + v, 0) / ponderingScores.length,
               pondering_max: Math.max(...ponderingScores),
               source_scope: sourceScope,
             };
@@ -206,6 +205,7 @@ export class MemoryService {
   async extractCustomerFacts(
     recentMessages: Array<{ role: string; content: string }>,
     existingFacts: CustomerFacts | null,
+    context: MemoryCallContext,
   ): Promise<CustomerFacts | null> {
     const convoText = recentMessages.map((m) => `${m.role}: ${m.content}`).join('\n');
     const existingJson = existingFacts ? JSON.stringify(existingFacts) : '{}';
@@ -213,7 +213,7 @@ export class MemoryService {
     // Fully fail-safe: a thrown Anthropic call (network/rate-limit) or malformed
     // output returns null so the caller keeps existingFacts unchanged.
     try {
-      const completion = await this.anthropic.createCompletion({
+      const completion = await this.llm.createCompletion({
         maxTokens: 256,
         system: `Extract and merge customer preferences from this WhatsApp conversation with a café bot.
 Return ONLY valid JSON with this exact shape:
@@ -230,6 +230,13 @@ Existing facts: ${existingJson}`,
       });
 
       if (!completion) return null;
+      await this.usage.record({
+        merchantId: context.merchantId,
+        conversationId: context.conversationId ?? null,
+        kind: 'facts',
+        promptTokens: completion.inputTokens,
+        completionTokens: completion.outputTokens,
+      });
       const jsonMatch = completion.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return null;
       return JSON.parse(jsonMatch[0]) as CustomerFacts;
@@ -245,6 +252,7 @@ Existing facts: ${existingJson}`,
   async generateSummary(
     olderMessages: Array<{ role: string; content: string }>,
     existingSummary: string | null,
+    context: MemoryCallContext,
   ): Promise<string | null> {
     const windowedMessages = olderMessages.slice(-16);
     const convoText = windowedMessages.map((m) => `${m.role}: ${m.content}`).join('\n');
@@ -252,7 +260,7 @@ Existing facts: ${existingJson}`,
       ? `Previous summary: ${existingSummary}\n\nNew messages to incorporate:\n`
       : '';
 
-    const completion = await this.anthropic.createCompletion({
+    const completion = await this.llm.createCompletion({
       maxTokens: 300,
       system: `You are summarizing a WhatsApp conversation with a café ordering bot.
 Write a concise summary (2-4 sentences) of what was discussed, what the customer ordered or asked about,
@@ -265,14 +273,22 @@ CRITICAL RULES:
       userMessage: `${existingContext}${convoText}`,
     });
 
+    if (completion) {
+      await this.usage.record({
+        merchantId: context.merchantId,
+        conversationId: context.conversationId ?? null,
+        kind: 'summary',
+        promptTokens: completion.inputTokens,
+        completionTokens: completion.outputTokens,
+      });
+    }
+
     const raw = completion?.text?.trim() ?? null;
     if (!raw) return null;
 
     const summaryMarker = raw.match(/\*{0,2}Summary:\*{0,2}\s*/i);
     if (summaryMarker) {
-      const afterMarker = raw
-        .slice(raw.indexOf(summaryMarker[0]) + summaryMarker[0].length)
-        .trim();
+      const afterMarker = raw.slice(raw.indexOf(summaryMarker[0]) + summaryMarker[0].length).trim();
       return afterMarker || raw;
     }
     return raw;
@@ -285,9 +301,7 @@ function normalizeIntentSignature(content: string): string {
   const text = content.toLowerCase().trim();
   if (!text) return 'empty';
   if (
-    /(lo de siempre|mismo pedido|otra vez|igual|repetir|ultimo pedido|último pedido)/i.test(
-      text,
-    )
+    /(lo de siempre|mismo pedido|otra vez|igual|repetir|ultimo pedido|último pedido)/i.test(text)
   ) {
     return 'repeat_order';
   }
@@ -298,9 +312,7 @@ function normalizeIntentSignature(content: string): string {
   if (/(donde|dónde|ubic|direccion|dirección|mapa)/i.test(text)) return 'location';
   if (/(menu|menú|categor|que tienes|qué tienes)/i.test(text)) return 'menu_browse';
   if (
-    /(americano|chai|matcha|latte|postre|galleta|tisana|limonada|espresso|caramelo)/i.test(
-      text,
-    )
+    /(americano|chai|matcha|latte|postre|galleta|tisana|limonada|espresso|caramelo)/i.test(text)
   ) {
     return 'product_or_order';
   }
@@ -315,10 +327,7 @@ function normalizeIntentSignature(content: string): string {
   );
 }
 
-function computeRecencyWeight(
-  createdAt: string | null | undefined,
-  now = new Date(),
-): number {
+function computeRecencyWeight(createdAt: string | null | undefined, now = new Date()): number {
   if (!createdAt) return 0.7;
   const ageMs = now.getTime() - new Date(createdAt).getTime();
   if (ageMs <= 0) return 1;

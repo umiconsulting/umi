@@ -5,12 +5,12 @@ import { workerOptions } from './job-options';
 import { BaseProcessor } from './base.processor';
 import { DeadLetterService } from './dead-letter.service';
 import { TwilioAdapter } from '../shared/adapters/twilio.adapter';
-import { TraceService } from '../shared/logging/trace.service';
+import { LoggingService } from '../shared/logging/logging.service';
 import { toWhatsAppMarkdown } from '../shared/format/whatsapp';
 
 /**
  * Outbound queue consumer (Phase 3d) — the delivery side of the transactional
- * outbox. The relay drains `queue.outbox_events` into this queue; each job is a
+ * outbox. The relay drains `runtime.outbox_event` into this queue; each job is a
  * WhatsApp send via the Twilio adapter. `toWhatsAppMarkdown` is re-applied here
  * (it was dropped in the Phase-1 adapter port; preflight §8). A null adapter
  * result throws → BullMQ retries (outbound attempts=5) → dead-letter.
@@ -23,7 +23,7 @@ export class OutboundProcessor extends BaseProcessor {
   constructor(
     deadLetters: DeadLetterService,
     private readonly twilio: TwilioAdapter,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
   ) {
     super(deadLetters);
   }
@@ -40,7 +40,9 @@ export class OutboundProcessor extends BaseProcessor {
         // Fail fast on a malformed job rather than coercing to ''/NaN and
         // handing Twilio a bad request (which it would reject anyway).
         if (!to || !from || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-          throw new Error(`twilio.location_pin missing/invalid fields (to/from/lat/lng) #${job.id}`);
+          throw new Error(
+            `twilio.location_pin missing/invalid fields (to/from/lat/lng) #${job.id}`,
+          );
         }
         const res = await this.twilio.sendLocationPin({
           to,
@@ -64,7 +66,7 @@ export class OutboundProcessor extends BaseProcessor {
         const res = await this.twilio.sendWhatsAppMessage({ to, body });
         if (!res) throw new Error(`twilio sendWhatsAppMessage returned null (${job.name})`);
         if (job.name === 'twilio.reply' && typeof p.trace_id === 'string') {
-          await this.trace.logPipelineTrace({
+          this.log.log('pipeline_trace', {
             trace_id: p.trace_id,
             conversation_id: typeof p.conversation_id === 'string' ? p.conversation_id : undefined,
             turn_id: typeof p.turn_id === 'string' ? p.turn_id : undefined,

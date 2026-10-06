@@ -41,10 +41,7 @@ export function applyToolOutcome(
   if (ORDER_CONFIRMATION_TOOLS.has(toolName)) state.orderConfirmed = true;
   if (toolName === 'confirm_order_changes') state.orderChangesConfirmed = true;
   if (toolName === 'cancel_order') state.orderCancelled = true;
-  if (
-    toolName === 'add_to_cart' ||
-    (toolName === 'edit_cart' && result?.cart_empty !== true)
-  ) {
+  if (toolName === 'add_to_cart' || (toolName === 'edit_cart' && result?.cart_empty !== true)) {
     state.cartUpdated = true;
   }
   if (SEARCH_TOOLS.has(toolName)) state.searchPerformed = true;
@@ -53,14 +50,9 @@ export function applyToolOutcome(
   if (suggestedTemplate) state.suggestedTemplate = suggestedTemplate;
 }
 
-function extractSuggestedTemplate(
-  toolName: string,
-  result: ToolResult,
-): string | null {
+function extractSuggestedTemplate(toolName: string, result: ToolResult): string | null {
   if (toolName === 'add_to_cart' || toolName === 'edit_cart') {
-    return (
-      (result?.summary_text as string) ?? (result?.customer_reply as string) ?? null
-    );
+    return (result?.summary_text as string) ?? (result?.customer_reply as string) ?? null;
   }
   if (
     ORDER_CONFIRMATION_TOOLS.has(toolName) ||

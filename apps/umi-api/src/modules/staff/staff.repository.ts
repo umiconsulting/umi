@@ -7,88 +7,271 @@ export interface StaffRow {
   phone: string | null;
   email: string | null;
   role: 'ADMIN' | 'STAFF';
+  roleId: string | null;
+  roleKey: string;
+  roleName: string;
+  roleIsSystem: boolean;
   status: string;
   permissions: Record<string, boolean> | null;
   invitedAt: Date | null;
   disabledAt: Date | null;
   createdAt: Date | string | null;
   updatedAt: Date | string | null;
+  hasOperatorPin: boolean;
 }
 
-// The role/permissions/invited/disabled columns aren't stored on
-// core.staff_members — role is derived from name, the rest are DTO-synthesized.
-// Kept identical to server.js so the dashboard renders unchanged.
+export type StaffRoleKey = 'admin' | 'staff';
+
+export interface StaffPinMaterial {
+  salt: string;
+  hash: string;
+  lookupHash: string;
+}
+
+// `role` comes from the real grant now — merchant.staff.role_id joined to the
+// umi.role catalog — not from `lower(name) = 'admin'`. It is still narrowed to the
+// two values the wire contract declares, so the dashboard renders unchanged: the
+// catalog has four café roles and the DTO has two.
+//
+// `permissions` and `invitedAt` stay synthesized. The permission set is derivable
+// (umi.role_permission), but the dashboard has always received null here and widening
+// it is a contract change, not a repair. `invitedAt` has no source at all: an
+// invitation belongs to umi.user, and that table records no timestamp for it.
+//
+// Every column is aliased `s.`, because the projection is used with a join.
 const PROJECTION = `
-  id::text,
-  name,
-  phone,
-  email,
-  CASE WHEN lower(name) = 'admin' THEN 'ADMIN' ELSE 'STAFF' END AS role,
-  status,
+  s.id::text,
+  s.name,
+  s.phone,
+  s.email,
+  CASE WHEN COALESCE(mr.key,r.key) IN ('owner','admin') THEN 'ADMIN' ELSE 'STAFF' END AS role,
+  mr.id::text AS "roleId",
+  COALESCE(mr.key,r.key,'staff') AS "roleKey",
+  COALESCE(mr.name,r.name,'Staff') AS "roleName",
+  COALESCE(mr.is_system,false) AS "roleIsSystem",
+  s.status,
   NULL::jsonb AS permissions,
   NULL::timestamptz AS "invitedAt",
-  created_at AS "createdAt",
-  updated_at AS "updatedAt"`;
+  (s.operator_pin_hash IS NOT NULL) AS "hasOperatorPin",
+  s.created_at AS "createdAt",
+  s.updated_at AS "updatedAt"`;
 
 @Injectable()
 export class StaffRepository {
   constructor(private readonly pg: PgService) {}
 
-  async list(tenantId: string): Promise<StaffRow[]> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async findRoleKey(merchantId: string, staffId: string): Promise<string | null> {
+    const { rows } = await this.pg.withMerchant((c) =>
+      c.query<{ roleKey: string }>(
+        `SELECT COALESCE(mr.key,r.key) AS "roleKey"
+         FROM merchant.staff s
+         LEFT JOIN merchant.role mr
+           ON mr.id=s.merchant_role_id AND mr.merchant_id=s.merchant_id
+         JOIN umi.role r ON r.id=s.role_id
+         WHERE s.merchant_id=$1::uuid AND s.id=$2::uuid`,
+        [merchantId, staffId],
+      ),
+    );
+    return rows[0]?.roleKey ?? null;
+  }
+
+  async findMerchantRole(
+    merchantId: string,
+    roleId: string,
+  ): Promise<{ id: string; key: string; name: string; isSystem: boolean } | null> {
+    const { rows } = await this.pg.withMerchant((client) =>
+      client.query<{ id: string; key: string; name: string; isSystem: boolean }>(
+        `SELECT id::text,key,name,is_system AS "isSystem"
+           FROM merchant.role
+          WHERE merchant_id=$1::uuid AND id=$2::uuid AND status='active'`,
+        [merchantId, roleId],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  async findMerchantRoleByKey(
+    merchantId: string,
+    roleKey: string,
+  ): Promise<{ id: string; key: string; name: string; isSystem: boolean } | null> {
+    const { rows } = await this.pg.withMerchant((client) =>
+      client.query<{ id: string; key: string; name: string; isSystem: boolean }>(
+        `SELECT id::text,key,name,is_system AS "isSystem"
+           FROM merchant.role
+          WHERE merchant_id=$1::uuid AND key=$2 AND status='active'`,
+        [merchantId, roleKey],
+      ),
+    );
+    return rows[0] ?? null;
+  }
+
+  async list(merchantId: string): Promise<StaffRow[]> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
         `SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
-         FROM core.staff_members
-         WHERE tenant_id = $1::uuid
+         FROM merchant.staff AS s
+         LEFT JOIN merchant.role AS mr
+           ON mr.id=s.merchant_role_id AND mr.merchant_id=s.merchant_id
+         LEFT JOIN umi.role AS r ON r.id = s.role_id
+         WHERE s.merchant_id = $1::uuid
          ORDER BY
-           CASE WHEN lower(name) = 'admin' THEN 0 ELSE 1 END,
-           CASE status WHEN 'active' THEN 0 WHEN 'invited' THEN 1 ELSE 2 END,
-           created_at ASC`,
-        [tenantId],
+           CASE WHEN COALESCE(mr.key,r.key) IN ('owner','admin') THEN 0 ELSE 1 END,
+           CASE s.status WHEN 'active' THEN 0 ELSE 1 END,
+           s.created_at ASC`,
+        [merchantId],
       ),
     );
     return rows;
   }
 
   async insert(
-    tenantId: string,
+    merchantId: string,
     locationId: string | null,
-    data: { name: string; phone: string | null; email: string | null; status: string },
+    data: {
+      name: string;
+      phone: string | null;
+      email: string | null;
+      status: string;
+      roleKey: StaffRoleKey;
+      roleId: string | null;
+      pinSalt: string | null;
+      pinHash: string | null;
+      pinLookup: string | null;
+    },
   ): Promise<StaffRow> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
-        `INSERT INTO core.staff_members (tenant_id, location_id, name, phone, email, status)
-         VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6)
-         RETURNING ${PROJECTION}, NULL::timestamptz AS "disabledAt"`,
-        [tenantId, locationId, data.name, data.phone, data.email, data.status],
+        // An employment is always backed by a umi.user (merchant.staff.user_id is NOT
+        // NULL), so this statement mints one. Everything is one statement, so a failure
+        // cannot leave a user with no employment.
+        //
+        // IT NEVER LINKS TO AN EXISTING ACCOUNT, and that is the whole point of `taken`.
+        // An earlier version looked up umi.user by email and reused the match, so a café
+        // could type any known address — hola@umiconsulting.co included — and silently
+        // employ that person. Membership is not something one party grants themselves
+        // over another; it needs an invitation the recipient accepts, and no such flow
+        // exists yet.
+        //
+        // So when the address is already claimed, the new umi.user is created WITHOUT an
+        // email. The typed address still lands on merchant.staff.email, which is the
+        // employment contact and was never the login. The behaviour is identical whether
+        // or not the address exists, so this also cannot be used to probe for accounts.
+        //
+        // The cost, stated: one human working at two cafés holds two umi.user rows until
+        // an invitation flow reconciles them. That is the honest position — we cannot
+        // prove two employments are the same person from a typed string.
+        //
+        // The new user gets no password. Its status follows the only door it has:
+        //   no email (or taken) -> 'active'   the person exists to hold a till PIN
+        //   a free email        -> 'invited'  a dashboard invitation is still owed
+        // 'active' + email + no hash is precisely what security_gate.sql refuses.
+        //
+        // RETURNING cannot join, so the write is wrapped in a CTE and the role catalog
+        // is joined to its output. One round trip.
+        `WITH selected_role AS (
+           SELECT mr.id AS merchant_role_id,mr.legacy_role_id
+             FROM merchant.role mr
+            WHERE mr.merchant_id=$1::uuid AND mr.status='active'
+              AND (($11::uuid IS NOT NULL AND mr.id=$11::uuid)
+                OR ($11::uuid IS NULL AND mr.key=$7::text))
+            LIMIT 1
+         ), taken AS (
+           SELECT 1 FROM umi.user
+            WHERE $5::text IS NOT NULL AND lower(email) = lower($5::text)
+            LIMIT 1
+         ), created AS (
+           INSERT INTO umi.user (email, full_name, status)
+           SELECT
+             CASE WHEN EXISTS (SELECT 1 FROM taken) THEN NULL ELSE $5::text END,
+             $3::text,
+             CASE WHEN $5::text IS NULL OR EXISTS (SELECT 1 FROM taken)
+                  THEN 'active' ELSE 'invited' END
+           FROM selected_role
+           RETURNING id
+         ), person AS (
+           SELECT id FROM created
+         ), ins AS (
+           INSERT INTO merchant.staff
+             (merchant_id, location_id, user_id, role_id, merchant_role_id,
+              name, phone, email, status,
+              operator_pin_salt, operator_pin_hash, operator_pin_lookup)
+           SELECT $1::uuid, $2::uuid, person.id,selected_role.legacy_role_id,
+                  selected_role.merchant_role_id,$3,$4,$5,$6,
+                  $8, $9, $10
+             FROM person CROSS JOIN selected_role
+           RETURNING *
+         )
+         SELECT ${PROJECTION}, NULL::timestamptz AS "disabledAt"
+         FROM ins AS s
+         LEFT JOIN merchant.role AS mr
+           ON mr.id=s.merchant_role_id AND mr.merchant_id=s.merchant_id
+         LEFT JOIN umi.role AS r ON r.id = s.role_id`,
+        [
+          merchantId,
+          locationId,
+          data.name,
+          data.phone,
+          data.email,
+          data.status,
+          data.roleKey,
+          data.pinSalt,
+          data.pinHash,
+          data.pinLookup,
+          data.roleId,
+        ],
       ),
     );
     return rows[0];
   }
 
   async update(
-    tenantId: string,
+    merchantId: string,
     staffId: string,
     patch: {
       name?: string;
       phone?: string | null;
       email?: string | null;
       status?: string | null;
+      roleKey?: StaffRoleKey;
+      roleId?: string;
+      pinMaterial?: StaffPinMaterial | null;
     },
   ): Promise<StaffRow | null> {
-    const { rows } = await this.pg.withTenant((c) =>
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<StaffRow>(
-        `UPDATE core.staff_members
-         SET name = COALESCE($3, name),
-             phone = CASE WHEN $4::boolean THEN $5 ELSE phone END,
-             email = CASE WHEN $6::boolean THEN $7 ELSE email END,
-             status = COALESCE($8, status),
-             updated_at = now()
-         WHERE id = $2::uuid AND tenant_id = $1::uuid
-         RETURNING ${PROJECTION},
-           CASE WHEN status = 'disabled' THEN updated_at ELSE NULL END AS "disabledAt"`,
+        `WITH upd AS (
+           UPDATE merchant.staff
+           SET name = COALESCE($3, name),
+               phone = CASE WHEN $4::boolean THEN $5 ELSE phone END,
+               email = CASE WHEN $6::boolean THEN $7 ELSE email END,
+               status = COALESCE($8, status),
+               role_id = CASE WHEN $9::boolean
+                         THEN (SELECT legacy_role_id FROM merchant.role
+                                WHERE merchant_id=$1::uuid AND status='active'
+                                  AND (($10::uuid IS NOT NULL AND id=$10::uuid)
+                                    OR ($10::uuid IS NULL AND key=$11::text)))
+                         ELSE role_id END,
+               merchant_role_id = CASE WHEN $9::boolean
+                         THEN (SELECT id FROM merchant.role
+                                WHERE merchant_id=$1::uuid AND status='active'
+                                  AND (($10::uuid IS NOT NULL AND id=$10::uuid)
+                                    OR ($10::uuid IS NULL AND key=$11::text)))
+                         ELSE merchant_role_id END,
+               operator_pin_salt = CASE WHEN $12::boolean THEN $13 ELSE operator_pin_salt END,
+               operator_pin_hash = CASE WHEN $12::boolean THEN $14 ELSE operator_pin_hash END,
+               operator_pin_lookup = CASE WHEN $12::boolean THEN $15 ELSE operator_pin_lookup END,
+               updated_at = now()
+           WHERE id = $2::uuid AND merchant_id = $1::uuid
+           RETURNING *
+         )
+         SELECT ${PROJECTION},
+           CASE WHEN s.status = 'disabled' THEN s.updated_at ELSE NULL END AS "disabledAt"
+         FROM upd AS s
+         LEFT JOIN merchant.role AS mr
+           ON mr.id=s.merchant_role_id AND mr.merchant_id=s.merchant_id
+         LEFT JOIN umi.role AS r ON r.id = s.role_id`,
         [
-          tenantId,
+          merchantId,
           staffId,
           patch.name ?? null,
           patch.phone !== undefined,
@@ -96,20 +279,27 @@ export class StaffRepository {
           patch.email !== undefined,
           patch.email ?? null,
           patch.status ?? null,
+          patch.roleKey !== undefined || patch.roleId !== undefined,
+          patch.roleId ?? null,
+          patch.roleKey ?? null,
+          patch.pinMaterial !== undefined,
+          patch.pinMaterial?.salt ?? null,
+          patch.pinMaterial?.hash ?? null,
+          patch.pinMaterial?.lookupHash ?? null,
         ],
       ),
     );
     return rows[0] ?? null;
   }
 
-  async softDelete(tenantId: string, staffId: string): Promise<boolean> {
-    const { rows } = await this.pg.withTenant((c) =>
+  async softDelete(merchantId: string, staffId: string): Promise<boolean> {
+    const { rows } = await this.pg.withMerchant((c) =>
       c.query<{ id: string }>(
-        `UPDATE core.staff_members
+        `UPDATE merchant.staff
          SET status = 'disabled', updated_at = now()
-         WHERE id = $2::uuid AND tenant_id = $1::uuid
+         WHERE id = $2::uuid AND merchant_id = $1::uuid
          RETURNING id::text`,
-        [tenantId, staffId],
+        [merchantId, staffId],
       ),
     );
     return rows.length > 0;

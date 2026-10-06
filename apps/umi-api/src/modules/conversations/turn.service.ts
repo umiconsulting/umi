@@ -3,8 +3,8 @@ import { OrderLocationResolver } from './order-location.resolver';
 import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
-import { TraceService } from '../../shared/logging/trace.service';
-import { BusinessConfigService, resolveVoiceConfig } from './business-config.service';
+import { LoggingService } from '../../shared/logging/logging.service';
+import { MerchantConfigService, resolveVoiceConfig } from './merchant-config.service';
 import { ConversationsRepository } from './conversations.repository';
 import { ConversationTurnsRepository, type TurnRecord } from './conversation-turns.repository';
 import { IdentityRepository } from './identity.repository';
@@ -12,28 +12,33 @@ import { MessagesRepository } from './messages.repository';
 import { MemoryService } from './memory.service';
 import { ToolLoopService } from './tool-loop.service';
 import { TurnCommitRepository } from './turn-commit.repository';
+import { AiUsageRepository } from '../../shared/usage/ai-usage.repository';
 import { createToolOutcomeState, type ToolOutcomeState } from './tool-outcomes';
-import { getActivePendingClarification } from './pending-clarification';
 import { shapeTurnMemory } from './turn-memory';
-import {
-  buildHarnessSystemPrompt,
-  PROMPT_VERSION,
-  type BranchPromptContext,
-} from './prompts';
+import { buildHarnessSystemPrompt, PROMPT_VERSION, type LocationPromptContext } from './prompts';
 import { sanitizeOutput } from './security.service';
-import {
-  blockUnverifiedOrderConfirmation,
-  deriveNextConversationState,
-  jsonByteLength,
-  truncateBytes,
-} from './turn-safety';
+import { blockUnverifiedOrderConfirmation, jsonByteLength, truncateBytes } from './turn-safety';
 import type { TurnProcessPayload } from './turn-integrity.service';
 
 const PROCESSOR_VERSION = 'mini_harness';
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_METADATA_BYTES = 10000;
-const COST_PER_INPUT_TOKEN = 0.00000025;
-const COST_PER_OUTPUT_TOKEN = 0.00000125;
+/**
+ * Prices for the reply model, `claude-haiku-4-5-20251001` (Claude Haiku 4.5).
+ * Haiku 4.5 costs $1.00 per Mtok input and $5.00 per Mtok output, that is
+ * 0.000001 and 0.000005 USD per token.
+ * Source: https://www.anthropic.com/pricing (checked 2026-09-18).
+ *
+ * The values before this change were 0.00000025 and 0.00000125 — the Claude 3
+ * Haiku prices — so every `ai_turn` cost figure and every stored
+ * `umi.ai_usage.cost_usd` was 4x too LOW for this model. This is a deliberate
+ * behaviour change: the number is now correct, it is not a new feature.
+ *
+ * The same two numbers live in `shared/usage/model-prices.ts`, which prices the
+ * stored billing row. Change both together.
+ */
+const COST_PER_INPUT_TOKEN = 0.000001;
+const COST_PER_OUTPUT_TOKEN = 0.000005;
 const MAX_TOOL_CALLS_PER_TURN = 4;
 /** Generous lock window for the per-conversation single-flight (matches the turns queue lock). */
 const TURN_LOCK_TTL_MS = 300_000;
@@ -68,38 +73,39 @@ export class TurnService {
     private readonly turns: ConversationTurnsRepository,
     private readonly identity: IdentityRepository,
     private readonly messages: MessagesRepository,
-    private readonly businessConfig: BusinessConfigService,
+    private readonly merchantConfig: MerchantConfigService,
     private readonly memory: MemoryService,
     private readonly toolLoop: ToolLoopService,
     private readonly commit: TurnCommitRepository,
     private readonly enqueue: EnqueueService,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
     private readonly orderLocation: OrderLocationResolver,
+    private readonly usage: AiUsageRepository,
   ) {}
 
   /**
-   * Multi-branch prompt context, derived from the fulfillment-location policy
-   * (OrderLocationResolver): when the tenant still needs the customer to choose a
-   * branch, expose the branch names so the LLM can ask; when one is already
+   * Multi-location prompt context, derived from the fulfillment-location policy
+   * (OrderLocationResolver): when the merchant still needs the customer to choose a
+   * location, expose the location names so the LLM can ask; when one is already
    * chosen, note it so the LLM stops asking. Null (no prompt block) whenever the
-   * branch is already determined by a bound number or a sole location — so
-   * single-branch tenants are untouched.
+   * location is already determined by a bound number or a sole location — so
+   * single-location merchants are untouched.
    */
-  private async resolveBranchContext(
-    tenantId: string,
+  private async resolveLocationContext(
+    merchantId: string,
     conversationId: string,
     channelLocationId: string | null,
-  ): Promise<BranchPromptContext | null> {
+  ): Promise<LocationPromptContext | null> {
     const resolution = await this.orderLocation.resolve({
-      tenantId,
+      merchantId,
       conversationId,
       channelLocationId,
     });
     if (resolution.kind === 'needs_selection') {
-      return { branches: resolution.branches.map((b) => b.name), selectedBranch: null };
+      return { locations: resolution.locations.map((b) => b.name), selectedLocation: null };
     }
     if (resolution.kind === 'resolved' && resolution.source === 'selection') {
-      return { branches: [], selectedBranch: resolution.name };
+      return { locations: [], selectedLocation: resolution.name };
     }
     return null;
   }
@@ -108,30 +114,31 @@ export class TurnService {
     const start = Date.now();
     const traceId = payload.request_id ?? payload.conversation_id;
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      merchant_id: payload.merchant_id,
       stage: 'process',
       event: 'started',
       detail: { processor_version: PROCESSOR_VERSION },
     });
 
-    // resolveBranchContext depends only on `payload`, so it rides along in this
+    // resolveLocationContext depends only on `payload`, so it rides along in this
     // batch instead of adding its own round trip to the turn's critical path.
-    const [turn, conversation, person, businessRow, messageCount, branchContext] = await Promise.all([
-      this.turns.loadTurn(payload.turn_id),
-      this.conversations.loadById(payload.conversation_id),
-      this.identity.getPerson(payload.tenant_id, payload.person_id),
-      this.businessConfig.fetchConfigRow(payload.tenant_id),
-      this.messages.countMessages(payload.conversation_id),
-      this.resolveBranchContext(
-        payload.tenant_id,
-        payload.conversation_id,
-        payload.location_id ?? null,
-      ),
-    ]);
+    const [turn, conversation, person, merchantRow, messageCount, locationContext] =
+      await Promise.all([
+        this.turns.loadTurn(payload.turn_id),
+        this.conversations.loadById(payload.conversation_id),
+        this.identity.getPerson(payload.merchant_id, payload.person_id),
+        this.merchantConfig.fetchConfigRow(payload.merchant_id),
+        this.messages.countMessages(payload.conversation_id),
+        this.resolveLocationContext(
+          payload.merchant_id,
+          payload.conversation_id,
+          payload.location_id ?? null,
+        ),
+      ]);
 
     if (!turn || !conversation || !person?.phone) {
       throw new Error(`turn.process missing turn/conversation/person for turn ${payload.turn_id}`);
@@ -145,21 +152,22 @@ export class TurnService {
         turn.sourceMessageIds ?? [],
       )
     ) {
-      await this.supersedeAndRequeue(payload, turn, 'newer_user_messages_arrived_before_processing', traceId);
+      await this.supersedeAndRequeue(
+        payload,
+        turn,
+        'newer_user_messages_arrived_before_processing',
+        traceId,
+      );
       return;
     }
 
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
-      tenantId: payload.tenant_id,
+      merchantId: payload.merchant_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'processing',
       sourceMessageIds: turn.sourceMessageIds,
       mergedUserText: turn.mergedUserText,
-      integrityDecision: turn.integrityDecision ?? '',
-      integrityReason: turn.integrityReason ?? '',
-      baseStateVersion: turn.baseStateVersion,
       firstMessageAt: turn.firstMessageAt,
       lastMessageAt: turn.lastMessageAt,
       releasedAt: turn.releasedAt ?? new Date().toISOString(),
@@ -168,7 +176,7 @@ export class TurnService {
     const rawWorkingMemory = await this.memory.buildWorkingMemory({
       conversationId: payload.conversation_id,
       personId: payload.person_id,
-      tenantId: payload.tenant_id,
+      merchantId: payload.merchant_id,
       currentMessage: turn.mergedUserText,
       totalMsgCount: messageCount,
       summary: conversation.summary,
@@ -177,12 +185,15 @@ export class TurnService {
 
     // Partial-cancellation context is Phase 4 (KDS); inert here.
     const partialCancelledOrder = null;
-    const currentState = conversation.currentState ?? 'initial';
-    const activePendingClarification = getActivePendingClarification(conversation.pendingClarification);
+    // The dialog-state label is DERIVED from cart-presence (no stored FSM). The open
+    // question is not a stored slot — the LLM infers it from the recent-message buffer.
+    const hasCart = !!conversation.draftCart?.items?.length;
+    const currentState = hasCart ? 'awaiting_confirmation' : 'initial';
+    const activePendingClarification = null;
     const voice = resolveVoiceConfig(
-      businessRow?.config ?? null,
-      businessRow?.name ?? null,
-      payload.tenant_id,
+      merchantRow?.config ?? null,
+      merchantRow?.name ?? null,
+      payload.merchant_id,
     );
     const systemPrompt = buildHarnessSystemPrompt({
       customerName: person.displayName,
@@ -190,7 +201,7 @@ export class TurnService {
       workingMemory,
       partialCancelledOrder,
       voice,
-      branchContext,
+      locationContext,
     });
 
     const toolOutcomes = createToolOutcomeState();
@@ -204,7 +215,7 @@ export class TurnService {
       toolOutcomes,
       maxToolCalls: MAX_TOOL_CALLS_PER_TURN,
       toolContext: {
-        tenantId: payload.tenant_id,
+        merchantId: payload.merchant_id,
         personId: payload.person_id,
         conversationId: payload.conversation_id,
         turnId: payload.turn_id,
@@ -219,33 +230,26 @@ export class TurnService {
       orderConfirmed: toolOutcomes.orderConfirmed,
     });
     const pendingClarification = loopResult.pendingClarification;
-    const nextConversationState = deriveNextConversationState({
-      pendingClarification,
-      orderConfirmed: toolOutcomes.orderConfirmed,
-      orderCancelled: toolOutcomes.orderCancelled,
-      orderChangesConfirmed: toolOutcomes.orderChangesConfirmed,
-      cartUpdated: toolOutcomes.cartUpdated,
-      searchPerformed: toolOutcomes.searchPerformed,
-      fallbackState: currentState,
-    });
+    const lastUserMessageId = turn.sourceMessageIds[turn.sourceMessageIds.length - 1] ?? turn.id;
 
-    const lastUserMessageId =
-      turn.sourceMessageIds[turn.sourceMessageIds.length - 1] ?? turn.id;
-    const reconciledAction = {
-      processor_version: PROCESSOR_VERSION,
-      stop_reason: loopResult.stopReason,
-      tool_calls: loopResult.toolCallCount,
-      tool_chain: truncateBytes(loopResult.toolChain, 5000),
-      pending_clarification: pendingClarification,
-    };
+    // Guard: if a newer user message arrived while we were computing the reply, the
+    // conversation has moved on — supersede and let the newer turn win. This replaces
+    // the old state-version CAS; exactly-once delivery is carried by the outbox key.
+    if (
+      await this.turns.hasNewerUserMessages(
+        payload.conversation_id,
+        turn.lastMessageAt ?? '',
+        turn.sourceMessageIds ?? [],
+      )
+    ) {
+      await this.supersedeAndRequeue(payload, turn, 'conversation_changed_before_commit', traceId);
+      return;
+    }
 
-    // Transactional outbox commit: CAS state + assistant message + reply outbox row.
+    // Transactional outbox commit: assistant message + reply outbox row.
     const committed = await this.commit.commitTurnReply({
-      tenantId: payload.tenant_id,
+      merchantId: payload.merchant_id,
       conversationId: payload.conversation_id,
-      expectedStateVersion: conversation.stateVersion,
-      nextState: nextConversationState,
-      pendingClarification,
       replyBody: finalResponse,
       eventType: 'twilio.reply',
       idempotencyKey: `twilio_reply_turn:${lastUserMessageId}`,
@@ -260,16 +264,11 @@ export class TurnService {
       },
     });
 
-    if (!committed.committed) {
-      await this.supersedeAndRequeue(payload, turn, 'conversation_changed_before_commit', traceId, reconciledAction);
-      return;
-    }
-
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      merchant_id: payload.merchant_id,
       stage: 'process',
       event: 'outbox_inserted',
       detail: {
@@ -282,22 +281,14 @@ export class TurnService {
 
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
-      tenantId: payload.tenant_id,
+      merchantId: payload.merchant_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'completed',
       sourceMessageIds: turn.sourceMessageIds,
       mergedUserText: turn.mergedUserText,
-      integrityDecision: turn.integrityDecision ?? '',
-      integrityReason: turn.integrityReason ?? '',
-      baseStateVersion: turn.baseStateVersion,
       firstMessageAt: turn.firstMessageAt,
       lastMessageAt: turn.lastMessageAt,
       releasedAt: turn.releasedAt,
-      processedAt: new Date().toISOString(),
-      assistantMessageId: committed.assistantMessageId,
-      extractedIntent: { processor_version: PROCESSOR_VERSION, current_state: nextConversationState },
-      reconciledAction,
     });
 
     const metadata = {
@@ -308,7 +299,7 @@ export class TurnService {
       tool_chain: truncateBytes(loopResult.toolChain, 5000),
       pending_clarification: pendingClarification,
       max_tool_calls: MAX_TOOL_CALLS_PER_TURN,
-      next_state: nextConversationState,
+      dialog_state: currentState,
     };
     const metrics = {
       processor_version: PROCESSOR_VERSION,
@@ -320,26 +311,50 @@ export class TurnService {
       metadata_bytes: jsonByteLength(metadata),
     };
 
-    await this.trace.logAiTurn({
+    const costUsd =
+      loopResult.inputTokens * COST_PER_INPUT_TOKEN +
+      loopResult.outputTokens * COST_PER_OUTPUT_TOKEN;
+
+    this.log.log('ai_turn', {
       conversation_id: payload.conversation_id,
       customer_id: payload.person_id,
-      business_id: payload.tenant_id,
+      merchant_id: payload.merchant_id,
       model: MODEL,
       prompt_version: `${PROMPT_VERSION}.${PROCESSOR_VERSION}`,
       prompt_tokens: loopResult.inputTokens,
       completion_tokens: loopResult.outputTokens,
-      cost_usd:
-        loopResult.inputTokens * COST_PER_INPUT_TOKEN +
-        loopResult.outputTokens * COST_PER_OUTPUT_TOKEN,
+      cost_usd: costUsd,
       latency_ms: Date.now() - start,
       response_type: responseType(toolOutcomes),
       customer_context: {
         name: person.displayName,
-        state: conversation.currentState,
+        state: currentState,
         turn_id: payload.turn_id,
       },
-      metadata: truncateBytes({ ...metadata, metrics }, MAX_METADATA_BYTES) as Record<string, unknown>,
+      metadata: truncateBytes({ ...metadata, metrics }, MAX_METADATA_BYTES) as Record<
+        string,
+        unknown
+      >,
       request_id: payload.request_id,
+    });
+
+    // The billing fact for the reply, on the same path as the log line above.
+    // The tool loop stays on Anthropic by design, so the provider is named here
+    // and is NOT read from LLM_PROVIDER. A failed insert logs a warning and
+    // never fails the turn: the reply is already committed.
+    await this.usage.record({
+      merchantId: payload.merchant_id,
+      conversationId: payload.conversation_id,
+      turnId: payload.turn_id,
+      requestId: payload.request_id,
+      kind: 'reply',
+      provider: 'anthropic',
+      model: MODEL,
+      promptTokens: loopResult.inputTokens,
+      completionTokens: loopResult.outputTokens,
+      llmCallCount: loopResult.llmCallCount,
+      latencyMs: Date.now() - start,
+      costUsd,
     });
 
     // Enrichment follow-ups (background).
@@ -353,7 +368,7 @@ export class TurnService {
           assistant_message_id: committed.assistantMessageId,
           user_text: turn.mergedUserText,
           assistant_text: finalResponse,
-          tenant_id: payload.tenant_id,
+          merchant_id: payload.merchant_id,
           request_id: payload.request_id,
         },
         { priority: JobPriority.Background },
@@ -363,7 +378,7 @@ export class TurnService {
         'conversation.summarize',
         {
           conversation_id: payload.conversation_id,
-          tenant_id: payload.tenant_id,
+          merchant_id: payload.merchant_id,
           request_id: payload.request_id,
         },
         { priority: JobPriority.Background },
@@ -374,7 +389,7 @@ export class TurnService {
         {
           person_id: payload.person_id,
           conversation_id: payload.conversation_id,
-          tenant_id: payload.tenant_id,
+          merchant_id: payload.merchant_id,
           message_count: totalMsgCountAfter,
           request_id: payload.request_id,
         },
@@ -382,11 +397,11 @@ export class TurnService {
       ),
     ]);
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      merchant_id: payload.merchant_id,
       stage: 'process',
       event: 'completed',
       detail: metrics,
@@ -398,30 +413,24 @@ export class TurnService {
     turn: TurnRecord,
     reason: string,
     traceId: string,
-    reconciledAction?: Record<string, unknown>,
   ): Promise<void> {
     await this.turns.upsertTurn({
       existingTurnId: turn.id,
-      tenantId: payload.tenant_id,
+      merchantId: payload.merchant_id,
       conversationId: payload.conversation_id,
-      personId: payload.person_id,
       status: 'superseded',
       sourceMessageIds: turn.sourceMessageIds,
       mergedUserText: turn.mergedUserText,
-      integrityDecision: 'cancel',
-      integrityReason: reason,
-      baseStateVersion: turn.baseStateVersion,
       firstMessageAt: turn.firstMessageAt,
       lastMessageAt: turn.lastMessageAt,
       supersededAt: new Date().toISOString(),
-      reconciledAction: reconciledAction ?? { processor_version: PROCESSOR_VERSION, reason },
     });
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: traceId,
       conversation_id: payload.conversation_id,
       turn_id: payload.turn_id,
-      business_id: payload.tenant_id,
+      merchant_id: payload.merchant_id,
       stage: 'process',
       event: 'superseded',
       detail: { processor_version: PROCESSOR_VERSION, reason },
@@ -433,7 +442,7 @@ export class TurnService {
       {
         conversation_id: payload.conversation_id,
         person_id: payload.person_id,
-        tenant_id: payload.tenant_id,
+        merchant_id: payload.merchant_id,
         request_id: payload.request_id,
       },
       { priority: JobPriority.Interactive },

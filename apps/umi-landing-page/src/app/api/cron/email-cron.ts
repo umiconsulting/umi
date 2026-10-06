@@ -1,5 +1,5 @@
 // src/app/api/cron/emailCron.ts - Para configurar tareas programadas
-import * as cron from "node-cron";
+import * as cron from 'node-cron';
 
 // Interfaces para tipado fuerte
 interface CronJobConfig {
@@ -35,134 +35,122 @@ export class EmailCronManager {
 
   scheduleSequenceProcessing() {
     const config: CronJobConfig = {
-      schedule: "0 9 * * *", // Diario a las 9:00 AM
-      timezone: "America/Mexico_City",
-      name: "daily_sequences",
-      description: "Procesamiento diario de secuencias de email",
+      schedule: '0 9 * * *', // Diario a las 9:00 AM
+      timezone: 'America/Mexico_City',
+      name: 'daily_sequences',
+      description: 'Procesamiento diario de secuencias de email',
     };
 
     const job = cron.schedule(
       config.schedule,
       async () => {
-        console.log("⏰ Ejecutando procesamiento diario de secuencias...");
+        console.log('⏰ Ejecutando procesamiento diario de secuencias...');
 
         try {
-          const response = await fetch("/api/email-system", { method: "GET" });
+          const response = await fetch('/api/email-system', { method: 'GET' });
           const result = await response.json();
 
           this.updateMetrics(true, result.metrics?.emailsSent || 0);
-          console.log("✅ Procesamiento completado:", result);
+          console.log('✅ Procesamiento completado:', result);
         } catch (error) {
           this.updateMetrics(false);
-          console.error("❌ Error en cron job:", this.getErrorMessage(error));
+          console.error('❌ Error en cron job:', this.getErrorMessage(error));
         }
       },
       // Solo incluir timezone si está definido
-      config.timezone ? { timezone: config.timezone } : {}
+      config.timezone ? { timezone: config.timezone } : {},
     );
 
     this.jobs.set(config.name, job);
-    console.log(
-      `📅 Cron job programado: ${config.description} - ${config.schedule}`
-    );
+    console.log(`📅 Cron job programado: ${config.description} - ${config.schedule}`);
   }
 
   scheduleWeeklyReport() {
     const config: CronJobConfig = {
-      schedule: "0 10 * * 1", // Lunes a las 10:00 AM
-      timezone: "America/Mexico_City",
-      name: "weekly_report",
-      description: "Reporte semanal de métricas",
+      schedule: '0 10 * * 1', // Lunes a las 10:00 AM
+      timezone: 'America/Mexico_City',
+      name: 'weekly_report',
+      description: 'Reporte semanal de métricas',
     };
 
     const job = cron.schedule(
       config.schedule,
       async () => {
-        console.log("📊 Generando reporte semanal...");
+        console.log('📊 Generando reporte semanal...');
 
         try {
-          const response = await fetch("/api/email-system", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "get_metrics" }),
+          const response = await fetch('/api/email-system', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'get_metrics' }),
           });
 
           const result = await response.json();
-          console.log("📈 Métricas semanales:", result.metrics);
+          console.log('📈 Métricas semanales:', result.metrics);
 
           this.updateMetrics(true);
           // Enviar reporte semanal detallado
           // implementar según necesidades
         } catch (error) {
           this.updateMetrics(false);
-          console.error(
-            "❌ Error en reporte semanal:",
-            this.getErrorMessage(error)
-          );
+          console.error('❌ Error en reporte semanal:', this.getErrorMessage(error));
         }
       },
       // Solo incluir timezone si está definido
-      config.timezone ? { timezone: config.timezone } : {}
+      config.timezone ? { timezone: config.timezone } : {},
     );
 
     this.jobs.set(config.name, job);
-    console.log(
-      `📅 Cron job programado: ${config.description} - ${config.schedule}`
-    );
+    console.log(`📅 Cron job programado: ${config.description} - ${config.schedule}`);
   }
 
   scheduleHealthCheck() {
     const config: CronJobConfig = {
-      schedule: "*/30 * * * *", // Cada 30 minutos
-      timezone: "America/Mexico_City",
-      name: "health_check",
-      description: "Verificación de salud del sistema",
+      schedule: '*/30 * * * *', // Cada 30 minutos
+      timezone: 'America/Mexico_City',
+      name: 'health_check',
+      description: 'Verificación de salud del sistema',
     };
 
     const job = cron.schedule(
       config.schedule,
       async () => {
-        console.log("🔍 Ejecutando health check...");
+        console.log('🔍 Ejecutando health check...');
 
         try {
-          const response = await fetch("/api/email-test", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "connection" }),
+          const response = await fetch('/api/email-test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'connection' }),
           });
 
           const result = await response.json();
 
           if (result.success) {
-            console.log("✅ Sistema de email funcionando correctamente");
+            console.log('✅ Sistema de email funcionando correctamente');
           } else {
-            console.warn("⚠️ Problema detectado en sistema de email");
+            console.warn('⚠️ Problema detectado en sistema de email');
           }
 
           this.updateMetrics(result.success);
         } catch (error) {
           this.updateMetrics(false);
-          console.error(
-            "❌ Error en health check:",
-            this.getErrorMessage(error)
-          );
+          console.error('❌ Error en health check:', this.getErrorMessage(error));
         }
       },
       // Solo incluir timezone si está definido
-      config.timezone ? { timezone: config.timezone } : {}
+      config.timezone ? { timezone: config.timezone } : {},
     );
 
     this.jobs.set(config.name, job);
-    console.log(
-      `📅 Cron job programado: ${config.description} - ${config.schedule}`
-    );
+    console.log(`📅 Cron job programado: ${config.description} - ${config.schedule}`);
   }
 
   startAllJobs() {
     this.scheduleSequenceProcessing();
     this.scheduleWeeklyReport();
     this.scheduleHealthCheck();
-    console.log("🚀 Todos los cron jobs iniciados");
+    console.log('🚀 Todos los cron jobs iniciados');
   }
 
   stopJob(jobName: string): boolean {
@@ -183,7 +171,7 @@ export class EmailCronManager {
       console.log(`🛑 Cron job detenido: ${name}`);
     }
     this.jobs.clear();
-    console.log("🛑 Todos los cron jobs detenidos");
+    console.log('🛑 Todos los cron jobs detenidos');
   }
 
   getActiveJobs(): string[] {
@@ -210,7 +198,7 @@ export class EmailCronManager {
       failedExecutions: 0,
       totalEmailsSent: 0,
     };
-    console.log("📊 Métricas de cron jobs reiniciadas");
+    console.log('📊 Métricas de cron jobs reiniciadas');
   }
 
   private updateMetrics(success: boolean, emailsSent: number = 0) {

@@ -93,11 +93,20 @@ export class LeadsController {
       throw new UnauthorizedException('Webhook signature inválida');
     }
     await this.leads.handleEmailResponse(dto);
-    return { success: true, processed: dto.type, leadId: dto.leadId, timestamp: new Date().toISOString() };
+    return {
+      success: true,
+      processed: dto.type,
+      leadId: dto.leadId,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   @Get(['api/leads/webhook/email-response', 'api/webhook/email-response'])
   webhookHealth(): unknown {
-    return { status: 'active', service: 'email-response-webhook', timestamp: new Date().toISOString() };
+    return {
+      status: 'active',
+      service: 'email-response-webhook',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

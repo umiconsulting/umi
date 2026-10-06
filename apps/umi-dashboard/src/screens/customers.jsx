@@ -1,158 +1,214 @@
-import React, { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { I } from '@/icons.jsx'
-import { XSep } from '@/shell.jsx'
-import { useCustomerDetail, useCustomerInsights, useCustomersData } from '@/data.jsx'
+import React, { useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { msg } from '@lingui/core/macro';
+import { Plural, Trans, useLingui } from '@lingui/react/macro';
+import { I } from '@/icons.jsx';
+import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
+import { XSep } from '@/shell.jsx';
+import { Segmented } from '@/components/segmented.jsx';
+import { PageHead } from '@/components/page-head.jsx';
+import {
+  creditLoyaltySeals,
+  loyaltyScan,
+  topupWallet,
+  useCustomerDescription,
+  useCustomerDetail,
+  useCustomerInsights,
+  useCustomersData,
+} from '@/data.jsx';
+// Code-split: react-virtuoso + the transcript load only when a conversation opens.
+const CustomerTranscript = React.lazy(() => import('@/components/customer-transcript.jsx'));
 
 const FILTERS = [
-  { id: '', label: 'All' },
+  { id: '', label: msg`Todos` },
   { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'cash', label: 'Loyalty' },
-  { id: 'memory', label: 'Memory' },
-  { id: 'review', label: 'Review' },
-]
+  { id: 'cash', label: msg`Lealtad` },
+  { id: 'memory', label: msg`Notas` },
+  { id: 'review', label: msg`Revisión` },
+];
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'overview', label: msg`Resumen` },
   { id: 'whatsapp', label: 'WhatsApp' },
-  { id: 'orders', label: 'Orders' },
-  { id: 'loyalty', label: 'Loyalty' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'data', label: 'Data' },
-]
+  { id: 'orders', label: msg`Pedidos` },
+  { id: 'loyalty', label: msg`Lealtad` },
+  { id: 'notes', label: msg`Notas` },
+  { id: 'data', label: msg`Datos` },
+];
+
+/** Brand names stay as strings; everything else is a message descriptor. */
+const text = (i18n, value) => (typeof value === 'string' ? value : i18n._(value));
 
 function fmtDate(value) {
-  if (!value) return '-'
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  if (!value) return '-';
+  return formatDate(value, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function fmtTime(value) {
-  if (!value) return '-'
-  return new Date(value).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  if (!value) return '-';
+  return formatDateTime(value, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function initials(name) {
-  return (name || 'UC').split(' ').filter(Boolean).map((part) => part[0]).slice(0, 2).join('').toUpperCase() || 'UC'
+  return (
+    (name || 'UC')
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || 'UC'
+  );
 }
 
 function statusBadge(status) {
-  if (!status) return 'badge-neutral'
-  if (['active', 'ready', 'open'].includes(status)) return 'badge-active'
-  if (['needs_review', 'warning', 'pending'].includes(status)) return 'badge-trial'
-  if (['failed', 'blocked', 'closed'].includes(status)) return 'badge-susp'
-  return 'badge-info'
+  if (!status) return 'badge-neutral';
+  if (['active', 'ready', 'open'].includes(status)) return 'badge-active';
+  if (['needs_review', 'warning', 'pending'].includes(status)) return 'badge-trial';
+  if (['failed', 'blocked', 'closed'].includes(status)) return 'badge-susp';
+  return 'badge-info';
 }
 
 function ProductChip({ product, icon, label }) {
-  const active = Boolean(product?.active)
-  const available = product?.available !== false
+  const active = Boolean(product?.active);
+  const available = product?.available !== false;
   return (
     <span className={'customer-chip ' + (active ? 'on' : available ? 'idle' : 'off')}>
       {icon}
       {label}
     </span>
-  )
+  );
 }
 
+/**
+ * One customer in the list. The row carries the four facts a person picks a
+ * customer by: the initials, the name, the phone, and the value. The product
+ * icons, the last-touch date, and the data-quality flag moved to the profile
+ * pane, which already shows all three. The audit of 2026-09-18 measured six
+ * facts and two icons inside a 300-pixel column, which is too much to scan.
+ */
 function CustomerRow({ customer, selected, onOpen }) {
+  const { t } = useLingui();
   return (
     <button className={'customer-row focusable' + (selected ? ' selected' : '')} onClick={onOpen}>
       <span className="avatar-lg customer-avatar">{initials(customer.displayName)}</span>
       <span className="customer-main">
-        <span className="customer-name">{customer.displayName || 'Unknown customer'}</span>
+        <span className="customer-name">{customer.displayName || t`Cliente sin nombre`}</span>
         <span className="customer-meta">
-          <I.Phone size={12}/>{customer.normalizedPhone || customer.phone || '-'}
-          <XSep/>
-          {fmtDate(customer.lastTouchAt)}
+          <I.Phone size={12} />
+          {customer.normalizedPhone || customer.phone || '-'}
         </span>
       </span>
-      <span className="customer-products">
-        {customer.products?.whatsapp?.active && <I.WhatsApp size={15}/>}
-        {customer.products?.cash?.active && <I.Wallet size={15}/>}
-        {customer.dataQuality?.needsReview && <I.AlertTriangle size={15}/>}
-      </span>
-      <span className="customer-value">
+      {/* The value spans the last two tracks. The row keeps the four-column
+          template, so the narrow layout below 900 pixels still hides it. */}
+      <span className="customer-value" style={{ gridColumn: '3 / -1' }}>
         <strong>{customer.value?.totalSpend || '$0.00'}</strong>
-        <small>{customer.value?.visits || 0} visits</small>
+        <small>
+          <Plural value={customer.value?.visits || 0} one="# visita" other="# visitas" />
+        </small>
       </span>
     </button>
-  )
+  );
 }
 
-function CustomersList({ selectedId }) {
-  const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const [page, setPage] = useState(Number(params.get('page') || 1))
-  const [search, setSearch] = useState(params.get('q') || '')
-  const filter = params.get('filter') || ''
-  const [debouncedSearch, setDebouncedSearch] = useState(search)
+function CustomersList({ selectedId, searchRef }) {
+  const { t } = useLingui();
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState(params.get('q') || '');
+  const filter = params.get('filter') || '';
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300)
-    return () => clearTimeout(timer)
-  }, [search])
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
+  // Sync the debounced search into the URL (?q=). Keyset paging replaced the page
+  // number, so there is no page to track. The functional updater reads `prev`
+  // instead of closing over `params`, so this read+write effect never loops.
   useEffect(() => {
-    const next = new URLSearchParams(params)
-    if (debouncedSearch) next.set('q', debouncedSearch)
-    else next.delete('q')
-    if (page > 1) next.set('page', String(page))
-    else next.delete('page')
-    setParams(next, { replace: true })
-  }, [debouncedSearch, page])
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (debouncedSearch) next.set('q', debouncedSearch);
+        else next.delete('q');
+        next.delete('page');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [debouncedSearch, setParams]);
 
-  const { data, loading, error } = useCustomersData({ page, search: debouncedSearch, filter })
-  const customers = data?.customers || []
-  const total = data?.total || 0
-  const totalPages = data?.totalPages || 1
-
-  function changeFilter(id) {
-    const next = new URLSearchParams(params)
-    if (id) next.set('filter', id)
-    else next.delete('filter')
-    next.delete('page')
-    setPage(1)
-    setParams(next)
-  }
+  const { customers, loading, error, hasMore, loadingMore, fetchMore, source } = useCustomersData({
+    search: debouncedSearch,
+    filter,
+  });
 
   function openCustomer(id) {
-    navigate('/customers/' + encodeURIComponent(id) + (params.toString() ? '?' + params.toString() : ''))
+    navigate(
+      '/customers/' + encodeURIComponent(id) + (params.toString() ? '?' + params.toString() : ''),
+    );
   }
 
   return (
     <section className="customers-list">
       <div className="customer-toolbar">
         <div className="customer-search">
-          <I.Search size={15}/>
+          <I.Search size={15} />
           <input
+            ref={searchRef}
             className="input"
-            placeholder="Search customers, phone, email"
+            placeholder={t`Buscar clientes, teléfono, correo`}
             value={search}
-            onChange={(event) => { setSearch(event.target.value); setPage(1) }}
+            onChange={(event) => setSearch(event.target.value)}
           />
-        </div>
-        <div className="seg customer-filter" role="tablist" aria-label="Customer filters">
-          {FILTERS.map((item) => (
-            <button key={item.id} className={filter === item.id ? 'on' : ''} onClick={() => changeFilter(item.id)}>
-              {item.label}
-            </button>
-          ))}
         </div>
       </div>
 
       <div className="customer-list-head">
-        <span>{loading ? 'Loading' : total.toLocaleString('en-US')} customers</span>
-        <span>{data?.source || 'customer platform'}</span>
+        <span>
+          {loading ? (
+            <Trans>Cargando…</Trans>
+          ) : (
+            <Plural value={customers.length} one="# cliente" other="# clientes" />
+          )}
+        </span>
+        {/* `source` is a human label. When the API hands back a raw schema.table
+            identifier (e.g. "merchant.customers"), print nothing: the old
+            fallback named the architecture, and the audit of 2026-09-18 counted
+            that as developer text on the owner's screen. */}
+        {source && !/^[a-z_]+\.[a-z_]+$/i.test(source) ? <span>{source}</span> : null}
       </div>
 
-      {error && <div className="alert danger"><span className="strip"/><I.AlertTriangle className="ico" size={18}/><div className="body"><div className="ttl">Customer data unavailable</div><div className="sub">{error}</div></div></div>}
+      {error && (
+        <div className="alert danger">
+          <span className="strip" />
+          <I.AlertTriangle className="ico" size={18} />
+          <div className="body">
+            <div className="ttl">
+              <Trans>Datos de clientes no disponibles</Trans>
+            </div>
+            <div className="sub">{error}</div>
+          </div>
+        </div>
+      )}
 
       <div className="customer-list-scroll">
         {customers.length === 0 && !loading && !error && (
           <div className="customer-empty">
-            <I.Users2 size={28}/>
-            <strong>No customers found</strong>
-            <span>Try another search or filter.</span>
+            <I.Users2 size={28} />
+            <strong>
+              <Trans>No hay clientes</Trans>
+            </strong>
+            <span>
+              <Trans>Prueba otra búsqueda u otro filtro.</Trans>
+            </span>
           </div>
         )}
         {customers.map((customer) => (
@@ -163,21 +219,18 @@ function CustomersList({ selectedId }) {
             onOpen={() => openCustomer(customer.id)}
           />
         ))}
+        {hasMore && (
+          <button
+            className="btn btn-ghost btn-sm customer-load-more"
+            disabled={loadingMore}
+            onClick={() => fetchMore()}
+          >
+            {loadingMore ? <Trans>Cargando…</Trans> : <Trans>Cargar más</Trans>}
+          </button>
+        )}
       </div>
-
-      {totalPages > 1 && (
-        <div className="customer-pager">
-          <button className="btn btn-ghost btn-sm" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>
-            <I.ChevronLeft size={14}/> Prev
-          </button>
-          <span>{page} / {totalPages}</span>
-          <button className="btn btn-ghost btn-sm" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
-            Next <I.ChevronRight size={14}/>
-          </button>
-        </div>
-      )}
     </section>
-  )
+  );
 }
 
 function Metric({ label, value, note, icon }) {
@@ -190,16 +243,283 @@ function Metric({ label, value, note, icon }) {
         {note && <em>{note}</em>}
       </div>
     </div>
-  )
+  );
+}
+
+// ── KPI-tab labels (static → msg descriptors, resolved with text(i18n, …)) ──────
+const SEGMENT_LABEL = {
+  vip: msg`VIP`,
+  regular: msg`Frecuente`,
+  new: msg`Nuevo`,
+  at_risk: msg`En riesgo`,
+  lapsed: msg`Inactivo`,
+  prospect: msg`Prospecto`,
+};
+const SEGMENT_HINT = {
+  vip: msg`Viene seguido y gasta bien.`,
+  regular: msg`Cliente habitual y activo.`,
+  new: msg`Apenas empieza a comprar.`,
+  at_risk: msg`Antes venía seguido y ya se tardó.`,
+  lapsed: msg`Hace mucho que no viene.`,
+  prospect: msg`Aún no ha comprado.`,
+};
+const SEGMENT_TONE = {
+  vip: 'seg-vip',
+  regular: 'seg-regular',
+  new: 'seg-new',
+  at_risk: 'seg-risk',
+  lapsed: 'seg-lapsed',
+  prospect: 'seg-prospect',
+};
+const CHANNEL_LABEL = {
+  dine_in: msg`En mesa`,
+  pickup: msg`Para llevar`,
+  delivery: msg`A domicilio`,
+  unspecified: msg`Sin especificar`,
+};
+const DAYPART_LABEL = {
+  0: msg`Madrugadas`,
+  1: msg`Mañanas`,
+  2: msg`Tardes`,
+  3: msg`Noches`,
+};
+const DOW_LABEL = {
+  0: msg`domingos`,
+  1: msg`lunes`,
+  2: msg`martes`,
+  3: msg`miércoles`,
+  4: msg`jueves`,
+  5: msg`viernes`,
+  6: msg`sábados`,
+};
+
+/** "70% en mesa · 30% para llevar" from the channel-mix counts. */
+function channelMixText(i18n, mix) {
+  if (!mix || !mix.total) return '';
+  const fields = [
+    ['dine_in', mix.dineIn],
+    ['pickup', mix.pickup],
+    ['delivery', mix.delivery],
+  ];
+  return fields
+    .filter(([, n]) => n > 0)
+    .map(([key, n]) => Math.round((n / mix.total) * 100) + '% ' + text(i18n, CHANNEL_LABEL[key]))
+    .join(' · ');
+}
+
+function SegmentBadge({ segment }) {
+  const { i18n } = useLingui();
+  const key = segment && SEGMENT_LABEL[segment] ? segment : 'prospect';
+  return (
+    <span className={'segment-badge ' + (SEGMENT_TONE[key] || 'seg-prospect')}>
+      {text(i18n, SEGMENT_LABEL[key])}
+    </span>
+  );
+}
+
+// The AI portrait: a short Spanish description synthesized from the customer's
+// memory (facts extracted from embedded messages), conversation summaries and KPIs.
+// Loaded lazily so the model call never blocks the KPI tiles; hidden when there is
+// nothing to say.
+function CustomerPortrait({ customerId, segment }) {
+  const { t, i18n } = useLingui();
+  const { data, loading } = useCustomerDescription(customerId);
+  const description = data?.description || null;
+  const seg = data?.segment || segment || null;
+
+  return (
+    <div className="customer-portrait">
+      <div className="portrait-head">
+        <span className="portrait-icon">
+          <I.Sparkles size={16} />
+        </span>
+        <div className="portrait-titles">
+          <strong>
+            <Trans>Resumen del cliente</Trans>
+          </strong>
+          <small>
+            <Trans>Escrito con IA a partir de su memoria y sus compras</Trans>
+          </small>
+        </div>
+        {seg && <SegmentBadge segment={seg} />}
+      </div>
+      {loading ? (
+        <div className="portrait-body loading" aria-hidden="true">
+          <span className="line" />
+          <span className="line" />
+          <span className="line short" />
+        </div>
+      ) : description ? (
+        <p className="portrait-body">{description}</p>
+      ) : (
+        <p className="portrait-body muted">
+          {seg && SEGMENT_HINT[seg]
+            ? text(i18n, SEGMENT_HINT[seg])
+            : t`Aún no hay datos para describir a este cliente.`}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function OverviewTab({ customerId, customer, kpis }) {
+  const { t, i18n } = useLingui();
+  const k = kpis || {};
+  const spend = k.spend || {};
+  const favorites = k.favorites || [];
+  const channel = k.channelMix || {};
+  const daypart = k.daypart || {};
+  const tips = k.tips || {};
+  const refunds = k.refunds || {};
+  const discounts = k.discounts || {};
+  const pct = (r) => Math.round((r || 0) * 100) + '%';
+
+  const recencyText =
+    k.recencyDays == null
+      ? t`Sin pedidos`
+      : k.recencyDays <= 0
+        ? t`Hoy`
+        : k.recencyDays === 1
+          ? t`Ayer`
+          : k.recencyDays < 30
+            ? t`Hace ${k.recencyDays} días`
+            : k.recencyDays < 365
+              ? t`Hace ${Math.round(k.recencyDays / 30)} meses`
+              : t`Hace ${Math.round(k.recencyDays / 365)} años`;
+
+  const tenureText =
+    k.tenureDays == null
+      ? ''
+      : k.tenureDays < 30
+        ? t`${k.tenureDays} días`
+        : k.tenureDays < 365
+          ? t`${Math.round(k.tenureDays / 30)} meses`
+          : t`${Math.round(k.tenureDays / 365)} años`;
+
+  const daypartText =
+    daypart.bucket != null && DAYPART_LABEL[daypart.bucket]
+      ? text(i18n, DAYPART_LABEL[daypart.bucket])
+      : '—';
+  const dowText =
+    daypart.dow != null && DOW_LABEL[daypart.dow] ? text(i18n, DOW_LABEL[daypart.dow]) : '';
+
+  return (
+    <>
+      <CustomerPortrait customerId={customerId} segment={k.segment || customer?.status} />
+
+      <div className="customer-metrics hero">
+        <Metric
+          label={t`Gastado`}
+          value={spend.total || '$0'}
+          note={t`en total`}
+          icon={<I.DollarSign size={18} />}
+        />
+        <Metric
+          label={t`Ticket promedio`}
+          value={spend.avgTicket || '$0'}
+          note={<Plural value={k.orders || 0} one="# pedido" other="# pedidos" />}
+          icon={<I.Receipt size={18} />}
+        />
+        <Metric
+          label={t`Visitas`}
+          value={formatNumber(k.visits || 0)}
+          note={t`días distintos`}
+          icon={<I.Activity size={18} />}
+        />
+        <Metric
+          label={t`Última visita`}
+          value={recencyText}
+          note={k.lastOrderAt ? fmtDate(k.lastOrderAt) : ''}
+          icon={<I.Clock size={18} />}
+        />
+      </div>
+
+      <div className="customer-metrics secondary">
+        <Metric
+          label={t`Visitas por mes`}
+          value={formatNumber(k.frequencyPerMonth || 0)}
+          note={t`en promedio`}
+          icon={<I.TrendUp size={18} />}
+        />
+        <Metric
+          label={t`Cliente desde`}
+          value={k.firstOrderAt ? fmtDate(k.firstOrderAt) : '—'}
+          note={tenureText}
+          icon={<I.Calendar size={18} />}
+        />
+        <Metric
+          label={t`Favoritos`}
+          value={favorites[0]?.name || '—'}
+          note={favorites
+            .slice(1, 3)
+            .map((f) => f.name)
+            .join(', ')}
+          icon={<I.Package size={18} />}
+        />
+        <Metric
+          label={t`Canal principal`}
+          value={
+            channel.dominant && CHANNEL_LABEL[channel.dominant]
+              ? text(i18n, CHANNEL_LABEL[channel.dominant])
+              : '—'
+          }
+          note={channelMixText(i18n, channel)}
+          icon={<I.Store size={18} />}
+        />
+        <Metric
+          label={t`Horario habitual`}
+          value={daypartText}
+          note={dowText ? t`sobre todo los ${dowText}` : ''}
+          icon={<I.Sun size={18} />}
+        />
+        <Metric
+          label={t`Propina`}
+          value={tips.attributed ? tips.avgWhenTipped : '—'}
+          note={
+            tips.attributed ? (
+              <Plural
+                value={tips.tippedReceipts || 0}
+                one="prom. en # recibo"
+                other="prom. en # recibos"
+              />
+            ) : (
+              t`sin datos de propina`
+            )
+          }
+          icon={<I.Wallet size={18} />}
+        />
+        <Metric
+          label={t`Reembolsos`}
+          value={pct(refunds.rate)}
+          note={t`${refunds.refundedOrders || 0} de ${k.orders || 0}`}
+          icon={<I.Refresh size={18} />}
+        />
+        <Metric
+          label={t`Descuentos`}
+          value={pct(discounts.rate)}
+          note={discounts.total || '$0'}
+          icon={<I.CreditCard size={18} />}
+        />
+      </div>
+    </>
+  );
 }
 
 function Timeline({ items }) {
-  if (!items?.length) return <EmptyState icon={<I.Activity size={24}/>} title="No recent activity" detail="Orders, messages, memory, and data-quality events will appear here."/>
+  const { t } = useLingui();
+  if (!items?.length)
+    return (
+      <EmptyState
+        icon={<I.Activity size={24} />}
+        title={t`Sin actividad reciente`}
+        detail={t`Aquí aparecerán pedidos, mensajes, memoria y eventos de calidad de datos.`}
+      />
+    );
   return (
     <div className="customer-timeline">
       {items.map((item) => (
         <div className="timeline-row" key={item.type + ':' + item.id}>
-          <span className="timeline-dot"/>
+          <span className="timeline-dot" />
           <div>
             <strong>{item.label || item.type}</strong>
             <span>{item.detail || item.product}</span>
@@ -208,105 +528,516 @@ function Timeline({ items }) {
         </div>
       ))}
     </div>
-  )
+  );
 }
 
-function ConversationList({ conversations }) {
-  if (!conversations?.length) return <EmptyState icon={<I.WhatsApp size={24}/>} title="No WhatsApp conversations" detail="Conversation history is nested under each customer."/>
+function ConversationList({ conversations, onOpen }) {
+  const { t } = useLingui();
+  if (!conversations?.length)
+    return (
+      <EmptyState
+        icon={<I.WhatsApp size={24} />}
+        title={t`Sin conversaciones de WhatsApp`}
+        detail={t`El historial de conversaciones vive dentro de cada cliente.`}
+      />
+    );
   return (
     <div className="profile-stack">
       {conversations.map((conversation) => (
-        <div className="profile-row" key={conversation.id}>
-          <span className="profile-row-icon"><I.WhatsApp size={17}/></span>
+        <button
+          type="button"
+          className="profile-row conversation-row focusable"
+          key={conversation.id}
+          onClick={() => onOpen(conversation.id)}
+        >
+          <span className="profile-row-icon">
+            <I.WhatsApp size={17} />
+          </span>
           <div>
-            <strong>{conversation.summary || 'WhatsApp conversation'}</strong>
-            <span>{conversation.messageCount || 0} messages <XSep/> last {fmtTime(conversation.lastMessageAt || conversation.updatedAt)}</span>
+            <strong>{conversation.summary || t`Conversación de WhatsApp`}</strong>
+            <span>
+              <Plural value={conversation.messageCount || 0} one="# mensaje" other="# mensajes" />{' '}
+              <XSep />{' '}
+              <Trans>último {fmtTime(conversation.lastMessageAt || conversation.updatedAt)}</Trans>
+            </span>
           </div>
-          <span className={'badge ' + statusBadge(conversation.status)}>{conversation.status || 'unknown'}</span>
-        </div>
+          <span className={'badge ' + statusBadge(conversation.status)}>
+            {conversation.status || t`desconocido`}
+          </span>
+        </button>
       ))}
     </div>
-  )
+  );
+}
+
+/** WhatsApp tab: the conversation list, drilling into a live transcript. */
+function WhatsAppPanel({ customerId, conversations }) {
+  const [openId, setOpenId] = useState(null);
+  if (openId) {
+    return (
+      <div className="wa-panel">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm wa-back"
+          onClick={() => setOpenId(null)}
+        >
+          <I.ChevronLeft size={14} /> <Trans>Conversaciones</Trans>
+        </button>
+        <Suspense
+          fallback={
+            <div className="transcript-state">
+              <span className="pulse" />
+            </div>
+          }
+        >
+          <CustomerTranscript customerId={customerId} conversationId={openId} />
+        </Suspense>
+      </div>
+    );
+  }
+  return <ConversationList conversations={conversations} onOpen={setOpenId} />;
 }
 
 function OrdersList({ orders }) {
-  if (!orders?.length) return <EmptyState icon={<I.Receipt size={24}/>} title="No linked orders" detail="Commerce orders linked to this contact will appear here."/>
+  const { t } = useLingui();
+  if (!orders?.length)
+    return (
+      <EmptyState
+        icon={<I.Receipt size={24} />}
+        title={t`Sin pedidos vinculados`}
+        detail={t`Aquí aparecerán los pedidos vinculados a este contacto.`}
+      />
+    );
   return (
     <div className="profile-stack">
       {orders.map((order) => (
         <div className="profile-row" key={order.id}>
-          <span className="profile-row-icon"><I.Receipt size={17}/></span>
+          <span className="profile-row-icon">
+            <I.Receipt size={17} />
+          </span>
           <div>
             <strong>{order.orderNumber || order.id}</strong>
-            <span>{order.channel || order.sourceProduct || 'order'} <XSep/> {fmtTime(order.placedAt)}</span>
+            <span>
+              {order.channel || order.sourceProduct || t`pedido`} <XSep /> {fmtTime(order.placedAt)}
+            </span>
           </div>
           <strong className="profile-money">{order.total || '$0.00'}</strong>
         </div>
       ))}
     </div>
-  )
+  );
 }
 
-function LoyaltyPanel({ cash }) {
-  if (!cash?.available) return <EmptyState icon={<I.Lock size={24}/>} title="Umi Cash not active" detail="Loyalty and wallet details are hidden until the product is active."/>
-  const account = cash?.account
-  if (!account) return <EmptyState icon={<I.Wallet size={24}/>} title="No loyalty account" detail="This customer does not have an active loyalty account yet."/>
+function SealsDialog({ account, onClose, onCredited }) {
+  const { t } = useLingui();
+  const [seals, setSeals] = useState(1);
+  const [note, setNote] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(null);
+  const count = Number(seals);
+  const valid = Number.isInteger(count) && count >= 1 && count <= 50;
+  // One random nonce per dialog, composed with the intent (card + amount) into the
+  // idempotency key: a retry of the same amount reuses the key so a credit that
+  // commits but loses its response lands once, while a corrected amount yields a new
+  // key so it is a new credit, not a deduped no-op.
+  const nonce = useMemo(() => crypto.randomUUID(), []);
+  const idempotencyKey = `${nonce}:${account.loyaltyCardId}:${count}`;
+
+  async function submit() {
+    if (!valid || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await creditLoyaltySeals({
+        cardId: account.loyaltyCardId,
+        seals: count,
+        note: note.trim(),
+        idempotencyKey,
+      });
+      onCredited();
+    } catch (err) {
+      setError(err?.message || t`No se pudieron acreditar los sellos.`);
+      setPending(false);
+    }
+  }
+
   return (
-    <div className="loyalty-grid">
-      <Metric label="Wallet balance" value={account.balance || '$0.00'} note={account.cardNumber || 'No card'} icon={<I.Wallet size={18}/>}/>
-      <Metric label="Total visits" value={account.totalVisits || 0} note={`${account.visitsThisCycle || 0} this cycle`} icon={<I.Stamp size={18}/>}/>
-      <Metric label="Pending rewards" value={account.pendingRewards || 0} note={account.status || 'loyalty'} icon={<I.Gift size={18}/>}/>
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Agregar sellos`}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Agregar sellos</Trans>
+            </h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              <Trans>
+                Acredita sellos a la tarjeta {account.cardNumber || t`de lealtad`}. Úsalo para poner
+                al día a un cliente que llega de otro programa.
+              </Trans>
+            </p>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
+            ×
+          </button>
+        </div>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>
+            <Trans>Sellos (1–50)</Trans>
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={seals}
+            onChange={(event) => setSeals(event.target.value)}
+            disabled={pending}
+          />
+        </label>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>
+            <Trans>Nota (opcional)</Trans>
+          </span>
+          <input
+            type="text"
+            maxLength={200}
+            value={note}
+            placeholder={t`p. ej. migración de cartón físico`}
+            onChange={(event) => setNote(event.target.value)}
+            disabled={pending}
+          />
+        </label>
+        {error && (
+          <p className="danger-state" style={{ marginTop: 12 }}>
+            {error}
+          </p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+            <Trans>Cancelar</Trans>
+          </button>
+          <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
+            {pending ? (
+              <Trans>Acreditando…</Trans>
+            ) : valid ? (
+              <Plural value={count} one="Acreditar # sello" other="Acreditar # sellos" />
+            ) : (
+              <Trans>Acreditar sellos</Trans>
+            )}
+          </button>
+        </div>
+      </section>
     </div>
-  )
+  );
+}
+
+function TopupDialog({ account, onClose, onCredited }) {
+  const { t } = useLingui();
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState(null);
+  const pesos = Number(amount);
+  const valid = Number.isFinite(pesos) && pesos >= 1;
+  // Stable key per (card, amount): a retry of the same amount dedups so a top-up
+  // that commits but loses its response lands once, not twice, on a money balance.
+  const nonce = useMemo(() => crypto.randomUUID(), []);
+  const idempotencyKey = `${nonce}:${account.loyaltyCardId}:${pesos}`;
+
+  async function submit() {
+    if (!valid || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await topupWallet({
+        cardId: account.loyaltyCardId,
+        amountCentavos: Math.round(pesos * 100),
+        note: note.trim(),
+        idempotencyKey,
+      });
+      onCredited();
+    } catch (err) {
+      setError(err?.message || t`No se pudo recargar el saldo.`);
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Recargar saldo`}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>
+              <Trans>Recargar saldo</Trans>
+            </h3>
+            <p style={{ color: 'var(--ink-3)' }}>
+              <Trans>
+                Agrega saldo al monedero de la tarjeta {account.cardNumber || t`de lealtad`}.
+              </Trans>
+            </p>
+          </div>
+          <button className="btn-icon" type="button" onClick={onClose} aria-label={t`Cerrar`}>
+            ×
+          </button>
+        </div>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>
+            <Trans>Monto (MXN)</Trans>
+          </span>
+          <input
+            type="number"
+            min={1}
+            step="1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            disabled={pending}
+          />
+        </label>
+        <label style={{ display: 'block', marginTop: 12 }}>
+          <span>
+            <Trans>Nota (opcional)</Trans>
+          </span>
+          <input
+            type="text"
+            maxLength={200}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            disabled={pending}
+          />
+        </label>
+        {error && (
+          <p className="danger-state" style={{ marginTop: 12 }}>
+            {error}
+          </p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={pending}>
+            <Trans>Cancelar</Trans>
+          </button>
+          <button className="btn" type="button" onClick={submit} disabled={!valid || pending}>
+            {pending ? (
+              <Trans>Recargando…</Trans>
+            ) : valid ? (
+              <Trans>Recargar ${pesos}</Trans>
+            ) : (
+              <Trans>Recargar</Trans>
+            )}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function LoyaltyPanel({ cash, onCredited }) {
+  const { t } = useLingui();
+  const [showSeals, setShowSeals] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
+  const [scanBusy, setScanBusy] = useState(null); // 'VISIT' | 'REDEEM' | null
+  const [scanError, setScanError] = useState(null);
+  if (!cash?.available)
+    return (
+      <EmptyState
+        icon={<I.Lock size={24} />}
+        title={t`Umi Cash no está activo`}
+        detail={t`Los datos de lealtad y monedero se ocultan hasta activar el producto.`}
+      />
+    );
+  const account = cash?.account;
+  if (!account)
+    return (
+      <EmptyState
+        icon={<I.Wallet size={24} />}
+        title={t`Sin cuenta de lealtad`}
+        detail={t`Este cliente todavía no tiene una cuenta de lealtad activa.`}
+      />
+    );
+
+  function credited() {
+    setShowSeals(false);
+    setShowTopup(false);
+    onCredited?.();
+  }
+
+  async function runScan(action) {
+    if (scanBusy) return;
+    setScanBusy(action);
+    setScanError(null);
+    try {
+      await loyaltyScan({ cardNumber: account.cardNumber, action });
+      onCredited?.();
+    } catch (err) {
+      setScanError(err?.message || t`No se pudo registrar la acción.`);
+    } finally {
+      setScanBusy(null);
+    }
+  }
+
+  return (
+    <div className="loyalty-panel">
+      <div className="loyalty-grid">
+        <Metric
+          label={t`Saldo del monedero`}
+          value={account.balance || '$0.00'}
+          note={account.cardNumber || t`Sin tarjeta`}
+          icon={<I.Wallet size={18} />}
+        />
+        <Metric
+          label={t`Visitas totales`}
+          value={account.totalVisits || 0}
+          note={t`${account.visitsThisCycle || 0} en este ciclo`}
+          icon={<I.Stamp size={18} />}
+        />
+        <Metric
+          label={t`Recompensas pendientes`}
+          value={account.pendingRewards || 0}
+          note={account.status || t`lealtad`}
+          icon={<I.Gift size={18} />}
+        />
+      </div>
+      {account.loyaltyCardId && (
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            onClick={() => setShowSeals(true)}
+          >
+            <I.Plus size={14} /> <Trans>Agregar sellos</Trans>
+          </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            onClick={() => setShowTopup(true)}
+          >
+            <I.Wallet size={14} /> <Trans>Recargar saldo</Trans>
+          </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            type="button"
+            disabled={scanBusy != null}
+            onClick={() => runScan('VISIT')}
+          >
+            <I.Activity size={14} />{' '}
+            {scanBusy === 'VISIT' ? <Trans>Registrando…</Trans> : <Trans>Registrar visita</Trans>}
+          </button>
+          {account.pendingRewards > 0 && (
+            <button
+              className="btn btn-sm"
+              type="button"
+              disabled={scanBusy != null}
+              onClick={() => runScan('REDEEM')}
+            >
+              <I.Gift size={14} />{' '}
+              {scanBusy === 'REDEEM' ? (
+                <Trans>Canjeando…</Trans>
+              ) : (
+                <Trans>Canjear recompensa</Trans>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+      {scanError && (
+        <p className="danger-state" style={{ marginTop: 8 }}>
+          {scanError}
+        </p>
+      )}
+      {showSeals && (
+        <SealsDialog account={account} onClose={() => setShowSeals(false)} onCredited={credited} />
+      )}
+      {showTopup && (
+        <TopupDialog account={account} onClose={() => setShowTopup(false)} onCredited={credited} />
+      )}
+    </div>
+  );
 }
 
 function IdentityPanel({ customer, identity }) {
-  const identities = identity?.identities || customer?.identities || []
-  const findings = identity?.findings || []
-  const candidates = identity?.mergeCandidates || []
+  const { t } = useLingui();
+  const identities = identity?.identities || customer?.identities || [];
+  const findings = identity?.findings || [];
+  const candidates = identity?.mergeCandidates || [];
   return (
     <div className="profile-split">
       <section>
-        <h3>Identities</h3>
+        <h3>
+          <Trans>Identidades</Trans>
+        </h3>
         <div className="profile-stack">
-          {identities.length === 0 && <EmptyState icon={<I.Info size={22}/>} title="No identity rows" detail="Phone or WhatsApp identities will appear here."/>}
+          {identities.length === 0 && (
+            <EmptyState
+              icon={<I.Info size={22} />}
+              title={t`Sin identidades`}
+              detail={t`Aquí aparecerán las identidades de teléfono o WhatsApp.`}
+            />
+          )}
           {identities.map((item) => (
-            <div className="profile-row compact" key={item.id || `${item.identity_type}:${item.normalized_value}`}>
+            <div
+              className="profile-row compact"
+              key={item.id || `${item.identity_type}:${item.normalized_value}`}
+            >
               <div>
-                <strong>{item.identity_type || item.identityType || 'identity'}</strong>
-                <span>{item.normalized_value || item.normalizedValue || item.identity_value || item.identityValue || '-'}</span>
+                <strong>{item.identity_type || item.identityType || t`identidad`}</strong>
+                <span>
+                  {item.normalized_value ||
+                    item.normalizedValue ||
+                    item.identity_value ||
+                    item.identityValue ||
+                    '-'}
+                </span>
               </div>
-              <span className="badge badge-neutral">{item.verification_status || item.verificationStatus || 'recorded'}</span>
+              <span className="badge badge-neutral">
+                {item.verification_status || item.verificationStatus || t`registrada`}
+              </span>
             </div>
           ))}
         </div>
       </section>
       <section>
-        <h3>Data quality</h3>
+        <h3>
+          <Trans>Calidad de datos</Trans>
+        </h3>
         <div className="profile-stack">
-          {candidates.length === 0 && findings.length === 0 && <EmptyState icon={<I.Check size={22}/>} title="No open review items" detail="Ambiguous matches are surfaced here for owner review, never silently merged."/>}
+          {candidates.length === 0 && findings.length === 0 && (
+            <EmptyState
+              icon={<I.Check size={22} />}
+              title={t`Sin pendientes de revisión`}
+              detail={t`Las coincidencias ambiguas se muestran aquí para que el dueño las revise; nunca se fusionan en silencio.`}
+            />
+          )}
           {candidates.map((item) => (
             <div className="profile-row compact" key={item.id}>
               <div>
-                <strong>{item.match_type || 'merge candidate'}</strong>
-                <span>{item.detail || 'Possible duplicate identity'}</span>
+                <strong>{item.match_type || t`candidato a fusión`}</strong>
+                <span>{item.detail || t`Posible identidad duplicada`}</span>
               </div>
-              <span className="badge badge-trial">{item.confidence || 'candidate'}</span>
+              <span className="badge badge-trial">{item.confidence || t`candidato`}</span>
             </div>
           ))}
           {findings.map((item) => (
             <div className="profile-row compact" key={item.id}>
               <div>
-                <strong>{item.finding_key || 'data finding'}</strong>
-                <span>{item.detail || item.status || 'Needs review'}</span>
+                <strong>{item.finding_key || t`hallazgo de datos`}</strong>
+                <span>{item.detail || item.status || t`Necesita revisión`}</span>
               </div>
-              <span className={'badge ' + statusBadge(item.severity)}>{item.severity || 'open'}</span>
+              <span className={'badge ' + statusBadge(item.severity)}>
+                {item.severity || t`abierto`}
+              </span>
             </div>
           ))}
         </div>
       </section>
     </div>
-  )
+  );
 }
 
 function EmptyState({ icon, title, detail }) {
@@ -316,120 +1047,232 @@ function EmptyState({ icon, title, detail }) {
       <strong>{title}</strong>
       <span>{detail}</span>
     </div>
-  )
+  );
 }
 
-function CustomerProfile({ customerId }) {
-  const [tab, setTab] = useState('overview')
-  const { data, loading, error } = useCustomerDetail(customerId)
-  const customer = data?.customer
+function CustomerProfile({ customerId, onSearch }) {
+  const { t, i18n } = useLingui();
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState('overview');
+  const [refresh, setRefresh] = useState(0);
+  const { data, loading, error } = useCustomerDetail(customerId, refresh);
+  const customer = data?.customer;
+
+  // Keep the active search/filter so the back chevron returns to the same list.
+  // The chevron only shows on narrow screens, where the profile replaces the
+  // list inside `customers-layout` instead of stacking below it.
+  const backTo = '/customers' + (params.toString() ? '?' + params.toString() : '');
+  const backBar = (
+    <Link className="profile-back focusable" to={backTo} aria-label={t`Volver a la lista`}>
+      <I.ChevronLeft size={16} />
+      <Trans>Clientes</Trans>
+    </Link>
+  );
 
   if (!customerId) {
     return (
       <section className="customer-profile placeholder">
-        <I.Users2 size={34}/>
-        <strong>Select a customer</strong>
-        <span>Customer timeline, WhatsApp conversations, orders, loyalty, notes, and identity review are shown together.</span>
+        <I.Users2 size={28} />
+        <strong>
+          <Trans>Elige un cliente</Trans>
+        </strong>
+        <span>
+          <Trans>
+            Aquí verás su historial, sus conversaciones de WhatsApp, sus pedidos, su lealtad y tus
+            notas, todo junto.
+          </Trans>
+        </span>
+        {/* The pane earns its space with the one action a person takes from an
+            empty selection: find the customer. The audit of 2026-09-18 measured
+            this pane as a 60-percent empty card with no verb. */}
+        <button className="btn btn-primary btn-sm" type="button" onClick={onSearch}>
+          <Trans>Buscar</Trans>
+        </button>
       </section>
-    )
+    );
   }
 
   if (loading) {
-    return <section className="customer-profile placeholder"><span className="pulse"/><strong>Loading customer</strong></section>
+    return (
+      <section className="customer-profile placeholder">
+        {backBar}
+        <span className="pulse" />
+        <strong>
+          <Trans>Cargando cliente</Trans>
+        </strong>
+      </section>
+    );
   }
 
   if (error || !customer) {
     return (
       <section className="customer-profile placeholder danger-state">
-        <I.AlertTriangle size={30}/>
-        <strong>Customer not found</strong>
-        <span>{error || 'The selected customer is not available for this tenant.'}</span>
-        <Link className="btn btn-secondary btn-sm" to="/customers">Back to Customers</Link>
+        {backBar}
+        <I.AlertTriangle size={30} />
+        <strong>
+          <Trans>Cliente no encontrado</Trans>
+        </strong>
+        <span>{error || t`El cliente seleccionado no está disponible para este negocio.`}</span>
+        <Link className="btn btn-secondary btn-sm" to="/customers">
+          <Trans>Volver a Clientes</Trans>
+        </Link>
       </section>
-    )
+    );
   }
 
-  const activeTab = TABS.find((item) => item.id === tab)?.id || 'overview'
+  const activeTab = TABS.find((item) => item.id === tab)?.id || 'overview';
 
   return (
     <section className="customer-profile">
+      {backBar}
       <header className="profile-head">
         <div className="profile-title">
           <span className="avatar-lg customer-avatar large">{initials(customer.displayName)}</span>
           <div>
-            <div className="sec-index"><span className="nn">C</span><span>/</span><span>CUSTOMER 360</span></div>
-            <h2>{customer.displayName || 'Unknown customer'}</h2>
-            <p>{customer.normalizedPhone || customer.phone || '-'}{customer.email ? ` / ${customer.email}` : ''}</p>
+            {' '}
+            <h2>{customer.displayName || t`Cliente sin nombre`}</h2>
+            <p>
+              {customer.normalizedPhone || customer.phone || '-'}
+              {customer.email ? ` / ${customer.email}` : ''}
+            </p>
           </div>
         </div>
         <div className="profile-actions">
-          <span className={'badge ' + statusBadge(customer.status)}>{customer.status || 'active'}</span>
-          {customer.dataQuality?.needsReview && <span className="badge badge-trial">Review</span>}
+          <span className={'badge ' + statusBadge(customer.status)}>
+            {customer.status || t`activo`}
+          </span>
+          {data?.kpis?.segment && SEGMENT_LABEL[data.kpis.segment] && (
+            <SegmentBadge segment={data.kpis.segment} />
+          )}
+          {customer.dataQuality?.needsReview && (
+            <span className="badge badge-trial">
+              <Trans>Revisión</Trans>
+            </span>
+          )}
         </div>
       </header>
 
       <div className="profile-products">
-        <ProductChip product={customer.products?.whatsapp} icon={<I.WhatsApp size={14}/>} label="WhatsApp"/>
-        <ProductChip product={customer.products?.cash} icon={<I.Wallet size={14}/>} label="Loyalty"/>
-        <ProductChip product={customer.products?.orders} icon={<I.Receipt size={14}/>} label="Orders"/>
-        <ProductChip product={customer.products?.giftCards} icon={<I.Gift size={14}/>} label="Gift cards"/>
+        <ProductChip
+          product={customer.products?.whatsapp}
+          icon={<I.WhatsApp size={14} />}
+          label="WhatsApp"
+        />
+        <ProductChip
+          product={customer.products?.cash}
+          icon={<I.Wallet size={14} />}
+          label={t`Lealtad`}
+        />
+        <ProductChip
+          product={customer.products?.orders}
+          icon={<I.Receipt size={14} />}
+          label={t`Pedidos`}
+        />
+        <ProductChip
+          product={customer.products?.giftCards}
+          icon={<I.Gift size={14} />}
+          label={t`Tarjetas de regalo`}
+        />
       </div>
 
-      <div className="profile-tabs" role="tablist" aria-label="Customer profile">
+      <div className="profile-tabs" role="tablist" aria-label={t`Perfil del cliente`}>
         {TABS.map((item) => (
-          <button key={item.id} className={activeTab === item.id ? 'on' : ''} onClick={() => setTab(item.id)}>{item.label}</button>
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === item.id}
+            className={activeTab === item.id ? 'on' : ''}
+            onClick={() => setTab(item.id)}
+          >
+            {text(i18n, item.label)}
+          </button>
         ))}
       </div>
 
       <div className="profile-body">
         {activeTab === 'overview' && (
-          <>
-            <div className="customer-metrics">
-              <Metric label="Orders" value={customer.value?.orders || 0} note={customer.value?.totalSpend || '$0.00'} icon={<I.Receipt size={18}/>}/>
-              <Metric label="Visits" value={customer.value?.visits || 0} note={customer.value?.walletBalance || '$0.00 wallet'} icon={<I.Activity size={18}/>}/>
-              <Metric label="Memory facts" value={customer.memory?.factsCount || 0} note={customer.memory?.embeddingHealth || 'not indexed'} icon={<I.Sparkles size={18}/>}/>
-            </div>
-            <Timeline items={data?.timeline || []}/>
-          </>
+          <OverviewTab customerId={customerId} customer={customer} kpis={data?.kpis} />
         )}
-        {activeTab === 'whatsapp' && <ConversationList conversations={data?.conversations || []}/>}
-        {activeTab === 'orders' && <OrdersList orders={data?.orders || []}/>}
-        {activeTab === 'loyalty' && <LoyaltyPanel cash={data?.cash}/>}
-        {activeTab === 'notes' && <Timeline items={(data?.timeline || []).filter((item) => item.type === 'memory')}/>}
-        {activeTab === 'data' && <IdentityPanel customer={customer} identity={data?.identity}/>}
+        {activeTab === 'whatsapp' && (
+          <WhatsAppPanel customerId={customerId} conversations={data?.conversations || []} />
+        )}
+        {activeTab === 'orders' && <OrdersList orders={data?.orders || []} />}
+        {activeTab === 'loyalty' && (
+          <LoyaltyPanel cash={data?.cash} onCredited={() => setRefresh((n) => n + 1)} />
+        )}
+        {activeTab === 'notes' && (
+          <Timeline items={(data?.timeline || []).filter((item) => item.type === 'memory')} />
+        )}
+        {activeTab === 'data' && <IdentityPanel customer={customer} identity={data?.identity} />}
       </div>
     </section>
-  )
+  );
 }
 
 export default function CustomersScreen() {
-  const params = useParams()
-  const customerId = params['*'] ? decodeURIComponent(params['*']) : ''
-  const { data: insights } = useCustomerInsights()
-  const metrics = insights?.metrics || {}
+  const params = useParams();
+  const customerId = params['*'] ? decodeURIComponent(params['*']) : '';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t, i18n } = useLingui();
+  const { data: insights, loaded: insightsReady } = useCustomerInsights();
+  // The empty detail pane points at the search box. One action, and the pane
+  // stops being a dead card.
+  const searchRef = useRef(null);
+  const metrics = insights?.metrics || {};
+  const filter = searchParams.get('filter') || '';
+  // The two figures that name work to do. They ride on the filter that acts on
+  // them, the way the inventory views carry their own counts.
+  const chipCount = { review: metrics.needsReview || 0, memory: metrics.memoryReady || 0 };
+
+  function changeFilter(id) {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set('filter', id);
+    else next.delete('filter');
+    next.delete('page');
+    setSearchParams(next);
+  }
 
   return (
-    <div className="customers-screen">
-      <div className="ed-head fade-up d1">
-        <div className="titles">
-          <div className="sec-index">
-            <span className="nn">A</span><span>/</span>
-            <span>CUSTOMERS <XSep/> WHATSAPP INSIDE CUSTOMER PROFILES</span>
-          </div>
-          <h2>Customers</h2>
-          <div className="en">Unified customer profiles across WhatsApp, orders, loyalty, wallet, and memory.</div>
-        </div>
-        <div className="customer-head-stats">
-          <span><b>{metrics.totalCustomers || 0}</b> total</span>
-          <span><b>{metrics.needsReview || 0}</b> review</span>
-          <span><b>{metrics.memoryReady || 0}</b> memory</span>
-        </div>
+    <div className="customers-screen" style={{ gap: 16 }}>
+      {/* The masthead carries the page name. This band carries one fact and no
+          second heading: the audit of 2026-09-18 measured `Clientes` printed in
+          the masthead and again 100 pixels below it. */}
+      <PageHead
+        count={
+          insightsReady && metrics.totalCustomers ? (
+            <Plural value={Number(metrics.totalCustomers)} one="# cliente" other="# clientes" />
+          ) : undefined
+        }
+      />
+
+      {/* The filter strip left the 340-pixel list column. Five targets of 76
+          pixels do not fit there, and the browser drew a native scrollbar under
+          them. Across the page the strip has room, so the scrollbar is gone. */}
+      <div style={{ maxWidth: 640 }}>
+        <Segmented
+          className="customer-filter"
+          label={t`Filtros de clientes`}
+          value={filter}
+          onChange={changeFilter}
+          options={FILTERS.map((item) => ({
+            id: item.id,
+            label: chipCount[item.id] ? (
+              <>
+                {text(i18n, item.label)}{' '}
+                <span className="inv-view-count">{formatNumber(chipCount[item.id])}</span>
+              </>
+            ) : (
+              text(i18n, item.label)
+            ),
+          }))}
+        />
       </div>
 
-      <div className="customers-layout fade-up d2">
-        <CustomersList selectedId={customerId}/>
-        <CustomerProfile customerId={customerId}/>
+      <div className={'customers-layout' + (customerId ? ' has-selection' : '')}>
+        <CustomersList selectedId={customerId} searchRef={searchRef} />
+        <CustomerProfile customerId={customerId} onSearch={() => searchRef.current?.focus()} />
       </div>
     </div>
-  )
+  );
 }

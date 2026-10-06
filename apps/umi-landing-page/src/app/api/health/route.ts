@@ -1,8 +1,8 @@
 // src/app/api/health/route.ts - Health check del sistema
-import { NextResponse } from "next/server";
-import { getEmailService } from "@/lib/email/email-service";
-import { getSequenceManager } from "@/lib/email/sequence-manager";
-import { getCronManager } from "@/app/api/cron/email-cron";
+import { NextResponse } from 'next/server';
+import { getEmailService } from '@/lib/email/email-service';
+import { getSequenceManager } from '@/lib/email/sequence-manager';
+import { getCronManager } from '@/app/api/cron/email-cron';
 
 // GET: Health check completo del sistema
 export async function GET() {
@@ -34,16 +34,15 @@ export async function GET() {
     };
 
     // Determinar salud general del sistema
-    const isHealthy =
-      connectionTest && envCheck.EMAIL_USER && envCheck.EMAIL_PASSWORD;
+    const isHealthy = connectionTest && envCheck.EMAIL_USER && envCheck.EMAIL_PASSWORD;
 
     const health = {
-      status: isHealthy ? "healthy" : "unhealthy",
+      status: isHealthy ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
       services: {
-        emailService: connectionTest ? "up" : "down",
-        sequenceManager: "up", // Asumir que siempre está up si llegamos aquí
-        cronManager: cronJobs.activeJobs.length > 0 ? "up" : "idle",
+        emailService: connectionTest ? 'up' : 'down',
+        sequenceManager: 'up', // Asumir que siempre está up si llegamos aquí
+        cronManager: cronJobs.activeJobs.length > 0 ? 'up' : 'idle',
       },
       environment: envCheck,
       metrics: {
@@ -52,42 +51,40 @@ export async function GET() {
         cron: cronMetrics,
       },
       cronJobs,
-      version: "1.0.0",
+      version: '1.0.0',
       uptime: process.uptime(),
     };
 
     return NextResponse.json(health, {
       status: isHealthy ? 200 : 503,
       headers: {
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
       },
     });
   } catch (error) {
-    console.error("❌ Error en health check:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+    console.error('❌ Error en health check:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
 
     return NextResponse.json(
       {
-        status: "unhealthy",
-        error: "Health check failed",
-        details:
-          process.env.NODE_ENV === "development" ? errorMessage : undefined,
+        status: 'unhealthy',
+        error: 'Health check failed',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
         timestamp: new Date().toISOString(),
         services: {
-          emailService: "unknown",
-          sequenceManager: "unknown",
-          cronManager: "unknown",
+          emailService: 'unknown',
+          sequenceManager: 'unknown',
+          cronManager: 'unknown',
         },
       },
       {
         status: 503,
         headers: {
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
-      }
+      },
     );
   }
 }
@@ -98,43 +95,39 @@ export async function POST(request: Request) {
     const { testType } = await request.json();
 
     switch (testType) {
-      case "email_connection":
+      case 'email_connection':
         const emailService = getEmailService();
         const connectionResult = await emailService.testConnection();
 
         return NextResponse.json({
           success: connectionResult,
-          test: "email_connection",
-          message: connectionResult
-            ? "✅ Conexión email OK"
-            : "❌ Error conexión email",
+          test: 'email_connection',
+          message: connectionResult ? '✅ Conexión email OK' : '❌ Error conexión email',
           timestamp: new Date().toISOString(),
         });
 
-      case "sequence_test":
+      case 'sequence_test':
         const sequenceManager = getSequenceManager();
         const testResult = await sequenceManager.testSequence(
-          "test@example.com",
-          "diagnostic_followup"
+          'test@example.com',
+          'diagnostic_followup',
         );
 
         return NextResponse.json({
           success: testResult,
-          test: "sequence_test",
-          message: testResult
-            ? "✅ Secuencia test OK"
-            : "❌ Error en secuencia",
+          test: 'sequence_test',
+          message: testResult ? '✅ Secuencia test OK' : '❌ Error en secuencia',
           timestamp: new Date().toISOString(),
         });
 
-      case "cron_status":
+      case 'cron_status':
         const cronManager = getCronManager();
         const cronStatus = cronManager.getJobStatus();
         const activeJobs = cronManager.getActiveJobs();
 
         return NextResponse.json({
           success: true,
-          test: "cron_status",
+          test: 'cron_status',
           data: {
             activeJobs,
             status: cronStatus,
@@ -143,13 +136,13 @@ export async function POST(request: Request) {
           timestamp: new Date().toISOString(),
         });
 
-      case "full_system":
+      case 'full_system':
         // Test completo del sistema
         const fullTest = await runFullSystemTest();
 
         return NextResponse.json({
           success: fullTest.allPassed,
-          test: "full_system",
+          test: 'full_system',
           results: fullTest.results,
           summary: fullTest.summary,
           timestamp: new Date().toISOString(),
@@ -158,30 +151,23 @@ export async function POST(request: Request) {
       default:
         return NextResponse.json(
           {
-            error: "Tipo de test no válido",
-            validTypes: [
-              "email_connection",
-              "sequence_test",
-              "cron_status",
-              "full_system",
-            ],
+            error: 'Tipo de test no válido',
+            validTypes: ['email_connection', 'sequence_test', 'cron_status', 'full_system'],
           },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error) {
-    console.error("❌ Error ejecutando test:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+    console.error('❌ Error ejecutando test:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
 
     return NextResponse.json(
       {
-        error: "Error ejecutando test",
-        details:
-          process.env.NODE_ENV === "development" ? errorMessage : undefined,
+        error: 'Error ejecutando test',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
         timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -210,9 +196,7 @@ async function runFullSystemTest() {
     else summary.failed++;
 
     // Test 2: Variables de entorno
-    results.environmentVars = !!(
-      process.env.EMAIL_USER && process.env.EMAIL_PASSWORD
-    );
+    results.environmentVars = !!(process.env.EMAIL_USER && process.env.EMAIL_PASSWORD);
     summary.total++;
     if (results.environmentVars) summary.passed++;
     else summary.failed++;
@@ -233,7 +217,7 @@ async function runFullSystemTest() {
     if (results.sequenceManager) summary.passed++;
     else summary.failed++;
   } catch (error) {
-    console.error("Error en full system test:", error);
+    console.error('Error en full system test:', error);
     summary.failed++;
   }
 

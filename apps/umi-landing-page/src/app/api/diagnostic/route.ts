@@ -1,9 +1,6 @@
 // src/app/api/diagnostic/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import {
-  getDiagnosticTrigger,
-  DiagnosticSubmission,
-} from "@/lib/integration/diagnostic-trigger";
+import { NextRequest, NextResponse } from 'next/server';
+import { getDiagnosticTrigger, DiagnosticSubmission } from '@/lib/integration/diagnostic-trigger';
 
 interface DiagnosticRequest {
   email: string;
@@ -31,18 +28,15 @@ export async function POST(request: NextRequest) {
     // Validar datos requeridos
     if (!body.email || !body.name || !body.responses) {
       return NextResponse.json(
-        { error: "Email, nombre y respuestas son requeridos" },
-        { status: 400 }
+        { error: 'Email, nombre y respuestas son requeridos' },
+        { status: 400 },
       );
     }
 
     // Validar formato de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(body.email)) {
-      return NextResponse.json(
-        { error: "Formato de email inválido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Formato de email inválido' }, { status: 400 });
     }
 
     // Procesar diagnóstico (lógica existente)
@@ -93,17 +87,15 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("❌ Error en API de diagnóstico:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+    console.error('❌ Error en API de diagnóstico:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
 
     return NextResponse.json(
       {
-        error: "Error interno del servidor",
-        details:
-          process.env.NODE_ENV === "development" ? errorMessage : undefined,
+        error: 'Error interno del servidor',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -112,12 +104,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url);
-    const action = url.searchParams.get("action");
+    const action = url.searchParams.get('action');
 
     const diagnosticTrigger = getDiagnosticTrigger();
 
     switch (action) {
-      case "metrics":
+      case 'metrics':
         const metrics = diagnosticTrigger.getMetrics();
 
         return NextResponse.json({
@@ -128,10 +120,9 @@ export async function GET(request: NextRequest) {
           },
         });
 
-      case "leads":
+      case 'leads':
         // Usar la base de datos directamente para obtener leads
-        const scheduledEmailsResult =
-          await diagnosticTrigger.processScheduledEmails();
+        const scheduledEmailsResult = await diagnosticTrigger.processScheduledEmails();
 
         return NextResponse.json({
           scheduledEmails: {
@@ -141,31 +132,29 @@ export async function GET(request: NextRequest) {
           },
         });
 
-      case "health":
+      case 'health':
         return NextResponse.json({
-          status: "healthy",
+          status: 'healthy',
           timestamp: new Date().toISOString(),
-          service: "diagnostic-api",
+          service: 'diagnostic-api',
         });
 
       default:
         return NextResponse.json(
-          { error: "Acción no válida. Use: metrics, leads, health" },
-          { status: 400 }
+          { error: 'Acción no válida. Use: metrics, leads, health' },
+          { status: 400 },
         );
     }
   } catch (error) {
-    console.error("❌ Error en GET de diagnóstico:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error desconocido";
+    console.error('❌ Error en GET de diagnóstico:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
 
     return NextResponse.json(
       {
-        error: "Error interno del servidor",
-        details:
-          process.env.NODE_ENV === "development" ? errorMessage : undefined,
+        error: 'Error interno del servidor',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -173,49 +162,43 @@ export async function GET(request: NextRequest) {
 /**
  * Calcular resultado del diagnóstico basado en respuestas
  */
-function calculateDiagnostic(
-  responses: Record<string, string | number>
-): DiagnosticResponse {
+function calculateDiagnostic(responses: Record<string, string | number>): DiagnosticResponse {
   // Lógica de cálculo del diagnóstico (mantener la existente o implementar nueva)
 
   // Ejemplo de cálculo basado en preguntas típicas
   const scores = {
     dataCollection: calculateAreaScore(responses, [
-      "analytics_stage",
-      "data_challenge",
-      "data_sources",
-      "data_quality",
-      "data_integration",
+      'analytics_stage',
+      'data_challenge',
+      'data_sources',
+      'data_quality',
+      'data_integration',
     ]),
     analysis: calculateAreaScore(responses, [
-      "analytics_stage",
-      "decision_basis",
-      "analysis_tools",
-      "analysis_frequency",
-      "analysis_depth",
+      'analytics_stage',
+      'decision_basis',
+      'analysis_tools',
+      'analysis_frequency',
+      'analysis_depth',
     ]),
     visualization: calculateAreaScore(responses, [
-      "analytics_stage",
-      "visualization_tools",
-      "dashboard_usage",
-      "report_creation",
+      'analytics_stage',
+      'visualization_tools',
+      'dashboard_usage',
+      'report_creation',
     ]),
     decisionMaking: calculateAreaScore(responses, [
-      "decision_basis",
-      "data_challenge",
-      "decision_speed",
-      "data_driven_decisions",
-      "kpi_tracking",
+      'decision_basis',
+      'data_challenge',
+      'decision_speed',
+      'data_driven_decisions',
+      'kpi_tracking',
     ]),
   };
 
   // Calcular score general
   const totalScore = Math.round(
-    (scores.dataCollection +
-      scores.analysis +
-      scores.visualization +
-      scores.decisionMaking) /
-      4
+    (scores.dataCollection + scores.analysis + scores.visualization + scores.decisionMaking) / 4,
   );
 
   // Determinar nivel
@@ -223,25 +206,25 @@ function calculateDiagnostic(
   let recommendations: string[];
 
   if (totalScore >= 8) {
-    level = "Avanzado";
+    level = 'Avanzado';
     recommendations = [
-      "Fortalecer observabilidad y trazas",
-      "Automatizar con controles de intervención",
-      "Medir el ciclo completo pedido-cocina-cliente",
+      'Fortalecer observabilidad y trazas',
+      'Automatizar con controles de intervención',
+      'Medir el ciclo completo pedido-cocina-cliente',
     ];
   } else if (totalScore >= 5) {
-    level = "Intermedio";
+    level = 'Intermedio';
     recommendations = [
-      "Conectar KDS, Cash y Dashboard",
-      "Unificar estados de pedidos y recompensas",
-      "Definir alertas operativas para gerencia",
+      'Conectar KDS, Cash y Dashboard',
+      'Unificar estados de pedidos y recompensas',
+      'Definir alertas operativas para gerencia',
     ];
   } else {
-    level = "Inicial";
+    level = 'Inicial';
     recommendations = [
-      "Activar ConversaFlow como entrada operativa",
-      "Estructurar el contrato mínimo de pedido y cliente",
-      "Crear la primera vista de seguimiento",
+      'Activar ConversaFlow como entrada operativa',
+      'Estructurar el contrato mínimo de pedido y cliente',
+      'Crear la primera vista de seguimiento',
     ];
   }
 
@@ -258,7 +241,7 @@ function calculateDiagnostic(
  */
 function calculateAreaScore(
   responses: Record<string, string | number>,
-  questionKeys: string[]
+  questionKeys: string[],
 ): number {
   let totalScore = 0;
   let validResponses = 0;
@@ -267,10 +250,7 @@ function calculateAreaScore(
     const response = responses[key];
     if (response !== undefined && response !== null) {
       // Convertir respuesta a número (1-5 scale típica)
-      const score =
-        typeof response === "number"
-          ? response
-          : getScoreFromString(String(response));
+      const score = typeof response === 'number' ? response : getScoreFromString(String(response));
       totalScore += score;
       validResponses++;
     }

@@ -1,0 +1,572 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:umi_contract/umi_contract.dart';
+
+import '../core/config/app_config.dart';
+import '../core/contracts/contract_gateway.dart';
+import '../core/feature_flags/feature_flags.dart';
+import '../core/network/api_client.dart';
+import '../core/observability/telemetry.dart';
+import '../core/platform/connectivity_plus_adapter.dart';
+import '../core/platform/platform_adapters.dart';
+import '../core/release/release_compatibility.dart';
+import '../core/security/credential_vault.dart';
+import '../core/security/device_key.dart';
+import '../core/security/keystore_device_key.dart';
+import '../core/security/tpm_backend.dart';
+import '../core/security/tpm_device_key.dart';
+import '../core/storage/storage.dart';
+import '../core/update/desktop_updater.dart';
+import '../features/cart/cart_controller.dart';
+import '../features/cart/cart_repository.dart';
+import '../features/cart/incoming_orders_controller.dart';
+import '../features/cash/cash_controller.dart';
+import '../features/cash/cash_recovery_store.dart';
+import '../features/cash/cash_repository.dart';
+import '../features/catalog/catalog_controller.dart';
+import '../features/catalog/catalog_repository.dart';
+import '../features/checkout/checkout_controller.dart';
+import '../features/checkout/checkout_repository.dart';
+import '../features/customer_value/customer_value_controller.dart';
+import '../features/customer_value/customer_value_repository.dart';
+import '../features/entry/device_channel_socket_client.dart';
+import '../features/entry/entry_controller.dart';
+import '../features/entry/entry_gateway.dart';
+import '../features/entry/pairing_socket_client.dart';
+import '../features/exception/exception_controller.dart';
+import '../features/exception/exception_recovery_store.dart';
+import '../features/exception/exception_repository.dart';
+import '../features/hardware/hardware_recovery_store.dart';
+import '../features/hardware/hardware_repository.dart';
+import '../features/hardware/hardware_runtime.dart';
+import '../features/hardware/hardware_service.dart';
+import '../features/hardware/pilot_hardware_adapters.dart';
+import '../features/inventory/inventory_controller.dart';
+import '../features/inventory/inventory_repository.dart';
+import '../features/kitchen/kitchen_board_controller.dart';
+import '../features/kitchen/kitchen_status_repository.dart';
+import '../features/offline/connectivity_controller.dart';
+import '../features/offline/offline_checkout_service.dart';
+import '../features/offline/offline_journal.dart';
+import '../features/offline/offline_policy.dart';
+import '../features/offline/replay_engine.dart';
+import '../features/sale/sale_lifecycle_controller.dart';
+import '../features/sale/sale_repository.dart';
+import '../features/tables/floor_plan_controller.dart';
+import '../features/tables/table_state_controller.dart';
+import '../features/tables/table_state_repository.dart';
+import 'bootstrap_controller.dart';
+
+final class AppCompositionRoot {
+  AppCompositionRoot({
+    required this.config,
+    required this.controller,
+    required this.telemetry,
+    required this.secureStorage,
+    required this.preferences,
+    required this.localDatabase,
+    required this.platform,
+    required this.apiClient,
+    required this.features,
+    required this.credentials,
+    required this.entry,
+    required this.exceptions,
+    required this.catalog,
+    required this.cart,
+    required this.incomingOrders,
+    required this.cash,
+    required this.checkout,
+    required this.sales,
+    this.kitchenStatus,
+    this.kitchenBoard,
+    this.floorPlan,
+    this.tableState,
+    this.customerValue,
+    this.deviceChannel,
+    required this.connectivity,
+    required this.offlineJournal,
+    this.inventory,
+    this.hardware,
+    this.offlineRecovery,
+    this.updater = const NoopDesktopUpdater(),
+  }) {
+    if (!kIsWeb && hardware != null) {
+      entry.addListener(_scheduleHardwareRelay);
+      _hardwareRelayTimer = Timer.periodic(
+        const Duration(seconds: 10),
+        (_) => _scheduleHardwareRelay(),
+      );
+      _scheduleHardwareRelay();
+    }
+    _observeInterface();
+  }
+
+  factory AppCompositionRoot.production() {
+    final config = AppConfig.fromEnvironment();
+    final telemetry = SafeTelemetry(
+      enabled: config.telemetryEnabled,
+      context: TelemetryContext.current(config),
+      exporter: const NoopTelemetryExporter(),
+    );
+    const secureStorage = FlutterSecureKeyValueStorage();
+    final credentials = CredentialVault(secureStorage);
+    // One device key for the whole app. Default is the software Ed25519 key that
+    // runs everywhere. Opt-in hardware builds: UMIPOS_DEVICE_KEY=tpm (desktop
+    // TPM, backend selected web-safely by `tpm_backend.dart`) or =keystore
+    // (mobile Android Keystore / iOS Secure Enclave over a MethodChannel).
+    final DeviceKey deviceKey;
+    if (config.useTpmDeviceKey) {
+      deviceKey = TpmDeviceKey(createTpmBackend());
+    } else if (config.useKeystoreDeviceKey) {
+      deviceKey = KeystoreDeviceKey(MethodChannelKeystore());
+    } else {
+      deviceKey = SoftwareDeviceKey(secureStorage);
+    }
+    const preferences = SharedPreferencesStore();
+    const localDatabase = UnsupportedLocalDatabase();
+    // The till's own view of the wire is the OS interface watch. Device
+    // identity and app lifecycle stay unsupported until something needs them
+    // (§8K step 1); an adapter that cannot watch leaves connectivity exactly as
+    // it was, driven by the requests the till is making anyway.
+    const platform = PlatformAdapters(
+      connectivity: ConnectivityPlusConnectivity(),
+      deviceIdentity: UnsupportedDeviceIdentity(),
+      lifecycle: UnsupportedAppLifecycle(),
+    );
+    final apiClient = BoundedApiClient(
+      config: config,
+      telemetry: telemetry,
+      tokenProvider: credentials,
+      deviceCredentialProvider: ProvingDeviceCredentials(
+        credentials,
+        deviceKey,
+      ),
+    );
+    final connectivity = ConnectivityController();
+    final hardwareLab = PilotHardwareLab(
+      allowSimulator: config.hardwareSimulatorEnabled,
+    );
+    final hardware = HardwareService(
+      repository: ApiHardwareRepository(apiClient),
+      coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+      recovery: SecureHardwareRecoveryStore(secureStorage),
+      adapterResolver: hardwareLab,
+    );
+    final offlineJournal = EncryptedOfflineJournal(
+      PlatformJournalCipherStore(preferences, secureStorage),
+    );
+    final policyCache = OfflinePolicyCache(offlineJournal);
+    final offlineCheckout = OfflineCheckoutService(
+      journal: offlineJournal,
+      policyCache: policyCache,
+      eligibility: const OfflineCheckoutEligibilityEngine(),
+    );
+    final offlineRecovery = OfflineRecoveryController(
+      journal: offlineJournal,
+      gateway: ApiReplayGateway(apiClient),
+      connectivity: connectivity,
+    );
+    final controller = BootstrapController(
+      config: config,
+      contracts: const GeneratedContractGateway(),
+      releaseCompatibility: ApiReleaseCompatibilityGateway(
+        api: apiClient,
+        config: config,
+      ),
+      secureStorage: secureStorage,
+      telemetry: telemetry,
+    );
+    // Null unless the build asks for the realtime nudge and knows where the API
+    // is. `EntryController.dispose` cancels the watch, and cancelling the stream
+    // closes the socket, so this needs no separate teardown here.
+    final apiBaseUri = config.apiBaseUri;
+    final pairingSocket = config.realtimeEnrollmentEnabled && apiBaseUri != null
+        ? SocketIoPairingClient(baseUri: apiBaseUri)
+        : null;
+    // The till's own nudge — Phase 3 step 3 — under the SAME opt-in as the pairing
+    // one, because it is the same capability: a deployment whose socket path
+    // works. It is inert without a device credential (the handshake is the
+    // credential the REST calls carry) and the poll stays the delivery path, so
+    // switching this off restores the previous behaviour exactly.
+    final deviceChannel = config.realtimeEnrollmentEnabled && apiBaseUri != null
+        ? SocketIoDeviceChannelClient(
+            baseUri: apiBaseUri,
+            deviceIdentity: credentials.deviceIdentity,
+          )
+        : null;
+    final entry = EntryController(
+      gateway: ApiEntryGateway(
+        apiClient,
+        credentials,
+        socketClient: pairingSocket,
+        deviceKey: deviceKey,
+      ),
+      vault: credentials,
+      telemetry: telemetry,
+      idleTimeout: const Duration(minutes: 30),
+    );
+    // Let any request renew an expired access token once and retry, so a long
+    // shift is not interrupted by the 30-minute access-token lifetime. The
+    // renewal itself opts out of this path, so a dead session fails cleanly.
+    apiClient.sessionRefresh = entry.renewAccessToken;
+    final cash = CashController(
+      repository: ApiCashRepository(apiClient),
+      recoveryStore: SecureCashRecoveryStore(secureStorage),
+      afterCommit: (action) async {
+        final state = entry.state;
+        final merchant = state.selectedTenant;
+        final location = state.selectedBranch;
+        final operator = state.operator;
+        final posDevice = state.device;
+        if (merchant == null ||
+            location == null ||
+            operator == null ||
+            posDevice == null) {
+          // Nothing to ask: there is no device to ask it of. That is not a
+          // drawer that failed to answer.
+          return true;
+        }
+        final results = await hardware.afterCashAction(
+          HardwareScope(
+            merchantId: merchant.id,
+            locationId: location.id,
+            operatorSessionId: operator.id,
+            deviceId: posDevice.id,
+            credentialVersion: posDevice.credentialVersion,
+            permissions: operator.permissions.toSet(),
+            registerId: action.registerId,
+          ),
+          reason: action.reason,
+          reference: action.reference,
+        );
+        // The runtime answers with one entry per command: the command result, or
+        // the error that stopped it. Anything that is not a command result is a
+        // drawer the operator is waiting on.
+        return results.every((result) => result is HardwareCommandResult);
+      },
+    );
+    final cartRepository = ApiCartRepository(apiClient);
+    final cart = CartController(
+      repository: cartRepository,
+      telemetry: telemetry,
+    );
+    final incomingOrders = IncomingOrdersController(
+      repository: cartRepository,
+      telemetry: telemetry,
+    );
+    return AppCompositionRoot(
+      config: config,
+      controller: controller,
+      telemetry: telemetry,
+      secureStorage: secureStorage,
+      preferences: preferences,
+      localDatabase: localDatabase,
+      platform: platform,
+      apiClient: apiClient,
+      features: FeatureFlags.bootstrap(config.featureBootstrapMode),
+      credentials: credentials,
+      entry: entry,
+      exceptions: SaleExceptionController(
+        repository: ApiSaleExceptionRepository(apiClient),
+        recoveryStore: SecureSaleExceptionRecoveryStore(secureStorage),
+        afterCommit: (result) async {
+          final state = entry.state;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          final posDevice = state.device;
+          if (merchant == null ||
+              location == null ||
+              operator == null ||
+              posDevice == null) {
+            return;
+          }
+          await hardware.afterRefundCompleted(
+            HardwareScope(
+              merchantId: merchant.id,
+              locationId: location.id,
+              operatorSessionId: operator.id,
+              deviceId: posDevice.id,
+              credentialVersion: posDevice.credentialVersion,
+              permissions: operator.permissions.toSet(),
+              registerId: cash.activeRegisterId,
+            ),
+            result,
+          );
+        },
+      ),
+      catalog: CatalogController(
+        repository: ApiCatalogRepository(apiClient),
+        cache: CatalogCache(),
+        telemetry: telemetry,
+      ),
+      cart: cart,
+      incomingOrders: incomingOrders,
+      cash: cash,
+      sales: SaleLifecycleController(
+        repository: ApiSaleRepository(apiClient),
+        cart: cart,
+        telemetry: telemetry,
+      ),
+      floorPlan: FloorPlanController(ApiFloorPlanRepository(apiClient)),
+      tableState: TableStateController(ApiTableStateRepository(apiClient)),
+      kitchenStatus: ApiKitchenStatusRepository(apiClient),
+      kitchenBoard: KitchenBoardController(
+        ApiKitchenBoardRepository(apiClient),
+        // The board reads on the operator session and writes on the till's own
+        // POS command route, so the cook can bump a dish without the screen it
+        // was read from going away (§8H step 3). That route authenticates with
+        // the session the ApiClient already carries — no separate header.
+        commands: ApiKitchenStatusRepository(apiClient),
+        // The board is the busiest API client on a kitchen till, so its own
+        // traffic is what keeps the till's connectivity state honest.
+        connectivity: connectivity,
+      ),
+      customerValue: CustomerValueController(
+        ApiCustomerValueRepository(apiClient),
+      ),
+      deviceChannel: deviceChannel,
+      checkout: CheckoutController(
+        repository: ApiCheckoutRepository(apiClient),
+        offlineCheckout: offlineCheckout,
+        connectivity: connectivity,
+        telemetry: telemetry,
+        afterCommit: (result) async {
+          final state = entry.state;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          final posDevice = state.device;
+          if (merchant == null ||
+              location == null ||
+              operator == null ||
+              posDevice == null) {
+            return;
+          }
+          await hardware.afterCheckoutCompleted(
+            HardwareScope(
+              merchantId: merchant.id,
+              locationId: location.id,
+              operatorSessionId: operator.id,
+              deviceId: posDevice.id,
+              credentialVersion: posDevice.credentialVersion,
+              permissions: operator.permissions.toSet(),
+              registerId: cash.activeRegisterId,
+            ),
+            result,
+          );
+        },
+        afterOfflineCommit: (receipt) async {
+          final state = entry.state;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          final posDevice = state.device;
+          if (merchant == null ||
+              location == null ||
+              operator == null ||
+              posDevice == null) {
+            return;
+          }
+          await hardware.afterOfflineCheckoutCompleted(
+            HardwareScope(
+              merchantId: merchant.id,
+              locationId: location.id,
+              operatorSessionId: operator.id,
+              deviceId: posDevice.id,
+              credentialVersion: posDevice.credentialVersion,
+              permissions: operator.permissions.toSet(),
+              registerId: cash.activeRegisterId,
+            ),
+            receipt,
+          );
+        },
+      ),
+      connectivity: connectivity,
+      offlineJournal: offlineJournal,
+      inventory: InventoryController(ApiInventoryRepository(apiClient)),
+      hardware: hardware,
+      offlineRecovery: offlineRecovery,
+      updater: createDesktopUpdater(
+        owner: config.updateGithubOwner,
+        repo: config.updateGithubRepo,
+        currentVersion: config.release.version,
+      ),
+    );
+  }
+
+  final AppConfig config;
+  final BootstrapController controller;
+  final Telemetry telemetry;
+  final SecureKeyValueStorage secureStorage;
+  final PreferencesStore preferences;
+  final LocalDatabase localDatabase;
+  final PlatformAdapters platform;
+  final ApiClient apiClient;
+  final FeatureFlags features;
+  final CredentialVault credentials;
+  final EntryController entry;
+  final SaleExceptionController exceptions;
+  final CatalogController catalog;
+  final CartController cart;
+  final IncomingOrdersController incomingOrders;
+  final CashController cash;
+  final CheckoutController checkout;
+  final SaleLifecycleController sales;
+  final KitchenStatusRepository? kitchenStatus;
+  final KitchenBoardController? kitchenBoard;
+  final FloorPlanController? floorPlan;
+  final TableStateController? tableState;
+  final CustomerValueController? customerValue;
+  final DeviceChannelSocketClient? deviceChannel;
+  final ConnectivityController connectivity;
+  final EncryptedOfflineJournal offlineJournal;
+  final InventoryController? inventory;
+  final HardwareService? hardware;
+  final OfflineRecoveryController? offlineRecovery;
+
+  /// Desktop self-updater. A no-op unless the build runs as a Linux AppImage
+  /// with an update repo configured.
+  final DesktopUpdater updater;
+  Timer? _hardwareRelayTimer;
+  bool _hardwareRelayBusy = false;
+  // Long-lived by design: the root holds this watch for its whole life and
+  // cancels it in `dispose`, which is where every other teardown for the root
+  // lives. The lint only reads one method, so it cannot follow the handle.
+  // ignore: cancel_subscriptions
+  StreamSubscription<bool>? _interfaceWatch;
+  bool _disposed = false;
+
+  /// Feed the controller from the operating system's interface state.
+  ///
+  /// The OS source is earlier than the request path: a dropped interface is a
+  /// fact here at once, where requests only report it once they have failed.
+  /// The direction of each signal is decided in the controller, not here — a
+  /// gone interface goes straight to offline, a returning interface only to
+  /// `recovering`, because an interface being up is not the API answering.
+  void _observeInterface() {
+    // Idempotent: a second call replaces the watch rather than adding one.
+    _cancelInterfaceWatch();
+    final watch = platform.connectivity.watch();
+    if (watch != null) {
+      _interfaceWatch = watch.listen(
+        _interfaceChanged,
+        // An adapter that throws on its own stream is a broken source, not a
+        // down interface. Take no position rather than guess, and keep the
+        // subscription so a later transition still arrives.
+        onError: (Object _) {},
+      );
+    }
+    unawaited(_readInterfaceOnce());
+  }
+
+  /// Detach the interface watch, if one is attached.
+  ///
+  /// The field is cleared *before* the cancel is awaited, and the handle is
+  /// taken to a local first. An `await` between reading the field and clearing
+  /// it would let this microtask land after the next `listen` and null out the
+  /// subscription that replaced it, which leaks the watch this exists to stop.
+  void _cancelInterfaceWatch() {
+    final previous = _interfaceWatch;
+    _interfaceWatch = null;
+    if (previous != null) unawaited(previous.cancel());
+  }
+
+  void _interfaceChanged(bool present) {
+    if (_disposed) return;
+    if (present) {
+      connectivity.networkUp();
+    } else {
+      connectivity.networkDown();
+    }
+  }
+
+  /// The one-shot boot read ([ConnectivityAdapter.isOnline]).
+  ///
+  /// Only the negative answer is authoritative: "there is no interface" is a
+  /// fact a platform can assert, while "an interface is up" says nothing at all
+  /// about the API. So a positive read changes no state — it would be the exact
+  /// guess this design exists to avoid — and it is never awaited on the boot
+  /// path, because the till must start whether or not the watcher answers.
+  Future<void> _readInterfaceOnce() async {
+    final CapabilityResult<bool> read;
+    try {
+      read = await platform.connectivity.isOnline();
+    } on Object {
+      return;
+    }
+    if (_disposed) return;
+    if (read.status == CapabilityStatus.ready && read.value == false) {
+      connectivity.networkDown();
+    }
+  }
+
+  void _scheduleHardwareRelay() {
+    if (_hardwareRelayBusy) return;
+    _hardwareRelayBusy = true;
+    unawaited(
+      _drainHardwareRelay().whenComplete(() => _hardwareRelayBusy = false),
+    );
+  }
+
+  Future<void> _drainHardwareRelay() async {
+    final service = hardware;
+    final state = entry.state;
+    final merchant = state.selectedTenant;
+    final location = state.selectedBranch;
+    final operator = state.operator;
+    final device = state.device;
+    if (service == null ||
+        merchant == null ||
+        location == null ||
+        operator == null ||
+        device == null) {
+      return;
+    }
+    final scope = HardwareScope(
+      merchantId: merchant.id,
+      locationId: location.id,
+      operatorSessionId: operator.id,
+      deviceId: device.id,
+      credentialVersion: device.credentialVersion,
+      permissions: operator.permissions.toSet(),
+      registerId: cash.activeRegisterId,
+    );
+    try {
+      await service.snapshot(scope);
+      for (var index = 0; index < 4; index++) {
+        if (await service.executeNextRemoteCommand(scope) == null) break;
+      }
+    } catch (_) {
+      // The next bounded poll recovers the relay. Financial state is unchanged.
+    }
+  }
+
+  void dispose() {
+    _disposed = true;
+    _cancelInterfaceWatch();
+    _hardwareRelayTimer?.cancel();
+    entry.removeListener(_scheduleHardwareRelay);
+    controller.dispose();
+    entry.dispose();
+    exceptions.dispose();
+    catalog.dispose();
+    cart.dispose();
+    cash.dispose();
+    checkout.dispose();
+    sales.dispose();
+    kitchenBoard?.dispose();
+    floorPlan?.dispose();
+    tableState?.dispose();
+    customerValue?.dispose();
+    final deviceChannelClose = deviceChannel?.close();
+    if (deviceChannelClose != null) unawaited(deviceChannelClose);
+    connectivity.dispose();
+    offlineRecovery?.dispose();
+    inventory?.dispose();
+    final hardwareDispose = hardware?.dispose();
+    if (hardwareDispose != null) unawaited(hardwareDispose);
+    apiClient.dispose();
+  }
+}

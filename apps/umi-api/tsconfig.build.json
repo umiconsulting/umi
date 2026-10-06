@@ -1,4 +1,16 @@
 {
+  // `**/*.integration.ts` joined `**/*.spec.ts` here on 2026-08-14.
+  //
+  // It was absent, so seven live-database suites compiled into `dist`, and
+  // `Dockerfile:39` copies `dist` into the runtime image. The production image
+  // therefore carried test code, and that test code carries DSN strings such as
+  // `postgresql://worker_login:harness_worker@127.0.0.1:5233/...`.
+  //
+  // The credentials are local-harness only and point at 127.0.0.1, so the real
+  // exposure was small. Two reasons to exclude them anyway: test code is not
+  // product, and a credential-shaped string in a shipped image is what every
+  // scanner reports. gitleaks cannot find this one — it reads the repository,
+  // not the image.
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "dist", "**/*.spec.ts", "test"]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.integration.ts", "test"]
 }

@@ -64,6 +64,28 @@ Merge to `main`. That's it. Watch progress under the repo's **Actions** tab; the
 run fails (and does not flip traffic blindly) if tests fail, the SSH/pull fails,
 or `/health` doesn't come back.
 
+## Release identity and required env (build-v3)
+
+The image carries its own identity — `deploy-backend.yml` bakes these at build
+time, and `/health/live` reports them:
+
+- `RELEASE_VERSION` — `git describe --tags --always` of the built commit.
+- `RELEASE_GIT_COMMIT` — the 40-char build SHA.
+- `RELEASE_BUILD_TIMESTAMP` — UTC build time.
+- `CONTRACT_VERSION` — read from `packages/contract/src/catalog.ts`.
+
+Do **not** set those four in the VPS `.env`. Two values are deployment state
+and DO belong in `apps/umi-api/.env` on the box:
+
+- `UMI_ENVIRONMENT=production` (with `NODE_ENV=production`) — the config
+  refuses to boot without it, and in a deployed environment it also demands
+  the full secret set (`config.schema.ts` lists them).
+- `EXPECTED_SCHEMA_VERSION` — the last applied migration
+  (`runtime.schema_migration`; `build-v3-48` today). `/health` answers
+  degraded until it matches the database, so the post-deploy health check
+  fails closed on a schema/code mismatch. After applying a new migration,
+  update the value and restart.
+
 ## Rollback
 
 Every deploy is an immutable `:sha-<git>` tag. To roll back, on the VPS:

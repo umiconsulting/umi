@@ -1,58 +1,282 @@
-// Zero-dependency HTTP route contract shared by umi-api (server) and
-// umi-dashboard (client). Keeping the path literals + builders in one place means
-// a rename can't silently drift between the two sides. Byte-exact to the NestJS
-// controllers (apps/umi-api/src/modules/**). This module imports nothing, so the
+// Zero-dependency HTTP route accessor shared by umi-api (server), umi-dashboard and
+// umi-cash (clients). This module imports nothing but `route-table.ts`, so the
 // dashboard can consume it without pulling zod into its bundle.
+//
+// THERE ARE NO PATH LITERALS HERE. Every path comes from `ROUTE_TABLE` in
+// `./route-table.ts`, which is the single author of the platform's URL space. This
+// file is the ergonomic view of that table: the shape callers already use, with the
+// parameters encoded. To change a path, change the table.
+//
+// The POS surface is versioned (`/api/v1/...`); the browser surfaces are not. The
+// reasoning is in `route-table.ts`.
 
-const enc = encodeURIComponent;
+import { buildPath, routePath, merchantBase } from './route-table';
 
-/** Base path for a tenant-scoped resource: `/api/tenants/:tenantId`. */
-const tenantBase = (tenantId: string): string => `/api/tenants/${enc(tenantId)}`;
+export { merchantBase };
 
 export const routes = {
   auth: {
-    login: '/api/auth/local/login',
-    refresh: '/api/auth/local/refresh',
-    logout: '/api/auth/local/logout',
-    forgotPassword: '/api/auth/local/forgot-password',
-    resetPassword: '/api/auth/local/reset-password',
-    me: '/api/auth/me',
+    login: routePath('auth.login'),
+    /** Second half of the two-step login, when `login` answers `mfaRequired`. */
+    mfaVerify: routePath('auth.mfaVerify'),
+    refresh: routePath('auth.refresh'),
+    logout: routePath('auth.logout'),
+    globalLogout: routePath('auth.globalLogout'),
+    forgotPassword: routePath('auth.forgotPassword'),
+    resetPassword: routePath('auth.resetPassword'),
+    me: routePath('auth.me'),
+    /** POS device authentication. Versioned — a field client depends on it. */
+    pos: {
+      login: routePath('auth.posLogin'),
+      pinLogin: routePath('auth.posPinLogin'),
+      refresh: routePath('auth.posRefresh'),
+      logout: routePath('auth.posLogout'),
+      globalLogout: routePath('auth.posGlobalLogout'),
+    },
   },
   me: {
-    tenants: '/api/me/tenants',
+    merchants: routePath('me.merchants'),
   },
-  tenants: {
-    /** `/api/tenants/:tenantId` — compose sub-paths onto this. Encodes the id,
-     *  matching the dashboard's `_tenantPath` (encodeURIComponent). */
-    base: tenantBase,
-    capabilities: (tenantId: string): string => `${tenantBase(tenantId)}/capabilities`,
-    settings: (tenantId: string): string => `${tenantBase(tenantId)}/settings`,
-    locations: (tenantId: string): string => `${tenantBase(tenantId)}/locations`,
+  merchants: {
+    /** `/api/merchants/:merchantId` — compose ad-hoc sub-paths onto this. */
+    base: merchantBase,
+    /** `POST` — open a café. Platform administrators only. */
+    provision: routePath('merchants.provision'),
+    capabilities: (merchantId: string): string =>
+      buildPath('merchants.capabilities', { merchantId }),
+    settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
+    locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
+    audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
+    operations: (merchantId: string): string => buildPath('merchants.operations', { merchantId }),
+    administrativeCommands: (merchantId: string): string =>
+      buildPath('merchants.administrativeCommands', { merchantId }),
   },
   cash: {
-    // Tenant-scoped surface (dashboard, cookie auth) — /api/tenants/:tenantId/cash/*.
-    stats: (tenantId: string): string => `${tenantBase(tenantId)}/cash/stats`,
-    analytics: (tenantId: string): string => `${tenantBase(tenantId)}/cash/analytics`,
-    customers: (tenantId: string): string => `${tenantBase(tenantId)}/cash/customers`,
-    members: (tenantId: string): string => `${tenantBase(tenantId)}/cash/members`,
-    giftCards: (tenantId: string): string => `${tenantBase(tenantId)}/cash/gift-cards`,
-    rewardConfig: (tenantId: string): string => `${tenantBase(tenantId)}/cash/reward-config`,
-    // Slug-scoped surface (umi-cash frontend) — /api/:slug/... . The write + primary
-    // read paths both surfaces call; each byte-exact to the cash-scan / cash-write /
-    // cash-customer / cash controllers (not an exhaustive mirror of every GET).
-    slug: {
-      scan: (slug: string): string => `/api/${enc(slug)}/admin/scan`,
-      topup: (slug: string): string => `/api/${enc(slug)}/admin/topup`,
-      purchase: (slug: string): string => `/api/${enc(slug)}/admin/purchase`,
-      giftCards: (slug: string): string => `/api/${enc(slug)}/admin/gift-cards`,
-      settings: (slug: string): string => `/api/${enc(slug)}/admin/settings`,
-      rewardConfig: (slug: string): string => `/api/${enc(slug)}/admin/reward-config`,
-      stats: (slug: string): string => `/api/${enc(slug)}/admin/stats`,
-      analytics: (slug: string): string => `/api/${enc(slug)}/admin/analytics`,
-      // POST /api/:slug/customers — member registration (name↔path: registers a member).
-      registerMember: (slug: string): string => `/api/${enc(slug)}/customers`,
-      gift: (slug: string, code: string): string => `/api/${enc(slug)}/gift/${enc(code)}`,
+    // Merchant-scoped surface (dashboard, cookie auth).
+    stats: (merchantId: string): string => buildPath('cash.stats', { merchantId }),
+    analytics: (merchantId: string): string => buildPath('cash.analytics', { merchantId }),
+    customers: (merchantId: string): string => buildPath('cash.customers', { merchantId }),
+    members: (merchantId: string): string => buildPath('cash.members', { merchantId }),
+    giftCards: (merchantId: string): string => buildPath('cash.giftCards', { merchantId }),
+    rewardConfig: (merchantId: string): string => buildPath('cash.rewardConfig', { merchantId }),
+    // The umi-cash surface, addressed by merchant REFERENCE: an id, or the published
+    // handle those URLs were built with. The write plus primary read paths both
+    // surfaces call; not an exhaustive mirror of every GET.
+    byRef: {
+      scan: (ref: string): string => buildPath('cash.byRef.scan', { merchantRef: ref }),
+      scanSeals: (ref: string): string => buildPath('cash.byRef.scanSeals', { merchantRef: ref }),
+      topup: (ref: string): string => buildPath('cash.byRef.topup', { merchantRef: ref }),
+      purchase: (ref: string): string => buildPath('cash.byRef.purchase', { merchantRef: ref }),
+      giftCards: (ref: string): string => buildPath('cash.byRef.giftCards', { merchantRef: ref }),
+      settings: (ref: string): string => buildPath('cash.byRef.settings', { merchantRef: ref }),
+      rewardConfig: (ref: string): string =>
+        buildPath('cash.byRef.rewardConfig', { merchantRef: ref }),
+      stats: (ref: string): string => buildPath('cash.byRef.stats', { merchantRef: ref }),
+      analytics: (ref: string): string => buildPath('cash.byRef.analytics', { merchantRef: ref }),
+      // POST /api/:merchantRef/customers — member registration (name↔path: registers a member).
+      registerMember: (ref: string): string =>
+        buildPath('cash.byRef.registerMember', { merchantRef: ref }),
+      gift: (ref: string, code: string): string =>
+        buildPath('cash.byRef.gift', { merchantRef: ref, code }),
     },
+  },
+  staff: {
+    /** Merchant-scoped, by id — what the dashboard calls. */
+    list: (merchantId: string): string => buildPath('staff.list', { merchantId }),
+    create: (merchantId: string): string => buildPath('staff.create', { merchantId }),
+    update: (merchantId: string, staffId: string): string =>
+      buildPath('staff.update', { merchantId, staffId }),
+    remove: (merchantId: string, staffId: string): string =>
+      buildPath('staff.remove', { merchantId, staffId }),
+    /** Reference-addressed — what the register calls. */
+    byRef: {
+      create: (ref: string): string => buildPath('staff.byRef.create', { merchantRef: ref }),
+      update: (ref: string, staffId: string): string =>
+        buildPath('staff.byRef.update', { merchantRef: ref, staffId }),
+    },
+  },
+  roles: {
+    list: (merchantId: string): string => buildPath('roles.list', { merchantId }),
+    create: (merchantId: string): string => buildPath('roles.create', { merchantId }),
+    update: (merchantId: string, roleId: string): string =>
+      buildPath('roles.update', { merchantId, roleId }),
+    archive: (merchantId: string, roleId: string, expectedRevision: number): string =>
+      `${buildPath('roles.archive', { merchantId, roleId })}?expectedRevision=${expectedRevision}`,
+  },
+  devices: {
+    list: (merchantId: string): string => buildPath('devices.list', { merchantId }),
+    update: (merchantId: string, deviceId: string): string =>
+      buildPath('devices.update', { merchantId, deviceId }),
+    revoke: (merchantId: string, deviceId: string): string =>
+      buildPath('devices.revoke', { merchantId, deviceId }),
+    beginEnrollment: (merchantId: string): string =>
+      buildPath('devices.beginEnrollment', { merchantId }),
+    enrollmentRequests: (merchantId: string): string =>
+      buildPath('devices.enrollmentRequests', { merchantId }),
+    approveEnrollment: (merchantId: string, requestId: string): string =>
+      buildPath('devices.approveEnrollment', { merchantId, requestId }),
+    denyEnrollment: (merchantId: string, requestId: string): string =>
+      buildPath('devices.denyEnrollment', { merchantId, requestId }),
+    completeEnrollment: routePath('devices.completeEnrollment'),
+    status: routePath('devices.status'),
+  },
+  pos: {
+    entryContext: routePath('pos.entryContext'),
+    operatorSessions: routePath('pos.operatorSessions'),
+    operatorLock: (operatorSessionId: string): string =>
+      buildPath('pos.operatorLock', { operatorSessionId }),
+    operatorEnd: (operatorSessionId: string): string =>
+      buildPath('pos.operatorEnd', { operatorSessionId }),
+    verifyPin: routePath('pos.verifyPin'),
+    managerApproval: routePath('pos.managerApproval'),
+    catalog: {
+      categories: (merchantId: string): string =>
+        buildPath('pos.catalogCategories', { merchantId }),
+      products: (merchantId: string): string => buildPath('pos.catalogProducts', { merchantId }),
+      product: (merchantId: string, productId: string): string =>
+        buildPath('pos.catalogProduct', { merchantId, productId }),
+    },
+    cart: {
+      base: (merchantId: string): string => buildPath('pos.cartCreate', { merchantId }),
+      lines: (merchantId: string): string => buildPath('pos.cartLines', { merchantId }),
+      line: (merchantId: string, lineId: string): string =>
+        buildPath('pos.cartLineUpdate', { merchantId, lineId }),
+      prepare: (merchantId: string): string => buildPath('pos.cartPrepare', { merchantId }),
+    },
+    checkout: {
+      base: (merchantId: string): string => buildPath('pos.checkout', { merchantId }),
+      payment: (merchantId: string, paymentId: string): string =>
+        buildPath('pos.checkoutPayment', { merchantId, paymentId }),
+      recovery: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutRecovery', { merchantId, cartId }),
+      cancel: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutCancel', { merchantId, cartId }),
+    },
+    cash: {
+      center: (merchantId: string): string => buildPath('pos.cashCenter', { merchantId }),
+      command: (merchantId: string, commandId: string): string =>
+        buildPath('pos.cashCommand', { merchantId, commandId }),
+      shifts: (merchantId: string): string => buildPath('pos.cashShifts', { merchantId }),
+      movement: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashMovement', { merchantId, shiftId }),
+      suspend: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashSuspend', { merchantId, shiftId }),
+      resume: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashResume', { merchantId, shiftId }),
+      handoff: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashHandoff', { merchantId, shiftId }),
+      adopt: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashAdopt', { merchantId, shiftId }),
+      recover: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashRecover', { merchantId, shiftId }),
+      count: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashCount', { merchantId, shiftId }),
+      recount: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashRecount', { merchantId, shiftId }),
+      variance: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashVariance', { merchantId, shiftId }),
+      reconcile: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashReconcile', { merchantId, shiftId }),
+      close: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashClose', { merchantId, shiftId }),
+      noSale: (merchantId: string, shiftId: string): string =>
+        buildPath('pos.cashNoSale', { merchantId, shiftId }),
+    },
+    exceptions: {
+      eligibility: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionEligibility', { merchantId, saleId }),
+      preview: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionPreview', { merchantId, saleId }),
+      approval: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionApproval', { merchantId, saleId }),
+      commit: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionCommit', { merchantId, saleId }),
+      history: (merchantId: string, saleId: string): string =>
+        buildPath('pos.exceptionHistory', { merchantId, saleId }),
+      result: (merchantId: string, saleId: string, exceptionId: string): string =>
+        buildPath('pos.exceptionResult', { merchantId, saleId, exceptionId }),
+      terminalOutcome: (merchantId: string, saleId: string, previewId: string): string =>
+        buildPath('pos.exceptionTerminalOutcome', { merchantId, saleId, previewId }),
+      command: (merchantId: string, commandId: string): string =>
+        buildPath('pos.exceptionCommand', { merchantId, commandId }),
+    },
+    sales: {
+      create: (merchantId: string): string => buildPath('pos.salesCreate', { merchantId }),
+      current: (merchantId: string): string => buildPath('pos.salesCurrent', { merchantId }),
+      list: (merchantId: string): string => buildPath('pos.salesList', { merchantId }),
+      suspend: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleSuspend', { merchantId, saleId }),
+      resume: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleResume', { merchantId, saleId }),
+      rename: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleRename', { merchantId, saleId }),
+      cancel: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCancel', { merchantId, saleId }),
+      attachCustomer: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCustomerAttach', { merchantId, saleId }),
+      detachCustomer: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleCustomerDetach', { merchantId, saleId }),
+      receipt: (merchantId: string, saleId: string): string =>
+        buildPath('pos.saleReceipt', { merchantId, saleId }),
+      customers: (merchantId: string): string => buildPath('pos.saleCustomers', { merchantId }),
+    },
+    offline: {
+      policy: (merchantId: string): string => buildPath('pos.offlinePolicy', { merchantId }),
+      replayBegin: (merchantId: string): string =>
+        buildPath('pos.offlineReplayBegin', { merchantId }),
+      replayBatch: (merchantId: string): string =>
+        buildPath('pos.offlineReplayBatch', { merchantId }),
+      replayCursor: (merchantId: string): string =>
+        buildPath('pos.offlineReplayCursor', { merchantId }),
+      replayCommand: (merchantId: string, commandId: string): string =>
+        buildPath('pos.offlineReplayCommand', { merchantId, commandId }),
+      conflicts: (merchantId: string): string => buildPath('pos.offlineConflicts', { merchantId }),
+      reconcile: (merchantId: string): string => buildPath('pos.offlineReconcile', { merchantId }),
+      reconcileAcknowledge: (merchantId: string): string =>
+        buildPath('pos.offlineReconcileAcknowledge', { merchantId }),
+      diagnostics: (merchantId: string): string =>
+        buildPath('pos.offlineDiagnostics', { merchantId }),
+    },
+    kitchen: {
+      order: (merchantId: string, sourceOrderId: string): string =>
+        buildPath('pos.kitchenOrder', { merchantId, sourceOrderId }),
+      command: (merchantId: string): string => buildPath('pos.kitchenCommand', { merchantId }),
+    },
+  },
+  kds: {
+    board: routePath('kds.board'),
+    command: routePath('kds.command'),
+  },
+  /**
+   * The console's recipes and inventory authoring surface (recipes module plan §6).
+   *
+   * READS ONLY, because plan D15 makes every write in this cluster an
+   * administrative command. The console posts those to
+   * `routes.merchants.administrativeCommands` with an operation name, so there is
+   * no path to build for them here.
+   */
+  inventory: {
+    items: (merchantId: string): string => buildPath('inventoryItem.list', { merchantId }),
+    unitConversions: (merchantId: string): string =>
+      buildPath('inventoryUnitConversion.list', { merchantId }),
+    allergens: (merchantId: string): string => buildPath('inventoryAllergen.list', { merchantId }),
+    recipes: (merchantId: string): string => buildPath('inventoryRecipe.list', { merchantId }),
+    recipeExplosion: (merchantId: string, recipeId: string): string =>
+      buildPath('inventoryRecipe.explode', { merchantId, recipeId }),
+    usageVariance: (merchantId: string): string =>
+      buildPath('inventoryCosting.usageVariance', { merchantId }),
+    recipeCosts: (merchantId: string): string =>
+      buildPath('inventoryCosting.recipeCosts', { merchantId }),
+    menuEngineering: (merchantId: string): string =>
+      buildPath('inventoryCosting.menuEngineering', { merchantId }),
+    prepList: (merchantId: string): string => buildPath('prepList.read', { merchantId }),
+    prepListLabels: (merchantId: string): string => buildPath('prepList.labels', { merchantId }),
+    lotRecall: (merchantId: string, lotId: string): string =>
+      buildPath('inventoryLot.recall', { merchantId, lotId }),
+  },
+  /** Supplier invoices: the inbox reads. Upload, match and commit are commands. */
+  supplierInvoices: {
+    list: (merchantId: string): string => buildPath('supplierInvoice.list', { merchantId }),
   },
 } as const;
 

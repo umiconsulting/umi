@@ -30,8 +30,7 @@ export class TwilioAdapter {
   }): Promise<{ sid: string } | null> {
     const accountSid = this.config.get('TWILIO_ACCOUNT_SID', { infer: true });
     const authToken = this.config.get('TWILIO_AUTH_TOKEN', { infer: true });
-    const from =
-      params.from ?? this.config.get('TWILIO_WHATSAPP_FROM', { infer: true });
+    const from = params.from ?? this.config.get('TWILIO_WHATSAPP_FROM', { infer: true });
 
     if (!accountSid || !authToken || !from) {
       this.logger.warn('twilio_adapter_missing_config');
@@ -79,8 +78,7 @@ export class TwilioAdapter {
     label: string,
   ): Promise<{ sid: string } | null> {
     const url = `${TWILIO_API}/${accountSid}/Messages.json`;
-    const auth =
-      'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const auth = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
 
     try {
       const res = await fetch(url, {

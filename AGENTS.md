@@ -1,37 +1,34 @@
 # Umi Workspace
 
-Umi is a multi-product organization workspace, not a single-app repository.
-This file is the workspace-wide contract — product boundaries, ownership,
-architecture rules, and the research standard. Hermes provides the generic
-agent operating model; the `codex-claude-pipeline` skill handles worker
-routing. What lives here is what no agent can infer.
+Umi is a multi-product monorepo and organization workspace.
+This file defines product boundaries, ownership, architecture rules, and the research standard.
 
 ## Start here
 
 - `WORKSPACE.md` — workspace map and cognitive layers
 - `docs/architecture/agent-operating-system.md` — neutral agent OS
 - `docs/architecture/maps/retrieval-map.md` — bounded progressive disclosure
-- `docs/migration/2026-06-09-workspace-integration-implementation-plan.md` — active program driver
+- `docs/migration/build-v3/GATED_CUTOVER_PLAN.md` — active cutover program
 
 ## Product boundaries
 
-| Path | Owns |
-|------|------|
-| `apps/umi-kds` | Native iPad Kitchen Display System client |
-| `apps/umi-cash` | Loyalty, wallet, passes, Cash-specific Prisma |
-| `apps/umi-conversaflow` | Shared Supabase backend, workflow jobs, prompts, traces, cross-channel normalization |
-| `apps/umi-logs` | ConversaFlow operational logs and trace UI |
-| `apps/umi-dashboard` | Owner dashboard app shell and live-data UI |
-| `apps/umi-landing-page` | Public landing and lead capture |
-| root `docs/` | Architecture, migration, governance, cross-product planning |
+| Path                    | Owns                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `apps/umi-api`          | Canonical backend for auth, cash, KDS, conversations, leads, passes, sales, inventory, and stored value |
+| `apps/umi-pos`          | Flutter UmiPOS client for operator access, sales, checkout, shifts, hardware, and offline replay        |
+| `apps/umi-cash`         | Cash compatibility client and Cash-specific Prisma. It forwards the frozen wallet-pass URL to `umi-api` |
+| `apps/umi-dashboard`    | Owner dashboard app shell and live-data UI                                                              |
+| `apps/umi-landing-page` | Public landing and lead capture                                                                         |
+| root `docs/`            | Architecture, migration, governance, and cross-product planning                                         |
 
 ## Database ownership
 
-- `conversaflow` — operational runtime: conversations, orders, workflow jobs, outbox
-- `kds` — kitchen read models and projections only
-- `umi_cash` — loyalty and wallet tables
-- `platform` — shared organization data (contacts, users, tenants, leads)
-- `public` — temporary compatibility surface; do not add new product logic
+- `umi` owns the sealed SaaS, identity, and entitlement model.
+- `merchant` owns café business facts and row-level security policies.
+- `runtime` owns sealed operational machinery.
+- `docs/migration/build-v3` owns pre-cutover database definitions.
+- `supabase/migrations` accepts approved post-cutover migrations only.
+- Build-v2 and legacy schemas are historical inputs. Do not add new logic to them.
 
 ## Architecture rules
 
@@ -58,15 +55,102 @@ Do not cargo-cult common patterns. Choose the design that best fits measured con
 operational simplicity, and source-backed tradeoffs. If a recommendation adds a new repo,
 service, or infrastructure boundary, justify it against simpler options with explicit criteria.
 
+### Tool selection and research, for every task
+
+Find the best available tool before you build anything by hand. This applies to every task,
+including a routine check. Research the approach, not only the fact.
+
+Be persistent. When a source blocks, try another route and record what failed. Use the
+research ladder: vendor documentation, changelog, the source repository, practitioner
+writing, communities, social, then primary research.
+
+Record the tool, its version, and the source in the task output. A hand-rolled solution
+needs a written reason.
+
+The full rule is in `docs/agents/tool-and-research-doctrine.md`. Load the `research` skill
+for a research task.
+
+**Verifying a change is its own skill.** How to start the local stack, which command proves
+which claim, how to drive the native POS with real clicks, and the traps that have already cost
+time are in `docs/development/LOCAL_VERIFICATION_PLAYBOOK.md`. Read it before sweeping or
+reporting a measurement, and before concluding that a check cannot run here.
+
+**The dashboard is verified the same way the POS is: in a real browser, with real clicks.**
+Use the Chromium that Playwright drives over CDP (`./scripts/ux-browser.sh`), click the actual
+workflow, and read the result — a component test or a reading of the JSX is not evidence about
+what the operator sees. The playbook's section 2 has the commands and the cost.
+
+## Writing standard — ASD-STE100
+
+Write all agent output in Simplified Technical English (ASD-STE100). This rule is
+permanent and applies to every agent in this workspace. It covers chat replies,
+commit messages, pull request text, code comments, and documentation.
+
+Rules:
+
+- Use one word for one meaning. Do not use a second word for the same thing.
+- Use each word in its approved part of speech. Do not make a verb from a noun.
+- Write short sentences. Use a maximum of 20 words in an instruction and 25 words
+  in a description.
+- Give one instruction in one sentence.
+- Use the active voice. Write an instruction as a command: "Run the migration."
+- Use the simple tenses: past, present, and future. Do not use the `-ing` form as a verb.
+- Keep the articles "a", "an", and "the".
+- Use a maximum of three words in a noun cluster. Break a longer cluster with "of" or "for".
+- Write a maximum of six sentences in a descriptive paragraph.
+- Write positive statements. Use a negative only for a prohibition or a danger.
+- Put conditions, options, and steps in a vertical list.
+- Start a warning or a caution with the command that prevents the danger.
+- Do not use slang, jargon, idioms, or metaphors.
+
+Exceptions:
+
+- Technical names and technical verbs stay unchanged. Examples: file paths, table
+  names, column names, commands, and product names.
+- Quoted text, error output, log lines, and code blocks stay verbatim.
+
+### Language
+
+Answer in the language that the user writes. Each language has its standard:
+
+| Content                    | Standard                               |
+| -------------------------- | -------------------------------------- |
+| English, all content       | ASD-STE100                             |
+| Spanish, technical content | Español Técnico Simplificado (ETS)     |
+| Spanish, all other content | Lenguaje claro (Red de Lenguaje Claro) |
+
+Spanish technical content is documentation, a commit message, a pull request, a code
+comment, a procedure, or a schema description. All other content is a chat reply, a
+summary, a recommendation, or a message to a person.
+
+**Español Técnico Simplificado (ETS)** applies the ASD-STE100 rules above to Spanish:
+
+- Use one word for one meaning. Do not use a synonym.
+- Use the active voice and the simple tenses.
+- Write short sentences. Give one instruction in one sentence.
+- Use the imperative for an instruction: "Ejecuta la migración."
+- Keep the articles and the prepositions. Do not drop "de", "que", or "el".
+- Do not use the gerund as a main verb.
+
+**Lenguaje claro** applies to all other Spanish content:
+
+- Put the main message first. The reader must find the answer in the first paragraph.
+- Speak to the reader directly.
+- Use common words. Explain a technical term the first time that you use it.
+- Use headings, short paragraphs, and lists.
+- Give the reason for a recommendation, and give the next action.
+
 ## Agent layer
 
-Hermes is the local orchestrator. DeepSeek v4 Pro is the reasoning engine. The
-`codex-claude-pipeline` skill (loaded by Hermes) governs when to delegate to Codex
-or Claude Code. Agent procedures live under `.agents/skills/` (canonical per the
-2026-06-10 S1.5 decision). Each tool reads its own path, so `.claude/skills/` is a **symlink**
-into it (`.claude/skills -> ../.agents/skills`) — one source of truth, nothing to regenerate.
-Write to `.agents/skills/`; the link reflects it instantly. `adapter-sync-check` guards the link.
-Symlinks assume macOS/Linux (Windows needs `git config core.symlinks true`).
+Agent procedures live under `.agents/skills/`.
+This path is the canonical procedure layer from the 2026-06-10 S1.5 decision.
+The `.claude/skills` path is a symlink to `../.agents/skills`.
+Write to `.agents/skills/`; the link reflects the change immediately.
+The `adapter-sync-check` skill guards the link.
+Symlinks assume macOS or Linux. Windows requires `git config core.symlinks true`.
+
+Hermes, Claude Code, and `codex-claude-pipeline` are external components.
+This repository does not install these components. Use them only after approved provisioning.
 
 For workspace-wide work, inspect root instructions first. For project-specific work,
 descend into the owning repo and follow its `AGENTS.md` / `REPO_CONTEXT.md` if present.
@@ -76,28 +160,31 @@ Prefer existing artifacts and owners over inventing parallel structures.
 
 ### Issue tracker
 
-Work items and PRDs live in self-hosted Plane (`https://plane.umiconsulting.co`, workspace
-`umi`, project `UMI`) through the Plane MCP; GitHub PRs are the review surface, linked to an
-item optionally. The `to-tickets` / `to-spec` / `triage` skills publish there; `code-review`
-checks a PR against its linked item when one is present. Agents raise work items as issues
-surface, rather than waiting for a person to file them.
+Work items and specs live in **Azure Boards** — organization `https://dev.azure.com/umiconsulting`,
+project `Umi Consulting` — through the Azure DevOps MCP. GitHub PRs are the review surface. A
+commit or PR that names `AB#<id>` links the work item; `Fixes AB#<id>` links it AND moves it, so
+use the bare form unless the merge truly completes the item. The `to-tickets` / `to-spec` /
+`triage` skills publish there; `code-review` checks a PR against its linked item when one is
+present. Agents raise work items as issues surface, rather than waiting for a person to file them.
+Trello and Plane are retired as trackers.
 See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ## Current stance
 
-- KDS reads a backend-owned kitchen projection in schema `kds`. The normalization
-  layer lives in `apps/umi-conversaflow` plus schema-qualified SQL under `kds`.
-- Dashboard has cut over to the single platform schema path (S4.1, 2026-06-10).
-- All app remotes use `git@github.com-umi:umiconsulting/<repo>.git`. The push matrix
-  is documented in `docs/governance/github-push-matrix.md`.
-- Root pnpm workspaces + Turborepo are additive and inert for app npm workflows
-  until the Phase 5 monorepo cutover (gated by ST-1…ST-5 in the implementation plan).
-- The active program driver is the 2026-06-09 implementation plan. Sequencing
-  invariant: database consolidation → backend consolidation → monorepo.
+- `apps/umi-api` owns authoritative business writes for build-v3.
+- Build-v3 uses `umi`, `merchant`, and `runtime` as its canonical schemas.
+- KDS reads the API-owned kitchen projection. KDS does not own commercial order truth.
+- UmiPOS consumes contract version 2.13.0 from `packages/contract`.
+- The workspace uses one Git repository at `git@github.com:umiconsulting/umi.git`.
+- App directories are not separate Git repositories.
+- Root pnpm workspaces and Turborepo own the active JavaScript workspace workflow.
+- Umi Cash stays outside pnpm and uses its separate npm lockfile.
+- The active program driver is the build-v3 gated cutover plan.
+- P7 production cutover remains active. Gate 13 waits for real hardware and environment validation.
 
 ## Commands
 
-Root monorepo (pnpm + Turborepo, additive at this phase):
+Root monorepo (pnpm + Turborepo):
 
 - Install: `pnpm install`
 - Build: `pnpm run build` (or `turbo run build`)
@@ -105,8 +192,8 @@ Root monorepo (pnpm + Turborepo, additive at this phase):
 - Test: `pnpm run test` (or `turbo run test`)
 - Dev: `pnpm run dev` (or `turbo run dev`)
 
-Per-app (current npm workflows):
+Umi Cash uses its separate npm workflow:
 
 ```sh
-cd apps/<app> && npm install && npm run dev
+cd apps/umi-cash && npm ci && npm run dev
 ```

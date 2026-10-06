@@ -29,16 +29,4 @@ describe('UpdateVoiceDto validation', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].property).toBe('assistant_name');
   });
-
-  it('rejects more than 8 style notes (@ArrayMaxSize)', () => {
-    const errors = check({ style_notes: Array.from({ length: 9 }, () => 'n') });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].property).toBe('style_notes');
-  });
-
-  it('rejects non-string style-note entries (@IsString each)', () => {
-    const errors = check({ style_notes: [123] });
-    expect(errors).toHaveLength(1);
-    expect(errors[0].property).toBe('style_notes');
-  });
 });

@@ -1,107 +1,100 @@
-# Issue tracker: Plane (+ GitHub PRs as the review surface)
+# Issue tracker: Azure Boards (+ GitHub PRs as the review surface)
 
-Work items and PRDs for this repo live in **self-hosted Plane**; code review happens on **GitHub PRs**. A work item is the *spec* (what the change must do); a PR is the *implementation and review*. Use the **Plane MCP** for all work-item operations, and the `gh` CLI for pull requests.
+Work items and specs for this repository live in **Azure Boards**. Code review happens
+on **GitHub pull requests**. A work item is the _spec_ — what the change must do. A pull
+request is the _implementation and the review_.
 
-- Instance: `https://plane.umiconsulting.co`
-- Workspace: `umi`
-- Project for this repo: **`UMI`** — identifiers read `UMI-42`
+- Organization: `https://dev.azure.com/umiconsulting`
+- Project: **`Umi Consulting`**
+- Work items read as a bare number: `#93`, `AB#93`
 
-If the Plane MCP is not connected in the current session, say so and stop. Do not guess the contents of a work item.
+Use the **Azure DevOps MCP** for every work-item operation, and the `gh` CLI for pull
+requests.
 
-Work items and PRs are independent. A work item can exist with no PR — future work, a bug handed to another dev, a request a client phoned in. A PR can exist with no work item (a small fix). A work item can come from the ticket skills (`to-tickets`, `to-spec`, `triage`) **or** from a person straight in the UI. Both are equally valid, and nothing here assumes an agent wrote it. Linking a PR to a work item is an optional enrichment, never a requirement.
+⚠ **Pin the organization on every call.** The local `az` login belongs to a different
+organization and is not authorized here. Never rely on a global CLI default.
 
-## One project per repo, not per app
+If the Azure DevOps MCP is not connected in the current session, say so and stop. Do not
+guess the contents of a work item.
 
-The `UMI` project holds the whole monorepo. Use **modules** for the area: `umi-api`, `dashboard`, `landing`, `kds`, `infra`.
+Work items and pull requests are independent. A work item can exist with no pull request —
+future work, a bug handed to another person, a request a client phoned in. A pull request
+can exist with no work item, for a small fix. A work item can come from the ticket skills
+(`to-tickets`, `to-spec`, `triage`) or from a person straight in the UI. Both are equally
+valid.
 
-The reason is cycles. Plane scopes a cycle to one project, so four projects need four parallel sprints, and a team of five cannot plan across them. Cross-cutting work has no home either: a change that touches `packages/contract` plus `umi-api` plus `dashboard` is one work item in one project, or three hand-synchronised items in three.
+## Retired trackers
 
-**The rule: the project boundary follows the repo and its deploy, not the directory.** The monorepo deploys as a unit, so it plans as a unit. A separate repo — `umi-eventos`, for example — gets its own project when it starts.
+Two systems held this role before. Neither holds it now. Do not read a specification from
+either one.
+
+| System     | Status                | What to do with it                                                                                                                                                                                       |
+| ---------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Trello** | Retired.              | The `build-v3` lineage sent `code-review` and `pr-gates` here, and the board holds no Build v3 work. The MCP server is removed from `.mcp.json`.                                                         |
+| **Plane**  | Retired as a tracker. | Declared by GitHub PR #91 on `main`. The `plane.umiconsulting.co` instance stays up until its data is exported. Its MCP server stays declared for that export only. It is not a source of specification. |
 
 ## Where the spec lives
 
-The spec/PRD for a change is its **work item**:
+The spec for a change is its Azure Boards work item:
 
-- **Description** — the requirement or problem statement.
-- **Sub-work-items** — acceptance criteria, when the item needs them broken out.
+- **Description** — the requirement and the measured condition.
+- **Acceptance Criteria** — what must be true to close it.
+- **Repro Steps** — on a Bug, the observed and the expected result.
 - **Comments** — clarifications and decisions.
-- **State** — triage status (below); **labels** — type; **module** — area.
+- **State** — status. **Area Path** — the owning product. **Tags** — type and phase.
 
-## Triage states — the state machine lives in states, not labels
+**Read every field, not only the description.** A work item is not one text field. A
+correction that lands in the description and not in the repro steps leaves the reader
+following the stale half.
 
-The engineering skills name five canonical triage roles. In Plane each one is a **state**, because that is what Plane states are for. This differs from the previous Trello setup, where a list carried the status.
+## One project, area paths per product
 
-| Canonical role | Plane state | State group |
-| --- | --- | --- |
-| `needs-triage` | **Needs triage** | Backlog |
-| `needs-info` | **Needs info** | Backlog |
-| `ready-for-agent` | **Ready for agent** | Unstarted |
-| `ready-for-human` | **Ready for human** | Unstarted |
-| `wontfix` | **Won't fix** | Cancelled |
+The `Umi Consulting` project holds the whole monorepo. The **Area Path** carries the
+product: `Platform\Database`, `Platform\API`, `Products\Umi Cash`, `Products\Umi Dashboard`,
+`Products\UmiPOS`, `Operations\Security`, `Operations\Cutover`, `Program`.
 
-Plus the ordinary lifecycle states: **In progress** (Started) and **Done** (Completed).
+The project boundary follows the repository and its deployment, not the directory. The
+monorepo deploys as a unit, so it plans as a unit. A separate repository gets its own
+project when it starts. `Umi Ticket Seller` is such a project, and it is not this one.
 
-A new work item starts in **Needs triage**. From there it moves to **Needs info**, **Ready for agent**, **Ready for human** or **Won't fix**. **Needs info** returns to **Needs triage** once the reporter replies.
+## Linking a pull request to its work item
 
-Every item carries exactly one state, so the "two conflicting state labels" problem from label-based trackers cannot happen here. That is the reason for the mapping.
+The Azure Boards app is installed on the GitHub organization, so a reference inside a
+commit message or a pull-request description creates a real link. **Linking is all it
+does — no form of the reference moves the state.**
 
-Labels stay free for **type**: `bug`, `task`, `debt`, `spec`, plus the `wayfinder:*` set below.
+| Form          | Effect                                                                      |
+| ------------- | --------------------------------------------------------------------------- |
+| `AB#93`       | Links the work item to the commit and the pull request.                     |
+| `Fixes AB#93` | **Also links. It does NOT move the state here.** See the measurement below. |
 
-## Linking a PR to its work item — optional
+⚠ **Measured on 2026-08-14: no `AB#` form transitions a work item in this repository.**
 
-Linking is opportunistic, never required. Most PRs will not carry one. When a PR does implement a specific item, declare it with a line in the **PR description**:
+GitHub PR #95 carried `Fixes AB#74` and `Fixes AB#83` in its description. After the pull
+request completed, all three referenced items were still `New`, and unchanged at the same
+revision 60 seconds later. Work item 74 was then closed by hand through the API.
 
-```
-Plane: UMI-42
-```
+The connection itself is healthy. `System.ChangedBy` reads `Azure Boards`, and work item 74
+gained three artifact links — the pull request plus both commits. **The app links and does
+not transition**, at least for a pull request whose base is not the default branch.
 
-Resolve the identifier in this order:
+**So: every closure in this project is a deliberate write, with evidence. No automation
+closes a work item.** Write the `AB#` reference for the link, then close the item yourself
+when its acceptance criteria are actually met.
 
-1. A `Plane:` line in the PR body.
-2. Any `UMI-<number>` reference in the PR body or the latest commit trailer.
-3. An identifier embedded in the branch name (`feat/UMI-42-short-slug`).
+Do not read a `Fixes` keyword in a merged pull request as evidence that the item is done.
 
-If none resolve, that is normal: `code-review` runs its Standards axis and skips the Spec axis. A missing link is **not** a finding.
+## When a work item closes
 
-## Conventions (via the Plane MCP)
+A work item closes when the work is done **and** tested. When the code is done and the test
+is missing, the item stays `Active` and names what is missing.
 
-- **Fetch a work item** — get it by identifier (`UMI-42`), then read its description, sub-items and comments.
-- **Search** — search across the workspace by text, state, label or module.
-- **Create a work item** — create it in the `UMI` project in state **Needs triage**, with a title, a structured description, and sub-items for acceptance criteria. Set the module when the area is clear.
-- **Comment** — add a comment to the item.
-- **State / label / module** — set the triage state, apply a type label, assign the area module.
+Evidence is the **output of a command**, with its date and its commit. A sentence that says
+"proven" is not evidence. A closed item with no evidence is an item that nobody can
+re-verify.
 
-Discover the exact `mcp__plane__*` tool names at runtime. The operations above map to whatever the connected server exposes.
+⚠ **A state value is legal for a work-item type, not for the project.** `Removed` is valid
+for a User Story and returns HTTP 400 for a Bug. On a Bug, use `Closed` with a reason.
 
-## When a skill says "publish to the issue tracker"
-
-Create a Plane work item, or comment on the relevant one, via the Plane MCP. For AI-authored triage output, start the body with:
-
-```
-> This was generated by AI.
-```
-
-Items a person creates by hand — straight from a client message, for example — are ordinary items and need no disclaimer.
-
-## When a skill says "fetch the relevant ticket"
-
-Resolve the identifier (order above) and read the item via the Plane MCP. Its description, sub-items and comments are the full ticket.
-
-## Pull requests as a triage surface
-
-**PRs as a request surface: no.** PRs are the review surface for internal changes, not an external feature-request queue. `code-review`'s Spec axis reviews a PR's code against its linked work item; `triage` operates on work items, not PRs.
-
-## Wayfinding operations
-
-Used by `wayfinder`. The **map** is a single work item; **child tickets** are work items under it.
-
-- **Map** — a work item labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body.
-- **Child ticket** — a **sub-work-item** of the map, labelled `wayfinder:<type>` (`research` / `prototype` / `grilling` / `task`), assigned to the driving dev once claimed.
-- **Blocking** — use Plane's native **"Blocked by"** relation between work items. A child is unblocked when every blocker sits in **Done**.
-- **Frontier query** — list the map's open sub-items, drop any with an unresolved blocker or an assignee; first in map order wins.
-- **Claim** — assign the item to yourself.
-- **Resolve** — comment the answer, move the item to **Done**, then append a pointer to the map's Decisions-so-far.
-
-Blocking is the one place where Plane beats the previous setup outright. Trello has no dependency graph, so blockers were a `Blocked by:` line typed into the description and checked by hand. Plane models the edge natively, so the frontier query reads a real graph.
-
-> **Verify once against the live instance:** native work-item relations must be available on the current plan. If `Blocked by` is missing in the UI or through the MCP, fall back to a `Blocked by: UMI-12, UMI-19` line at the top of the child's description and delete this note.
+⚠ **`System.Parent` is read-only.** Set the parent when you create the item, or use the
+work-item link API. A direct field write fails.

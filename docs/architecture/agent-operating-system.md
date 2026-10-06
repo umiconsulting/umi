@@ -122,11 +122,9 @@ For meaningful technical decisions:
 
 ### Product-local systems
 
-- [apps/umi-kds/CLAUDE.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-kds/CLAUDE.md:1)
 - [apps/umi-cash/CLAUDE.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-cash/CLAUDE.md:1)
 - [apps/umi-conversaflow/CLAUDE.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-conversaflow/CLAUDE.md:1)
 - [apps/umi-conversaflow/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-conversaflow/REPO_CONTEXT.md:1)
-- [apps/umi-kds/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-kds/REPO_CONTEXT.md:1)
 - [apps/umi-cash/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-cash/REPO_CONTEXT.md:1)
 - [apps/umi-logs/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-logs/REPO_CONTEXT.md:1)
 - [apps/umi-dashboard/REPO_CONTEXT.md](/Users/juanlopez1/Documents/Repositories/Umi/apps/umi-dashboard/REPO_CONTEXT.md:1)

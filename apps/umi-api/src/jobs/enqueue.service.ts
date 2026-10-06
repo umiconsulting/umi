@@ -3,6 +3,10 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { QUEUES, type QueueName } from './queues';
 import { defaultJobOptions, JobPriority, toBullPriority } from './job-options';
+import { RESOURCE_LIMITS } from '../shared/operations/resource-limits';
+import { getRequestContext } from '../shared/database/request-context';
+
+export const MAX_QUEUE_DEPTH = RESOURCE_LIMITS.queueDepth;
 
 export interface EnqueueOptions {
   /** Logical priority — inverted to BullMQ's numeric scale centrally. */
@@ -12,8 +16,8 @@ export interface EnqueueOptions {
    * turn_id for a reply, `cardId:journey:date` for a lifecycle nudge). Any ':' is
    * sanitized to '_' before enqueue (BullMQ forbids it in custom ids). BullMQ
    * drops a duplicate enqueue while a job with this id still exists. For durable
-   * cross-restart idempotency, pair this with the `queue.inbound_events` gate or
-   * a `queue.outbox_events` UNIQUE(idempotency_key) row (see QueueRepository).
+   * cross-restart idempotency, pair this with the `runtime.inbound_event` gate or
+   * a `runtime.outbox_event` UNIQUE(idempotency_key) row (see QueueRepository).
    */
   jobId?: string;
   /** Delay before the job becomes eligible (ms). Used for debounce/backoff. */
@@ -38,6 +42,7 @@ export class EnqueueService {
     @InjectQueue(QUEUES.outbound) outbound: Queue,
     @InjectQueue(QUEUES.integrations) integrations: Queue,
     @InjectQueue(QUEUES.lifecycle) lifecycle: Queue,
+    @InjectQueue(QUEUES.tender) tender: Queue,
   ) {
     this.queues = {
       system,
@@ -46,6 +51,7 @@ export class EnqueueService {
       outbound,
       integrations,
       lifecycle,
+      tender,
     };
   }
 
@@ -56,7 +62,17 @@ export class EnqueueService {
     data: T,
     opts: EnqueueOptions = {},
   ): Promise<string> {
-    const job = await this.queues[queue].add(name, data, {
+    const counts = await this.queues[queue].getJobCounts('active', 'waiting', 'delayed', 'paused');
+    const depth = Object.values(counts).reduce((total, value) => total + value, 0);
+    if (depth >= MAX_QUEUE_DEPTH) {
+      throw new Error(`queue_backpressure:${queue}`);
+    }
+    const correlationId = getRequestContext()?.correlationId;
+    const jobData =
+      correlationId && !('correlation_id' in data)
+        ? { ...data, correlation_id: correlationId }
+        : data;
+    const job = await this.queues[queue].add(name, jobData, {
       ...defaultJobOptions(queue),
       priority: toBullPriority(opts.priority),
       // BullMQ uses ':' as its Redis key separator and rejects custom job ids

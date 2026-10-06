@@ -19,158 +19,467 @@ const booleanFromEnv = z.preprocess((v) => {
  * fails loudly if they're missing. Values added in later phases are optional
  * until their phase wires them in.
  */
-export const configSchema = z.object({
-  NODE_ENV: z
-    .enum(['development', 'test', 'production'])
-    .default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
+export const configSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']),
+    UMI_ENVIRONMENT: z.enum(['development', 'test', 'staging', 'pilot', 'production']),
+    PORT: z.coerce.number().int().positive().default(3000),
 
-  // Database — two roles (spec §11.2).
-  DATABASE_URL_APP: z.string().url(), // umi_app (RLS request role)
-  DATABASE_URL_WORKER: z.string().url(), // umi_worker (BYPASSRLS)
-  DATABASE_URL_READONLY: z.string().url().optional(), // umi_readonly (analytics)
-  // Postgres root CA — a filesystem path, or the PEM itself. Presence is what
-  // switches TLS on, so LEAVING IT UNSET keeps today's behaviour exactly (local
-  // dev talks plaintext to localhost). Set in production. Do NOT put `sslmode`
-  // in the URLs above: this variable governs TLS, and sslmode=require would
-  // encrypt WITHOUT verifying, which is the failure this exists to prevent.
-  PGSSLROOTCERT: z.string().optional(),
+    // Database — two roles (spec §11.2).
+    DATABASE_URL_APP: z.string().url(), // umi_app (RLS request role)
+    DATABASE_URL_WORKER: z.string().url(), // umi_worker (BYPASSRLS)
+    DATABASE_URL_READONLY: z.string().url().optional(), // umi_readonly (analytics)
+    DATABASE_TLS_MODE: z.enum(['disable', 'verify-full']).default('disable'),
+    // TLS: path to (or inline PEM of) the Postgres server's root CA. When set, both
+    // pools use verify-full (CA + hostname + rejectUnauthorized). Unset = plaintext
+    // (local dev against localhost). Do NOT put sslmode in the URLs — this governs TLS.
+    PGSSLROOTCERT: z.string().optional(),
 
-  // Redis / BullMQ.
-  REDIS_URL: z.string().url(),
+    // Redis / BullMQ.
+    REDIS_URL: z.string().url(),
+    OPERATIONS_TOKEN: z.string().min(32).optional(),
 
-  // Observability schema that holds the runtime trace tables umi-logs reads
-  // (ai_turn_logs, edge_function_logs, security_logs, pipeline_traces). Live
-  // default is `conversaflow`; confirm against the platform DB. Validated as a
-  // safe SQL identifier since it's interpolated into INSERT statements.
-  OBSERVABILITY_SCHEMA: z
-    .string()
-    .regex(/^[A-Za-z_][A-Za-z0-9_]*$/)
-    .default('conversaflow'),
+    // ── Apple Wallet pass signing ───────────────────────────────────────────
+    // The three PEMs, base64-encoded. A pass needs all three to get a signature.
+    // `ApplePassBuilder.isConfigured()` gives false until they are all present,
+    // and the pass routes then answer 503.
+    // The private key is encrypted, so APPLE_KEY_PASSPHRASE goes with it.
+    APPLE_SIGNER_CERT: z.string().optional(),
+    APPLE_SIGNER_KEY: z.string().optional(),
+    APPLE_WWDR_CERT: z.string().optional(),
+    APPLE_KEY_PASSPHRASE: z.string().optional(),
+    APPLE_PASS_TYPE_ID: z.string().default('pass.co.umicash.loyalty'),
+    APPLE_TEAM_ID: z.string().optional(),
 
-  // Wallet-pass refresh (Apple PassKit + Google Wallet). Best-effort push fired
-  // after cash money writes; when unset, the refresh is skipped (money write is
-  // unaffected). Points at the pass-push service once cert infra is provisioned.
-  WALLET_PASS_PUSH_URL: z.string().url().optional(),
+    // APNs token auth for pass updates: the .p8 base64-encoded, plus its Key ID.
+    // This is the "Keys" mechanism, not an APNs SSL certificate. The .p8 can never
+    // be re-downloaded from Apple, so these values are the only copy.
+    APPLE_APN_KEY: z.string().optional(),
+    APPLE_APN_KEY_ID: z.string().optional(),
 
-  // Feature flags.
-  CASH_WRITE_ENABLED: booleanFromEnv.default(false), // retained; cash writes are live
-  // Transactional-outbox relay (§10.4). Phase 3d registered the event_type→queue
-  // routes (twilio.reply etc.), so it's on by default now. Worker-only +
-  // idempotent (deterministic jobIds); set false to pause delivery in an emergency.
-  OUTBOX_RELAY_ENABLED: booleanFromEnv.default(true),
-  // Lifecycle WhatsApp crons (reward_expiring / streak / welcome_no_visit /
-  // winback). OFF by default: umi-cash still runs these journeys during the
-  // dual-writer window, so enabling here before umi-cash stops would double-send.
-  // Owner flips to true at the Phase 3 cutover (and disables the umi-cash crons).
-  LIFECYCLE_CRONS_ENABLED: booleanFromEnv.default(false),
-  // KDS customer status notifications (Phase 4). When a KDS transition/partial-
-  // cancel runs, emit a `twilio.status_notification`/`twilio.cancel_notification`
-  // outbox row. OFF by default: while the iPad still hits the Supabase edge
-  // functions, the legacy `kds.transition_ticket` RPC already enqueues these —
-  // enabling here before the iPad is repointed would double-send. Transitions
-  // still execute when off; only the customer notify is gated. Owner flips it
-  // true at the iPad repoint + edge-function decommission.
-  KDS_STATUS_NOTIFY_ENABLED: booleanFromEnv.default(false),
-  // Landing-page lead email sequences (Phase 5). Gates the repeatable
-  // `email_sequence` job that drains due diagnostic-followup emails. OFF by
-  // default: while the landing page still runs its own SQLite/Vercel cron, a
-  // second sender here would double-mail prospects. Owner flips it true at the
-  // landing cutover (and disables the landing cron). Public contact/diagnostic
-  // routes stay live regardless — only the background sequence tick is gated.
-  LEADS_SEQUENCE_ENABLED: booleanFromEnv.default(false),
+    // ── Google Wallet ───────────────────────────────────────────────────────
+    // Classes are pre-created through the REST API and are named
+    // `{issuer}.{handle}_{classIdPrefix}`; only the loyalty OBJECT travels in the
+    // save JWT. The private key arrives with literal "\n" sequences from most
+    // secret stores, so it is un-escaped where it is read.
+    GOOGLE_WALLET_ISSUER_ID: z.string().optional(),
+    GOOGLE_WALLET_CLASS_ID: z.string().default('loyalty_v2'),
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().optional(),
+    GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
 
-  // CORS.
-  CORS_ORIGINS: z.string().optional(), // comma-separated origins
+    // The origin that serves the customer-facing wallet surface.
+    //
+    // THIS VALUE IS PERMANENT. It is written into `webServiceURL` inside every
+    // `.pkpass` at signing time, and the copy on a customer's phone can never be
+    // changed — Apple calls back to whatever host was signed in. It must stay
+    // `https://cash.umiconsulting.co` for as long as any issued pass exists.
+    // It is also the base for `/logos/*` brand assets, which live in umi-cash's
+    // `public/` directory and are fetched over HTTP rather than duplicated here.
+    WALLET_PUBLIC_ORIGIN: z.string().url().optional(),
 
-  // ── Auth (Phase 2, D9) — JWT access+refresh in httpOnly cookies ──
-  // JWT_SECRET stays optional in the schema (so non-auth phases/tests boot
-  // without it); JwtService throws a clear error if it's actually used without
-  // one. Set it in any environment that serves the dashboard API.
-  JWT_SECRET: z.string().min(16).optional(),
-  // Duration grammar must match parseDurationSeconds (jose-style: 30m, 1h, 1800).
-  // Reject unsupported values at config load — otherwise they parse to 0 and
-  // silently disable cookie maxAge / the SPA's proactive refresh.
-  JWT_ACCESS_TTL: z
-    .string()
-    .regex(/^\d+\s*(?:s|m|h|d|w)?$/, 'must be a duration like 30m, 1h, or 1800')
-    .default('30m'), // SPA refreshes silently before expiry
-  JWT_REFRESH_TTL: z
-    .string()
-    .regex(/^\d+\s*(?:s|m|h|d|w)?$/, 'must be a duration like 30d, 720h, or 2592000')
-    .default('30d'),
-  COOKIE_SECURE: booleanFromEnv.default(true), // false for local http dev
-  COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
-  COOKIE_DOMAIN: z.string().optional(), // e.g. .umiconsulting.co
-  APP_URL: z.string().url().optional(), // password-reset link base
+    // Public routing and trusted ingress. No public URL is inferred from a request.
+    PUBLIC_API_URL: z.string().url().optional(),
+    PUBLIC_DASHBOARD_URL: z.string().url().optional(),
+    TRUSTED_PROXY_CIDRS: z.string().optional(),
 
-  // Cash QR + customer-auth secrets (ported from umi-cash; MUST be byte-identical
-  // to umi-cash's values or already-issued wallet passes / customer tokens fail).
-  // APP_QR_SECRET is used TWO ways: HS256 JWT key (UTF-8 bytes) for in-app QR, and
-  // RAW string HMAC key for static wallet barcodes — never pre-transform it.
-  APP_QR_SECRET: z.string().min(32).optional(),
-  JWT_ACCESS_SECRET: z.string().min(32).optional(), // cash CUSTOMER access token (24h)
-  JWT_REFRESH_SECRET: z.string().min(32).optional(), // cash CUSTOMER refresh token (30d)
+    // Artifact identity. Release tooling sets these values from the actual build.
+    RELEASE_VERSION: z
+      .string()
+      .regex(/^[0-9A-Za-z][0-9A-Za-z.+-]{0,79}$/)
+      .optional(),
+    RELEASE_GIT_COMMIT: z
+      .string()
+      .regex(/^[0-9a-f]{40}$/)
+      .optional(),
+    RELEASE_BUILD_TIMESTAMP: z.string().datetime().optional(),
+    CONTRACT_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .optional(),
+    EXPECTED_SCHEMA_VERSION: z
+      .string()
+      .regex(/^[0-9A-Za-z][0-9A-Za-z._-]{0,79}$/)
+      .optional(),
+    CONFIG_SCHEMA_VERSION: z.string().regex(/^\d+$/).default('1'),
+    MINIMUM_POS_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/)
+      .default('0.1.0'),
+    MINIMUM_DASHBOARD_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/)
+      .default('0.2.0'),
 
-  ANTHROPIC_API_KEY: z.string().optional(),
-  VOYAGE_API_KEY: z.string().optional(),
-  TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_WHATSAPP_FROM: z.string().optional(),
-  // The EXACT public URL Twilio signs (e.g. https://api.umiconsulting.co/conversations/whatsapp).
-  // Used for HMAC-SHA1 signature validation — never inferred from req.url (Phase 3d, spec §8.2).
-  TWILIO_WEBHOOK_URL: z.string().url().optional(),
-  // The webhook FAILS CLOSED when TWILIO_AUTH_TOKEN is unset (drops the request
-  // rather than processing unsigned input). Set this true ONLY for local dev to
-  // bypass signature validation; it must never be true in production.
-  ALLOW_INSECURE_TWILIO_WEBHOOK: booleanFromEnv.default(false),
-  // Location-pin tool (geo). Optional; the tool degrades to text when unset.
-  GOOGLE_MAPS_API_KEY: z.string().optional(),
-  // Tenant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
-  // matching ops.channel_accounts row, messages resolve to this tenant. Lets the
-  // single live tenant keep working before its number is seeded in channel_accounts.
-  DEFAULT_TENANT_ID: z.string().uuid().optional(),
-  ZETTLE_CLIENT_ID: z.string().optional(),
-  ZETTLE_API_KEY: z.string().optional(),
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.coerce.number().int().positive().optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASSWORD: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
-  // Recipient for the landing-page contact-form internal notification (Phase 5).
-  // Falls back to EMAIL_FROM then hola@umiconsulting.co when unset.
-  CONTACT_TO_EMAIL: z.string().optional(),
-  // HMAC-SHA256 secret for the /api/leads/webhook/email-response signature
-  // (X-Webhook-Signature: sha256=…). When set, the webhook verifies it and fails
-  // closed on mismatch. When unset, the webhook is rejected in production and
-  // allowed only in non-production (local testing) — mirroring the ported stub.
-  LEADS_WEBHOOK_SECRET: z.string().optional(),
-}).superRefine((cfg, ctx) => {
-  // The Twilio signature bypass is a local-dev escape hatch only. Reject it at
-  // boot in production so it can never silently disable webhook verification.
-  if (cfg.NODE_ENV === 'production' && cfg.ALLOW_INSECURE_TWILIO_WEBHOOK) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['ALLOW_INSECURE_TWILIO_WEBHOOK'],
-      message: 'must not be true when NODE_ENV=production (it disables Twilio signature validation)',
-    });
-  }
-  // If the lead sequence runs in production, the email-response webhook MUST be
-  // verifiable — otherwise reply-driven mark_responded/unsubscribe fails closed
-  // (unset secret → rejected in prod) and we keep mailing people who replied or
-  // unsubscribed. Require the secret whenever the sequence is enabled in prod.
-  if (
-    cfg.NODE_ENV === 'production' &&
-    cfg.LEADS_SEQUENCE_ENABLED &&
-    !cfg.LEADS_WEBHOOK_SECRET
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['LEADS_WEBHOOK_SECRET'],
-      message: 'must be set when LEADS_SEQUENCE_ENABLED=true in production',
-    });
-  }
-});
+    // OpenTelemetry uses OTLP. Headers can contain credentials and are never logged.
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+    OTEL_EXPORTER_OTLP_HEADERS: z.string().max(4096).optional(),
+    OBSERVABILITY_SCHEMA: z
+      .string()
+      .regex(/^[a-z_][a-z0-9_]*$/)
+      .default('conversaflow'),
+
+    // Object storage remains optional until a deployed UmiPOS path uses it.
+    OBJECT_STORAGE_ENABLED: booleanFromEnv.default(false),
+    OBJECT_STORAGE_ENDPOINT: z.string().url().optional(),
+    OBJECT_STORAGE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .optional(),
+    OBJECT_STORAGE_REGION: z.string().min(1).max(80).optional(),
+    OBJECT_STORAGE_ACCESS_KEY: z.string().min(8).optional(),
+    OBJECT_STORAGE_SECRET_KEY: z.string().min(16).optional(),
+
+    // One rate-limit schema controls ingress defaults.
+    RATE_LIMIT_IP_PER_MINUTE: z.coerce.number().int().min(10).max(10000).default(300),
+    // The same address bucket, charged at this ceiling once the caller presents a
+    // VERIFIED principal (§3.5). Higher by design: everyone behind one NAT — a
+    // café's dashboard, its tills, a workstation running the UX sweep — shares the
+    // address budget, and the per-principal buckets are the limit that actually
+    // binds a signed-in caller. 10x the anonymous ceiling still throttles one
+    // abusive address (50 req/s), which is the point of keeping it.
+    RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE: z.coerce
+      .number()
+      .int()
+      .min(10)
+      .max(10000)
+      .default(3000),
+    STARTUP_RETRY_ATTEMPTS: z.coerce.number().int().min(1).max(12).default(5),
+    STARTUP_RETRY_DELAY_MS: z.coerce.number().int().min(0).max(10000).default(1000),
+
+    // Wallet-pass refresh (Apple PassKit + Google Wallet). Best-effort push fired
+    // after cash money writes; when unset, the refresh is skipped (money write is
+    // unaffected). Points at the pass-push service once cert infra is provisioned.
+    WALLET_PASS_PUSH_URL: z.string().url().optional(),
+
+    // Feature flags.
+    CASH_WRITE_ENABLED: booleanFromEnv.default(false), // retained; cash writes are live
+    // Transactional-outbox relay (§10.4). Phase 3d registered the event_type→queue
+    // routes (twilio.reply etc.), so it's on by default now. Worker-only +
+    // idempotent (deterministic jobIds); set false to pause delivery in an emergency.
+    OUTBOX_RELAY_ENABLED: booleanFromEnv.default(true),
+    // Lifecycle WhatsApp crons (reward_expiring / streak / welcome_no_visit /
+    // winback). OFF by default: umi-cash still runs these journeys during the
+    // dual-writer window, so enabling here before umi-cash stops would double-send.
+    // Owner flips to true at the Phase 3 cutover (and disables the umi-cash crons).
+    LIFECYCLE_CRONS_ENABLED: booleanFromEnv.default(false),
+    // KDS customer status notifications (Phase 4). When a KDS transition/partial-
+    // cancel runs, emit a `twilio.status_notification`/`twilio.cancel_notification`
+    // outbox row. OFF by default: while the iPad still hits the Supabase edge
+    // functions, the legacy `kds.transition_ticket` RPC already enqueues these —
+    // enabling here before the iPad is repointed would double-send. Transitions
+    // still execute when off; only the customer notify is gated. Owner flips it
+    // true at the iPad repoint + edge-function decommission.
+    KDS_STATUS_NOTIFY_ENABLED: booleanFromEnv.default(false),
+    // Landing-page lead email sequences (Phase 5). Gates the repeatable
+    // `email_sequence` job that drains due diagnostic-followup emails. OFF by
+    // default: while the landing page still runs its own SQLite/Vercel cron, a
+    // second sender here would double-mail prospects. Owner flips it true at the
+    // landing cutover (and disables the landing cron). Public contact/diagnostic
+    // routes stay live regardless — only the background sequence tick is gated.
+    LEADS_SEQUENCE_ENABLED: booleanFromEnv.default(false),
+    // Releases expired points and stored-value holds through one idempotent command.
+    CUSTOMER_VALUE_EXPIRY_ENABLED: booleanFromEnv.default(true),
+
+    // CORS.
+    CORS_ORIGINS: z.string().optional(), // comma-separated origins
+
+    // ── Auth (Phase 2, D9) — JWT access+refresh in httpOnly cookies ──
+    // JWT_SECRET stays optional in the schema (so non-auth phases/tests boot
+    // without it); JwtService throws a clear error if it's actually used without
+    // one. Set it in any environment that serves the dashboard API.
+    JWT_SECRET: z.string().min(16).optional(),
+    // Duration grammar must match parseDurationSeconds (jose-style: 30m, 1h, 1800).
+    // Reject unsupported values at config load — otherwise they parse to 0 and
+    // silently disable cookie maxAge / the SPA's proactive refresh.
+    JWT_ACCESS_TTL: z
+      .string()
+      .regex(/^\d+\s*(?:s|m|h|d|w)?$/, 'must be a duration like 30m, 1h, or 1800')
+      .default('30m'), // SPA refreshes silently before expiry
+    JWT_REFRESH_TTL: z
+      .string()
+      .regex(/^\d+\s*(?:s|m|h|d|w)?$/, 'must be a duration like 30d, 720h, or 2592000')
+      .default('30d'),
+    COOKIE_SECURE: booleanFromEnv.default(true), // false for local http dev
+    COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+    COOKIE_DOMAIN: z.string().optional(), // e.g. .umiconsulting.co
+    APP_URL: z.string().url().optional(), // password-reset link base
+
+    // ── Second factor ────────────────────────────────────────────────────────
+    // The pepper for runtime.otp.code_hash. A six-digit code has only 10^6
+    // possibilities, so a plain digest of it is reversible by brute force the
+    // moment someone reads the table. HMAC under a key held OUTSIDE the database
+    // means a stolen dump alone does not yield the codes. Same reasoning, and the
+    // same construction, as merchant.staff.operator_pin_lookup.
+    // Optional in the schema so non-auth phases and tests boot; MfaService throws
+    // a clear configuration error if a code is ever issued without it.
+    MFA_OTP_PEPPER: z.string().min(32).optional(),
+    // How long a mailed code stays valid. Short on purpose: the code travels over
+    // email, which is the weakest part of this factor.
+    MFA_OTP_TTL_SECONDS: z.coerce.number().int().min(60).max(1800).default(300),
+    // Wrong guesses allowed against ONE code before it is burned. Six digits with
+    // unlimited guesses is not a factor, it is a delay.
+    MFA_OTP_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(5),
+    // Codes ISSUED per user per hour. This is what makes MFA_OTP_MAX_ATTEMPTS mean
+    // anything: a new code resets `attempts` to 0, so without a ceiling here an
+    // attacker who holds the password just re-logs-in for a fresh allowance and the
+    // per-code cap bounds nothing. 5/hour leaves room for a user who mistypes an
+    // address or waits out a slow mail relay.
+    MFA_OTP_MAX_PER_HOUR: z.coerce.number().int().min(1).max(50).default(5),
+
+    // Cash QR + customer-auth secrets (ported from umi-cash; MUST be byte-identical
+    // to umi-cash's values or already-issued wallet passes / customer tokens fail).
+    // APP_QR_SECRET is used TWO ways: HS256 JWT key (UTF-8 bytes) for in-app QR, and
+    // RAW string HMAC key for static wallet barcodes — never pre-transform it.
+    APP_QR_SECRET: z.string().min(32).optional(),
+    JWT_ACCESS_SECRET: z.string().min(32).optional(), // cash CUSTOMER access token (24h)
+    JWT_REFRESH_SECRET: z.string().min(32).optional(), // cash CUSTOMER refresh token (30d)
+    // HMAC and AES key source for customer-history cursors and one-time gift-card delivery.
+    CUSTOMER_VALUE_SECRET: z.string().min(32).optional(),
+
+    ANTHROPIC_API_KEY: z.string().optional(),
+    // Which provider serves single-shot LLM completions (facts, summaries, the customer
+    // portrait, intent). The WhatsApp bot's tool loop stays on Anthropic for now. Default
+    // 'anthropic' keeps current behavior; set 'deepseek' + DEEPSEEK_API_KEY to switch.
+    LLM_PROVIDER: z.enum(['anthropic', 'deepseek']).default('anthropic'),
+    // DeepSeek uses an OpenAI-compatible API. Model id is configurable so a new tier
+    // (e.g. a "flash" model) is a config change, not a code change.
+    DEEPSEEK_API_KEY: z.string().optional(),
+    DEEPSEEK_BASE_URL: z.string().url().default('https://api.deepseek.com'),
+    // `deepseek-flash` = DeepSeek V4.1 Flash (the current first-party id, released
+    // 2026-09-10). The old `deepseek-chat`/`deepseek-reasoner` names are legacy.
+    DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
+    VOYAGE_API_KEY: z.string().optional(),
+    TWILIO_ACCOUNT_SID: z.string().optional(),
+    TWILIO_AUTH_TOKEN: z.string().optional(),
+    TWILIO_WHATSAPP_FROM: z.string().optional(),
+    // The EXACT public URL Twilio signs (e.g. https://api.umiconsulting.co/conversations/whatsapp).
+    // Used for HMAC-SHA1 signature validation — never inferred from req.url (Phase 3d, spec §8.2).
+    TWILIO_WEBHOOK_URL: z.string().url().optional(),
+    // The webhook FAILS CLOSED when TWILIO_AUTH_TOKEN is unset (drops the request
+    // rather than processing unsigned input). Set this true ONLY for local dev to
+    // bypass signature validation; it must never be true in production.
+    ALLOW_INSECURE_TWILIO_WEBHOOK: booleanFromEnv.default(false),
+    // Location-pin tool (geo). Optional; the tool degrades to text when unset.
+    GOOGLE_MAPS_API_KEY: z.string().optional(),
+    // Merchant-resolution fallback (Phase 3): when an inbound WhatsApp number has no
+    // matching merchant.whatsapp_number row, messages resolve to this merchant. Lets the
+    // single live merchant keep working before its number is seeded in channel_accounts.
+    DEFAULT_MERCHANT_ID: z.string().uuid().optional(),
+    ZETTLE_CLIENT_ID: z.string().optional(),
+    ZETTLE_API_KEY: z.string().optional(),
+    // Facturapi (CFDI 4.0 PAC front — ADR 2026-09-08). The USER KEY manages issuing
+    // Organizations (one per merchant emisor); per-merchant stamping uses that
+    // Organization's own secret key, held with the merchant's fiscal profile — not here.
+    // Optional until the fiscal flow is wired (Fase 3b).
+    FACTURAPI_USER_KEY: z.string().optional(),
+    FACTURAPI_BASE_URL: z.string().url().default('https://www.facturapi.io/v2'),
+    // The per-Organization secret that stamps on a merchant emisor's behalf. Held here
+    // only until the merchant's fiscal profile carries it; until then a stamp is refused
+    // with a sentence naming what is missing rather than attempted and failed.
+    FACTURAPI_ORGANIZATION_SECRET: z.string().optional(),
+    // Mercado Pago Point — the only card-present tender (ADR 2026-09-16). Both optional:
+    // when either is missing the provider reports itself unavailable and the till offers
+    // no card-present method, which is the difference between a method that works and a
+    // button that fails after the customer has already decided.
+    MERCADO_PAGO_POINT_ACCESS_TOKEN: z.string().optional(),
+    MERCADO_PAGO_POINT_TERMINAL_ID: z.string().optional(),
+    // The Orders API origin. Overridable so the live transport can be pointed at a stub
+    // in a test without a different build; a deployment leaves it at the vendor's host.
+    MERCADO_PAGO_POINT_API_BASE_URL: z.string().url().default('https://api.mercadopago.com'),
+    // The secret the panel generates for the order webhook (research note 02 §2). Like the
+    // token, it is optional on purpose: with no secret the receiver REFUSES every
+    // notification rather than trusting an unsigned body, so an unconfigured deployment
+    // cannot be fed a forged payment by anyone who learns the URL.
+    MERCADO_PAGO_POINT_WEBHOOK_SECRET: z.string().optional(),
+    // ── The third-party path: the merchant's own account (Phase 5, decisions D7 and D8) ──
+    //
+    // ONE DEPLOYMENT TOKEN SERVES ONE ACCOUNT, and Umi's clients are other sellers, so the
+    // clients' money can only reach the clients' books through OAuth. These five values are
+    // the application's identity to the vendor and the key we hold the per-merchant tokens
+    // under. All optional: with any of them unset the connection flow reports itself
+    // unavailable rather than half-working, and the deployment token above still serves the
+    // "own account" mode that phases 1 to 4 use.
+    MERCADO_PAGO_POINT_CLIENT_ID: z.string().optional(),
+    MERCADO_PAGO_POINT_CLIENT_SECRET: z.string().optional(),
+    // Where the vendor sends the seller back. The vendor requires a STATIC https URL declared
+    // in the application, so it is configuration rather than something we compute.
+    MERCADO_PAGO_POINT_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // The key material the per-merchant tokens are encrypted under (AES-256-GCM, purpose
+    // derived). Never a vendor value, and never optional in a deployment that connects
+    // merchants: a credential with no key to hold it under is not stored at all.
+    MERCADO_PAGO_POINT_CREDENTIAL_KEY: z.string().min(32).optional(),
+    // The vendor's authorization and token hosts. Overridable so a test can point them at a
+    // stub; a deployment leaves them alone.
+    MERCADO_PAGO_POINT_OAUTH_AUTHORIZE_URL: z
+      .string()
+      .url()
+      .default('https://auth.mercadopago.com/authorization'),
+    MERCADO_PAGO_POINT_OAUTH_TOKEN_URL: z
+      .string()
+      .url()
+      .default('https://api.mercadopago.com/oauth/token'),
+    // The scripted tender providers and the scripted PAC — the acceptance suite's
+    // instrument for the success/failure/unknown sequence (§8G step 7). NEVER enable this
+    // in a deployment that takes real money: a scripted provider captures nothing and
+    // says it did.
+    TENDER_SCRIPTED_PROVIDERS: booleanFromEnv.default(false),
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.coerce.number().int().positive().optional(),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
+    EMAIL_FROM: z.string().optional(),
+    // Recipient for the landing-page contact-form internal notification (Phase 5).
+    // Falls back to EMAIL_FROM then hola@umiconsulting.co when unset.
+    CONTACT_TO_EMAIL: z.string().optional(),
+    // HMAC-SHA256 secret for the /api/leads/webhook/email-response signature
+    // (X-Webhook-Signature: sha256=…). When set, the webhook verifies it and fails
+    // closed on mismatch. When unset, the webhook is rejected in production and
+    // allowed only in non-production (local testing) — mirroring the ported stub.
+    LEADS_WEBHOOK_SECRET: z.string().optional(),
+  })
+  .superRefine((cfg, ctx) => {
+    const deployed = ['staging', 'pilot', 'production'].includes(cfg.UMI_ENVIRONMENT);
+    const requireValue = (key: keyof typeof cfg) => {
+      if (cfg[key] === undefined || cfg[key] === '') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'is required' });
+      }
+    };
+
+    if (deployed) {
+      for (const key of [
+        'PUBLIC_API_URL',
+        'PUBLIC_DASHBOARD_URL',
+        'CORS_ORIGINS',
+        'TRUSTED_PROXY_CIDRS',
+        'JWT_SECRET',
+        'APP_QR_SECRET',
+        'JWT_ACCESS_SECRET',
+        'JWT_REFRESH_SECRET',
+        'MFA_OTP_PEPPER',
+        'CUSTOMER_VALUE_SECRET',
+        'OPERATIONS_TOKEN',
+        'RELEASE_VERSION',
+        'RELEASE_GIT_COMMIT',
+        'RELEASE_BUILD_TIMESTAMP',
+        'CONTRACT_VERSION',
+        'EXPECTED_SCHEMA_VERSION',
+        'OTEL_EXPORTER_OTLP_ENDPOINT',
+      ] as const) {
+        requireValue(key);
+      }
+      if (cfg.NODE_ENV !== 'production') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['NODE_ENV'],
+          message: 'must be production for staging, pilot, and production',
+        });
+      }
+      for (const key of ['PUBLIC_API_URL', 'PUBLIC_DASHBOARD_URL'] as const) {
+        const value = cfg[key];
+        if (value && new URL(value).protocol !== 'https:') {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: 'must use https' });
+        }
+      }
+      if (!cfg.COOKIE_SECURE) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['COOKIE_SECURE'],
+          message: 'must be true outside development and test',
+        });
+      }
+      if (cfg.CORS_ORIGINS?.split(',').some((origin) => origin.trim() === '*')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CORS_ORIGINS'],
+          message: 'must contain explicit origins',
+        });
+      }
+    }
+
+    // §3.5: the authenticated address ceiling exists to be LOOSER than the
+    // anonymous one — the per-principal buckets, not the address, are what binds a
+    // signed-in caller. A configuration that inverts the two hands anonymous
+    // callers more budget than verified ones, which is not a policy anyone wants;
+    // refuse the boot rather than run it.
+    if (cfg.RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE < cfg.RATE_LIMIT_IP_PER_MINUTE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['RATE_LIMIT_IP_AUTHENTICATED_PER_MINUTE'],
+        message: 'must be at least RATE_LIMIT_IP_PER_MINUTE',
+      });
+    }
+
+    // PGSSLROOTCERT is the authority (D4): when it is set, PgService connects
+    // verify-full, whatever this knob says — `resolveSslOption` reads only the CA.
+    // DATABASE_TLS_MODE is the operator's stated intent, checked one way: asking
+    // for verify-full without a CA is a contradiction and is refused. A CA with
+    // the default 'disable' is not — the CA wins, and production requires it above.
+    if (cfg.DATABASE_TLS_MODE === 'verify-full' && !cfg.PGSSLROOTCERT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['PGSSLROOTCERT'],
+        message: 'is required when DATABASE_TLS_MODE=verify-full',
+      });
+    }
+
+    if (cfg.OBJECT_STORAGE_ENABLED) {
+      for (const key of [
+        'OBJECT_STORAGE_ENDPOINT',
+        'OBJECT_STORAGE_BUCKET',
+        'OBJECT_STORAGE_REGION',
+        'OBJECT_STORAGE_ACCESS_KEY',
+        'OBJECT_STORAGE_SECRET_KEY',
+      ] as const) {
+        requireValue(key);
+      }
+    }
+
+    if (cfg.COOKIE_SAMESITE === 'none' && !cfg.COOKIE_SECURE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['COOKIE_SECURE'],
+        message: 'must be true when COOKIE_SAMESITE=none',
+      });
+    }
+    // The Twilio signature bypass is a local-dev escape hatch only. Reject it at
+    // boot in production so it can never silently disable webhook verification.
+    if (cfg.NODE_ENV === 'production' && cfg.ALLOW_INSECURE_TWILIO_WEBHOOK) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ALLOW_INSECURE_TWILIO_WEBHOOK'],
+        message:
+          'must not be true when NODE_ENV=production (it disables Twilio signature validation)',
+      });
+    }
+    // If the lead sequence runs in production, the email-response webhook MUST be
+    // verifiable — otherwise reply-driven mark_responded/unsubscribe fails closed
+    // (unset secret → rejected in prod) and we keep mailing people who replied or
+    // unsubscribed. Require the secret whenever the sequence is enabled in prod.
+    if (cfg.NODE_ENV === 'production' && cfg.LEADS_SEQUENCE_ENABLED && !cfg.LEADS_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['LEADS_WEBHOOK_SECRET'],
+        message: 'must be set when LEADS_SEQUENCE_ENABLED=true in production',
+      });
+    }
+    // D4 — the TLS control must not fail open.
+    //
+    // Without this variable `PgService` builds no `ssl` option. Both pools then
+    // reach Supabase in plaintext, over the public internet. The only report is
+    // one log line: `no TLS — local/dev`.
+    //
+    // Refuse the boot instead. An empty string counts as absent, because
+    // `config.get` returns '' and `ssl` stays undefined.
+    if (cfg.NODE_ENV === 'production' && !cfg.PGSSLROOTCERT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['PGSSLROOTCERT'],
+        message:
+          'must be set when NODE_ENV=production — without it both Postgres pools ' +
+          'connect in plaintext (no TLS). Give the path to the server root CA, or the PEM itself.',
+      });
+    }
+  });
 
 export type AppConfig = z.infer<typeof configSchema>;
 

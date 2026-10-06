@@ -6,9 +6,12 @@ import { EnqueueService } from '../../jobs/enqueue.service';
 import { JobPriority } from '../../jobs/job-options';
 import { QUEUES } from '../../jobs/queues';
 import { QueueRepository } from '../../jobs/queue.repository';
-import { TraceService } from '../../shared/logging/trace.service';
+import { LoggingService } from '../../shared/logging/logging.service';
+import { hashPhone } from '../../shared/logging/hash-phone';
+import { securityEvent } from '../../shared/logging/security-event';
+import { getRequestContext } from '../../shared/database/request-context';
 import { twimlMessage, emptyTwiml } from '../../shared/format/whatsapp';
-import { TenantResolutionService } from './tenant-resolution.service';
+import { MerchantResolutionService } from './merchant-resolution.service';
 import {
   SECURITY_CONFIG,
   SecurityService,
@@ -23,8 +26,8 @@ import { MessagesRepository, DUPLICATE_MESSAGE } from './messages.repository';
 /**
  * Twilio WhatsApp webhook ingress (spec §8.2). Port of `whatsapp-handler/index.ts`.
  * Validates the HMAC-SHA1 signature against the RAW form body (Fastify
- * form-urlencoded raw-body parser, registered in main.ts), resolves tenant +
- * identity, gates duplicates via `queue.inbound_events`, persists the user
+ * form-urlencoded raw-body parser, registered in main.ts), resolves merchant +
+ * identity, gates duplicates via `runtime.inbound_event`, persists the user
  * message, enqueues `turn.integrity` (MessageSid = deterministic jobId), and
  * returns empty TwiML fast — the real reply arrives async via the outbound
  * processor. All heavy work is off the request path.
@@ -38,14 +41,14 @@ export class WhatsappController {
 
   constructor(
     config: ConfigService<AppConfig, true>,
-    private readonly tenants: TenantResolutionService,
+    private readonly merchants: MerchantResolutionService,
     private readonly security: SecurityService,
     private readonly identity: IdentityRepository,
     private readonly conversations: ConversationsRepository,
     private readonly messages: MessagesRepository,
     private readonly queue: QueueRepository,
     private readonly enqueue: EnqueueService,
-    private readonly trace: TraceService,
+    private readonly log: LoggingService,
   ) {
     this.authToken = config.get('TWILIO_AUTH_TOKEN', { infer: true });
     this.webhookUrl = config.get('TWILIO_WEBHOOK_URL', { infer: true });
@@ -58,7 +61,11 @@ export class WhatsappController {
     @Body() rawBody: unknown,
     @Headers('x-twilio-signature') signature?: string,
   ): Promise<string> {
-    const requestId = randomUUID();
+    // One id for the whole request. `RequestContextMiddleware` mints it for every
+    // HTTP route, and `LoggingService` stamps it on every line it writes, so a
+    // second id here would appear on the `logger` lines only and would be dropped
+    // from the `log` lines. Mint one only when there is no HTTP context.
+    const requestId = getRequestContext()?.requestId ?? randomUUID();
     const params = new URLSearchParams(typeof rawBody === 'string' ? rawBody : '');
 
     // ── SEC-01/FT-02: signature validation against the exact signed URL ──
@@ -74,7 +81,12 @@ export class WhatsappController {
         return emptyTwiml();
       }
     } else {
-      const valid = validateTwilioSignature(this.authToken, signature ?? '', this.webhookUrl, params);
+      const valid = validateTwilioSignature(
+        this.authToken,
+        signature ?? '',
+        this.webhookUrl,
+        params,
+      );
       if (!valid) {
         this.logger.warn(`twilio_sig_invalid request_id=${requestId}`);
         return emptyTwiml(); // drop silently (don't process unsigned requests)
@@ -93,21 +105,20 @@ export class WhatsappController {
       );
     }
 
-    // ── Tenant resolution (inbound business number → tenant) ──
-    const resolved = await this.tenants.resolveInboundTenant(toAddress);
+    // ── Merchant resolution (inbound merchant number → merchant) ──
+    const resolved = await this.merchants.resolveInboundMerchant(toAddress);
     if (!resolved) {
       this.logger.error(`unresolved inbound WhatsApp number; dropping. request_id=${requestId}`);
       return emptyTwiml();
     }
-    const { tenantId, locationId } = resolved;
+    const { merchantId, locationId } = resolved;
 
-    // ── Identity (creates core.people + contact_methods idempotently) ──
+    // ── Identity: resolve-or-create merchant.customer (federated graph) ──
     const personId = await this.identity.resolveContact({
-      tenantId,
+      merchantId,
       kind: 'whatsapp',
       rawValue: phone,
       displayName: profileName,
-      sourceSystem: 'whatsapp',
     });
     if (!personId) {
       this.logger.error(`identity resolution failed; dropping. request_id=${requestId}`);
@@ -115,27 +126,33 @@ export class WhatsappController {
     }
 
     // ── Rate limit + prompt-injection ──
-    const rate = await this.security.checkRateLimit(tenantId, personId);
+    const rate = await this.security.checkRateLimit(merchantId, personId);
     if (!rate.allowed) {
-      await this.trace.logSecurityEvent({
-        phone,
-        eventType: 'rate_limit_exceeded',
-        inputText: `${rate.count} messages`,
-        requestId,
-      });
+      this.log.warn(
+        'security_event',
+        securityEvent({
+          phone,
+          eventType: 'rate_limit_exceeded',
+          inputText: `${rate.count} messages`,
+          requestId,
+        }),
+      );
       return twimlMessage(
         'Has enviado demasiados mensajes. Por favor, espera un momento antes de continuar.',
       );
     }
     const injection = detectPromptInjection(rawMessage);
     if (injection.detected) {
-      await this.trace.logSecurityEvent({
-        phone,
-        eventType: 'prompt_injection_attempt',
-        inputText: rawMessage,
-        details: injection.pattern,
-        requestId,
-      });
+      this.log.warn(
+        'security_event',
+        securityEvent({
+          phone,
+          eventType: 'prompt_injection_attempt',
+          inputText: rawMessage,
+          details: injection.pattern,
+          requestId,
+        }),
+      );
       return twimlMessage(
         'Lo siento, tu mensaje contiene caracteres no permitidos. Por favor, reformula tu pregunta.',
       );
@@ -143,36 +160,38 @@ export class WhatsappController {
 
     const message = sanitizeInput(rawMessage);
 
-    // ── Ingress observability gate (queue.inbound_events UNIQUE(provider, event id)) ──
+    // ── Ingress observability gate (runtime.inbound_event UNIQUE(provider, event id)) ──
     // NOTE: this is NOT the authoritative dedup. It commits before the message
     // insert + enqueue, so hard-dropping on its `duplicate` flag would strand a
     // first attempt that crashed mid-flight (gate written, work not done). The
-    // durable, idempotent guards are below: comms.messages.twilio_message_sid
+    // durable, idempotent guards are below: merchant.message.provider_message_id
     // (UNIQUE) → DUPLICATE_MESSAGE, and the enqueue jobId=messageSid (BullMQ drops
     // a re-add). So we log a duplicate here and continue; the message-level dedup
     // is what actually prevents a double turn.
     if (messageSid) {
       const gate = await this.queue.registerInboundEvent({
-        tenantId,
+        merchantId,
         provider: 'twilio',
         providerEventId: messageSid,
         eventType: 'whatsapp_message',
-        payload: { phone_hash: this.trace.hashPhone(phone), message_length: message.length },
+        payload: { phone_hash: hashPhone(phone), message_length: message.length },
       });
       if (gate.duplicate) {
-        this.logger.log(`inbound_event_seen message_sid=${messageSid} (continuing; message-level dedup is authoritative)`);
+        this.logger.log(
+          `inbound_event_seen message_sid=${messageSid} (continuing; message-level dedup is authoritative)`,
+        );
       }
     }
 
-    const { conversation } = await this.conversations.getOrCreateConversation(tenantId, personId);
+    const { conversation } = await this.conversations.getOrCreateConversation(merchantId, personId);
 
-    // ── Persist the user message (twilio_message_sid dedup backstop) ──
+    // ── Persist the user message (provider_message_id dedup backstop) ──
     const userMsgId = await this.messages.insertMessage({
-      tenantId,
+      merchantId,
       conversationId: conversation.id,
       role: 'user',
       content: message,
-      twilioMessageSid: messageSid,
+      providerMessageId: messageSid,
     });
     if (userMsgId === DUPLICATE_MESSAGE) {
       return emptyTwiml();
@@ -185,17 +204,17 @@ export class WhatsappController {
       {
         conversation_id: conversation.id,
         person_id: personId,
-        tenant_id: tenantId,
+        merchant_id: merchantId,
         location_id: locationId,
         request_id: requestId,
       },
       { priority: JobPriority.Interactive, jobId: messageSid },
     );
 
-    await this.trace.logPipelineTrace({
+    this.log.log('pipeline_trace', {
       trace_id: requestId,
       conversation_id: conversation.id,
-      business_id: tenantId,
+      merchant_id: merchantId,
       stage: 'inbound',
       event: 'enqueued',
       detail: { user_message_id: userMsgId, message_sid: messageSid ?? null },

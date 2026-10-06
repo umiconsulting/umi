@@ -2,22 +2,26 @@ import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
 
 /**
- * Data access for landing-page leads (Phase 5, spec §9.3). Reads/writes the
- * canonical `grow.leads` + `grow.lead_events` tables — confirmed live on the
- * platform DB (2026-06-30) with every column §9.3 lists, so NO schema migration
- * is needed. `grow` is a service-role-only schema, so this repository always
- * uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no tenant and no
- * authenticated user, exactly like the lifecycle reads. Isolation is not an
- * issue: prospects are Umi-internal, `tenant_id` is NULL by design.
+ * Data access for the landing-page leads funnel (Phase 5, spec §9.3), on build-v3:
  *
- * Event-sourced: every mutation appends a `grow.lead_events` row (email_sent,
+ *   grow.leads       → umi.prospect        (person = contact_name; company = business_name;
+ *                                           status is the ONE pipeline lifecycle)
+ *   grow.lead_events → umi.prospect_event  (event_type + event_data, open vocab)
+ *
+ * `umi.prospect` is Umi's single sales pipeline: the same café-prospect whether the
+ * automated funnel is nurturing it (this engine) or a human is working it. It is a
+ * sealed/service-role table (umi.* has no api grant on prospect), so this repository
+ * always uses the BYPASSRLS **worker pool** (`pg.query`) — leads have no merchant and no
+ * authenticated user, exactly like the lifecycle reads. `merchant_id` is NULL by design.
+ *
+ * Event-sourced: every mutation appends a `umi.prospect_event` row (email_sent,
  * email_failed, sequence_paused/resumed, responded, diagnostic_completed, …).
  */
 
-// Statuses the partial-unique index `grow_leads_email_active_uidx` protects —
+// Statuses the partial-unique index `umi_prospect_email_active_uidx` protects —
 // only one live lead per email may sit in these. Once a lead is converted/lost/
 // unsubscribed it leaves the set and the email can appear again.
-const ACTIVE_STATUSES = ['new', 'nurturing', 'qualified'] as const;
+export const ACTIVE_STATUSES = ['new', 'nurturing', 'qualified'] as const;
 
 export interface LeadDiagnosticData {
   score: number;
@@ -74,9 +78,10 @@ function toIso(v: Ts | null): string {
   return v instanceof Date ? v.toISOString() : String(v);
 }
 
-const SELECT_COLS = `id::text, email, name, company, phone, lifecycle_status,
-  diagnostic_data, diagnostic_date, sequence_paused, pause_reason,
-  emails_sent, last_email_sent_at, created_at, updated_at`;
+const SELECT_COLS = `id::text, email, contact_name AS name, business_name AS company,
+  phone, status AS lifecycle_status, diagnostic_data, diagnostic_date,
+  sequence_paused, pause_reason, emails_sent, last_email_sent_at,
+  created_at, updated_at`;
 
 function toRecord(r: LeadRow): LeadRecord {
   return {
@@ -103,7 +108,7 @@ export interface UpsertLeadInput {
   company?: string | null;
   phone?: string | null;
   diagnosticData: LeadDiagnosticData;
-  diagnosticDate: string; // ISO — required (grow.leads.diagnostic_date is NOT NULL, no default)
+  diagnosticDate: string; // ISO — a landing capture always has one (the column is nullable for manually-entered prospects)
   sourceApp?: string;
 }
 
@@ -114,17 +119,17 @@ export class LeadsRepository {
   /** The single active lead for an email (matches the partial-unique index). */
   async findActiveByEmail(email: string): Promise<LeadRecord | null> {
     const { rows } = await this.pg.query<LeadRow>(
-      `SELECT ${SELECT_COLS} FROM grow.leads
-        WHERE email = $1 AND lifecycle_status = ANY($2::text[])
+      `SELECT ${SELECT_COLS} FROM umi.prospect
+        WHERE email = $1 AND status = ANY($2::text[])
         ORDER BY created_at DESC LIMIT 1`,
-      [email, ACTIVE_STATUSES as unknown as string[]],
+      [email, ACTIVE_STATUSES],
     );
     return rows[0] ? toRecord(rows[0]) : null;
   }
 
   async findById(id: string): Promise<LeadRecord | null> {
     const { rows } = await this.pg.query<LeadRow>(
-      `SELECT ${SELECT_COLS} FROM grow.leads WHERE id = $1`,
+      `SELECT ${SELECT_COLS} FROM umi.prospect WHERE id = $1`,
       [id],
     );
     return rows[0] ? toRecord(rows[0]) : null;
@@ -135,9 +140,7 @@ export class LeadsRepository {
    * keep the original diagnostic_date (like the ported updateExistingLead) and
    * only refresh name/company/phone/diagnostic_data.
    */
-  async upsertByEmail(
-    input: UpsertLeadInput,
-  ): Promise<{ lead: LeadRecord; isNew: boolean }> {
+  async upsertByEmail(input: UpsertLeadInput): Promise<{ lead: LeadRecord; isNew: boolean }> {
     const existing = await this.findActiveByEmail(input.email);
     if (existing) {
       return { lead: await this.applyUpdate(existing.id, input), isNew: false };
@@ -145,8 +148,8 @@ export class LeadsRepository {
 
     try {
       const { rows } = await this.pg.query<LeadRow>(
-        `INSERT INTO grow.leads
-           (email, name, company, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
+        `INSERT INTO umi.prospect
+           (email, contact_name, business_name, phone, diagnostic_data, diagnostic_date, source_app, submitted_form)
          VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7, 'umi-landing-page'), 'diagnostic')
          RETURNING ${SELECT_COLS}`,
         [
@@ -163,7 +166,7 @@ export class LeadsRepository {
     } catch (err) {
       // TOCTOU: a concurrent submission for the same email inserted the active
       // lead between our findActiveByEmail() and this INSERT, tripping the partial
-      // unique index grow_leads_email_active_uidx (23505). Re-read and update so
+      // unique index umi_prospect_email_active_uidx (23505). Re-read and update so
       // the flow stays idempotent instead of throwing.
       if ((err as { code?: string }).code === '23505') {
         const now = await this.findActiveByEmail(input.email);
@@ -176,14 +179,11 @@ export class LeadsRepository {
   }
 
   /** Refresh a lead's mutable fields, keeping its original diagnostic_date. */
-  private async applyUpdate(
-    id: string,
-    input: UpsertLeadInput,
-  ): Promise<LeadRecord> {
+  private async applyUpdate(id: string, input: UpsertLeadInput): Promise<LeadRecord> {
     const { rows } = await this.pg.query<LeadRow>(
-      `UPDATE grow.leads
-          SET name = $2,
-              company = COALESCE($3, company),
+      `UPDATE umi.prospect
+          SET contact_name = $2,
+              business_name = COALESCE($3, business_name),
               phone = COALESCE($4, phone),
               diagnostic_data = $5::jsonb,
               updated_at = now()
@@ -207,7 +207,7 @@ export class LeadsRepository {
     eventData?: Record<string, unknown>,
   ): Promise<void> {
     await this.pg.query(
-      `INSERT INTO grow.lead_events (lead_id, event_type, event_data)
+      `INSERT INTO umi.prospect_event (prospect_id, event_type, event_data)
        VALUES ($1, $2, $3::jsonb)`,
       [leadId, eventType, eventData ? JSON.stringify(eventData) : null],
     );
@@ -223,7 +223,7 @@ export class LeadsRepository {
    */
   async reserveEmailStep(leadId: string, emailKey: string): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET emails_sent = array_append(emails_sent, $2), updated_at = now()
         WHERE id = $1 AND NOT ($2 = ANY(emails_sent))`,
       [leadId, emailKey],
@@ -241,7 +241,7 @@ export class LeadsRepository {
     sentAt?: string;
   }): Promise<void> {
     await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET last_email_sent_at = COALESCE($2, now()), updated_at = now()
         WHERE id = $1`,
       [params.leadId, params.sentAt ?? null],
@@ -266,7 +266,7 @@ export class LeadsRepository {
     subject: string;
   }): Promise<void> {
     await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET emails_sent = array_remove(emails_sent, $2), updated_at = now()
         WHERE id = $1`,
       [params.leadId, params.emailKey],
@@ -282,10 +282,10 @@ export class LeadsRepository {
   /** Active (non-paused) leads still inside a live lifecycle status. */
   async listActive(): Promise<LeadRecord[]> {
     const { rows } = await this.pg.query<LeadRow>(
-      `SELECT ${SELECT_COLS} FROM grow.leads
-        WHERE sequence_paused = false AND lifecycle_status = ANY($1::text[])
+      `SELECT ${SELECT_COLS} FROM umi.prospect
+        WHERE sequence_paused = false AND status = ANY($1::text[])
         ORDER BY diagnostic_date ASC`,
-      [ACTIVE_STATUSES as unknown as string[]],
+      [ACTIVE_STATUSES],
     );
     return rows.map(toRecord);
   }
@@ -299,7 +299,7 @@ export class LeadsRepository {
     eventData?: Record<string, unknown>,
   ): Promise<boolean> {
     const { rowCount } = await this.pg.query(
-      `UPDATE grow.leads
+      `UPDATE umi.prospect
           SET sequence_paused = $2,
               pause_reason = $3,
               updated_at = now()

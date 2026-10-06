@@ -3,12 +3,12 @@
 Canonical Umi design tokens. One DTCG-subset source (`tokens/*.json`) is generated
 into the two shapes the frontends actually consume:
 
-| Output | Consumed by | How |
-| --- | --- | --- |
-| `dist/dashboard.css` | `umi-dashboard` | `@import '@umi/tokens/dashboard.css'` in `src/styles.css` (Vite `@umi/tokens` alias) |
-| `dist/landing.cjs` | `umi-landing-page` | `require('../../packages/tokens/dist/landing.cjs')` in `tailwind.config.js` |
-| `dist/landing.mjs` | (ESM mirror) | future ESM consumers |
-| `dist/tokens.json` | tooling / docs | fully-resolved flat token set |
+| Output               | Consumed by        | How                                                                                  |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------ |
+| `dist/dashboard.css` | `umi-dashboard`    | `@import '@umi/tokens/dashboard.css'` in `src/styles.css` (Vite `@umi/tokens` alias) |
+| `dist/landing.cjs`   | `umi-landing-page` | `require('../../packages/tokens/dist/landing.cjs')` in `tailwind.config.js`          |
+| `dist/landing.mjs`   | (ESM mirror)       | future ESM consumers                                                                 |
+| `dist/tokens.json`   | tooling / docs     | fully-resolved flat token set                                                        |
 
 ## Why `dist/` is committed to git
 
@@ -43,15 +43,15 @@ app-scoped on purpose; converging any of them repaints a live site, so each is a
 separate, explicit follow-up commit (move the chosen value into `core.json` and
 delete the per-app override) — never a side effect of centralizing.
 
-| Concept | dashboard | landing | note |
-| --- | --- | --- | --- |
-| soft blue | `--umi-blue-soft #a8bbde` | `umi-light-blue.soft #BFD1F2` | landing is airier |
-| warm paper | `--surface-warm #FAF4EC` | `umi-paper #FBF7EF` | **landing's whole page background** |
-| warm border | `--surface-warm-border #EAE0D3` | `umi-paper-warm #EDE7DA` | low impact |
-| deepest navy | `--umi-navy-ink #131f44` | `umi-blue.deep #0A1430` | different roles |
-| primary ink | `--ink-1 #131f44` | (globals) `--ink #142142` | near-identical |
-| warm accent | `--warning #B5812A` / `--tenant-brand #B5605A` | `umi-accent #E7A85B` | likely stay distinct |
-| type system | Source Sans 3 / JetBrains Mono | Nunito / Fraunces / Source Code | product-distinct by design |
+| Concept      | dashboard                                      | landing                         | note                                |
+| ------------ | ---------------------------------------------- | ------------------------------- | ----------------------------------- |
+| soft blue    | `--umi-blue-soft #a8bbde`                      | `umi-light-blue.soft #BFD1F2`   | landing is airier                   |
+| warm paper   | `--surface-warm #FAF4EC`                       | `umi-paper #FBF7EF`             | **landing's whole page background** |
+| warm border  | `--surface-warm-border #EAE0D3`                | `umi-paper-warm #EDE7DA`        | low impact                          |
+| deepest navy | `--umi-navy-ink #131f44`                       | `umi-blue.deep #0A1430`         | different roles                     |
+| primary ink  | `--ink-1 #131f44`                              | (globals) `--ink #142142`       | near-identical                      |
+| warm accent  | `--warning #B5812A` / `--tenant-brand #B5605A` | `umi-accent #E7A85B`            | likely stay distinct                |
+| type system  | Source Sans 3 / JetBrains Mono                 | Nunito / Fraunces / Source Code | product-distinct by design          |
 
 ## Not yet covered (Phase 2)
 

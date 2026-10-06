@@ -12,13 +12,13 @@ Program driver: `2026-06-09-workspace-integration-implementation-plan.md` step S
 
 ## Delta re-verification (matches 2026-05-16 audit exactly)
 
-| table | public-only rows |
-|---|---|
-| businesses / customers / conversations / transactions | 0 |
-| messages | 12 |
-| jobs | 30 (2 pending) |
-| job_attempts | 30 |
-| outbox | 6 |
+| table                                                 | public-only rows |
+| ----------------------------------------------------- | ---------------- |
+| businesses / customers / conversations / transactions | 0                |
+| messages                                              | 12               |
+| jobs                                                  | 30 (2 pending)   |
+| job_attempts                                          | 30               |
+| outbox                                                | 6                |
 
 Snapshot unchanged since the 05-16 audit; zero public-only canonical rows.
 

@@ -42,9 +42,7 @@ export function isExtensionLike(text: string): boolean {
   );
 }
 
-export function buildMergedTurnText(
-  messages: Array<Pick<MessageRunItem, 'content'>>,
-): string {
+export function buildMergedTurnText(messages: Array<Pick<MessageRunItem, 'content'>>): string {
   return messages
     .map((message) => message.content.trim())
     .filter(Boolean)

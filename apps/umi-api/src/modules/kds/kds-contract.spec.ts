@@ -30,8 +30,7 @@ describe('KDS frozen contract', () => {
   it('device_revoked body is byte-exact (used for both 401 and 403)', () => {
     expect(DEVICE_REVOKED_BODY).toEqual({
       error: 'device_revoked',
-      message:
-        'This KDS device has been removed. Pair it again from the dashboard.',
+      message: 'This KDS device has been removed. Pair it again from the dashboard.',
     });
   });
 
@@ -63,13 +62,17 @@ describe('KDS frozen contract', () => {
     expect(STATUS_TRANSITIONS.new).toContain('cancelled');
   });
 
-  it('maps kitchen_status → ops.orders.status', () => {
-    expect(mapKitchenToOrderStatus('new')).toBe('pending');
-    expect(mapKitchenToOrderStatus('preparing')).toBe('in_progress');
+  // Rebound from the legacy ops.orders vocabulary (pending/in_progress/cancelled) to
+  // build-v3's CHECK (placed/preparing/ready/completed/canceled). The exhaustive
+  // both-directions coverage lives in kds-status-map.spec.ts; this keeps the spot
+  // checks that were already here.
+  it('maps kitchen_status → merchant.customer_order.status', () => {
+    expect(mapKitchenToOrderStatus('new')).toBe('placed');
+    expect(mapKitchenToOrderStatus('preparing')).toBe('preparing');
     expect(mapKitchenToOrderStatus('ready')).toBe('ready');
     expect(mapKitchenToOrderStatus('completed')).toBe('completed');
-    expect(mapKitchenToOrderStatus('cancelled')).toBe('cancelled');
-    expect(mapKitchenToOrderStatus('partial_cancelled')).toBe('in_progress');
+    expect(mapKitchenToOrderStatus('cancelled')).toBe('canceled');
+    expect(mapKitchenToOrderStatus('partial_cancelled')).toBe('preparing');
   });
 });
 
@@ -113,15 +116,9 @@ describe('KDS notification copy (ported byte-for-byte)', () => {
     expect(statusNotificationBody('accepted')).toBe(
       'Tu pedido fue aceptado y está en cola en cocina.',
     );
-    expect(statusNotificationBody('preparing')).toBe(
-      'Tu pedido se está preparando.',
-    );
-    expect(statusNotificationBody('ready')).toBe(
-      'Tu pedido está listo para recoger.',
-    );
-    expect(statusNotificationBody('completed')).toBe(
-      'Tu pedido fue completado. ¡Gracias!',
-    );
+    expect(statusNotificationBody('preparing')).toBe('Tu pedido se está preparando.');
+    expect(statusNotificationBody('ready')).toBe('Tu pedido está listo para recoger.');
+    expect(statusNotificationBody('completed')).toBe('Tu pedido fue completado. ¡Gracias!');
     expect(statusNotificationBody('cancelled')).toBe('Tu pedido fue cancelado.');
     expect(statusNotificationBody('new')).toBeNull();
   });

@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
-import ProgressBar from "./ProgressBar";
+import { motion } from 'framer-motion';
+import { ArrowLeft } from 'lucide-react';
+import ProgressBar from './ProgressBar';
 
 export interface Question {
   id: number;
@@ -41,9 +41,9 @@ const QuestionStep = ({
       currentStep={currentQuestion}
       totalSteps={totalQuestions + 2} // +2 for welcome and result steps
       messages={{
-        1: "Diagnóstico - Primera pregunta",
-        2: "Diagnóstico - Casi a mitad de camino",
-        3: "Diagnóstico - Última pregunta",
+        1: 'Diagnóstico - Primera pregunta',
+        2: 'Diagnóstico - Casi a mitad de camino',
+        3: 'Diagnóstico - Última pregunta',
       }}
     />
 
@@ -63,12 +63,14 @@ const QuestionStep = ({
           onClick={() => onSelect(option.value)}
           className={`rounded-[24px] border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(34,57,121,0.1)] ${
             selectedValue === option.value
-              ? "border-umi-blue-dark bg-[#eef3ff]"
-              : "border-[var(--stroke)] bg-[#fbf7ef] hover:border-umi-blue-dark/35"
+              ? 'border-umi-blue-dark bg-[#eef3ff]'
+              : 'border-[var(--stroke)] bg-[#fbf7ef] hover:border-umi-blue-dark/35'
           }`}
         >
           <h4 className="mb-2 text-lg font-extrabold text-umi-blue-deep">{option.text}</h4>
-          <p className="text-sm font-semibold leading-[1.5] text-[rgba(20,33,66,0.62)]">{option.description}</p>
+          <p className="text-sm font-semibold leading-[1.5] text-[rgba(20,33,66,0.62)]">
+            {option.description}
+          </p>
         </button>
       ))}
     </div>
@@ -89,7 +91,7 @@ const QuestionStep = ({
     <div className="mt-6 border-t border-[var(--stroke)] pt-6 text-center text-sm font-bold text-[rgba(20,33,66,0.48)]">
       <p>
         {currentQuestion === totalQuestions
-          ? "Última pregunta - ¡Ya casi terminas!"
+          ? 'Última pregunta - ¡Ya casi terminas!'
           : `Pregunta ${currentQuestion} de ${totalQuestions} - ¡Sigue avanzando!`}
       </p>
     </div>

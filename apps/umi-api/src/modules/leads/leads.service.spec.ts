@@ -14,14 +14,20 @@ function make(env: Record<string, unknown> = {}) {
   const config = { get: vi.fn((k: string) => env[k]) };
   return {
     svc: new LeadsService(sequences as never, email as never, config as never),
-    sequences, email, config,
+    sequences,
+    email,
+    config,
   };
 }
 
 describe('LeadsService.sendContact', () => {
   it('sends the internal notification (reply-to prospect) + the auto-reply', async () => {
     const h = make({ CONTACT_TO_EMAIL: 'hola@umiconsulting.co' });
-    const r = await h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx', company: 'Café Luna' } as never);
+    const r = await h.svc.sendContact({
+      name: 'Ana',
+      email: 'ana@cafe.mx',
+      company: 'Café Luna',
+    });
     expect(r).toEqual({ sent: 2, failed: 0 });
     expect(h.email.send).toHaveBeenCalledTimes(2);
     // internal notification replies to the prospect
@@ -33,12 +39,12 @@ describe('LeadsService.sendContact', () => {
   it('throws when both sends fail', async () => {
     const h = make({ CONTACT_TO_EMAIL: 'hola@umiconsulting.co' });
     h.email.send.mockResolvedValue(null);
-    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' } as never)).rejects.toThrow();
+    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' })).rejects.toThrow();
   });
 
   it('fails closed (no send) when no internal recipient is configured', async () => {
     const h = make({}); // neither CONTACT_TO_EMAIL nor EMAIL_FROM
-    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' } as never)).rejects.toThrow(
+    await expect(h.svc.sendContact({ name: 'Ana', email: 'ana@cafe.mx' })).rejects.toThrow(
       'contact_internal_email_missing',
     );
     expect(h.email.send).not.toHaveBeenCalled();

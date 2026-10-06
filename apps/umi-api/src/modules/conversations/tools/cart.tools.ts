@@ -24,7 +24,7 @@ import { needsInputToolError, retryableToolError, terminalToolError } from './to
 /**
  * Cart tools: add_to_cart + edit_cart. Ported from `tools.ts`; product reads
  * rebound to ProductsRepository, draft cart to ConversationsRepository
- * (`comms.conversations.draft_cart` + CAS on `draft_cart_version`). The legacy
+ * (`runtime.conversation_cart.cart`, last-write-wins — no CAS). The legacy
  * partial-order seed (kds.tickets) is deferred to Phase 4 → no seed here.
  * Money is PESOS (tool unit).
  */
@@ -43,21 +43,34 @@ export class CartTools {
   ): Promise<{ cart: DraftCart | null; version: number }> {
     const conv = await this.conversations.loadById(conversationId);
     const cart = (conv?.draftCart as DraftCart | null) ?? null;
-    const version = conv?.draftCartVersion ?? 0;
+    const version = 0; // last-write-wins: no CAS version any more (the FSM is gone)
     if (!validateCartItems(cart).valid) {
       return { cart: { items: [], updated_at: new Date().toISOString() }, version };
     }
     return { cart, version };
   }
 
-  /** CAS write (returns true if this writer won the version race). */
+  /** Last-write-wins cart write. There is no CAS, so the write always lands
+   *  (the retry loop at call sites now runs a single iteration).
+   *
+   *  `presented` records that THIS write is the one the customer sees priced, via the
+   *  `formatCartSummary` read-back the caller is about to return. It is a parameter
+   *  rather than something inferred here because the two are not the same event: an
+   *  edit that still needs a variant answers with a QUESTION, not a total, and
+   *  stamping `presented_at` there would have the confirmation frame claim the
+   *  customer saw a price they were never shown. */
   private async writeDraftCart(
     conversationId: string,
     cart: DraftCart | null,
-    expectedVersion: number,
+    _expectedVersion: number,
+    presented: boolean,
   ): Promise<boolean> {
-    const next = await this.conversations.updateDraftCartCas(conversationId, expectedVersion, cart);
-    return next !== null;
+    const next =
+      presented && cart && cart.items.length > 0
+        ? { ...cart, presented_at: new Date().toISOString() }
+        : cart;
+    await this.conversations.setDraftCart(conversationId, next);
+    return true;
   }
 
   async addToCart(
@@ -82,7 +95,7 @@ export class CartTools {
       temp: input.temp,
       milk: input.milk,
     });
-    const searchResults = await this.products.searchByQuery(ctx.tenantId, input.query, 10);
+    const searchResults = await this.products.searchByQuery(ctx.merchantId, input.query, 10);
     let products = chooseBestProductMatch(searchResults, input.query);
     let effectiveQuery = input.query;
 
@@ -94,7 +107,11 @@ export class CartTools {
         variantFilters.milk,
       );
       if (strippedQuery) {
-        const strippedResults = await this.products.searchByQuery(ctx.tenantId, strippedQuery, 10);
+        const strippedResults = await this.products.searchByQuery(
+          ctx.merchantId,
+          strippedQuery,
+          10,
+        );
         const strippedProducts = chooseBestProductMatch(strippedResults, strippedQuery);
         if (strippedProducts.length) {
           products = strippedProducts;
@@ -104,7 +121,7 @@ export class CartTools {
     }
 
     if (!products.length) {
-      const suggestions = await this.products.categorySuggestions(ctx.tenantId);
+      const suggestions = await this.products.categorySuggestions(ctx.merchantId);
       return {
         ...retryableToolError(
           `No encontré "${effectiveQuery}" en el menú.`,
@@ -162,7 +179,7 @@ export class CartTools {
         });
       }
       const cart = buildDraftCart(items, input.customer_note ?? seedCart?.customer_note ?? null);
-      const wrote = await this.writeDraftCart(ctx.conversationId, cart, version);
+      const wrote = await this.writeDraftCart(ctx.conversationId, cart, version, true);
       if (!wrote) continue;
       return {
         success: true,
@@ -200,7 +217,7 @@ export class CartTools {
       }
 
       if (input.action === 'clear') {
-        const wrote = await this.writeDraftCart(ctx.conversationId, null, version);
+        const wrote = await this.writeDraftCart(ctx.conversationId, null, version, false);
         if (!wrote) continue;
         return {
           success: true,
@@ -233,7 +250,7 @@ export class CartTools {
           );
         }
         const target = matches[0];
-        const product = await this.products.getById(ctx.tenantId, target.product_id);
+        const product = await this.products.getById(ctx.merchantId, target.product_id);
         if (!product || product.available === false) {
           return retryableToolError(`El producto ${target.product_name} ya no está disponible.`, {
             tool: 'search_menu',
@@ -249,7 +266,8 @@ export class CartTools {
         if (!resolvedVariant.success) {
           return {
             ...needsInputToolError(
-              resolvedVariant.needs_clarification ?? 'Necesito más detalle para cambiar esa opción.',
+              resolvedVariant.needs_clarification ??
+                'Necesito más detalle para cambiar esa opción.',
             ),
             needs_clarification: resolvedVariant.needs_clarification,
           };
@@ -261,7 +279,7 @@ export class CartTools {
             : item,
         );
         const nextCart = buildDraftCart(items, cart.customer_note ?? null);
-        const wrote = await this.writeDraftCart(ctx.conversationId, nextCart, version);
+        const wrote = await this.writeDraftCart(ctx.conversationId, nextCart, version, true);
         if (!wrote) continue;
         return {
           success: true,
@@ -282,7 +300,12 @@ export class CartTools {
         );
       }
       const nextCart = edit.cart.items.length > 0 ? edit.cart : null;
-      const wrote = await this.writeDraftCart(ctx.conversationId, nextCart, version);
+      const wrote = await this.writeDraftCart(
+        ctx.conversationId,
+        nextCart,
+        version,
+        !edit.keptMissing,
+      );
       if (!wrote) continue;
 
       const removedText =

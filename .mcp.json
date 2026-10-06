@@ -1,5 +1,35 @@
 {
   "mcpServers": {
+    "azure-devops": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp@2.9.0",
+        "umiconsulting",
+        "--authentication",
+        "interactive",
+        "-d",
+        "core",
+        "work",
+        "work-items",
+        "repositories",
+        "pipelines",
+        "wiki"
+      ]
+    },
+    "plane": {
+      "command": "uvx",
+      "args": [
+        "plane-mcp-server",
+        "stdio"
+      ],
+      "env": {
+        "PLANE_API_KEY": "${PLANE_API_KEY}",
+        "PLANE_WORKSPACE_SLUG": "umi",
+        "PLANE_BASE_URL": "https://plane.umiconsulting.co"
+      }
+    },
     "playwright-mcp": {
       "type": "stdio",
       "command": "npx",
@@ -20,8 +50,11 @@
     },
     "deepseek": {
       "type": "stdio",
-      "command": "deepseek-mcp-server",
-      "args": [],
+      "command": "npx",
+      "args": [
+        "-y",
+        "deepseek-mcp-server@0.6.0"
+      ],
       "env": {
         "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}",
         "DEEPSEEK_DEFAULT_MODEL": "deepseek-v4-pro"
@@ -38,17 +71,13 @@
         "GEMINI_API_KEY": "${GEMINI_API_KEY}"
       }
     },
-    "plane": {
-      "command": "uvx",
+    "dart": {
+      "type": "stdio",
+      "command": "dart",
       "args": [
-        "plane-mcp-server",
-        "stdio"
+        "mcp-server"
       ],
-      "env": {
-        "PLANE_API_KEY": "${PLANE_API_KEY}",
-        "PLANE_WORKSPACE_SLUG": "umi",
-        "PLANE_BASE_URL": "https://plane.umiconsulting.co"
-      }
+      "env": {}
     }
   }
 }

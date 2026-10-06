@@ -5,9 +5,9 @@ import type Anthropic from '@anthropic-ai/sdk';
  * conversaflow turn processors + tool loop.
  */
 
-/** Per-turn context handed to every tool. Canonical ids (tenant/person). */
+/** Per-turn context handed to every tool. Canonical ids (merchant/person). */
 export interface ToolContext {
-  tenantId: string;
+  merchantId: string;
   personId: string;
   conversationId: string;
   /** The turn id — used as the deterministic checkout idempotency key (3c). */

@@ -10,7 +10,7 @@ import { PgService } from '../../shared/database/pg.service';
  * The pure functions are exported standalone (no DI) so the turn loop and intent
  * extractor can call them without injecting the service. `checkRateLimit` is the
  * only DB-bound piece — rebound to canonical `comms.*` and run on the worker
- * pool (unauthenticated WhatsApp path), with explicit tenant predicates.
+ * pool (unauthenticated WhatsApp path), with explicit merchant predicates.
  */
 
 export const SECURITY_CONFIG = {
@@ -61,13 +61,15 @@ export function sanitizeInput(input: string | undefined | null): string {
 }
 
 export function sanitizeOutput(output: string): string {
-  return output
-    .replace(/ANTHROPIC_API_KEY/gi, '[REDACTED]')
-    .replace(/SUPABASE.*KEY/gi, '[REDACTED]')
-    .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, '[REDACTED]')
-    // Strip transcript-continuation hallucinations: lines starting with a role.
-    .replace(/\n(user|assistant|cliente|asistente):\s*.*/gi, '')
-    .trim();
+  return (
+    output
+      .replace(/ANTHROPIC_API_KEY/gi, '[REDACTED]')
+      .replace(/SUPABASE.*KEY/gi, '[REDACTED]')
+      .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, '[REDACTED]')
+      // Strip transcript-continuation hallucinations: lines starting with a role.
+      .replace(/\n(user|assistant|cliente|asistente):\s*.*/gi, '')
+      .trim()
+  );
 }
 
 export interface OrderItemInput {
@@ -142,10 +144,7 @@ export function validateCartItems(cart: unknown): {
     if (typeof item.product_id !== 'string' || item.product_id.trim().length === 0) {
       return { valid: false, reason: 'product_id inválido' };
     }
-    if (
-      typeof item.product_name !== 'string' ||
-      item.product_name.trim().length === 0
-    ) {
+    if (typeof item.product_name !== 'string' || item.product_name.trim().length === 0) {
       return { valid: false, reason: 'product_name inválido' };
     }
     if (item.variant_name != null && typeof item.variant_name !== 'string') {
@@ -205,23 +204,23 @@ export class SecurityService {
 
   /**
    * Rate-limit a sender by counting their user messages in the last minute/hour
-   * on their most recent active conversation. Rebound from the legacy
-   * customers→conversations→messages chain to canonical `comms.*`.
+   * on their most recent active conversation. Reads `merchant.conversation` +
+   * `merchant.message` (build-v2).
    */
   async checkRateLimit(
-    tenantId: string,
+    merchantId: string,
     personId: string,
   ): Promise<{ allowed: boolean; count: number }> {
     const conv = await this.pg.query<{ id: string }>(
       `SELECT id
-         FROM comms.conversations
-        WHERE person_id = $1
-          AND tenant_id = $2
+         FROM merchant.conversation
+        WHERE customer_id = $1
+          AND merchant_id = $2
           AND status IN ('open', 'active', 'pending')
           AND last_message_at >= now() - interval '1 hour'
         ORDER BY last_message_at DESC
         LIMIT 1`,
-      [personId, tenantId],
+      [personId, merchantId],
     );
     if (!conv.rows[0]) return { allowed: true, count: 0 };
 
@@ -229,8 +228,8 @@ export class SecurityService {
       `SELECT
          count(*) FILTER (WHERE created_at >= now() - interval '1 minute') AS minute,
          count(*) FILTER (WHERE created_at >= now() - interval '1 hour')   AS hour
-       FROM comms.messages
-       WHERE conversation_id = $1 AND role = 'user'`,
+       FROM merchant.message
+       WHERE conversation_id = $1 AND sender = 'customer'`,
       [conv.rows[0].id],
     );
 

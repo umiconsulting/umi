@@ -7,22 +7,22 @@ import type { ToolDefinitions } from '../turn.types';
  */
 export const TOOL_DEFINITIONS: ToolDefinitions = [
   {
-    name: 'set_branch',
+    name: 'set_location',
     description:
       'Registra a qué sucursal quiere ordenar el cliente, cuando el negocio tiene más de una sucursal activa. Úsala cuando el cliente indique la sucursal, zona o colonia —aunque use un apodo o abreviación como "chapu" por "Chapultepec"—. No inventes la sucursal: si no queda clara, vuelve a preguntar. No la uses si el negocio tiene una sola sucursal.',
     input_schema: {
       type: 'object',
       properties: {
-        branch: {
+        location: {
           type: 'string',
           description: 'Nombre de la sucursal que indicó el cliente (tal como la nombró).',
         },
       },
-      required: ['branch'],
+      required: ['location'],
     },
   },
   {
-    name: 'get_business_info',
+    name: 'get_merchant_info',
     description:
       'Obtiene dirección, métodos de pago y datos operativos del negocio. Úsala para ubicación, pagos o información general del café. No la uses para horarios ni para responder preguntas de menú.',
     input_schema: { type: 'object', properties: {} },
@@ -56,7 +56,11 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
       type: 'object',
       properties: {
         query: { type: 'string' },
-        quantity: { type: 'integer', minimum: 1, description: 'Cantidad entera de unidades (por ejemplo, 2).' },
+        quantity: {
+          type: 'integer',
+          minimum: 1,
+          description: 'Cantidad entera de unidades (por ejemplo, 2).',
+        },
         size: { type: 'string' },
         temp: { type: 'string' },
         milk: { type: 'string' },
@@ -83,14 +87,19 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
           description:
             'Tipo de edición. Usa update_options para cambiar leche, tamaño o temperatura de un producto ya presente.',
         },
-        remove_query: { type: 'string', description: 'Producto o línea que se debe quitar del carrito.' },
+        remove_query: {
+          type: 'string',
+          description: 'Producto o línea que se debe quitar del carrito.',
+        },
         keep_query: {
           type: 'string',
-          description: 'Producto que el cliente quiere conservar como único item, si ya está en carrito.',
+          description:
+            'Producto que el cliente quiere conservar como único item, si ya está en carrito.',
         },
         target_query: {
           type: 'string',
-          description: 'Producto ya presente cuyas opciones se deben cambiar, por ejemplo Latte Regular.',
+          description:
+            'Producto ya presente cuyas opciones se deben cambiar, por ejemplo Latte Regular.',
         },
         size: { type: 'string' },
         temp: { type: 'string' },
@@ -105,17 +114,32 @@ export const TOOL_DEFINITIONS: ToolDefinitions = [
     input_schema: {
       type: 'object',
       properties: {
+        customer_confirmation: {
+          type: 'string',
+          description:
+            'Las palabras EXACTAS del último mensaje del cliente que confirman el pedido, copiadas tal cual (cualquier idioma o registro: "confirmado", "sale", "yeah go ahead", "👍"). Tú decides si confirman; esto solo comprueba que el cliente sí las escribió. No inventes ni parafrasees. Una pregunta NUNCA es una confirmación: si el cliente pregunta "¿sale más caro?", la palabra "sale" ahí no confirma nada. Si el cliente no confirmó, pídele la confirmación en vez de llamar esta herramienta.',
+        },
         pickup_person: { type: 'string' },
-        personal_message: { type: 'string' },
         customer_note: { type: 'string' },
       },
+      required: ['customer_confirmation'],
     },
   },
   {
     name: 'confirm_order_changes',
     description:
       'Confirma los cambios de una cancelación parcial activa para que el pedido actualizado siga en cocina. Úsala solo cuando existe una cancelación parcial pendiente y el cliente acepta esos cambios. No la uses para confirmaciones normales.',
-    input_schema: { type: 'object', properties: {} },
+    input_schema: {
+      type: 'object',
+      properties: {
+        customer_confirmation: {
+          type: 'string',
+          description:
+            'Las palabras EXACTAS del último mensaje del cliente que aceptan los cambios, copiadas tal cual. No inventes ni parafrasees.',
+        },
+      },
+      required: ['customer_confirmation'],
+    },
   },
   {
     name: 'cancel_order',

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "profileType": "template",
+  "environment": "pilot",
+  "merchant": {
+    "publicReference": "OWNER_DECISION_REQUIRED",
+    "name": "OWNER_DECISION_REQUIRED",
+    "timezone": "America/Mazatlan",
+    "currency": "MXN",
+    "locale": "es-MX"
+  },
+  "locations": [
+    {
+      "publicReference": "OWNER_DECISION_REQUIRED",
+      "name": "OWNER_DECISION_REQUIRED",
+      "timezone": "America/Mazatlan",
+      "registers": [{ "publicReference": "OWNER_DECISION_REQUIRED", "name": "Caja 1" }]
+    }
+  ],
+  "policies": {
+    "receipt": { "autoPrint": true, "controlledCopies": true },
+    "cash": {
+      "currency": "MXN",
+      "openingFloatMinorUnits": "OWNER_DECISION_REQUIRED",
+      "blindClose": true
+    },
+    "hardware": {
+      "simulatorAllowed": false,
+      "primaryPrinterRequired": true,
+      "scannerRequired": true
+    },
+    "offline": {
+      "eligibleCashSales": true,
+      "storedValueRedemption": false,
+      "sensitiveCustomerMutation": false
+    },
+    "loyalty": {
+      "enabled": false,
+      "earnRate": "OWNER_DECISION_REQUIRED",
+      "expiration": "OWNER_DECISION_REQUIRED"
+    },
+    "rewards": { "enabled": false, "threshold": "OWNER_DECISION_REQUIRED" },
+    "giftCards": {
+      "enabled": false,
+      "maximumMinorUnits": "OWNER_DECISION_REQUIRED",
+      "expiration": "OWNER_DECISION_REQUIRED"
+    },
+    "inventory": {
+      "negativeStockOverride": false,
+      "defaultLowStockMinorUnits": "OWNER_DECISION_REQUIRED"
+    },
+    "approvals": {
+      "refundThresholdMinorUnits": "OWNER_DECISION_REQUIRED",
+      "inventoryThresholdMinorUnits": "OWNER_DECISION_REQUIRED"
+    }
+  },
+  "kitchenStations": [{ "publicReference": "OWNER_DECISION_REQUIRED", "name": "Preparación" }],
+  "featureFlags": {
+    "paymentsProvider": false,
+    "analytics": false,
+    "hardwareSimulator": false
+  }
+}

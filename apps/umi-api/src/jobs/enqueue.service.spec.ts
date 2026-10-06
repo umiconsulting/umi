@@ -5,7 +5,10 @@ import { QUEUES } from './queues';
 import { JobPriority, toBullPriority } from './job-options';
 
 function makeQueue(): Queue {
-  return { add: vi.fn().mockResolvedValue({ id: 'job-1' }) } as unknown as Queue;
+  return {
+    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
+    getJobCounts: vi.fn().mockResolvedValue({ active: 0, waiting: 0, delayed: 0, paused: 0 }),
+  } as unknown as Queue;
 }
 
 function serviceWithQueues(): { svc: EnqueueService; queues: Record<string, Queue> } {
@@ -18,6 +21,7 @@ function serviceWithQueues(): { svc: EnqueueService; queues: Record<string, Queu
     queues[QUEUES.outbound],
     queues[QUEUES.integrations],
     queues[QUEUES.lifecycle],
+    queues[QUEUES.tender],
   );
   return { svc, queues };
 }
@@ -28,14 +32,14 @@ describe('EnqueueService', () => {
     const id = await svc.enqueue(
       QUEUES.turns,
       'turn.process',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       { priority: JobPriority.Interactive, jobId: 'msg-abc' },
     );
 
     expect(id).toBe('job-1');
     expect(queues[QUEUES.turns].add).toHaveBeenCalledWith(
       'turn.process',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       expect.objectContaining({
         priority: toBullPriority(JobPriority.Interactive),
         jobId: 'msg-abc',
@@ -50,13 +54,13 @@ describe('EnqueueService', () => {
     await svc.enqueue(
       QUEUES.turns,
       'turn.process',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       { jobId: 'turn_process:11111111-2222-3333-4444-555555555555' },
     );
 
     expect(queues[QUEUES.turns].add).toHaveBeenCalledWith(
       'turn.process',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       expect.objectContaining({
         jobId: 'turn_process_11111111-2222-3333-4444-555555555555',
       }),
@@ -65,12 +69,12 @@ describe('EnqueueService', () => {
 
   it('routes to the requested queue and defaults priority', async () => {
     const { svc, queues } = serviceWithQueues();
-    await svc.enqueue(QUEUES.outbound, 'twilio.reply', { tenantId: 't1' });
+    await svc.enqueue(QUEUES.outbound, 'twilio.reply', { merchantId: 't1' });
 
     expect(queues[QUEUES.turns].add).not.toHaveBeenCalled();
     expect(queues[QUEUES.outbound].add).toHaveBeenCalledWith(
       'twilio.reply',
-      { tenantId: 't1' },
+      { merchantId: 't1' },
       expect.objectContaining({
         priority: toBullPriority(JobPriority.Default),
         attempts: 5, // outbound keeps the legacy outbox max_attempts

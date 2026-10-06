@@ -21,6 +21,468 @@ Record successful and failed cross-workspace traces here before proposing new re
 
 ## Current entries
 
+### 2026-09-14 - Launch the local database, API, and POS stack
+- task type: local runtime startup
+- request summary: Start the local Postgres, Redis, umi-api, and native Linux UmiPOS, then prove readiness.
+- filesystem slice inspected: `deploy/local/compose.yml`, `apps/umi-api/README.md`, `apps/umi-api/.env`, `apps/umi-pos/README.md`, `docs/development/RUNNING_UMIPOS.md`
+- chosen owner: root local runtime; no source edit
+- chosen path: reuse the running Docker database and Redis on ports 4003 and 4004; reuse the healthy API on port 4001; build and run the native Linux UmiPOS
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md` only
+- tools used: `docker exec`, `psql`, `curl`, `flutter build linux`, `setsid`, `pgrep`, `xwininfo`, `xwd`, `ffmpeg`
+- outcome: database and Redis healthy; API `/health` answers 200 with compatible schema `build-v3-62`; the native POS window runs and shows the till
+- reusable pattern observed: a background command from a tool shell stops without `setsid`; the POS needs the release identity dart-defines to pass its release gate
+- promotion follow-up: none; `deploy/local/compose.yml` and the UmiPOS runbook already state the steps
+
+### 2026-09-01 - Device branch assignment and enrollment list stabilization
+- task type: dashboard and API bug fix for device registration
+- request summary: assign devices to a branch and stop the UmiPOS request count from decreasing after page load
+- filesystem slice inspected: `apps/umi-dashboard/src/screens/devices.jsx`, dashboard merchant context, KDS API service, and KDS repository
+- chosen owner: `apps/umi-api` owns device scope; `apps/umi-dashboard` owns the branch selection interface
+- chosen path: direct implementation; the existing database already stores `merchant.device.location_id`
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `ui-ux-pro-max`, and `diagnosing-bugs`; no subagent
+- files touched: dashboard device screen and utility tests; KDS repository projection and query regression test
+- tools used: CodeGraph sync, `rg`, Vitest, TypeScript, ESLint, Vite, and Playwright with Firefox
+- outcome: the first render now hides old completed requests; registration requires a branch; device rows expose their branch
+- reusable pattern observed: use the merchant context for branch state; do not read branch state directly from `localStorage`
+- promotion follow-up: none; the existing boundary skills cover this pattern
+
+- 2026-09-01 — Merchant roles and POS permissions. Owner: `apps/umi-api`, `apps/umi-dashboard`, and build-v3 migration definitions. Used `workspace-boundary-check`, `repository-cartographer`, CodeGraph, and the staging rehearsal. Added merchant role storage, API contracts, Dashboard management, POS permission resolution, and rehearsal evidence.
+
+### 2026-09-01 - POS roles and staff PIN management
+- task type: Cross-product implementation
+- request summary: Show the POS permission matrix and manage staff PIN access from Dashboard `/staff`.
+- filesystem slice inspected: `apps/umi-api`, `apps/umi-dashboard`, `packages/contract`, `config`, and build-v3 docs.
+- chosen owner: `apps/umi-api`
+- chosen path: Keep grants and PIN writes in the API. Keep the Dashboard as a contract client.
+- skill or subagent used: `task-router`, `workspace-boundary-check`, `scientific-research-check`, and `playwright-cli`
+- files touched: Staff API, Dashboard staff screen, shared contract, RBAC generator, generated SQL, and RBAC docs.
+- tools used: Repository search, API tests, contract tests, Dashboard tests, build checks, lint, and Firefox automation.
+- outcome: Added Admin and Barista matrix views. Added role and PIN management with server authorization.
+- reusable pattern observed: Present canonical grants as a summary. Do not add a client-side permission editor.
+- promotion follow-up: None.
+
+### 2026-08-31 - Diagnose the Dashboard super-admin session failure
+- task type: cross-product runtime diagnosis
+- request summary: Find the saved intent for super-admin café access and explain the Dashboard logout.
+- filesystem slice inspected: root documentation, apps/umi-dashboard, apps/umi-api, packages/contract
+- chosen owner: apps/umi-dashboard
+- chosen path: diagnose the browser session boundary and verify the build-v3 rehearsal data
+- skill or subagent used: task-router, diagnosing-bugs, research, super_admin_history
+- files touched: apps/umi-dashboard/package.json; docs/development/RUNNING_UMIPOS.md; docs/reports/2026-08-31-super-admin-dashboard-research.md; .agents/skills/task-router/routing-ledger.md
+- tools used: ripgrep, Git history, PostgreSQL-backed API requests, process inspection, runtime restart
+- outcome: Confirmed a localhost and 127.0.0.1 cookie mismatch; made 127.0.0.1 the default Dashboard host.
+- reusable pattern observed: local cookie-auth clients must use one hostname across the browser and API.
+- promotion follow-up: Add a browser test and an explicit Vite host in a separate fix.
+
+### 2026-08-31 - Connect local Dashboard and POS to the build-v3 rehearsal
+- task type: cross-product local runtime configuration
+- request summary: Route Dashboard and POS through umi-api to the rehearsal database, then prepare Kalala for POS testing.
+- filesystem slice inspected: `apps/umi-api`, `apps/umi-dashboard`, `apps/umi-pos`, and the build-v3 rehearsal database.
+- chosen owner: `apps/umi-api` owns the database connection; Dashboard and POS remain API clients.
+- chosen path: Switch the API process to the rehearsal database and keep both client API URLs unchanged.
+- skill or subagent used: `task-router`, `diagnosing-bugs`, and `webapp-testing`; no subagent.
+- files touched: `.agents/skills/task-router/routing-ledger.md`; runtime changes affected only the rehearsal database and local processes.
+- tools used: PostgreSQL, Docker, curl, Firefox, Flutter, Vite, X11, and local process inspection.
+- outcome: API uses `umi_transition_rehearsal_20260901`; Dashboard login works; POS shows device registration; Kalala has an active rehearsal POS entitlement and its 136-product catalog remains unchanged.
+- reusable pattern observed: A restored merchant can need a rehearsal-only entitlement override before a new product client can use migrated source data.
+- promotion follow-up: none; wait for the manual POS registration and the next debug result.
+
+### 2026-08-31 - Rehearse build-v3 against the current production snapshot
+
+- task type: cross-workspace database transition validation
+- request summary: Restore the new production dump and run the full build-v3 transition SQL against it.
+- filesystem slice inspected: build-v3 DDL and backfill, migration gates, API integration tests, and audit evidence
+- chosen owner: root `docs/migration/build-v3` for the transition; `apps/umi-api` for the data-pinned integration test
+- chosen path: Restore nine source schemas into PostgreSQL 17. Rebuild a separate target through the canonical backfill runner.
+- skill or subagent used: `staging-validation-runner`, `diagnosing-bugs`, and `task-router`; no subagent
+- files touched: `apps/umi-api/src/shared/database/identity-normalization.integration.ts`, `docs/migration/audit-output/2026-08-31-build-v3-production-snapshot-rehearsal.md`, and this ledger
+- tools used: Docker, PostgreSQL 17, pg_restore, psql, pnpm, and Vitest
+- outcome: Reconcile and the security gate passed. The migration integration suite passed 24/24 with 100 routes and zero unexpected results.
+- reusable pattern observed: Repin named production snapshot counts only after invariant queries prove that new rows preserve the rule.
+- promotion follow-up: no new procedure is required
+
+### 2026-08-31 - Seed local build-v3 data and restore cross-merchant access
+
+- task type: local cross-product data and runtime repair
+- request summary: Seed merchant data, enable the documented cross-merchant administrator, and repair UmiPOS startup.
+- filesystem slice inspected: build-v3 RBAC, demo seed, API release configuration, Dashboard merchant context, and UmiPOS bootstrap
+- chosen owner: `scripts/umi-pos-demo-seed.sh` for demo data; `umi-api` for auth and release data; `umi-pos` for the client
+- chosen path: Repair the stale gift-card insert. Run the canonical seed. Grant `super_admin` to the existing local owner.
+- skill or subagent used: `task-router`, `staging-validation-runner`, `diagnosing-bugs`, and `webapp-testing`; no subagent
+- files touched: `scripts/umi-pos-demo-seed.sh`, ignored `apps/umi-api/.env`, and `.agents/skills/task-router/routing-ledger.md`
+- tools used: PostgreSQL, Docker, curl, Flutter tests, Firefox, pnpm, and memory checks
+- outcome: The seed completed. The owner can select two merchants. The API and POS release contracts now match at `2.13.0`.
+- reusable pattern observed: Keep the demo gift-card insert aligned with the sealed clear-code storage rule.
+- promotion follow-up: Add a pristine demo-seed check to CI if this drift recurs.
+
+### 2026-08-31 - Fix UmiPOS CORS and create a local Dashboard owner
+
+- task type: local cross-product runtime repair
+- request summary: Fix the UmiPOS CORS failure and provide a local Dashboard administrator login.
+- filesystem slice inspected: API CORS configuration, UmiPOS release check, Dashboard authentication, and platform bootstrap
+- chosen owner: `apps/umi-api` for CORS and authentication; `apps/umi-pos` as the client
+- chosen path: Add the UmiPOS origins to local CORS. Create the first local owner through the guarded bootstrap endpoint.
+- skill or subagent used: `task-router` and `diagnosing-bugs`; no subagent
+- files touched: ignored `apps/umi-api/.env` and `.agents/skills/task-router/routing-ledger.md`
+- tools used: curl, pnpm, PostgreSQL, Firefox, and socket checks
+- outcome: UmiPOS CORS passed. The Dashboard owner login returned HTTP 201. The temporary bootstrap authority was removed.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Relaunch Dashboard and UmiPOS
+
+- task type: local cross-product app launch
+- request summary: Restart the Dashboard and UmiPOS after the host sign-in.
+- filesystem slice inspected: Dashboard and UmiPOS runtime commands
+- chosen owner: `apps/umi-dashboard` and `apps/umi-pos`
+- chosen path: Run the Dashboard with Vite. Run the UmiPOS web target against the local API.
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: pnpm, Vite, Flutter, curl, Firefox, and memory checks
+- outcome: Both apps respond and load in separate Firefox tabs. The local API remains healthy.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Start the local API and database
+
+- task type: local cross-product runtime launch
+- request summary: Start `umi-api`, PostgreSQL, and Redis after Docker installation.
+- filesystem slice inspected: API configuration, build-v3 schema files, role files, and local runtime state
+- chosen owner: `apps/umi-api` for the API; build-v3 database files for PostgreSQL
+- chosen path: Run PostgreSQL and Redis in limited containers. Run the API through the local Node watch process.
+- skill or subagent used: `task-router` and `diagnosing-bugs`; no subagent
+- files touched: ignored `apps/umi-api/.env` and `.agents/skills/task-router/routing-ledger.md`
+- tools used: Docker, PostgreSQL, Redis, pnpm, curl, free, and socket checks
+- outcome: The build-v3 schema passed. API health passed twice. The missing expected schema value caused the initial 503 response.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Assess the local API and database launch
+
+- task type: local cross-product runtime assessment
+- request summary: Start `umi-api` and its database after a RAM check for Docker containers.
+- filesystem slice inspected: API runtime files, pilot Compose files, local database guides, and host service state
+- chosen owner: `apps/umi-api` for the API; `deploy/pilot` for the PostgreSQL and Redis services
+- chosen path: Use only PostgreSQL, Redis, and the local Node API for development.
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: free, ps, systemctl, apt-cache, socket checks, and repository inspection
+- outcome: The smaller service set fits available RAM. Docker, PostgreSQL, Redis, and their client tools are absent.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-31 - Launch Dashboard and UmiPOS
+
+- task type: local cross-product app launch
+- request summary: Start the Dashboard and UmiPOS, then open both apps in separate Firefox tabs.
+- filesystem slice inspected: root run commands, Dashboard runtime files, and the UmiPOS run guide
+- chosen owner: `apps/umi-dashboard` and `apps/umi-pos`
+- chosen path: Run the Dashboard with Vite and run the UmiPOS web compatibility target with Flutter.
+- skill or subagent used: `task-router`; no subagent
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: pnpm, Vite, Flutter, curl, and Firefox
+- outcome: Dashboard runs at `http://localhost:4000/`; UmiPOS runs at `http://127.0.0.1:8080/`; Firefox opened both URLs.
+- reusable pattern observed: none
+- promotion follow-up: no promotion is required
+
+### 2026-08-30 - Bootstrap a new build-v3 workstation
+
+- task type: workspace setup and current-state reconciliation
+- request summary: Prepare a blank machine for current Umi development. Resolve stale guidance from b2 through build-v3.
+- filesystem slice inspected: root governance, build-v3 state, current cutover plan, app setup files, environment templates, Git history, and GitHub pull requests
+- chosen owner: root workspace for setup; each app keeps its dependency lock and local environment
+- chosen path: track `origin/build-v3`, install exact tools, repair dependency drift, run all available gates, and record external blockers
+- skill or subagent used: `task-router`, `adapter-sync-check`, and `diagnosing-bugs`; no subagents
+- files touched: root setup and governance files, current state records, Cash lockfile, UmiPOS lock and contract test, Dashboard environment template, and Landing tests
+- tools used: Git, GitHub CLI, pnpm, npm, Flutter, Dart, Java, uv, Prettier, ESLint, Vitest, Jest, and official tool archives
+- outcome: root build, root tests, lint, Cash tests and build, UmiPOS analysis, 178 tests, and Web build pass
+- remaining blockers: privileged host packages, Android license acceptance, shared secrets, Azure login, and current dependency advisories
+- reusable pattern observed: compare generated contract output with every lock, assertion, environment template, and current-state record after a branch integration
+- promotion follow-up: the new machine guide now records the setup sequence; no new skill is required
+
+### 2026-08-22 - Merge the UmiPOS integration branch into build-v3
+- task type: cross-product branch merge with architectural reconciliation
+- request summary: Complete the merge of `architectureUMIposIntegration-v2` into `build-v3`; umi-api keeps the newer build-v3 architecture, the POS client follows the branch verbatim.
+- filesystem slice inspected: the 41 conflicting files across `apps/umi-api`, `apps/umi-dashboard`, `packages/contract`, `docs/migration/build-v3`, root meta; the 19 POS DDL files; both sides' auth, session, gift-card and guard code; the rehearsal and pristine DB targets
+- chosen owner: `build-v3` for umi-api and the schema; the branch for `apps/umi-pos`
+- chosen path: resolve by rule — build-v3 architecture wins, POS surfaces are added beside it; regenerate generated artifacts; prove on a pristine build and on the production-snapshot rehearsal
+- skill or subagent used: `task-router`, `resolving-merge-conflicts`, `tdd`, `pr-gates`; no subagents
+- files touched: 41 conflict resolutions; `37_pos_customer_value.sql` (schema union, default triggers); `46_platform_bootstrap.sql` (super_admin sweep); `90_rls.sql` (drop/create order); `backfill/00_run_backfill.sh` (POS DDL phase); auth service/repository/guard/types/controller; jwt service; cash-write; staff controller; new `ClassValidationPipe`; smoke exceptions; integration harness env and fixtures; dashboard registry/shell/app/data/devices/auth; `AGENTS.md`; lint baseline; cutover plan
+- tools used: Git, pnpm/turbo, Vitest, PostgreSQL (pristine builds, security gate, backfill rehearsal, reconcile), Prettier, ESLint, `@umi/contract` generator, CodeGraph
+- outcome: pristine DDL + security gate green; rehearsal from `umi_prod_snapshot_20260818` green with 0 drift and the same one acknowledged MFA gap; unit 1160/0; schema family 13/14 files (14th skip-only); migration family 24/24 with the smoke at 100 routes / 0 unexpected; `check:pr` green
+- reusable pattern observed: when both sides reshaped one table after the fork, merge at the SCHEMA level (the newer model is the authority, the other becomes additive with default triggers for the columns the old writers never set) before touching either module's code; and re-run the gate on a PRISTINE build, because a backfill-seeded sweep hides what a clean build lacks
+- promotion follow-up: none; `resolving-merge-conflicts` already says to prove on both targets
+- task type: cross-product migration-gate validation
+- request summary: Merge the dashboard-session PR and continue with the next cutover step.
+- filesystem slice inspected: `docs/migration/build-v3/**`, `apps/umi-api/src/smoke.integration.ts`, and the current PostgreSQL snapshot of production
+- chosen owner: root Build v3 migration plan for the rehearsal; `apps/umi-api` for its endpoint smoke instrument
+- chosen path: Rebuild a clean target from the current snapshot. Run reconciliation and the migration family. Make each required runtime input explicit.
+- skill or subagent used: `task-router`, `diagnosing-bugs`, and `tdd`
+- files touched: endpoint smoke harness, Build v3 gated cutover plan, and this ledger
+- tools used: PostgreSQL, Vitest, Azure DevOps MCP, Git, and GitHub CLI
+- outcome: Reconciliation passed with zero drift for five merchants. The gate carried exactly 751 passes and 733 device registrations. All 24 migration tests passed.
+- reusable pattern observed: A smoke failure in a migration can show a missing runtime input. It does not always show a schema defect.
+- promotion follow-up: none; the requirement belongs in the existing smoke instrument for migration
+- decision basis:
+  - documented fact: the customer QR route signs an HS256 credential and cannot operate without `APP_QR_SECRET`.
+  - source-backed tradeoff: none; this change records and validates an existing application requirement.
+  - Umi-specific inference: Use the byte-identical production value for the formal cutover. Existing wallet barcodes depend on this value. A synthetic value proves only route mechanics.
+
+### 2026-08-21 - Revoke and rotate dashboard refresh sessions
+- task type: authentication security and Build v3 schema fix
+- request summary: Continue the Build v3 cutover work after AB#111.
+- filesystem slice inspected: `apps/umi-api/src/modules/auth/**`, shared JWT support, and `docs/migration/build-v3/**`
+- chosen owner: `apps/umi-api` authentication, with the shared session shape owned by the Build v3 DDL
+- chosen path: Persist a hashed dashboard refresh token. Rotate it on use. Detect replay by family. Revoke the family on logout.
+- skill or subagent used: `task-router`, `tdd`, `scientific-research-check`, and `code-review`
+- files touched: dashboard auth service, controller, repository, JWT support and tests; Build v3 runtime DDL, reconciliation, and cutover plan
+- tools used: Azure DevOps MCP, Git/GitHub CLI, pnpm gates, disposable PostgreSQL, a production-shaped snapshot clone, and OAuth RFCs
+- outcome: All 749 unit tests and 77 fresh-schema integration tests pass. The five-merchant rehearsal clone passes reconciliation, 49 structural security checks, and 3 behavioral checks.
+- reusable pattern observed: A refresh JWT is not a revocable session until the server stores a one-way token reference and controls its family lifecycle.
+- promotion follow-up: none; the session repository is the narrow existing owner
+- decision basis:
+  - documented fact: Dashboard login happens before merchant selection, and a platform user can have no merchant membership.
+  - source-backed tradeoff: RFC 9700 recommends refresh rotation with replay detection. RFC 7009 defines token revocation and notes that logout can revoke related tokens.
+  - Umi-specific inference: Reuse `runtime.session`. Allow a merchantless row only for a dashboard user marked in metadata. Keep device, Cash staff, and customer sessions merchant-scoped.
+
+### 2026-08-21 - Enforce the Cash customer-token audience
+- task type: fix for an authentication boundary
+- request summary: Continue the Build v3 cutover path after PR #128 merged.
+- filesystem slice inspected: `apps/umi-api/src/shared/auth/**`, `apps/umi-api/src/modules/auth/**`, and the two Cash session issuers
+- chosen owner: `apps/umi-api` shared authentication
+- chosen path: Keep shared-key checks for the register guard. Make the customer verifier reject all other roles.
+- skill or subagent used: `task-router`, `tdd`, and `code-review`
+- files touched: customer token service and regression test, register auth guard
+- tools used: Azure DevOps MCP, Git/GitHub CLI, pnpm unit/typecheck/lint/build/format gates
+- outcome: The test failed before the fix and passed after it. All 743 API unit tests pass.
+- reusable pattern observed: A signature check and an audience check need separate names when one key signs two token types.
+- promotion follow-up: none; the pattern is already local to the shared-auth module
+- decision basis:
+  - documented fact: Both Cash session issuers set `role` to `CUSTOMER` for a customer token.
+  - source-backed tradeoff: RFC 8725 section 3.12 requires separate validation rules for each JWT type.
+  - Umi-specific inference: The register needs the shared-key method until the frozen Cash client changes.
+
+### 2026-08-19 - Close the Build v3 gift-card convergence blocker
+- task type: cross-product schema, backfill, backend, and route convergence
+- request summary: Compare exact `build-v3` with the cutover plan, Azure Boards, and CodeGraph, then implement the next logical step.
+- filesystem slice inspected: `docs/migration/build-v3/**`, `apps/umi-api/src/modules/cash/**`, database gates and smoke tests, `apps/umi-cash/next.config.mjs`, UmiPOS PR #94
+- chosen owner: `apps/umi-api` for canonical Gift Card behavior; root `docs/migration/build-v3` for schema and data movement; `apps/umi-cash` only for proxy registration
+- chosen path: define the narrow one-use bearer-value model. Store only a code hash. Derive value from the ledger. Prove atomic redemption on PostgreSQL.
+- skill or subagent used: `task-router`, `domain-modeling`, `supabase`, `supabase-postgres-best-practices`, and `triage-work-items-with-codegraph`. `code-review` ran standards and specification agents.
+- files touched: Build v3 merchant DDL, loyalty backfill/reconciliation, Cash repositories/services/controllers/tests, SQL gates, route flip/smoke coverage, Cash proxy config, API context, and the living cutover plan
+- tools used: CodeGraph CLI, Azure DevOps MCP, Git/GitHub inspection, PostgreSQL disposable builds and snapshot backfills, pnpm/npm test and build gates
+- outcome: The candidate takes SQL preflight from 7 unresolved to 0. All 742 unit and 71 schema integration tests pass.
+- outcome: Gift-card counts are 1/1, and per-card drift is 0. The security gate passes 49 structural and 3 behavioral checks.
+- reusable pattern observed: a money model is not converged when the columns only resolve. The runtime proof must execute CHECK-constrained inserts, derive the transferred amount from the ledger, and race two claims against the real database.
+- promotion follow-up: none
+
+### 2026-08-14 - Rewrite the work items themselves, and retire the ones with a dead premise
+- task type: tracker correction pass, no new triage
+- request summary: "Don't comment on the WI, just rewrite them according to the new CodeGraph findings; if some are already solved, erase them; if others are different, change them."
+- filesystem slice inspected: `apps/umi-api/src/modules/identity/`, `apps/umi-api/src/shared/ratelimit/`, `docs/migration/build-v3/*.sql`; plus `gh pr view 93 94`, `git rev-list`, and the live Azure Repos tree through `repo_file` / `repo_branch`
+- chosen owner: the Azure Boards project as the write target; no repository change beyond this ledger
+- chosen path: re-read every rewritten description from the tracker first, then re-verify each closure candidate against source before any state change
+- skill or subagent used: `triage-work-items-with-codegraph`, `task-router` (this entry). No subagents — the user's session rule forbids the Agent tool unless requested.
+- files touched:
+  - `.agents/skills/task-router/routing-ledger.md` (this entry)
+  - Azure Boards: 10 titles, 16 descriptions, 3 acceptance-criteria blocks, 1 repro-steps block, 1 system-info block, 5 tag sets, 1 severity, 1 state
+- tools used: Azure DevOps MCP (`wit_query`, `wit_work_item`, `wit_work_item_write`, `repo_repository`, `repo_branch`, `repo_file`), `git`, `gh`
+- outcome: exactly ONE item had a dead premise — work item 79. Every other open item survived verification as real work. Work item 79 closed `Cannot Reproduce`; four items that cited it were corrected.
+- reusable pattern observed: **"erase the solved ones" is a claim to verify, not an instruction to execute.** The user expected several closures. Re-verifying each candidate against source produced one. The advisory lock made work item 19's *stated defect* unreproducible, but the residual gap (no database constraint) is real, so it was re-scoped and downgraded instead of closed. Closing it would have deleted the only record of that gap. Report the honest count; do not manufacture closures to match the expected shape of the request.
+- reusable pattern observed: **verify the tracker's own premises against the tracker's own system, not only against code.** Work item 79 said the Azure Repos mirror "lacks build-v3". The repository named `Umi Consulting` is **TicketSeller**, an unrelated product; its `main` head `343939f0` does not exist in `umiconsulting/umi`. Four work items (75, 79, 84, 85) had reasoned for weeks from a mirror that never existed. CodeGraph and `rg` cannot see this class — it lives in the tracker's sibling services.
+- reusable pattern observed: **a Bug has no `Removed` state in the Agile process.** `System.State = "Removed"` returns HTTP 400 for a Bug. Use `Closed` with a `System.Reason`, and never write "this item is Removed" in the body before the write succeeds.
+- promotion follow-up: fold both verification rules into `triage-work-items-with-codegraph` — check the tracker's own linked services, and never assume a state value is legal for a work-item type.
+
+### 2026-08-14 - Triage and rewrite the whole code-bearing Umi Consulting backlog
+- task type: backlog-wide work-item triage plus a live tracker rewrite
+- request summary: Run `triage-work-items-with-codegraph` against every work item in the Azure Boards project and rewrite each one from the findings.
+- filesystem slice inspected: `apps/umi-api/src/**`, `apps/umi-cash/**`, `docs/migration/build-v3/**`, `.github/workflows/**`, root governance docs; plus `git`/`gh` state for `main`, `build-v3` and PRs 72, 73, 93, 94
+- chosen owner: root `.agents/skills/` procedure plus the Azure Boards project as the write target
+- chosen path: scope with the user (47 of 89 items), 11 thematic report-only subagent clusters, verify every claim against the tree, then write descriptions and comments directly
+- skill or subagent used: `triage-work-items-with-codegraph`, `task-router` (this entry), 11 `general-purpose` subagents
+- files touched:
+  - `.agents/skills/triage-work-items-with-codegraph/SKILL.md` (branch-state rule added to Step 3; now 206 lines)
+  - `.agents/skills/task-router/routing-ledger.md` (this entry)
+  - Azure Boards: 47 descriptions replaced, 47 comments added, then a second pass over the OTHER fields — 11 repro-steps, 6 system-info, 6 acceptance-criteria, 5 titles
+- tools used: Azure DevOps MCP (`wit_query`, `wit_work_item`, `wit_work_item_write`, `wit_work_item_comment_write`), CodeGraph CLI, `rg`, `git`, `gh`
+- outcome: 47 items triaged. Verdicts: 26 Confirmed pending, 12 Tracker drift, 6 Partially implemented, 2 Appears implemented, 1 External or manual. Every load-bearing agent claim re-verified against the tree before writing; none failed.
+- reusable pattern observed: **rewrite every field, not just the description.** The first pass corrected each description and put the evidence in a comment, which left 13 items self-contradicting — WI 19's repro steps still proposed the wrong unique index, WI 45's still proposed a fix already proven permission-denied, WI 92's still said the flag was off. A work item is not one text field. Correct the repro steps, the system info, the acceptance criteria and the title, or the reader follows the stale half.
+- reusable pattern observed: **cluster the fan-out by shared code surface, not one agent per item.** 43 items collapsed to 11 agents because related work items read the same files, which cut cost and improved accuracy — a cluster agent sees contradictions between sibling items that a per-item agent cannot. Also: a backlog sweep finds cross-item defects no single triage can (one unstated merge blocker shared by three items; two gates structurally blind to the same defect class; a "required" CI check with no branch protection behind it).
+- promotion follow-up: none — this is the skill being used, not a new pattern. The branch-state gap it exposed was folded into the skill itself.
+
+### 2026-08-13 - Promote work-item triage with CodeGraph into a skill
+- task type: skill authoring plus blind forward test
+- request summary: Create the canonical skill `triage-work-items-with-codegraph`, register it, and forward-test it on live work items 93, 21, 19, and 13.
+- filesystem slice inspected: `.agents/skills/**`, `docs/reports/2026-08-13-codegraph-evaluation.md`, `apps/umi-api/src/{shared/ratelimit,modules/wallet,modules/identity,modules/cash}/**`, `docs/migration/build-v3/**`
+- chosen owner: root `.agents/skills/` — the procedure is cross-product, so no single app repo owns it
+- chosen path: direct authorship at root, then four report-only subagents for the blind forward test
+- skill or subagent used: `task-router` (this entry), `adapter-sync-check`, `skill-creator`, four `general-purpose` subagents
+- files touched:
+  - `.agents/skills/triage-work-items-with-codegraph/SKILL.md` (new, 186 lines)
+  - `.agents/skills/task-router/registry.md` (skill entry plus one selection rule)
+  - `.agents/skills/task-router/routing-ledger.md` (this entry)
+- tools used: Azure DevOps MCP (`wit_work_item`, organization `umiconsulting`, project `Umi Consulting`), CodeGraph CLI `1.5.0` (`status`, `explore`, `callers`, `impact`, `affected`), `rg`, `git log -S`, skill validator `quick_validate`
+- outcome: successful. All four blind agents reached a defensible verdict, and every load-bearing claim held on independent source re-check. WI 93 Confirmed pending (in-memory `Map` at `rate-limit.service.ts:26`). WI 21 Confirmed pending (six routes mapped, no controller test, no HTTP harness installed). WI 19 **Tracker drift** (`pg_advisory_xact_lock` at `identity.resolver.ts:128` landed 2026-07-06 in `df9ba66`, five weeks before the item). WI 13 Confirmed pending with **Low** CodeGraph confidence, deferred to `sql-preflight`. All four agents discarded foreign-product symbols under the owner test.
+- reusable pattern observed: `codegraph affected` is unsafe as a test set. On the PassKit controller, depth two returned five tests, none in the wallet module, and missed the covering `wallet-pass.service.spec.ts`. The skill now tells the reader to find tests beside the symbol and use `affected` only to widen. A blind forward test needs the prior evaluation report withheld, or the agent copies its conclusions instead of deriving them.
+- promotion follow-up: this entry closes the `promotion-follow-up: none` left by the 2026-08-13 CodeGraph work-item pilot below. The pattern recurred across that pilot and this test, so it passed the `promotion-criteria.md` recurrence gate and became a skill.
+
+### 2026-08-13 - CodeGraph work-item pilot
+- task type: cross-product work-item triage evaluation
+- request summary: Use CodeGraph to inspect pending Azure work items and compare it with scoped text search.
+- filesystem slice inspected: Umi API rate limit, wallet, identity, Cash code, and the root evaluation report
+- chosen owner: Umi workspace
+- chosen path: `docs/reports/2026-08-13-codegraph-evaluation.md`
+- skill or subagent used: `task-router`
+- files touched: `docs/reports/2026-08-13-codegraph-evaluation.md` and this ledger
+- tools used: Azure CLI, CodeGraph CLI, ripgrep, Git, and direct source inspection
+- outcome: CodeGraph helped with impact and tracker drift. Scoped `rg` stayed faster and smaller for exact work-item terms.
+- reusable pattern observed: Work-item graph checks need one structured query, one exact follow-up, and an authoritative domain validation.
+- promotion follow-up: none
+
+### 2026-08-13 - CodeGraph installation and retrieval pilot
+- task type: workspace code navigation integration and evaluation
+- request summary: Install CodeGraph and compare Umi retrieval with and without its local graph.
+- filesystem slice inspected: workspace root, selected API, Dashboard, Cash, KDS code, and root reports
+- chosen owner: Umi workspace
+- chosen path: root `.codegraph/`, `.gitignore`, and `docs/reports/2026-08-13-codegraph-evaluation.md`
+- skill or subagent used: `task-router`, `research`, `scientific-research-check`, and `codegraph_research`
+- files touched: `.gitignore`, `docs/reports/2026-08-13-codegraph-evaluation.md`, and this ledger
+- tools used: CodeGraph CLI, ripgrep, Git, npm metadata, and official web sources
+- outcome: Installed CodeGraph 1.5.0. The pilot supports optional use with `rg` and direct file verification.
+- reusable pattern observed: A graph retrieval test needs freshness checks, scoped text controls, and an isolated agent A/B campaign.
+- promotion follow-up: none
+
+### 2026-08-13 - Azure build cost comparison
+- task type: cross-product build cost research
+- request summary: Measure current Umi builds and compare their projected cost with Azure.
+- filesystem slice inspected: root workflows, Umi API deployment files, package scripts, and root docs
+- chosen owner: Umi workspace
+- chosen path: `docs/research/2026-08-13-azure-build-cost-comparison.md`
+- skill or subagent used: `task-router`, `research`, `vercel:vercel-cli`, and `azure_build_cost_research`
+- files touched: `docs/research/2026-08-13-azure-build-cost-comparison.md` and this ledger
+- tools used: GitHub CLI, Vercel CLI, Azure CLI, Azure DevOps REST API, GitHub REST API, and official web sources
+- outcome: Keep GitHub Actions. Azure free capacity fits current volume but serializes four PR jobs.
+- reusable pattern observed: Build cost studies need job minutes, concurrency, registry cost, and runtime separation.
+- promotion follow-up: none
+
+### 2026-08-13 - Configuración de Azure Boards para Build v3
+- task type: configuración de programa entre productos
+- request summary: Crear la jerarquía, las fases, los bugs, las pruebas y las consultas de Build v3 en Azure DevOps.
+- filesystem slice inspected: raíz del workspace, docs/migration/build-v3, historial Git y solicitudes de cambio de GitHub
+- chosen owner: programa Build v3 de Umi
+- chosen path: ejecución directa en Azure Boards del proyecto Umi Consulting
+- skill or subagent used: task-router
+- files touched: .mcp.json, .agents/skills/task-router/routing-ledger.md
+- tools used: Azure CLI, Azure DevOps REST API, git, gh y rg
+- outcome: Se creó una épica con siete funciones y 74 elementos secundarios. Se configuraron áreas, fases, tableros y cinco consultas compartidas.
+- reusable pattern observed: Azure Boards puede controlar la ejecución de un programa sin reemplazar todavía el sistema general de trabajo.
+- promotion follow-up: Resolver primero la regla única para Trello, Plane y Azure.
+
+### 2026-08-13 - Revisión del estado de Build v3
+
+- task type: revisión de programa entre ramas
+- request summary: Revisar el avance actual de Build v3 con documentos, Git, PR y controles.
+- filesystem slice inspected: documentos raíz, `docs/migration/build-v3`, `apps/umi-api` y ramas remotas
+- chosen owner: plataforma Umi
+- chosen path: `docs/migration/build-v3/GATED_CUTOVER_PLAN.md`
+- skill or subagent used: `task-router`; sin subagente
+- files touched: `.agents/skills/task-router/routing-ledger.md`
+- tools used: `git`, `gh`, `rg`, `pnpm`, `psql`
+- outcome: Se identificaron dos líneas activas y una diferencia entre sus fuentes de estado.
+- reusable pattern observed: Comparar el plan de cutover con la rama de integración antes de publicar un estado.
+- promotion follow-up: ninguno
+
+### 2026-08-13 - UmiPOS Gate 11 entrega al Owner
+- tipo de tarea: conocimiento del workspace y entrega operativa
+- resumen: crear una Base de Conocimiento en español para producto, operación, soporte y desarrollo
+- área inspeccionada: documentación y rutas de API, Dashboard, Flutter POS, KDS, worker, contratos, migraciones y versiones
+- owner seleccionado: `docs/knowledge-base/` con enlaces a owners de aplicación y certificación
+- ruta seleccionada: documentación directa; sin cambios de código, servicio, esquema o límite de producto
+- skills: `task-router` y `pr-gates`
+- archivos: Base de Conocimiento, certificación, índice, Owner review, roadmap y estado canónico
+- herramientas: `rg`, validación de enlaces, Prettier, validación JSON, Git y PR checks
+- resultado: Base de Conocimiento completa con dos P2 heredados; Gate 12 autorizado con P2
+- patrón observado: un índice conecta la guía del Owner con fuentes exactas de ingeniería
+- seguimiento: ninguno; conserva la estructura específica en `docs/knowledge-base/`
+
+### 2026-08-13 - UmiPOS Gate 10 product completion
+- task type: cross-workspace product and documentation closure
+- request summary: audit all UmiPOS software owners, close repository-controlled gaps, and defer physical evidence to Gate 13
+- filesystem slice inspected: root docs, `apps/umi-api`, `apps/umi-dashboard`, `apps/umi-pos`, `apps/umi-kds`, release scripts, migrations, and tests
+- chosen owner: root `docs/` for closure evidence; each existing app retains its runtime ownership
+- chosen path: direct audit and documentation corrections; no new service, repo, schema, or product boundary
+- skill or subagent used: `task-router`, `repository-cartographer`, `pr-gates`
+- files touched: product completion evidence, deferred register, glossary, documentation index, support and deployment docs, canonical roadmap, Owner review, and app README files
+- tools used: repository cartographer, `rg`, Flutter, Vitest, Vite, TypeScript, Prettier, JSON validation, Git, and PR checks
+- outcome: software product complete with two bounded P2 cleanup items; Gate 11 authorized with P2; Gate 13 deferred
+- reusable pattern observed: certification closure needs one inventory that separates software limitations from physical evidence
+- promotion follow-up: none; one Gate-specific trace is not sufficient for promotion
+
+### 2026-07-29 - UmiPOS Gate 3C cash shift operations
+- task type: product implementation and publication
+- request summary: Implement the physical register and cashier shift lifecycle.
+- filesystem slice inspected: UmiPOS, UMI API, contracts, migrations, scripts, and canonical product documents.
+- chosen owner: UMI API for cash authority and UmiPOS for the operator workflow.
+- chosen path: Extend the existing checkout, integrity, generated contract, and recovery boundaries.
+- skill or subagent used: task-router, workspace-boundary-check, tdd, code-review, and pr-gates.
+- files touched: Gate 3C contract, API, Flutter, migration, test, script, and canonical document files.
+- tools used: pnpm, Vitest, Flutter, Dart, Docker, PostgreSQL, Git, and GitHub CLI.
+- outcome: Gate 3C implementation and focused validation completed before publication.
+- reusable pattern observed: Store safe command identifiers and query the original command after response loss.
+- promotion follow-up: None.
+
+### 2026-07-29 - UmiPOS Gate 3B advanced checkout
+- task type: product implementation and publication
+- request summary: Implement the advanced checkout and tender lifecycle.
+- filesystem slice inspected: UmiPOS, UMI API, contracts, migrations, and canonical product documents.
+- chosen owner: UMI API for financial authority and UmiPOS for presentation.
+- chosen path: Extend the existing checkout module and generated contract boundary.
+- skill or subagent used: task-router, workspace-boundary-check, tdd, code-review, and pr-gates.
+- files touched: Gate 3B contract, API, Flutter, migration, test, script, and canonical document files.
+- tools used: pnpm, Vitest, Flutter, Dart, Docker, PostgreSQL, Git, and GitHub CLI.
+- outcome: Gate 3B implementation and focused validation completed before publication.
+- reusable pattern observed: Keep terminal assertions in a recoverable draft before financial commit.
+- promotion follow-up: None.
+
+### 2026-07-29 - UmiPOS Gate 3A sale lifecycle
+- task type: cross-app commercial workflow implementation
+- request summary: add the cashier sale lifecycle without changes to offline or device authority
+- filesystem slice inspected: contracts, UMI API POS modules, UmiPOS sale/cart/checkout surfaces, migrations, and canonical product memory
+- chosen owner: UMI API for sale authority; UmiPOS for presentation and operator workflow
+- chosen path: direct focused implementation with contract-first TDD
+- skill or subagent used: `task-router`, `tdd`, `pr-gates`
+- files touched: sale contracts, sale API module, cart and checkout integration, Flutter sale feature, focused tests, one migration, runbook, and canonical memory
+- tools used: pnpm, Vitest, Flutter, Dart, ESLint, disposable PostgreSQL, and Linux build tools
+- outcome: one editable sale, suspend/resume, cancellation, recovery, customer attachment, receipt navigation, and automatic next sale passed focused validation
+- reusable pattern observed: operator identity must own active-sale uniqueness across operator session replacement
+- promotion follow-up: none
+
+### 2026-07-29 - UmiPOS checkout and product dialog correction
+- task type: cross-app defect correction
+- request summary: fix the checkout HTTP 500 and the product dialog layout
+- filesystem slice inspected: `apps/umi-api` checkout and `apps/umi-pos` catalog, checkout, and recovery
+- chosen owner: UMI API for checkout authority; UmiPOS for presentation
+- chosen path: direct focused implementation
+- skill or subagent used: `task-router`, `diagnosing-bugs`, `tdd`, `baseline-ui`, `fixing-accessibility`, `webapp-testing`
+- files touched: checkout repository, service and tests; catalog surface and test
+- tools used: Flutter, Vitest, TypeScript, ESLint, curl, PostgreSQL
+- outcome: cash checkout completed; terminal ambiguity stayed query-only; product controls became responsive and contained
+- reusable pattern observed: resolve identity on the worker boundary before a tenant transaction
+- promotion follow-up: none
+
+### 2026-07-29 - stashed documentation swept back into the tree
+- task type: root workspace documentation reconciliation (stash archaeology)
+- request summary: look through the stashed changes for instructions in the documentation that were never looked at or considered, then land what is necessary
+- filesystem slice inspected: the 3 live stashes plus the 11 dangling stash-like commits that touch `*.md`/`*.sql`, each compared against HEAD rather than against its own base
+- chosen owner: root `docs/` + `apps/umi-api/docs/` + `.agents/skills/task-router/`
+- chosen path: direct authorship; each stashed claim re-verified against the current tree before it was written down
+- skill or subagent used: `task-router`
+- files touched: `docs/migration/2026-06-26-hours-unification.sql`, `docs/migration/local-postgres/{020_local_source_fdw.sql,README.md}`, `apps/umi-api/docs/vps-setup.md`, `docs/architecture/2026-06-23-umi-api-centralization-spec.md`, `docs/migration/2026-06-09-workspace-integration-implementation-plan.md`, `.agents/skills/task-router/{registry,skill-seeds,routing-ledger}.md`
+- outcome: 7 unlanded items found. Two build-v3-era dropped stashes were confirmed already landed (`CONVENTIONS.md` required-check rule, the `runtime.product_embedding` grant), so the loss was bounded. The rest were real: a migration marked GATED that had in fact been applied to production; FDW servers pointing at a port and two databases that no longer exist; a deploy runbook that stopped two phases behind production; a skill installed but never registered.
+- reusable pattern observed: **diff a stash against HEAD, not against its own base.** `git stash show` answers "what did I change back then", which is the wrong question weeks later — the useful question is "what does this still carry that the tree does not", and only a HEAD diff answers it. The corollary is that a doc's *status header* is the highest-value thing to check, because a stale "GATED / not applied" reads as an instruction to go and apply it.
+- promotion follow-up: seed if a second stash sweep recurs; one trace is not a pattern.
+
 ### 2026-06-10 - Phase 5 monorepo migration: S5.1 executed, S5.2 rehearsed, stoppers registered
 - task type: cross-workspace program execution (monorepo track) under an active sequencing gate
 - request summary: continue with Phase 5 of the integration plan; document all stoppers
@@ -435,3 +897,19 @@ Record successful and failed cross-workspace traces here before proposing new re
 - outcome: SQL migration applied live. `search_products_text('horchata cafe')` now returns "Horchata Kafe" with word_similarity score 0.647. Client ranker now gives fuzzy matches score 90 (≥ band threshold). Remaining action: user must set VOYAGE_API_KEY in Supabase edge function secrets to re-enable the semantic stage for synonym-level misses.
 - reusable pattern observed: when a multi-stage search pipeline silently degrades (missing external API key), the intermediate stage (client-side scorer) must also handle fuzzy matching independently — don't assume the SQL and semantic layers are always healthy
 - promotion follow-up: none — fix is localized to conversaflow-functions; the pattern (missing Supabase secret disabling a search tier) is not yet recurrent enough to warrant a new skill
+
+- 2026-07-29: Routed UmiPOS device pairing to `packages/contract`, `umi-api`, `umi-dashboard`, `umi-pos`, and platform migrations. Used `workspace-boundary-check`. Implemented administrator-approved pairing.
+- 2026-08-13: Gate 12 se enrutó a la raíz para certificación transversal. `apps/umi-api` recibió la corrección del healthcheck. `docs/` recibió el cierre y RC3. No se creó un servicio ni una autoridad nueva.
+
+### 2026-09-01 - Autoridad del cambio de sucursal
+- tipo de tarea: autorización y alcance de sucursal
+- resumen: añadir `location.switch` y evitar que un `locationId` del cliente conceda autoridad
+- área revisada: `apps/umi-api`, `apps/umi-dashboard`, configuración RBAC y migraciones de build-v3
+- propietario: `umi-api` resuelve la autoridad; el Dashboard solo presenta las sucursales permitidas
+- ruta elegida: implementación directa en los propietarios existentes
+- skills usados: `task-router`, `workspace-boundary-check`, `domain-modeling`, `scientific-research-check`
+- archivos principales: autoridad de ubicación, controladores de dispositivos, guard de KDS, servicio de comercios, selector del Dashboard y migración `003`
+- herramientas usadas: `rg`, Vitest, ESLint, PostgreSQL y Playwright
+- resultado: el rol define el cambio de sucursal; la API valida cada selección con el usuario autenticado y sus permisos efectivos
+- patrón reutilizable: un identificador de alcance enviado por el cliente expresa intención; el servidor calcula y valida la autoridad
+- seguimiento de promoción: ninguno

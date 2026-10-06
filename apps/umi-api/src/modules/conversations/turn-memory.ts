@@ -49,8 +49,7 @@ export function shapeTurnMemory(
   options: { maxRecentMessages?: number; maxRetrievedMemories?: number } = {},
 ): { workingMemory: WorkingMemory; metadata: TurnMemoryMetadata } {
   const maxRecentMessages = options.maxRecentMessages ?? DEFAULT_MAX_RECENT_MESSAGES;
-  const maxRetrievedMemories =
-    options.maxRetrievedMemories ?? DEFAULT_MAX_RETRIEVED_MEMORIES;
+  const maxRetrievedMemories = options.maxRetrievedMemories ?? DEFAULT_MAX_RETRIEVED_MEMORIES;
 
   const shaped: WorkingMemory = {
     ...workingMemory,

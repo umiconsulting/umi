@@ -1,62 +1,81 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { AppConfig } from '../config/config.schema';
+import { ApplePushService } from '../../modules/wallet/apple-push.service';
+import { WalletPassService } from '../../modules/wallet/wallet-pass.service';
 
 /**
- * Wallet-pass refresh (Apple PassKit push + Google Wallet object update). umi-cash
- * fires these best-effort after every money write so the customer's pass updates
- * its balance/visits on the lock screen. The push is non-transactional: a money
- * write must succeed even if the pass refresh fails (exactly the live `.catch`
- * behavior), so callers never await this in their DB transaction.
+ * Wallet-pass refresh, fired best-effort after every money or visit write so the
+ * customer's pass updates on their lock screen.
  *
- * The Apple/Google push is cert/secret-bound (APN cert, Google service-account
- * key, the pass `webServiceURL`). Until those are provisioned in VPS secrets this
- * adapter logs the refresh request and returns; once configured it performs the
- * push. Either way the money write is complete and correct.
+ * THIS USED TO BE AN HTTP CALL. The adapter POSTed a `cardId` at
+ * `WALLET_PASS_PUSH_URL` and let umi-cash do the work, because umi-cash owned the
+ * signing certificates and the pass tables. It was never configured in
+ * production, so it logged and returned — every refresh was a no-op.
+ *
+ * The wallet layer now lives in this process, so the hop is gone: this calls
+ * `ApplePushService` directly. One less network round trip on the write path, one
+ * less secret to provision, and no way for the two halves to be pointed at
+ * different databases.
+ *
+ * The contract is unchanged and is the reason this stays a thin seam: a money
+ * write must succeed even when the push fails. Nothing here throws, and callers
+ * must never await it inside their transaction.
  */
 @Injectable()
 export class WalletPassAdapter {
   private readonly logger = new Logger(WalletPassAdapter.name);
-  private readonly configured: boolean;
 
-  constructor(config: ConfigService<AppConfig, true>) {
-    this.configured = !!config.get('WALLET_PASS_PUSH_URL', { infer: true });
+  constructor(
+    private readonly push: ApplePushService,
+    private readonly wallet: WalletPassService,
+  ) {}
+
+  /**
+   * Refresh the wallet pass for a card after a balance or visit change.
+   *
+   * BOTH PLATFORMS, and they work in opposite directions. Apple gets a push that
+   * makes the phone come and re-download the pass; Google gets a PATCH that
+   * carries the new state to it. Neither may be skipped: a customer with an
+   * Android pass is exactly as entitled to a correct stamp count.
+   *
+   * Resolves even on failure; never throws into the caller.
+   */
+  async refreshCard(cardId: string): Promise<void> {
+    // Independent of each other — one platform failing must not silence the other.
+    const [apple, google] = await Promise.allSettled([
+      this.push.pushCard(cardId),
+      this.wallet.refreshGoogleObject(cardId),
+    ]);
+    if (apple.status === 'fulfilled') {
+      const { sent, failed } = apple.value;
+      if (sent || failed) {
+        this.logger.debug(`wallet_pass_refresh card=${cardId} sent=${sent} failed=${failed}`);
+      }
+    } else {
+      // A second guard: pushCard also catches its own errors.
+      this.logger.warn(`wallet_pass_refresh_failed card=${cardId}: ${String(apple.reason)}`);
+    }
+    if (google.status === 'rejected') {
+      this.logger.warn(`google_object_refresh_failed card=${cardId}: ${String(google.reason)}`);
+    }
   }
 
   /**
-   * Refresh the wallet pass for a card after a balance/visit change. Best-effort:
-   * resolves even on failure, never throws into the caller's request/transaction.
+   * Refresh every pass at one café, after a change that alters what all of them
+   * say — the reward config, the branding, the promotion.
+   *
+   * Same best-effort contract: a café must be able to rename its reward even when
+   * Apple is unreachable.
    */
-  async refreshCard(cardId: string): Promise<void> {
-    if (!this.configured) {
-      this.logger.debug(`wallet_pass_refresh_skipped card=${cardId} (push not configured)`);
-      return;
-    }
+  async refreshMerchant(merchantId: string): Promise<void> {
     try {
-      await this.push(cardId);
+      const { cards, sent } = await this.push.pushMerchant(merchantId);
+      if (cards) {
+        this.logger.debug(
+          `wallet_merchant_refresh merchant=${merchantId} cards=${cards} sent=${sent}`,
+        );
+      }
     } catch (err) {
-      // Mirror umi-cash: log and continue; the money write already committed.
-      this.logger.warn(`wallet_pass_refresh_failed card=${cardId}: ${String(err)}`);
+      this.logger.warn(`wallet_merchant_refresh_failed merchant=${merchantId}: ${String(err)}`);
     }
-  }
-
-  private async push(cardId: string): Promise<void> {
-    // Delegates to the pass push service (APN + Google Wallet) once wired. The
-    // body is intentionally minimal — the push service re-reads card state.
-    const url = this.urlOrThrow();
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cardId }),
-      // Bound the request — refreshCard() is awaited after the write commits, so a
-      // hung push endpoint would otherwise stall the caller (matches zettle.adapter).
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) throw new Error(`pass push ${res.status}`);
-  }
-
-  private urlOrThrow(): string {
-    // configured === true guarantees this is set.
-    return process.env.WALLET_PASS_PUSH_URL as string;
   }
 }

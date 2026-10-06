@@ -356,6 +356,7 @@ create table if not exists runtime.conversation_state (
   state_data            jsonb not null default '{}'::jsonb,       -- CAS state (preserved)
   conversation_history  jsonb not null default '[]'::jsonb,       -- rolling history (preserved)
   pending_clarification jsonb,                                    -- open question (preserved)
+  selected_location_id  uuid,                                     -- SOFT ref to tenant.branch (in-flight branch pick; was inline on comms.conversations)
   state_version         bigint not null default 0,                -- optimistic concurrency
   draft_cart_version    bigint not null default 0,                -- optimistic concurrency
   base_state_version    bigint,                                   -- turn base snapshot
@@ -414,6 +415,70 @@ create table if not exists runtime.device_event (
 );
 create index if not exists runtime_device_event_device_idx
   on runtime.device_event (device_id, occurred_at desc);
+
+-- ===========================================================================
+-- runtime.v_kds_tickets  <- ops.v_kds_tickets (REIMPLEMENTED for de-overload).
+--   The KDS read projection — "a live view, not a duplicate table." Relocated
+--   from `ops` to `runtime` because it is a rebuildable, non-authoritative
+--   derived read (same class as conversation_state/conversation_turn) served on
+--   the worker pool. Two source changes vs the old view:
+--     * the order's `kitchen_status` MOVED to the `tenant.order_event` journal, so
+--       a ticket's current status is DERIVED as the latest kitchen event (the
+--       CROSS JOIN LATERAL also replaces the old `WHERE kitchen_status IS NOT NULL`
+--       filter — an order with no kitchen event is not a ticket and drops out).
+--     * `channel` (free-form) -> `channel_id` -> the GLOBAL tenant.channel catalog
+--       (source_channel is now the catalog key), `person_id` -> `customer_id`.
+--   `v_` prefix keeps the tenant integrity gate from treating it as a base table
+--   (though it lives in runtime, which has no RLS loop). Runs with the querying
+--   role's privileges — umi_worker has SELECT on the underlying tenant tables.
+-- ===========================================================================
+create or replace view runtime.v_kds_tickets as
+select
+  o.id                    as ticket_id,
+  o.tenant_id             as tenant_id,
+  o.source_transaction_id as source_transaction_id,
+  ch.key                  as source_channel,
+  o.customer_id           as customer_person_id,
+  ks.kitchen_status       as status,
+  o.station_id            as station_id,
+  o.station_name          as station_name,
+  o.pickup_person         as pickup_person,
+  o.notes                 as customer_note,
+  o.total_cents           as total_cents,
+  o.created_at            as created_at,
+  o.updated_at            as updated_at,
+  coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'ticket_item_id',   oi.id,
+        'product_id',       oi.product_id,
+        'display_order',    oi.display_order,
+        'name',             oi.name,
+        'variant_name',     oi.variant_name,
+        'quantity',         oi.quantity,
+        'unit_price_cents', oi.unit_price_cents,
+        'notes',            oi.notes,
+        'kitchen_status',   oi.kitchen_status,
+        'is_cancelled',     oi.is_cancelled
+      )
+      order by oi.display_order
+    ) filter (where oi.id is not null),
+    '[]'::jsonb
+  )                       as items
+from tenant."order" o
+cross join lateral (
+  -- the ticket's CURRENT kitchen status = the latest kitchen event; an order with
+  -- none is excluded (inner lateral), reproducing the old kitchen_status filter.
+  select oe.kitchen_status
+    from tenant.order_event oe
+   where oe.tenant_id = o.tenant_id and oe.order_id = o.id
+     and oe.kitchen_status is not null
+   order by oe.occurred_at desc, oe.kitchen_sequence desc nulls last
+   limit 1
+) ks
+left join tenant.channel ch on ch.id = o.channel_id
+left join tenant.order_item oi on oi.tenant_id = o.tenant_id and oi.order_id = o.id
+group by o.tenant_id, o.id, ch.key, ks.kitchen_status;
 
 grant select on all tables in schema runtime to umi_worker, umi_readonly;
 grant insert, update, delete on all tables in schema runtime to umi_worker;

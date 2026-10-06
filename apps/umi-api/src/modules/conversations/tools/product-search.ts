@@ -1,9 +1,4 @@
-import {
-  MILK_SYNONYMS,
-  normalizeSynonymText,
-  SIZE_SYNONYMS,
-  TEMP_SYNONYMS,
-} from '../synonyms';
+import { MILK_SYNONYMS, normalizeSynonymText, SIZE_SYNONYMS, TEMP_SYNONYMS } from '../synonyms';
 import type { DraftCart, DraftCartItem } from '../conversation.types';
 
 /**
@@ -46,7 +41,10 @@ export const BROWSE_INTENT_CATEGORIES: Array<{ pattern: RegExp; categories: stri
     pattern: /\b(postre|postres|dulce|dulces|galleta|oblea|gomita)\b/i,
     categories: ['POSTRES', 'snacks'],
   },
-  { pattern: /\b(bebida|bebidas|tomar|sed)\b/i, categories: ['Cafe', 'Matcha', 'Sin cafe', 'otras bebidas'] },
+  {
+    pattern: /\b(bebida|bebidas|tomar|sed)\b/i,
+    categories: ['Cafe', 'Matcha', 'Sin cafe', 'otras bebidas'],
+  },
   { pattern: /\b(cafe|café)\b/i, categories: ['Cafe'] },
   { pattern: /\b(matcha)\b/i, categories: ['Matcha'] },
   {
@@ -145,7 +143,18 @@ export function displayVariantName(name: string | null): string | null {
 }
 
 const VARIANT_FILLER_WORDS = new Set([
-  'de', 'con', 'en', 'las', 'la', 'los', 'el', 'un', 'una', 'a', 'al', 'leche',
+  'de',
+  'con',
+  'en',
+  'las',
+  'la',
+  'los',
+  'el',
+  'un',
+  'una',
+  'a',
+  'al',
+  'leche',
 ]);
 
 export function normalizeVariantPreference(
@@ -155,8 +164,7 @@ export function normalizeVariantPreference(
   if (!value) return null;
   const normalized = normalizeText(value);
   if (!normalized) return null;
-  const dict =
-    kind === 'size' ? SIZE_SYNONYMS : kind === 'temp' ? TEMP_SYNONYMS : MILK_SYNONYMS;
+  const dict = kind === 'size' ? SIZE_SYNONYMS : kind === 'temp' ? TEMP_SYNONYMS : MILK_SYNONYMS;
   if (dict[normalized]) return dict[normalized];
   const tokens = normalized.split(' ').filter(Boolean);
   for (const token of tokens) {
@@ -399,7 +407,8 @@ function collectSupportedVariantTokens(variants: ProductVariant[]): {
   for (const variant of variants) {
     for (const token of splitVariantTokens(variant.name)) {
       if (token === 'CH' || token === 'GDE') supported.size.add(token);
-      if (token === 'CALIENTE' || token === 'ROCAS' || token === 'FRAPPE') supported.temp.add(token);
+      if (token === 'CALIENTE' || token === 'ROCAS' || token === 'FRAPPE')
+        supported.temp.add(token);
       if (canonicalMilks.has(token)) supported.milk.add(token);
     }
   }
@@ -500,7 +509,10 @@ export function resolveVariant(product: ProductRecord, filters: VariantFilters):
       };
     }
   }
-  return { success: false, needs_clarification: buildVariantClarification(sanitizedFilters, variants) };
+  return {
+    success: false,
+    needs_clarification: buildVariantClarification(sanitizedFilters, variants),
+  };
 }
 
 export function formatMoney(value: number): string {
@@ -554,7 +566,12 @@ export { cartItemMatchesQuery, filtersFromVariantName };
 export function editDraftCartItems(
   cart: DraftCart,
   input: { remove_query?: string | null; keep_query?: string | null },
-): { cart: DraftCart; removed: DraftCartItem[]; keptMissing: string | null; notFound: string | null } {
+): {
+  cart: DraftCart;
+  removed: DraftCartItem[];
+  keptMissing: string | null;
+  notFound: string | null;
+} {
   let items = [...cart.items];
   const removed: DraftCartItem[] = [];
   const removeQuery = input.remove_query?.trim() || null;
@@ -679,7 +696,11 @@ export function formatProductDisplay(
     })
     .join(' | ');
 
-  const tempMap: Record<string, string> = { CALIENTE: 'Caliente', ROCAS: 'Rocas', FRAPPE: 'Frappe' };
+  const tempMap: Record<string, string> = {
+    CALIENTE: 'Caliente',
+    ROCAS: 'Rocas',
+    FRAPPE: 'Frappe',
+  };
   const milkMap: Record<string, string> = {
     DESLACTOSADA: 'Deslactosada',
     ALMENDRA: 'Almendra',
@@ -692,12 +713,18 @@ export function formatProductDisplay(
   if (sizeLine) lines.push(`  ${sizeLine}`);
   if (temps.size > 0) {
     lines.push(
-      `  ${['CALIENTE', 'ROCAS', 'FRAPPE'].filter((token) => temps.has(token)).map((token) => tempMap[token]).join(' · ')}`,
+      `  ${['CALIENTE', 'ROCAS', 'FRAPPE']
+        .filter((token) => temps.has(token))
+        .map((token) => tempMap[token])
+        .join(' · ')}`,
     );
   }
   if (milks.size > 0) {
     lines.push(
-      `  Leches: ${Object.keys(milkMap).filter((token) => milks.has(token)).map((token) => milkMap[token]).join(', ')}`,
+      `  Leches: ${Object.keys(milkMap)
+        .filter((token) => milks.has(token))
+        .map((token) => milkMap[token])
+        .join(', ')}`,
     );
   }
   return lines.join('\n');

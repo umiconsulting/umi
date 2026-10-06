@@ -19,7 +19,7 @@ This file is the default report entrypoint for agents. Load individual reports o
 
 ## KDS
 
-- Current local KDS architecture context lives in `apps/umi-kds/Sources/Docs/KDSArchitecture.md`.
+- Current local KDS architecture context lives in `docs/architecture/2026-09-16-pos-is-a-native-app.md`.
 - Root KDS audit and migration docs are useful background, but should be checked against current code and migrations.
 
 ## Cash
