@@ -575,20 +575,25 @@ export class CashScanRepository {
           Math.floor((before.total_visits - cycleAnchor) / before.visits_required);
       }
       // Rotate the QR token; stamp the lifecycle moment message on a visit. No
-      // cache columns to touch — the visit/reward counts and the balance are derived
-      // below from the events plus the two anchors written here.
+      // ⚠️ THE MESSAGE IS WRITTEN ON EVERY SCAN, and it may be NULL. umi-cash wrote
+      // it unconditionally (`lifecycleMetadata(fresh.metadata, momentMessage)`), and
+      // that is what makes the field trustworthy: a scan with no moment CLEARS the
+      // previous one, so a "you earned a reward" line from this morning cannot
+      // linger on a pass through an afternoon redemption. Writing it only on visits
+      // left the redeem-only path (banked OR early cash-out — a real thing the
+      // register does) keeping whatever the last visit said. Found by the live
+      // rehearsal in REGISTER_FLIP_PARITY.md.
       const upd = await c.query<{ card_number: string }>(
         `UPDATE merchant.loyalty_card SET
-           lifecycle_message    = CASE WHEN $3 THEN $4::text ELSE lifecycle_message END,
-           lifecycle_message_at = CASE WHEN $3 THEN now()    ELSE lifecycle_message_at END,
-           qr_token = $5, qr_issued_at = now(), updated_at = now(),
-           cycle_anchor = $6, rewards_earned = $7
+           lifecycle_message    = $3::text,
+           lifecycle_message_at = CASE WHEN $3 IS NULL THEN NULL ELSE now() END,
+           qr_token = $4, qr_issued_at = now(), updated_at = now(),
+           cycle_anchor = $5, rewards_earned = $6
          WHERE merchant_id=$1::uuid AND id=$2::uuid
          RETURNING card_number`,
         [
           input.merchantId,
           input.cardId,
-          input.doVisit,
           input.momentMessage,
           input.newQrToken,
           cycleAnchor,

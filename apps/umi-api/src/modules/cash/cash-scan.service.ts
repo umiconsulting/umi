@@ -173,7 +173,16 @@ export class CashScanService {
     const customerName = card.display_name ?? null;
 
     // Reward-cycle math (only meaningful on visit).
-    const newVisitsThisCycle = card.visits_this_cycle + 1;
+    //
+    // ⚠️ WHICH CYCLE THE VISIT LANDS ON. When the barista cashes the lower tier out in
+    // the same tap, the card has already been TORN OFF: umi-cash called the position
+    // it counted from `cycleNow` and set it to zero in the cash-out step, so the visit
+    // that follows is the first stamp of the NEW cycle. Reading the pre-scan position
+    // here made a card at 8/9 with an early cash-out announce that the customer had
+    // earned the top tier — a reward nobody handed over, printed on her lock screen.
+    // (Found by the live rehearsal in REGISTER_FLIP_PARITY.md, not by a test.)
+    const cycleBeforeVisit = includesRedeemBase ? 0 : card.visits_this_cycle;
+    const newVisitsThisCycle = cycleBeforeVisit + 1;
     const newTotalVisits = card.total_visits + 1;
     const earnedReward = includesVisit && newVisitsThisCycle >= visitsRequired;
 

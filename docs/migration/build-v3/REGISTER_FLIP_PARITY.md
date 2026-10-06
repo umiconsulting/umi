@@ -94,6 +94,52 @@ out of the count. One card in production has reverted redemptions.
 
 ## What still blocks the flip
 
+### A live rehearsal of the write path (2026-10-06, production)
+
+Exit criterion 4 was "the write routes are exercised somewhere that is not a
+customer's card, or accepted in writing as code-reviewed only". Here is the
+rehearsal, run against production with **throwaway cards** — every row created for it
+is deleted afterwards, and no real customer's card is touched. That constraint is not
+caution for its own sake: no till has written since the cutover, so the legacy world
+the register reads and the new world the API writes are still in perfect step. A
+rehearsal on a real card would break that for good, and the flip would not repair it
+— there is no second backfill.
+
+What the first attempt found before it even ran:
+
+| attempt                            | answer                                        | what it means                                                                                                                                    |
+| ---------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scan/seals` at El Gran Ribera     | `403 Función no habilitada`                   | the catch-up credit is `multi_seal_enabled`, and only Kalala has it. A rehearsal that needs stamps at a ladder café cannot get them from the API |
+| a second `VISIT` in one day        | `429 Ya se registró una visita hoy`           | the once-a-day cap is live                                                                                                                       |
+| `REDEEM_BASE` below the lower tier | `400 Aún no llega a 7 visitas para Capuccino` | the early cash-out refuses correctly, in production, before it writes                                                                            |
+
+The lesson in that last row is the one worth keeping: the guard is what makes the
+anchor safe. `REDEEM_BASE` is refused unless the customer is genuinely at the lower
+threshold, so the anchor can only ever move to a stamp count the customer reached.
+
+**And the rehearsal paid for itself.** With the pre-state seeded (the cap makes it
+impossible to reach seven stamps in one session) and three throwaway cards, each one
+driven by a single API call, it found two customer-facing defects that no test had
+caught — both now fixed and pinned:
+
+| card | what it exercises                              | before the fix                                                                                                                                                                                      |
+| ---- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A    | a visit that completes a cycle                 | correct: numbers, staff line, moment                                                                                                                                                                |
+| B    | the early cash-out alone                       | the pass kept `null`: the moment was only written on a visit, so a redemption left the customer with no line where umi-cash left "you redeemed it"                                                  |
+| C    | the early cash-out and a visit in the same tap | **the staff line claimed she had won the top tier**, and the moment written to her pass said so — the visit read the position from BEFORE the card was torn off, so 8 + 1 looked like the threshold |
+
+The numbers in every case matched what umi-cash would have computed, which is the
+point of the rehearsal: the arithmetic was right and the words were not.
+
+| card | anchor | total | cycle | pending | umi-cash would say |
+| ---- | ------ | ----- | ----- | ------- | ------------------ |
+| A    | 0      | 9     | 0/9   | 1       | 0/1                |
+| B    | 8      | 8     | 0/9   | 0       | 0/0                |
+| C    | 8      | 9     | 1/9   | 0       | 1/0                |
+
+Every row created for the rehearsal — three customers, three cards, three visits, one
+canje — was deleted afterwards, and the count of anchored real cards was unchanged at 23. No real customer's card was touched.
+
 ### 1. ~~The cycle cannot be cut short~~ — RESOLVED by `79_cycle_anchor.sql`
 
 Keep the analysis below: it is why the columns exist, and the next reader of that

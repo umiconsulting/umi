@@ -279,6 +279,44 @@ describe('CashScanService.scan — the two-tier ladder', () => {
     // The visit counted against the FRESH cycle, so it did not complete one.
     expect(arg.earnedReward).toBe(false);
   });
+
+  /**
+   * THE TWO LIES THE LIVE REHEARSAL CAUGHT (2026-10-06, production).
+   *
+   * Both were invisible to every test in this file and both were customer-facing:
+   * one told the barista a reward had been won when it had not, and the other left
+   * the pass with no line at all after a redemption.
+   */
+  it('does not claim a reward the early cash-out made impossible', async () => {
+    // A card ONE stamp short of the cycle, cashed out early in the same tap. The
+    // visit lands on the new cycle, so it earns nothing — but reading the position
+    // before the cash-out made 8 + 1 look like the threshold.
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      visits_this_cycle: 8,
+      total_visits: 8,
+      pending_rewards: 0,
+    });
+    const r = await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', actions: ['REDEEM_BASE', 'VISIT'] });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.earnedReward).toBe(false);
+    expect(arg.newVisitsThisCycle).toBe(1);
+    expect(r.rewardEarned).toBe(false);
+    expect(r.message).not.toContain('ganó una recompensa');
+    expect(r.message).toContain('canjeado en nivel 1');
+    // The moment stays the one the action produced: the drink that left the bar.
+    expect(arg.momentMessage).toContain('Canjeaste tu Capuccino');
+  });
+
+  it('leaves a moment behind for a redemption with no visit', async () => {
+    h.cards.findCard.mockResolvedValue({ ...CARD, pending_rewards: 1, pending_tier1: 0 });
+    await h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'REDEEM' });
+    const arg = h.repo.performScan.mock.calls[0][0];
+    expect(arg.doVisit).toBe(false);
+    // umi-cash wrote the field on EVERY scan, clearing a stale moment with null when
+    // there was none. A redeem-only scan has one, and it must reach the pass.
+    expect(arg.momentMessage).toContain('Canjeaste tu Latte rocas');
+  });
 });
 
 describe('CashScanService.scan — guards', () => {
