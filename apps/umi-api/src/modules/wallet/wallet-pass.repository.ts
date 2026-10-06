@@ -344,10 +344,20 @@ export class WalletPassRepository {
                 p.promo_ends_at           AS promo_ends_at,
                 p.promo_days              AS promo_days,
                 p.topup_enabled           AS topup_enabled,
-                -- Both builders read this (google-pass.service.ts:249,
-                -- apple-pass.builder.ts:265). Omitting it here is why the
-                -- Android reward line was empty after the port.
-                p.birthday_reward_name    AS birthday_reward_name,
+                -- ⚠️ THE CUSTOMER'S GIFT, NOT THE CAFÉ'S SETTING. Both builders put
+                -- this line on the pass front, and both legacy paths passed it only
+                -- for a card that ACTUALLY holds an active grant (hasBirthday ? name
+                -- : null, in the bulk Google refresh and the scan push; the Apple
+                -- pass route passed nothing at all). Reading the program's configured
+                -- name here put "REGALO DE CUMPLEAÑOS" on every pass at a café that
+                -- has the feature switched off — a line the customer has no way to
+                -- interpret and no gift behind it. Found on a real pass minutes after
+                -- the Wallet switch went on.
+                CASE WHEN EXISTS (
+                  SELECT 1 FROM merchant.loyalty_birthday_grant AS g
+                   WHERE g.merchant_id = c.merchant_id AND g.card_id = c.id
+                     AND g.status = 'active' AND g.expires_at > now()
+                ) THEN p.birthday_reward_name ELSE NULL END AS birthday_reward_name,
                 -- The café's LADDER, as rows: the standard reward (the lower tier a
                 -- customer may cash out early), the optional upper tier the cycle runs
                 -- to, and this card's own override. Resolved in the service by
