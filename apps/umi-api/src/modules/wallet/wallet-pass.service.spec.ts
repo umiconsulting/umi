@@ -78,16 +78,63 @@ function makeService(render: PassRenderData | null = RENDER) {
     serialsUpdatedSince: vi.fn(),
     merchantByHandle: vi.fn(),
     merchantForCard: vi.fn(),
+    googleObjectForCard: vi
+      .fn()
+      .mockResolvedValue('3388000000023116211.card_cmnuuglu40004oyt5s8bve44e'),
+    googleObjectsForMerchant: vi
+      .fn()
+      .mockResolvedValue([{ cardId: 'card-1', objectId: 'stored-object-id' }]),
   };
   const builder = { build, isConfigured: () => true, assetOrigin: () => '' };
-  const google = { isConfigured: () => false, saveUrl: vi.fn(), updateObject: vi.fn() };
+  const google = {
+    isConfigured: () => false,
+    saveUrl: vi.fn(),
+    updateObject: vi.fn().mockResolvedValue(true),
+    refreshMerchantObjects: vi.fn().mockResolvedValue({ total: 1, refreshed: 1, failed: 0 }),
+  };
   const service = new WalletPassService(
     repo as unknown as ConstructorParameters<typeof WalletPassService>[0],
     builder as unknown as ConstructorParameters<typeof WalletPassService>[1],
     google as unknown as ConstructorParameters<typeof WalletPassService>[2],
   );
-  return { service, build, repo };
+  return { service, build, repo, google };
 }
+
+/**
+ * THE ID THAT MAKES AN ANDROID UPDATE LAND. Objects in circulation were created by
+ * umi-cash under Prisma cuids; the id this codebase would construct is a uuid. The
+ * first version PATCHed the constructed one, so all 155 Android passes 404'd on every
+ * refresh and kept showing the previous week. Only a test at the service sees which id
+ * is carried from the pass row into the request.
+ */
+describe('WalletPassService · the Android object id', () => {
+  it('refreshes with the id the object HAS, not one it would be given', async () => {
+    const { service, repo, google } = makeService();
+    repo.merchantForCard.mockResolvedValue('merchant-1');
+    (google as unknown as { isConfigured: () => boolean }).isConfigured = () => true;
+    await service.refreshGoogleObject('card-1');
+    const passed = google.updateObject.mock.calls[0][0];
+    expect(passed.objectId).toBe('3388000000023116211.card_cmnuuglu40004oyt5s8bve44e');
+  });
+
+  it('does nothing for a card whose customer never added the Android pass', async () => {
+    const { service, repo, google } = makeService();
+    (google as unknown as { isConfigured: () => boolean }).isConfigured = () => true;
+    repo.merchantForCard.mockResolvedValue('merchant-1');
+    repo.googleObjectForCard.mockResolvedValue(null);
+    await service.refreshGoogleObject('card-1');
+    // Before this, every write to such a card fired a PATCH at an object that does
+    // not exist and logged a 404 — 404s that read like a Google outage.
+    expect(google.updateObject).not.toHaveBeenCalled();
+  });
+
+  it('walks the café for the merchant-wide refresh', async () => {
+    const { service, repo, google } = makeService();
+    await service.refreshMerchantGoogleObjects('merchant-1');
+    expect(repo.googleObjectsForMerchant).toHaveBeenCalledWith('merchant-1');
+    expect(google.refreshMerchantObjects).toHaveBeenCalled();
+  });
+});
 
 describe('WalletPassService.renderPass', () => {
   it('signs the SAME authentication token back into the rebuilt pass', async () => {

@@ -255,8 +255,15 @@ export class CashController {
   @HttpCode(200)
   @RequirePermission('merchant.manage')
   async resyncRewardConfig(@Merchant() t: MerchantAccess) {
-    const apple = await this.walletPass.refreshMerchantWithCounts(t.merchantId);
-    return { apple, google: null };
+    // BOTH PLATFORMS, and they are independent — one unreachable provider must not
+    // silence the other. This used to answer `google: null` because the merchant-wide
+    // Google refresh had no counterpart here; the operator saw "Google: 0/0" and every
+    // Android pass kept yesterday's numbers.
+    const [apple, google] = await Promise.all([
+      this.walletPass.refreshMerchantWithCounts(t.merchantId),
+      this.walletPass.refreshMerchantGoogleObjects(t.merchantId),
+    ]);
+    return { apple, google };
   }
 
   /**

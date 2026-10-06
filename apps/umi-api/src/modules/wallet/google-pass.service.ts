@@ -97,8 +97,8 @@ export class GooglePassService {
    * Best-effort, like the Apple push: the money write has committed and must not
    * be undone by an unreachable Google. Nothing here throws.
    */
-  async updateObject(data: GooglePassData): Promise<void> {
-    if (!this.isConfigured()) return;
+  async updateObject(data: GooglePassData): Promise<boolean> {
+    if (!this.isConfigured()) return false;
     // ⚠️ THE ID THE OBJECT ACTUALLY HAS. Every object in circulation was created by
     // umi-cash under a Prisma cuid (…card_cmnuuglu40004oyt5s8bve44e); the id a NEW
     // object would get here is …card_<uuid>. Patching the constructed id asked Google
@@ -108,7 +108,7 @@ export class GooglePassService {
     const objectId = data.objectId ?? this.objectId(data.cardId);
     try {
       const token = await this.accessToken();
-      if (!token) return;
+      if (!token) return false;
 
       const patched = await fetch(
         `${WALLET_OBJECTS}/loyaltyObject/${encodeURIComponent(objectId)}`,
@@ -125,7 +125,7 @@ export class GooglePassService {
           `google_patch_failed object=${objectId} status=${patched.status} ` +
             `${await patched.text().catch(() => '')}`,
         );
-        return;
+        return false;
       }
 
       // PATCHing text modules updates the card but raises NO notification. Google
@@ -134,9 +134,53 @@ export class GooglePassService {
       if (data.lifecycleMessage) {
         await this.notify(objectId, token, data);
       }
+      return true;
     } catch (err) {
       this.logger.warn(`google_update_failed object=${objectId}: ${String(err)}`);
+      return false;
     }
+  }
+
+  /**
+   * Refresh every Android object at one café — the Google half of the register's
+   * "Actualizar pases".
+   *
+   * WHY IT IS A MERCHANT-WIDE WALK AND NOT A FEW CALLS. `merchant.loyalty_wallet_pass`
+   * holds one row per object, and each PATCH is idempotent content for one customer.
+   * The legacy refresh did the same; what it did NOT do is survive being skipped,
+   * which is what happened here: an operator could press the button, see the Apple
+   * count move, and leave every Android pass showing the previous week.
+   *
+   * Bounded concurrency: Google rate-limits, the objects are independent, and a
+   * sequential walk of 155 would outlive the proxy window in front of the API.
+   */
+  async refreshMerchantObjects(
+    entries: { cardId: string; objectId: string }[],
+    load: (cardId: string, objectId: string) => Promise<GooglePassData | null>,
+    concurrency = 4,
+  ): Promise<{ total: number; refreshed: number; failed: number }> {
+    if (!this.isConfigured())
+      return { total: entries.length, refreshed: 0, failed: entries.length };
+    const queue = [...entries];
+    let refreshed = 0;
+    let failed = 0;
+    const worker = async () => {
+      for (let entry = queue.shift(); entry; entry = queue.shift()) {
+        try {
+          const data = await load(entry.cardId, entry.objectId);
+          if (data && (await this.updateObject(data))) refreshed++;
+          else failed++;
+        } catch (err) {
+          failed++;
+          this.logger.warn(`google_merchant_refresh_failed card=${entry.cardId}: ${String(err)}`);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker));
+    this.logger.log(
+      `google_merchant_refresh objects=${entries.length} refreshed=${refreshed} failed=${failed}`,
+    );
+    return { total: entries.length, refreshed, failed };
   }
 
   private async notify(objectId: string, token: string, data: GooglePassData): Promise<void> {

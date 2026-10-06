@@ -87,6 +87,29 @@ export class WalletPassRepository {
     return rows[0]?.external_object_id ?? null;
   }
 
+  /**
+   * Every card at this café whose customer actually added the Android pass, with the
+   * object id that pass has.
+   *
+   * The id is carried, never derived: the objects in circulation were created by
+   * umi-cash under Prisma cuids while this codebase would mint uuids, so a PATCH to the
+   * constructed id is a 404 — which is what every Android refresh did until the Wallet
+   * switch made it visible.
+   */
+  async googleObjectsForMerchant(
+    merchantId: string,
+  ): Promise<{ cardId: string; objectId: string }[]> {
+    const { rows } = await this.pg.query<{ card_id: string; external_object_id: string }>(
+      `SELECT wp.card_id::text, wp.external_object_id
+         FROM merchant.loyalty_wallet_pass AS wp
+         JOIN merchant.loyalty_card AS c ON c.id = wp.card_id
+        WHERE c.merchant_id = $1::uuid AND wp.platform = 'google' AND wp.status = 'active'
+          AND wp.external_object_id IS NOT NULL`,
+      [merchantId],
+    );
+    return rows.map((r) => ({ cardId: r.card_id, objectId: r.external_object_id }));
+  }
+
   /** The loyalty card a signed-in customer holds at this café, if any. */
   async cardForCustomer(merchantId: string, customerId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ id: string }>(
