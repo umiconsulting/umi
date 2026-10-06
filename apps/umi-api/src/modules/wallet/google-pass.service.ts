@@ -131,13 +131,21 @@ export class GooglePassService {
         // A 404 is not a Google fault: it means this row points at an object that does
         // not exist — the customer never finished adding the pass, or removed it. The
         // caller marks the row so the next walk does not count it again.
-        if (patched.status === 404) {
+        //
+        // A 400 `Invalid resource ID` is the same answer wearing a different number: the
+        // row's id itself is malformed (one holds a literal backslash-n inside it), so it
+        // can never be PATCHed and there is nothing to update. Treating it as a Google
+        // fault made a healthy refresh report a failure on every single run.
+        const detail = await patched.text().catch(() => '');
+        if (
+          patched.status === 404 ||
+          (patched.status === 400 && /invalid resource id/i.test(detail))
+        ) {
           this.logger.log(`google_object_missing object=${objectId}`);
           return 'missing';
         }
         this.logger.warn(
-          `google_patch_failed object=${objectId} status=${patched.status} ` +
-            `${await patched.text().catch(() => '')}`,
+          `google_patch_failed object=${objectId} status=${patched.status} ${detail}`,
         );
         return 'failed';
       }
