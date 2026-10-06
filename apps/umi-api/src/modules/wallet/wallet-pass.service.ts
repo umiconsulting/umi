@@ -195,7 +195,7 @@ export class WalletPassService {
       // Google does not have this object. Marking the row `removed` is what the status
       // is for, and it stops every future walk from counting a 404 as an outage — 19
       // rows did that on each refresh, for objects that were never there to update.
-      if (outcome === 'missing') await this.repo.markGoogleObjectRemoved(objectId);
+      if (outcome === 'missing') await this.repo.markGoogleObjectRemoved(cardId);
       return outcome;
     });
   }
