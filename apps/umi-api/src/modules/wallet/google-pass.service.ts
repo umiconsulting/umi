@@ -342,7 +342,13 @@ export function buildLoyaltyObject(input: {
   }
 
   const object: Record<string, unknown> = {
-    id: `${issuerId}.card_${data.cardId}`,
+    // ⚠️ THE SAME ID AS THE URL. A PATCH's body must carry the object's existing id:
+    // Google refuses a body whose id differs from the one in the path, and it reports
+    // the BODY's id in the error — which is how this hid. The first fix corrected the
+    // url and left the body constructing `…card_<uuid>` while the object in circulation
+    // is `…card_<cuid>`, so every Android refresh still 404'd, now with two different
+    // ids in the same log line. `objectId` is absent only when CREATING an object.
+    id: data.objectId ?? `${issuerId}.card_${data.cardId}`,
     classId: `${issuerId}.${handle}_${classPrefix}`,
     state: 'active',
     accountId: data.cardNumber,
