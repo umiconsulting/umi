@@ -168,7 +168,8 @@ export class CashScanService {
         earnedReward,
         isFirstVisitEver: newTotalVisits === 1,
       });
-      if (earnedReward || visitM.journey === 'base_reward_ready' || moment === null) moment = visitM;
+      if (earnedReward || visitM.journey === 'base_reward_ready' || moment === null)
+        moment = visitM;
     }
     // Rendered with the same variables umi-cash's copy uses — including the ladder
     // extras, so café copy may name the upper tier.
@@ -292,11 +293,7 @@ export class CashScanService {
    * else comes back as the tier the cycle banks. umi-cash decided this by comparing
    * the redemption's config against the profile's base tier, and so does this.
    */
-  async revertRedemption(
-    merchantId: string,
-    userId: string,
-    redemptionId: string,
-  ) {
+  async revertRedemption(merchantId: string, userId: string, redemptionId: string) {
     const redemption = await this.repo.findRedemption(merchantId, redemptionId);
     if (!redemption) throw new NotFoundException({ error: 'Canje no encontrado' });
     if (redemption.revertedAt) {
@@ -318,9 +315,7 @@ export class CashScanService {
     );
     const revertsBaseTier =
       !!profile.baseTier?.configId && redemption.rewardId === profile.baseTier.configId;
-    const rewardName = revertsBaseTier
-      ? profile.baseTier!.rewardName
-      : profile.rewardName;
+    const rewardName = revertsBaseTier ? profile.baseTier!.rewardName : profile.rewardName;
 
     const { alreadyReverted, card } = await this.repo.revertRedemption({
       merchantId,

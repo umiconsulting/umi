@@ -135,7 +135,13 @@ export const LIFECYCLE_VARIABLES: Record<LifecycleJourneyKey, string[]> = {
   winback_60: ['{name}', '{tenant}', '{rewardName}', '{visitsThisCycle}', '{visitsRequired}'],
   reward_expiring: ['{name}', '{tenant}', '{rewardName}', '{date}'],
   first_visit: ['{name}', '{tenant}', '{rewardName}'],
-  milestone_halfway: ['{name}', '{tenant}', '{rewardName}', '{visitsThisCycle}', '{visitsRequired}'],
+  milestone_halfway: [
+    '{name}',
+    '{tenant}',
+    '{rewardName}',
+    '{visitsThisCycle}',
+    '{visitsRequired}',
+  ],
   milestone_one_left: ['{name}', '{tenant}', '{rewardName}'],
   reward_earned: ['{name}', '{tenant}', '{rewardName}'],
   base_reward_ready: [

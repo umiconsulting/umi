@@ -64,7 +64,7 @@ is impossible and a silent gap is impossible too.
 
 Porting the revert required a second fix: `pending_rewards` derives from
 `COUNT(loyalty_redemption)`, which counted reverted canjes, so undoing a redemption
-would have *cost* the customer a reward. Reverted rows now stay in the bitácora and
+would have _cost_ the customer a reward. Reverted rows now stay in the bitácora and
 out of the count. One card in production has reverted redemptions.
 
 ## What still blocks the flip
@@ -77,7 +77,7 @@ to 0 and the customer starts cycling again. umi-api's scan accepts only
 BIRTHDAY/REDEEM/VISIT.
 
 That is not a missing branch; the shape of the data has no room for it.
-build-v3 has no cache columns, so the scan *derives*
+build-v3 has no cache columns, so the scan _derives_
 `visits_this_cycle = SUM(stamps) % visits_required` and
 `pending_rewards = SUM(stamps) / visits_required − COUNT(redemptions)`. Both are
 monotone in the customer's lifetime stamps, and an early cash-out is not: it resets
@@ -97,7 +97,7 @@ Measured on production, 2026-10-06:
 (`visits_this_cycle` derived at the upper tier vs. the till's own cached value. At
 the standard tier the same measure is 7 of 592 — the cache is history-dependent:
 it was written against whichever config was active at each customer's last visit,
-so *neither* formula reproduces it everywhere, and the ladder makes the gap wider.)
+so _neither_ formula reproduces it everywhere, and the ladder makes the gap wider.)
 
 One card holds the whole problem: `EGR-6659949340` has 49 lifetime stamps, one early
 cash-out (its `note` reads `Canje anticipado con 8/9 visitas` — the only non-null

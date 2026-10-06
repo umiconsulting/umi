@@ -261,7 +261,12 @@ export function visitMoment(
   });
   const toward = (journey: LifecycleJourneyKey): VisitMoment => {
     const n = nextTier(profile, v);
-    return { journey, rewardName: n.rewardName, visitsRequired: n.visitsRequired, visitsThisCycle: v };
+    return {
+      journey,
+      rewardName: n.rewardName,
+      visitsRequired: n.visitsRequired,
+      visitsThisCycle: v,
+    };
   };
 
   if (earnedReward) return { ...top('reward_earned'), visitsThisCycle: required };
@@ -329,9 +334,7 @@ export type StripState = { filled: number; required: number; bonusFrom: number |
 
 /** Inverse of stripState for the public image route; null on anything malformed or out of range. */
 export function parseStripState(state: string, maxRequired: number): StripState | null {
-  const m = state
-    .replace(/\.png$/i, '')
-    .match(/^(\d+)-(\d+)(?:-b(\d+))?$/);
+  const m = state.replace(/\.png$/i, '').match(/^(\d+)-(\d+)(?:-b(\d+))?$/);
   if (!m) return null;
   const required = parseInt(m[2], 10);
   if (!Number.isInteger(required) || required < 1 || required > maxRequired) return null;

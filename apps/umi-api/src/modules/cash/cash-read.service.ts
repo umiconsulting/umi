@@ -2,11 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { formatMxn, formatMxn2, iso } from '../../shared/format/money';
 import { CashRepository } from './cash.repository';
 import { CashCardRepository } from './cash-card.repository';
-import {
-  DEFAULT_LIFECYCLE_COPY,
-  LIFECYCLE_JOURNEYS,
-  LIFECYCLE_VARIABLES,
-} from './lifecycle-copy';
+import { DEFAULT_LIFECYCLE_COPY, LIFECYCLE_JOURNEYS, LIFECYCLE_VARIABLES } from './lifecycle-copy';
 import { cardRewardFields } from '../../shared/loyalty/reward-tiers';
 import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
 
@@ -145,7 +141,7 @@ export class CashReadService {
     const { visits, topups, pending } = await this.repo.stats(merchantId, dayStart);
     return {
       // The till's own role, in the till's vocabulary. umi-cash sent `staff.role`;
-     visitsToday: Number(visits?.n ?? 0),
+      visitsToday: Number(visits?.n ?? 0),
       topupsTodayCount: Number(topups?.n ?? 0),
       topupsTodayMXN: formatMxn(Number(topups?.sum ?? 0)),
       pendingRewards: Number(pending?.sum ?? 0),

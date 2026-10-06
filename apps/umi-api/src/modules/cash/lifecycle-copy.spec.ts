@@ -19,7 +19,9 @@ describe('renderTemplate', () => {
       rewardName: 'Café',
       tenant: 'Kala',
     });
-    expect(out).toBe('🎉 ¡Felicidades Ana! Ganaste Café — te espera en Kala, canjéalo en tu próxima visita.');
+    expect(out).toBe(
+      '🎉 ¡Felicidades Ana! Ganaste Café — te espera en Kala, canjéalo en tu próxima visita.',
+    );
   });
 });
 
