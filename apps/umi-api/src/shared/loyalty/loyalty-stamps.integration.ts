@@ -24,6 +24,15 @@ import { LOYALTY_CARD_STATE_SQL } from './card-state.sql';
  * counts, and a mocked repository returns whatever the mock was told to return.
  * `cash-write.service.spec.ts` mocks the repository and stayed green throughout.
  *
+ * WHAT THE ANCHORS ADD (79_cycle_anchor.sql). `visits_this_cycle` is still read off
+ * the stamp SUM, and the two magnitude cases below are still the point of this file.
+ * But a cycle can start somewhere other than a multiple of the threshold, and a
+ * COMPLETED cycle left no row anywhere, so the numerator of `pending_rewards` is now
+ * the card's `rewards_earned` anchor rather than `sum / threshold`. The cases that
+ * need a completed cycle therefore SET the anchor the scan would have written, and
+ * the ones at the end pin the two shapes that motivated the column: an early
+ * cash-out (a non-zero anchor) and a canje that consumed the cycle, not a reward.
+ *
  * Self-seeding, so it runs against any build-v3 database — including the pristine
  * one CI builds. Every row it writes is removed in afterAll.
  *
@@ -67,6 +76,8 @@ interface CardState {
   visits_this_cycle: number;
   pending_rewards: number;
   visits_required: number;
+  cycle_anchor: number;
+  rewards_earned: number;
 }
 
 describe('loyalty stamps · a row is not a magnitude', () => {
@@ -105,6 +116,31 @@ describe('loyalty stamps · a row is not a magnitude', () => {
   const clearVisits = () =>
     pg.query(`DELETE FROM merchant.loyalty_visit WHERE merchant_id = $1::uuid`, [MERCHANT]);
 
+  /**
+   * Put the card back to a clean slate: no visits, no canjes, both anchors at zero
+   * (the state a café that never changed a threshold and never cut a card short
+   * leaves behind).
+   */
+  const clearCard = async () => {
+    await clearVisits();
+    await pg.query(`DELETE FROM merchant.loyalty_redemption WHERE merchant_id = $1::uuid`, [
+      MERCHANT,
+    ]);
+    await pg.query(
+      `UPDATE merchant.loyalty_card SET cycle_anchor = 0, rewards_earned = 0
+        WHERE merchant_id = $1::uuid`,
+      [MERCHANT],
+    );
+  };
+
+  /** What the scan writes when a visit completes a cycle. */
+  const earnRewards = (n: number) =>
+    pg.query(
+      `UPDATE merchant.loyalty_card SET rewards_earned = rewards_earned + $2
+        WHERE merchant_id = $1::uuid`,
+      [MERCHANT, n],
+    );
+
   const addVisit = (stamps: number, source = 'scan') =>
     pg.query(
       `INSERT INTO merchant.loyalty_visit (merchant_id, card_id, source, stamps)
@@ -118,7 +154,7 @@ describe('loyalty stamps · a row is not a magnitude', () => {
   };
 
   it('a scan defaults to one stamp, so nothing about the ordinary path changed', async () => {
-    await clearVisits();
+    await clearCard();
     await addVisit(1);
     await addVisit(1);
     await addVisit(1);
@@ -129,9 +165,13 @@ describe('loyalty stamps · a row is not a magnitude', () => {
   });
 
   it('THE REGRESSION · one bulk credit of 9 is worth 9 stamps, not 1', async () => {
-    await clearVisits();
+    await clearCard();
     await addVisit(1);
     await addVisit(9, 'manual_bulk');
+    // The credit crossed the threshold, so the scan (or the bulk path) wrote the
+    // anchor. Without this line the position below is right and the reward is not —
+    // which is the whole reason `rewards_earned` is stored.
+    await earnRewards(1);
 
     const s = await state();
     // count(*) would say 2 here, and that is exactly the defect: a customer who
@@ -139,10 +179,11 @@ describe('loyalty stamps · a row is not a magnitude', () => {
     expect(s.total_visits).toBe(10);
     expect(s.visits_this_cycle).toBe(0); // 10 % 10
     expect(s.pending_rewards).toBe(1); // she has earned the reward
+    expect(s.rewards_earned).toBe(1);
   });
 
   it('the worst measured card · 20 stamps must not read as 5', async () => {
-    await clearVisits();
+    await clearCard();
     // The shape that cost the real customer: four interactions, one of them a
     // large catch-up. count(*) = 5, sum(stamps) = 20.
     await addVisit(1);
@@ -150,6 +191,7 @@ describe('loyalty stamps · a row is not a magnitude', () => {
     await addVisit(1);
     await addVisit(1);
     await addVisit(16, 'manual_bulk');
+    await earnRewards(2);
 
     const s = await state();
     expect(s.total_visits).toBe(20);
@@ -164,10 +206,80 @@ describe('loyalty stamps · a row is not a magnitude', () => {
   });
 
   it('a card with no visits reads 0, not NULL', async () => {
-    await clearVisits();
+    await clearCard();
     const s = await state();
     expect(s.total_visits).toBe(0);
     expect(s.pending_rewards).toBe(0);
+    expect(s.visits_this_cycle).toBe(0);
+  });
+
+  /**
+   * THE SHAPES THE ANCHORS EXIST FOR.
+   *
+   * Both were measured on production before the columns were written: an early
+   * cash-out makes the position stop being a modulo of the threshold, and a moved
+   * threshold leaves the next cycle starting where the old one left off. In each
+   * case the plain `sum % threshold` reads a different number than the till did.
+   */
+  it('an early cash-out · the cycle restarts where the card was torn off', async () => {
+    await clearCard();
+    // 7 stamps toward a 10-stamp cycle, then the barista hands over the lower tier
+    // and tears the card off. umi-cash read 0/10 afterwards and so must this.
+    await addVisit(7);
+    await pg.query(
+      `UPDATE merchant.loyalty_card SET cycle_anchor = 7 WHERE merchant_id = $1::uuid`,
+      [MERCHANT],
+    );
+
+    const s = await state();
+    expect(s.total_visits).toBe(7);
+    expect(s.visits_this_cycle).toBe(0); // NOT 7
+    expect(s.pending_rewards).toBe(0); // and no reward was consumed
+
+    // Two more visits put her at 2/10, not at 9/10.
+    await addVisit(1);
+    await addVisit(1);
+    expect((await state()).visits_this_cycle).toBe(2);
+  });
+
+  it('the early cash-out canje does not count against pending_rewards', async () => {
+    await clearCard();
+    await addVisit(7);
+    await pg.query(
+      `UPDATE merchant.loyalty_card SET cycle_anchor = 7 WHERE merchant_id = $1::uuid`,
+      [MERCHANT],
+    );
+    await pg.query(
+      `INSERT INTO merchant.loyalty_redemption
+         (merchant_id, card_id, reason, cycle_reset)
+       VALUES ($1::uuid, $2::uuid, 'stamps', true)`,
+      [MERCHANT, CARD],
+    );
+
+    // The same row WITHOUT the flag would have charged her a banked reward, which is
+    // the defect the flag exists to prevent: `pending_rewards` would read −1 and the
+    // next visit she earned would be swallowed.
+    const s = await state();
+    expect(s.pending_rewards).toBe(0);
+  });
+
+  it('a reverted canje hands the reward back without a counter write', async () => {
+    await clearCard();
+    await addVisit(10);
+    await earnRewards(1);
+    await pg.query(
+      `INSERT INTO merchant.loyalty_redemption (merchant_id, card_id, reason)
+       VALUES ($1::uuid, $2::uuid, 'stamps')`,
+      [MERCHANT, CARD],
+    );
+    expect((await state()).pending_rewards).toBe(0);
+
+    await pg.query(
+      `UPDATE merchant.loyalty_redemption SET reverted_at = now()
+        WHERE merchant_id = $1::uuid`,
+      [MERCHANT],
+    );
+    expect((await state()).pending_rewards).toBe(1);
   });
 
   it('the CHECK bounds the magnitude · 51 is rejected', async () => {

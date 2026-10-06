@@ -64,12 +64,17 @@ const CARD_PERSON_JOIN = `
      LIMIT 1
   ) ph ON true`;
 const HAS_PHONE = `ph.phone IS NOT NULL`;
-// visits_this_cycle = SUM(visit stamps) % the café's cycle threshold (default 10).
-// The threshold is the ladder's TOP tier where one exists — see
+// visits_this_cycle = (SUM(visit stamps) − the card's cycle anchor) % the café's
+// cycle threshold (default 10). The threshold is the ladder's TOP tier where one
+// exists, and the anchor is where the current cycle began — see
 // shared/loyalty/card-state.sql.ts for why, and for the one copy of the rule.
-const VISITS_THIS_CYCLE = `(
-  (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
-  % COALESCE(${EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL}, ${DEFAULT_VISITS_REQUIRED})
+// The parentheses around the subtraction are load-bearing: `%` binds tighter than
+// `-`, so `a - b % t` is `a - (b % t)`, which is not the position of anything.
+const VISITS_THIS_CYCLE = `((
+  (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
+    WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
+  - c.cycle_anchor
+) % COALESCE(${EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL}, ${DEFAULT_VISITS_REQUIRED})
 )::int`;
 
 @Injectable()
