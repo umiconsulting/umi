@@ -1,7 +1,11 @@
 # The register flip is blocked on response shape, not on routes
 
-Status: update 2026-10-06 (later the same night) below. The original finding and
-the plan it produced are kept as written.
+Status: **FLIPPED 2026-10-06 12:16Z**, with the Wallet switch three minutes later. Both
+blockers below were closed first — the cycle anchor by `79_cycle_anchor.sql`, the Google
+resync by a merchant-wide refresh — and the flip was then verified from a real phone, on
+real passes, before opening. The original finding and the plan it produced are kept as
+written: the record of why the first attempt did not happen is what made the second one
+work.
 
 Status at the time: `BLOCKED — measured 2026-10-06, one hour before the window closed`.
 Companion: [`CUTOVER_RUNBOOK.md`](./CUTOVER_RUNBOOK.md) ·
@@ -217,13 +221,21 @@ not approximately right for most of them.
 
 That was the blocker. `79_cycle_anchor.sql` is the repair, described above.
 
-### 2. The café-wide Google resync is not ported
+### 2. ~~The café-wide Google resync is not ported~~ — RESOLVED before the flip
 
-`reward-config/resync` touches Apple passes and pushes. A merchant-wide Google
-re-PATCH (umi-cash's `refreshGoogleWalletObjectsForTenant`) has no counterpart in
-umi-api yet, so the route answers `google: null` and the screen renders
-`Google: 0/0` — a number nobody measured, in a field the operator only reads when
-something is already wrong.
+`reward-config/resync` used to touch and push Apple passes only and answer
+`google: null`, so the screen rendered `Google: 0/0` — a number nobody measured, in a
+field the operator only reads when something is already wrong. It now refreshes both
+platforms in parallel and answers real counts:
+
+```
+{ apple: { cards, sent }, google: { total, refreshed, missing, failed } }
+```
+
+and `?platform=apple|google` runs one half — the difference between ~100 object
+PATCHes and 449 APNs round trips. This mattered more than the shape of the answer: the
+Android objects had been stale since the Wallet switch, and nothing else would have
+caught one up but a transaction.
 
 ## What happened
 
