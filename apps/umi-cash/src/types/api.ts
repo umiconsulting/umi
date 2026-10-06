@@ -1,3 +1,11 @@
+/** Lower tier of a two-tier reward ladder, as every card payload carries it. */
+export interface BaseRewardSummary {
+  visitsRequired: number;
+  rewardName: string;
+  /** visitsThisCycle has reached the tier — the customer may cash it out now. */
+  ready: boolean;
+}
+
 export interface CardState {
   cardId: string;
   cardNumber: string;
@@ -11,6 +19,10 @@ export interface CardState {
   pendingRewards: number;
   rewardName: string;
   rewardDescription: string | null;
+  /** null = single reward. */
+  baseReward: BaseRewardSummary | null;
+  /** Name of the reward a banked redemption hands over (ladder-aware). */
+  pendingRewardName: string;
   progressPercent: number;
   recentVisits: {
     id: string;
@@ -27,7 +39,7 @@ export interface CardState {
 
 export interface ScanResult {
   success: boolean;
-  action: 'VISIT' | 'REDEEM';
+  action: 'VISIT' | 'REDEEM' | 'REDEEM_BASE';
   message: string;
   customer: {
     name: string | null;
@@ -38,6 +50,8 @@ export interface ScanResult {
     visitsRequired: number;
     pendingRewards: number;
     balanceMXN: string;
+    baseReward: BaseRewardSummary | null;
+    pendingRewardName: string;
   };
   rewardEarned?: boolean;
 }
@@ -70,6 +84,13 @@ export interface RewardConfig {
   rewardCostCentavos: number;
   isActive: boolean;
   activatedAt: string;
+}
+
+/** GET /admin/reward-config — `upgrade` is the optional upper tier of a two-tier ladder. */
+export interface RewardConfigResponse {
+  active: RewardConfig | null;
+  upgrade: RewardConfig | null;
+  history: RewardConfig[];
 }
 
 export interface TopUpResult {

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getActiveRewardConfig, rewardConfigDefaults } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard } from '@/lib/prisma-helpers';
 import { resolveScanTarget } from '@/lib/scan-resolve';
 import { formatMXN } from '@/lib/currency';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
 import { tenantStartOfDay } from '@/lib/timezone';
+import { cardRewardFields } from '@/lib/scan-helpers';
 
 const PreviewSchema = z.object({
   qrPayload: z.string().min(1),
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       return NextResponse.json({ error: 'No puedes escanear tu propia tarjeta' }, { status: 403 });
     }
 
-    const [rewardConfig, activeBirthdayReward] = await Promise.all([
-      getActiveRewardConfig(tenant.id),
+    const [rewardProfile, activeBirthdayReward] = await Promise.all([
+      getRewardProfileForCard(tenant.id, card),
       prisma.birthday_rewards.findFirst({
         // NULL expires_at = never expires (Postgres NULL >= now() is NULL, not true).
         where: {
@@ -53,8 +54,6 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
         },
       }),
     ]);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
-
     // Check if already visited today (calendar day in tenant timezone)
     const recentVisit = await prisma.visit_events.findFirst({
       where: { tenant_id: tenant.id, loyalty_card_id: card.id, occurred_at: { gte: tenantStartOfDay(tenant.timezone) } },
@@ -67,11 +66,11 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       customer: { name: card.person?.display_name ?? null },
       card: {
         visitsThisCycle: card.visits_this_cycle,
-        visitsRequired,
         pendingRewards: card.pending_rewards,
         balanceMXN: formatMXN(card.balance_cents),
         balanceCentavos: card.balance_cents,
-        rewardName,
+        // visitsRequired / rewardName (cycle values) + baseReward / pendingRewardName (ladder)
+        ...cardRewardFields(card, rewardProfile),
         visitLimitReached: !!recentVisit,
         lastVisitAt: recentVisit?.occurred_at ?? null,
       },

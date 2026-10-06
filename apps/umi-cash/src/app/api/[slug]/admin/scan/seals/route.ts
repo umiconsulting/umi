@@ -4,11 +4,14 @@ import { randomUUID } from 'node:crypto';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getStaffMemberId } from '@/lib/identity';
-import { getActiveRewardConfig, rewardConfigDefaults, findCardByIdentifier } from '@/lib/prisma-helpers';
+import { getRewardProfileForCard, findCardByIdentifier } from '@/lib/prisma-helpers';
 import { lockCard } from '@/lib/wallet';
 import { getTenant, requireActiveSubscription } from '@/lib/tenant';
-import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage } from '@/lib/scan-helpers';
+import { triggerWalletUpdates, buildCardSummary, readLifecycleMessage, lifecycleMetadata } from '@/lib/scan-helpers';
 import { afterResponse } from '@/lib/after-response';
+import { DEFAULT_CUSTOMER_NAME } from '@/lib/constants';
+import { resolveJourneyTemplate, renderTemplate } from '@/lib/lifecycle-copy';
+import { momentVars, visitMoment } from '@/lib/reward-tiers';
 
 // waitUntil work shares this budget — see the scan route; the backgrounded wallet push
 // is cancelled if the invocation ends first.
@@ -77,8 +80,10 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     if (!staffMemberId) {
       return NextResponse.json({ error: 'Tu usuario no está registrado como personal' }, { status: 403 });
     }
-    const rewardConfig = await getActiveRewardConfig(tenant.id);
-    const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+    const rewardProfile = await getRewardProfileForCard(tenant.id, card);
+    // Cycle length is the TOP tier on a two-tier ladder; a bulk credit that crosses the
+    // lower tier just leaves the card there (the customer chooses on their next scan).
+    const { visitsRequired } = rewardProfile;
     const required = Math.max(1, visitsRequired); // guard divide-by-zero on a mis-set config
 
     // Keep the pass's birthday reward visible if one is still active (this action
@@ -115,6 +120,23 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       const rewardsEarned = Math.floor(total / required);
       const newCycle = total % required;
 
+      // Same moment system as the scan route (reward-tiers.ts): a credit that crosses
+      // the threshold announces the reward; lesser milestones fill in behind it.
+      // Written on every applied credit (moment or null), so a moment cached by an
+      // earlier visit can never linger — or re-notify — on the wallet push this credit
+      // triggers. No first_visit here: a bulk import isn't the customer's first stamp
+      // story. Every credit changes the lifecycle field — the single Apple
+      // notification channel — with real copy.
+      const moment = visitMoment(rewardProfile, {
+        newVisitsThisCycle: rewardsEarned > 0 ? required : newCycle,
+        earnedReward: rewardsEarned > 0,
+        isFirstVisitEver: false,
+      });
+      const momentMessage = renderTemplate(
+        resolveJourneyTemplate(tenant.lifecycleCopy, moment.journey),
+        momentVars(rewardProfile, moment, { name: card.person?.display_name || DEFAULT_CUSTOMER_NAME, tenant: tenant.name }),
+      );
+
       await tx.visit_events.create({
         data: {
           tenant_id: tenant.id,
@@ -131,6 +153,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
           total_visits: { increment: seals },
           visits_this_cycle: newCycle,
           pending_rewards: { increment: rewardsEarned },
+          metadata: lifecycleMetadata(fresh.metadata, momentMessage),
         },
       });
 
@@ -140,24 +163,26 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
     const customerName = card.person?.display_name ?? null;
     // Credit is committed — the wallet refresh must not delay the response (see
     // afterResponse: a slow Apple/Google hop surfaced as "Error de conexión" on a
-    // seal that had already landed).
-    await afterResponse(
-      'wallet:seals',
-      triggerWalletUpdates(
-        cardId,
-        card.card_number,
-        result.card,
-        customerName,
-        visitsRequired,
-        rewardName,
-        card.created_at,
-        tenant.name,
-        params.slug,
-        tenant.primaryColor,
-        birthdayRewardName,
-        readLifecycleMessage(result.card.metadata),
-      ),
-    );
+    // seal that had already landed). A replayed credit changed nothing, so there is
+    // nothing to push — skip the provider hops entirely rather than re-send stale state.
+    if (!result.replayed) {
+      await afterResponse(
+        'wallet:seals',
+        triggerWalletUpdates(
+          cardId,
+          card.card_number,
+          result.card,
+          customerName,
+          rewardProfile,
+          card.created_at,
+          tenant.name,
+          params.slug,
+          tenant.primaryColor,
+          birthdayRewardName,
+          readLifecycleMessage(result.card.metadata),
+        ),
+      );
+    }
 
     const sealWord = seals === 1 ? 'sello' : 'sellos';
     let message = result.replayed
@@ -173,7 +198,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       seals,
       rewardsEarned: earned,
       message,
-      card: buildCardSummary(result.card, visitsRequired),
+      card: buildCardSummary(result.card, rewardProfile),
     });
   } catch (err) {
     if (err instanceof z.ZodError) return NextResponse.json({ error: 'Datos inválidos' }, { status: 400 });

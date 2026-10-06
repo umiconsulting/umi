@@ -7,6 +7,7 @@ import { centavosFromPesos, formatMXN, COMMON_TOPUP_AMOUNTS } from '@/lib/curren
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
 import { describeReadFailure, handleWriteFailure } from '@/lib/request-failure';
+import { VISIT_CAP_HINT, visitCapNotice } from '@/lib/visit-cap';
 
 interface CardPreview {
   cardId: string;
@@ -19,6 +20,10 @@ interface CardPreview {
     balanceMXN: string;
     balanceCentavos: number;
     rewardName: string;
+    /** Two-tier ladder: the lower tier and whether it can be cashed out right now. */
+    baseReward: { visitsRequired: number; rewardName: string; ready: boolean } | null;
+    /** What a banked redemption hands over (ladder-aware). */
+    pendingRewardName: string;
     visitLimitReached: boolean;
     lastVisitAt: string | null;
   };
@@ -168,11 +173,12 @@ export default function ScanPage() {
       if (res.ok) {
         lastPayloadRef.current = payload;
         setPreview(data);
-        // Default-check available loyalty actions so the common case (visit + redeem) is one tap
+        // Only the visit is pre-selected. Redemptions must be an explicit staff tap:
+        // pre-checking REDEEM turned a routine confirm into an accidental canje when
+        // the daily visit cap left it as the only armed action (a second scan of the
+        // same card redeemed the customer's reward without anyone noticing).
         const defaults = new Set<string>();
         if (!data.card.visitLimitReached) defaults.add('VISIT');
-        if (data.card.pendingRewards > 0) defaults.add('REDEEM');
-        if (data.birthdayReward) defaults.add('BIRTHDAY_REDEEM');
         setSelectedActions(defaults);
         stopCamera();
       } else {
@@ -508,12 +514,30 @@ export default function ScanPage() {
             {/* Visit progress */}
             <div className="flex items-baseline justify-between mb-2">
               <span className="u-eyebrow" style={{ fontSize: 10 }}>Próxima recompensa</span>
-              <span className="text-xs font-semibold" style={{ color: 'var(--color-brand)' }}>{preview.card.visitsThisCycle}/{preview.card.visitsRequired} · {preview.card.rewardName}</span>
+              <span className="text-xs font-semibold" style={{ color: 'var(--color-brand)' }}>
+                {preview.card.visitsThisCycle}/{preview.card.visitsRequired} · {preview.card.rewardName}
+                {preview.card.baseReward && ` · ${preview.card.baseReward.rewardName} a las ${preview.card.baseReward.visitsRequired}`}
+              </span>
             </div>
             <div className="u-progress-track">
               <div className="u-progress-fill" style={{ width: `${progressPct}%` }} />
             </div>
           </div>
+
+          {/* Daily visit cap notice — without this the only trace was the greyed-out
+              checkbox hint, and baristas read the silent stall as a broken scan. */}
+          {preview.card.visitLimitReached && (
+            <div className="flex items-start gap-3 rounded-xl px-4 py-3 bg-amber-50 border border-amber-200">
+              <svg className="flex-shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div className="text-sm text-amber-800">
+                {visitCapNotice(preview.card.lastVisitAt)}
+              </div>
+            </div>
+          )}
 
           {/* Cobrar saldo form (inline) */}
           {showCharge ? (
@@ -682,34 +706,44 @@ export default function ScanPage() {
               {(() => {
                 const visitDisabled = preview.card.visitLimitReached;
                 const redeemDisabled = preview.card.pendingRewards === 0;
-                const visitWaitLabel = preview.card.visitLimitReached
-                  ? (() => {
-                      if (!preview.card.lastVisitAt) return 'Visita ya registrada hoy';
-                      const minsLeft = Math.ceil((new Date(preview.card.lastVisitAt).getTime() + 24 * 60 * 60 * 1000 - Date.now()) / 60000);
-                      const hrsLeft = Math.floor(minsLeft / 60);
-                      const remaining = hrsLeft > 0 ? `${hrsLeft}h ${minsLeft % 60}m` : `${minsLeft}m`;
-                      return `Disponible en ${remaining}`;
-                    })()
-                  : null;
+                const visitWaitLabel = preview.card.visitLimitReached ? VISIT_CAP_HINT : null;
 
                 type Choice = { key: string; label: string; sublabel: string; disabled: boolean; disabledHint?: string; tint?: 'brand' | 'amber' };
+                // On a ladder the next visit counts toward the lower tier until it's
+                // reached, then toward the top.
+                const base = preview.card.baseReward;
+                const nextVisit = preview.card.visitsThisCycle + 1;
+                const visitSublabel = base && nextVisit <= base.visitsRequired
+                  ? `${nextVisit}/${base.visitsRequired} hacia ${base.rewardName}`
+                  : `${nextVisit}/${preview.card.visitsRequired} hacia ${preview.card.rewardName}`;
                 const choices: Choice[] = [
                   {
                     key: 'VISIT',
                     label: 'Registrar visita',
-                    sublabel: `${preview.card.visitsThisCycle + 1}/${preview.card.visitsRequired} hacia ${preview.card.rewardName}`,
+                    sublabel: visitSublabel,
                     disabled: visitDisabled,
                     disabledHint: visitWaitLabel ?? undefined,
                   },
                   {
                     key: 'REDEEM',
                     label: 'Canjear recompensa',
-                    sublabel: preview.card.rewardName,
+                    sublabel: preview.card.pendingRewardName ?? preview.card.rewardName,
                     disabled: redeemDisabled,
                     disabledHint: redeemDisabled ? 'Sin recompensas pendientes' : undefined,
                     tint: 'amber',
                   },
                 ];
+                if (base?.ready) {
+                  // Early cash-out of the lower tier: consumes the running cycle.
+                  const toTop = Math.max(1, preview.card.visitsRequired - preview.card.visitsThisCycle);
+                  choices.push({
+                    key: 'REDEEM_BASE',
+                    label: `Canjear ${base.rewardName}`,
+                    sublabel: `Reinicia la tarjeta · o ${toTop} visita${toTop === 1 ? '' : 's'} más para ${preview.card.rewardName}`,
+                    disabled: false,
+                    tint: 'amber',
+                  });
+                }
                 if (preview.birthdayReward) {
                   choices.push({
                     key: 'BIRTHDAY_REDEEM',

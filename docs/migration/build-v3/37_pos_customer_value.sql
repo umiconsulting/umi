@@ -302,9 +302,24 @@ alter table merchant.loyalty_card
   add column ledger_sequence bigint not null default 0 check (ledger_sequence>=0),
   add column projection_version integer not null default 1 check (projection_version>0),
   add column version integer not null default 1 check (version>0),
+  -- A PER-CARD reward override, carried from legacy `loyalty.cards.reward_config_id`.
+  -- One customer can be given a different reward from the café's standard one; the
+  -- override is a `merchant.loyalty_reward` row of kind='override' and this is the
+  -- link. Composite FK, not a single-column one: the UUID PK alone cannot prove that
+  -- the card and the reward belong to the same café, the same reason the other child
+  -- FKs here are composite. NO ACTION and not SET NULL, because SET NULL would null
+  -- `merchant_id` too; rewards are never deleted, only deactivated, so it never fires.
+  add column reward_override_id uuid,
   add constraint loyalty_card_merchant_id_uk unique (merchant_id,id),
+  add constraint loyalty_card_reward_override_fk
+    foreign key (merchant_id,reward_override_id)
+    references merchant.loyalty_reward(merchant_id,id)
+    on delete no action on update no action,
   add constraint loyalty_card_customer_scope_fk foreign key (merchant_id,customer_id)
     references merchant.customer(merchant_id,id) on delete restrict;
+create index loyalty_card_reward_override_idx
+  on merchant.loyalty_card(merchant_id,reward_override_id)
+  where reward_override_id is not null;
 update merchant.loyalty_card set public_reference='WAL-'||id::text where public_reference is null;
 alter table merchant.loyalty_card alter column public_reference set not null;
 create unique index loyalty_card_reference_uidx

@@ -8,7 +8,9 @@
 import { prisma } from './prisma';
 import { sendApplePushUpdate } from './push-apple';
 import { updateGoogleWalletObject } from './pass-google';
-import { getActiveRewardConfig, rewardConfigDefaults } from './prisma-helpers';
+import { findSavedGoogleObjectId } from './scan-helpers';
+import { getRewardProfileForCard } from './prisma-helpers';
+import { walletRewardFields } from './reward-tiers';
 import { getTenantConfig } from './tenant';
 import { DEFAULT_CUSTOMER_NAME } from './constants';
 
@@ -62,7 +64,7 @@ export async function sendLifecycleMessage(
   // other keys.
   const existing = await prisma.cards.findUnique({
     where: { id: cardId },
-    select: { metadata: true, card_number: true, balance_cents: true, visits_this_cycle: true, pending_rewards: true, total_visits: true, created_at: true, account_id: true },
+    select: { metadata: true, card_number: true, balance_cents: true, visits_this_cycle: true, pending_rewards: true, total_visits: true, created_at: true, account_id: true, reward_config_id: true },
   });
   if (!existing) return false;
 
@@ -92,21 +94,24 @@ export async function sendLifecycleMessage(
 
   // Fire both wallet pushes in parallel — failures are logged inside each
   // helper and must not roll back the lifecycle_sends row (it would re-send forever).
-  const rewardConfig = await getActiveRewardConfig(tenantId);
-  const { visitsRequired, rewardName } = rewardConfigDefaults(rewardConfig);
+  const rewardProfile = await getRewardProfileForCard(tenantId, existing);
+
+  // Cron sends must hit the object the customer actually saved, exactly like the
+  // scan path — otherwise winbacks to re-imported cards patch an object nobody holds.
+  const savedObjectId = await findSavedGoogleObjectId(tenantId, cardId);
 
   await Promise.allSettled([
     sendApplePushUpdate(cardId),
     tenant &&
       updateGoogleWalletObject({
         cardId,
+        objectId: savedObjectId,
         cardNumber: existing.card_number,
         customerName: person?.display_name || DEFAULT_CUSTOMER_NAME,
         balanceCentavos: existing.balance_cents,
         visitsThisCycle: existing.visits_this_cycle,
-        visitsRequired,
         pendingRewards: existing.pending_rewards,
-        rewardName,
+        ...walletRewardFields(rewardProfile, existing.metadata),
         totalVisits: existing.total_visits,
         memberSince: existing.created_at.toISOString(),
         tenantName: tenant.name,

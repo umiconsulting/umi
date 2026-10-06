@@ -99,7 +99,7 @@ from loyalty.programs p;
 --    customer; the fix is to carry the reward, never to drop the redemption.
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_reward
-  (id, merchant_id, name, description, type, stamps_required, spend_required, value,
+  (id, merchant_id, name, description, type, kind, stamps_required, spend_required, value,
    active, created_at, updated_at)
 select
   rc.id,
@@ -107,6 +107,7 @@ select
   rc.reward_name                               as name,
   rc.reward_description                         as description,
   'stamps_free_item'                           as type,
+  rc.kind                                      as kind,
   rc.visits_required                           as stamps_required,
   null::bigint                                 as spend_required,
   rc.reward_cost_cents::bigint                 as value,
@@ -121,9 +122,12 @@ left join loyalty.programs p on p.id = rc.program_id;
 --    reason: source has none; all are stamp redemptions → 'stamps'.
 --    staff_id: merchant.staff is empty → NULL (source staff_member_id cannot resolve).
 --    value: granted centavos from the reward_config. note: source empty → drop.
+--    reverted_at: carried, because a reversed canje must stay visible in the bitácora.
+--    reverted_by_staff_id: NULL for the same reason staff_id is — merchant.staff is empty.
 -- ----------------------------------------------------------------------------
 insert into merchant.loyalty_redemption
-  (id, merchant_id, card_id, reward_id, reason, value, staff_id, occurred_at, created_at)
+  (id, merchant_id, card_id, reward_id, reason, value, staff_id, occurred_at, created_at,
+   reverted_at, reverted_by_staff_id)
 select
   r.id,
   r.tenant_id                                  as merchant_id,
@@ -133,7 +137,9 @@ select
   rc.reward_cost_cents::bigint                 as value,
   null::uuid                                   as staff_id,
   r.redeemed_at                                as occurred_at,
-  r.redeemed_at                                as created_at
+  r.redeemed_at                                as created_at,
+  r.reverted_at                                as reverted_at,
+  null::uuid                                   as reverted_by_staff_id
 from loyalty.reward_redemptions r
 join loyalty.reward_configs rc on rc.id = r.reward_config_id;
 -- reward_config_id NOT NULL. Measured 2026-09-25: 161/161 redemptions resolve to

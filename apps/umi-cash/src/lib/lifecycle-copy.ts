@@ -7,6 +7,9 @@
  *     logged to LifecycleEvent, visible in /admin/messages.
  *   - scan-driven moments (first_visit, milestones, reward_earned) — written directly to
  *     card.lifecycleMessage from the scan handler, no LifecycleEvent.
+ *
+ * Two-tier ladder (reward-tiers.ts): scan moments also receive {upgradeRewardName},
+ * {baseRewardName} and {visitsToUpgrade}; {rewardName} is the tier the moment is about.
  */
 
 export type LifecycleJourneyKey =
@@ -19,6 +22,9 @@ export type LifecycleJourneyKey =
   | 'milestone_halfway'
   | 'milestone_one_left'
   | 'reward_earned'
+  | 'base_reward_ready'
+  | 'reward_redeemed'
+  | 'visit_recorded'
   | 'streak_3w'
   | 'streak_6w'
   | 'streak_12w';
@@ -44,6 +50,21 @@ export const LIFECYCLE_JOURNEYS: { key: LifecycleJourneyKey; label: string; desc
     key: 'reward_earned',
     label: 'Recompensa ganada',
     description: 'Cliente completó el ciclo y ganó una recompensa.',
+  },
+  {
+    key: 'base_reward_ready',
+    label: 'Primer nivel alcanzado',
+    description: 'Solo con dos niveles de recompensa: el cliente llegó al primero y puede canjearlo ya o seguir hacia el mayor.',
+  },
+  {
+    key: 'reward_redeemed',
+    label: 'Recompensa canjeada',
+    description: 'Cliente acaba de canjear su recompensa en tienda.',
+  },
+  {
+    key: 'visit_recorded',
+    label: 'Visita registrada',
+    description: 'Visita normal, sin hito — el mensaje que acompaña cada sello.',
   },
   // Cron-driven journeys
   {
@@ -99,6 +120,9 @@ export const LIFECYCLE_VARIABLES: Record<LifecycleJourneyKey, string[]> = {
   milestone_halfway:  ['{name}', '{tenant}', '{rewardName}', '{visitsThisCycle}', '{visitsRequired}'],
   milestone_one_left: ['{name}', '{tenant}', '{rewardName}'],
   reward_earned:      ['{name}', '{tenant}', '{rewardName}'],
+  base_reward_ready:  ['{name}', '{tenant}', '{rewardName}', '{upgradeRewardName}', '{visitsToUpgrade}'],
+  reward_redeemed:    ['{name}', '{tenant}', '{rewardName}'],
+  visit_recorded:     ['{name}', '{tenant}', '{rewardName}', '{visitsThisCycle}', '{visitsRequired}'],
   streak_3w:          ['{name}', '{tenant}', '{rewardName}'],
   streak_6w:          ['{name}', '{tenant}', '{rewardName}'],
   streak_12w:         ['{name}', '{tenant}', '{rewardName}'],
@@ -114,6 +138,9 @@ export const DEFAULT_LIFECYCLE_COPY: Record<LifecycleJourneyKey, string> = {
   milestone_halfway:  '¡Vas a la mitad! {visitsThisCycle}/{visitsRequired} sellos hacia tu {rewardName} en {tenant}.',
   milestone_one_left: '¡{name}, solo una visita más y tu {rewardName} es tuyo! 🎁 Te esperamos en {tenant}.',
   reward_earned:      '🎉 ¡Felicidades {name}! Ganaste {rewardName} — te espera en {tenant}, canjéalo en tu próxima visita.',
+  base_reward_ready:  '🎁 ¡{name}, tu {rewardName} ya es tuyo! Canjéalo en {tenant} o junta {visitsToUpgrade} visitas más para {upgradeRewardName}.',
+  reward_redeemed:    '¡Provecho, {name}! Canjeaste tu {rewardName} en {tenant} — tu tarjeta ya suma sellos para la siguiente. ☕',
+  visit_recorded:     'Visita registrada ☕ {visitsThisCycle}/{visitsRequired} hacia tu {rewardName} en {tenant}.',
   streak_3w:          '🔥 ¡3 semanas seguidas visitando {tenant}! Sigue así, {name}.',
   streak_6w:          '🔥 ¡6 semanas seguidas! {name}, eres parte de la familia de {tenant}.',
   streak_12w:         '🏆 ¡12 semanas seguidas! Gracias por tu fidelidad, {name}.',
