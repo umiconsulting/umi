@@ -10,6 +10,7 @@ import {
 } from './wallet-pass.repository';
 import { ApplePassBuilder } from './apple-pass.builder';
 import { GooglePassService, type GooglePassData } from './google-pass.service';
+import { cardRewardFields } from '../../shared/loyalty/reward-tiers';
 import { resolveRewardProfile, type RewardProfile } from '../../shared/loyalty/reward-profile';
 
 /** What the customer is called on the pass when the café recorded no name. */
@@ -43,11 +44,19 @@ function profileOf(data: PassRenderData): RewardProfile {
  * before the cycle completes. Null on a single-reward café, which is every surface
  * that predates the ladder.
  */
-function walletBaseReward(profile: RewardProfile) {
+function walletBaseReward(profile: RewardProfile, state: PassRenderData['state']) {
+  const base = cardRewardFields(profile, {
+    visitsThisCycle: state.visits_this_cycle,
+    pendingTier1: state.pending_tier1,
+    rewardPolicy: state.reward_policy,
+    cycleRewardAvailable: state.cycle_reward_available,
+    baseRewardBlockedByHistory: state.base_reward_blocked_by_history,
+  }).baseReward;
   return profile.baseTier
     ? {
         visitsRequired: profile.baseTier.visitsRequired,
         rewardName: profile.baseTier.rewardName,
+        ...(state.reward_policy === 'single_cycle' ? { canRedeem: base?.canRedeem === true } : {}),
       }
     : null;
 }
@@ -242,7 +251,7 @@ export class WalletPassService {
       // the customer's phone in the first place.
       visitsRequired: profile.visitsRequired,
       rewardName: profile.rewardName,
-      baseReward: walletBaseReward(profile),
+      baseReward: walletBaseReward(profile, d.state),
       pendingTier1: d.state.pending_tier1,
       ...cardPolicyFields(d.state),
       // Both builders read this. Drop it here and the reward line
@@ -284,7 +293,7 @@ export class WalletPassService {
       visitsRequired: profile.visitsRequired,
       totalVisits: data.state.total_visits,
       rewardName: profile.rewardName,
-      baseReward: walletBaseReward(profile),
+      baseReward: walletBaseReward(profile, data.state),
       pendingTier1: data.state.pending_tier1,
       ...cardPolicyFields(data.state),
       birthdayRewardName: data.birthdayRewardName,

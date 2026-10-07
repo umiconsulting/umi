@@ -561,8 +561,8 @@ export default function ScanPage() {
               {!!preview.card.legacyPendingRewards && <p>Saldo anterior: {preview.card.legacyPendingRewards} recompensas.</p>}
               {preview.card.nextRewardExpiresAt && <p>Vence: {rewardExpiryLabel(preview.card.nextRewardExpiresAt, preview.card.merchantTimezone)} ({preview.card.merchantTimezone}).</p>}
               {preview.card.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, preview.card.merchantTimezone)}</p>)}
-              <p>Pregunta al cliente qué recompensa quiere canjear.</p>
-              <p>El canje consume las visitas del premio elegido. Las visitas restantes se conservan para el siguiente ciclo.</p>
+              <p>Elige una recompensa.</p>
+              <p>Usa 7 visitas para el primer premio o 9 para el segundo. Conserva las que sobren.</p>
             </div>
           )}
           {/* Daily visit cap notice — without this the only trace was the greyed-out
@@ -937,7 +937,7 @@ export default function ScanPage() {
             <div className="u-display" style={{ fontSize: 28, fontWeight: 600, marginTop: 16, letterSpacing: '-0.015em', lineHeight: 1.1 }}>
               {result.message}
             </div>
-            {result.success && preview && <p className="mt-3">Ciclo: {preview.card.visitsThisCycle}/{preview.card.visitsRequired}</p>}
+            {result.success && preview && <p className="mt-3">Visitas: {preview.card.visitsThisCycle}/{preview.card.visitsRequired}</p>}
             {result.redemption && (
               <div className="mt-3 text-sm space-y-1">
                 <p>Canje: {result.redemption.quantity} · {result.redemption.items.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ')}</p>

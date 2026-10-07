@@ -600,7 +600,7 @@ export class CashScanRepository {
     restoreEarnedReward: boolean;
     /** The lock-screen line the customer sees: her reward is back. */
     message: string;
-  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null }> {
+  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null; restoredExpired?: boolean }> {
     return this.withLockedCard(input.merchantId, input.cardId, async (c, before) => {
       if (input.userId) {
         const staff = await this.authenticatedStaff(c, input.merchantId, input.userId);
@@ -609,13 +609,22 @@ export class CashScanRepository {
       }
 
       const fresh = await c.query<Row>(
-        `SELECT reverted_at AS "revertedAt" FROM merchant.loyalty_redemption
-          WHERE merchant_id = $1::uuid AND id = $2::uuid AND card_id=$3::uuid
-          FOR UPDATE`,
+        `SELECT r.reverted_at AS "revertedAt",
+                EXISTS(SELECT 1 FROM merchant.loyalty_reward_redemption_link l
+                  JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id
+                  WHERE l.merchant_id=r.merchant_id AND l.redemption_id=r.id AND e.expires_at<=clock_timestamp()) AS "restoredExpired"
+           FROM merchant.loyalty_redemption r
+          WHERE r.merchant_id = $1::uuid AND r.id = $2::uuid AND r.card_id=$3::uuid
+          FOR UPDATE OF r`,
         [input.merchantId, input.redemptionId, input.cardId],
       );
       if (!fresh.rows[0]) throw new NotFoundException('redemption_not_found');
-      if (fresh.rows[0].revertedAt) return { alreadyReverted: true, card: before };
+      if (fresh.rows[0].revertedAt)
+        return {
+          alreadyReverted: true,
+          card: before,
+          restoredExpired: fresh.rows[0].restoredExpired === true,
+        };
 
       const restored = await restoreRewardEntitlement(c, input.merchantId, input.redemptionId);
       await c.query(
@@ -649,14 +658,18 @@ export class CashScanRepository {
         `UPDATE merchant.loyalty_card
             SET lifecycle_message = $3, lifecycle_message_at = now(), updated_at = now()
           WHERE merchant_id = $1::uuid AND id = $2::uuid`,
-        [input.merchantId, input.cardId, input.message],
+        [
+          input.merchantId,
+          input.cardId,
+          restored.expired ? 'Canje revertido. La recompensa ya venció.' : input.message,
+        ],
       );
 
       const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
         input.merchantId,
         input.cardId,
       ]);
-      return { alreadyReverted: false, card: rows[0] };
+      return { alreadyReverted: false, card: rows[0], restoredExpired: restored.expired };
     });
   }
 

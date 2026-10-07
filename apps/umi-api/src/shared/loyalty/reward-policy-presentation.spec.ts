@@ -119,3 +119,26 @@ it('shows both reward costs on the Apple front at nine', () => {
     { key: 'topChoice', label: 'O · 9 VISITAS', value: 'Upper · quedan 0' },
   ]);
 });
+
+it('does not offer a blocked base or continuation while historical rewards remain', () => {
+  const state = {
+    rewardPolicy: 'single_cycle',
+    cycleRewardAvailable: true,
+    visitsThisCycle: 8,
+    visitsRequired: 9,
+    rewardName: 'Upper',
+    baseReward: { visitsRequired: 7, rewardName: 'Base', canRedeem: false },
+    legacyPendingRewards: 1,
+    visitBlockedReason: 'REDEMPTION_REQUIRED',
+  };
+  const copy = policyRewardCopy(state);
+  expect(copy?.body).not.toContain('Base listo');
+  expect(copy?.body).not.toContain('continuar');
+  expect(copy?.body).toContain('saldo anterior');
+  expect(policyReadyFrontFields(state)).toEqual([
+    { key: 'historyFirst', label: 'SALDO ANTERIOR', value: 'Canjea antes de otra visita' },
+  ]);
+  expect(policyReadyFrontFields({ ...state, visitsThisCycle: 9 })).not.toEqual(
+    expect.arrayContaining([expect.objectContaining({ key: 'baseChoice' })]),
+  );
+});

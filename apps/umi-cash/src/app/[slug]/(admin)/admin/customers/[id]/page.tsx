@@ -1,6 +1,6 @@
 'use client';
 
-import { rewardExpiryLabel, rewardVisitCostLabel } from '@/lib/loyalty-operation';
+import { rewardExpiryLabel, rewardVisitCostLabel, customerRedemptionDestination } from '@/lib/loyalty-operation';
 import type { RewardPolicyFields } from '@/types/api';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -96,6 +96,8 @@ export default function CustomerDetailPage() {
 
   async function handleRedeem() {
     if (!customer) return;
+    const destination = customerRedemptionDestination(customer.rewardPolicy, slug);
+    if (destination) { router.push(destination); return; }
     setRedeemLoading(true);
     setMessage('');
 
@@ -339,7 +341,7 @@ export default function CustomerDetailPage() {
         {customer.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, customer.merchantTimezone)}</p>)}
         {customer.baseReward?.ready && <p>{customer.baseReward.rewardName}: {rewardVisitCostLabel(customer.visitsThisCycle, customer.baseReward.visitsRequired)}</p>}
             {customer.cycleRewardAvailable && customer.visitsThisCycle >= customer.visitsRequired && <p>{customer.rewardName}: {rewardVisitCostLabel(customer.visitsThisCycle, customer.visitsRequired)}</p>}
-            <p>El canje consume las visitas del premio elegido y conserva las restantes para el siguiente ciclo. No vencen hasta llegar a 7 visitas.</p>
+            <p>Conservas las visitas que sobren. El plazo de 30 días empieza al llegar a 7.</p>
       </div>}
       {customer.pendingRewards > 0 && (
         <div className="u-surface p-5 mb-4" style={{ borderColor: 'var(--color-brand)' }}>
@@ -348,7 +350,11 @@ export default function CustomerDetailPage() {
             {customer.pendingRewards} recompensa{customer.pendingRewards > 1 ? 's' : ''} pendiente{customer.pendingRewards > 1 ? 's' : ''}
             {customer.pendingRewardName && ` · ${customer.pendingRewardName}`}
           </p>
-          {confirmRedeem ? (
+          {customerRedemptionDestination(customer.rewardPolicy, slug) ? (
+            <button onClick={() => router.push(customerRedemptionDestination(customer.rewardPolicy, slug)!)} className="u-btn u-btn-primary" style={{ width: '100%' }}>
+              Elegir recompensa y registrar recibo
+            </button>
+          ) : confirmRedeem ? (
             <div className="space-y-2 mt-3">
               <p className="text-sm text-center" style={{ color: 'var(--color-ink)' }}>¿Confirmar canjeo para {customer.name}?</p>
               <div className="flex gap-2">

@@ -608,7 +608,7 @@ export class CashScanService {
       redemption.rewardName ??
       (revertsBaseTier ? profile.baseTier!.rewardName : profile.rewardName);
 
-    const { alreadyReverted, card } = await this.repo.revertRedemption({
+    const { alreadyReverted, card, restoredExpired } = await this.repo.revertRedemption({
       merchantId,
       redemptionId,
       userId,
@@ -618,7 +618,7 @@ export class CashScanService {
       // An early cash-out never consumed a banked reward, so undoing one has to hand
       // a banked reward back explicitly (see CashScanRepository.revertRedemption).
       restoreEarnedReward: redemption.cycleReset,
-      message: `Te devolvimos tu ${rewardName} — está lista para canjear de nuevo 🎁`,
+      message: `Canje revertido. ${rewardName} disponible.`,
     });
     if (!card) {
       throw new ConflictException({ error: 'Este canje ya fue revertido' });
@@ -629,7 +629,9 @@ export class CashScanService {
 
     return {
       success: true,
-      message: `Canje revertido — ${rewardName} devuelta al cliente`,
+      message: restoredExpired
+        ? `Canje revertido. ${rewardName} ya venció.`
+        : `Canje revertido. ${rewardName} disponible.`,
       pendingRewards: card.pending_rewards,
     };
   }
@@ -907,7 +909,7 @@ export class CashScanService {
       const remaining = updated.visits_this_cycle;
       parts.push(
         updated.reward_policy === 'single_cycle'
-          ? `✓ ${baseRewardName ?? rewardName} canjeado — ${remaining} visita${remaining !== 1 ? 's' : ''} en el siguiente ciclo`
+          ? `✓ ${baseRewardName ?? rewardName} canjeado — ${remaining} visita${remaining !== 1 ? 's' : ''} restantes`
           : `✓ ${baseRewardName ?? rewardName} canjeado en nivel 1 — tarjeta reiniciada`,
       );
     }

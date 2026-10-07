@@ -11,7 +11,12 @@ import { StampRewardExpiryWallet } from './stamp-reward-expiry.wallet';
 export const STAMP_REWARD_EXPIRY_JOB = 'stamp_reward_expiry';
 export const STAMP_REWARD_REMINDER_TOPIC = 'stamp.reward_expiry.reminder';
 export type ReminderGroup = { merchantId: string; cardId: string; expiresAt: string };
-type Unit = { id: string; reward_name: string; reminder_enqueued_at: Date | null };
+type Unit = {
+  id: string;
+  reward_name: string;
+  reminder_enqueued_at: Date | null;
+  restoration_identity: string | null;
+};
 type Recipient = { name: string; phone: string; merchant: string; timezone: string };
 
 export function stampRewardReminderKey(merchant: string, card: string, expiry: string): string {
@@ -146,7 +151,11 @@ export class StampRewardExpiryProcessor {
   }
   private async units(c: PoolClient, group: ReminderGroup): Promise<Unit[]> {
     const rows = await c.query<Unit>(
-      `SELECT id::text, COALESCE(CASE WHEN (CASE WHEN recovery THEN COALESCE(recovery_tier,tier) ELSE tier END)='top' THEN top_reward_name ELSE base_reward_name END,'Recompensa') AS reward_name, reminder_enqueued_at
+      `SELECT id::text, COALESCE(CASE WHEN (CASE WHEN recovery THEN COALESCE(recovery_tier,tier) ELSE tier END)='top' THEN top_reward_name ELSE base_reward_name END,'Recompensa') AS reward_name, reminder_enqueued_at,
+              (SELECT to_char(max(l.restored_at) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                 FROM merchant.loyalty_reward_redemption_link l
+                 WHERE l.merchant_id=merchant.loyalty_reward_entitlement.merchant_id
+                   AND l.entitlement_id=merchant.loyalty_reward_entitlement.id) AS restoration_identity
        FROM merchant.loyalty_reward_entitlement
        WHERE merchant_id=$1::uuid AND card_id=$2::uuid AND expires_at=$3::timestamptz
          AND redeemed_at IS NULL AND expired_at IS NULL AND reminder_sent_at IS NULL
@@ -193,7 +202,7 @@ export class StampRewardExpiryProcessor {
           )
             .update(
               units
-                .map((unit) => unit.id)
+                .map((unit) => `${unit.id}:${unit.restoration_identity ?? ''}`)
                 .sort()
                 .join(','),
             )

@@ -969,7 +969,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           ))}
           <p>
             <Trans>
-              Pregunta al cliente qué recompensa quiere canjear. El canje consume las visitas del premio elegido y conserva las restantes.
+              Elige una recompensa. Conserva las visitas que sobren.
             </Trans>
           </p>
         </div>
@@ -984,7 +984,7 @@ function LoyaltyPanel({ cash, onCredited }) {
         <Metric
           label={t`Visitas totales`}
           value={account.totalVisits || 0}
-          note={t`${account.visitsThisCycle || 0} en este ciclo`}
+          note={t`${account.visitsThisCycle || 0} visitas disponibles`}
           icon={<I.Stamp size={18} />}
         />
         <Metric

@@ -70,7 +70,7 @@ export type PolicyPresentation = {
   visitsThisCycle: number;
   visitsRequired: number;
   rewardName: string;
-  baseReward?: { visitsRequired: number; rewardName: string } | null;
+  baseReward?: { visitsRequired: number; rewardName: string; canRedeem?: boolean } | null;
 };
 
 export function policyRewardCopy(
@@ -82,13 +82,16 @@ export function policyRewardCopy(
     lines.push(
       `Saldo anterior: ${data.legacyPendingRewards} recompensas. Canjea antes de otra visita.`,
     );
-  if (data.cycleRewardAvailable !== false && data.visitsThisCycle >= data.visitsRequired) {
+  if (data.legacyPendingRewards && data.visitBlockedReason) {
+    lines.push('Canjea primero el saldo anterior.');
+  } else if (data.cycleRewardAvailable !== false && data.visitsThisCycle >= data.visitsRequired) {
     lines.push(
-      `Elige ${data.baseReward ? `${data.baseReward.rewardName} (${data.baseReward.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.baseReward.visitsRequired)}) o ` : ''}${data.rewardName} (${data.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.visitsRequired)}). Canjea antes de otra visita.`,
+      `Elige ${data.baseReward && data.baseReward.canRedeem !== false ? `${data.baseReward.rewardName} (${data.baseReward.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.baseReward.visitsRequired)}) o ` : ''}${data.rewardName} (${data.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.visitsRequired)}). Canjea antes de otra visita.`,
     );
   } else if (
     data.cycleRewardAvailable !== false &&
     data.baseReward &&
+    data.baseReward.canRedeem !== false &&
     data.visitsThisCycle >= data.baseReward.visitsRequired
   ) {
     lines.push(
@@ -115,14 +118,14 @@ export function policyRewardCopy(
     }).format(new Date(item.expiresAt));
     lines.push(`${item.quantity} × ${item.rewardName}. Vence: ${expiry}.`);
   }
-  lines.push(
-    'El canje consume las visitas del premio elegido. Las visitas restantes se conservan para el siguiente ciclo, sin vencimiento hasta llegar a 7.',
-  );
-  return { header: 'RECOMPENSA DEL CICLO', body: lines.join(' ') };
+  lines.push('Conservas las visitas que sobren. El plazo de 30 días empieza al llegar a 7.');
+  return { header: 'TU RECOMPENSA', body: lines.join(' ') };
 }
 
 /** Compact alternatives for a fully eligible Apple pass. */
 export function policyReadyFrontFields(data: PolicyPresentation) {
+  if (data.rewardPolicy === 'single_cycle' && data.legacyPendingRewards && data.visitBlockedReason)
+    return [{ key: 'historyFirst', label: 'SALDO ANTERIOR', value: 'Canjea antes de otra visita' }];
   if (
     data.rewardPolicy !== 'single_cycle' ||
     data.cycleRewardAvailable === false ||
@@ -130,7 +133,7 @@ export function policyReadyFrontFields(data: PolicyPresentation) {
   )
     return null;
   const fields = [];
-  if (data.baseReward)
+  if (data.baseReward && data.baseReward.canRedeem !== false)
     fields.push({
       key: 'baseChoice',
       label: `ELIGE · ${data.baseReward.visitsRequired} VISITAS`,

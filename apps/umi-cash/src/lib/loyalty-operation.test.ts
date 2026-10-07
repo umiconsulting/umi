@@ -43,3 +43,9 @@ it('defaults only to allowed visits and asks for an explicit reward choice at ni
   expect(Array.from(defaultLoyaltyActions({ rewardPolicy: 'single_cycle', visitsThisCycle: 9, visitsRequired: 9 }))).toEqual([]);
   expect(Array.from(defaultLoyaltyActions({ visitBlockedReason: 'REDEMPTION_REQUIRED' }))).toEqual([]);
 });
+
+it('routes enabled customer-detail redemption to the canonical receipt and choice flow', async () => {
+  const { customerRedemptionDestination } = await import('./loyalty-operation');
+  expect(customerRedemptionDestination('single_cycle', 'el-gran-ribera')).toBe('/el-gran-ribera/admin/scan');
+  expect(customerRedemptionDestination('accumulate', 'other')).toBeNull();
+});

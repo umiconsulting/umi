@@ -352,7 +352,7 @@ export default function CardPage() {
             {card.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, card.merchantTimezone)}</p>)}
             {card.baseReward?.ready && <p>{card.baseReward.rewardName}: {rewardVisitCostLabel(card.visitsThisCycle, card.baseReward.visitsRequired)}</p>}
             {card.cycleRewardAvailable && card.visitsThisCycle >= card.visitsRequired && <p>{card.rewardName}: {rewardVisitCostLabel(card.visitsThisCycle, card.visitsRequired)}</p>}
-            <p>El canje consume las visitas del premio elegido y conserva las restantes para el siguiente ciclo. No vencen hasta llegar a 7 visitas.</p>
+            <p>Conservas las visitas que sobren. El plazo de 30 días empieza al llegar a 7.</p>
           </div>}
           {card.baseReward?.ready && (
             <p className="text-white text-xs text-center font-semibold mt-1">

@@ -396,8 +396,8 @@ body { font-family: 'Domus', system-ui, -apple-system, sans-serif; }
   padding: 22px;
   color: #fff;
 }
-.u-result-hero.ok  { background: linear-gradient(135deg, var(--color-success), color-mix(in oklab, var(--color-success) 70%, black)); }
-.u-result-hero.err { background: linear-gradient(135deg, var(--color-danger),  color-mix(in oklab, var(--color-danger)  70%, black)); }
+.u-result-hero.ok  { background: var(--color-success); }
+.u-result-hero.err { background: var(--color-danger); }
 
 /* Pill toggle (filter chips) */
 .u-chip {

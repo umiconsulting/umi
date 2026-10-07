@@ -979,7 +979,7 @@ describe('selected reward visit consumption', () => {
       expect(result.card.visitsThisCycle).toBe(progress - 7);
       expect(result.redemption?.items).toEqual([{ rewardName: 'Capuccino', quantity: 1 }]);
       expect(result.message).toContain(
-        `${progress - 7} visita${progress - 7 === 1 ? '' : 's'} en el siguiente ciclo`,
+        `${progress - 7} visita${progress - 7 === 1 ? '' : 's'} restantes`,
       );
     },
   );

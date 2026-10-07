@@ -49,3 +49,7 @@ export function defaultLoyaltyActions(card: { visitLimitReached?: boolean; visit
   const blocked = card.visitLimitReached || card.visitBlockedReason || (card.rewardPolicy === 'single_cycle' && (card.visitsThisCycle ?? 0) >= (card.visitsRequired ?? 9));
   return new Set<string>(blocked ? [] : ['VISIT']);
 }
+
+export function customerRedemptionDestination(rewardPolicy: string | undefined, slug: string): string | null {
+  return rewardPolicy === 'single_cycle' ? `/${encodeURIComponent(slug)}/admin/scan` : null;
+}

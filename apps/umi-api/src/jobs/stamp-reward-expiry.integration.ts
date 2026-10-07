@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { Pool, type PoolClient } from 'pg';
 import { randomUUID } from 'node:crypto';
+import { restoreRewardEntitlement } from '../shared/loyalty/reward-entitlements';
 import {
   StampRewardExpiryProcessor,
   STAMP_REWARD_REMINDER_TOPIC,
@@ -86,6 +87,33 @@ async function unit(
   );
   return row.rows[0].id as string;
 }
+async function redeemFixtureUnit(target: { merchantId: string; cardId: string }, unitId: string) {
+  const redemptionId = (
+    await pool.query(
+      `INSERT INTO merchant.loyalty_redemption(merchant_id,card_id,reason) VALUES($1,$2,'stamps') RETURNING id`,
+      [target.merchantId, target.cardId],
+    )
+  ).rows[0].id as string;
+  await pool.query(
+    `INSERT INTO merchant.loyalty_reward_redemption_link(merchant_id,redemption_id,entitlement_id,claimed_tier) VALUES($1,$2,$3,'base')`,
+    [target.merchantId, redemptionId, unitId],
+  );
+  await pool.query(
+    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=clock_timestamp() WHERE id=$1`,
+    [unitId],
+  );
+  return redemptionId;
+}
+async function restoreFixtureUnit(
+  target: { merchantId: string; cardId: string },
+  redemptionId: string,
+) {
+  return tx(async (c) => {
+    await c.query(`SELECT id FROM merchant.loyalty_card WHERE id=$1 FOR UPDATE`, [target.cardId]);
+    return restoreRewardEntitlement(c, target.merchantId, redemptionId);
+  });
+}
+
 async function deadline(expression: string) {
   return (await pool.query(`SELECT (${expression})::text AS at`)).rows[0].at as string;
 }
@@ -249,6 +277,44 @@ it('queues a restored unsent unit after its deadline group already completed', a
     ).rows[0].reminder_sent_at,
   ).not.toBeNull();
 });
+
+it.each([false, true])(
+  'requeues restored members after completed delivery: all redeemed=%s',
+  async (allRedeemed) => {
+    const target = await card();
+    const at = await deadline(`clock_timestamp()+interval '6 days'`);
+    const first = await unit(target, 'legacy', at);
+    const second = await unit(target, 'legacy', at);
+    const bodies: string[] = [];
+    const p = processor({
+      send: async (input) => {
+        bodies.push(input.body);
+        return { sid: 'fixture-generation' };
+      },
+    });
+    expect((await p.sweep()).queuedReminders).toBe(1);
+    const group = await queued(target);
+    const secondClaim = await redeemFixtureUnit(target, second);
+    const firstClaim = allRedeemed ? await redeemFixtureUnit(target, first) : null;
+    expect(await p.deliverReminder(group)).toBe(!allRedeemed);
+    await restoreFixtureUnit(target, secondClaim);
+    if (firstClaim) await restoreFixtureUnit(target, firstClaim);
+    expect((await p.sweep()).queuedReminders).toBe(1);
+    expect((await p.sweep()).queuedReminders).toBe(0);
+    expect(await p.deliverReminder(group)).toBe(true);
+    expect(await p.deliverReminder(group)).toBe(false);
+    expect(bodies).toHaveLength(allRedeemed ? 1 : 2);
+    expect(bodies.at(-1)).toContain(`${allRedeemed ? 2 : 1} × Base snapshot`);
+    expect(
+      (
+        await pool.query(
+          `SELECT count(*)::int AS n FROM runtime.outbox_event WHERE merchant_id=$1 AND topic=$2`,
+          [target.merchantId, STAMP_REWARD_REMINDER_TOPIC],
+        )
+      ).rows[0].n,
+    ).toBe(2);
+  },
+);
 
 it('reminds the restored selected tier rather than the original upgraded tier', async () => {
   const target = await card();
