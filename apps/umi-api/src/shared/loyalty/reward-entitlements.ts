@@ -304,7 +304,7 @@ export async function restoreRewardEntitlement(
     [merchantId, redemptionId],
   );
   await c.query(
-    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=NULL,recovery=true,recovery_tier=$3,expired_at=CASE WHEN expires_at<=clock_timestamp() THEN clock_timestamp() ELSE NULL END,pass_refresh_requested_at=clock_timestamp() WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=NULL,recovery=true,recovery_tier=$3,reminder_enqueued_at=CASE WHEN reminder_sent_at IS NULL THEN NULL ELSE reminder_enqueued_at END,expired_at=CASE WHEN expires_at<=clock_timestamp() THEN clock_timestamp() ELSE NULL END,pass_refresh_requested_at=clock_timestamp() WHERE merchant_id=$1::uuid AND id=$2::uuid`,
     [merchantId, row.id, row.claimed_tier],
   );
   return { linked: true, expired: row.expired, changed: true };

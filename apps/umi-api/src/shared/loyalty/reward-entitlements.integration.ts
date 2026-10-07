@@ -343,6 +343,48 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
     expect(state.pending_rewards).toBe(1);
     expect(state.rewards_earned).toBe(2);
   });
+  it.each([false, true])(
+    'restoration resets an unsent reminder marker and preserves a sent marker (sent=%s)',
+    async (sent) => {
+      const { syncCycleReward, redeemRewardEntitlements, restoreRewardEntitlement } =
+        await import('./reward-entitlements');
+      const id = await newCard(8);
+      const unit = await lockedTx(id, (c) =>
+        syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 8, cycleAnchor: 0, profile }),
+      );
+      const original = (
+        await worker.query(
+          `UPDATE merchant.loyalty_reward_entitlement SET reminder_enqueued_at=clock_timestamp(),reminder_sent_at=CASE WHEN $2 THEN clock_timestamp() ELSE NULL END WHERE id=$1 RETURNING expires_at,reminder_enqueued_at,reminder_sent_at`,
+          [unit.entitlementId, sent],
+        )
+      ).rows[0];
+      const claim = await lockedTx(id, (c) =>
+        redeemRewardEntitlements(c, {
+          merchantId,
+          cardId: id,
+          quantity: 1,
+          staffId,
+          externalReceiptNumber: 'REMINDER-RESTORE',
+          selection: 'cycle_base',
+        }),
+      );
+      expect(
+        await lockedTx(id, (c) => restoreRewardEntitlement(c, merchantId, claim.redemptionIds[0])),
+      ).toEqual({ linked: true, expired: false, changed: true });
+      const restored = (
+        await worker.query(
+          `SELECT expires_at,reminder_enqueued_at,reminder_sent_at FROM merchant.loyalty_reward_entitlement WHERE id=$1`,
+          [unit.entitlementId],
+        )
+      ).rows[0];
+      expect(restored.reminder_enqueued_at).toEqual(sent ? original.reminder_enqueued_at : null);
+      expect(restored.reminder_sent_at).toEqual(original.reminder_sent_at);
+      expect(restored.expires_at).toEqual(original.expires_at);
+      const state = (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0];
+      expect(state.visits_this_cycle).toBe(1);
+      expect(state.total_visits).toBe(8);
+    },
+  );
   it('base reversal at nine restores base with its original deadline and preserves a later cycle', async () => {
     const { syncCycleReward, redeemRewardEntitlements, restoreRewardEntitlement } =
       await import('./reward-entitlements');
