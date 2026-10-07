@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type { Cart, CartLineInput, PosIncomingOrder } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
+import { writeOrder } from '../../shared/orders/order-writer';
 
 /**
  * What `price()` needs to price a line: the product, the variant (if any) and the
@@ -46,6 +47,12 @@ export class PosCartRepository {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
+    /**
+     * Which permission the operator session must hold. `cart.write` by default, because
+     * that is what building and editing a cart needs; the fired order passes its own
+     * (`order.fire`), which is a different act — see `fire()`.
+     */
+    permission = 'cart.write',
   ): Promise<boolean> {
     return this.pg.runWithMerchant(
       merchantId,
@@ -57,10 +64,10 @@ export class PosCartRepository {
        WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid AND os.user_id=$1::uuid
          AND os.device_id=$3::uuid AND os.merchant_id=$4::uuid AND os.location_id=$5::uuid
          AND os.state='active' AND os.expires_at>now() AND d.status='active'
-         AND ('cart.write'=ANY(os.permissions) OR '*'=ANY(os.permissions))
+         AND ($7=ANY(os.permissions) OR '*'=ANY(os.permissions))
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos' AND COALESCE((e->>'enabled')::boolean,false))`,
-          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId],
+          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId, permission],
         );
         return (rowCount ?? 0) > 0;
       },
@@ -474,6 +481,136 @@ export class PosCartRepository {
     );
   }
 
+  /**
+   * Fire a cart: write its order and project the kitchen ticket WITHOUT taking money.
+   *
+   * THE TRICK IS THE `external_ref`. It is the same `pos-cart:<cartId>` the checkout
+   * uses, and `writeOrder` is idempotent by `(merchant_id, external_ref)`: when the
+   * checkout later runs it gets THIS order back — `created: false`, its lines untouched —
+   * and hangs the payment, the receipt and the committed sale on it. No second order, no
+   * second kitchen ticket, and no branch of its own in the checkout. That is why this is
+   * one method rather than a new settlement path.
+   *
+   * The row is locked `FOR UPDATE` before the version is compared, so the comparison is
+   * authoritative: a cart that moved under the operator is refused rather than tied to an
+   * order nobody is looking at.
+   *
+   * The caller owns the transaction. If `writeOrder` throws, the cart mark rolls back with
+   * it; and a cart that was already fired answers `already_fired` instead of writing a
+   * second order.
+   */
+  async fire(
+    client: PoolClient,
+    merchantId: string,
+    cart: Cart,
+    expectedVersion: number,
+    operatorSessionId: string,
+  ): Promise<
+    | {
+        state: 'fired' | 'already_fired';
+        orderId: string;
+        reference: string | null;
+        lineCount: number;
+        cartVersion: number;
+      }
+    | { state: 'rejected' }
+  > {
+    const current = await client.query<{
+      firedOrderId: string | null;
+      version: number;
+      status: string;
+      lifecycleState: string;
+    }>(
+      `SELECT fired_order_id::text AS "firedOrderId",version,status,
+              lifecycle_state AS "lifecycleState"
+         FROM merchant.pos_cart
+        WHERE merchant_id=$1::uuid AND id=$2::uuid AND operator_session_id=$3::uuid
+        FOR UPDATE`,
+      [merchantId, cart.id, operatorSessionId],
+    );
+    const row = current.rows[0];
+    if (!row) return { state: 'rejected' };
+
+    if (row.firedOrderId) {
+      // Answer with the order this cart already owns. A fired cart is frozen for edits
+      // (`bump`), so there is nothing new it could be sending.
+      const prior = await client.query<{ reference: string | null; lineCount: string }>(
+        `SELECT COALESCE(o.external_ref,o.id::text) AS reference,
+                (SELECT count(*) FROM merchant.order_item i WHERE i.order_id=o.id)::text
+                  AS "lineCount"
+           FROM merchant.customer_order o
+          WHERE o.id=$1::uuid AND o.merchant_id=$2::uuid`,
+        [row.firedOrderId, merchantId],
+      );
+      if (!prior.rows[0]) return { state: 'rejected' };
+      return {
+        state: 'already_fired',
+        orderId: row.firedOrderId,
+        reference: prior.rows[0].reference,
+        lineCount: Number(prior.rows[0].lineCount),
+        cartVersion: row.version,
+      };
+    }
+
+    if (
+      row.version !== expectedVersion ||
+      !['building_cart', 'ready_for_checkout', 'recovered'].includes(row.lifecycleState) ||
+      !['draft', 'prepared'].includes(row.status)
+    ) {
+      return { state: 'rejected' };
+    }
+
+    // An empty ticket is a cook walking to a screen to find nothing.
+    if (cart.items.length === 0) return { state: 'rejected' };
+
+    const externalRef = `pos-cart:${cart.id}`;
+    const written = await writeOrder(client, {
+      merchantId,
+      locationId: cart.locationId,
+      customerId: null,
+      source: 'pos',
+      // v1 fires dine-in only. The cart carries no order type yet, and `dine_in` is what
+      // the checkout already assumes for a POS sale; the order type is the next step.
+      fulfillmentType: 'dine_in',
+      externalRef,
+      lines: cart.items.map((item) => ({
+        productId: item.productId,
+        name: item.productName,
+        variantName: item.variant?.name ?? null,
+        quantity: item.quantity,
+        courseNumber: item.courseNumber,
+        // `unitPrice` already folds the variant delta AND the modifiers — the cart
+        // computes it as base + variantDelta + modifierTotal — which is exactly what an
+        // order line means by "modifiers already folded in".
+        unitPriceCents: item.price.unitPrice.minorUnits,
+        notes: item.note,
+        // Same reason as the checkout: the money is in `unitPriceCents`, so a modifier
+        // carries no delta of its own here. It exists for the kitchen ticket, which prints
+        // what was asked for, not what it cost.
+        modifiers: item.modifiers.map((modifier) => ({
+          name: modifier.name,
+          priceDeltaCents: 0,
+        })),
+      })),
+    });
+    if (!written.orderId) return { state: 'rejected' };
+
+    await client.query(
+      `UPDATE merchant.pos_cart
+          SET fired_order_id=$3::uuid,version=version+1,updated_at=now()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, cart.id, written.orderId],
+    );
+
+    return {
+      state: 'fired',
+      orderId: written.orderId,
+      reference: externalRef,
+      lineCount: cart.items.length,
+      cartVersion: row.version + 1,
+    };
+  }
+
   private async bump(
     client: PoolClient,
     merchantId: string,
@@ -486,6 +623,7 @@ export class PosCartRepository {
          version=version+1,updated_at=now()
        WHERE merchant_id=$1::uuid AND id=$2::uuid AND version=$3
          AND operator_session_id=$4::uuid
+         AND fired_order_id IS NULL
          AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
          AND status IN ('draft','prepared')`,
       [merchantId, cartId, expectedVersion, operatorSessionId],

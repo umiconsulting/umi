@@ -19,6 +19,13 @@ function harness() {
     authorize: vi.fn().mockResolvedValue(true),
     create: vi.fn().mockResolvedValue('00000000-0000-4000-8000-000000000007'),
     bindOrigin: vi.fn().mockResolvedValue(true),
+    fire: vi.fn().mockResolvedValue({
+      state: 'fired',
+      orderId: '00000000-0000-4000-8000-000000000008',
+      reference: 'pos-cart:00000000-0000-4000-8000-000000000007',
+      lineCount: 2,
+      cartVersion: 2,
+    }),
     listIncomingOrders: vi.fn().mockResolvedValue([]),
     snapshotWithClient: vi.fn().mockResolvedValue({
       id: '00000000-0000-4000-8000-000000000007',
@@ -63,6 +70,9 @@ describe('PosCartService', () => {
       user.id,
       dto.locationId,
       dto.operatorSessionId,
+      // The permission the session must hold. Every cart action asks for `cart.write`;
+      // `fire` asks for `order.fire` instead, which is the point of the parameter.
+      'cart.write',
     );
     expect(integrity.execute).toHaveBeenCalledOnce();
   });
@@ -130,6 +140,7 @@ describe('PosCartService', () => {
       user.id,
       dto.locationId,
       dto.operatorSessionId,
+      'cart.write',
     );
     expect(repo.listIncomingOrders).toHaveBeenCalledWith(user.id, dto.locationId, user.id);
   });
@@ -144,5 +155,53 @@ describe('PosCartService', () => {
         dto.operatorSessionId,
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  // The fired order asks for its OWN permission, not the cart's. That is the whole reason
+  // `authorize` grew the parameter: a café that wants a waiter running orders to the kitchen
+  // without letting them charge gives the role `order.fire` and not `cart.write`.
+  it('authorizes firing with order.fire and not with cart.write', async () => {
+    const { service, repo } = harness();
+    await service.fire(user, user.id, {
+      ...dto,
+      cartId: '00000000-0000-4000-8000-000000000007',
+      expectedVersion: 1,
+    });
+    expect(repo.authorize).toHaveBeenCalledWith(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      user.id,
+      dto.locationId,
+      dto.operatorSessionId,
+      'order.fire',
+    );
+  });
+
+  it('answers a fired order with the order the cart now owns', async () => {
+    const { service } = harness();
+    const fired = await service.fire(user, user.id, {
+      ...dto,
+      cartId: '00000000-0000-4000-8000-000000000007',
+      expectedVersion: 1,
+    });
+    expect(fired.orderId).toBe('00000000-0000-4000-8000-000000000008');
+    expect(fired.cartVersion).toBe(2);
+    expect(fired.lineCount).toBe(2);
+    expect(Number.isNaN(Date.parse(fired.firedAt))).toBe(false);
+  });
+
+  // A cart that moved, is empty, or is not in a state that may fire all answer the same
+  // public code, because the operator's next move is the same in all three: reload.
+  it('maps a refused fire to the public cart conflict', async () => {
+    const { service, repo } = harness();
+    repo.fire.mockResolvedValue({ state: 'rejected' });
+    await expect(
+      service.fire(user, user.id, {
+        ...dto,
+        cartId: '00000000-0000-4000-8000-000000000007',
+        expectedVersion: 1,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

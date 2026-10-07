@@ -73,6 +73,27 @@ and the bar makes the drinks twice. The distinction is not cosmetic:
 | What the checkout writes              | its own new order                   | **nothing** — it settles the fired one |
 | What the checkout closes              | the linked order                    | n/a — it is the order being settled    |
 
+### 3.2 The finding that shrank this: the checkout already settles in place
+
+This ADR originally planned a branch in the checkout — "if the linked order was created by
+this cart, do not write a second one". Writing it found that **no branch is needed**:
+`writeOrder` is already idempotent by `(merchant_id, external_ref)`. On a duplicate
+`external_ref` it returns the existing order with `created: false` and deliberately does not
+rewrite its lines (`order-writer.ts`, "a duplicate delivery of the same source record").
+
+The fire writes its order with the SAME `pos-cart:<cartId>` the checkout uses. So when the
+checkout runs it gets the fired order back and hangs the payment, the receipt and the
+committed sale on it. One order, one kitchen ticket, and the money attached to both.
+
+Two consequences worth stating plainly:
+
+1. **The mechanism was already there.** The fired order is the first thing that made the
+   `external_ref` idempotency load-bearing rather than a delivery-dedup nicety.
+2. **What it does NOT protect is a line added after the fire.** The checkout's `writeOrder`
+   returns early, so a dessert rung on a fired cart would be charged and never reach the
+   kitchen — silently, which is the worst way. So v1 **freezes the cart on firing**, and
+   lifting that freeze is the "second round" work of §8.
+
 ## 4. The model
 
 ```
@@ -101,14 +122,15 @@ that alone is the weak point of this shape.
 
 ## 5. What changes, file by file
 
-| Layer                | Change                                                                                                                                       |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Permission catalogue | one new primitive, `order.fire`, grouped under `pos`, risk `medium`                                                                          |
-| Contract             | a `FireOrderRequest`/`FireOrderResult` pair in `pos-cart` or a new `pos-order`; the cart view gains whether it is fired and at what order id |
-| Route                | `POST /api/v1/pos/merchants/:merchantId/orders/fire`, guarded by `order.fire` + the operator session, idempotent on a client-supplied key    |
-| Repository           | a `writeOrder` call **outside** the checkout transaction, plus the cart update, in one transaction of its own                                |
-| Checkout             | one branch: when the linked order was created by this cart, skip `writeOrder` and settle in place                                            |
-| POS app              | the button that does not exist today — "Enviar a cocina" — and a fired/not-fired marker on the cart                                          |
+| Layer                   | Change                                                                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Permission catalogue    | one new primitive, `order.fire`, grouped under `pos`, risk `medium`                                                                          |
+| Contract                | a `FireOrderRequest`/`FireOrderResult` pair in `pos-cart` or a new `pos-order`; the cart view gains whether it is fired and at what order id |
+| Route                   | `POST /api/v1/pos/merchants/:merchantId/orders/fire`, guarded by `order.fire` + the operator session, idempotent on a client-supplied key    |
+| Repository              | a `writeOrder` call **outside** the checkout transaction, plus the cart update, in one transaction of its own                                |
+| Checkout                | **nothing** — §3.2. The existing `writeOrder` call returns the fired order by `external_ref` and hangs the money on it                       |
+| Cart edits after firing | **frozen**: `bump` refuses while `fired_order_id` is set, so a line added later cannot be charged without reaching the kitchen               |
+| POS app                 | the button that does not exist today — "Enviar a cocina" — and a fired/not-fired marker on the cart                                          |
 
 **Nothing in the schema has to change for the first version**, which is the sign the model
 was already half-built.
