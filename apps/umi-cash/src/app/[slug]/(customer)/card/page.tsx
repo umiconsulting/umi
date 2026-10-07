@@ -7,6 +7,7 @@ import { useTenant } from '@/context/TenantContext';
 import { formatDateTimeMX, formatDateShortMX } from '@/lib/intl';
 import { isTokenValid } from '@/lib/token';
 import type { CardState } from '@/types/api';
+import { rewardExpiryLabel } from '@/lib/loyalty-operation';
 import { profileFromWalletFields, progressLine } from '@/lib/reward-tiers';
 
 function useAuth() {
@@ -293,7 +294,7 @@ export default function CardPage() {
 
   const firstName = card.customerName?.split(' ')[0] ?? 'Hola';
   // Same copy the wallet passes use (reward-tiers.ts) — ladder-aware.
-  const progressCopy = progressLine(profileFromWalletFields(card), card.visitsThisCycle);
+  const progressCopy = card.rewardPolicy === 'single_cycle' && card.visitsThisCycle >= card.visitsRequired ? `${card.rewardName} listo. Canjea antes de otra visita.` : progressLine(profileFromWalletFields(card), card.visitsThisCycle);
 
   return (
     <main className="min-h-screen bg-coffee-cream pb-8">
@@ -323,7 +324,7 @@ export default function CardPage() {
                 {card.pendingRewards === 1 ? 'Tienes una recompensa lista' : `${card.pendingRewards} recompensas listas`}
               </p>
               <p className="text-white/60 text-xs text-center mt-0.5">
-                Pídele al barista: {card.pendingRewardName ?? card.rewardName}
+                Pídele al barista: {card.rewardPolicy === 'single_cycle' && card.availableRewards?.length ? card.availableRewards.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ') : card.pendingRewardName ?? card.rewardName}
               </p>
             </div>
           )}
@@ -345,6 +346,12 @@ export default function CardPage() {
           <p className="text-coffee-pale/50 text-xs text-center">
             {progressCopy}
           </p>
+          {card.rewardPolicy === 'single_cycle' && <div className="text-white text-xs text-center mt-3 space-y-1">
+            {!!card.legacyPendingRewards && <p>Saldo anterior: {card.legacyPendingRewards} recompensas.</p>}
+            {card.nextRewardExpiresAt && <p>Vence: {rewardExpiryLabel(card.nextRewardExpiresAt, card.merchantTimezone)} ({card.merchantTimezone}).</p>}
+            {card.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, card.merchantTimezone)}</p>)}
+            <p>El canje reinicia el ciclo en cero.</p>
+          </div>}
           {card.baseReward?.ready && (
             <p className="text-white text-xs text-center font-semibold mt-1">
               Pídele al barista tu {card.baseReward.rewardName}, o sigue sumando sellos.

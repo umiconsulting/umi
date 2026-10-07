@@ -7,13 +7,15 @@ import { centavosFromPesos, formatMXN, COMMON_TOPUP_AMOUNTS } from '@/lib/curren
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
 import { describeReadFailure, handleWriteFailure } from '@/lib/request-failure';
+import { LoyaltyOperation, toggleLoyaltyAction, rewardExpiryLabel } from '@/lib/loyalty-operation';
+import type { RewardPolicyFields, RedemptionConfirmation } from '@/types/api';
 import { VISIT_CAP_HINT, visitCapNotice } from '@/lib/visit-cap';
 
 interface CardPreview {
   cardId: string;
   cardNumber: string;
-  customer: { name: string | null };
-  card: {
+  customer: { id?: string; name: string | null };
+  card: RewardPolicyFields & {
     visitsThisCycle: number;
     visitsRequired: number;
     pendingRewards: number;
@@ -21,7 +23,7 @@ interface CardPreview {
     balanceCentavos: number;
     rewardName: string;
     /** Two-tier ladder: the lower tier and whether it can be cashed out right now. */
-    baseReward: { visitsRequired: number; rewardName: string; ready: boolean } | null;
+    baseReward: { visitsRequired: number; rewardName: string; ready: boolean; canRedeem?: boolean } | null;
     /** What a banked redemption hands over (ladder-aware). */
     pendingRewardName: string;
     visitLimitReached: boolean;
@@ -34,6 +36,8 @@ interface ActionResult {
   success: boolean;
   message: string;
   detail?: string;
+  redemption?: RedemptionConfirmation;
+  history?: { id: string; redeemedAt: string; note: string | null }[];
   newBalanceMXN?: string;
 }
 
@@ -55,6 +59,10 @@ export default function ScanPage() {
   const [preview, setPreview] = useState<CardPreview | null>(null);
 
   // Selected loyalty actions to perform in one confirmation (visit / redeem / birthday redeem)
+  const loyaltyOperation = useRef(new LoyaltyOperation());
+  const loyaltyBusy = useRef(false);
+  const [receipt, setReceipt] = useState('');
+  const [redeemQuantity, setRedeemQuantity] = useState('1');
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
 
   // Step 3: action result
@@ -152,7 +160,7 @@ export default function ScanPage() {
   // ── Preview ──────────────────────────────────────────────────────────────
 
   async function loadPreview(payload: string) {
-    if (processing) return;
+    if (processing || loyaltyOperation.current.pending) return;
     setProcessing(true);
     setResult(null);
     setShowCharge(false);
@@ -178,7 +186,9 @@ export default function ScanPage() {
         // the daily visit cap left it as the only armed action (a second scan of the
         // same card redeemed the customer's reward without anyone noticing).
         const defaults = new Set<string>();
-        if (!data.card.visitLimitReached) defaults.add('VISIT');
+        if (!data.card.visitLimitReached && !data.card.visitBlockedReason) defaults.add('VISIT');
+        setReceipt('');
+        setRedeemQuantity('1');
         setSelectedActions(defaults);
         stopCamera();
       } else {
@@ -202,7 +212,15 @@ export default function ScanPage() {
   // ── Actions ──────────────────────────────────────────────────────────────
 
   async function doActions() {
-    if (!preview || selectedActions.size === 0) return;
+    if (!preview || processing || loyaltyBusy.current || selectedActions.size === 0) return;
+    const redeem = selectedActions.has('REDEEM') || selectedActions.has('REDEEM_BASE');
+    const singleCycle = preview.card.rewardPolicy === 'single_cycle';
+    if (!loyaltyOperation.current.pending && singleCycle && redeem && !receipt.trim()) return;
+    const request = loyaltyOperation.current.begin({
+      qrPayload: lastPayloadRef.current, actions: Array.from(selectedActions),
+      ...(redeem ? { redeemQuantity: selectedActions.has('REDEEM_BASE') || (singleCycle && !preview.card.legacyPendingRewards) ? 1 : Number(redeemQuantity), externalReceiptNumber: receipt.trim() } : {}),
+    });
+    loyaltyBusy.current = true;
     setProcessing(true);
     setResult(null);
 
@@ -210,11 +228,26 @@ export default function ScanPage() {
       const res = await authedFetch(slug, `/api/${slug}/admin/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrPayload: lastPayloadRef.current, actions: Array.from(selectedActions) }),
+        body: JSON.stringify(request),
       });
       const data = await res.json();
-      setResult({ success: res.ok, message: data.message ?? data.error });
-      if (res.ok) setPreview(null);
+      if (res.ok && singleCycle && redeem && !data.redemption) throw new Error('La respuesta no confirma el canje.');
+      loyaltyOperation.current.finish(res.status);
+      setResult({ success: res.ok, message: data.message ?? data.error, redemption: data.redemption });
+      if (res.ok) {
+        if (data.card) setPreview((previous) => previous ? { ...previous, card: { ...previous.card, ...data.card } } : previous);
+        const refreshed = await authedFetch(slug, `/api/${slug}/admin/scan/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrPayload: lastPayloadRef.current }) }).catch(() => null);
+        if (refreshed?.ok) {
+          const freshPreview = await refreshed.json().catch(() => null);
+          if (freshPreview) setPreview(freshPreview);
+        }
+        if (preview.customer.id) {
+          const historyResponse = await authedFetch(slug, `/api/${slug}/admin/customers/${preview.customer.id}`).catch(() => null);
+          const history = historyResponse?.ok ? await historyResponse.json().catch(() => null) : null;
+          if (history) setResult((current) => current ? { ...current, history: history.recentRedemptions } : current);
+        }
+        setSelectedActions(new Set());
+      }
     } catch (err) {
       setResult({
         success: false,
@@ -225,16 +258,14 @@ export default function ScanPage() {
         }),
       });
     } finally {
+      loyaltyBusy.current = false;
       setProcessing(false);
     }
   }
 
   function toggleAction(key: string) {
-    setSelectedActions((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
+    if (processing || loyaltyOperation.current.pending) return;
+    setSelectedActions((prev) => toggleLoyaltyAction(prev, key, preview?.card.rewardPolicy === 'single_cycle'));
   }
 
   async function doCharge(e: React.FormEvent) {
@@ -328,6 +359,7 @@ export default function ScanPage() {
   }
 
   function reset() {
+    if (processing || loyaltyOperation.current.pending) return;
     setPreview(null);
     setResult(null);
     setShowCharge(false);
@@ -468,7 +500,7 @@ export default function ScanPage() {
       )}
 
       {/* ── Step 2: customer card + actions ── */}
-      {preview && !result && (
+      {preview && (!result || !result.success) && (
         <div className="space-y-4 animate-slide-up">
           {/* Customer info card */}
           <div className="u-surface p-5">
@@ -490,7 +522,7 @@ export default function ScanPage() {
                 </p>
                 <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--color-ink-light)', letterSpacing: '0.08em' }}>{preview.cardNumber}</p>
               </div>
-              <button onClick={reset} className="p-1" style={{ color: 'var(--color-ink-light)' }}>
+              <button disabled={processing || loyaltyOperation.current.pending} onClick={reset} className="p-1" style={{ color: 'var(--color-ink-light)' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -524,6 +556,15 @@ export default function ScanPage() {
             </div>
           </div>
 
+          {preview.card.rewardPolicy === 'single_cycle' && (
+            <div className="u-surface p-4 text-sm space-y-1">
+              {preview.card.visitBlockedReason && <p>Canjea la recompensa antes de registrar otra visita.</p>}
+              {!!preview.card.legacyPendingRewards && <p>Saldo anterior: {preview.card.legacyPendingRewards} recompensas.</p>}
+              {preview.card.nextRewardExpiresAt && <p>Vence: {rewardExpiryLabel(preview.card.nextRewardExpiresAt, preview.card.merchantTimezone)} ({preview.card.merchantTimezone}).</p>}
+              {preview.card.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, preview.card.merchantTimezone)}</p>)}
+              <p>El canje reinicia el ciclo en cero. Las visitas adicionales no se conservan.</p>
+            </div>
+          )}
           {/* Daily visit cap notice — without this the only trace was the greyed-out
               checkbox hint, and baristas read the silent stall as a broken scan. */}
           {preview.card.visitLimitReached && (
@@ -667,7 +708,7 @@ export default function ScanPage() {
                   placeholder="Número de sellos"
                   className="u-input"
                   min="1"
-                  max="50"
+                  max={preview.card.rewardPolicy === 'single_cycle' ? preview.card.visitsRequired - preview.card.visitsThisCycle : 50}
                   step="1"
                   autoFocus
                 />
@@ -676,8 +717,9 @@ export default function ScanPage() {
                   if (!Number.isInteger(n) || n < 1) return null;
                   const req = preview.card.visitsRequired;
                   const total = preview.card.visitsThisCycle + n;
-                  const rewards = Math.floor(total / req);
-                  const cycle = total % req;
+                  const single = preview.card.rewardPolicy === 'single_cycle';
+                  const rewards = single ? 0 : Math.floor(total / req);
+                  const cycle = single ? total : total % req;
                   return (
                     <p className="text-sm -mt-1" style={{ color: 'var(--color-ink-light)' }}>
                       Quedará en {cycle}/{req}
@@ -691,7 +733,7 @@ export default function ScanPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={processing || !(parseInt(sealsCount, 10) >= 1)}
+                    disabled={processing || !!preview.card.visitBlockedReason || !(parseInt(sealsCount, 10) >= 1) || (preview.card.rewardPolicy === 'single_cycle' && preview.card.visitsThisCycle + Number(sealsCount) > preview.card.visitsRequired)}
                     className="u-btn u-btn-primary flex-1"
                   >
                     {processing ? 'Procesando...' : 'Confirmar sellos'}
@@ -704,8 +746,8 @@ export default function ScanPage() {
             /* Action checklist + Confirmar */
             <div className="space-y-3">
               {(() => {
-                const visitDisabled = preview.card.visitLimitReached;
-                const redeemDisabled = preview.card.pendingRewards === 0;
+                const visitDisabled = preview.card.visitLimitReached || !!preview.card.visitBlockedReason;
+                const redeemDisabled = preview.card.pendingRewards === 0 || (preview.card.rewardPolicy === 'single_cycle' && !preview.card.legacyPendingRewards && preview.card.visitsThisCycle < preview.card.visitsRequired);
                 const visitWaitLabel = preview.card.visitLimitReached ? VISIT_CAP_HINT : null;
 
                 type Choice = { key: string; label: string; sublabel: string; disabled: boolean; disabledHint?: string; tint?: 'brand' | 'amber' };
@@ -733,7 +775,7 @@ export default function ScanPage() {
                     tint: 'amber',
                   },
                 ];
-                if (base?.ready) {
+                if (base && (base.canRedeem ?? base.ready) && (preview.card.rewardPolicy !== 'single_cycle' || preview.card.visitsThisCycle < preview.card.visitsRequired)) {
                   // Early cash-out of the lower tier: consumes the running cycle.
                   const toTop = Math.max(1, preview.card.visitsRequired - preview.card.visitsThisCycle);
                   choices.push({
@@ -774,7 +816,7 @@ export default function ScanPage() {
                             <input
                               type="checkbox"
                               checked={checked && !c.disabled}
-                              disabled={c.disabled}
+                              disabled={c.disabled || processing || loyaltyOperation.current.pending}
                               onChange={() => !c.disabled && toggleAction(c.key)}
                               className="w-5 h-5 rounded accent-coffee-dark flex-shrink-0"
                             />
@@ -793,9 +835,22 @@ export default function ScanPage() {
                       })}
                     </div>
 
+                    {(selectedActions.has('REDEEM') || selectedActions.has('REDEEM_BASE')) && (
+                      <div className="u-surface p-3 space-y-2">
+                        <label className="block text-sm">Número de recibo
+                          <input className="u-input" value={receipt} onChange={(e) => setReceipt(e.target.value)} disabled={processing || loyaltyOperation.current.pending} maxLength={200} />
+                        </label>
+                        {selectedActions.has('REDEEM') && (preview.card.legacyPendingRewards ?? 0) > 0 && (
+                          <label className="block text-sm">Cantidad del saldo anterior
+                            <input className="u-input" type="number" min="1" max={preview.card.legacyPendingRewards} value={redeemQuantity} onChange={(e) => setRedeemQuantity(e.target.value)} disabled={processing || loyaltyOperation.current.pending} />
+                          </label>
+                        )}
+                        {loyaltyOperation.current.pending && !processing && <p className="text-sm">La respuesta es incierta. Reintenta la misma operación para obtener el resultado.</p>}
+                      </div>
+                    )}
                     <button
                       onClick={doActions}
-                      disabled={processing || confirmCount === 0}
+                      disabled={processing || confirmCount === 0 || (preview.card.rewardPolicy === 'single_cycle' && (selectedActions.has('REDEEM') || selectedActions.has('REDEEM_BASE')) && !receipt.trim())}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl bg-coffee-dark text-white font-semibold text-sm disabled:opacity-40 hover:bg-coffee-medium transition-colors"
                     >
                       {processing ? 'Procesando...' : confirmLabel}
@@ -882,11 +937,24 @@ export default function ScanPage() {
             <div className="u-display" style={{ fontSize: 28, fontWeight: 600, marginTop: 16, letterSpacing: '-0.015em', lineHeight: 1.1 }}>
               {result.message}
             </div>
+            {result.success && preview && <p className="mt-3">Ciclo: {preview.card.visitsThisCycle}/{preview.card.visitsRequired}</p>}
+            {result.redemption && (
+              <div className="mt-3 text-sm space-y-1">
+                <p>Canje: {result.redemption.quantity} · {result.redemption.items.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ')}</p>
+                <p>Restantes: {result.redemption.remainingRewards}</p>
+                <p>Recibo: {result.redemption.externalReceiptNumber} · Operador: {result.redemption.operator.name}</p>
+                <p>{rewardExpiryLabel(result.redemption.redeemedAt, preview?.card.merchantTimezone)}</p>
+              </div>
+            )}
+            {result.history && result.history.length > 0 && <div className="mt-3 text-sm">
+              <p>Historial actualizado</p>
+              {result.history.map((entry) => <p key={entry.id}>{rewardExpiryLabel(entry.redeemedAt, preview?.card.merchantTimezone)} · {entry.note}</p>)}
+            </div>}
             {result.detail && (
               <div style={{ marginTop: 8, fontSize: 14, opacity: 0.9, lineHeight: 1.5 }}>{result.detail}</div>
             )}
           </div>
-          <button onClick={reset} className="u-btn u-btn-primary" style={{ width: '100%' }}>
+          <button disabled={processing || loyaltyOperation.current.pending} onClick={reset} className="u-btn u-btn-primary" style={{ width: '100%' }}>
             Siguiente cliente
           </button>
         </div>

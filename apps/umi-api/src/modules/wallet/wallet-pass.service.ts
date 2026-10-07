@@ -1,3 +1,7 @@
+import {
+  cardPolicyFields,
+  rewardProfileWithSnapshot,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   WalletPassRepository,
@@ -207,7 +211,7 @@ export class WalletPassService {
   ): Promise<GooglePassData> {
     const d = await this.repo.renderData(merchantId, cardId);
     if (!d) throw new NotFoundException('card_not_found');
-    const profile = profileOf(d);
+    const profile = rewardProfileWithSnapshot(profileOf(d), d.state);
     return {
       cardId,
       cardNumber: d.cardNumber,
@@ -226,6 +230,7 @@ export class WalletPassService {
       rewardName: profile.rewardName,
       baseReward: walletBaseReward(profile),
       pendingTier1: d.state.pending_tier1,
+      ...cardPolicyFields(d.state),
       // Both builders read this. Drop it here and the reward line
       // disappears from the pass, with no error anywhere.
       birthdayRewardName: d.birthdayRewardName,
@@ -249,7 +254,7 @@ export class WalletPassService {
   async renderPass(pass: AuthenticatedPass): Promise<RenderedPass> {
     const data = await this.repo.renderData(pass.merchantId, pass.cardId);
     if (!data) throw new NotFoundException();
-    const profile = profileOf(data);
+    const profile = rewardProfileWithSnapshot(profileOf(data), data.state);
 
     const buffer = await this.builder.build({
       serial: pass.serialNumber,
@@ -267,6 +272,7 @@ export class WalletPassService {
       rewardName: profile.rewardName,
       baseReward: walletBaseReward(profile),
       pendingTier1: data.state.pending_tier1,
+      ...cardPolicyFields(data.state),
       birthdayRewardName: data.birthdayRewardName,
       passStyle: data.passStyle,
       primaryColor: data.primaryColor,

@@ -1,12 +1,35 @@
+export interface RewardPolicyFields {
+  rewardPolicy?: 'accumulate' | 'single_cycle';
+  rewardExpiryDays?: number | null;
+  nextRewardExpiresAt?: string | null;
+  legacyPendingRewards?: number;
+  cycleRewardAvailable?: boolean;
+  visitBlockedReason?: 'REDEMPTION_REQUIRED' | null;
+  merchantTimezone?: string;
+  availableRewards?: { rewardName: string; quantity: number; expiresAt: string }[];
+}
+
+export interface RedemptionConfirmation {
+  operationId: string;
+  quantity: number;
+  remainingRewards: number;
+  externalReceiptNumber: string | null;
+  operator: { id: string; name: string };
+  redeemedAt: string;
+  replayed: boolean;
+  items: { rewardName: string; quantity: number }[];
+}
+
 /** Lower tier of a two-tier reward ladder, as every card payload carries it. */
 export interface BaseRewardSummary {
   visitsRequired: number;
   rewardName: string;
   /** visitsThisCycle has reached the tier — the customer may cash it out now. */
   ready: boolean;
+  canRedeem?: boolean;
 }
 
-export interface CardState {
+export interface CardState extends RewardPolicyFields {
   cardId: string;
   cardNumber: string;
   customerName: string;
@@ -54,9 +77,10 @@ export interface ScanResult {
     pendingRewardName: string;
   };
   rewardEarned?: boolean;
+  redemption?: RedemptionConfirmation;
 }
 
-export interface AdminCustomer {
+export interface AdminCustomer extends RewardPolicyFields {
   id: string;
   name: string | null;
   phone: string | null;

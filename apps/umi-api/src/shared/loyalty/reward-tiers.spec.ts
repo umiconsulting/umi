@@ -263,3 +263,29 @@ describe('visitMoment', () => {
     ).toMatchObject({ journey: 'base_reward_ready', rewardName: 'Capuccino' });
   });
 });
+
+it('disables the base reward after a single cycle reaches its upper tier', () => {
+  const profile: RewardProfile = {
+    visitsRequired: 9,
+    rewardName: 'Upper',
+    rewardDescription: null,
+    redemptionConfigId: null,
+    baseTier: { visitsRequired: 7, rewardName: 'Base', rewardDescription: null, configId: null },
+  };
+  expect(
+    cardRewardFields(profile, {
+      visitsThisCycle: 9,
+      pendingTier1: 0,
+      rewardPolicy: 'single_cycle',
+      cycleRewardAvailable: true,
+    }).baseReward,
+  ).toMatchObject({ ready: false, canRedeem: false });
+  expect(
+    cardRewardFields(profile, {
+      visitsThisCycle: 8,
+      pendingTier1: 0,
+      rewardPolicy: 'single_cycle',
+      cycleRewardAvailable: true,
+    }).baseReward,
+  ).toMatchObject({ ready: true, canRedeem: true });
+});

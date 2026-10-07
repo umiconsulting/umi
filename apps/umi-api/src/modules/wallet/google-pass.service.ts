@@ -1,3 +1,7 @@
+import {
+  policyRewardCopy,
+  type PolicyPresentation,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createPrivateKey } from 'node:crypto';
@@ -372,9 +376,17 @@ export function buildLoyaltyObject(input: {
   // face. These two ids are named by the class cardTemplateOverride, and on a ladder
   // the same two ids carry the tier the customer can take now versus the one she is
   // still working toward.
-  const pending = pendingRewardsCopy(profile, data.pendingRewards, data.pendingTier1 ?? 0);
+  const pending =
+    policyRewardCopy(data) ??
+    pendingRewardsCopy(profile, data.pendingRewards, data.pendingTier1 ?? 0);
   if (pending) {
-    textModules.push({ ...pending, id: 'pending_rewards' });
+    textModules.push({
+      ...pending,
+      id:
+        data.rewardPolicy === 'single_cycle' && data.pendingRewards === 0
+          ? 'next_reward'
+          : 'pending_rewards',
+    });
   } else {
     textModules.push({ ...nextRewardCopy(profile, data.visitsThisCycle), id: 'next_reward' });
   }
@@ -462,7 +474,7 @@ export function buildLoyaltyObject(input: {
   return object;
 }
 
-export interface GooglePassData {
+export interface GooglePassData extends PolicyPresentation {
   cardId: string;
   cardNumber: string;
   customerName: string;

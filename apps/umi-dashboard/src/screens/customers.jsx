@@ -4,6 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
+import { LoyaltyOperation, rewardExpiryLabel } from '@/lib/loyalty-operation.js';
 import { XSep } from '@/shell.jsx';
 import { Segmented } from '@/components/segmented.jsx';
 import { PageHead } from '@/components/page-head.jsx';
@@ -635,7 +636,12 @@ function SealsDialog({ account, onClose, onCredited }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
   const count = Number(seals);
-  const valid = Number.isInteger(count) && count >= 1 && count <= 50;
+  const maxSeals =
+    account.rewardPolicy === 'single_cycle'
+      ? Math.max(0, account.visitsRequired - account.visitsThisCycle)
+      : 50;
+  const valid =
+    Number.isInteger(count) && count >= 1 && count <= maxSeals && !account.visitBlockedReason;
   // One random nonce per dialog, composed with the intent (card + amount) into the
   // idempotency key: a retry of the same amount reuses the key so a credit that
   // commits but loses its response lands once, while a corrected amount yields a new
@@ -687,12 +693,12 @@ function SealsDialog({ account, onClose, onCredited }) {
         </div>
         <label style={{ display: 'block', marginTop: 12 }}>
           <span>
-            <Trans>Sellos (1–50)</Trans>
+            <Trans>Sellos (1–{maxSeals})</Trans>
           </span>
           <input
             type="number"
             min={1}
-            max={50}
+            max={maxSeals}
             value={seals}
             onChange={(event) => setSeals(event.target.value)}
             disabled={pending}
@@ -844,6 +850,12 @@ function LoyaltyPanel({ cash, onCredited }) {
   const [showTopup, setShowTopup] = useState(false);
   const [scanBusy, setScanBusy] = useState(null); // 'VISIT' | 'REDEEM' | null
   const [scanError, setScanError] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
+  const [receipt, setReceipt] = useState('');
+  const [redeemQuantity, setRedeemQuantity] = useState('1');
+  const operation = useRef(new LoyaltyOperation());
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const scanInFlight = useRef(false);
   if (!cash?.available)
     return (
       <EmptyState
@@ -869,21 +881,99 @@ function LoyaltyPanel({ cash, onCredited }) {
   }
 
   async function runScan(action) {
-    if (scanBusy) return;
+    if (scanBusy || scanInFlight.current) return;
+    scanInFlight.current = true;
     setScanBusy(action);
     setScanError(null);
     try {
-      await loyaltyScan({ cardNumber: account.cardNumber, action });
+      const request = operation.current.begin({
+        cardNumber: account.cardNumber,
+        action,
+        ...(action !== 'VISIT'
+          ? {
+              externalReceiptNumber: receipt.trim(),
+              redeemQuantity:
+                action === 'REDEEM_BASE' ||
+                (account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards)
+                  ? 1
+                  : Number(redeemQuantity),
+            }
+          : {}),
+      });
+      setPendingRequest(request);
+      const response = await loyaltyScan(request);
+      if (
+        account.rewardPolicy === 'single_cycle' &&
+        request.action !== 'VISIT' &&
+        !response.redemption
+      )
+        throw new Error(t`La respuesta no confirma el canje. Reintenta la misma operación.`);
+      operation.current.finish(200);
+      setPendingRequest(null);
+      setScanResult(response.redemption || null);
+      setReceipt('');
+      setRedeemQuantity('1');
       onCredited?.();
     } catch (err) {
+      operation.current.finish(err?.status || 0);
+      if (!operation.current.pending) setPendingRequest(null);
       setScanError(err?.message || t`No se pudo registrar la acción.`);
     } finally {
+      scanInFlight.current = false;
       setScanBusy(null);
     }
   }
 
   return (
     <div className="loyalty-panel">
+      {account.rewardPolicy === 'single_cycle' && (
+        <div className="profile-stack">
+          {account.baseReward?.canRedeem && (
+            <p>
+              <Trans>
+                Puedes canjear {account.baseReward.rewardName}, o continuar hasta{' '}
+                {account.visitsRequired} visitas para {account.rewardName}.
+              </Trans>
+            </p>
+          )}
+          {account.visitsThisCycle >= account.visitsRequired && (
+            <p>
+              <Trans>{account.rewardName} listo para canjear.</Trans>
+            </p>
+          )}
+          {account.visitBlockedReason && (
+            <p>
+              <Trans>Canjea la recompensa antes de registrar otra visita.</Trans>
+            </p>
+          )}
+          {!!account.legacyPendingRewards && (
+            <p>
+              <Trans>Saldo anterior: {account.legacyPendingRewards} recompensas.</Trans>
+            </p>
+          )}
+          {account.nextRewardExpiresAt && (
+            <p>
+              <Trans>
+                Vence: {rewardExpiryLabel(account.nextRewardExpiresAt, account.merchantTimezone)} (
+                {account.merchantTimezone}).
+              </Trans>
+            </p>
+          )}
+          {account.availableRewards?.map((item, index) => (
+            <p key={index}>
+              <Trans>
+                {item.quantity} × {item.rewardName} · Vence:{' '}
+                {rewardExpiryLabel(item.expiresAt, account.merchantTimezone)}
+              </Trans>
+            </p>
+          ))}
+          <p>
+            <Trans>
+              El canje reinicia el ciclo en cero. Las visitas adicionales no se conservan.
+            </Trans>
+          </p>
+        </div>
+      )}
       <div className="loyalty-grid">
         <Metric
           label={t`Saldo del monedero`}
@@ -909,6 +999,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           <button
             className="btn btn-secondary btn-sm"
             type="button"
+            disabled={scanBusy != null || !!pendingRequest || !!account.visitBlockedReason}
             onClick={() => setShowSeals(true)}
           >
             <I.Plus size={14} /> <Trans>Agregar sellos</Trans>
@@ -916,6 +1007,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           <button
             className="btn btn-secondary btn-sm"
             type="button"
+            disabled={scanBusy != null || !!pendingRequest}
             onClick={() => setShowTopup(true)}
           >
             <I.Wallet size={14} /> <Trans>Recargar saldo</Trans>
@@ -923,27 +1015,110 @@ function LoyaltyPanel({ cash, onCredited }) {
           <button
             className="btn btn-secondary btn-sm"
             type="button"
-            disabled={scanBusy != null}
+            disabled={scanBusy != null || !!pendingRequest || !!account.visitBlockedReason}
             onClick={() => runScan('VISIT')}
           >
             <I.Activity size={14} />{' '}
             {scanBusy === 'VISIT' ? <Trans>Registrando…</Trans> : <Trans>Registrar visita</Trans>}
           </button>
-          {account.pendingRewards > 0 && (
-            <button
-              className="btn btn-sm"
-              type="button"
-              disabled={scanBusy != null}
-              onClick={() => runScan('REDEEM')}
-            >
-              <I.Gift size={14} />{' '}
-              {scanBusy === 'REDEEM' ? (
-                <Trans>Canjeando…</Trans>
-              ) : (
-                <Trans>Canjear recompensa</Trans>
-              )}
-            </button>
+          {account.pendingRewards > 0 &&
+            (account.rewardPolicy !== 'single_cycle' ||
+              account.legacyPendingRewards > 0 ||
+              account.visitsThisCycle >= account.visitsRequired) && (
+              <button
+                className="btn btn-sm"
+                type="button"
+                disabled={
+                  scanBusy != null ||
+                  (account.rewardPolicy === 'single_cycle' && !receipt.trim()) ||
+                  (!!pendingRequest && pendingRequest.action !== 'REDEEM')
+                }
+                onClick={() => runScan('REDEEM')}
+              >
+                <I.Gift size={14} />{' '}
+                {scanBusy === 'REDEEM' ? (
+                  <Trans>Canjeando…</Trans>
+                ) : (
+                  <Trans>Canjear recompensa</Trans>
+                )}
+              </button>
+            )}
+        </div>
+      )}
+      {account.rewardPolicy === 'single_cycle' && account.baseReward?.canRedeem && (
+        <button
+          className="btn btn-sm"
+          disabled={
+            scanBusy != null ||
+            !receipt.trim() ||
+            (!!pendingRequest && pendingRequest.action !== 'REDEEM_BASE')
+          }
+          onClick={() => runScan('REDEEM_BASE')}
+        >
+          <Trans>Canjear {account.baseReward.rewardName}</Trans>
+        </button>
+      )}
+      {account.pendingRewards > 0 && (
+        <div className="profile-stack" style={{ marginTop: 12 }}>
+          <label>
+            <Trans>Número de recibo</Trans>{' '}
+            <input
+              value={receipt}
+              maxLength={200}
+              disabled={scanBusy != null || !!pendingRequest}
+              onChange={(event) => setReceipt(event.target.value)}
+            />
+          </label>
+          {account.legacyPendingRewards > 0 && (
+            <label>
+              <Trans>Cantidad del saldo anterior</Trans>{' '}
+              <input
+                type="number"
+                min="1"
+                max={account.legacyPendingRewards}
+                value={redeemQuantity}
+                disabled={scanBusy != null || !!pendingRequest}
+                onChange={(event) => setRedeemQuantity(event.target.value)}
+              />
+            </label>
           )}
+        </div>
+      )}
+      {!!pendingRequest && scanBusy == null && (
+        <div>
+          <p>
+            <Trans>
+              La respuesta es incierta. Reintenta la misma operación para obtener el resultado.
+            </Trans>
+          </p>
+          <button
+            className="btn btn-sm"
+            disabled={scanBusy != null}
+            onClick={() => runScan(pendingRequest.action)}
+          >
+            <Trans>Reintentar la misma operación</Trans>
+          </button>
+        </div>
+      )}
+      {scanResult && (
+        <div className="profile-stack" role="status" style={{ marginTop: 12 }}>
+          <p>
+            <Trans>
+              Canje: {scanResult.quantity} ·{' '}
+              {scanResult.items.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ')}
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Restantes: {scanResult.remainingRewards} · Recibo: {scanResult.externalReceiptNumber}
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Operador: {scanResult.operator.name} ·{' '}
+              {rewardExpiryLabel(scanResult.redeemedAt, account.merchantTimezone)}
+            </Trans>
+          </p>
         </div>
       )}
       {scanError && (

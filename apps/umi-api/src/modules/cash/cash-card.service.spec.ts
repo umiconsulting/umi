@@ -194,3 +194,41 @@ describe('CashCardService.qr', () => {
     expect(h.qr.signQRPayload).toHaveBeenCalledWith('card-1', '');
   });
 });
+
+it('projects single cycle deadlines and snapshots on the customer card', async () => {
+  const h = make();
+  h.repo.cardState.mockResolvedValue({
+    card_number: 'KAL-1',
+    total_visits: 8,
+    visits_this_cycle: 8,
+    pending_rewards: 1,
+    balance_cents: 0,
+    visits_required: 9,
+    pending_tier1: 0,
+    reward_policy: 'single_cycle',
+    reward_expiry_days: 30,
+    next_reward_expires_at: new Date('2026-11-06T18:00:00Z'),
+    legacy_pending_rewards: 0,
+    cycle_reward_available: true,
+    visit_blocked_reason: null,
+    merchant_timezone: 'America/Mazatlan',
+    reward_name: 'Original upper',
+    base_reward_name: 'Original base',
+    base_visits_required: 7,
+    available_rewards: [
+      { rewardName: 'Original base', quantity: 1, expiresAt: '2026-11-06T18:00:00.000Z' },
+    ],
+  });
+  const card = await h.svc.card('m1', 'cust-1', 'Café');
+  expect(card).toMatchObject({
+    rewardPolicy: 'single_cycle',
+    rewardExpiryDays: 30,
+    visitsThisCycle: 8,
+    pendingRewards: 1,
+    nextRewardExpiresAt: '2026-11-06T18:00:00.000Z',
+    rewardName: 'Original upper',
+    pendingRewardName: 'Original base',
+    baseReward: { rewardName: 'Original base', ready: true, canRedeem: true },
+    merchantTimezone: 'America/Mazatlan',
+  });
+});

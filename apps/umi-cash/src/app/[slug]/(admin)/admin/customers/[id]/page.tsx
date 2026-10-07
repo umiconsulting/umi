@@ -1,5 +1,7 @@
 'use client';
 
+import { rewardExpiryLabel } from '@/lib/loyalty-operation';
+import type { RewardPolicyFields } from '@/types/api';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { formatMXN, COMMON_TOPUP_AMOUNTS, centavosFromPesos } from '@/lib/currency';
@@ -7,7 +9,7 @@ import { useTenant } from '@/context/TenantContext';
 import { formatDateShortMX, formatDateTimeMX } from '@/lib/intl';
 import { authedFetch } from '@/lib/authed-fetch';
 
-interface CustomerDetail {
+interface CustomerDetail extends RewardPolicyFields {
   id: string; name: string | null; phone: string | null; email: string | null; device: string | null; os: string | null; birthDate: string | null;
   cardNumber: string; cardId: string; balanceMXN: string; balanceCentavos: number;
   totalVisits: number; visitsThisCycle: number; visitsRequired: number; pendingRewards: number; rewardsRedeemed: number;
@@ -330,6 +332,13 @@ export default function CustomerDetailPage() {
         </div>
       )}
 
+      {customer.rewardPolicy === 'single_cycle' && <div className="u-surface p-4 text-sm space-y-1">
+        {!!customer.legacyPendingRewards && <p>Saldo anterior: {customer.legacyPendingRewards} recompensas.</p>}
+        {customer.visitBlockedReason && <p>Canjea la recompensa antes de registrar otra visita.</p>}
+        {customer.nextRewardExpiresAt && <p>Vence: {rewardExpiryLabel(customer.nextRewardExpiresAt, customer.merchantTimezone)} ({customer.merchantTimezone}).</p>}
+        {customer.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, customer.merchantTimezone)}</p>)}
+        <p>El canje reinicia el ciclo en cero.</p>
+      </div>}
       {customer.pendingRewards > 0 && (
         <div className="u-surface p-5 mb-4" style={{ borderColor: 'var(--color-brand)' }}>
           <div className="u-eyebrow mb-2" style={{ color: 'var(--color-brand)' }}>Recompensa disponible</div>
