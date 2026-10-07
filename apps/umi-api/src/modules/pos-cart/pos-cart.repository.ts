@@ -53,23 +53,38 @@ export class PosCartRepository {
      * (`order.fire`), which is a different act — see `fire()`.
      */
     permission = 'cart.write',
-  ): Promise<boolean> {
+  ): Promise<{ allowed: boolean; permissions: string[] }> {
     return this.pg.runWithMerchant(
       merchantId,
       userId,
       async (client) => {
-        const { rowCount } = await client.query(
-          `SELECT 1 FROM runtime.operator_session os
+        // The session's OWN permissions come back with the verdict, exactly as
+        // `KdsRepository.authorizePos` does and for the same reason: a bare boolean cannot
+        // tell "there is no live session" from "the session is live and lacks this
+        // permission". The first asks the operator to sign in again; the second is a role
+        // gap that signing in will not change. A commissioning session showed what the
+        // difference costs — the app treated a permission gap as a lost session, locked
+        // the till and dropped to the PIN on every operator switch.
+        //
+        // An empty array means no live session: nothing matched, or the device, the
+        // location, the entitlement or the expiry did not hold.
+        const result = await client.query<{ permissions: string[] }>(
+          `SELECT os.permissions FROM runtime.operator_session os
        JOIN merchant.device d ON d.id=os.device_id
        WHERE os.id=$6::uuid AND os.durable_session_id=$2::uuid AND os.user_id=$1::uuid
          AND os.device_id=$3::uuid AND os.merchant_id=$4::uuid AND os.location_id=$5::uuid
          AND os.state='active' AND os.expires_at>now() AND d.status='active'
-         AND ($7=ANY(os.permissions) OR '*'=ANY(os.permissions))
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos' AND COALESCE((e->>'enabled')::boolean,false))`,
-          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId, permission],
+          [userId, sessionId, deviceId, merchantId, locationId, operatorSessionId],
         );
-        return (rowCount ?? 0) > 0;
+        const row = result.rows[0];
+        if (!row) return { allowed: false, permissions: [] as string[] };
+        const permissions = Array.isArray(row.permissions) ? row.permissions : [];
+        return {
+          allowed: permissions.includes(permission) || permissions.includes('*'),
+          permissions,
+        };
       },
       locationId,
     );

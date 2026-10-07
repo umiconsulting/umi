@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { PosCartService } from './pos-cart.service';
 
@@ -16,7 +16,9 @@ const dto = {
 
 function harness() {
   const repo = {
-    authorize: vi.fn().mockResolvedValue(true),
+    // The verdict carries the session's OWN permissions, so the service can tell a dead
+    // session (empty) from a role gap (non-empty, missing the one it needs).
+    authorize: vi.fn().mockResolvedValue({ allowed: true, permissions: ['cart.write'] }),
     create: vi.fn().mockResolvedValue('00000000-0000-4000-8000-000000000007'),
     bindOrigin: vi.fn().mockResolvedValue(true),
     fire: vi.fn().mockResolvedValue({
@@ -79,8 +81,19 @@ describe('PosCartService', () => {
 
   it('fails closed when authorization does not grant cart.write', async () => {
     const { service, repo } = harness();
-    repo.authorize.mockResolvedValue(false);
-    await expect(service.create(user, user.id, dto)).rejects.toBeDefined();
+    // A LIVE session that lacks the permission is a role gap: 403, and signing in again
+    // would change nothing.
+    repo.authorize.mockResolvedValue({ allowed: false, permissions: ['sale.lifecycle'] });
+    await expect(service.create(user, user.id, dto)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('answers a session with no permissions as a dead session, not a role gap', async () => {
+    const { service, repo } = harness();
+    // Nothing matched: expired, locked from another surface, ended by a role change, or a
+    // session from another device. That is what 401 means, and it is what sends the
+    // operator back to the PIN pad.
+    repo.authorize.mockResolvedValue({ allowed: false, permissions: [] });
+    await expect(service.create(user, user.id, dto)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('maps a rejected mutation to a public cart conflict', async () => {

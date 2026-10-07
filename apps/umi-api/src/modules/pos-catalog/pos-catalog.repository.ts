@@ -20,13 +20,18 @@ export class PosCatalogRepository {
     deviceId: string,
     merchantId: string,
     locationId: string,
-  ): Promise<boolean> {
+  ): Promise<{ allowed: boolean; permissions: string[] }> {
     return this.pg.runWithMerchant(
       merchantId,
       userId,
       async (client) => {
-        const { rowCount } = await client.query(
-          `SELECT 1
+        // The permissions come back WITH the verdict so the caller can tell a dead session
+        // from a role that simply cannot read the catalog — the same distinction, and the
+        // same reason, as `PosCartRepository.authorize`. An empty array means no live
+        // session; a non-empty one without `catalog.read` is a role gap the operator
+        // cannot fix by signing in again.
+        const result = await client.query<{ permissions: string[] }>(
+          `SELECT os.permissions
        FROM runtime.operator_session os
        JOIN merchant.device d ON d.id = os.device_id
        JOIN merchant.location b ON b.id = os.location_id AND b.merchant_id = os.merchant_id
@@ -34,7 +39,6 @@ export class PosCatalogRepository {
          AND os.device_id = $3::uuid AND os.merchant_id = $4::uuid
          AND os.location_id = $5::uuid AND os.state = 'active' AND os.expires_at > now()
          AND d.status = 'active' AND b.status = 'active'
-         AND ('catalog.read' = ANY(os.permissions) OR '*' = ANY(os.permissions))
          AND EXISTS (
            SELECT 1 FROM jsonb_array_elements(os.entitlements) entitlement
            WHERE entitlement->>'featureKey' = 'pos'
@@ -42,7 +46,13 @@ export class PosCatalogRepository {
          )`,
           [userId, sessionId, deviceId, merchantId, locationId],
         );
-        return (rowCount ?? 0) > 0;
+        const row = result.rows[0];
+        if (!row) return { allowed: false, permissions: [] as string[] };
+        const permissions = Array.isArray(row.permissions) ? row.permissions : [];
+        return {
+          allowed: permissions.includes('catalog.read') || permissions.includes('*'),
+          permissions,
+        };
       },
       locationId,
     );

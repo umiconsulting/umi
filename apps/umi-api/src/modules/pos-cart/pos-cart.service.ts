@@ -347,17 +347,25 @@ export class PosCartService {
     permission = 'cart.write',
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    if (
-      !(await this.repo.authorize(
-        user.id,
-        user.sessionId,
-        user.deviceId,
-        merchantId,
-        locationId,
-        operatorSessionId,
-        permission,
-      ))
-    ) {
+    const access = await this.repo.authorize(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      locationId,
+      operatorSessionId,
+      permission,
+    );
+    // TWO REFUSALS, NAMED DIFFERENTLY, because the operator's next move differs. A session
+    // with no permissions at all is not live — expired, locked, ended by a role change, or
+    // from another device — so signing in again is the fix, and 401 is what says that. A
+    // live session that lacks the permission is a role gap, and 403 says so; re-entering
+    // the PIN would change nothing, which is exactly the confusion that had the till
+    // locking itself every time an operator switched.
+    if (access.permissions.length === 0) {
+      throw new UnauthorizedException({ code: 'AUTHENTICATION_REQUIRED' });
+    }
+    if (!access.allowed) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
   }

@@ -299,8 +299,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// and stand down during an intentional lock/logout.
   bool _reauthIfSessionLost(String? errorCode) {
     if (_leaving || errorCode == null) return false;
+    // NOT `PERMISSION_DENIED`, and the distinction is the whole point of this guard. The
+    // API answers 401 `AUTHENTICATION_REQUIRED` when the operator session is no longer
+    // live — expired, locked from another surface, ended by a role change — and that is the
+    // case worth returning to the PIN for. `PERMISSION_DENIED` is a 403 on a LIVE session:
+    // the role lacks a permission, and signing in again cannot change it. Listing the 403
+    // here locked the till and dropped it to the PIN pad on every operator switch; a
+    // commissioning session reproduced it with a role holding all 145 permissions, which
+    // is what ruled out "a role is missing something" and left the guard itself.
     final lost =
-        errorCode == 'PERMISSION_DENIED' ||
+        errorCode == 'AUTHENTICATION_REQUIRED' ||
         errorCode == 'OPERATOR_SESSION_ENDED' ||
         errorCode == 'UNAUTHORIZED';
     if (!lost) return false;
@@ -1075,8 +1083,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       // (their session was ended server-side, e.g. after a role change) —
       // there is nothing left to preserve and nothing they can do here.
       final code = widget.sales.state.errorCode;
+      // Same vocabulary as `_reauthIfSessionLost`: a dead session answers 401, so a 403 is
+      // never read as "authority lost". Letting a 403 fall through to the logout would
+      // abandon an open sale for a role gap that has nothing to do with the sale.
       final authorityLost =
-          code == 'PERMISSION_DENIED' ||
+          code == 'AUTHENTICATION_REQUIRED' ||
           code == 'OPERATOR_SESSION_ENDED' ||
           code == 'UNAUTHORIZED';
       if (lock && !authorityLost) {
