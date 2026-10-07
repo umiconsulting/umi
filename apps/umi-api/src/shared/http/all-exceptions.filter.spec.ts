@@ -5,10 +5,18 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 function harness() {
   const send = vi.fn();
   const status = vi.fn(() => ({ send }));
+  // The real `ArgumentsHost` carries the REQUEST too, and the filter reads its
+  // method and URL for the refusal line. A double that offers only the response
+  // is not a smaller host — it is a different one, and the filter crashed on it
+  // in CI while a fresh `http.getRequest` was being added.
   const host = {
     getType: () => 'http',
     switchToHttp: () => ({
       getResponse: () => ({ status }),
+      getRequest: () => ({
+        method: 'POST',
+        url: '/api/v1/pos/merchants/x/cart?operatorSessionId=y',
+      }),
     }),
   };
   return { host, status, send };

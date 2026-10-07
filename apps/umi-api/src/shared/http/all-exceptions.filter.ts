@@ -34,7 +34,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // tell which surface was refused, and the answer — a role missing one permission —
     // had to be guessed. `url` is the path WITHOUT the query string, because a query
     // carries operator session ids and the log is not the place for them.
-    const request = http.getRequest<{ method?: string; url?: string }>();
+    //
+    // Read defensively, because this is the ERROR path: a filter that throws while
+    // reporting a failure replaces a 400 with a 500 and says nothing about either.
+    // A real host always answers `getRequest`; a test double or a future adapter that
+    // does not must still get its error reported.
+    const request =
+      typeof http.getRequest === 'function'
+        ? http.getRequest<{ method?: string; url?: string }>()
+        : undefined;
     const route = `${request?.method ?? '?'} ${(request?.url ?? '?').split('?')[0]}`;
 
     const status =
