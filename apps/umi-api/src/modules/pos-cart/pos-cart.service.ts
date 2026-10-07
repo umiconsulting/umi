@@ -12,6 +12,8 @@ import type {
   CartLineInput,
   ClearCartRequest,
   CreateCartRequest,
+  FireOrderRequest,
+  FireOrderResult,
   PosIncomingOrders,
   PrepareSaleRequest,
   RemoveCartLineRequest,
@@ -195,6 +197,87 @@ export class PosCartService {
     );
   }
 
+  /**
+   * Send the cart to the kitchen before the money — the fired order of
+   * `docs/architecture/2026-10-07-pos-fired-order-adr.md`.
+   *
+   * Authorized by `order.fire` and NOT by `cart.write`. Building a cart and committing an
+   * order are different acts, and a café that wants a waiter running orders to the kitchen
+   * without letting them charge gives the role one and not the other.
+   *
+   * It does not go through `command()`, which is typed to return a Cart and audits one. The
+   * operation here answers with an order reference, so the integrity envelope is written out
+   * once instead of bending a helper every other caller depends on.
+   */
+  async fire(user: AuthUser, merchantId: string, dto: FireOrderRequest): Promise<FireOrderResult> {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId, 'order.fire');
+    const result = await this.integrity.execute<FireOrderResult>(
+      {
+        merchantId,
+        locationId: dto.locationId,
+        commandId: randomUUID(),
+        idempotencyKey: dto.idempotencyKey,
+        commandType: 'order.fire',
+        payload: dto,
+      },
+      async (context) => {
+        const cart = await this.repo.snapshotWithClient(context.client, merchantId, dto.cartId);
+        if (!cart) {
+          return {
+            ok: false,
+            code: 'RESOURCE_NOT_FOUND',
+            failureClass: 'permanent',
+            retryable: false,
+          };
+        }
+        const fired = await this.repo.fire(
+          context.client,
+          merchantId,
+          cart,
+          dto.expectedVersion,
+          dto.operatorSessionId,
+        );
+        if (fired.state === 'rejected') {
+          // ONE code for "the cart moved, is empty, or is not in a state that may fire",
+          // because the operator's next move is the same in all three: reload the cart.
+          return {
+            ok: false,
+            code: 'CART_VALIDATION_FAILED',
+            failureClass: 'conflict',
+            retryable: false,
+          };
+        }
+        await context.appendAudit({
+          eventType: 'order.fire',
+          entityType: 'pos_cart',
+          entityId: cart.id,
+          outcome: 'success',
+          publicData: {
+            orderId: fired.orderId,
+            reference: fired.reference,
+            lineCount: fired.lineCount,
+            alreadyFired: fired.state === 'already_fired',
+          },
+        });
+        return {
+          ok: true,
+          value: {
+            cartId: cart.id,
+            cartVersion: fired.cartVersion,
+            orderId: fired.orderId,
+            reference: fired.reference,
+            lineCount: fired.lineCount,
+            firedAt: new Date().toISOString(),
+          },
+        };
+      },
+    );
+    if (result.status !== 'succeeded' || !result.result) {
+      throw new ConflictException({ code: result.failureCode ?? 'CART_VALIDATION_FAILED' });
+    }
+    return result.result;
+  }
+
   // The incoming commercial orders this till can pick up and fulfil. Read-only; authorized by
   // the same device + operator session as a cart write.
   async incomingOrders(
@@ -260,18 +343,29 @@ export class PosCartService {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
+    /** `cart.write` unless the action needs its own primitive — see `fire`. */
+    permission = 'cart.write',
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    if (
-      !(await this.repo.authorize(
-        user.id,
-        user.sessionId,
-        user.deviceId,
-        merchantId,
-        locationId,
-        operatorSessionId,
-      ))
-    ) {
+    const access = await this.repo.authorize(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      locationId,
+      operatorSessionId,
+      permission,
+    );
+    // TWO REFUSALS, NAMED DIFFERENTLY, because the operator's next move differs. A session
+    // with no permissions at all is not live — expired, locked, ended by a role change, or
+    // from another device — so signing in again is the fix, and 401 is what says that. A
+    // live session that lacks the permission is a role gap, and 403 says so; re-entering
+    // the PIN would change nothing, which is exactly the confusion that had the till
+    // locking itself every time an operator switched.
+    if (access.permissions.length === 0) {
+      throw new UnauthorizedException({ code: 'AUTHENTICATION_REQUIRED' });
+    }
+    if (!access.allowed) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
   }

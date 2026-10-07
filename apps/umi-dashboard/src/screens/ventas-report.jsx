@@ -220,7 +220,15 @@ function ChannelMix({ channelMix, currency }) {
   );
 }
 
-/** The pivot: group by producto, categoría, barista or hour. Sortable columns. */
+/**
+ * The pivot: group by producto, categoría, operador or hour. Sortable columns.
+ *
+ * "OPERADOR", not "Barista". The dimension is whoever rang the sale, and the
+ * platform's own word for that person is the operator — `runtime.operator_session`,
+ * the PIN pad's "Ingresa tu PIN de operador". "Barista" is one trade's word for
+ * that person, and a suite for businesses does not print one trade's vocabulary on
+ * every other business's report.
+ */
 function Pivot({ productMix, byOperator, byHour, currency }) {
   const { t } = useLingui();
   const [groupBy, setGroupBy] = useState('producto');
@@ -244,7 +252,7 @@ function Pivot({ productMix, byOperator, byHour, currency }) {
               return acc;
             }, {}),
           )
-        : groupBy === 'barista'
+        : groupBy === 'operador'
           ? byOperator.map((r) => ({ key: r.key, sub: null, units: r.units, net: r.netMinorUnits }))
           : byHour.map((r) => ({ key: r.key, sub: null, units: r.units, net: r.netMinorUnits }));
   const totalNet = rows.reduce((s, r) => s + r.net, 0);
@@ -262,7 +270,7 @@ function Pivot({ productMix, byOperator, byHour, currency }) {
   const GROUPS = [
     { id: 'producto', label: <Trans>Producto</Trans> },
     { id: 'categoria', label: <Trans>Categoría</Trans> },
-    { id: 'barista', label: <Trans>Barista</Trans> },
+    { id: 'operador', label: <Trans>Operador</Trans> },
     { id: 'hora', label: <Trans>Hora</Trans> },
   ];
   const keyLabel =
@@ -270,8 +278,8 @@ function Pivot({ productMix, byOperator, byHour, currency }) {
       <Trans>Producto</Trans>
     ) : groupBy === 'categoria' ? (
       <Trans>Categoría</Trans>
-    ) : groupBy === 'barista' ? (
-      <Trans>Barista</Trans>
+    ) : groupBy === 'operador' ? (
+      <Trans>Operador</Trans>
     ) : (
       <Trans>Hora</Trans>
     );

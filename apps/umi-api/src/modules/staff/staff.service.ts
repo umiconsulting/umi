@@ -256,7 +256,12 @@ export class StaffService {
     }
     const normalized = String(value).trim().toLowerCase();
     if (normalized === 'admin') return 'admin';
-    if (['staff', 'cashier', 'barista'].includes(normalized)) return 'staff';
+    // The platform's own two-role vocabulary, plus the catalogue keys that predate
+    // it. `'barista'` was in this list and matched NO role in `umi.role` — a
+    // business's trade word, dead in the platform's code, and the wrong mechanism
+    // besides: a café that wants a Barista role creates a `merchant.role`, which is
+    // what ONCA's four roles are.
+    if (['staff', 'cashier'].includes(normalized)) return 'staff';
     throw new BadRequestException('role must be ADMIN or STAFF');
   }
 

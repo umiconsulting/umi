@@ -28,7 +28,15 @@ const product = {
 
 const make = (authorized = true) => {
   const repo = {
-    authorize: vi.fn().mockResolvedValue(authorized),
+    // The verdict carries the session's own permissions: an empty list is a dead session
+    // (401, sign in again) and a non-empty one without `catalog.read` is a role gap (403).
+    authorize: vi
+      .fn()
+      .mockResolvedValue(
+        authorized
+          ? { allowed: true, permissions: ['catalog.read'] }
+          : { allowed: false, permissions: ['cart.write'] },
+      ),
     categories: vi.fn().mockResolvedValue([]),
     products: vi.fn().mockResolvedValue([product, { ...product, id: user.id, name: 'Té' }]),
     detail: vi

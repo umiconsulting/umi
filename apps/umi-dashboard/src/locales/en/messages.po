@@ -692,6 +692,7 @@ msgstr "Drawer"
 #: src/screens/caja-turnos.jsx
 #: src/screens/recibos.jsx
 #: src/screens/reembolsos.jsx
+#: src/screens/ventas-report.jsx
 msgid "Operador"
 msgstr "Operator"
 
@@ -6456,6 +6457,7 @@ msgid "Encargado"
 msgstr "Manager"
 
 #: src/screens/profile.jsx
+#: src/screens/staff.jsx
 msgid "Personal"
 msgstr "Staff"
 
@@ -7489,13 +7491,13 @@ msgstr "e.g. the downtown one, next to the park"
 #~ msgstr "Nothing is deleted: their shift and sales history is kept, and you can hand the access back from this same screen whenever you want."
 
 #: src/screens/staff.jsx
-msgid "Admin"
-msgstr "Admin"
+#: src/screens/ventas-report.jsx
+#~ msgid "Barista"
+#~ msgstr "Barista"
 
 #: src/screens/staff.jsx
-#: src/screens/ventas-report.jsx
-msgid "Barista"
-msgstr "Barista"
+msgid "Admin"
+msgstr "Admin"
 
 #: src/screens/staff.jsx
 msgid "Carrito"

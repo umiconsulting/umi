@@ -202,6 +202,36 @@ jobs:
           psql -v ON_ERROR_STOP=1 -d "$GATE_DB" \
             -f apps/umi-api/db/roles/004_buildv3_login_roles.sql
 
+      # THE FORWARD MIGRATIONS, BEFORE THE INSTRUMENTS.
+      #
+      # Post-cutover, "a pristine build" is no longer the schema the app expects.
+      # Every feature that adds a column arrives as a file in
+      # `docs/migration/build-v3/migrations/`, and the application is written —
+      # and tested — against the result. Running the schema instruments on the
+      # pre-migration build therefore measures a schema nobody ships, and a
+      # feature whose column is missing fails here for a reason that has nothing
+      # to do with the feature.
+      #
+      # THIS WAS INVISIBLE UNTIL IT WAS NOT. `pos_cart.fired_order_id` (004) is
+      # referenced by the cart repository the moment the migration exists in the
+      # tree; six tests in `pos-offline.integration.ts` and every SQL statement
+      # the preflight collects failed with `column "fired_order_id" does not
+      # exist` — against a build that had never applied the file. Measured on a
+      # workstation: a fresh build WITH these files applied passes the whole
+      # schema family, 231 tests across 28 files.
+      #
+      # Applied ONCE here. The step further down still applies every file a second
+      # and a third time, and that is where the re-runnable rule is proved; it
+      # sees these as already applied, which is exactly the case it must tolerate.
+      - name: Apply the forward migrations
+        run: |
+          set -euo pipefail
+          for f in docs/migration/build-v3/migrations/*.sql; do
+            [ -e "$f" ] || { echo "no forward migrations yet"; break; }
+            echo "== $(basename "$f") =="
+            psql -v ON_ERROR_STOP=1 -q -d "$GATE_DB" -f "$f"
+          done
+
       - name: Schema instruments (preflight · check-values · parity · carry · stamps · seals · logout · login · creds)
         working-directory: apps/umi-api
         env:
