@@ -173,17 +173,21 @@ it('resets an expired cycle and keeps a failed wallet refresh durable across rep
 it('expires legacy units and touches the card while it preserves partial progress', async () => {
   const target = await card(3);
   const before = (
-    await pool.query(`SELECT updated_at FROM merchant.loyalty_card WHERE id=$1`, [target.cardId])
+    await pool.query(
+      `SELECT updated_at::text AS updated_at FROM merchant.loyalty_card WHERE id=$1`,
+      [target.cardId],
+    )
   ).rows[0].updated_at;
   await unit(target, 'legacy', await deadline(`clock_timestamp()-interval '1 second'`));
   expect((await processor().sweep()).expiredUnits).toBe(1);
   const after = (
-    await pool.query(`SELECT cycle_anchor,updated_at FROM merchant.loyalty_card WHERE id=$1`, [
-      target.cardId,
-    ])
+    await pool.query(
+      `SELECT cycle_anchor,updated_at > $2::timestamptz AS touched FROM merchant.loyalty_card WHERE id=$1`,
+      [target.cardId, before],
+    )
   ).rows[0];
   expect(after.cycle_anchor).toBe(0);
-  expect(after.updated_at.getTime()).toBeGreaterThan(before.getTime());
+  expect(after.touched).toBe(true);
 });
 
 it('keeps disabled policy cards unchanged', async () => {
