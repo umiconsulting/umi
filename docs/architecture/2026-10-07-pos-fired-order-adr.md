@@ -2,8 +2,9 @@
 
 _ADR · build-v3 · `merchant` schema · POS cart + checkout + kitchen cluster · 2026-10-07_
 
-**Status:** PROPOSED. One decision is open (§7) and it touches the money path, so it is
-the owner's.
+**Status:** ACCEPTED (2026-10-07). The open decision in §7 is resolved: **option 2**, an
+explicit column. The checkout reads a fact the row states, not a convention it has to
+remember.
 **Extends:** `ORDER_MODEL.md` §1 (the order and its event spine) and §5 (config vs data)
 **Relates to:** [`2026-09-13-pos-channel-attribution-adr.md`](2026-09-13-pos-channel-attribution-adr.md)
 — this reuses its `origin_order_id` seam and must not break its link-don't-merge rule.
@@ -138,9 +139,16 @@ else's to link and close"?**
    `origin_order_id`). One guarded column, unambiguous, and the intent is readable in the
    data rather than inferred from a convention.
 
-This ADR recommends **(2)**: the cost is one column in a migration we control, and it turns
-a rule the checkout has to remember into a fact the row states. Option (1) is the choice
-only if we want zero schema churn in the first version.
+**DECIDED 2026-10-07: option (2).** The cost is one column in a migration we control, and it
+turns a rule the checkout has to remember into a fact the row states. Option (1) was the
+choice only if we wanted zero schema churn in the first version, and we do not: this is the
+seam the whole feature hangs on, and it is worth one column to not have to re-derive it.
+
+The column is `merchant.pos_cart.fired_order_id` — separate from `origin_order_id` on
+purpose. They answer different questions and a cart may legitimately carry both: a fired
+order that this cart created, settling nothing upstream; or an upstream order it links and
+closes, having been fired nowhere. Merging them into one column would make the checkout
+guess which rule applies, which is the failure this decision exists to prevent.
 
 ## 8. What this ADR does not decide
 
