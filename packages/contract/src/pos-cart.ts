@@ -173,6 +173,40 @@ export const PosIncomingOrder = z
   .strict();
 export const PosIncomingOrders = z.object({ orders: z.array(PosIncomingOrder).max(100) }).strict();
 
+// The fired order (ADR 2026-10-07-pos-fired-order-adr). Firing writes the order and
+// projects its kitchen ticket WITHOUT taking money, and the checkout later settles that
+// same order instead of minting a second one — a second order projects a second ticket,
+// and the bar makes the drinks twice. The request names the cart because the cart is what
+// is fired; the ORDER is what comes out, which is why the route lives under `/orders`.
+//
+// `expectedVersion` is the cart's, not the order's: the order does not exist until this
+// call succeeds, so the only thing there is to be stale against is the cart the operator
+// is looking at.
+export const FireOrderRequest = z
+  .object({
+    cartId: Uuid,
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    expectedVersion: z.number().int().positive(),
+    idempotencyKey: Idempotency,
+  })
+  .strict();
+
+// What the till gets back. `reference` is the string the kitchen ticket shows, so it is
+// what an operator reads to a cook; `lineCount` is never zero, because an empty cart is
+// refused rather than fired — a ticket with no items is a cook walking to a screen to find
+// nothing.
+export const FireOrderResult = z
+  .object({
+    cartId: Uuid,
+    cartVersion: z.number().int().positive(),
+    orderId: Uuid,
+    reference: z.string().max(160).nullable(),
+    lineCount: z.number().int().positive(),
+    firedAt: Timestamp,
+  })
+  .strict();
+
 export type Cart = z.infer<typeof Cart>;
 export type CartItem = z.infer<typeof CartItem>;
 export type CartLineInput = z.infer<typeof CartLineInput>;
@@ -184,6 +218,8 @@ export type CartQuery = z.infer<typeof CartQuery>;
 export type BindCartOriginRequest = z.infer<typeof BindCartOriginRequest>;
 export type PosIncomingOrder = z.infer<typeof PosIncomingOrder>;
 export type PosIncomingOrders = z.infer<typeof PosIncomingOrders>;
+export type FireOrderRequest = z.infer<typeof FireOrderRequest>;
+export type FireOrderResult = z.infer<typeof FireOrderResult>;
 export const posCartModels = {
   VariantSelection,
   ModifierSelection,
@@ -201,4 +237,6 @@ export const posCartModels = {
   BindCartOriginRequest,
   PosIncomingOrder,
   PosIncomingOrders,
+  FireOrderRequest,
+  FireOrderResult,
 };

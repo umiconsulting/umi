@@ -143,6 +143,10 @@ export const routes = {
         buildPath('pos.cartLineUpdate', { merchantId, lineId }),
       prepare: (merchantId: string): string => buildPath('pos.cartPrepare', { merchantId }),
     },
+    /** The fired order — sending an order to the kitchen before the money. */
+    order: {
+      fire: (merchantId: string): string => buildPath('pos.orderFire', { merchantId }),
+    },
     checkout: {
       base: (merchantId: string): string => buildPath('pos.checkout', { merchantId }),
       payment: (merchantId: string, paymentId: string): string =>

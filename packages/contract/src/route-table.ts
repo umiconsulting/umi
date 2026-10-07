@@ -2248,6 +2248,37 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
 
+  // ── The fired order ────────────────────────────────────────────────────────
+  //
+  // Sending an order to the kitchen before the money. ADR:
+  // docs/architecture/2026-10-07-pos-fired-order-adr.md.
+  //
+  // `order.fire` and NOT a kitchen permission, on purpose: this CREATES the order and
+  // its kitchen ticket, whereas every `kitchen.*` command acts on a ticket that already
+  // exists (and `fire_course` merely advances the courses of one). Naming it after the
+  // kitchen would file the one action that makes a ticket among the ones that consume it.
+  //
+  // The path is `/orders/fire` rather than `/cart/fire` because the cart is what is
+  // fired but the ORDER is what the action produces — and the order-level actions that
+  // follow (a second round, a split) belong under the same prefix.
+  posMerchantRoute({
+    id: 'pos.orderFire',
+    method: 'POST',
+    suffix: '/orders/fire',
+    dart: 'posOrderFire',
+    request: 'FireOrderRequest',
+    response: 'FireOrderResult',
+    permission: 'order.fire',
+    errors: [
+      'PERMISSION_DENIED',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+      'RESOURCE_NOT_FOUND',
+      'CART_EMPTY',
+      'VALIDATION_FAILED',
+    ],
+  }),
+
   // ── POS checkout ───────────────────────────────────────────────────────────
   {
     id: 'pos.checkout',

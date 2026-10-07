@@ -1,6 +1,6 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "11de10f21fb3e10523ebcde6329d6e1ef2e010355a8aaf28b60494296f06e7ef",
+  "contentHash": "5118482601c0f6d491f1ad7d9a901c797d88aa176ccfea6d48499d5d2fbf2f22",
   "contractVersion": "2.23.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
@@ -32885,6 +32885,84 @@
         "data",
         "correlationId",
         "occurredAt"
+      ],
+      "type": "object"
+    },
+    "FireOrderRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "cartId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "expectedVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "idempotencyKey": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "locationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operatorSessionId": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cartId",
+        "locationId",
+        "operatorSessionId",
+        "expectedVersion",
+        "idempotencyKey"
+      ],
+      "type": "object"
+    },
+    "FireOrderResult": {
+      "additionalProperties": false,
+      "properties": {
+        "cartId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "cartVersion": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "firedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "lineCount": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "orderId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "cartId",
+        "cartVersion",
+        "orderId",
+        "reference",
+        "lineCount",
+        "firedAt"
       ],
       "type": "object"
     },
@@ -100295,6 +100373,26 @@
       "pin": false,
       "request": "BeginReplayRequest",
       "response": "BeginReplayResponse"
+    },
+    "POST /api/v1/pos/merchants/:merchantId/orders/fire": {
+      "approval": false,
+      "auth": "operator-session",
+      "errors": [
+        "PERMISSION_DENIED",
+        "OPTIMISTIC_VERSION_CONFLICT",
+        "IDEMPOTENCY_CONFLICT",
+        "RESOURCE_NOT_FOUND",
+        "CART_EMPTY",
+        "VALIDATION_FAILED"
+      ],
+      "idempotent": true,
+      "locationContext": true,
+      "merchantContext": true,
+      "offline": false,
+      "permission": "order.fire",
+      "pin": false,
+      "request": "FireOrderRequest",
+      "response": "FireOrderResult"
     },
     "POST /api/v1/pos/merchants/:merchantId/sales": {
       "approval": false,
