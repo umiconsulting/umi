@@ -567,7 +567,7 @@ export default function ScanPage() {
           )}
           {/* Daily visit cap notice — without this the only trace was the greyed-out
               checkbox hint, and baristas read the silent stall as a broken scan. */}
-          {preview.card.visitLimitReached && (
+          {preview.card.visitLimitReached && !preview.card.visitBlockedReason && (
             <div className="flex items-start gap-3 rounded-xl px-4 py-3 bg-amber-50 border border-amber-200">
               <svg className="flex-shrink-0 mt-0.5" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />

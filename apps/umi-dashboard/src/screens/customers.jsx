@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
 import { LoyaltyOperation, rewardExpiryLabel, rewardVisitCostLabel } from '@/lib/loyalty-operation.js';
 import { XSep } from '@/shell.jsx';
@@ -844,13 +845,12 @@ function TopupDialog({ account, onClose, onCredited }) {
   );
 }
 
-function LoyaltyPanel({ cash, onCredited }) {
+function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
   const { t } = useLingui();
   const [showSeals, setShowSeals] = useState(false);
   const [showTopup, setShowTopup] = useState(false);
   const [scanBusy, setScanBusy] = useState(null); // 'VISIT' | 'REDEEM' | null
   const [scanError, setScanError] = useState(null);
-  const [scanResult, setScanResult] = useState(null);
   const [receipt, setReceipt] = useState('');
   const [redeemQuantity, setRedeemQuantity] = useState('1');
   const operation = useRef(new LoyaltyOperation());
@@ -910,7 +910,7 @@ function LoyaltyPanel({ cash, onCredited }) {
         throw new Error(t`La respuesta no confirma el canje. Reintenta la misma operación.`);
       operation.current.finish(200);
       setPendingRequest(null);
-      setScanResult(response.redemption ? { ...response.redemption, remainingVisits: response.card?.visitsThisCycle } : null);
+      onScanResult(response.redemption ? { ...response.redemption, remainingVisits: response.card?.visitsThisCycle } : null);
       setReceipt('');
       setRedeemQuantity('1');
       onCredited?.();
@@ -1225,11 +1225,18 @@ function EmptyState({ icon, title, detail }) {
   );
 }
 
-function CustomerProfile({ customerId, onSearch }) {
+function CustomerProfile(props) {
+  const { selectedMerchantId } = useMerchant();
+  // Refreshes keep the committed receipt; changing customer or merchant clears it.
+  return <CustomerProfileContent key={`${selectedMerchantId || ''}:${props.customerId || ''}`} {...props} />;
+}
+
+function CustomerProfileContent({ customerId, onSearch }) {
   const { t, i18n } = useLingui();
   const [params] = useSearchParams();
   const [tab, setTab] = useState('overview');
   const [refresh, setRefresh] = useState(0);
+  const [loyaltyConfirmation, setLoyaltyConfirmation] = useState(null);
   const { data, loading, error } = useCustomerDetail(customerId, refresh);
   const customer = data?.customer;
 
@@ -1374,7 +1381,12 @@ function CustomerProfile({ customerId, onSearch }) {
         )}
         {activeTab === 'orders' && <OrdersList orders={data?.orders || []} />}
         {activeTab === 'loyalty' && (
-          <LoyaltyPanel cash={data?.cash} onCredited={() => setRefresh((n) => n + 1)} />
+          <LoyaltyPanel
+            cash={data?.cash}
+            scanResult={loyaltyConfirmation}
+            onScanResult={setLoyaltyConfirmation}
+            onCredited={() => setRefresh((n) => n + 1)}
+          />
         )}
         {activeTab === 'notes' && (
           <Timeline items={(data?.timeline || []).filter((item) => item.type === 'memory')} />

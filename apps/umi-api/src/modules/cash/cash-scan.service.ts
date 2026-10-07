@@ -909,7 +909,7 @@ export class CashScanService {
       const remaining = updated.visits_this_cycle;
       parts.push(
         updated.reward_policy === 'single_cycle'
-          ? `✓ ${baseRewardName ?? rewardName} canjeado — ${remaining} visita${remaining !== 1 ? 's' : ''} restantes`
+          ? `${baseRewardName ?? rewardName} canjeado. ${remaining === 1 ? 'Queda 1 visita.' : `Quedan ${remaining} visitas.`}`
           : `✓ ${baseRewardName ?? rewardName} canjeado en nivel 1 — tarjeta reiniciada`,
       );
     }
