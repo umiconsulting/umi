@@ -1,3 +1,7 @@
+import {
+  StampRewardExpiryProcessor,
+  STAMP_REWARD_EXPIRY_JOB,
+} from './stamp-reward-expiry.processor';
 import { Processor } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUES } from './queues';
@@ -39,11 +43,16 @@ export class SystemProcessor extends BaseProcessor {
      * would COMPETE with this one rather than add to it (`queues.ts` says so, from experience).
      */
     private readonly attemptHealth: PointAttemptHealthService,
+    private readonly stampRewards: StampRewardExpiryProcessor,
   ) {
     super(deadLetters);
   }
 
   async process(job: Job): Promise<void> {
+    if (job.name === STAMP_REWARD_EXPIRY_JOB) {
+      await this.stampRewards.sweep(Number(job.data?.batchSize ?? 100));
+      return;
+    }
     if (job.name === 'customer_value_authorization_expiry') {
       const count = await this.customerValue.expireAllAuthorizations(
         Number(job.data?.batchSize ?? 100),

@@ -1,3 +1,8 @@
+import {
+  StampRewardExpiryProcessor,
+  STAMP_REWARD_REMINDER_TOPIC,
+  type ReminderGroup,
+} from './stamp-reward-expiry.processor';
 import { Processor } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUES } from './queues';
@@ -24,6 +29,7 @@ export class OutboundProcessor extends BaseProcessor {
     deadLetters: DeadLetterService,
     private readonly twilio: TwilioAdapter,
     private readonly log: LoggingService,
+    private readonly stampRewards: StampRewardExpiryProcessor,
   ) {
     super(deadLetters);
   }
@@ -33,6 +39,9 @@ export class OutboundProcessor extends BaseProcessor {
     const to = String(p.to ?? '');
 
     switch (job.name) {
+      case STAMP_REWARD_REMINDER_TOPIC:
+        await this.stampRewards.deliverReminder(p as unknown as ReminderGroup);
+        return;
       case 'twilio.location_pin': {
         const from = String(p.from ?? '');
         const lat = Number(p.lat);

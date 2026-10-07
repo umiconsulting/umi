@@ -179,6 +179,20 @@ export class WalletPassService {
     if (data) await this.google.updateObject(data);
   }
 
+  /** Return an explicit result for jobs with a durable retry marker. */
+  async refreshGoogleObjectWithOutcome(cardId: string): Promise<boolean> {
+    const merchantId = await this.repo.merchantForCard(cardId);
+    if (!merchantId) return true;
+    const objectId = await this.repo.googleObjectForCard(cardId);
+    if (!objectId) return true;
+    if (!this.google.isConfigured()) return false;
+    const data = await this.googlePassData(merchantId, cardId, objectId).catch(() => null);
+    if (!data) return false;
+    const outcome = await this.google.updateObject(data);
+    if (outcome === 'missing') await this.repo.markGoogleObjectRemoved(cardId);
+    return outcome === 'updated' || outcome === 'missing';
+  }
+
   /**
    * Refresh every Android pass at one café — the other half of the register's
    * "Actualizar pases", and the half that did not exist.

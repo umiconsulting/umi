@@ -254,3 +254,11 @@ describe('WalletPassService · the birthday reward line', () => {
     expect(passed.birthdayRewardName).toBeNull();
   });
 });
+
+it('returns a failed durable refresh when Google rejects the update', async () => {
+  const h = makeService();
+  h.repo.merchantForCard.mockResolvedValue('merchant-1');
+  h.google.isConfigured = () => true;
+  h.google.updateObject.mockResolvedValue('failed');
+  expect(await h.service.refreshGoogleObjectWithOutcome('card-1')).toBe(false);
+});
