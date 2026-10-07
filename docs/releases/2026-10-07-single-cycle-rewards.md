@@ -77,7 +77,7 @@ This release does not promise exactly-once provider delivery.
 
 ## Local evidence
 
-Final verification evidence follows in the branch verification record.
+Final verification evidence is in [the local verification record](2026-10-07-single-cycle-rewards-verification.md).
 The private stack uses PostgreSQL 16.15, Node 22.23.3, pnpm 10.29.3, and Vitest 2.1.9.
 The browser proof uses Playwright 1.62.1 over CDP with a headed Brave Chromium browser.
 The temporary launcher adapts the repository's Linux browser script to macOS.
