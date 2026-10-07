@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
-import { EFFECTIVE_VISITS_REQUIRED_SQL } from '../../shared/loyalty/card-state.sql';
+import {
+  EFFECTIVE_VISITS_REQUIRED_SQL,
+  BASE_REWARD_BLOCKED_BY_HISTORY_SQL,
+  type LoyaltyCardState,
+} from '../../shared/loyalty/card-state.sql';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>;
@@ -22,7 +26,7 @@ export interface WalletDelta {
   sourceId?: string | null;
 }
 
-export interface CardRow {
+export interface CardRow extends LoyaltyCardState {
   id: string;
   customer_id: string | null;
   card_number: string;
@@ -101,9 +105,13 @@ export class CashWriteRepository {
          SELECT c.id::text, c.customer_id::text, c.card_number, c.qr_token,
                 agg.balance_cents::int                                   AS balance_cents,
                 agg.total_visits::int                                    AS total_visits,
-                ((agg.total_visits - c.cycle_anchor) % vr.n)::int        AS visits_this_cycle,
-                (c.rewards_earned - agg.redemptions)::int                AS pending_rewards,
-                c.pending_tier1, c.cycle_anchor, c.rewards_earned,
+                rs.visits_this_cycle,
+                rs.pending_rewards,
+                c.pending_tier1, c.cycle_anchor, c.rewards_earned, rs.visits_required,
+                rs.reward_policy,rs.reward_expiry_days,rs.next_reward_expires_at,rs.legacy_pending_rewards,
+                rs.cycle_reward_available,rs.visit_blocked_reason,rs.available_rewards,rs.merchant_timezone,
+                rs.reward_name,rs.base_reward_name,rs.base_visits_required,
+                ${BASE_REWARD_BLOCKED_BY_HISTORY_SQL} AS base_reward_blocked_by_history,
                 cu.id::text                                              AS person_id,
                 cu.name                                                  AS display_name,
                 NULL::text                                               AS normalized_email
@@ -112,6 +120,7 @@ export class CashWriteRepository {
          LEFT JOIN merchant.customer AS cu
            ON cu.merchant_id = c.merchant_id AND cu.id = c.customer_id
          CROSS JOIN vr
+         CROSS JOIN LATERAL merchant.loyalty_reward_card_state(c.merchant_id,c.id) rs
          CROSS JOIN LATERAL (
            SELECT
              (SELECT COALESCE(SUM(v.stamps), 0) FROM merchant.loyalty_visit v

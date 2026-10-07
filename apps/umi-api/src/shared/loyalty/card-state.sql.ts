@@ -1,43 +1,11 @@
 /**
- * The derived loyalty state of one card, in SQL. One author, two readers.
- *
- * `merchant.loyalty_card` carries no counters. The old `total_visits`,
- * `visits_this_cycle`, `pending_rewards` and `balance_cents` cache columns are
- * gone, so every caller computes the same four numbers from the event tables and
- * the CARD'S TWO ANCHORS (79_cycle_anchor.sql):
- *
- *   total_visits      = SUM(merchant.loyalty_visit.stamps)
- *   visits_this_cycle = (total_visits - cycle_anchor) % visits_required
- *   pending_rewards   = rewards_earned - COUNT(canjes that stand)
- *   balance_cents     = COALESCE(SUM(merchant.loyalty_stored_value_ledger.delta), 0)
- *
- * WHY THE ANCHORS ARE THERE, in one line each: a plain modulo assumes every cycle
- * ran 0 → 1 → … → threshold → 0 at a threshold that never moved. An early cash-out
- * restarts the cycle at the customer's current stamp count (not a multiple), and a
- * threshold that moved leaves a cycle finishing under the old one. `cycle_anchor` is
- * where the current cycle began, and `rewards_earned` counts the cycles this card
- * has completed — which no formula can recover from the events, because earning a
- * reward wrote no row. Measured before that file was written: the derivation below
- * reproduces umi-cash's own numbers for 1053 of 1053 cards.
- *
- * A canje with `cycle_reset` is an early cash-out: it consumed the cycle, not a
- * banked reward, so it does not count here.
- *
- * `visits_required` is the merchant's active `merchant.loyalty_reward`, and it
- * defaults to 10 when no reward row exists. The default also prevents a division
- * by zero.
- *
- * WHY THIS IS SHARED. The register (`cash-scan.repository.ts`) and the wallet
- * pass (`wallet-pass.repository.ts`) both show these numbers to the same person
- * at the same moment: the customer reads the phone while the barista reads the
- * till. Two copies of this formula would drift, and the customer would see the
- * disagreement before we did. Keep one copy.
- *
- * The query returns `visits_required` as well, so the threshold that produced
- * the modulo is always the threshold that gets displayed.
- *
+ * Shared card state for scans, passes, and customer reads.
+ * Lifetime stamps and stored value derive from their event tables.
+ * Disabled merchants retain the cycle modulo and historical reward count.
+ * Enabled merchants use absolute anchors and unexpired entitlement units.
+ * Expired cycles read zero before the expiry worker updates their anchors.
+ * The canonical migration defines merchant.loyalty_reward_card_state.
  * Parameters: $1 = merchant id, $2 = card id.
- * It returns no row when the card does not exist, or when RLS hides it.
  */
 
 /**
@@ -104,6 +72,16 @@ export const EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL = `
                       AND r.kind = 'standard'
                     ORDER BY r.created_at DESC NULLS LAST LIMIT 1) AS n) AS std)`;
 
+/** The earliest historical deadline takes priority over an eligible base cycle. Card alias: c. */
+export const BASE_REWARD_BLOCKED_BY_HISTORY_SQL = `
+  EXISTS(SELECT 1 FROM merchant.loyalty_reward_entitlement h
+    WHERE h.merchant_id=c.merchant_id AND h.card_id=c.id AND (h.source='legacy' OR h.recovery)
+      AND h.redeemed_at IS NULL AND h.expired_at IS NULL AND h.expires_at>statement_timestamp()
+      AND h.expires_at <= (SELECT min(e.expires_at) FROM merchant.loyalty_reward_entitlement e
+        WHERE e.merchant_id=c.merchant_id AND e.card_id=c.id AND e.source='cycle' AND NOT e.recovery
+          AND e.cycle_anchor=c.cycle_anchor AND e.tier='base' AND e.redeemed_at IS NULL
+          AND e.expired_at IS NULL AND e.expires_at>statement_timestamp()))`;
+
 export const LOYALTY_CARD_STATE_SQL = `
   WITH vr AS (
     SELECT COALESCE(${EFFECTIVE_VISITS_REQUIRED_SQL}, 10) AS n
@@ -126,10 +104,10 @@ export const LOYALTY_CARD_STATE_SQL = `
            WHERE merchant_id = $1::uuid AND card_id = $2::uuid)
   SELECT c.card_number,
          tv.n                 AS total_visits,
-         ((tv.n - c.cycle_anchor) % vr.n) AS visits_this_cycle,
-         (c.rewards_earned - rr.n)        AS pending_rewards,
+         rs.visits_this_cycle,
+         rs.pending_rewards,
          bal.n                AS balance_cents,
-         vr.n                 AS visits_required,
+         rs.visits_required,
          -- Both anchors ride along: a writer needs them to compute the next value
          -- (the scan) or to preserve the position across a threshold change (the
          -- reward-config save), and re-reading the card to get them would be a
@@ -141,12 +119,29 @@ export const LOYALTY_CARD_STATE_SQL = `
         -- first. A counter, not a flag: the reward-config save that turns a ladder
         -- on seeds it with the card's banked rewards, redeeming one of those
         -- decrements it, and reverting that redemption increments it.
-        c.pending_tier1
-  FROM merchant.loyalty_card AS c, vr, tv, rr, bal
+        c.pending_tier1,
+        rs.reward_policy,rs.reward_expiry_days,rs.next_reward_expires_at,rs.legacy_pending_rewards,
+        rs.cycle_reward_available,rs.visit_blocked_reason,rs.available_rewards,rs.merchant_timezone,
+        rs.reward_name,rs.base_reward_name,rs.base_visits_required,
+        ${BASE_REWARD_BLOCKED_BY_HISTORY_SQL} AS base_reward_blocked_by_history
+  FROM merchant.loyalty_card AS c CROSS JOIN vr CROSS JOIN tv CROSS JOIN rr CROSS JOIN bal
+  CROSS JOIN LATERAL merchant.loyalty_reward_card_state(c.merchant_id,c.id) rs
   WHERE c.merchant_id = $1::uuid AND c.id = $2::uuid`;
 
 /** The row `LOYALTY_CARD_STATE_SQL` returns. */
 export interface LoyaltyCardState {
+  base_reward_blocked_by_history?: boolean;
+  reward_policy?: 'accumulate' | 'single_cycle';
+  reward_expiry_days?: number | null;
+  next_reward_expires_at?: Date | string | null;
+  legacy_pending_rewards?: number;
+  cycle_reward_available?: boolean;
+  visit_blocked_reason?: 'REDEMPTION_REQUIRED' | null;
+  available_rewards?: { rewardName: string; quantity: number; expiresAt: string }[];
+  merchant_timezone?: string;
+  reward_name?: string | null;
+  base_reward_name?: string | null;
+  base_visits_required?: number | null;
   card_number: string;
   total_visits: number;
   visits_this_cycle: number;

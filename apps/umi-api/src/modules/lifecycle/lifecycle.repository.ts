@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PgService } from '../../shared/database/pg.service';
-import { EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL } from '../../shared/loyalty/card-state.sql';
 
 /**
  * Canonical reads for the scheduled lifecycle WhatsApp journeys (3d-lifecycle),
@@ -64,18 +63,8 @@ const CARD_PERSON_JOIN = `
      LIMIT 1
   ) ph ON true`;
 const HAS_PHONE = `ph.phone IS NOT NULL`;
-// visits_this_cycle = (SUM(visit stamps) − the card's cycle anchor) % the café's
-// cycle threshold (default 10). The threshold is the ladder's TOP tier where one
-// exists, and the anchor is where the current cycle began — see
-// shared/loyalty/card-state.sql.ts for why, and for the one copy of the rule.
-// The parentheses around the subtraction are load-bearing: `%` binds tighter than
-// `-`, so `a - b % t` is `a - (b % t)`, which is not the position of anything.
-const VISITS_THIS_CYCLE = `((
-  (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v
-    WHERE v.merchant_id = c.merchant_id AND v.card_id = c.id)
-  - c.cycle_anchor
-) % COALESCE(${EFFECTIVE_VISITS_REQUIRED_CORRELATED_SQL}, ${DEFAULT_VISITS_REQUIRED})
-)::int`;
+// Use the same policy and expiry state as the scan and wallet readers.
+const VISITS_THIS_CYCLE = `(SELECT visits_this_cycle FROM merchant.loyalty_reward_card_state(c.merchant_id,c.id))`;
 
 @Injectable()
 export class LifecycleRepository {

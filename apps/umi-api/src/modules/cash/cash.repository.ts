@@ -78,10 +78,13 @@ const CUST_CTE = `
           -- The two anchors the cycle derives from (79_cycle_anchor.sql). Carried
           -- through the CTE so the list, the export and the count all speak the same
           -- arithmetic as the scan and the pass.
-          c.cycle_anchor, c.rewards_earned
+          c.cycle_anchor, c.rewards_earned,rs.visits_this_cycle,rs.pending_rewards,
+          rs.reward_policy,rs.reward_expiry_days,rs.next_reward_expires_at,rs.legacy_pending_rewards,
+          rs.cycle_reward_available,rs.visit_blocked_reason,rs.available_rewards,rs.merchant_timezone
         FROM merchant.customer cu
         LEFT JOIN merchant.loyalty_card c
           ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
+        LEFT JOIN LATERAL merchant.loyalty_reward_card_state(c.merchant_id,c.id) rs ON true
         WHERE cu.merchant_id = $1::uuid
       )`;
 
@@ -191,19 +194,12 @@ export class CashRepository {
            WHERE merchant_id = $1::uuid AND reason = 'topup' AND created_at >= $2`,
           [merchantId, dayStart],
         ),
-        // pending rewards across all active cards = Σ max(rewards_earned − standing
-        // canjes, 0). Rewards EARNED is the card's own anchor, not a division: a
-        // division cannot tell a cycle that was cut short from one that completed
-        // (79_cycle_anchor.sql).
+        // Sum the same unexpired count that each card surface shows.
         c.query<Row>(
           `SELECT COALESCE(sum(pend), 0)::int AS sum FROM (
-             SELECT (
-               c.rewards_earned
-               - (SELECT count(*) FROM merchant.loyalty_redemption r
-                   WHERE r.merchant_id = c.merchant_id AND r.card_id = c.id
-                     AND r.reverted_at IS NULL AND NOT r.cycle_reset)
-             ) AS pend
+             SELECT rs.pending_rewards AS pend
              FROM merchant.loyalty_card c
+             CROSS JOIN LATERAL merchant.loyalty_reward_card_state(c.merchant_id,c.id) rs
              WHERE c.merchant_id = $1::uuid AND c.status = 'active'
            ) s WHERE pend > 0`,
           [merchantId],
@@ -399,9 +395,11 @@ export class CashRepository {
                   device, os,
                   card_id::text AS "cardId", card_number AS "cardNumber",
                   balance_cents AS "balanceCentavos", total_visits AS "totalVisits",
-                  ((total_visits - coalesce(cycle_anchor, 0)) % (SELECT n FROM vr_n))::int
+                  COALESCE(visits_this_cycle,0)
                                                                                    AS "visitsThisCycle",
-                  (coalesce(rewards_earned, 0) - redemptions)::int                 AS "pendingRewards",
+                  COALESCE(pending_rewards,0)                 AS "pendingRewards",
+                  reward_policy,reward_expiry_days,next_reward_expires_at,legacy_pending_rewards,
+                  cycle_reward_available,visit_blocked_reason,available_rewards,merchant_timezone,
                   last_visit AS "lastVisit", ltv_centavos AS "ltvCentavos"
            FROM cust
            WHERE ${filter}
@@ -663,7 +661,8 @@ export class CashRepository {
                    FROM merchant.loyalty_card c
                   WHERE c.merchant_id = $1::uuid
                ) AS d
-              WHERE ca.merchant_id = $1::uuid AND ca.id = d.id AND d.pending > 0`,
+              WHERE ca.merchant_id = $1::uuid AND ca.id = d.id AND d.pending > 0
+                AND NOT EXISTS(SELECT 1 FROM merchant.loyalty_reward_policy rp WHERE rp.merchant_id=ca.merchant_id AND rp.mode='single_cycle')`,
             [merchantId, previousThreshold],
           );
         }
@@ -694,7 +693,8 @@ export class CashRepository {
                FROM merchant.loyalty_card c
               WHERE c.merchant_id = $1::uuid
            ) AS d
-          WHERE ca.merchant_id = $1::uuid AND ca.id = d.id`,
+          WHERE ca.merchant_id = $1::uuid AND ca.id = d.id
+            AND NOT EXISTS(SELECT 1 FROM merchant.loyalty_reward_policy rp WHERE rp.merchant_id=ca.merchant_id AND rp.mode='single_cycle')`,
         [merchantId, Math.max(1, previousCycleThreshold), Math.max(1, nextThreshold)],
       );
 
@@ -765,6 +765,7 @@ export class CashRepository {
            FROM merchant.customer cu
            JOIN merchant.loyalty_card c
              ON c.merchant_id = cu.merchant_id AND c.customer_id = cu.id AND c.status = 'active'
+        LEFT JOIN LATERAL merchant.loyalty_reward_card_state(c.merchant_id,c.id) rs ON true
           WHERE cu.merchant_id = $1::uuid AND cu.id = $2::uuid
           ORDER BY c.created_at DESC
           LIMIT 1`,
@@ -850,9 +851,11 @@ export class CashRepository {
          SELECT name, phone, email, card_number AS "cardNumber",
                 balance_cents AS "balanceCentavos",
                 total_visits AS "totalVisits",
-                ((total_visits - coalesce(cycle_anchor, 0)) % (SELECT n FROM vr_n))::int
+                COALESCE(visits_this_cycle,0)
                                                                         AS "visitsThisCycle",
-                (coalesce(rewards_earned, 0) - redemptions)::int         AS "pendingRewards",
+                COALESCE(pending_rewards,0)         AS "pendingRewards",
+                reward_policy,reward_expiry_days,next_reward_expires_at,legacy_pending_rewards,
+                cycle_reward_available,visit_blocked_reason,available_rewards,merchant_timezone,
                 to_char(created_at AT TIME ZONE $2, 'FMDD/FMMM/YYYY')    AS "registeredOn"
            FROM cust
           ORDER BY created_at DESC`,
