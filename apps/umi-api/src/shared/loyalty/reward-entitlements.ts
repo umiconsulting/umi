@@ -169,6 +169,11 @@ export async function redeemRewardEntitlements(
     tier: string;
     source: string;
     recovery: boolean;
+    recovery_tier: string | null;
+    card_anchor: number;
+    lifetime_total: number;
+    base_visits_required: number;
+    top_visits_required: number;
     cycle_anchor: number | null;
     expires_at: Date;
     base_reward_id: string | null;
@@ -176,10 +181,10 @@ export async function redeemRewardEntitlements(
     base_reward_name: string;
     top_reward_name: string;
   }>(
-    `SELECT e.* FROM merchant.loyalty_reward_entitlement e JOIN merchant.loyalty_card ca ON ca.merchant_id=e.merchant_id AND ca.id=e.card_id
+    `SELECT e.*,ca.cycle_anchor card_anchor,(SELECT COALESCE(sum(stamps),0)::int FROM merchant.loyalty_visit WHERE merchant_id=$1::uuid AND card_id=$2::uuid) lifetime_total FROM merchant.loyalty_reward_entitlement e JOIN merchant.loyalty_card ca ON ca.merchant_id=e.merchant_id AND ca.id=e.card_id
       WHERE e.merchant_id=$1::uuid AND e.card_id=$2::uuid AND e.redeemed_at IS NULL AND e.expired_at IS NULL AND e.expires_at>clock_timestamp()
       AND (CASE WHEN $3='legacy' THEN e.source='legacy' OR e.recovery
-        WHEN $3='cycle_base' THEN e.source='cycle' AND NOT e.recovery AND e.tier='base' AND e.cycle_anchor=ca.cycle_anchor
+        WHEN $3='cycle_base' THEN e.source='cycle' AND NOT e.recovery AND e.cycle_anchor=ca.cycle_anchor
         ELSE e.source='legacy' OR e.recovery OR (e.source='cycle' AND NOT e.recovery AND e.tier='top' AND e.cycle_anchor=ca.cycle_anchor) END)
       ORDER BY e.expires_at,e.created_at,e.id LIMIT $4 FOR UPDATE OF e`,
     [input.merchantId, input.cardId, input.selection, input.quantity],
@@ -200,7 +205,28 @@ export async function redeemRewardEntitlements(
   const redeemedAt = iso((await c.query<{ ts: Date }>(`SELECT clock_timestamp() ts`)).rows[0].ts);
   const items: RedeemedRewardItem[] = [];
   for (const unit of rows) {
-    const isBase = unit.tier === 'base';
+    const liveCycle = unit.source === 'cycle' && !unit.recovery;
+    const chosenTier = liveCycle
+      ? input.selection === 'cycle_base'
+        ? 'base'
+        : 'top'
+      : unit.recovery
+        ? (unit.recovery_tier ?? unit.tier)
+        : unit.tier;
+    const isBase = chosenTier === 'base';
+    const consumed = liveCycle
+      ? isBase
+        ? unit.base_visits_required
+        : unit.top_visits_required
+      : 0;
+    const anchorBefore = liveCycle ? unit.card_anchor : null;
+    const anchorAfter = liveCycle ? unit.card_anchor + consumed : null;
+    if (
+      liveCycle &&
+      (unit.lifetime_total - unit.card_anchor < consumed ||
+        unit.lifetime_total - unit.card_anchor > 9)
+    )
+      throw new BadRequestException('Selected reward visits are unavailable');
     const { rows: redemptions } = await c.query<{ id: string }>(
       `INSERT INTO merchant.loyalty_redemption(merchant_id,card_id,reward_id,reason,staff_id,occurred_at,cycle_reset)
       VALUES($1::uuid,$2::uuid,$3::uuid,'stamps',$4::uuid,$5::timestamptz,$6) RETURNING id::text`,
@@ -215,24 +241,32 @@ export async function redeemRewardEntitlements(
     );
     const redemptionId = redemptions[0].id;
     await c.query(
-      `INSERT INTO merchant.loyalty_reward_redemption_link(merchant_id,redemption_id,entitlement_id,command_id,external_receipt_number) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5)`,
+      `INSERT INTO merchant.loyalty_reward_redemption_link(merchant_id,redemption_id,entitlement_id,command_id,external_receipt_number,claimed_tier,stamps_consumed,cycle_anchor_before,cycle_anchor_after,lifetime_total_at_claim) VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10)`,
       [
         input.merchantId,
         redemptionId,
         unit.id,
         input.commandId ?? null,
         input.externalReceiptNumber,
+        chosenTier,
+        consumed,
+        anchorBefore,
+        anchorAfter,
+        unit.lifetime_total,
       ],
     );
     await c.query(
       `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=$3::timestamptz WHERE merchant_id=$1::uuid AND id=$2::uuid`,
       [input.merchantId, unit.id, redeemedAt],
     );
-    if (unit.source === 'cycle' && !unit.recovery)
-      await c.query(
-        `UPDATE merchant.loyalty_card SET cycle_anchor=(SELECT COALESCE(sum(stamps),0)::int FROM merchant.loyalty_visit WHERE merchant_id=$1::uuid AND card_id=$2::uuid),updated_at=clock_timestamp() WHERE merchant_id=$1::uuid AND id=$2::uuid AND cycle_anchor=$3`,
-        [input.merchantId, input.cardId, unit.cycle_anchor],
+    if (liveCycle) {
+      const update = await c.query(
+        `UPDATE merchant.loyalty_card SET cycle_anchor=$4,updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND id=$2::uuid AND cycle_anchor=$3 RETURNING id`,
+        [input.merchantId, input.cardId, anchorBefore, anchorAfter],
       );
+      if (update.rowCount !== 1) throw new BadRequestException('Cycle changed before redemption');
+    }
     items.push({
       entitlementId: unit.id,
       redemptionId,
@@ -253,8 +287,13 @@ export async function restoreRewardEntitlement(
   merchantId: string,
   redemptionId: string,
 ): Promise<{ linked: boolean; expired: boolean; changed: boolean }> {
-  const { rows } = await c.query<{ id: string; restored_at: Date | null; expired: boolean }>(
-    `SELECT e.id,l.restored_at,(e.expires_at<=clock_timestamp()) expired FROM merchant.loyalty_reward_redemption_link l JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id WHERE l.merchant_id=$1::uuid AND l.redemption_id=$2::uuid FOR UPDATE OF l,e`,
+  const { rows } = await c.query<{
+    id: string;
+    restored_at: Date | null;
+    expired: boolean;
+    claimed_tier: string;
+  }>(
+    `SELECT e.id,l.restored_at,COALESCE(l.claimed_tier,e.tier) claimed_tier,(e.expires_at<=clock_timestamp()) expired FROM merchant.loyalty_reward_redemption_link l JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id WHERE l.merchant_id=$1::uuid AND l.redemption_id=$2::uuid FOR UPDATE OF l,e`,
     [merchantId, redemptionId],
   );
   const row = rows[0];
@@ -265,8 +304,8 @@ export async function restoreRewardEntitlement(
     [merchantId, redemptionId],
   );
   await c.query(
-    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=NULL,recovery=true,expired_at=CASE WHEN expires_at<=clock_timestamp() THEN clock_timestamp() ELSE NULL END,pass_refresh_requested_at=clock_timestamp() WHERE merchant_id=$1::uuid AND id=$2::uuid`,
-    [merchantId, row.id],
+    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=NULL,recovery=true,recovery_tier=$3,expired_at=CASE WHEN expires_at<=clock_timestamp() THEN clock_timestamp() ELSE NULL END,pass_refresh_requested_at=clock_timestamp() WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+    [merchantId, row.id, row.claimed_tier],
   );
   return { linked: true, expired: row.expired, changed: true };
 }

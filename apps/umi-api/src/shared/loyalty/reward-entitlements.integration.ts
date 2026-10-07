@@ -40,6 +40,15 @@ async function tx<T>(work: (c: PoolClient) => Promise<T>): Promise<T> {
     c.release();
   }
 }
+async function lockedTx<T>(id: string, work: (c: PoolClient) => Promise<T>): Promise<T> {
+  return tx(async (c) => {
+    await c.query(
+      `SELECT id FROM merchant.loyalty_card WHERE merchant_id=$1 AND id=$2 FOR UPDATE`,
+      [merchantId, id],
+    );
+    return work(c);
+  });
+}
 async function newCard(total = 0, anchor = 0, earned = 0) {
   const customerId = randomUUID();
   const id = randomUUID();
@@ -229,28 +238,223 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
       (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0].visits_this_cycle,
     ).toBe(9);
   });
-  it.each([7, 8, 9])('redemption at %i consumes the cycle without carryover', async (total) => {
+  it.each([
+    [7, 'cycle_base', 0, 7],
+    [8, 'cycle_base', 1, 7],
+    [9, 'cycle_base', 2, 7],
+    [9, 'cycle_top', 0, 9],
+  ] as const)(
+    'choice at %i with %s retains %i visits',
+    async (total, selection, remaining, consumed) => {
+      const { syncCycleReward, redeemRewardEntitlements } = await import('./reward-entitlements');
+      const id = await newCard(total);
+      await lockedTx(id, (c) =>
+        syncCycleReward(c, {
+          merchantId,
+          cardId: id,
+          lifetimeTotal: total,
+          cycleAnchor: 0,
+          profile,
+        }),
+      );
+      const result = await lockedTx(id, (c) =>
+        redeemRewardEntitlements(c, {
+          merchantId,
+          cardId: id,
+          quantity: 1,
+          staffId,
+          externalReceiptNumber: 'CHOICE',
+          selection,
+        }),
+      );
+      expect(result.quantity).toBe(1);
+      expect(result.items[0].isBase).toBe(selection === 'cycle_base');
+      expect(result.items[0].rewardName).toBe(
+        selection === 'cycle_base' ? 'Base snapshot' : 'Top snapshot',
+      );
+      const state = (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0];
+      expect(state.visits_this_cycle).toBe(remaining);
+      expect(state.cycle_anchor).toBe(consumed);
+      expect(state.total_visits).toBe(total);
+      expect(state.pending_rewards).toBe(0);
+      expect(state.next_reward_expires_at).toBeNull();
+      const link = (
+        await worker.query(
+          `SELECT * FROM merchant.loyalty_reward_redemption_link WHERE merchant_id=$1 AND redemption_id=$2`,
+          [merchantId, result.redemptionIds[0]],
+        )
+      ).rows[0];
+      expect(link.claimed_tier).toBe(selection === 'cycle_base' ? 'base' : 'top');
+      expect(link.stamps_consumed).toBe(consumed);
+      expect(link.cycle_anchor_before).toBe(0);
+      expect(link.cycle_anchor_after).toBe(consumed);
+      expect(link.lifetime_total_at_claim).toBe(total);
+    },
+  );
+  it('retained visits open a new unit and deadline only when the next cycle reaches seven', async () => {
     const { syncCycleReward, redeemRewardEntitlements } = await import('./reward-entitlements');
-    const id = await newCard(total);
-    await tx((c) =>
-      syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: total, cycleAnchor: 0, profile }),
+    const id = await newCard(9);
+    const old = await lockedTx(id, (c) =>
+      syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 9, cycleAnchor: 0, profile }),
     );
-    const result = await tx((c) =>
+    await lockedTx(id, (c) =>
       redeemRewardEntitlements(c, {
         merchantId,
         cardId: id,
         quantity: 1,
         staffId,
-        externalReceiptNumber: 'TEST-1',
-        selection: total === 9 ? 'cycle_top' : 'cycle_base',
+        externalReceiptNumber: 'CARRY',
+        selection: 'cycle_base',
       }),
     );
-    expect(result.quantity).toBe(1);
-    expect(result.items[0].rewardName).toBe(total === 9 ? 'Top snapshot' : 'Base snapshot');
+    await worker.query(
+      `INSERT INTO merchant.loyalty_visit(merchant_id,card_id,stamps,source) VALUES($1,$2,4,'manual_bulk')`,
+      [merchantId, id],
+    );
+    expect(
+      await lockedTx(id, (c) =>
+        syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 13, cycleAnchor: 7, profile }),
+      ),
+    ).toEqual({ changed: false, entitlementId: null });
+    expect(
+      (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0].next_reward_expires_at,
+    ).toBeNull();
+    await worker.query(
+      `INSERT INTO merchant.loyalty_visit(merchant_id,card_id,stamps,source) VALUES($1,$2,1,'manual_bulk')`,
+      [merchantId, id],
+    );
+    const next = await lockedTx(id, (c) =>
+      syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 14, cycleAnchor: 7, profile }),
+    );
+    expect(next.entitlementId).not.toBe(old.entitlementId);
+    const comparison = (
+      await worker.query(
+        `SELECT n.eligible_at>o.eligible_at newer_eligibility,n.expires_at>o.expires_at newer_deadline,n.expires_at-n.eligible_at=interval '30 days' exact_deadline FROM merchant.loyalty_reward_entitlement n,merchant.loyalty_reward_entitlement o WHERE n.id=$1 AND o.id=$2`,
+        [next.entitlementId, old.entitlementId],
+      )
+    ).rows[0];
+    expect(comparison).toEqual({
+      newer_eligibility: true,
+      newer_deadline: true,
+      exact_deadline: true,
+    });
     const state = (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0];
-    expect(state.visits_this_cycle).toBe(0);
-    expect(state.total_visits).toBe(total);
-    expect(state.pending_rewards).toBe(0);
+    expect(state.visits_this_cycle).toBe(7);
+    expect(state.pending_rewards).toBe(1);
+    expect(state.rewards_earned).toBe(2);
+  });
+  it('base reversal at nine restores base with its original deadline and preserves a later cycle', async () => {
+    const { syncCycleReward, redeemRewardEntitlements, restoreRewardEntitlement } =
+      await import('./reward-entitlements');
+    const id = await newCard(9);
+    const old = await lockedTx(id, (c) =>
+      syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 9, cycleAnchor: 0, profile }),
+    );
+    const claim = await lockedTx(id, (c) =>
+      redeemRewardEntitlements(c, {
+        merchantId,
+        cardId: id,
+        quantity: 1,
+        staffId,
+        externalReceiptNumber: 'BASE-NINE',
+        selection: 'cycle_base',
+      }),
+    );
+    await worker.query(
+      `INSERT INTO merchant.loyalty_visit(merchant_id,card_id,stamps,source) VALUES($1,$2,5,'manual_bulk')`,
+      [merchantId, id],
+    );
+    await lockedTx(id, (c) =>
+      syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 14, cycleAnchor: 7, profile }),
+    );
+    expect(
+      await lockedTx(id, (c) => restoreRewardEntitlement(c, merchantId, claim.redemptionIds[0])),
+    ).toEqual({ linked: true, expired: false, changed: true });
+    expect(
+      await lockedTx(id, (c) => restoreRewardEntitlement(c, merchantId, claim.redemptionIds[0])),
+    ).toEqual({ linked: true, expired: false, changed: false });
+    const restored = (
+      await worker.query(`SELECT * FROM merchant.loyalty_reward_entitlement WHERE id=$1`, [
+        old.entitlementId,
+      ])
+    ).rows[0];
+    expect(restored.tier).toBe('top');
+    expect(restored.recovery_tier).toBe('base');
+    expect(restored.recovery).toBe(true);
+    let state = (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0];
+    expect(state.visits_this_cycle).toBe(7);
+    expect(state.pending_rewards).toBe(2);
+    expect(state.legacy_pending_rewards).toBe(1);
+    expect(
+      state.available_rewards.every(
+        (r: { rewardName: string }) => r.rewardName === 'Base snapshot',
+      ),
+    ).toBe(true);
+    const recoveryClaim = await lockedTx(id, (c) =>
+      redeemRewardEntitlements(c, {
+        merchantId,
+        cardId: id,
+        quantity: 1,
+        staffId,
+        externalReceiptNumber: 'RECOVERY-BASE',
+        selection: 'legacy',
+      }),
+    );
+    expect(recoveryClaim.items[0].isBase).toBe(true);
+    expect(recoveryClaim.items[0].rewardName).toBe('Base snapshot');
+    expect(recoveryClaim.items[0].expiresAt).toBe(claim.items[0].expiresAt);
+    state = (await worker.query(LOYALTY_CARD_STATE_SQL, [merchantId, id])).rows[0];
+    expect(state.visits_this_cycle).toBe(7);
+    expect(state.cycle_anchor).toBe(7);
+    const link = (
+      await worker.query(
+        `SELECT * FROM merchant.loyalty_reward_redemption_link WHERE merchant_id=$1 AND redemption_id=$2`,
+        [merchantId, recoveryClaim.redemptionIds[0]],
+      )
+    ).rows[0];
+    expect(link.claimed_tier).toBe('base');
+    expect(link.stamps_consumed).toBe(0);
+    expect(link.cycle_anchor_before).toBeNull();
+    expect(link.cycle_anchor_after).toBeNull();
+  });
+  it('concurrent base and top choices consume one unit once', async () => {
+    const { syncCycleReward, redeemRewardEntitlements } = await import('./reward-entitlements');
+    const id = await newCard(9);
+    await lockedTx(id, (c) =>
+      syncCycleReward(c, { merchantId, cardId: id, lifetimeTotal: 9, cycleAnchor: 0, profile }),
+    );
+    const choices = await Promise.allSettled(
+      (['cycle_base', 'cycle_top'] as const).map((selection) =>
+        lockedTx(id, (c) =>
+          redeemRewardEntitlements(c, {
+            merchantId,
+            cardId: id,
+            quantity: 1,
+            staffId,
+            externalReceiptNumber: selection,
+            selection,
+          }),
+        ),
+      ),
+    );
+    expect(choices.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(choices.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect(
+      (
+        await worker.query(
+          `SELECT count(*)::int n FROM merchant.loyalty_redemption WHERE merchant_id=$1 AND card_id=$2`,
+          [merchantId, id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
+    expect(
+      (
+        await worker.query(
+          `SELECT count(*)::int n FROM merchant.loyalty_reward_entitlement WHERE merchant_id=$1 AND card_id=$2`,
+          [merchantId, id],
+        )
+      ).rows[0].n,
+    ).toBe(1);
   });
   it('expiry reads zero before cleanup and advances the same live cycle anchor', async () => {
     const { syncCycleReward, expireCycleReward } = await import('./reward-entitlements');
@@ -444,11 +648,16 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
     const { restoreRewardEntitlement } = await import('./reward-entitlements');
     const before = (
       await worker.query(
-        `SELECT e.id,e.eligible_at,e.expires_at FROM merchant.loyalty_reward_redemption_link l JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id WHERE l.merchant_id=$1 AND l.redemption_id=$2`,
+        `SELECT e.id,e.eligible_at,e.expires_at,l.claimed_tier,l.stamps_consumed,l.cycle_anchor_before,l.cycle_anchor_after,l.lifetime_total_at_claim FROM merchant.loyalty_reward_redemption_link l JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id WHERE l.merchant_id=$1 AND l.redemption_id=$2`,
         [merchantId, historicalRedemptionId],
       )
     ).rows[0];
     expect(before.eligible_at).toBeNull();
+    expect(before.claimed_tier).toBe('top');
+    expect(before.stamps_consumed).toBeNull();
+    expect(before.cycle_anchor_before).toBeNull();
+    expect(before.cycle_anchor_after).toBeNull();
+    expect(before.lifetime_total_at_claim).toBeNull();
     expect(
       await tx((c) => restoreRewardEntitlement(c, merchantId, historicalRedemptionId)),
     ).toEqual({ linked: true, expired: false, changed: true });
@@ -508,6 +717,66 @@ describe('single-cycle reward entitlements · real PostgreSQL', () => {
     expect(unit.expired_at).toBeInstanceOf(Date);
     expect(unit.pass_refresh_requested_at).toBeInstanceOf(Date);
   });
+  it('keeps selected claim facts immutable', async () => {
+    const link = (
+      await worker.query(
+        `SELECT redemption_id FROM merchant.loyalty_reward_redemption_link WHERE merchant_id=$1 AND stamps_consumed=7 LIMIT 1`,
+        [merchantId],
+      )
+    ).rows[0];
+    for (const assignment of [
+      "claimed_tier='top'",
+      'stamps_consumed=9',
+      'cycle_anchor_before=1',
+      'lifetime_total_at_claim=50',
+    ]) {
+      await expect(
+        worker.query(
+          `UPDATE merchant.loyalty_reward_redemption_link SET ${assignment} WHERE merchant_id=$1 AND redemption_id=$2`,
+          [merchantId, link.redemption_id],
+        ),
+      ).rejects.toMatchObject({ code: '23514' });
+    }
+  });
+  it.runIf(process.env.REWARD_MIGRATION_RERUN === '1')(
+    'migration reruns preserve selected facts, residual progress, and original deadlines',
+    async () => {
+      const sql = readFileSync(
+        resolve(
+          process.cwd(),
+          '../../supabase/migrations/20261007000000_stamp_reward_entitlements.sql',
+        ),
+        'utf8',
+      );
+      const rows = async () => ({
+        entitlements: (
+          await worker.query(
+            `SELECT * FROM merchant.loyalty_reward_entitlement WHERE merchant_id=$1 ORDER BY id`,
+            [merchantId],
+          )
+        ).rows,
+        links: (
+          await worker.query(
+            `SELECT * FROM merchant.loyalty_reward_redemption_link WHERE merchant_id=$1 ORDER BY redemption_id`,
+            [merchantId],
+          )
+        ).rows,
+        cards: (
+          await worker.query(
+            `SELECT id,cycle_anchor,rewards_earned FROM merchant.loyalty_card WHERE merchant_id=$1 ORDER BY id`,
+            [merchantId],
+          )
+        ).rows,
+      });
+      const before = await rows();
+      await admin.query(sql);
+      await admin.query(sql);
+      await worker.query(`SELECT merchant.activate_single_cycle_reward_policy($1,30)`, [
+        merchantId,
+      ]);
+      expect(await rows()).toEqual(before);
+    },
+  );
   it('RLS hides another merchant and tenant references reject grafts', async () => {
     const c = await app.connect();
     try {

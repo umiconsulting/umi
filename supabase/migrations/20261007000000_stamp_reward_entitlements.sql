@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS merchant.loyalty_reward_entitlement (
   card_id uuid NOT NULL,
   source text NOT NULL CHECK (source IN ('cycle','legacy')),
   recovery boolean NOT NULL DEFAULT false,
+  recovery_tier text CHECK(recovery_tier IN ('base','top')),
   cycle_anchor integer,
   eligible_at timestamptz,
   activated_at timestamptz,
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS merchant.loyalty_reward_entitlement (
   CHECK (source <> 'cycle' OR (cycle_anchor IS NOT NULL AND (eligible_at IS NOT NULL OR activated_at IS NOT NULL))),
   CHECK (base_visits_required > 0 AND top_visits_required >= base_visits_required)
 );
+ALTER TABLE merchant.loyalty_reward_entitlement ADD COLUMN IF NOT EXISTS recovery_tier text CHECK(recovery_tier IN ('base','top'));
 CREATE UNIQUE INDEX IF NOT EXISTS loyalty_reward_one_open_cycle_uq
   ON merchant.loyalty_reward_entitlement(merchant_id,card_id)
   WHERE source='cycle' AND NOT recovery AND redeemed_at IS NULL AND expired_at IS NULL;
@@ -57,12 +59,39 @@ CREATE TABLE IF NOT EXISTS merchant.loyalty_reward_redemption_link (
   entitlement_id uuid NOT NULL,
   command_id uuid,
   external_receipt_number text,
+  claimed_tier text CHECK(claimed_tier IN ('base','top')),
+  stamps_consumed integer CHECK(stamps_consumed IN (0,7,9)),
+  cycle_anchor_before integer CHECK(cycle_anchor_before>=0),
+  cycle_anchor_after integer CHECK(cycle_anchor_after>=0),
+  lifetime_total_at_claim integer CHECK(lifetime_total_at_claim>=0),
   restored_at timestamptz,
   PRIMARY KEY(merchant_id,redemption_id),
   FOREIGN KEY(merchant_id,redemption_id) REFERENCES merchant.loyalty_redemption(merchant_id,id) ON DELETE CASCADE,
   FOREIGN KEY(merchant_id,entitlement_id) REFERENCES merchant.loyalty_reward_entitlement(merchant_id,id) ON DELETE CASCADE,
   FOREIGN KEY(merchant_id,command_id) REFERENCES merchant.business_command(merchant_id,command_id)
 );
+ALTER TABLE merchant.loyalty_reward_redemption_link
+  ADD COLUMN IF NOT EXISTS claimed_tier text CHECK(claimed_tier IN ('base','top')),
+  ADD COLUMN IF NOT EXISTS stamps_consumed integer CHECK(stamps_consumed IN (0,7,9)),
+  ADD COLUMN IF NOT EXISTS cycle_anchor_before integer CHECK(cycle_anchor_before>=0),
+  ADD COLUMN IF NOT EXISTS cycle_anchor_after integer CHECK(cycle_anchor_after>=0),
+  ADD COLUMN IF NOT EXISTS lifetime_total_at_claim integer CHECK(lifetime_total_at_claim>=0);
+ALTER TABLE merchant.loyalty_reward_redemption_link DROP CONSTRAINT IF EXISTS loyalty_reward_claim_anchor_shape;
+ALTER TABLE merchant.loyalty_reward_redemption_link ADD CONSTRAINT loyalty_reward_claim_anchor_shape CHECK(
+  (cycle_anchor_before IS NULL)=(cycle_anchor_after IS NULL)
+  AND (cycle_anchor_before IS NULL OR (stamps_consumed IN (7,9)
+    AND cycle_anchor_after=cycle_anchor_before+stamps_consumed AND lifetime_total_at_claim>=cycle_anchor_after))
+  AND (stamps_consumed IS NULL OR claimed_tier IS NOT NULL));
+-- Old links preserve unknown visit consumption. Their unit records the selected tier.
+DROP TRIGGER IF EXISTS reward_redemption_link_immutable ON merchant.loyalty_reward_redemption_link;
+UPDATE merchant.loyalty_reward_redemption_link l SET claimed_tier=e.tier
+  FROM merchant.loyalty_reward_entitlement e
+  WHERE e.merchant_id=l.merchant_id AND e.id=l.entitlement_id AND l.claimed_tier IS NULL;
+UPDATE merchant.loyalty_reward_entitlement e SET recovery_tier=(
+  SELECT l.claimed_tier FROM merchant.loyalty_reward_redemption_link l
+  WHERE l.merchant_id=e.merchant_id AND l.entitlement_id=e.id AND l.restored_at IS NOT NULL
+  ORDER BY l.restored_at DESC,l.redemption_id LIMIT 1)
+  WHERE e.recovery AND e.recovery_tier IS NULL;
 ALTER TABLE merchant.loyalty_reward_redemption_link DROP CONSTRAINT IF EXISTS loyalty_reward_redemption_link_merchant_id_command_id_fkey;
 ALTER TABLE merchant.loyalty_reward_redemption_link ADD CONSTRAINT loyalty_reward_redemption_link_merchant_id_command_id_fkey FOREIGN KEY(merchant_id,command_id) REFERENCES merchant.business_command(merchant_id,command_id);
 ALTER TABLE merchant.loyalty_reward_entitlement DROP CONSTRAINT IF EXISTS loyalty_reward_entitlement_check;
@@ -108,6 +137,20 @@ DO $$ DECLARE t text; BEGIN
 END $$;
 GRANT INSERT,UPDATE ON merchant.loyalty_reward_entitlement,merchant.loyalty_reward_redemption_link TO api;
 
+CREATE OR REPLACE FUNCTION merchant.guard_reward_redemption_link_facts() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,merchant AS $$
+BEGIN
+  IF ROW(NEW.merchant_id,NEW.redemption_id,NEW.entitlement_id,NEW.command_id,NEW.external_receipt_number,
+    NEW.claimed_tier,NEW.stamps_consumed,NEW.cycle_anchor_before,NEW.cycle_anchor_after,NEW.lifetime_total_at_claim)
+    IS DISTINCT FROM ROW(OLD.merchant_id,OLD.redemption_id,OLD.entitlement_id,OLD.command_id,OLD.external_receipt_number,
+    OLD.claimed_tier,OLD.stamps_consumed,OLD.cycle_anchor_before,OLD.cycle_anchor_after,OLD.lifetime_total_at_claim) THEN
+    RAISE EXCEPTION 'Selected reward and consumed visits are immutable' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER reward_redemption_link_immutable BEFORE UPDATE ON merchant.loyalty_reward_redemption_link
+  FOR EACH ROW EXECUTE FUNCTION merchant.guard_reward_redemption_link_facts();
+
 -- Activation is explicit. The migration never enables a merchant.
 CREATE OR REPLACE FUNCTION merchant.activate_single_cycle_reward_policy(p_merchant uuid,p_days integer DEFAULT 30)
 RETURNS void LANGUAGE plpgsql SET search_path=pg_catalog,merchant AS $$
@@ -149,7 +192,7 @@ BEGIN
         base_reward_id,base_reward_name,base_reward_description,base_visits_required,top_reward_id,top_reward_name,top_reward_description,top_visits_required)
       VALUES(p_merchant,ca.id,'legacy',started,deadline,CASE WHEN rd.cycle_reset OR rd.reward_id=base_id THEN 'base' ELSE 'top' END,rd.occurred_at,
         rd.reward_id,COALESCE(rd.reward_name,base_name),base_desc,base_n,rd.reward_id,COALESCE(rd.reward_name,top_name),top_desc,threshold) RETURNING id INTO unit;
-      INSERT INTO merchant.loyalty_reward_redemption_link(merchant_id,redemption_id,entitlement_id) VALUES(p_merchant,rd.id,unit);
+      INSERT INTO merchant.loyalty_reward_redemption_link(merchant_id,redemption_id,entitlement_id,claimed_tier) VALUES(p_merchant,rd.id,unit,CASE WHEN rd.cycle_reset OR rd.reward_id=base_id THEN 'base' ELSE 'top' END);
     END LOOP;
     IF pos>=base_n THEN
       INSERT INTO merchant.loyalty_reward_entitlement(merchant_id,card_id,source,cycle_anchor,eligible_at,activated_at,expires_at,tier,
@@ -171,7 +214,7 @@ LANGUAGE sql STABLE SET search_path=pg_catalog,merchant AS $$
  card AS (SELECT c.*,COALESCE((SELECT sum(stamps) FROM merchant.loyalty_visit v WHERE v.merchant_id=p_merchant AND v.card_id=p_card),0)::int total FROM merchant.loyalty_card c WHERE c.merchant_id=p_merchant AND c.id=p_card),
  ladder AS (SELECT COALESCE((SELECT stamps_required FROM merchant.loyalty_reward WHERE merchant_id=p_merchant AND active AND kind='upgrade' AND type='stamps_free_item' ORDER BY created_at DESC LIMIT 1),0) up,
  COALESCE((SELECT stamps_required FROM merchant.loyalty_reward WHERE merchant_id=p_merchant AND active AND kind='standard' AND type='stamps_free_item' ORDER BY created_at DESC LIMIT 1),10) base),
- units AS (SELECT e.*,CASE WHEN e.tier='base' THEN e.base_reward_name ELSE e.top_reward_name END display_name FROM merchant.loyalty_reward_entitlement e WHERE e.merchant_id=p_merchant AND e.card_id=p_card AND e.redeemed_at IS NULL AND e.expired_at IS NULL AND e.expires_at>statement_timestamp()),
+ units AS (SELECT e.*,CASE WHEN (CASE WHEN e.recovery THEN COALESCE(e.recovery_tier,e.tier) ELSE e.tier END)='base' THEN e.base_reward_name ELSE e.top_reward_name END display_name FROM merchant.loyalty_reward_entitlement e WHERE e.merchant_id=p_merchant AND e.card_id=p_card AND e.redeemed_at IS NULL AND e.expired_at IS NULL AND e.expires_at>statement_timestamp()),
  active_cycle AS (SELECT e.* FROM units e,card c WHERE e.source='cycle' AND NOT e.recovery AND e.cycle_anchor=c.cycle_anchor LIMIT 1),
  grouped AS (SELECT display_name,expires_at,count(*)::int qty FROM units GROUP BY display_name,expires_at)
  SELECT CASE WHEN p.mode='single_cycle' THEN CASE WHEN EXISTS(SELECT 1 FROM merchant.loyalty_reward_entitlement e WHERE e.merchant_id=p_merchant AND e.card_id=p_card AND e.source='cycle' AND NOT e.recovery AND e.cycle_anchor=c.cycle_anchor AND e.redeemed_at IS NULL AND e.expires_at<=statement_timestamp()) THEN 0 ELSE GREATEST(0,c.total-c.cycle_anchor) END ELSE (c.total-c.cycle_anchor)%GREATEST(l.base,l.up) END::int,

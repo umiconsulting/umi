@@ -356,7 +356,7 @@ export class CustomersRepository {
                AND h.redeemed_at IS NULL AND h.expired_at IS NULL AND h.expires_at>statement_timestamp()
                AND h.expires_at <= (SELECT min(e.expires_at) FROM merchant.loyalty_reward_entitlement e
                  WHERE e.merchant_id=lc.merchant_id AND e.card_id=lc.id AND e.source='cycle' AND NOT e.recovery
-                   AND e.cycle_anchor=lc.cycle_anchor AND e.tier='base' AND e.redeemed_at IS NULL
+                   AND e.cycle_anchor=lc.cycle_anchor AND e.tier IN ('base','top') AND e.redeemed_at IS NULL
                    AND e.expired_at IS NULL AND e.expires_at>statement_timestamp())) AS base_reward_blocked_by_history,
            lc.created_at,
            lc.updated_at

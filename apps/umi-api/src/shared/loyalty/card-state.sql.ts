@@ -79,7 +79,7 @@ export const BASE_REWARD_BLOCKED_BY_HISTORY_SQL = `
       AND h.redeemed_at IS NULL AND h.expired_at IS NULL AND h.expires_at>statement_timestamp()
       AND h.expires_at <= (SELECT min(e.expires_at) FROM merchant.loyalty_reward_entitlement e
         WHERE e.merchant_id=c.merchant_id AND e.card_id=c.id AND e.source='cycle' AND NOT e.recovery
-          AND e.cycle_anchor=c.cycle_anchor AND e.tier='base' AND e.redeemed_at IS NULL
+          AND e.cycle_anchor=c.cycle_anchor AND e.tier IN ('base','top') AND e.redeemed_at IS NULL
           AND e.expired_at IS NULL AND e.expires_at>statement_timestamp()))`;
 
 export const LOYALTY_CARD_STATE_SQL = `
