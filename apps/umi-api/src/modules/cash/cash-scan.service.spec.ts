@@ -16,6 +16,18 @@ function make() {
     findPersonCard: vi.fn().mockResolvedValue(null),
   };
   const repo = {
+    findScanTarget: vi.fn(async (_client, _merchant, identifier) =>
+      cards.findCard(_merchant, identifier),
+    ),
+    withLockedCard: vi.fn(async (_merchant, _card, work) => {
+      const card = await cards.findCard();
+      if (!card) throw new NotFoundException();
+      return work({}, card);
+    }),
+    authenticatedStaff: vi.fn(async () => {
+      const id = await cards.getStaffMemberId();
+      return id ? { id, name: 'Barista' } : null;
+    }),
     merchantConfig: vi.fn().mockResolvedValue({
       name: 'Kala',
       timezone: 'America/Mexico_City',
@@ -66,14 +78,21 @@ function make() {
   };
   const walletPass = { refreshCard: vi.fn().mockResolvedValue(undefined) };
   const email = { send: vi.fn().mockResolvedValue(null) };
+  const integrity = {
+    execute: vi.fn(async (_input, operation) => ({
+      result: (await operation({ client: {}, commandId: 'command-1' })).value,
+      duplicate: false,
+    })),
+  };
   const svc = new CashScanService(
     qr as never,
     cards as never,
     repo as never,
     walletPass as never,
     email as never,
+    integrity as never,
   );
-  return { svc, qr, cards, repo, walletPass, email };
+  return { svc, qr, cards, repo, walletPass, email, integrity };
 }
 
 const CARD = {
@@ -558,20 +577,23 @@ describe('CashScanService.seals', () => {
   it('credits one interaction worth N stamps, attributed to the staff member', async () => {
     await h.svc.seals('t1', 'u1', { cardId: 'card-uuid', seals: 8, idempotencyKey: 'key-1' });
 
-    expect(h.repo.creditSeals).toHaveBeenCalledWith({
-      merchantId: 't1',
-      cardId: 'card-uuid',
-      staffMemberId: 'staff-1',
-      seals: 8,
-      note: null,
-      idempotencyKey: 'key-1',
-      // The moment the credit leaves on the card, rendered by the service. It is what
-      // the pass shows AND what makes Apple fetch at all — a credit that writes no
-      // message and touches no row leaves the phone asking "anything new?" forever.
-      // She was at 3 of 10 and the credit is 8: the crossing is the headline, so the
-      // moment is `reward_earned` rather than a bare "stamps added".
-      momentMessage: expect.stringContaining('Ganaste Café'),
-    });
+    expect(h.repo.creditSeals).toHaveBeenCalledWith(
+      {
+        merchantId: 't1',
+        cardId: 'card-uuid',
+        staffMemberId: 'staff-1',
+        seals: 8,
+        note: null,
+        idempotencyKey: 'key-1',
+        // The moment the credit leaves on the card, rendered by the service. It is what
+        // the pass shows AND what makes Apple fetch at all — a credit that writes no
+        // message and touches no row leaves the phone asking "anything new?" forever.
+        // She was at 3 of 10 and the credit is 8: the crossing is the headline, so the
+        // moment is `reward_earned` rather than a bare "stamps added".
+        momentMessage: expect.stringContaining('Ganaste Café'),
+      },
+      {},
+    );
   });
 
   it('keeps a client-supplied note and stores none when there is none', async () => {
@@ -682,5 +704,232 @@ describe('CashScanService.seals', () => {
 
     expect(r.success).toBe(true);
     expect(h.repo.creditSeals).toHaveBeenCalled();
+  });
+});
+
+describe('single cycle scan guards', () => {
+  it('refuses both stamp redemption actions for every merchant', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({ ...CARD, visits_this_cycle: 7, pending_rewards: 1 });
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    await expect(
+      h.svc.scan('t1', 'u1', { qrPayload: 'jwt', actions: ['REDEEM', 'REDEEM_BASE'] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses visit plus cycle redemption under the enabled policy', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 7,
+      pending_rewards: 1,
+    });
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    await expect(
+      h.svc.scan('t1', 'u1', { qrPayload: 'jwt', actions: ['VISIT', 'REDEEM_BASE'] }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('requires an external receipt for enabled stamp redemption', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 7,
+      pending_rewards: 1,
+    });
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    await expect(
+      h.svc.scan('t1', 'u1', {
+        qrPayload: 'jwt',
+        action: 'REDEEM_BASE',
+        idempotencyKey: 'receipt-test-key',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses an upper reward at seven visits without legacy units', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      legacy_pending_rewards: 0,
+      cycle_reward_available: true,
+      visits_this_cycle: 7,
+      pending_rewards: 1,
+    });
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    await expect(
+      h.svc.scan('t1', 'u1', {
+        qrPayload: 'jwt',
+        action: 'REDEEM',
+        externalReceiptNumber: 'R-1',
+        idempotencyKey: 'upper-test-key',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('scan transaction guards', () => {
+  it('checks visit capacity using the card under its row lock', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 8,
+    });
+    h.repo.withLockedCard.mockImplementation(async (_m, _c, work) =>
+      work(
+        {},
+        {
+          ...CARD,
+          reward_policy: 'single_cycle',
+          visits_this_cycle: 9,
+          visit_blocked_reason: 'REDEMPTION_REQUIRED',
+        },
+      ),
+    );
+    await expect(
+      h.svc.scan('t1', 'u1', { qrPayload: 'jwt', action: 'VISIT' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('single cycle credit guards', () => {
+  it('refuses excess stamps without a partial credit', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 8,
+    });
+    await expect(h.svc.seals('t1', 'u1', { cardId: CARD.id, seals: 2 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+  it('refuses credits while legacy rewards block visits', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 3,
+      visit_blocked_reason: 'REDEMPTION_REQUIRED',
+    });
+    await expect(h.svc.seals('t1', 'u1', { cardId: CARD.id, seals: 1 })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+});
+
+describe('redemption reversal replay', () => {
+  it('returns the unchanged result for a repeated reversal', async () => {
+    const h = make();
+    Object.assign(h.repo, {
+      findRedemption: vi.fn().mockResolvedValue({
+        id: 'redemption',
+        cardId: CARD.id,
+        rewardId: 'rc1',
+        revertedAt: new Date(),
+        cycleReset: false,
+      }),
+      revertRedemption: vi
+        .fn()
+        .mockResolvedValue({ alreadyReverted: true, card: { ...CARD, pending_rewards: 1 } }),
+    });
+    await expect(h.svc.revertRedemption('t1', 'u1', 'redemption')).resolves.toMatchObject({
+      success: true,
+      pendingRewards: 1,
+    });
+  });
+});
+
+describe('committed command replay', () => {
+  it('returns a committed response without resolving an expired QR', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue(null);
+    h.qr.verifyQRPayload.mockResolvedValue(null);
+    h.integrity.execute.mockResolvedValue({
+      duplicate: true,
+      result: {
+        success: true,
+        actions: ['REDEEM_BASE'],
+        message: 'Committed',
+        rewardEarned: false,
+        afterHours: false,
+        customer: { name: 'Ana', displayIdentifier: 'KAL-1' },
+        card: { visitsThisCycle: 0, visitsRequired: 9, pendingRewards: 0, balanceMXN: '$0.00' },
+        birthdayReward: null,
+        redemption: {
+          operationId: 'op',
+          quantity: 1,
+          remainingRewards: 0,
+          externalReceiptNumber: 'R-1',
+          operator: { id: 'staff-1', name: 'Barista' },
+          redeemedAt: '2026-10-07T12:00:00.000Z',
+          replayed: false,
+          items: [{ rewardName: 'Base', quantity: 1 }],
+        },
+        targetId: CARD.id,
+        recipientEmail: null,
+      },
+    });
+    const r = await h.svc.scan('t1', 'u1', {
+      qrPayload: 'expired',
+      action: 'REDEEM_BASE',
+      idempotencyKey: 'committed-key',
+      externalReceiptNumber: 'R-1',
+    });
+    expect(r.customer.cardNumber).toBe('KAL-1');
+    expect(r.redemption?.replayed).toBe(true);
+    expect(h.walletPass.refreshCard).not.toHaveBeenCalled();
+  });
+});
+
+describe('single cycle quantities', () => {
+  it('refuses multiple units when only the current cycle is available', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 9,
+      pending_rewards: 1,
+      legacy_pending_rewards: 0,
+      cycle_reward_available: true,
+    });
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    await expect(
+      h.svc.scan('t1', 'u1', {
+        qrPayload: 'jwt',
+        action: 'REDEEM',
+        redeemQuantity: 2,
+        externalReceiptNumber: 'QTY',
+        idempotencyKey: 'quantity-command',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('historical reward order', () => {
+  it('requires an earlier historical unit before the current base cycle', async () => {
+    const h = make();
+    h.cards.findCard.mockResolvedValue({
+      ...CARD,
+      reward_policy: 'single_cycle',
+      visits_this_cycle: 7,
+      pending_rewards: 2,
+      legacy_pending_rewards: 1,
+      cycle_reward_available: true,
+      base_reward_blocked_by_history: true,
+    });
+    h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+    await expect(
+      h.svc.scan('t1', 'u1', {
+        qrPayload: 'jwt',
+        action: 'REDEEM_BASE',
+        externalReceiptNumber: 'ORDER',
+        idempotencyKey: 'order-command',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

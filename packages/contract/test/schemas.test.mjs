@@ -305,3 +305,16 @@ test('VerifyMfaRequest takes exactly six digits', () => {
 test('VerifyMfaRequest needs a challenge token', () => {
   assert.equal(VerifyMfaRequest.safeParse({ challengeToken: '', code: '123456' }).success, false);
 });
+
+test('scan redemption request keeps receipt, quantity and durable key', () => {
+  const input = {
+    qrPayload: 'fixture',
+    action: 'REDEEM_BASE',
+    redeemQuantity: 1,
+    externalReceiptNumber: 'FIXTURE-1',
+    idempotencyKey: 'fixture-command-key',
+  };
+  assert.deepEqual(ScanRequest.parse(input), input);
+  assert.equal(ScanRequest.safeParse({ ...input, redeemQuantity: 0 }).success, false);
+  assert.equal(ScanRequest.safeParse({ ...input, redeemQuantity: 1.5 }).success, false);
+});

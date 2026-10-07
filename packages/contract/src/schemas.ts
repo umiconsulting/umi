@@ -230,8 +230,57 @@ export const ScanRequest = z.object({
   qrPayload: z.string(),
   action: z.enum(CASH_SCAN_ACTIONS).optional(),
   actions: z.array(z.enum(CASH_SCAN_ACTIONS)).min(1).max(3).optional(),
+  redeemQuantity: z.number().int().min(1).max(50).optional(),
+  externalReceiptNumber: z.string().min(1).max(200).optional(),
+  idempotencyKey: z.string().min(8).max(200).optional(),
 });
 export type ScanRequest = z.infer<typeof ScanRequest>;
+
+export const LoyaltyRewardPolicyFields = z.object({
+  rewardPolicy: z.enum(['accumulate', 'single_cycle']),
+  rewardExpiryDays: z.number().int().positive().nullable(),
+  nextRewardExpiresAt: z.string().datetime({ offset: true }).nullable(),
+  legacyPendingRewards: z.number().int().nonnegative(),
+  cycleRewardAvailable: z.boolean(),
+  visitBlockedReason: z.literal('REDEMPTION_REQUIRED').nullable(),
+  merchantTimezone: z.string(),
+  availableRewards: z.array(
+    z.object({
+      rewardName: z.string(),
+      quantity: z.number().int().positive(),
+      expiresAt: z.string().datetime({ offset: true }),
+    }),
+  ),
+});
+export type LoyaltyRewardPolicyFields = z.infer<typeof LoyaltyRewardPolicyFields>;
+export const ScanRedemptionConfirmation = z.object({
+  operationId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  remainingRewards: z.number().int().nonnegative(),
+  externalReceiptNumber: z.string().nullable(),
+  operator: z.object({ id: z.string().uuid(), name: z.string() }),
+  redeemedAt: z.string().datetime({ offset: true }),
+  replayed: z.boolean(),
+  items: z.array(z.object({ rewardName: z.string(), quantity: z.number().int().positive() })),
+});
+export type ScanRedemptionConfirmation = z.infer<typeof ScanRedemptionConfirmation>;
+export const ScanResponse = z.object({
+  success: z.literal(true),
+  actions: z.array(z.enum(CASH_SCAN_ACTIONS)),
+  message: z.string(),
+  rewardEarned: z.boolean(),
+  afterHours: z.boolean(),
+  customer: z.object({ name: z.string().nullable(), cardNumber: z.string() }),
+  card: LoyaltyRewardPolicyFields.extend({
+    visitsThisCycle: z.number().int().nonnegative(),
+    visitsRequired: z.number().int().positive(),
+    pendingRewards: z.number().int().nonnegative(),
+    balanceMXN: z.string(),
+  }),
+  birthdayReward: z.object({ id: z.string().uuid(), rewardName: z.string().nullable() }).nullable(),
+  redemption: ScanRedemptionConfirmation.optional(),
+});
+export type ScanResponse = z.infer<typeof ScanResponse>;
 
 /** POST /api/:merchantRef/admin/scan/seals — mirrors ScanSealsDto. A manual bulk
  *  stamp credit (catch-up for a customer migrated from another loyalty program).
@@ -357,6 +406,9 @@ export const httpModels = {
   CreateStaffRequest,
   UpdateStaffRequest,
   ScanRequest,
+  ScanResponse,
+  LoyaltyRewardPolicyFields,
+  ScanRedemptionConfirmation,
   ScanSealsRequest,
   TopupRequest,
   PurchaseRequest,

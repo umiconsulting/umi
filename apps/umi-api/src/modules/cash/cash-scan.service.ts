@@ -1,3 +1,6 @@
+import type { PoolClient } from 'pg';
+import { randomUUID } from 'node:crypto';
+import { IntegrityService } from '../integrity/integrity.service';
 import {
   BadRequestException,
   ConflictException,
@@ -12,8 +15,16 @@ import { QrService } from '../../shared/auth/qr.service';
 import { WalletPassAdapter } from '../../shared/adapters/wallet-pass.adapter';
 import { EmailAdapter } from '../../shared/adapters/email.adapter';
 import { CashWriteRepository } from './cash-write.repository';
-import { CashScanRepository, type ScannedCard } from './cash-scan.repository';
+import {
+  CashScanRepository,
+  type ScannedCard,
+  type LockedScannedCard,
+} from './cash-scan.repository';
 import { resolveJourneyTemplate, renderTemplate } from './lifecycle-copy';
+import {
+  cardPolicyFields,
+  rewardProfileWithSnapshot,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
 import {
   bankedReward,
@@ -61,12 +72,15 @@ export interface ScanInput {
   qrPayload: string;
   action?: string;
   actions?: string[];
+  redeemQuantity?: number;
+  externalReceiptNumber?: string;
+  idempotencyKey?: string;
 }
 
 /**
  * Loyalty scan — visit / reward redeem / birthday redeem. Ported faithfully from
- * umi-cash scan/route.ts: fixed BIRTHDAY→REDEEM→VISIT order, all guards before
- * the transaction, reward-cycle math, lock-screen moment message, and QR-token
+ * umi-cash scan/route.ts: fixed BIRTHDAY→REDEEM→VISIT order, all guards under
+ * the card lock, reward-cycle math, lock-screen moment message, and QR-token
  * rotation. Touches loyalty STATE only — never money.
  */
 @Injectable()
@@ -77,12 +91,128 @@ export class CashScanService {
     private readonly repo: CashScanRepository,
     private readonly walletPass: WalletPassAdapter,
     private readonly email: EmailAdapter,
+    private readonly integrity: IntegrityService,
   ) {}
 
   async scan(merchantId: string, userId: string, input: ScanInput) {
+    let targetId = '';
+    let recipientEmail: string | null = null;
+    const execute = async (client?: PoolClient, commandId?: string) => {
+      const target = await this.resolveScanTarget(merchantId, input.qrPayload, true, client);
+      targetId = target.card.id;
+      recipientEmail = target.card.normalized_email;
+      const userPersonId = client ? userId : await this.cards.getUserPersonId(userId);
+      return this.repo.withLockedCard(
+        merchantId,
+        targetId,
+        (c, card) =>
+          this.scanLocked(
+            merchantId,
+            userId,
+            input,
+            card,
+            target.qrData,
+            c,
+            userPersonId,
+            commandId,
+          ),
+        client,
+      );
+    };
+    let response: Awaited<ReturnType<CashScanService['scanLocked']>>;
+    let replayed = false;
+    if (input.idempotencyKey) {
+      const command = await this.integrity.execute(
+        {
+          merchantId,
+          locationId: null,
+          commandId: randomUUID(),
+          idempotencyKey: input.idempotencyKey,
+          commandType: 'cash.loyalty.scan',
+          payload: {
+            actorUserId: userId,
+            qrPayload: input.qrPayload,
+            actions: [...new Set(input.actions ?? (input.action ? [input.action] : []))].sort(),
+            redeemQuantity: input.redeemQuantity ?? 1,
+            externalReceiptNumber: input.externalReceiptNumber?.trim() ?? null,
+          },
+        },
+        async ({ client, commandId }) => {
+          const result = await execute(client, commandId);
+          // The command journal redacts cardNumber keys. Use the storage name for this public display field.
+          const { cardNumber, ...customer } = result.customer;
+          return {
+            ok: true,
+            value: {
+              ...result,
+              customer: { ...customer, displayIdentifier: cardNumber },
+              targetId,
+              recipientEmail,
+            },
+          };
+        },
+      );
+      if (!command.result)
+        throw new ConflictException(command.failureCode ?? 'scan_command_failed');
+      const {
+        targetId: storedTarget,
+        recipientEmail: storedEmail,
+        customer: storedCustomer,
+        ...storedResponse
+      } = command.result;
+      const { displayIdentifier, ...customer } = storedCustomer;
+      targetId = storedTarget;
+      recipientEmail = storedEmail;
+      response = { ...storedResponse, customer: { ...customer, cardNumber: displayIdentifier } };
+      replayed = command.duplicate;
+      if (response.redemption) response.redemption = { ...response.redemption, replayed };
+    } else {
+      response = await execute();
+    }
+    if (!replayed) {
+      void this.walletPass.refreshCard(targetId);
+      if (response.rewardEarned && recipientEmail) {
+        const cfg = await this.repo.merchantConfig(merchantId);
+        const profileRows = await this.repo.rewardProfileRows(merchantId, targetId);
+        const profile = resolveRewardProfile(
+          profileRows.defaultConfig,
+          profileRows.overrideConfig,
+          profileRows.upgradeConfig,
+        );
+        const earnedName = response.card.availableRewards[0]?.rewardName ?? profile.rewardName;
+        void this.email.send({
+          to: recipientEmail,
+          subject: `¡Ganaste ${earnedName}!`,
+          html: `<p>${response.customer.name ?? 'Cliente'}, ganaste <strong>${earnedName}</strong> en ${cfg?.name ?? ''}. Pasa a canjearla.</p>`,
+        });
+      }
+    }
+    return response;
+  }
+
+  private async scanLocked(
+    merchantId: string,
+    userId: string,
+    input: ScanInput,
+    card: LockedScannedCard,
+    qrData: Awaited<ReturnType<QrService['verifyQRPayload']>>,
+    client: PoolClient,
+    userPersonId: string | null,
+    commandId?: string,
+  ) {
     const requested = new Set<string>(input.actions ?? (input.action ? [input.action] : []));
     if (requested.size === 0) {
       throw new BadRequestException('action or actions required');
+    }
+    if ([...requested].some((action) => !ACTION_ORDER.includes(action as ScanAction)))
+      throw new BadRequestException('Unknown scan action');
+    if (
+      input.redeemQuantity !== undefined &&
+      (!Number.isInteger(input.redeemQuantity) ||
+        input.redeemQuantity < 1 ||
+        input.redeemQuantity > 50)
+    ) {
+      throw new BadRequestException('Invalid redemption quantity');
     }
     const actionList = ACTION_ORDER.filter((a) => requested.has(a));
     const includesVisit = actionList.includes(VISIT);
@@ -90,29 +220,67 @@ export class CashScanService {
     const includesRedeemBase = actionList.includes(REDEEM_BASE);
     const includesBirthday = actionList.includes(BIRTHDAY);
 
-    const { card, qrData } = await this.resolveScanTarget(merchantId, input.qrPayload);
+    if (includesRedeem && includesRedeemBase) {
+      throw new BadRequestException('Choose one stamp redemption action');
+    }
+    if (qrData && !qrData.isWalletScan && card.qr_token !== qrData.qrToken) {
+      throw new BadRequestException(
+        'Código QR ya fue usado. Pídele al cliente que actualice su código.',
+      );
+    }
+    const enabled = card.reward_policy === 'single_cycle';
+    if (enabled && includesVisit && (includesRedeem || includesRedeemBase)) {
+      throw new BadRequestException('Visit and stamp redemption must be separate');
+    }
+    if (enabled && (includesRedeem || includesRedeemBase)) {
+      if (!input.externalReceiptNumber?.trim() || !input.idempotencyKey?.trim()) {
+        throw new BadRequestException('Receipt number and idempotency key required');
+      }
+      if (includesRedeemBase && (input.redeemQuantity ?? 1) !== 1)
+        throw new BadRequestException('Cycle quantity must be one');
+      const quantity = input.redeemQuantity ?? 1;
+      if (includesRedeem && quantity > 1 && quantity > (card.legacy_pending_rewards ?? 0)) {
+        throw new BadRequestException('Quantity exceeds the legacy reward balance');
+      }
+      if (
+        includesRedeem &&
+        card.visits_this_cycle < 9 &&
+        quantity > (card.legacy_pending_rewards ?? 0)
+      ) {
+        throw new BadRequestException('Quantity exceeds the legacy reward balance');
+      }
+      if (includesRedeem && card.visits_this_cycle < 9 && !card.legacy_pending_rewards) {
+        throw new BadRequestException('Upper reward requires nine visits');
+      }
+    }
 
+    if (enabled && includesVisit && (card.visit_blocked_reason || card.visits_this_cycle >= 9)) {
+      throw new BadRequestException('Redeem the available reward before another visit');
+    }
     // Wallet replay: block a 2nd visit within 60s of a static-barcode scan.
     if (qrData?.isWalletScan && includesVisit) {
-      if (await this.repo.recentVisitWithin(merchantId, card.id, 60)) {
+      if (await this.repo.recentVisitWithin(merchantId, card.id, 60, client)) {
         tooMany('Visita ya registrada recientemente. Espera un momento.');
       }
     }
 
-    const [staffMemberId, userPersonId, cfg] = await Promise.all([
-      this.cards.getStaffMemberId(merchantId, userId),
-      this.cards.getUserPersonId(userId),
-      this.repo.merchantConfig(merchantId),
+    const [staff, cfg] = await Promise.all([
+      this.repo.authenticatedStaff(client, merchantId, userId),
+      this.repo.merchantConfig(merchantId, client),
     ]);
+    const staffMemberId = staff?.id ?? null;
+    if (enabled && (includesRedeem || includesRedeemBase) && !staffMemberId) {
+      throw new ForbiddenException('Tu usuario no está registrado como personal');
+    }
     if (userPersonId && userPersonId === card.person_id) {
       throw new ForbiddenException({ error: 'No puedes escanear tu propia tarjeta' });
     }
 
     const tz = cfg?.timezone || DEFAULT_TZ;
-    const afterHours = includesVisit && (await this.repo.isAfterHours(merchantId, tz));
+    const afterHours = includesVisit && (await this.repo.isAfterHours(merchantId, tz, client));
 
     if (includesVisit) {
-      if (await this.repo.visitedToday(merchantId, card.id, tz)) {
+      if (await this.repo.visitedToday(merchantId, card.id, tz, client)) {
         tooMany('Ya se registró una visita hoy');
       }
     }
@@ -121,16 +289,19 @@ export class CashScanService {
     // plus any per-card override. `visitsRequired` is the tier the CYCLE runs to,
     // so a café on a 7/9 ladder counts to 9 and offers the 7-tier as an early
     // cash-out, exactly as umi-cash did.
-    const profileRows = await this.repo.rewardProfileRows(merchantId, card.id);
-    const profile = resolveRewardProfile(
-      profileRows.defaultConfig,
-      profileRows.overrideConfig,
-      profileRows.upgradeConfig,
+    const profileRows = await this.repo.rewardProfileRows(merchantId, card.id, client);
+    const profile = rewardProfileWithSnapshot(
+      resolveRewardProfile(
+        profileRows.defaultConfig,
+        profileRows.overrideConfig,
+        profileRows.upgradeConfig,
+      ),
+      card,
     );
     const visitsRequired = profile.visitsRequired;
     const rewardName = profile.rewardName;
 
-    const activeBirthday = await this.repo.activeBirthdayReward(merchantId, card.id);
+    const activeBirthday = await this.repo.activeBirthdayReward(merchantId, card.id, client);
     if (includesBirthday && !activeBirthday) {
       throw new BadRequestException({ error: 'No hay regalo de cumpleaños activo' });
     }
@@ -142,10 +313,10 @@ export class CashScanService {
       // Which tier this redemption hands over. A banked reward is the top tier —
       // unless the card still carries pre-ladder tags, in which case the older
       // rewards were earned under the single threshold and are the LOWER tier.
-      if (!bankedReward(profile, card.pending_tier1).configId) {
+      if (!enabled && !bankedReward(profile, card.pending_tier1).configId) {
         throw new BadRequestException({ error: 'No hay configuración de recompensa activa' });
       }
-      if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30)) {
+      if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30, client)) {
         tooMany('Recompensa ya canjeada. Espera un momento si deseas canjear otra.');
       }
     }
@@ -156,16 +327,21 @@ export class CashScanService {
     // card is torn off, which is what makes this a different write from a banked
     // canje. Refused before that threshold, exactly as umi-cash refused it.
     if (includesRedeemBase) {
+      if (enabled && card.base_reward_blocked_by_history)
+        throw new BadRequestException('Redeem historical rewards first');
       const base = profile.baseTier;
-      if (!base?.configId) {
+      if (!base || (!enabled && !base.configId)) {
         throw new BadRequestException({ error: 'Este café no tiene un segundo nivel activo' });
       }
-      if (!isBaseReady(profile, card.visits_this_cycle)) {
+      if (
+        !isBaseReady(profile, card.visits_this_cycle) ||
+        (enabled && (!card.cycle_reward_available || card.visits_this_cycle >= 9))
+      ) {
         throw new BadRequestException({
           error: `Aún no llega a ${base.visitsRequired} visitas para ${base.rewardName}`,
         });
       }
-      if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30)) {
+      if (await this.repo.recentRedemptionWithin(merchantId, card.id, 30, client)) {
         tooMany('Recompensa ya canjeada. Espera un momento si deseas canjear otra.');
       }
     }
@@ -232,45 +408,63 @@ export class CashScanService {
         })
       : null;
 
-    const updated = await this.repo.performScan({
-      merchantId,
-      cardId: card.id,
-      staffMemberId,
-      doBirthday: includesBirthday && !!activeBirthday,
-      birthdayRewardId: activeBirthday?.id ?? null,
-      doRedeem: includesRedeem || includesRedeemBase,
-      // A banked canje hands over the tier it is owed; an early cash-out always hands
-      // over the LOWER one, which is the whole point of the action.
-      rewardConfigId: banked?.configId ?? profile.baseTier?.configId ?? null,
-      decrementPendingTier1: !!banked?.isBase,
-      // Only one of the two canjes can be in one action list, and only the early one
-      // moves the cycle. `rewardConfigId` above carries the tier either way.
-      resetCycle: includesRedeemBase,
-      doVisit: includesVisit,
-      earnedReward,
-      newVisitsThisCycle,
-      momentMessage,
-      newQrToken: this.qr.generateRandomToken(),
-    });
+    const updated = await this.repo.performScan(
+      {
+        merchantId,
+        cardId: card.id,
+        staffMemberId,
+        doBirthday: includesBirthday && !!activeBirthday,
+        birthdayRewardId: activeBirthday?.id ?? null,
+        doRedeem: includesRedeem || includesRedeemBase,
+        // A banked canje hands over the tier it is owed; an early cash-out always hands
+        // over the LOWER one, which is the whole point of the action.
+        rewardConfigId: banked?.configId ?? profile.baseTier?.configId ?? null,
+        decrementPendingTier1: !!banked?.isBase,
+        // Only one of the two canjes can be in one action list, and only the early one
+        // moves the cycle. `rewardConfigId` above carries the tier either way.
+        resetCycle: includesRedeemBase,
+        doVisit: includesVisit,
+        earnedReward,
+        newVisitsThisCycle,
+        momentMessage,
+        newQrToken: this.qr.generateRandomToken(),
+        redeemQuantity: input.redeemQuantity ?? 1,
+        externalReceiptNumber: input.externalReceiptNumber?.trim(),
+        commandId,
+      },
+      client,
+    );
 
     const performed = actionList as readonly ScanAction[];
 
-    // Reward-earned email — fire-and-forget, never blocks/fails the scan.
-    if (earnedReward && card.normalized_email) {
-      void this.email.send({
-        to: card.normalized_email,
-        subject: `¡Ganaste ${rewardName}!`,
-        html: `<p>${customerName ?? 'Cliente'}, ganaste <strong>${rewardName}</strong> en ${cfg?.name ?? ''}. Pasa a canjearla.</p>`,
-      });
+    const committedRewardName = updated.redemptionResult
+      ? [...new Set(updated.redemptionResult.items.map((item) => item.rewardName))].join(' / ')
+      : rewardName;
+    if (updated.redemptionResult) {
+      const committedMoment: VisitMoment = {
+        journey: 'reward_redeemed',
+        rewardName: committedRewardName,
+        visitsRequired,
+        visitsThisCycle: updated.visits_this_cycle,
+      };
+      await this.repo.writeLifecycleMessage(
+        client,
+        merchantId,
+        card.id,
+        renderTemplate(resolveJourneyTemplate(cfg?.lifecycleCopy, committedMoment.journey), {
+          ...momentVars(profile, committedMoment, {
+            name: customerName || DEFAULT_CUSTOMER_NAME,
+            tenant: cfg?.name ?? '',
+          }),
+        }),
+      );
     }
-    void this.walletPass.refreshCard(card.id);
-
     const message = this.composeMessage(
       performed,
       updated,
       visitsRequired,
-      rewardName,
-      profile.baseTier?.rewardName ?? null,
+      committedRewardName,
+      updated.redemptionResult ? committedRewardName : (profile.baseTier?.rewardName ?? null),
       cfg?.birthdayRewardName ?? null,
       customerName,
       earnedReward,
@@ -280,7 +474,7 @@ export class CashScanService {
       success: true,
       actions: performed,
       message,
-      rewardEarned: earnedReward,
+      rewardEarned: enabled ? updated.pending_rewards > card.pending_rewards : earnedReward,
       afterHours,
       customer: { name: customerName, cardNumber: updated.card_number },
       card: {
@@ -288,7 +482,37 @@ export class CashScanService {
         visitsRequired,
         pendingRewards: updated.pending_rewards,
         balanceMXN: formatMxn2(updated.balance_cents),
+        ...this.policyFields(updated),
       },
+      ...(updated.redemptionResult && staff
+        ? {
+            redemption: {
+              operationId: commandId ?? updated.redemptionResult.redemptionIds[0],
+              quantity: updated.redemptionResult.quantity,
+              remainingRewards: updated.pending_rewards,
+              externalReceiptNumber: input.externalReceiptNumber?.trim() ?? null,
+              operator: { id: staff.id, name: staff.name },
+              redeemedAt: updated.redemptionResult.redeemedAt,
+              replayed: false,
+              items: Object.values(
+                updated.redemptionResult.items.reduce<
+                  Record<string, { rewardName: string; quantity: number }>
+                >(
+                  (groups, item) => {
+                    const group = groups[item.rewardName] ?? {
+                      rewardName: item.rewardName,
+                      quantity: 0,
+                    };
+                    group.quantity++;
+                    groups[item.rewardName] = group;
+                    return groups;
+                  },
+                  Object.create(null) as Record<string, { rewardName: string; quantity: number }>,
+                ),
+              ),
+            },
+          }
+        : {}),
       birthdayReward:
         !includesBirthday && activeBirthday
           ? { id: activeBirthday.id, rewardName: cfg?.birthdayRewardName ?? null }
@@ -306,14 +530,29 @@ export class CashScanService {
    * carries no token, like a wallet barcode, so `qrData` is null and the
    * freshness rule does not apply to it.
    */
-  private async resolveScanTarget(merchantId: string, qrPayload: string) {
+  private async resolveScanTarget(
+    merchantId: string,
+    qrPayload: string,
+    deferFreshness = false,
+    client?: PoolClient,
+  ) {
     const qrData = await this.qr.verifyQRPayload(qrPayload);
+    if (client) {
+      const card = await this.repo.findScanTarget(
+        client,
+        merchantId,
+        qrData?.cardId ?? qrPayload.trim(),
+        !qrData,
+      );
+      if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+      return { card, qrData };
+    }
 
     if (qrData) {
       const card = await this.cards.findCard(merchantId, qrData.cardId);
       if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
       // Single-use rotating-token check for in-app QR (wallet barcodes skip it).
-      if (!qrData.isWalletScan && card.qr_token !== qrData.qrToken) {
+      if (!deferFreshness && !qrData.isWalletScan && card.qr_token !== qrData.qrToken) {
         throw new BadRequestException({
           error: 'Código QR ya fue usado. Pídele al cliente que actualice su código.',
         });
@@ -352,9 +591,6 @@ export class CashScanService {
   async revertRedemption(merchantId: string, userId: string, redemptionId: string) {
     const redemption = await this.repo.findRedemption(merchantId, redemptionId);
     if (!redemption) throw new NotFoundException({ error: 'Canje no encontrado' });
-    if (redemption.revertedAt) {
-      throw new ConflictException({ error: 'Este canje ya fue revertido' });
-    }
 
     // Fail closed on attribution: a reversal is value-bearing, so it must name a
     // real staff member — the same stance as the top-up and bulk-seal paths.
@@ -370,12 +606,16 @@ export class CashScanService {
       profileRows.upgradeConfig,
     );
     const revertsBaseTier =
-      !!profile.baseTier?.configId && redemption.rewardId === profile.baseTier.configId;
-    const rewardName = revertsBaseTier ? profile.baseTier!.rewardName : profile.rewardName;
+      redemption.isBase ??
+      (!!profile.baseTier?.configId && redemption.rewardId === profile.baseTier.configId);
+    const rewardName =
+      redemption.rewardName ??
+      (revertsBaseTier ? profile.baseTier!.rewardName : profile.rewardName);
 
     const { alreadyReverted, card } = await this.repo.revertRedemption({
       merchantId,
       redemptionId,
+      userId,
       cardId: redemption.cardId,
       staffMemberId,
       restoreBaseTier: revertsBaseTier,
@@ -384,12 +624,12 @@ export class CashScanService {
       restoreEarnedReward: redemption.cycleReset,
       message: `Te devolvimos tu ${rewardName} — está lista para canjear de nuevo 🎁`,
     });
-    if (alreadyReverted || !card) {
+    if (!card) {
       throw new ConflictException({ error: 'Este canje ya fue revertido' });
     }
 
     // The reversal is committed; the wallet refresh must not delay the response.
-    void this.walletPass.refreshCard(redemption.cardId);
+    if (!alreadyReverted) void this.walletPass.refreshCard(redemption.cardId);
 
     return {
       success: true,
@@ -415,10 +655,13 @@ export class CashScanService {
       this.repo.rewardProfileRows(merchantId, card.id),
       this.cards.getUserPersonId(userId),
     ]);
-    const profile = resolveRewardProfile(
-      profileRows.defaultConfig,
-      profileRows.overrideConfig,
-      profileRows.upgradeConfig,
+    const profile = rewardProfileWithSnapshot(
+      resolveRewardProfile(
+        profileRows.defaultConfig,
+        profileRows.overrideConfig,
+        profileRows.upgradeConfig,
+      ),
+      card,
     );
 
     // Same refusal as the scan itself. Preview leads straight to the commit
@@ -437,7 +680,7 @@ export class CashScanService {
     return {
       cardId: card.id,
       cardNumber: card.card_number,
-      customer: { name: card.display_name ?? null },
+      customer: { id: card.person_id, name: card.display_name ?? null },
       card: {
         visitsThisCycle: card.visits_this_cycle,
         pendingRewards: card.pending_rewards,
@@ -449,8 +692,13 @@ export class CashScanService {
         ...cardRewardFields(profile, {
           visitsThisCycle: card.visits_this_cycle,
           pendingTier1: card.pending_tier1,
+          rewardPolicy: card.reward_policy,
+          cycleRewardAvailable: card.cycle_reward_available,
+          availableRewards: card.available_rewards,
+          baseRewardBlockedByHistory: card.base_reward_blocked_by_history,
         }),
-        visitLimitReached: lastVisitAt !== null,
+        ...cardPolicyFields(card),
+        visitLimitReached: lastVisitAt !== null || !!card.visit_blocked_reason,
         lastVisitAt: iso(lastVisitAt),
       },
       birthdayReward: activeBirthday
@@ -477,19 +725,57 @@ export class CashScanService {
    * already bought elsewhere, and it is the whole point that it lands today.
    */
   async seals(merchantId: string, userId: string, input: SealsInput) {
-    const cfg = await this.repo.merchantConfig(merchantId);
+    const userPersonId = await this.cards.getUserPersonId(userId);
+    const execute = (client?: PoolClient) =>
+      this.repo.withLockedCard(
+        merchantId,
+        input.cardId,
+        (c, card) => this.sealsLocked(merchantId, userId, input, card, c, userPersonId),
+        client,
+      );
+    if (input.idempotencyKey) {
+      const command = await this.integrity.execute(
+        {
+          merchantId,
+          locationId: null,
+          commandId: randomUUID(),
+          idempotencyKey: input.idempotencyKey,
+          commandType: 'cash.loyalty.credit',
+          payload: {
+            actorUserId: userId,
+            cardId: input.cardId,
+            seals: input.seals,
+            note: input.note ?? null,
+          },
+        },
+        async ({ client }) => ({ ok: true, value: await execute(client) }),
+      );
+      if (!command.result)
+        throw new ConflictException(command.failureCode ?? 'credit_command_failed');
+      if (!command.duplicate) void this.walletPass.refreshCard(input.cardId);
+      return command.result;
+    }
+    const result = await execute();
+    void this.walletPass.refreshCard(input.cardId);
+    return result;
+  }
+
+  private async sealsLocked(
+    merchantId: string,
+    userId: string,
+    input: SealsInput,
+    card: LockedScannedCard,
+    client: PoolClient,
+    userPersonId: string | null,
+  ) {
+    const cfg = await this.repo.merchantConfig(merchantId, client);
     // Defence in depth — the register already hides the control when it is off.
     if (!cfg?.multiSealEnabled) {
       throw new ForbiddenException({ error: 'Función no habilitada' });
     }
 
-    const card = await this.cards.findCard(merchantId, input.cardId);
-    if (!card) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
-
-    const [staffMemberId, userPersonId] = await Promise.all([
-      this.cards.getStaffMemberId(merchantId, userId),
-      this.cards.getUserPersonId(userId),
-    ]);
+    const staff = await this.repo.authenticatedStaff(client, merchantId, userId);
+    const staffMemberId = staff?.id ?? null;
     // Fail closed on attribution: a bulk credit is the most abusable write in the
     // register, so it must name the staff member who made it.
     if (!staffMemberId) {
@@ -501,17 +787,26 @@ export class CashScanService {
       throw new ForbiddenException({ error: 'No puedes escanear tu propia tarjeta' });
     }
 
+    const enabled = card.reward_policy === 'single_cycle';
+    if (enabled && (card.visit_blocked_reason || card.visits_this_cycle + input.seals > 9)) {
+      throw new BadRequestException('Credit exceeds the remaining cycle capacity');
+    }
     // The moment the credit leaves on the card — the legacy seals route wrote one, and
     // it is the pass's only notification channel. Without it the customer's lock screen
     // keeps whatever the last scan said, and (worse) Apple has nothing to fetch.
-    const profileRows = await this.repo.rewardProfileRows(merchantId, card.id);
-    const profile = resolveRewardProfile(
-      profileRows.defaultConfig,
-      profileRows.overrideConfig,
-      profileRows.upgradeConfig,
+    const profileRows = await this.repo.rewardProfileRows(merchantId, card.id, client);
+    const profile = rewardProfileWithSnapshot(
+      resolveRewardProfile(
+        profileRows.defaultConfig,
+        profileRows.overrideConfig,
+        profileRows.upgradeConfig,
+      ),
+      card,
     );
     const required = profile.visitsRequired;
-    const newVisitsThisCycle = (card.visits_this_cycle + input.seals) % required;
+    const newVisitsThisCycle = enabled
+      ? card.visits_this_cycle + input.seals
+      : (card.visits_this_cycle + input.seals) % required;
     const moment = visitMoment(profile, {
       newVisitsThisCycle,
       earnedReward: card.visits_this_cycle + input.seals >= required,
@@ -525,17 +820,20 @@ export class CashScanService {
       }),
     );
 
-    const credited = await this.repo.creditSeals({
-      merchantId,
-      cardId: card.id,
-      staffMemberId,
-      seals: input.seals,
-      note: input.note ?? null,
-      // Kept NULL when the register sends none. Minting one here would look like
-      // idempotency and provide none — a fresh key can never match a retry.
-      idempotencyKey: input.idempotencyKey ?? null,
-      momentMessage,
-    });
+    const credited = await this.repo.creditSeals(
+      {
+        merchantId,
+        cardId: card.id,
+        staffMemberId,
+        seals: input.seals,
+        note: input.note ?? null,
+        // Kept NULL when the register sends none. Minting one here would look like
+        // idempotency and provide none — a fresh key can never match a retry.
+        idempotencyKey: input.idempotencyKey ?? null,
+        momentMessage,
+      },
+      client,
+    );
 
     // Rewards THIS action minted: how many thresholds the credit crossed from
     // where the cycle stood. No divide-by-zero guard, because there is nothing
@@ -544,9 +842,9 @@ export class CashScanService {
     const creditedRequired = credited.visitsRequired;
     const rewardsEarned = credited.replayed
       ? 0
-      : Math.floor((credited.cycleBefore + input.seals) / creditedRequired);
-
-    void this.walletPass.refreshCard(card.id);
+      : enabled
+        ? Number(credited.cycleBefore < 7 && credited.card.cycle_reward_available)
+        : Math.floor((credited.cycleBefore + input.seals) / creditedRequired);
 
     return {
       success: true,
@@ -558,8 +856,13 @@ export class CashScanService {
         visitsRequired: required,
         pendingRewards: credited.card.pending_rewards,
         balanceMXN: formatMxn2(credited.card.balance_cents),
+        ...cardPolicyFields(credited.card),
       },
     };
+  }
+
+  private policyFields(card: ScannedCard) {
+    return cardPolicyFields(card);
   }
 
   private composeSealsMessage(seals: number, rewardsEarned: number, replayed: boolean): string {

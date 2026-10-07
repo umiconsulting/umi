@@ -37,6 +37,24 @@ export class ScanDto {
   @ArrayMaxSize(3)
   @IsIn(ACTIONS, { each: true })
   actions?: ScanAction[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  redeemQuantity?: number;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  externalReceiptNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  idempotencyKey?: string;
 }
 
 /**

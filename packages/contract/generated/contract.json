@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "11de10f21fb3e10523ebcde6329d6e1ef2e010355a8aaf28b60494296f06e7ef",
-  "contractVersion": "2.23.0",
+  "contentHash": "4293bcb72e10e137ae88e79f6b1fbad922b9bb64db3a2dd5fb1391616d0afce7",
+  "contractVersion": "2.24.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -54267,6 +54267,97 @@
       ],
       "type": "object"
     },
+    "LoyaltyRewardPolicyFields": {
+      "additionalProperties": false,
+      "properties": {
+        "availableRewards": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "expiresAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "rewardName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "rewardName",
+              "quantity",
+              "expiresAt"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "cycleRewardAvailable": {
+          "type": "boolean"
+        },
+        "legacyPendingRewards": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "merchantTimezone": {
+          "type": "string"
+        },
+        "nextRewardExpiresAt": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rewardExpiryDays": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rewardPolicy": {
+          "enum": [
+            "accumulate",
+            "single_cycle"
+          ],
+          "type": "string"
+        },
+        "visitBlockedReason": {
+          "anyOf": [
+            {
+              "const": "REDEMPTION_REQUIRED",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "rewardPolicy",
+        "rewardExpiryDays",
+        "nextRewardExpiresAt",
+        "legacyPendingRewards",
+        "cycleRewardAvailable",
+        "visitBlockedReason",
+        "merchantTimezone",
+        "availableRewards"
+      ],
+      "type": "object"
+    },
     "ManagerApprovalRequest": {
       "additionalProperties": false,
       "properties": {
@@ -84477,6 +84568,84 @@
       ],
       "type": "object"
     },
+    "ScanRedemptionConfirmation": {
+      "additionalProperties": false,
+      "properties": {
+        "externalReceiptNumber": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "quantity": {
+                "exclusiveMinimum": 0,
+                "type": "integer"
+              },
+              "rewardName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "rewardName",
+              "quantity"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "operationId": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "operator": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "type": "object"
+        },
+        "quantity": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "redeemedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "remainingRewards": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "replayed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "operationId",
+        "quantity",
+        "remainingRewards",
+        "externalReceiptNumber",
+        "operator",
+        "redeemedAt",
+        "replayed",
+        "items"
+      ],
+      "type": "object"
+    },
     "ScanRequest": {
       "additionalProperties": false,
       "properties": {
@@ -84503,12 +84672,302 @@
           "minItems": 1,
           "type": "array"
         },
+        "externalReceiptNumber": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "maxLength": 200,
+          "minLength": 8,
+          "type": "string"
+        },
         "qrPayload": {
           "type": "string"
+        },
+        "redeemQuantity": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
         }
       },
       "required": [
         "qrPayload"
+      ],
+      "type": "object"
+    },
+    "ScanResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "enum": [
+              "VISIT",
+              "REDEEM",
+              "REDEEM_BASE",
+              "BIRTHDAY_REDEEM"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "afterHours": {
+          "type": "boolean"
+        },
+        "birthdayReward": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "rewardName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "rewardName"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "card": {
+          "additionalProperties": false,
+          "properties": {
+            "availableRewards": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "expiresAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "rewardName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "rewardName",
+                  "quantity",
+                  "expiresAt"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "balanceMXN": {
+              "type": "string"
+            },
+            "cycleRewardAvailable": {
+              "type": "boolean"
+            },
+            "legacyPendingRewards": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "merchantTimezone": {
+              "type": "string"
+            },
+            "nextRewardExpiresAt": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pendingRewards": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "rewardExpiryDays": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "rewardPolicy": {
+              "enum": [
+                "accumulate",
+                "single_cycle"
+              ],
+              "type": "string"
+            },
+            "visitBlockedReason": {
+              "anyOf": [
+                {
+                  "const": "REDEMPTION_REQUIRED",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "visitsRequired": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "visitsThisCycle": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "rewardPolicy",
+            "rewardExpiryDays",
+            "nextRewardExpiresAt",
+            "legacyPendingRewards",
+            "cycleRewardAvailable",
+            "visitBlockedReason",
+            "merchantTimezone",
+            "availableRewards",
+            "visitsThisCycle",
+            "visitsRequired",
+            "pendingRewards",
+            "balanceMXN"
+          ],
+          "type": "object"
+        },
+        "customer": {
+          "additionalProperties": false,
+          "properties": {
+            "cardNumber": {
+              "type": "string"
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "cardNumber"
+          ],
+          "type": "object"
+        },
+        "message": {
+          "type": "string"
+        },
+        "redemption": {
+          "additionalProperties": false,
+          "properties": {
+            "externalReceiptNumber": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "quantity": {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  "rewardName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "rewardName",
+                  "quantity"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "operationId": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "operator": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "type": "object"
+            },
+            "quantity": {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            "redeemedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "remainingRewards": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "replayed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "operationId",
+            "quantity",
+            "remainingRewards",
+            "externalReceiptNumber",
+            "operator",
+            "redeemedAt",
+            "replayed",
+            "items"
+          ],
+          "type": "object"
+        },
+        "rewardEarned": {
+          "type": "boolean"
+        },
+        "success": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success",
+        "actions",
+        "message",
+        "rewardEarned",
+        "afterHours",
+        "customer",
+        "card",
+        "birthdayReward"
       ],
       "type": "object"
     },
@@ -98716,7 +99175,7 @@
       "permission": null,
       "pin": false,
       "request": "ScanRequest",
-      "response": null
+      "response": "ScanResponse"
     },
     "POST /api/:merchantRef/admin/scan/seals": {
       "approval": false,
