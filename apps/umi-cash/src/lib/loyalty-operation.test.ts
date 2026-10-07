@@ -23,3 +23,9 @@ describe('loyalty operation', () => {
     expect(Array.from(toggleLoyaltyAction(new Set(['REDEEM']), 'REDEEM_BASE', false))).toEqual(['REDEEM_BASE']);
   });
 });
+
+it('renders wrapped API guard failures as text', async () => {
+  const { loyaltyResponseMessage } = await import('./loyalty-operation');
+  expect(loyaltyResponseMessage({ error: { message: 'Redeem historical rewards first' } })).toBe('Redeem historical rewards first');
+  expect(loyaltyResponseMessage({ message: ['Quantity is invalid', 'Receipt is required'] })).toBe('Quantity is invalid. Receipt is required');
+});

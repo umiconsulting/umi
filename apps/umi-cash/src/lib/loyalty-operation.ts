@@ -29,3 +29,14 @@ export function toggleLoyaltyAction(actions: Set<string>, key: string, singleCyc
 export function rewardExpiryLabel(expiresAt: string | null | undefined, timezone = 'America/Mexico_City') {
   return expiresAt ? new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(expiresAt)) : null;
 }
+
+export function loyaltyResponseMessage(payload: unknown): string {
+  if (typeof payload === 'string') return payload;
+  if (Array.isArray(payload)) return payload.filter((item) => typeof item === 'string').join('. ') || 'No se pudo completar la operación.';
+  if (payload && typeof payload === 'object') {
+    const value = payload as { message?: unknown; error?: unknown };
+    if (value.message !== undefined) return loyaltyResponseMessage(value.message);
+    if (value.error !== undefined) return loyaltyResponseMessage(value.error);
+  }
+  return 'No se pudo completar la operación.';
+}

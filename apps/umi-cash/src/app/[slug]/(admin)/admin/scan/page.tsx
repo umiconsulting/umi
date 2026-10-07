@@ -7,7 +7,7 @@ import { centavosFromPesos, formatMXN, COMMON_TOPUP_AMOUNTS } from '@/lib/curren
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
 import { describeReadFailure, handleWriteFailure } from '@/lib/request-failure';
-import { LoyaltyOperation, toggleLoyaltyAction, rewardExpiryLabel } from '@/lib/loyalty-operation';
+import { LoyaltyOperation, toggleLoyaltyAction, rewardExpiryLabel, loyaltyResponseMessage } from '@/lib/loyalty-operation';
 import type { RewardPolicyFields, RedemptionConfirmation } from '@/types/api';
 import { VISIT_CAP_HINT, visitCapNotice } from '@/lib/visit-cap';
 
@@ -233,7 +233,7 @@ export default function ScanPage() {
       const data = await res.json();
       if (res.ok && singleCycle && redeem && !data.redemption) throw new Error('La respuesta no confirma el canje.');
       loyaltyOperation.current.finish(res.status);
-      setResult({ success: res.ok, message: data.message ?? data.error, redemption: data.redemption });
+      setResult({ success: res.ok, message: loyaltyResponseMessage(data), redemption: data.redemption });
       if (res.ok) {
         if (data.card) setPreview((previous) => previous ? { ...previous, card: { ...previous.card, ...data.card } } : previous);
         const refreshed = await authedFetch(slug, `/api/${slug}/admin/scan/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrPayload: lastPayloadRef.current }) }).catch(() => null);
@@ -748,7 +748,7 @@ export default function ScanPage() {
               {(() => {
                 const visitDisabled = preview.card.visitLimitReached || !!preview.card.visitBlockedReason;
                 const redeemDisabled = preview.card.pendingRewards === 0 || (preview.card.rewardPolicy === 'single_cycle' && !preview.card.legacyPendingRewards && preview.card.visitsThisCycle < preview.card.visitsRequired);
-                const visitWaitLabel = preview.card.visitLimitReached ? VISIT_CAP_HINT : null;
+                const visitWaitLabel = preview.card.visitBlockedReason ? 'Canjea la recompensa para iniciar otro ciclo' : preview.card.visitLimitReached ? VISIT_CAP_HINT : null;
 
                 type Choice = { key: string; label: string; sublabel: string; disabled: boolean; disabledHint?: string; tint?: 'brand' | 'amber' };
                 // On a ladder the next visit counts toward the lower tier until it's
@@ -771,7 +771,7 @@ export default function ScanPage() {
                     label: 'Canjear recompensa',
                     sublabel: preview.card.pendingRewardName ?? preview.card.rewardName,
                     disabled: redeemDisabled,
-                    disabledHint: redeemDisabled ? 'Sin recompensas pendientes' : undefined,
+                    disabledHint: redeemDisabled ? (preview.card.rewardPolicy === 'single_cycle' && !preview.card.legacyPendingRewards && preview.card.visitsThisCycle < 9 ? 'Disponible a las 9 visitas' : 'Sin recompensas pendientes') : undefined,
                     tint: 'amber',
                   },
                 ];
@@ -863,7 +863,7 @@ export default function ScanPage() {
               {tenant.multiSealEnabled && (
                 <button
                   onClick={() => setShowSeals(true)}
-                  disabled={processing}
+                  disabled={processing || loyaltyOperation.current.pending || !!preview.card.visitBlockedReason || (preview.card.rewardPolicy === 'single_cycle' && preview.card.visitsThisCycle >= 9)}
                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-coffee-brand text-white font-semibold text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

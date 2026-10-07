@@ -44,13 +44,16 @@ export function cardRewardFields(
     pendingTier1: number;
     rewardPolicy?: string;
     cycleRewardAvailable?: boolean;
+    baseRewardBlockedByHistory?: boolean;
     availableRewards?: { rewardName: string }[];
   },
 ) {
   const canRedeem =
     isBaseReady(profile, card.visitsThisCycle) &&
     (card.rewardPolicy !== 'single_cycle' ||
-      (card.cycleRewardAvailable === true && card.visitsThisCycle < profile.visitsRequired));
+      (card.cycleRewardAvailable === true &&
+        !card.baseRewardBlockedByHistory &&
+        card.visitsThisCycle < profile.visitsRequired));
   return {
     visitsRequired: profile.visitsRequired,
     rewardName: profile.rewardName,

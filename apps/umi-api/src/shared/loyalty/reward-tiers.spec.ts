@@ -289,3 +289,25 @@ it('disables the base reward after a single cycle reaches its upper tier', () =>
     }).baseReward,
   ).toMatchObject({ ready: true, canRedeem: true });
 });
+
+it.each([true, false])(
+  'shows base eligibility only after earlier history clears: blocked=%s',
+  (blocked) => {
+    const profile: RewardProfile = {
+      visitsRequired: 9,
+      rewardName: 'Upper',
+      rewardDescription: null,
+      redemptionConfigId: null,
+      baseTier: { visitsRequired: 7, rewardName: 'Base', rewardDescription: null, configId: null },
+    };
+    expect(
+      cardRewardFields(profile, {
+        visitsThisCycle: 8,
+        pendingTier1: 0,
+        rewardPolicy: 'single_cycle',
+        cycleRewardAvailable: true,
+        baseRewardBlockedByHistory: blocked,
+      }).baseReward,
+    ).toMatchObject({ ready: !blocked, canRedeem: !blocked });
+  },
+);

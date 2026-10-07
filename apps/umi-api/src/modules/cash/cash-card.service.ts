@@ -65,6 +65,7 @@ export class CashCardService {
       pendingTier1: state.pending_tier1,
       rewardPolicy: state.reward_policy,
       cycleRewardAvailable: state.cycle_reward_available,
+      baseRewardBlockedByHistory: state.base_reward_blocked_by_history,
       availableRewards: state.available_rewards,
     });
     const visitsRequired = reward.visitsRequired || DEFAULT_VISITS_REQUIRED;

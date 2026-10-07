@@ -58,3 +58,31 @@ describe('single cycle presentation', () => {
     expect(copy?.body).toContain('11:00');
   });
 });
+
+it('keeps the enabled 7/9 thresholds before eligibility while it preserves custom names', () => {
+  const custom = {
+    ...profile,
+    visitsRequired: 12,
+    rewardName: 'Custom upper',
+    baseTier: { ...profile.baseTier, visitsRequired: 8, rewardName: 'Custom base' },
+  };
+  expect(
+    rewardProfileWithSnapshot(custom, {
+      reward_policy: 'single_cycle',
+      cycle_reward_available: false,
+    }),
+  ).toMatchObject({
+    visitsRequired: 9,
+    rewardName: 'Custom upper',
+    baseTier: { visitsRequired: 7, rewardName: 'Custom base' },
+  });
+  expect(
+    rewardProfileWithSnapshot(
+      { ...custom, baseTier: null },
+      { reward_policy: 'single_cycle', cycle_reward_available: false },
+    ),
+  ).toMatchObject({
+    visitsRequired: 9,
+    baseTier: { visitsRequired: 7, rewardName: 'Custom upper' },
+  });
+});

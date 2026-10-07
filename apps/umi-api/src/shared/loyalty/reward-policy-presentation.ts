@@ -36,20 +36,26 @@ export function rewardProfileWithSnapshot(
   profile: RewardProfile,
   row: RewardPolicyRow,
 ): RewardProfile {
-  if (row.reward_policy !== 'single_cycle' || !row.cycle_reward_available) return profile;
+  if (row.reward_policy !== 'single_cycle') return profile;
+  const base = profile.baseTier ?? {
+    visitsRequired: 7,
+    rewardName: profile.rewardName,
+    rewardDescription: profile.rewardDescription,
+    configId: profile.redemptionConfigId,
+  };
   return {
     ...profile,
-    visitsRequired: row.visits_required ?? profile.visitsRequired,
-    rewardName: row.reward_name ?? profile.rewardName,
-    baseTier:
-      row.base_reward_name && row.base_visits_required
-        ? {
-            visitsRequired: row.base_visits_required,
-            rewardName: row.base_reward_name,
-            rewardDescription: null,
-            configId: profile.baseTier?.configId ?? null,
-          }
-        : profile.baseTier,
+    visitsRequired: 9,
+    rewardName: row.cycle_reward_available
+      ? (row.reward_name ?? profile.rewardName)
+      : profile.rewardName,
+    baseTier: {
+      ...base,
+      visitsRequired: 7,
+      rewardName: row.cycle_reward_available
+        ? (row.base_reward_name ?? base.rewardName)
+        : base.rewardName,
+    },
   };
 }
 
