@@ -66,8 +66,8 @@ import type { ZodTypeAny } from 'zod';
  * usage-variance, recipe-cost, menu-engineering and prep-list reads. Additive to the
  * artifact: no described path changed meaning, so the URL major stays at 1.
  */
-/** 2.24.0 adds single-cycle policy fields and committed scan redemption responses. */
-export const CONTRACT_VERSION = '2.24.0';
+/** 2.25.0 defines selected-tier visit costs and retained progress in scan responses. */
+export const CONTRACT_VERSION = '2.25.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

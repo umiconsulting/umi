@@ -38,9 +38,8 @@ import {
 const VISIT = 'VISIT';
 const REDEEM = 'REDEEM';
 /**
- * The early cash-out of the ladder's LOWER tier. Same bar, same card, different
- * arithmetic: it consumes the cycle (the card is torn off) instead of a banked
- * reward, so the cycle restarts at the customer's current stamp count.
+ * Select the base reward. The single-cycle policy consumes seven visits;
+ * disabled merchants retain the original cycle reset.
  */
 const REDEEM_BASE = 'REDEEM_BASE';
 const BIRTHDAY = 'BIRTHDAY_REDEEM';
@@ -322,10 +321,8 @@ export class CashScanService {
     }
     const banked = includesRedeem ? bankedReward(profile, card.pending_tier1) : null;
 
-    // The EARLY CASH-OUT. The customer may take the lower tier as soon as she has
-    // reached its threshold, instead of stamping on toward the upper one — and the
-    // card is torn off, which is what makes this a different write from a banked
-    // canje. Refused before that threshold, exactly as umi-cash refused it.
+    // The base reward is available from its threshold through the cycle cap.
+    // Historical rewards with an earlier deadline must be redeemed first.
     if (includesRedeemBase) {
       if (enabled && card.base_reward_blocked_by_history)
         throw new BadRequestException('Redeem historical rewards first');
@@ -335,7 +332,7 @@ export class CashScanService {
       }
       if (
         !isBaseReady(profile, card.visits_this_cycle) ||
-        (enabled && (!card.cycle_reward_available || card.visits_this_cycle >= 9))
+        (enabled && (!card.cycle_reward_available || card.visits_this_cycle > 9))
       ) {
         throw new BadRequestException({
           error: `Aún no llega a ${base.visitsRequired} visitas para ${base.rewardName}`,
@@ -369,9 +366,8 @@ export class CashScanService {
     // and otherwise only fills an empty slot. That is umi-cash's precedence:
     // reward_earned > base_reward_ready > reward_redeemed > first_visit >
     // milestone_one_left > milestone_halfway > visit_recorded.
-    // A banked canje and an early cash-out both leave `reward_redeemed`, naming the
-    // tier that left the bar. The early one resets the cycle it was running, so the
-    // moment reports the position the customer now holds: zero.
+    // Both reward actions name the selected tier. The enabled policy replaces
+    // this provisional moment with the committed reward and remaining visits.
     let moment: VisitMoment | null = null;
     if (banked) {
       moment = {
@@ -908,10 +904,12 @@ export class CashScanService {
       parts.push(`✓ Recompensa canjeada: ${rewardName}`);
     }
     if (performed.includes(REDEEM_BASE)) {
-      // The staff line has to say the card restarted, because that is what the
-      // customer is about to see on her pass and the barista is about to be asked
-      // about ("¿por qué mi tarjeta quedó en cero?").
-      parts.push(`✓ ${baseRewardName ?? rewardName} canjeado en nivel 1 — tarjeta reiniciada`);
+      const remaining = updated.visits_this_cycle;
+      parts.push(
+        updated.reward_policy === 'single_cycle'
+          ? `✓ ${baseRewardName ?? rewardName} canjeado — ${remaining} visita${remaining !== 1 ? 's' : ''} en el siguiente ciclo`
+          : `✓ ${baseRewardName ?? rewardName} canjeado en nivel 1 — tarjeta reiniciada`,
+      );
     }
     if (performed.includes(VISIT)) {
       const remaining = visitsRequired - updated.visits_this_cycle;

@@ -933,3 +933,54 @@ describe('historical reward order', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('selected reward visit consumption', () => {
+  it.each([7, 8, 9])(
+    'returns the committed retained visits for a base choice at %i',
+    async (progress) => {
+      const h = make();
+      h.cards.findCard.mockResolvedValue({
+        ...CARD,
+        total_visits: progress,
+        reward_policy: 'single_cycle',
+        visits_this_cycle: progress,
+        pending_rewards: 1,
+        cycle_reward_available: true,
+      });
+      h.repo.rewardProfileRows.mockResolvedValue(LADDER_ROWS);
+      Object.assign(h.repo, { writeLifecycleMessage: vi.fn().mockResolvedValue(undefined) });
+      h.repo.performScan.mockResolvedValue({
+        ...CARD,
+        total_visits: progress,
+        reward_policy: 'single_cycle',
+        visits_this_cycle: progress - 7,
+        pending_rewards: 0,
+        redemptionResult: {
+          quantity: 1,
+          redemptionIds: ['redemption'],
+          items: [
+            {
+              entitlementId: 'unit',
+              redemptionId: 'redemption',
+              rewardName: 'Capuccino',
+              isBase: true,
+              expiresAt: '2026-11-07T00:00:00.000Z',
+            },
+          ],
+          redeemedAt: '2026-10-08T00:00:00.000Z',
+        },
+      });
+      const result = await h.svc.scan('t1', 'u1', {
+        qrPayload: 'jwt',
+        action: 'REDEEM_BASE',
+        externalReceiptNumber: 'SELECTED-BASE',
+        idempotencyKey: 'selected-base-command',
+      });
+      expect(result.card.visitsThisCycle).toBe(progress - 7);
+      expect(result.redemption?.items).toEqual([{ rewardName: 'Capuccino', quantity: 1 }]);
+      expect(result.message).toContain(
+        `${progress - 7} visita${progress - 7 === 1 ? '' : 's'} en el siguiente ciclo`,
+      );
+    },
+  );
+});

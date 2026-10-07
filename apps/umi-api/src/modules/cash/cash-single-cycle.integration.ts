@@ -173,23 +173,37 @@ describe('single cycle scan operations · PostgreSQL and RLS', () => {
       ).rows[0].n,
     ).toBe(1);
   });
-  it.each([7, 8, 9])('redeems the unit at %i and returns zero cycle progress', async (stamps) => {
-    const id = await card(stamps);
-    const r = await scan(id, stamps < 9 ? 'REDEEM_BASE' : 'REDEEM');
-    expect(r.card.visitsThisCycle).toBe(0);
-    expect(r.card.pendingRewards).toBe(0);
-    expect(r.redemption).toMatchObject({
-      quantity: 1,
-      remainingRewards: 0,
-      externalReceiptNumber: 'FIXTURE-RECEIPT',
-      operator: { id: staffId, name: 'Fixture operator' },
-      items: [{ rewardName: stamps < 9 ? 'Base fixture' : 'Top fixture', quantity: 1 }],
-    });
-  });
+  it.each([
+    [7, 'REDEEM_BASE', 0, 'Base fixture'],
+    [8, 'REDEEM_BASE', 1, 'Base fixture'],
+    [9, 'REDEEM_BASE', 2, 'Base fixture'],
+    [9, 'REDEEM', 0, 'Top fixture'],
+  ] as const)(
+    'redeems %i visits with %s and retains %i',
+    async (stamps, action, remaining, name) => {
+      const id = await card(stamps);
+      const preview = await asMerchant(() =>
+        service.preview(merchantId, userId, { qrPayload: id }),
+      );
+      expect(preview.card.baseReward?.canRedeem).toBe(true);
+      const r = await scan(id, action);
+      expect(ScanResponse.parse(r)).toEqual(r);
+      expect(r.card.visitsThisCycle).toBe(remaining);
+      expect(r.card.pendingRewards).toBe(0);
+      expect(r.redemption).toMatchObject({
+        quantity: 1,
+        remainingRewards: 0,
+        externalReceiptNumber: 'FIXTURE-RECEIPT',
+        operator: { id: staffId, name: 'Fixture operator' },
+        items: [{ rewardName: name, quantity: 1 }],
+      });
+    },
+  );
   it('returns the original response on replay after later progress without effects', async () => {
-    const id = await card(7);
+    const id = await card(9);
     const key = randomUUID();
     const first = await scan(id, 'REDEEM_BASE', key);
+    expect(first.card.visitsThisCycle).toBe(2);
     await credits(id, 2);
     wallet.refreshCard.mockClear();
     const retry = await scan(id, 'REDEEM_BASE', key);
@@ -251,9 +265,15 @@ describe('single cycle scan operations · PostgreSQL and RLS', () => {
     ).toBe(9);
   });
   it('serializes concurrent redemption and cannot consume twice', async () => {
-    const id = await card(7);
-    const outcomes = await Promise.allSettled([scan(id, 'REDEEM_BASE'), scan(id, 'REDEEM_BASE')]);
+    const id = await card(9);
+    const outcomes = await Promise.allSettled([scan(id, 'REDEEM_BASE'), scan(id, 'REDEEM')]);
     expect(outcomes.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const winner = outcomes.find((r) => r.status === 'fulfilled');
+    if (winner?.status !== 'fulfilled') throw new Error('Expected one redemption');
+    const rewardName = winner.value.redemption?.items[0].rewardName;
+    expect(['Base fixture', 'Top fixture']).toContain(rewardName);
+    expect(winner.value.card.visitsThisCycle).toBe(rewardName === 'Base fixture' ? 2 : 0);
+    expect(winner.value.card.pendingRewards).toBe(0);
     expect(
       (
         await pg.query(
@@ -312,7 +332,7 @@ describe('single cycle scan operations · PostgreSQL and RLS', () => {
     expect(r.card.pendingRewards).toBe(0);
   });
   it('restores the original deadline and preserves later progress on reversal', async () => {
-    const id = await card(7);
+    const id = await card(9);
     const before = await asMerchant(() => service.preview(merchantId, userId, { qrPayload: id }));
     await scan(id, 'REDEEM_BASE');
     await credits(id, 3);
@@ -331,7 +351,7 @@ describe('single cycle scan operations · PostgreSQL and RLS', () => {
     expect(r.message).toContain('Base fixture');
     expect(r.pendingRewards).toBe(1);
     const state = await asMerchant(() => service.preview(merchantId, userId, { qrPayload: id }));
-    expect(state.card.visitsThisCycle).toBe(3);
+    expect(state.card.visitsThisCycle).toBe(5);
     expect(state.card.nextRewardExpiresAt).toBe(before.card.nextRewardExpiresAt);
     expect(state.card.legacyPendingRewards).toBe(1);
     await expect(scan(id, 'VISIT')).rejects.toThrow();
@@ -344,7 +364,7 @@ describe('single cycle scan operations · PostgreSQL and RLS', () => {
       [redemptionId],
     );
     const recovery = await scan(id, 'REDEEM');
-    expect(recovery.card.visitsThisCycle).toBe(3);
+    expect(recovery.card.visitsThisCycle).toBe(5);
     expect(recovery.redemption?.items).toEqual([{ rewardName: 'Base fixture', quantity: 1 }]);
     expect(recovery.message).toContain('Base fixture');
     expect(

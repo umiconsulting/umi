@@ -552,8 +552,11 @@ export class CashScanRepository {
       c.query<RedemptionRow>(
         `SELECT r.id::text AS id, r.card_id::text AS "cardId", r.reward_id::text AS "rewardId",
                 r.reverted_at AS "revertedAt", r.cycle_reset AS "cycleReset",
-                CASE WHEN e.tier='base' THEN e.base_reward_name ELSE e.top_reward_name END AS "rewardName",
-                CASE WHEN e.id IS NOT NULL THEN e.tier='base' ELSE NULL END AS "isBase"
+                CASE WHEN COALESCE(l.claimed_tier, CASE WHEN r.reward_id=e.base_reward_id THEN 'base' ELSE e.tier END)='base'
+                     THEN e.base_reward_name ELSE e.top_reward_name END AS "rewardName",
+                CASE WHEN e.id IS NOT NULL THEN
+                     COALESCE(l.claimed_tier, CASE WHEN r.reward_id=e.base_reward_id THEN 'base' ELSE e.tier END)='base'
+                     ELSE NULL END AS "isBase"
            FROM merchant.loyalty_redemption r
            LEFT JOIN merchant.loyalty_reward_redemption_link l ON l.merchant_id=r.merchant_id AND l.redemption_id=r.id
            LEFT JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id
