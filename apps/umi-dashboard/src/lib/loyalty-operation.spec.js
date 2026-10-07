@@ -14,3 +14,10 @@ it('retains the receipt, action, quantity and key until a definite response', ()
   operation.finish(200);
   expect(operation.pending).toBe(false);
 });
+
+it('describes selected reward cost and retained visits', async () => {
+  const { rewardVisitCostLabel } = await import('./loyalty-operation.js');
+  expect(rewardVisitCostLabel(8, 7)).toBe('7 visitas · quedan 1');
+  expect(rewardVisitCostLabel(9, 7)).toBe('7 visitas · quedan 2');
+  expect(rewardVisitCostLabel(9, 9)).toBe('9 visitas · quedan 0');
+});

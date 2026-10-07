@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
-import { LoyaltyOperation, rewardExpiryLabel } from '@/lib/loyalty-operation.js';
+import { LoyaltyOperation, rewardExpiryLabel, rewardVisitCostLabel } from '@/lib/loyalty-operation.js';
 import { XSep } from '@/shell.jsx';
 import { Segmented } from '@/components/segmented.jsx';
 import { PageHead } from '@/components/page-head.jsx';
@@ -910,7 +910,7 @@ function LoyaltyPanel({ cash, onCredited }) {
         throw new Error(t`La respuesta no confirma el canje. Reintenta la misma operación.`);
       operation.current.finish(200);
       setPendingRequest(null);
-      setScanResult(response.redemption || null);
+      setScanResult(response.redemption ? { ...response.redemption, remainingVisits: response.card?.visitsThisCycle } : null);
       setReceipt('');
       setRedeemQuantity('1');
       onCredited?.();
@@ -931,14 +931,14 @@ function LoyaltyPanel({ cash, onCredited }) {
           {account.baseReward?.canRedeem && (
             <p>
               <Trans>
-                Puedes canjear {account.baseReward.rewardName}, o continuar hasta{' '}
-                {account.visitsRequired} visitas para {account.rewardName}.
+                {account.baseReward.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.baseReward.visitsRequired)}.
+                {account.visitsThisCycle < account.visitsRequired && ` Puedes continuar hasta ${account.visitsRequired} visitas para ${account.rewardName}.`}
               </Trans>
             </p>
           )}
           {account.visitsThisCycle >= account.visitsRequired && (
             <p>
-              <Trans>{account.rewardName} listo para canjear.</Trans>
+              <Trans>{account.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.visitsRequired)}.</Trans>
             </p>
           )}
           {account.visitBlockedReason && (
@@ -969,7 +969,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           ))}
           <p>
             <Trans>
-              El canje reinicia el ciclo en cero. Las visitas adicionales no se conservan.
+              Pregunta al cliente qué recompensa quiere canjear. El canje consume las visitas del premio elegido y conserva las restantes.
             </Trans>
           </p>
         </div>
@@ -1039,7 +1039,7 @@ function LoyaltyPanel({ cash, onCredited }) {
                 {scanBusy === 'REDEEM' ? (
                   <Trans>Canjeando…</Trans>
                 ) : (
-                  <Trans>Canjear recompensa</Trans>
+                  <Trans>Canjear {account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards ? account.rewardName : 'recompensa'}</Trans>
                 )}
               </button>
             )}
@@ -1110,7 +1110,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           </p>
           <p>
             <Trans>
-              Restantes: {scanResult.remainingRewards} · Recibo: {scanResult.externalReceiptNumber}
+              Visitas restantes: {scanResult.remainingVisits ?? account.visitsThisCycle} · Recompensas restantes: {scanResult.remainingRewards} · Recibo: {scanResult.externalReceiptNumber}
             </Trans>
           </p>
           <p>

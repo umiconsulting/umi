@@ -7,7 +7,7 @@ import { useTenant } from '@/context/TenantContext';
 import { formatDateTimeMX, formatDateShortMX } from '@/lib/intl';
 import { isTokenValid } from '@/lib/token';
 import type { CardState } from '@/types/api';
-import { rewardExpiryLabel } from '@/lib/loyalty-operation';
+import { rewardExpiryLabel, rewardVisitCostLabel } from '@/lib/loyalty-operation';
 import { profileFromWalletFields, progressLine } from '@/lib/reward-tiers';
 
 function useAuth() {
@@ -350,11 +350,13 @@ export default function CardPage() {
             {!!card.legacyPendingRewards && <p>Saldo anterior: {card.legacyPendingRewards} recompensas.</p>}
             {card.nextRewardExpiresAt && <p>Vence: {rewardExpiryLabel(card.nextRewardExpiresAt, card.merchantTimezone)} ({card.merchantTimezone}).</p>}
             {card.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, card.merchantTimezone)}</p>)}
-            <p>El canje reinicia el ciclo en cero.</p>
+            {card.baseReward?.ready && <p>{card.baseReward.rewardName}: {rewardVisitCostLabel(card.visitsThisCycle, card.baseReward.visitsRequired)}</p>}
+            {card.cycleRewardAvailable && card.visitsThisCycle >= card.visitsRequired && <p>{card.rewardName}: {rewardVisitCostLabel(card.visitsThisCycle, card.visitsRequired)}</p>}
+            <p>El canje consume las visitas del premio elegido y conserva las restantes para el siguiente ciclo. No vencen hasta llegar a 7 visitas.</p>
           </div>}
           {card.baseReward?.ready && (
             <p className="text-white text-xs text-center font-semibold mt-1">
-              Pídele al barista tu {card.baseReward.rewardName}, o sigue sumando sellos.
+              Elige {card.baseReward.rewardName}{card.visitsThisCycle < card.visitsRequired ? ', o continúa hacia el segundo premio.' : `, o ${card.rewardName}.`}
             </p>
           )}
 

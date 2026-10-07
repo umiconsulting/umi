@@ -29,3 +29,17 @@ it('renders wrapped API guard failures as text', async () => {
   expect(loyaltyResponseMessage({ error: { message: 'Redeem historical rewards first' } })).toBe('Redeem historical rewards first');
   expect(loyaltyResponseMessage({ message: ['Quantity is invalid', 'Receipt is required'] })).toBe('Quantity is invalid. Receipt is required');
 });
+
+it('describes selected reward cost and retained visits', async () => {
+  const { rewardVisitCostLabel } = await import('./loyalty-operation');
+  expect(rewardVisitCostLabel(8, 7)).toBe('7 visitas · quedan 1');
+  expect(rewardVisitCostLabel(9, 7)).toBe('7 visitas · quedan 2');
+  expect(rewardVisitCostLabel(9, 9)).toBe('9 visitas · quedan 0');
+});
+
+it('defaults only to allowed visits and asks for an explicit reward choice at nine', async () => {
+  const { defaultLoyaltyActions } = await import('./loyalty-operation');
+  for (const visitsThisCycle of [7, 8]) expect(Array.from(defaultLoyaltyActions({ rewardPolicy: 'single_cycle', visitsThisCycle, visitsRequired: 9 }))).toEqual(['VISIT']);
+  expect(Array.from(defaultLoyaltyActions({ rewardPolicy: 'single_cycle', visitsThisCycle: 9, visitsRequired: 9 }))).toEqual([]);
+  expect(Array.from(defaultLoyaltyActions({ visitBlockedReason: 'REDEMPTION_REQUIRED' }))).toEqual([]);
+});

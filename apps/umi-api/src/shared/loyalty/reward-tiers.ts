@@ -53,7 +53,7 @@ export function cardRewardFields(
     (card.rewardPolicy !== 'single_cycle' ||
       (card.cycleRewardAvailable === true &&
         !card.baseRewardBlockedByHistory &&
-        card.visitsThisCycle < profile.visitsRequired));
+        card.visitsThisCycle <= profile.visitsRequired));
   return {
     visitsRequired: profile.visitsRequired,
     rewardName: profile.rewardName,

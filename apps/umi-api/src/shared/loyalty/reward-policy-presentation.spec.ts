@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cardPolicyFields,
+  policyReadyFrontFields,
   policyRewardCopy,
   rewardProfileWithSnapshot,
 } from './reward-policy-presentation';
@@ -41,7 +42,7 @@ describe('single cycle presentation', () => {
       merchantTimezone: 'America/Mazatlan',
     });
   });
-  it('shows the upper reward and blocked visits at nine', () => {
+  it('shows both exclusive choices and retained visits at nine', () => {
     const copy = policyRewardCopy({
       rewardPolicy: 'single_cycle',
       visitsThisCycle: 9,
@@ -54,7 +55,10 @@ describe('single cycle presentation', () => {
     });
     expect(copy?.body).toContain('Upper');
     expect(copy?.body).toContain('Canjea antes de otra visita');
-    expect(copy?.body).not.toContain('Base');
+    expect(copy?.body).toContain('Base');
+    expect(copy?.body).toContain('7 visitas · quedan 2');
+    expect(copy?.body).toContain('9 visitas · quedan 0');
+    expect(copy?.body).not.toContain('reinicia');
     expect(copy?.body).toContain('11:00');
   });
 });
@@ -85,4 +89,33 @@ it('keeps the enabled 7/9 thresholds before eligibility while it preserves custo
     visitsRequired: 9,
     baseTier: { visitsRequired: 7, rewardName: 'Custom upper' },
   });
+});
+
+it('shows the base cost and retained visit at eight without a reset claim', () => {
+  const copy = policyRewardCopy({
+    rewardPolicy: 'single_cycle',
+    visitsThisCycle: 8,
+    visitsRequired: 9,
+    rewardName: 'Upper',
+    baseReward: { visitsRequired: 7, rewardName: 'Base' },
+  });
+  expect(copy?.body).toContain('7 visitas · quedan 1');
+  expect(copy?.body).toContain('continuar');
+  expect(copy?.body).not.toContain('reinicia');
+});
+
+it('shows both reward costs on the Apple front at nine', () => {
+  expect(
+    policyReadyFrontFields({
+      rewardPolicy: 'single_cycle',
+      cycleRewardAvailable: true,
+      visitsThisCycle: 9,
+      visitsRequired: 9,
+      rewardName: 'Upper',
+      baseReward: { visitsRequired: 7, rewardName: 'Base' },
+    }),
+  ).toEqual([
+    { key: 'baseChoice', label: 'ELIGE · 7 VISITAS', value: 'Base · quedan 2' },
+    { key: 'topChoice', label: 'O · 9 VISITAS', value: 'Upper · quedan 0' },
+  ]);
 });

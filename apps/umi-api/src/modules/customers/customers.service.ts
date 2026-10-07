@@ -587,7 +587,7 @@ export class CustomersService {
                   row.cycle_reward_available === true &&
                   !row.base_reward_blocked_by_history &&
                   Number(row.visits_this_cycle) >= Number(row.base_visits_required) &&
-                  Number(row.visits_this_cycle) < Number(row.visits_required),
+                  Number(row.visits_this_cycle) <= Number(row.visits_required),
               }
             : null,
         createdAt: iso(row.created_at),

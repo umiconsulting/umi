@@ -203,6 +203,27 @@ it('groups mixed rewards into one outbox event and sends the group once', async 
   ).toBe(3);
 });
 
+it('reminds the restored selected tier rather than the original upgraded tier', async () => {
+  const target = await card();
+  const at = await deadline(`clock_timestamp()+interval '6 days'`);
+  const id = await unit(target, 'legacy', at, 'top');
+  await pool.query(
+    `UPDATE merchant.loyalty_reward_entitlement SET recovery=true,recovery_tier='base' WHERE id=$1`,
+    [id],
+  );
+  const bodies: string[] = [];
+  const p = processor({
+    send: async (input) => {
+      bodies.push(input.body);
+      return { sid: 'fixture-recovery' };
+    },
+  });
+  await p.sweep();
+  await p.deliverReminder(await queued(target));
+  expect(bodies[0]).toContain('1 × Base snapshot');
+  expect(bodies[0]).not.toContain('Upper snapshot');
+});
+
 it('retries a failed delivery and rechecks redemption before it sends', async () => {
   const target = await card();
   const id = await unit(target, 'cycle', await deadline(`clock_timestamp()+interval '6 days'`));

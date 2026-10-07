@@ -1,5 +1,6 @@
 import {
   policyRewardCopy,
+  policyReadyFrontFields,
   type PolicyPresentation,
 } from '../../shared/loyalty/reward-policy-presentation';
 import { Injectable, Logger } from '@nestjs/common';
@@ -241,17 +242,15 @@ export class ApplePassBuilder {
       // the row once the lower tier is reached. No `changeMessage` on these — a visit
       // changes several at once and iOS collapses them into a generic notification; the
       // lifecycle back field is the single notification channel (see the scan).
-      for (const field of data.rewardPolicy === 'single_cycle' &&
-      data.visitsThisCycle >= data.visitsRequired
-        ? [{ key: 'cycleReady', label: 'LISTO PARA CANJEAR', value: data.rewardName }]
-        : appleFrontFields(
-            profileFromWalletFields({
-              visitsRequired: data.visitsRequired,
-              rewardName: data.rewardName,
-              baseReward: data.baseReward,
-            }),
-            data.visitsThisCycle,
-          )) {
+      for (const field of policyReadyFrontFields(data) ??
+        appleFrontFields(
+          profileFromWalletFields({
+            visitsRequired: data.visitsRequired,
+            rewardName: data.rewardName,
+            baseReward: data.baseReward,
+          }),
+          data.visitsThisCycle,
+        )) {
         pass.secondaryFields.push(field);
       }
       // Néctar Café asked for the member name on the front of the stamps pass.

@@ -83,14 +83,16 @@ export function policyRewardCopy(
       `Saldo anterior: ${data.legacyPendingRewards} recompensas. Canjea antes de otra visita.`,
     );
   if (data.cycleRewardAvailable !== false && data.visitsThisCycle >= data.visitsRequired) {
-    lines.push(`${data.rewardName} listo. Canjea antes de otra visita.`);
+    lines.push(
+      `Elige ${data.baseReward ? `${data.baseReward.rewardName} (${data.baseReward.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.baseReward.visitsRequired)}) o ` : ''}${data.rewardName} (${data.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.visitsRequired)}). Canjea antes de otra visita.`,
+    );
   } else if (
     data.cycleRewardAvailable !== false &&
     data.baseReward &&
     data.visitsThisCycle >= data.baseReward.visitsRequired
   ) {
     lines.push(
-      `${data.baseReward.rewardName} listo. Puedes continuar hasta ${data.visitsRequired} visitas para ${data.rewardName}.`,
+      `${data.baseReward.rewardName} listo (${data.baseReward.visitsRequired} visitas · quedan ${Math.max(0, data.visitsThisCycle - data.baseReward.visitsRequired)}). Puedes continuar hasta ${data.visitsRequired} visitas para ${data.rewardName}.`,
     );
   } else {
     const next =
@@ -113,6 +115,31 @@ export function policyRewardCopy(
     }).format(new Date(item.expiresAt));
     lines.push(`${item.quantity} × ${item.rewardName}. Vence: ${expiry}.`);
   }
-  lines.push('El canje reinicia el ciclo en cero.');
+  lines.push(
+    'El canje consume las visitas del premio elegido. Las visitas restantes se conservan para el siguiente ciclo, sin vencimiento hasta llegar a 7.',
+  );
   return { header: 'RECOMPENSA DEL CICLO', body: lines.join(' ') };
+}
+
+/** Compact alternatives for a fully eligible Apple pass. */
+export function policyReadyFrontFields(data: PolicyPresentation) {
+  if (
+    data.rewardPolicy !== 'single_cycle' ||
+    data.cycleRewardAvailable === false ||
+    data.visitsThisCycle < data.visitsRequired
+  )
+    return null;
+  const fields = [];
+  if (data.baseReward)
+    fields.push({
+      key: 'baseChoice',
+      label: `ELIGE · ${data.baseReward.visitsRequired} VISITAS`,
+      value: `${data.baseReward.rewardName} · quedan ${Math.max(0, data.visitsThisCycle - data.baseReward.visitsRequired)}`,
+    });
+  fields.push({
+    key: 'topChoice',
+    label: `O · ${data.visitsRequired} VISITAS`,
+    value: `${data.rewardName} · quedan ${Math.max(0, data.visitsThisCycle - data.visitsRequired)}`,
+  });
+  return fields;
 }

@@ -40,3 +40,12 @@ export function loyaltyResponseMessage(payload: unknown): string {
   }
   return 'No se pudo completar la operación.';
 }
+
+export function rewardVisitCostLabel(visits: number, cost: number) {
+  return `${cost} visitas · quedan ${Math.max(0, visits - cost)}`;
+}
+
+export function defaultLoyaltyActions(card: { visitLimitReached?: boolean; visitBlockedReason?: string | null; rewardPolicy?: string; visitsThisCycle?: number; visitsRequired?: number }) {
+  const blocked = card.visitLimitReached || card.visitBlockedReason || (card.rewardPolicy === 'single_cycle' && (card.visitsThisCycle ?? 0) >= (card.visitsRequired ?? 9));
+  return new Set<string>(blocked ? [] : ['VISIT']);
+}

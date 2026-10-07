@@ -28,3 +28,7 @@ export function rewardExpiryLabel(expiresAt, timezone = 'America/Mexico_City') {
       }).format(new Date(expiresAt))
     : null;
 }
+
+export function rewardVisitCostLabel(visits, cost) {
+  return `${cost} visitas · quedan ${Math.max(0, visits - cost)}`;
+}

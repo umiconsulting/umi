@@ -264,7 +264,7 @@ describe('visitMoment', () => {
   });
 });
 
-it('disables the base reward after a single cycle reaches its upper tier', () => {
+it('keeps the base reward available as an alternative at nine', () => {
   const profile: RewardProfile = {
     visitsRequired: 9,
     rewardName: 'Upper',
@@ -279,7 +279,7 @@ it('disables the base reward after a single cycle reaches its upper tier', () =>
       rewardPolicy: 'single_cycle',
       cycleRewardAvailable: true,
     }).baseReward,
-  ).toMatchObject({ ready: false, canRedeem: false });
+  ).toMatchObject({ ready: true, canRedeem: true });
   expect(
     cardRewardFields(profile, {
       visitsThisCycle: 8,

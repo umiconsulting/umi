@@ -145,7 +145,7 @@ export class StampRewardExpiryProcessor {
   }
   private async units(c: PoolClient, group: ReminderGroup): Promise<Unit[]> {
     const rows = await c.query<Unit>(
-      `SELECT id::text, COALESCE(CASE WHEN tier='top' THEN top_reward_name ELSE base_reward_name END,'Recompensa') AS reward_name, reminder_enqueued_at
+      `SELECT id::text, COALESCE(CASE WHEN (CASE WHEN recovery THEN COALESCE(recovery_tier,tier) ELSE tier END)='top' THEN top_reward_name ELSE base_reward_name END,'Recompensa') AS reward_name, reminder_enqueued_at
        FROM merchant.loyalty_reward_entitlement
        WHERE merchant_id=$1::uuid AND card_id=$2::uuid AND expires_at=$3::timestamptz
          AND redeemed_at IS NULL AND expired_at IS NULL AND reminder_sent_at IS NULL

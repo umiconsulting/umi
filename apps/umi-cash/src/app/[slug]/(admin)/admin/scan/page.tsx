@@ -7,7 +7,7 @@ import { centavosFromPesos, formatMXN, COMMON_TOPUP_AMOUNTS } from '@/lib/curren
 import { useTenant } from '@/context/TenantContext';
 import { authedFetch } from '@/lib/authed-fetch';
 import { describeReadFailure, handleWriteFailure } from '@/lib/request-failure';
-import { LoyaltyOperation, toggleLoyaltyAction, rewardExpiryLabel, loyaltyResponseMessage } from '@/lib/loyalty-operation';
+import { LoyaltyOperation, toggleLoyaltyAction, rewardExpiryLabel, loyaltyResponseMessage, rewardVisitCostLabel, defaultLoyaltyActions } from '@/lib/loyalty-operation';
 import type { RewardPolicyFields, RedemptionConfirmation } from '@/types/api';
 import { VISIT_CAP_HINT, visitCapNotice } from '@/lib/visit-cap';
 
@@ -185,8 +185,7 @@ export default function ScanPage() {
         // pre-checking REDEEM turned a routine confirm into an accidental canje when
         // the daily visit cap left it as the only armed action (a second scan of the
         // same card redeemed the customer's reward without anyone noticing).
-        const defaults = new Set<string>();
-        if (!data.card.visitLimitReached && !data.card.visitBlockedReason) defaults.add('VISIT');
+        const defaults = defaultLoyaltyActions(data.card);
         setReceipt('');
         setRedeemQuantity('1');
         setSelectedActions(defaults);
@@ -562,7 +561,8 @@ export default function ScanPage() {
               {!!preview.card.legacyPendingRewards && <p>Saldo anterior: {preview.card.legacyPendingRewards} recompensas.</p>}
               {preview.card.nextRewardExpiresAt && <p>Vence: {rewardExpiryLabel(preview.card.nextRewardExpiresAt, preview.card.merchantTimezone)} ({preview.card.merchantTimezone}).</p>}
               {preview.card.availableRewards?.map((item, index) => <p key={index}>{item.quantity} × {item.rewardName} · Vence: {rewardExpiryLabel(item.expiresAt, preview.card.merchantTimezone)}</p>)}
-              <p>El canje reinicia el ciclo en cero. Las visitas adicionales no se conservan.</p>
+              <p>Pregunta al cliente qué recompensa quiere canjear.</p>
+              <p>El canje consume las visitas del premio elegido. Las visitas restantes se conservan para el siguiente ciclo.</p>
             </div>
           )}
           {/* Daily visit cap notice — without this the only trace was the greyed-out
@@ -746,9 +746,9 @@ export default function ScanPage() {
             /* Action checklist + Confirmar */
             <div className="space-y-3">
               {(() => {
-                const visitDisabled = preview.card.visitLimitReached || !!preview.card.visitBlockedReason;
+                const visitDisabled = defaultLoyaltyActions(preview.card).size === 0;
                 const redeemDisabled = preview.card.pendingRewards === 0 || (preview.card.rewardPolicy === 'single_cycle' && !preview.card.legacyPendingRewards && preview.card.visitsThisCycle < preview.card.visitsRequired);
-                const visitWaitLabel = preview.card.visitBlockedReason ? 'Canjea la recompensa para iniciar otro ciclo' : preview.card.visitLimitReached ? VISIT_CAP_HINT : null;
+                const visitWaitLabel = preview.card.visitBlockedReason ? 'Elige una recompensa antes de registrar otra visita' : preview.card.visitLimitReached ? VISIT_CAP_HINT : null;
 
                 type Choice = { key: string; label: string; sublabel: string; disabled: boolean; disabledHint?: string; tint?: 'brand' | 'amber' };
                 // On a ladder the next visit counts toward the lower tier until it's
@@ -769,19 +769,19 @@ export default function ScanPage() {
                   {
                     key: 'REDEEM',
                     label: 'Canjear recompensa',
-                    sublabel: preview.card.pendingRewardName ?? preview.card.rewardName,
+                    sublabel: preview.card.rewardPolicy === 'single_cycle' && !preview.card.legacyPendingRewards ? `${preview.card.rewardName} · ${rewardVisitCostLabel(preview.card.visitsThisCycle, preview.card.visitsRequired)}` : preview.card.pendingRewardName ?? preview.card.rewardName,
                     disabled: redeemDisabled,
                     disabledHint: redeemDisabled ? (preview.card.rewardPolicy === 'single_cycle' && !preview.card.legacyPendingRewards && preview.card.visitsThisCycle < 9 ? 'Disponible a las 9 visitas' : 'Sin recompensas pendientes') : undefined,
                     tint: 'amber',
                   },
                 ];
-                if (base && (base.canRedeem ?? base.ready) && (preview.card.rewardPolicy !== 'single_cycle' || preview.card.visitsThisCycle < preview.card.visitsRequired)) {
-                  // Early cash-out of the lower tier: consumes the running cycle.
+                if (base && (base.canRedeem ?? base.ready)) {
+                  // The selected reward consumes its visit cost.
                   const toTop = Math.max(1, preview.card.visitsRequired - preview.card.visitsThisCycle);
                   choices.push({
                     key: 'REDEEM_BASE',
                     label: `Canjear ${base.rewardName}`,
-                    sublabel: `Reinicia la tarjeta · o ${toTop} visita${toTop === 1 ? '' : 's'} más para ${preview.card.rewardName}`,
+                    sublabel: preview.card.rewardPolicy === 'single_cycle' ? `${rewardVisitCostLabel(preview.card.visitsThisCycle, base.visitsRequired)}${preview.card.visitsThisCycle < preview.card.visitsRequired ? ` · o continúa ${toTop} visita${toTop === 1 ? '' : 's'} para ${preview.card.rewardName}` : ''}` : `Reinicia la tarjeta · o ${toTop} visita${toTop === 1 ? '' : 's'} más para ${preview.card.rewardName}`,
                     disabled: false,
                     tint: 'amber',
                   });
@@ -941,7 +941,8 @@ export default function ScanPage() {
             {result.redemption && (
               <div className="mt-3 text-sm space-y-1">
                 <p>Canje: {result.redemption.quantity} · {result.redemption.items.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ')}</p>
-                <p>Restantes: {result.redemption.remainingRewards}</p>
+                <p>Recompensas restantes: {result.redemption.remainingRewards}</p>
+                <p>Visitas restantes: {preview?.card.visitsThisCycle}</p>
                 <p>Recibo: {result.redemption.externalReceiptNumber} · Operador: {result.redemption.operator.name}</p>
                 <p>{rewardExpiryLabel(result.redemption.redeemedAt, preview?.card.merchantTimezone)}</p>
               </div>

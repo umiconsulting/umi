@@ -273,5 +273,7 @@ it('renders the available cycle reward and original deadline in the merchant tim
   expect(rendered?.body).toContain('Original upper');
   expect(rendered?.body).toContain('11:00');
   expect(rendered?.body).toContain('Canjea antes de otra visita');
-  expect(rendered?.body).not.toContain('Original base');
+  expect(rendered?.body).toContain('Original base');
+  expect(rendered?.body).toContain('7 visitas · quedan 2');
+  expect(rendered?.body).toContain('9 visitas · quedan 0');
 });
