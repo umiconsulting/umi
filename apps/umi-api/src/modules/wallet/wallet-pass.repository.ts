@@ -22,6 +22,27 @@ import { weekdayInZone } from '../../shared/format/weekday';
  * Isolation comes from the token itself. A caller who cannot present the token
  * that was signed into the pass sees nothing.
  */
+/**
+ * An object id as Google will accept it.
+ *
+ * One row in production holds `…3388000000023116211\n.card_cmnuuglu…` — a LITERAL
+ * backslash-n, not a newline, left by the legacy save flow reading an env var that had
+ * been written with an escape in it. `btrim` cannot help (it is not whitespace) and
+ * Google answers `400 Invalid resource ID`, which reads like a fault in Google.
+ */
+function cleanObjectId(id: string | null): string | null {
+  if (id === null) return null;
+  // Both spellings of the same dirt: a real newline/tab, and the two-character ESCAPE
+  // that produced it. The production row has the escape, in the MIDDLE of the id —
+  // between the issuer and `.card_` — which is why stripping only a trailing sequence
+  // was not enough. Neither a backslash nor whitespace can occur in a valid object id.
+  const cleaned = id
+    .replace(/\\[nrtf]/g, '')
+    .replace(/[\r\n\t]/g, '')
+    .trim();
+  return cleaned.length > 0 ? cleaned : null;
+}
+
 @Injectable()
 export class WalletPassRepository {
   constructor(private readonly pg: PgService) {}
@@ -79,17 +100,15 @@ export class WalletPassRepository {
    */
   async googleObjectForCard(cardId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ external_object_id: string }>(
-      // btrim: one row in production holds an object id with a NEWLINE inside it
-      // (…3388000000023116211\n.card_cmnuuglu…), left by the legacy save flow reading a
-      // padded env var. Google answers `400 Invalid resource ID` for it, which reads
-      // like a Google fault and is not one. Normalising on READ keeps the URL, the body
-      // and the mark-as-removed below agreeing on the same string.
-      `SELECT btrim(external_object_id) AS external_object_id FROM merchant.loyalty_wallet_pass
+      // `cleanObjectId` below, not SQL: the dirt is a literal backslash-n, which no
+      // string function in Postgres will treat as whitespace. Every read goes through
+      // it, so the URL, the PATCH body and the mark-as-removed all agree.
+      `SELECT external_object_id FROM merchant.loyalty_wallet_pass
         WHERE card_id = $1::uuid AND platform = 'google' AND status = 'active'
         LIMIT 1`,
       [cardId],
     );
-    return rows[0]?.external_object_id ?? null;
+    return cleanObjectId(rows[0]?.external_object_id ?? null);
   }
 
   /**
@@ -106,7 +125,7 @@ export class WalletPassRepository {
       [cardId],
     );
     const row = rows[0];
-    return row ? { objectId: row.external_object_id, status: row.status } : null;
+    return row ? { objectId: cleanObjectId(row.external_object_id), status: row.status } : null;
   }
 
   /**
@@ -138,12 +157,15 @@ export class WalletPassRepository {
    * status is for, and it stops every future walk from counting a 404 as a fault —
    * 19 rows did, on every refresh, for objects that were never there to update.
    */
-  async markGoogleObjectRemoved(objectId: string): Promise<void> {
+  async markGoogleObjectRemoved(cardId: string): Promise<void> {
+    // Matched on the CARD, not on the object id: the id is the very thing that can be
+    // malformed, and a row that cannot be addressed by its id is exactly the row this
+    // has to mark. `unique (card_id, platform)` makes one row the whole answer.
     await this.pg.query(
       `UPDATE merchant.loyalty_wallet_pass
           SET status = 'removed', updated_at = now()
-        WHERE platform = 'google' AND btrim(external_object_id) = btrim($1)`,
-      [objectId],
+        WHERE card_id = $1::uuid AND platform = 'google'`,
+      [cardId],
     );
   }
 
@@ -160,14 +182,16 @@ export class WalletPassRepository {
     merchantId: string,
   ): Promise<{ cardId: string; objectId: string }[]> {
     const { rows } = await this.pg.query<{ card_id: string; external_object_id: string }>(
-      `SELECT wp.card_id::text, btrim(wp.external_object_id) AS external_object_id
+      `SELECT wp.card_id::text, wp.external_object_id
          FROM merchant.loyalty_wallet_pass AS wp
          JOIN merchant.loyalty_card AS c ON c.id = wp.card_id
         WHERE c.merchant_id = $1::uuid AND wp.platform = 'google' AND wp.status = 'active'
           AND wp.external_object_id IS NOT NULL`,
       [merchantId],
     );
-    return rows.map((r) => ({ cardId: r.card_id, objectId: r.external_object_id }));
+    return rows
+      .map((r) => ({ cardId: r.card_id, objectId: cleanObjectId(r.external_object_id) }))
+      .filter((r): r is { cardId: string; objectId: string } => r.objectId !== null);
   }
 
   /** The loyalty card a signed-in customer holds at this café, if any. */

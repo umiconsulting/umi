@@ -247,6 +247,47 @@ describe('wallet carry list · the five values the cutover must move intact', ()
   });
 
   /**
+   * 7b · the dirt in one object id, and why it is cleaned on READ.
+   *
+   * A production row holds `…3388000000023116211\n.card_cmnuuglu…` — a LITERAL backslash-n,
+   * not a newline — left by the legacy save flow reading an env var that had been written
+   * with an escape in it. `btrim` cannot help and Google answers `400 Invalid resource
+   * ID`, so every refresh reported a failure for a row that can never be updated.
+   */
+  it('7b · a literal backslash-n in an object id is cleaned, and a bad one is not returned', async () => {
+    const DIRTY = '9f000000-0000-4000-8000-0000000000d1';
+    const DIRTY_CARD = '9f000000-0000-4000-8000-0000000000d2';
+    await pg.query(
+      `INSERT INTO merchant.loyalty_card (id, merchant_id, customer_id, card_number)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, 'CARRY-DIRTY')`,
+      [DIRTY_CARD, MERCHANT, CUSTOMER],
+    );
+    await pg.query(
+      `INSERT INTO merchant.loyalty_wallet_pass (id, card_id, platform, external_object_id)
+       VALUES ($1::uuid, $2::uuid, 'google', $3)`,
+      [DIRTY, DIRTY_CARD, '3388000000023116211\\n.card_cmnuuglu40004oyt5s8bve44e'],
+    );
+
+    expect(await repo.googleObjectForCard(DIRTY_CARD)).toBe(
+      '3388000000023116211.card_cmnuuglu40004oyt5s8bve44e',
+    );
+    expect(await repo.googleObjectsForMerchant(MERCHANT)).toContainEqual({
+      cardId: DIRTY_CARD,
+      objectId: '3388000000023116211.card_cmnuuglu40004oyt5s8bve44e',
+    });
+
+    // Marking matches the CARD, because the id is the thing that can be malformed.
+    await repo.markGoogleObjectRemoved(DIRTY_CARD);
+    const { rows } = await pg.query<{ status: string }>(
+      `SELECT status FROM merchant.loyalty_wallet_pass WHERE id = $1::uuid`,
+      [DIRTY],
+    );
+    expect(rows[0].status).toBe('removed');
+    await pg.query(`DELETE FROM merchant.loyalty_wallet_pass WHERE id = $1::uuid`, [DIRTY]);
+    await pg.query(`DELETE FROM merchant.loyalty_card WHERE id = $1::uuid`, [DIRTY_CARD]);
+  });
+
+  /**
    * 8 · pass health is measurable at all.
    *
    * Work item 31 stays open on DETECTION, not on prevention: four failure paths
