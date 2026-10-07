@@ -50,7 +50,8 @@ export class SystemProcessor extends BaseProcessor {
 
   async process(job: Job): Promise<void> {
     if (job.name === STAMP_REWARD_EXPIRY_JOB) {
-      await this.stampRewards.sweep(Number(job.data?.batchSize ?? 100));
+      const result = await this.stampRewards.sweep(Number(job.data?.batchSize ?? 100));
+      this.logger.log(`stamp reward expiry sweep: ${JSON.stringify(result)}`);
       return;
     }
     if (job.name === 'customer_value_authorization_expiry') {

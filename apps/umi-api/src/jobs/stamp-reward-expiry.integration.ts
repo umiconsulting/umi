@@ -203,6 +203,53 @@ it('groups mixed rewards into one outbox event and sends the group once', async 
   ).toBe(3);
 });
 
+it('queues a restored unsent unit after its deadline group already completed', async () => {
+  const target = await card();
+  const at = await deadline(`clock_timestamp()+interval '6 days'`);
+  await unit(target, 'legacy', at);
+  const restoredId = await unit(target, 'legacy', at, 'top');
+  await pool.query(
+    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=clock_timestamp() WHERE id=$1`,
+    [restoredId],
+  );
+  const bodies: string[] = [];
+  const p = processor({
+    send: async (input) => {
+      bodies.push(input.body);
+      return { sid: 'fixture-restored-group' };
+    },
+  });
+  expect((await p.sweep()).queuedReminders).toBe(1);
+  const group = await queued(target);
+  expect(await p.deliverReminder(group)).toBe(true);
+  await pool.query(
+    `UPDATE merchant.loyalty_reward_entitlement SET redeemed_at=NULL,recovery=true,recovery_tier='base' WHERE id=$1`,
+    [restoredId],
+  );
+  expect((await p.sweep()).queuedReminders).toBe(1);
+  expect((await p.sweep()).queuedReminders).toBe(0);
+  expect(
+    (
+      await pool.query(
+        `SELECT count(*)::int AS n FROM runtime.outbox_event WHERE merchant_id=$1 AND topic=$2`,
+        [target.merchantId, STAMP_REWARD_REMINDER_TOPIC],
+      )
+    ).rows[0].n,
+  ).toBe(2);
+  expect(await p.deliverReminder(group)).toBe(true);
+  expect(await p.deliverReminder(group)).toBe(false);
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]).toContain('1 × Base snapshot');
+  expect(
+    (
+      await pool.query(
+        `SELECT reminder_sent_at FROM merchant.loyalty_reward_entitlement WHERE id=$1`,
+        [restoredId],
+      )
+    ).rows[0].reminder_sent_at,
+  ).not.toBeNull();
+});
+
 it('reminds the restored selected tier rather than the original upgraded tier', async () => {
   const target = await card();
   const at = await deadline(`clock_timestamp()+interval '6 days'`);

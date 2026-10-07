@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import type { PoolClient } from 'pg';
 import type { AppConfig } from '../shared/config/config.schema';
@@ -186,7 +187,17 @@ export class StampRewardExpiryProcessor {
           group.merchantId,
           STAMP_REWARD_REMINDER_TOPIC,
           group.cardId,
-          stampRewardReminderKey(group.merchantId, group.cardId, group.expiresAt),
+          // A new unsent membership must not conflict with an already completed group.
+          `${stampRewardReminderKey(group.merchantId, group.cardId, group.expiresAt)}:units:${createHash(
+            'sha256',
+          )
+            .update(
+              units
+                .map((unit) => unit.id)
+                .sort()
+                .join(','),
+            )
+            .digest('hex')}`,
           JSON.stringify(group),
         ],
       );
