@@ -19,7 +19,14 @@ import {
 } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 
-const ROLE_LABELS = { ADMIN: msg`Admin`, STAFF: msg`Barista` };
+// THE PLATFORM'S WORD, NOT ONE BUSINESS'S. `STAFF` was labelled "Barista" — a
+// word from one café's trade, shown to every business on the platform. The
+// schema settled this on 2026-07-xx when the catalogue section was named
+// `COMMERCE (generic — no "menu")`: the model is generic commerce, and a
+// business's own vocabulary belongs to its CONFIGURATION, never to ours. A café
+// that wants a role called "Barista" creates one — `merchant.role` exists for
+// exactly that, and ONCA has four of them.
+const ROLE_LABELS = { ADMIN: msg`Admin`, STAFF: msg`Personal` };
 
 /**
  * A permission group is an API key, not a word. The console shows the word.

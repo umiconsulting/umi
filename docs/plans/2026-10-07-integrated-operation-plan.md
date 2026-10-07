@@ -411,6 +411,37 @@ evita que la barra prepare dos veces, que es del usuario.
   lección de las 16 cancelaciones "prueba".
 - **El aparato no decide lo que puede hacer.** El servidor autoriza; el cliente presenta.
 
+### 8.3.1 El vocabulario del negocio es configuración, no modelo
+
+Ya estaba decidido y hay que aplicarlo: la sección del catálogo en el esquema se llama
+literalmente **`COMMERCE (generic — no "menu")`** (`20_merchant.sql`), y el análisis de
+integración lo desarrolla separando **autoridad** (el dueño del negocio), **sistema de
+registro** (el API/DB de Umi, siempre) e **interfaz** (el dashboard, el POS, una
+sincronización externa — todos por el mismo API).
+
+La app que ONCA usaba **no** hizo eso: sus tablas se llaman `drinks_ready`, `pizzas_ready`,
+`drink_note`, `pizza_note`. Son columnas por oficio, y por eso un negocio distinto no cabe
+en ese esquema. Es la firma de haber crecido a golpes de caso particular, y **no es el modelo
+que estamos construyendo**: el nuestro enruta por estación y por curso, y la palabra "pizza"
+sólo existe donde debe — en la configuración de ONCA.
+
+**Auditoría del 2026-10-07, tras esta observación.** Se buscó vocabulario de oficio en el
+código y el esquema de la plataforma. Resultado: en el esquema **no hay ninguna columna,
+tabla o enum de dominio** — las apariciones son comentarios explicativos y los datos de la
+migración de ONCA, que son su configuración. En el código aparecieron **tres fugas reales, y
+las tres se corrigieron**:
+
+| Fuga                                                                 | Dónde                       | Corrección                                                                                                                                                        |
+| -------------------------------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| El rol `STAFF` se mostraba como **"Barista"** a _todos_ los negocios | `screens/staff.jsx`         | pasa a **"Personal"** (`msgid` que ya existía y traduce "Staff")                                                                                                  |
+| El reporte de ventas agrupaba por **"Barista"**                      | `screens/ventas-report.jsx` | la dimensión pasa a **"Operador"**, que es la palabra que la propia app usa (`runtime.operator_session`, el PIN de operador)                                      |
+| `'barista'` en la lista de roles compatibles del API                 | `staff.service.ts`          | eliminada: **no correspondía a ningún rol** de `umi.role`, y el mecanismo correcto es un `merchant.role` — que es exactamente lo que son los cuatro roles de ONCA |
+
+La regla, entonces: **si un negocio cambiaría esa palabra, no va en el esquema ni en el
+código; va en su configuración.** Y el corolario práctico: cuando un café pide "un rol
+barista", la respuesta es crearle un rol de café, no enseñarle al producto la palabra
+"barista".
+
 ### 8.4 Cómo sabremos que funcionó
 
 Métricas que este plan puede mover y que se miden con lo que ya tenemos:

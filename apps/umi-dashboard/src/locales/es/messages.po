@@ -692,6 +692,7 @@ msgstr "Caja"
 #: src/screens/caja-turnos.jsx
 #: src/screens/recibos.jsx
 #: src/screens/reembolsos.jsx
+#: src/screens/ventas-report.jsx
 msgid "Operador"
 msgstr "Operador"
 
@@ -6456,6 +6457,7 @@ msgid "Encargado"
 msgstr "Encargado"
 
 #: src/screens/profile.jsx
+#: src/screens/staff.jsx
 msgid "Personal"
 msgstr "Personal"
 
@@ -7489,13 +7491,13 @@ msgstr "p. ej. la del centro, junto al parque"
 #~ msgstr "No se borra nada: el historial de sus turnos y ventas se conserva, y puedes devolverle el acceso desde esta misma pantalla cuando quieras."
 
 #: src/screens/staff.jsx
-msgid "Admin"
-msgstr "Admin"
+#: src/screens/ventas-report.jsx
+#~ msgid "Barista"
+#~ msgstr "Barista"
 
 #: src/screens/staff.jsx
-#: src/screens/ventas-report.jsx
-msgid "Barista"
-msgstr "Barista"
+msgid "Admin"
+msgstr "Admin"
 
 #: src/screens/staff.jsx
 msgid "Carrito"
