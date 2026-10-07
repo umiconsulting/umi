@@ -207,6 +207,8 @@ jobs:
         env:
           DATABASE_URL_APP: postgresql://api_login:harness_api@localhost:5432/umi_build_v3_ci
           DATABASE_URL_WORKER: postgresql://worker_login:harness_worker@localhost:5432/umi_build_v3_ci
+          # Reward expiry fixtures shift immutable deadlines in this private database.
+          DATABASE_URL_ADMIN: postgresql://postgres:postgres@localhost:5432/umi_build_v3_ci
           # Declared because the config schema requires it. No suite in this
           # family opens a Redis connection — verified by running them all with
           # no Redis process at all.
