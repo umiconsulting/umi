@@ -1,3 +1,5 @@
+import { i18n } from '@lingui/core';
+import { plural } from '@lingui/core/macro';
 /** Keep the original command after an uncertain response. */
 export class LoyaltyOperation {
   request = null;
@@ -21,7 +23,7 @@ export class LoyaltyOperation {
 }
 export function rewardExpiryLabel(expiresAt, timezone = 'America/Mexico_City') {
   return expiresAt
-    ? new Intl.DateTimeFormat('es-MX', {
+    ? new Intl.DateTimeFormat(i18n.locale === 'en' ? 'en-US' : 'es-MX', {
         dateStyle: 'medium',
         timeStyle: 'short',
         timeZone: timezone,
@@ -30,5 +32,6 @@ export function rewardExpiryLabel(expiresAt, timezone = 'America/Mexico_City') {
 }
 
 export function rewardVisitCostLabel(visits, cost) {
-  return `${cost} visitas · quedan ${Math.max(0, visits - cost)}`;
+  const remaining = Math.max(0, visits - cost);
+  return `${plural(cost, { one: '# visita', other: '# visitas' })} · ${plural(remaining, { one: '# visita restante', other: '# visitas restantes' })}`;
 }

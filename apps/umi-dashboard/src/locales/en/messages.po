@@ -207,6 +207,14 @@ msgstr "The server did not return a session. Try again."
 msgid "Código incorrecto o vencido."
 msgstr "Incorrect or expired code."
 
+#: src/lib/loyalty-operation.js
+msgid "{cost, plural, one {# visita} other {# visitas}}"
+msgstr "{cost, plural, one {# visit} other {# visits}}"
+
+#: src/lib/loyalty-operation.js
+msgid "{remaining, plural, one {# visita restante} other {# visitas restantes}}"
+msgstr "{remaining, plural, one {# visit left} other {# visits left}}"
+
 #: src/lib/module-registry.js
 #: src/screens/catalog-inventory.jsx
 #: src/shell.jsx
@@ -994,6 +1002,15 @@ msgstr "Waiting"
 #~ msgstr "<0>{0}</0> with memory"
 
 #: src/screens/customers.jsx
+#~ msgid "Sellos (1–50)"
+#~ msgstr "Stamps (1–50)"
+
+#. placeholder {0}: account.visitsThisCycle || 0
+#: src/screens/customers.jsx
+#~ msgid "{0} en este ciclo"
+#~ msgstr "{0} this cycle"
+
+#: src/screens/customers.jsx
 #: src/screens/inventory-costing.jsx
 #: src/screens/inventory-filters.jsx
 #: src/screens/orders.jsx
@@ -1389,8 +1406,8 @@ msgid "de lealtad"
 msgstr "loyalty"
 
 #: src/screens/customers.jsx
-msgid "Sellos (1–50)"
-msgstr "Stamps (1–50)"
+msgid "Sellos (1–{maxSeals})"
+msgstr "Stamps (1–{maxSeals})"
 
 #: src/screens/customers.jsx
 msgid "Nota (opcional)"
@@ -1456,8 +1473,48 @@ msgid "Este cliente todavía no tiene una cuenta de lealtad activa."
 msgstr "This customer does not have an active loyalty account yet."
 
 #: src/screens/customers.jsx
+msgid "La respuesta no confirma el canje. Reintenta la misma operación."
+msgstr "Redemption was not confirmed. Retry the same request."
+
+#: src/screens/customers.jsx
 msgid "No se pudo registrar la acción."
 msgstr "The action could not be recorded."
+
+#. placeholder {0}: account.visitsRequired
+#. placeholder {1}: account.rewardName
+#: src/screens/customers.jsx
+msgid "Puedes seguir hasta {0} visitas para {1}."
+msgstr "Keep going to {0} visits for {1}."
+
+#: src/screens/customers.jsx
+msgid "Canjea la recompensa antes de registrar otra visita."
+msgstr "Redeem a reward before recording another visit."
+
+#: src/screens/customers.jsx
+msgid "Saldo anterior:"
+msgstr "Previous rewards:"
+
+#. placeholder {0}: account.legacyPendingRewards
+#: src/screens/customers.jsx
+msgid "{0, plural, one {# recompensa} other {# recompensas}}"
+msgstr "{0, plural, one {# reward} other {# rewards}}"
+
+#. placeholder {0}: rewardExpiryLabel(account.nextRewardExpiresAt, account.merchantTimezone)
+#. placeholder {1}: account.merchantTimezone
+#: src/screens/customers.jsx
+msgid "Vence: {0} ({1})."
+msgstr "Expires: {0} ({1})."
+
+#. placeholder {0}: item.quantity
+#. placeholder {1}: item.rewardName
+#. placeholder {2}: rewardExpiryLabel(item.expiresAt, account.merchantTimezone)
+#: src/screens/customers.jsx
+msgid "{0} × {1} · Vence: {2}"
+msgstr "{0} × {1} · Expires: {2}"
+
+#: src/screens/customers.jsx
+msgid "Elige una recompensa. Conserva las visitas que sobren."
+msgstr "Choose one reward. Keep any visits left over."
 
 #: src/screens/customers.jsx
 msgid "Saldo del monedero"
@@ -1474,8 +1531,8 @@ msgstr "Total visits"
 
 #. placeholder {0}: account.visitsThisCycle || 0
 #: src/screens/customers.jsx
-msgid "{0} en este ciclo"
-msgstr "{0} this cycle"
+msgid "{0, plural, one {# visita disponible} other {# visitas disponibles}}"
+msgstr "{0, plural, one {# visit available} other {# visits available}}"
 
 #: src/screens/customers.jsx
 #: src/screens/members.jsx
@@ -1500,9 +1557,50 @@ msgstr "Record visit"
 msgid "Canjeando…"
 msgstr "Redeeming…"
 
+#. placeholder {0}: account.baseReward.rewardName
+#. placeholder {0}: account.rewardName
+#: src/screens/customers.jsx
+msgid "Canjear {0}"
+msgstr "Redeem {0}"
+
 #: src/screens/customers.jsx
 msgid "Canjear recompensa"
 msgstr "Redeem reward"
+
+#: src/screens/customers.jsx
+msgid "Número de recibo"
+msgstr "Receipt number"
+
+#: src/screens/customers.jsx
+msgid "Cantidad del saldo anterior"
+msgstr "Previous rewards to redeem"
+
+#: src/screens/customers.jsx
+msgid "La respuesta es incierta. Reintenta la misma operación para obtener el resultado."
+msgstr "The result is uncertain. Retry the same request."
+
+#: src/screens/customers.jsx
+msgid "Reintentar la misma operación"
+msgstr "Retry the same request"
+
+#. placeholder {0}: scanResult.quantity
+#. placeholder {1}: scanResult.items.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ')
+#: src/screens/customers.jsx
+msgid "Canje: {0} · {1}"
+msgstr "Redeemed: {0} · {1}"
+
+#. placeholder {0}: scanResult.remainingVisits ?? account.visitsThisCycle
+#. placeholder {1}: scanResult.remainingRewards
+#. placeholder {2}: scanResult.externalReceiptNumber
+#: src/screens/customers.jsx
+msgid "Visitas restantes: {0} · Recompensas restantes: {1} · Recibo: {2}"
+msgstr "Visits left: {0} · Rewards left: {1} · Receipt: {2}"
+
+#. placeholder {0}: scanResult.operator.name
+#. placeholder {1}: rewardExpiryLabel(scanResult.redeemedAt, account.merchantTimezone)
+#: src/screens/customers.jsx
+msgid "Operador: {0} · {1}"
+msgstr "Staff: {0} · {1}"
 
 #: src/screens/customers.jsx
 msgid "Identidades"

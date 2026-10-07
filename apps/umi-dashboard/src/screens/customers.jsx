@@ -930,15 +930,13 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
         <div className="profile-stack">
           {account.baseReward?.canRedeem && (
             <p>
-              <Trans>
-                {account.baseReward.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.baseReward.visitsRequired)}.
-                {account.visitsThisCycle < account.visitsRequired && ` Puedes continuar hasta ${account.visitsRequired} visitas para ${account.rewardName}.`}
-              </Trans>
+              {account.baseReward.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.baseReward.visitsRequired)}.
+              {account.visitsThisCycle < account.visitsRequired && <>{' '}<Trans>Puedes seguir hasta {account.visitsRequired} visitas para {account.rewardName}.</Trans></>}
             </p>
           )}
           {account.visitsThisCycle >= account.visitsRequired && (
             <p>
-              <Trans>{account.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.visitsRequired)}.</Trans>
+              {account.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.visitsRequired)}.
             </p>
           )}
           {account.visitBlockedReason && (
@@ -948,7 +946,7 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
           )}
           {!!account.legacyPendingRewards && (
             <p>
-              <Trans>Saldo anterior: {account.legacyPendingRewards} recompensas.</Trans>
+              <Trans>Saldo anterior:</Trans>{' '}<Plural value={account.legacyPendingRewards} one="# recompensa" other="# recompensas" />
             </p>
           )}
           {account.nextRewardExpiresAt && (
@@ -984,7 +982,7 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
         <Metric
           label={t`Visitas totales`}
           value={account.totalVisits || 0}
-          note={t`${account.visitsThisCycle || 0} visitas disponibles`}
+          note={<Plural value={account.visitsThisCycle || 0} one="# visita disponible" other="# visitas disponibles" />}
           icon={<I.Stamp size={18} />}
         />
         <Metric
@@ -1039,7 +1037,7 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
                 {scanBusy === 'REDEEM' ? (
                   <Trans>Canjeando…</Trans>
                 ) : (
-                  <Trans>Canjear {account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards ? account.rewardName : 'recompensa'}</Trans>
+                  account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards ? <Trans>Canjear {account.rewardName}</Trans> : <Trans>Canjear recompensa</Trans>
                 )}
               </button>
             )}
