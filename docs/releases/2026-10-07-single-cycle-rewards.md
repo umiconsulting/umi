@@ -2,6 +2,8 @@
 
 Status: local implementation. Production activation has not occurred.
 
+Current production gates are recorded in [the production preparation record](2026-10-07-single-cycle-rewards-production-preflight.md).
+
 The tenant policy uses one reward entitlement with two choices.
 The base reward costs 7 visits. The higher reward costs 9 visits.
 Unused visits remain. Further visits stop at 9 until redemption or expiry.
