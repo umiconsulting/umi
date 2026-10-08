@@ -5,7 +5,11 @@ import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
-import { LoyaltyOperation, rewardExpiryLabel, rewardVisitCostLabel } from '@/lib/loyalty-operation.js';
+import {
+  LoyaltyOperation,
+  rewardExpiryLabel,
+  rewardVisitCostLabel,
+} from '@/lib/loyalty-operation.js';
 import { XSep } from '@/shell.jsx';
 import { Segmented } from '@/components/segmented.jsx';
 import { PageHead } from '@/components/page-head.jsx';
@@ -910,7 +914,11 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
         throw new Error(t`La respuesta no confirma el canje. Reintenta la misma operación.`);
       operation.current.finish(200);
       setPendingRequest(null);
-      onScanResult(response.redemption ? { ...response.redemption, remainingVisits: response.card?.visitsThisCycle } : null);
+      onScanResult(
+        response.redemption
+          ? { ...response.redemption, remainingVisits: response.card?.visitsThisCycle }
+          : null,
+      );
       setReceipt('');
       setRedeemQuantity('1');
       onCredited?.();
@@ -930,13 +938,22 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
         <div className="profile-stack">
           {account.baseReward?.canRedeem && (
             <p>
-              {account.baseReward.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.baseReward.visitsRequired)}.
-              {account.visitsThisCycle < account.visitsRequired && <>{' '}<Trans>Puedes seguir hasta {account.visitsRequired} visitas para {account.rewardName}.</Trans></>}
+              {account.baseReward.rewardName}:{' '}
+              {rewardVisitCostLabel(account.visitsThisCycle, account.baseReward.visitsRequired)}.
+              {account.visitsThisCycle < account.visitsRequired && (
+                <>
+                  {' '}
+                  <Trans>
+                    Puedes seguir hasta {account.visitsRequired} visitas para {account.rewardName}.
+                  </Trans>
+                </>
+              )}
             </p>
           )}
           {account.visitsThisCycle >= account.visitsRequired && (
             <p>
-              {account.rewardName}: {rewardVisitCostLabel(account.visitsThisCycle, account.visitsRequired)}.
+              {account.rewardName}:{' '}
+              {rewardVisitCostLabel(account.visitsThisCycle, account.visitsRequired)}.
             </p>
           )}
           {account.visitBlockedReason && (
@@ -946,7 +963,12 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
           )}
           {!!account.legacyPendingRewards && (
             <p>
-              <Trans>Saldo anterior:</Trans>{' '}<Plural value={account.legacyPendingRewards} one="# recompensa" other="# recompensas" />
+              <Trans>Saldo anterior:</Trans>{' '}
+              <Plural
+                value={account.legacyPendingRewards}
+                one="# recompensa"
+                other="# recompensas"
+              />
             </p>
           )}
           {account.nextRewardExpiresAt && (
@@ -966,9 +988,7 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
             </p>
           ))}
           <p>
-            <Trans>
-              Elige una recompensa. Conserva las visitas que sobren.
-            </Trans>
+            <Trans>Elige una recompensa. Conserva las visitas que sobren.</Trans>
           </p>
         </div>
       )}
@@ -982,7 +1002,13 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
         <Metric
           label={t`Visitas totales`}
           value={account.totalVisits || 0}
-          note={<Plural value={account.visitsThisCycle || 0} one="# visita disponible" other="# visitas disponibles" />}
+          note={
+            <Plural
+              value={account.visitsThisCycle || 0}
+              one="# visita disponible"
+              other="# visitas disponibles"
+            />
+          }
           icon={<I.Stamp size={18} />}
         />
         <Metric
@@ -1036,8 +1062,10 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
                 <I.Gift size={14} />{' '}
                 {scanBusy === 'REDEEM' ? (
                   <Trans>Canjeando…</Trans>
+                ) : account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards ? (
+                  <Trans>Canjear {account.rewardName}</Trans>
                 ) : (
-                  account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards ? <Trans>Canjear {account.rewardName}</Trans> : <Trans>Canjear recompensa</Trans>
+                  <Trans>Canjear recompensa</Trans>
                 )}
               </button>
             )}
@@ -1108,7 +1136,9 @@ function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
           </p>
           <p>
             <Trans>
-              Visitas restantes: {scanResult.remainingVisits ?? account.visitsThisCycle} · Recompensas restantes: {scanResult.remainingRewards} · Recibo: {scanResult.externalReceiptNumber}
+              Visitas restantes: {scanResult.remainingVisits ?? account.visitsThisCycle} ·
+              Recompensas restantes: {scanResult.remainingRewards} · Recibo:{' '}
+              {scanResult.externalReceiptNumber}
             </Trans>
           </p>
           <p>
@@ -1226,7 +1256,12 @@ function EmptyState({ icon, title, detail }) {
 function CustomerProfile(props) {
   const { selectedMerchantId } = useMerchant();
   // Refreshes keep the committed receipt; changing customer or merchant clears it.
-  return <CustomerProfileContent key={`${selectedMerchantId || ''}:${props.customerId || ''}`} {...props} />;
+  return (
+    <CustomerProfileContent
+      key={`${selectedMerchantId || ''}:${props.customerId || ''}`}
+      {...props}
+    />
+  );
 }
 
 function CustomerProfileContent({ customerId, onSearch }) {

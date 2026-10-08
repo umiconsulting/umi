@@ -27,6 +27,7 @@
 ## Task 1: Unit entitlements and availability
 
 **Files:**
+
 - Create `supabase/migrations/20261007000000_stamp_reward_entitlements.sql`.
 - Create `apps/umi-api/src/shared/loyalty/reward-entitlements.ts`.
 - Create `apps/umi-api/src/shared/loyalty/reward-entitlements.integration.ts`.

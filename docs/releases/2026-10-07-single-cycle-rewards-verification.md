@@ -30,14 +30,14 @@ The private release fixture passed preflight, activation, activation rerun, and 
 Playwright drove the actual Cash and dashboard controls through CDP.
 The fixture cards used the canonical API for visit credits and redemptions.
 
-| Client | Starting state | Operation | Result |
-| --- | --- | --- | --- |
-| Cash | 8 visits | First reward | 1 retained visit, zero rewards |
-| Cash | 9 visits | First reward | 2 retained visits, zero rewards |
-| Cash | 9 visits | Second reward | Zero visits, zero rewards |
-| Cash | 7 visits | First reward with lost response | Retry returned the same claim, zero visits |
-| Cash | 3 historical rewards | Redeem quantity 3 | Zero historical rewards |
-| Dashboard | 8 visits | First reward | 1 retained visit and visible receipt after refresh |
+| Client    | Starting state       | Operation                       | Result                                             |
+| --------- | -------------------- | ------------------------------- | -------------------------------------------------- |
+| Cash      | 8 visits             | First reward                    | 1 retained visit, zero rewards                     |
+| Cash      | 9 visits             | First reward                    | 2 retained visits, zero rewards                    |
+| Cash      | 9 visits             | Second reward                   | Zero visits, zero rewards                          |
+| Cash      | 7 visits             | First reward with lost response | Retry returned the same claim, zero visits         |
+| Cash      | 3 historical rewards | Redeem quantity 3               | Zero historical rewards                            |
+| Dashboard | 8 visits             | First reward                    | 1 retained visit and visible receipt after refresh |
 
 At nine visits, both reward choices were available and mutually exclusive.
 Further visits and bulk credits were disabled.
