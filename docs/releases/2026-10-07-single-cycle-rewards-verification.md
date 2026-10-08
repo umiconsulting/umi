@@ -2,7 +2,8 @@
 
 The implementation remains on `feat/loyalty-expiry-and-redemption`, based on `affd6bc`.
 All database changes and browser operations used private fixtures.
-Production deployment, tenant activation, and customer balance corrections remain pending.
+Production deployment and tenant activation remain pending.
+Customer balance corrections use separate private audit records.
 Independent final spec and quality review passed through implementation commit `8c50526`.
 The reviewer found no open Critical or Important issue.
 
@@ -21,6 +22,11 @@ Cash operation checks passed seven tests. Dashboard operation and locale checks 
 API, Cash, and dashboard builds passed with the final changes.
 The dashboard catalogs passed extraction and strict compilation.
 The affected source files passed lint and whitespace checks.
+The production preparation also passed the complete affected build, lint, and test command.
+API units passed 1,766 tests; 29 tests stayed skipped under their existing configuration.
+Dashboard units passed 342 tests. The contract suite passed 80 tests.
+The repository's PR check passed, including its existing 67-warning lint baseline.
+The dashboard workflow now derives the contract version from the shared catalog.
 
 The schema checks cover expiry, retained visits, concurrent claims, replay, reversals, tenant isolation, reminders, and wallet refresh retries.
 The private release fixture passed preflight, activation, activation rerun, and verification SQL.
