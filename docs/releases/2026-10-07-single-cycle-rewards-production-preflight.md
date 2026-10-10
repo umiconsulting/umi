@@ -34,3 +34,16 @@ The production worker also inherits the image's HTTP healthcheck despite running
 Reminder delivery references: [WhatsApp service window](https://www.twilio.com/docs/whatsapp/key-concepts) and [template requests](https://www.twilio.com/docs/content/send-templates-created-with-the-content-template-builder).
 
 No credentials, private backup, or customer reconciliation data belong in the PR.
+
+## Merge into main with deployment held
+
+The October 10 merge uses a deployment hold so the reviewed code can enter `main` before the database migration.
+
+- Set repository variable `UMI_REWARD_RELEASE_HOLD=true` before the merge. Both production GitHub deployment jobs check it. Dashboard previews stay enabled.
+- Cash and dashboard Vercel configurations set `git.deploymentEnabled.main=false`. Other branches retain the provider's default deployment behavior.
+- Keep the three production apps on their current versions. New clients offer durable redemption retries, which the old API cannot honor.
+- After the backup, migration, and release checks pass, release the hold through a reviewed change. Deploy the matching API and worker before the clients.
+- Restore Vercel main deployments only after the matching API is ready. Remove or set the repository hold variable to `false` only as part of that release.
+- The API workflow has no manual dispatch trigger. Plan a current-main deployment trigger after the database checks; re-enabling a trigger does not deploy a missed commit.
+
+Configuration source: [Vercel configuration schema](https://openapi.vercel.sh/vercel.json). It defines branch-specific deployment control and enables unspecified branches by default.

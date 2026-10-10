@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   deploy:
+    if: ${{ vars.UMI_REWARD_RELEASE_HOLD != 'true' }}
     uses: ./.github/workflows/deploy-backend.yml
     with:
       app_name: umi-api
