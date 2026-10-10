@@ -1,3 +1,7 @@
+import {
+  cardPolicyFields,
+  rewardProfileWithSnapshot,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import QRCode from 'qrcode';
 import { formatMxn2 } from '../../shared/format/money';
@@ -48,14 +52,21 @@ export class CashCardService {
     // the pass use, and `cardRewardFields` is the shape umi-cash's own card route
     // returns (visitsRequired / rewardName / rewardDescription / baseReward /
     // pendingRewardName).
-    const profile = resolveRewardProfile(
-      profileRows.defaultConfig,
-      profileRows.overrideConfig,
-      profileRows.upgradeConfig,
+    const profile = rewardProfileWithSnapshot(
+      resolveRewardProfile(
+        profileRows.defaultConfig,
+        profileRows.overrideConfig,
+        profileRows.upgradeConfig,
+      ),
+      state,
     );
     const reward = cardRewardFields(profile, {
       visitsThisCycle: state.visits_this_cycle,
       pendingTier1: state.pending_tier1,
+      rewardPolicy: state.reward_policy,
+      cycleRewardAvailable: state.cycle_reward_available,
+      baseRewardBlockedByHistory: state.base_reward_blocked_by_history,
+      availableRewards: state.available_rewards,
     });
     const visitsRequired = reward.visitsRequired || DEFAULT_VISITS_REQUIRED;
 
@@ -69,6 +80,7 @@ export class CashCardService {
       totalVisits: state.total_visits,
       visitsThisCycle: state.visits_this_cycle,
       pendingRewards: state.pending_rewards,
+      ...cardPolicyFields(state),
       ...reward,
       // Capped, because a cycle can overshoot its threshold between the visit
       // that crossed it and the redemption that clears it.

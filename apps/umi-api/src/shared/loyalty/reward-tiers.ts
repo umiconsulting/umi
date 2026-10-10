@@ -39,8 +39,21 @@ export type NextTier = {
  */
 export function cardRewardFields(
   profile: RewardProfile,
-  card: { visitsThisCycle: number; pendingTier1: number },
+  card: {
+    visitsThisCycle: number;
+    pendingTier1: number;
+    rewardPolicy?: string;
+    cycleRewardAvailable?: boolean;
+    baseRewardBlockedByHistory?: boolean;
+    availableRewards?: { rewardName: string }[];
+  },
 ) {
+  const canRedeem =
+    isBaseReady(profile, card.visitsThisCycle) &&
+    (card.rewardPolicy !== 'single_cycle' ||
+      (card.cycleRewardAvailable === true &&
+        !card.baseRewardBlockedByHistory &&
+        card.visitsThisCycle <= profile.visitsRequired));
   return {
     visitsRequired: profile.visitsRequired,
     rewardName: profile.rewardName,
@@ -49,11 +62,16 @@ export function cardRewardFields(
       ? {
           visitsRequired: profile.baseTier.visitsRequired,
           rewardName: profile.baseTier.rewardName,
-          ready: isBaseReady(profile, card.visitsThisCycle),
+          ready: canRedeem,
+          ...(card.rewardPolicy === 'single_cycle' ? { canRedeem } : {}),
         }
       : null,
     // Which reward a banked redemption would hand over right now.
-    pendingRewardName: bankedReward(profile, card.pendingTier1).rewardName,
+    pendingRewardName:
+      card.rewardPolicy === 'single_cycle'
+        ? (card.availableRewards?.[0]?.rewardName ??
+          (canRedeem ? profile.baseTier!.rewardName : profile.rewardName))
+        : bankedReward(profile, card.pendingTier1).rewardName,
   };
 }
 

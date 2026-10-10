@@ -14,11 +14,10 @@ import {
 } from 'class-validator';
 
 /**
- * The four actions the register's scan screen can commit. `REDEEM_BASE` is the
- * early cash-out: at the ladder's LOWER threshold the barista hands over that tier
- * and the card is torn off, which is a different operation from `REDEEM` (a banked
- * reward) in two ways that matter — it consumes the cycle rather than a banked
- * reward, and it moves the card's `cycle_anchor`. See 79_cycle_anchor.sql.
+ * The four actions the register can commit. Under the single-cycle policy,
+ * REDEEM_BASE consumes seven visits and REDEEM consumes nine for the top reward.
+ * At nine, either action selects one reward from the same entitlement.
+ * Disabled merchants retain their existing ladder behavior.
  */
 const ACTIONS = ['VISIT', 'REDEEM', 'REDEEM_BASE', 'BIRTHDAY_REDEEM'] as const;
 type ScanAction = (typeof ACTIONS)[number];
@@ -37,6 +36,24 @@ export class ScanDto {
   @ArrayMaxSize(3)
   @IsIn(ACTIONS, { each: true })
   actions?: ScanAction[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  redeemQuantity?: number;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  externalReceiptNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(200)
+  idempotencyKey?: string;
 }
 
 /**

@@ -1,3 +1,7 @@
+import {
+  cardPolicyFields,
+  rewardProfileWithSnapshot,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { formatMxn, formatMxn2, iso } from '../../shared/format/money';
 import { CashRepository } from './cash.repository';
@@ -341,6 +345,7 @@ export class CashReadService {
       totalVisits: Number(r.totalVisits ?? 0),
       visitsThisCycle: Number(r.visitsThisCycle ?? 0),
       pendingRewards: Number(r.pendingRewards ?? 0),
+      ...cardPolicyFields(r),
       lastVisit: r.lastVisit ? new Date(r.lastVisit).toISOString() : null,
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : null,
       ltvCentavos: Number(r.ltvCentavos ?? 0),
@@ -474,10 +479,13 @@ export class CashReadService {
     ]);
     if (!state) throw new NotFoundException({ error: 'Cliente no encontrado' });
 
-    const profile = resolveRewardProfile(
-      rewardRows.defaultConfig,
-      rewardRows.overrideConfig,
-      rewardRows.upgradeConfig,
+    const profile = rewardProfileWithSnapshot(
+      resolveRewardProfile(
+        rewardRows.defaultConfig,
+        rewardRows.overrideConfig,
+        rewardRows.upgradeConfig,
+      ),
+      state,
     );
     const ltvCentavos = Number(totals.ltvCentavos ?? 0);
     const totalTopupCentavos = Number(totals.topupCentavos ?? 0);
@@ -499,6 +507,7 @@ export class CashReadService {
       totalVisits: state.total_visits,
       visitsThisCycle: state.visits_this_cycle,
       pendingRewards: state.pending_rewards,
+      ...cardPolicyFields(state),
       // The cycle's threshold and reward name, plus the ladder: `baseReward` is
       // the lower rung and `pendingRewardName` which tier a banked redemption
       // would hand over right now. The screen's last line — "Puede canjear
@@ -506,6 +515,10 @@ export class CashReadService {
       ...cardRewardFields(profile, {
         visitsThisCycle: state.visits_this_cycle,
         pendingTier1: state.pending_tier1,
+        rewardPolicy: state.reward_policy,
+        cycleRewardAvailable: state.cycle_reward_available,
+        baseRewardBlockedByHistory: state.base_reward_blocked_by_history,
+        availableRewards: state.available_rewards,
       }),
       rewardsRedeemed: redemptions.total,
       // This customer's own reward, if the café gave her one. The override row is

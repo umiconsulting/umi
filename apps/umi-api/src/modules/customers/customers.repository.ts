@@ -346,13 +346,24 @@ export class CustomersRepository {
            lc.card_number,
            agg.balance_cents::int                        AS balance_cents,
            agg.total_visits::int                         AS total_visits,
-           ((agg.total_visits - lc.cycle_anchor) % vr.n)::int AS visits_this_cycle,
-           (lc.rewards_earned - agg.redemptions)::int    AS pending_rewards,
+           rs.visits_this_cycle,
+           rs.pending_rewards,
+           rs.reward_policy,rs.reward_expiry_days,rs.next_reward_expires_at,rs.legacy_pending_rewards,
+           rs.cycle_reward_available,rs.visit_blocked_reason,rs.available_rewards,rs.merchant_timezone,
+           rs.reward_name,rs.visits_required,rs.base_reward_name,rs.base_visits_required,
+           EXISTS(SELECT 1 FROM merchant.loyalty_reward_entitlement h
+             WHERE h.merchant_id=lc.merchant_id AND h.card_id=lc.id AND (h.source='legacy' OR h.recovery)
+               AND h.redeemed_at IS NULL AND h.expired_at IS NULL AND h.expires_at>statement_timestamp()
+               AND h.expires_at <= (SELECT min(e.expires_at) FROM merchant.loyalty_reward_entitlement e
+                 WHERE e.merchant_id=lc.merchant_id AND e.card_id=lc.id AND e.source='cycle' AND NOT e.recovery
+                   AND e.cycle_anchor=lc.cycle_anchor AND e.tier IN ('base','top') AND e.redeemed_at IS NULL
+                   AND e.expired_at IS NULL AND e.expires_at>statement_timestamp())) AS base_reward_blocked_by_history,
            lc.created_at,
            lc.updated_at
          FROM merchant.loyalty_card AS lc
          JOIN merchant.customer AS cu ON cu.merchant_id = lc.merchant_id AND cu.id = lc.customer_id
          CROSS JOIN vr
+         CROSS JOIN LATERAL merchant.loyalty_reward_card_state(lc.merchant_id,lc.id) rs
          CROSS JOIN LATERAL (
            SELECT
              (SELECT COALESCE(sum(v.stamps), 0) FROM merchant.loyalty_visit v WHERE v.merchant_id = lc.merchant_id AND v.card_id = lc.id) AS total_visits,

@@ -788,12 +788,24 @@ async function topupWallet({ cardId, amountCentavos, note, idempotencyKey }) {
 // signed QR to a plain CARD NUMBER, so the dashboard passes the card number it already
 // shows. `action` is 'VISIT' (add a stamp) or 'REDEEM' (claim an earned reward); the
 // API enforces the reward-cycle math and rejects a redeem with nothing to claim.
-async function loyaltyScan({ cardNumber, action }) {
+async function loyaltyScan({
+  cardNumber,
+  action,
+  redeemQuantity,
+  externalReceiptNumber,
+  idempotencyKey,
+}) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(routes.cash.byRef.scan(merchantId), {
     method: 'POST',
-    body: JSON.stringify({ qrPayload: cardNumber, action }),
+    body: JSON.stringify({
+      qrPayload: cardNumber,
+      action,
+      redeemQuantity,
+      externalReceiptNumber,
+      idempotencyKey,
+    }),
   });
 }
 

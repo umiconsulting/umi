@@ -254,3 +254,26 @@ describe('Google loyalty object · identity', () => {
     expect(obj.barcode.alternateText).toBe('KLC-4076462081');
   });
 });
+
+it('renders the available cycle reward and original deadline in the merchant timezone', () => {
+  const rendered = modules(
+    build({
+      rewardPolicy: 'single_cycle',
+      visitsThisCycle: 9,
+      visitsRequired: 9,
+      rewardName: 'Original upper',
+      baseReward: { visitsRequired: 7, rewardName: 'Original base' },
+      pendingRewards: 1,
+      cycleRewardAvailable: true,
+      legacyPendingRewards: 0,
+      merchantTimezone: 'America/Mazatlan',
+      nextRewardExpiresAt: '2026-11-06T18:00:00Z',
+    }),
+  ).find((module) => module.id === 'pending_rewards');
+  expect(rendered?.body).toContain('Original upper');
+  expect(rendered?.body).toContain('11:00');
+  expect(rendered?.body).toContain('Canjea antes de otra visita');
+  expect(rendered?.body).toContain('Original base');
+  expect(rendered?.body).toContain('7 visitas · quedan 2');
+  expect(rendered?.body).toContain('9 visitas · quedan 0');
+});

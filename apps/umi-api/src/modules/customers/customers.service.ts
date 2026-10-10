@@ -1,3 +1,4 @@
+import { cardPolicyFields } from '../../shared/loyalty/reward-policy-presentation';
 import { Inject, Injectable } from '@nestjs/common';
 import { formatMxn, iso } from '../../shared/format/money';
 import { isProductStatusActive } from '@umi/contract';
@@ -573,6 +574,22 @@ export class CustomersService {
         totalVisits: Number(row.total_visits || 0),
         visitsThisCycle: Number(row.visits_this_cycle || 0),
         pendingRewards: Number(row.pending_rewards || 0),
+        ...cardPolicyFields(row),
+        visitsRequired: Number(row.visits_required || 10),
+        rewardName: row.reward_name ?? '',
+        baseReward:
+          row.base_reward_name && row.base_visits_required
+            ? {
+                visitsRequired: Number(row.base_visits_required),
+                rewardName: row.base_reward_name,
+                canRedeem:
+                  row.reward_policy === 'single_cycle' &&
+                  row.cycle_reward_available === true &&
+                  !row.base_reward_blocked_by_history &&
+                  Number(row.visits_this_cycle) >= Number(row.base_visits_required) &&
+                  Number(row.visits_this_cycle) <= Number(row.visits_required),
+              }
+            : null,
         createdAt: iso(row.created_at),
         updatedAt: iso(row.updated_at),
       },

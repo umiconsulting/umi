@@ -263,3 +263,51 @@ describe('visitMoment', () => {
     ).toMatchObject({ journey: 'base_reward_ready', rewardName: 'Capuccino' });
   });
 });
+
+it('keeps the base reward available as an alternative at nine', () => {
+  const profile: RewardProfile = {
+    visitsRequired: 9,
+    rewardName: 'Upper',
+    rewardDescription: null,
+    redemptionConfigId: null,
+    baseTier: { visitsRequired: 7, rewardName: 'Base', rewardDescription: null, configId: null },
+  };
+  expect(
+    cardRewardFields(profile, {
+      visitsThisCycle: 9,
+      pendingTier1: 0,
+      rewardPolicy: 'single_cycle',
+      cycleRewardAvailable: true,
+    }).baseReward,
+  ).toMatchObject({ ready: true, canRedeem: true });
+  expect(
+    cardRewardFields(profile, {
+      visitsThisCycle: 8,
+      pendingTier1: 0,
+      rewardPolicy: 'single_cycle',
+      cycleRewardAvailable: true,
+    }).baseReward,
+  ).toMatchObject({ ready: true, canRedeem: true });
+});
+
+it.each([true, false])(
+  'shows base eligibility only after earlier history clears: blocked=%s',
+  (blocked) => {
+    const profile: RewardProfile = {
+      visitsRequired: 9,
+      rewardName: 'Upper',
+      rewardDescription: null,
+      redemptionConfigId: null,
+      baseTier: { visitsRequired: 7, rewardName: 'Base', rewardDescription: null, configId: null },
+    };
+    expect(
+      cardRewardFields(profile, {
+        visitsThisCycle: 8,
+        pendingTier1: 0,
+        rewardPolicy: 'single_cycle',
+        cycleRewardAvailable: true,
+        baseRewardBlockedByHistory: blocked,
+      }).baseReward,
+    ).toMatchObject({ ready: !blocked, canRedeem: !blocked });
+  },
+);

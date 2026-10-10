@@ -1447,7 +1447,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: null,
     contract: {
       request: 'ScanRequest',
-      response: null,
+      response: 'ScanResponse',
       auth: 'session',
       permission: null,
       idempotent: false,

@@ -1,3 +1,8 @@
+import {
+  policyRewardCopy,
+  policyReadyFrontFields,
+  type PolicyPresentation,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
@@ -237,14 +242,15 @@ export class ApplePassBuilder {
       // the row once the lower tier is reached. No `changeMessage` on these — a visit
       // changes several at once and iOS collapses them into a generic notification; the
       // lifecycle back field is the single notification channel (see the scan).
-      for (const field of appleFrontFields(
-        profileFromWalletFields({
-          visitsRequired: data.visitsRequired,
-          rewardName: data.rewardName,
-          baseReward: data.baseReward,
-        }),
-        data.visitsThisCycle,
-      )) {
+      for (const field of policyReadyFrontFields(data) ??
+        appleFrontFields(
+          profileFromWalletFields({
+            visitsRequired: data.visitsRequired,
+            rewardName: data.rewardName,
+            baseReward: data.baseReward,
+          }),
+          data.visitsThisCycle,
+        )) {
         pass.secondaryFields.push(field);
       }
       // Néctar Café asked for the member name on the front of the stamps pass.
@@ -267,6 +273,24 @@ export class ApplePassBuilder {
       });
     }
 
+    const policyCopy = policyRewardCopy(data);
+    if (policyCopy) {
+      pass.backFields.push({
+        key: 'cyclePolicy',
+        label: policyCopy.header,
+        value: policyCopy.body,
+      });
+      if (data.nextRewardExpiresAt)
+        pass.auxiliaryFields.push({
+          key: 'rewardExpiry',
+          label: 'VENCE',
+          value: new Intl.DateTimeFormat('es-MX', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: data.merchantTimezone,
+          }).format(new Date(data.nextRewardExpiresAt)),
+        });
+    }
     if (data.birthdayRewardName) {
       pass.auxiliaryFields.push({
         key: 'birthdayReward',
@@ -339,7 +363,7 @@ export class ApplePassBuilder {
 
 // ─── types and constants ─────────────────────────────────────────────────────
 
-export interface ApplePassData {
+export interface ApplePassData extends PolicyPresentation {
   serial: string;
   authToken: string;
   cardNumber: string;

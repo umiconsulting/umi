@@ -64,6 +64,7 @@ permissions:
 
 jobs:
   deploy:
+    if: ${{ (github.head_ref || github.ref_name) != 'main' || vars.UMI_REWARD_RELEASE_HOLD != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -95,16 +96,16 @@ jobs:
           # backend is chosen at runtime by the Pages "Preview" env var
           # API_ORIGIN. All values here are public build-time config.
           BRANCH="${{ github.head_ref || github.ref_name }}"
+          CONTRACT_VERSION="$(sed -n "s/^export const CONTRACT_VERSION = '\(.*\)';$/\1/p" packages/contract/src/catalog.ts)"
+          test -n "$CONTRACT_VERSION" || { echo "CONTRACT_VERSION not found in packages/contract/src/catalog.ts"; exit 1; }
           if [ "$BRANCH" = "main" ]; then
             ENVIRONMENT=production
             API_BASE=https://api.umiconsulting.co
             PUBLIC_URL=https://dashboard.umiconsulting.co
-            CONTRACT_VERSION=2.13.0
           else
             ENVIRONMENT=staging
             API_BASE=
             PUBLIC_URL=https://build-v3.umi-dashboard.pages.dev
-            CONTRACT_VERSION=2.18.0
           fi
           echo "Build env: branch=$BRANCH environment=$ENVIRONMENT api=${API_BASE:-(same-origin)}"
           cat > apps/umi-dashboard/.env.production.local <<EOF

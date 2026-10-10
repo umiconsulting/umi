@@ -1,3 +1,7 @@
+import {
+  cardPolicyFields,
+  rewardProfileWithSnapshot,
+} from '../../shared/loyalty/reward-policy-presentation';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   WalletPassRepository,
@@ -6,6 +10,7 @@ import {
 } from './wallet-pass.repository';
 import { ApplePassBuilder } from './apple-pass.builder';
 import { GooglePassService, type GooglePassData } from './google-pass.service';
+import { cardRewardFields } from '../../shared/loyalty/reward-tiers';
 import { resolveRewardProfile, type RewardProfile } from '../../shared/loyalty/reward-profile';
 
 /** What the customer is called on the pass when the café recorded no name. */
@@ -39,11 +44,19 @@ function profileOf(data: PassRenderData): RewardProfile {
  * before the cycle completes. Null on a single-reward café, which is every surface
  * that predates the ladder.
  */
-function walletBaseReward(profile: RewardProfile) {
+function walletBaseReward(profile: RewardProfile, state: PassRenderData['state']) {
+  const base = cardRewardFields(profile, {
+    visitsThisCycle: state.visits_this_cycle,
+    pendingTier1: state.pending_tier1,
+    rewardPolicy: state.reward_policy,
+    cycleRewardAvailable: state.cycle_reward_available,
+    baseRewardBlockedByHistory: state.base_reward_blocked_by_history,
+  }).baseReward;
   return profile.baseTier
     ? {
         visitsRequired: profile.baseTier.visitsRequired,
         rewardName: profile.baseTier.rewardName,
+        ...(state.reward_policy === 'single_cycle' ? { canRedeem: base?.canRedeem === true } : {}),
       }
     : null;
 }
@@ -175,6 +188,20 @@ export class WalletPassService {
     if (data) await this.google.updateObject(data);
   }
 
+  /** Return an explicit result for jobs with a durable retry marker. */
+  async refreshGoogleObjectWithOutcome(cardId: string): Promise<boolean> {
+    const merchantId = await this.repo.merchantForCard(cardId);
+    if (!merchantId) return true;
+    const objectId = await this.repo.googleObjectForCard(cardId);
+    if (!objectId) return true;
+    if (!this.google.isConfigured()) return false;
+    const data = await this.googlePassData(merchantId, cardId, objectId).catch(() => null);
+    if (!data) return false;
+    const outcome = await this.google.updateObject(data);
+    if (outcome === 'missing') await this.repo.markGoogleObjectRemoved(cardId);
+    return outcome === 'updated' || outcome === 'missing';
+  }
+
   /**
    * Refresh every Android pass at one café — the other half of the register's
    * "Actualizar pases", and the half that did not exist.
@@ -207,7 +234,7 @@ export class WalletPassService {
   ): Promise<GooglePassData> {
     const d = await this.repo.renderData(merchantId, cardId);
     if (!d) throw new NotFoundException('card_not_found');
-    const profile = profileOf(d);
+    const profile = rewardProfileWithSnapshot(profileOf(d), d.state);
     return {
       cardId,
       cardNumber: d.cardNumber,
@@ -224,8 +251,9 @@ export class WalletPassService {
       // the customer's phone in the first place.
       visitsRequired: profile.visitsRequired,
       rewardName: profile.rewardName,
-      baseReward: walletBaseReward(profile),
+      baseReward: walletBaseReward(profile, d.state),
       pendingTier1: d.state.pending_tier1,
+      ...cardPolicyFields(d.state),
       // Both builders read this. Drop it here and the reward line
       // disappears from the pass, with no error anywhere.
       birthdayRewardName: d.birthdayRewardName,
@@ -249,7 +277,7 @@ export class WalletPassService {
   async renderPass(pass: AuthenticatedPass): Promise<RenderedPass> {
     const data = await this.repo.renderData(pass.merchantId, pass.cardId);
     if (!data) throw new NotFoundException();
-    const profile = profileOf(data);
+    const profile = rewardProfileWithSnapshot(profileOf(data), data.state);
 
     const buffer = await this.builder.build({
       serial: pass.serialNumber,
@@ -265,8 +293,9 @@ export class WalletPassService {
       visitsRequired: profile.visitsRequired,
       totalVisits: data.state.total_visits,
       rewardName: profile.rewardName,
-      baseReward: walletBaseReward(profile),
+      baseReward: walletBaseReward(profile, data.state),
       pendingTier1: data.state.pending_tier1,
+      ...cardPolicyFields(data.state),
       birthdayRewardName: data.birthdayRewardName,
       passStyle: data.passStyle,
       primaryColor: data.primaryColor,

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
 import { isOpenAt, parseOpenHours } from '../business-hours/open-hours';
@@ -8,6 +14,13 @@ import {
   ACTIVE_LADDER_ROWS_SQL,
   CARD_OVERRIDE_ROW_SQL,
 } from '../../shared/loyalty/reward-config.sql';
+import {
+  expireCycleReward,
+  syncCycleReward,
+  redeemRewardEntitlements,
+  restoreRewardEntitlement,
+} from '../../shared/loyalty/reward-entitlements';
+import { resolveRewardProfile } from '../../shared/loyalty/reward-profile';
 import type { RewardConfigRow } from '../../shared/loyalty/reward-profile';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -80,6 +93,9 @@ export interface PerformScanInput {
   newVisitsThisCycle: number;
   momentMessage: string | null;
   newQrToken: string;
+  redeemQuantity?: number;
+  externalReceiptNumber?: string;
+  commandId?: string;
 }
 
 /** One canje, as the revert path reads it. */
@@ -87,6 +103,8 @@ export interface RedemptionRow {
   id: string;
   cardId: string;
   rewardId: string | null;
+  rewardName?: string | null;
+  isBase?: boolean | null;
   revertedAt: Date | null;
   /** The canje was an early cash-out (it consumed the cycle, not a banked reward). */
   cycleReset: boolean;
@@ -96,7 +114,16 @@ export interface RedemptionRow {
  * What a scan reports back. It is the shared derived state, unchanged — the
  * register and the wallet pass must never disagree about these numbers.
  */
-export type ScannedCard = LoyaltyCardState;
+export type ScannedCard = LoyaltyCardState & {
+  redemptionResult?: Awaited<ReturnType<typeof redeemRewardEntitlements>>;
+};
+export type LockedScannedCard = ScannedCard & {
+  id: string;
+  person_id: string | null;
+  display_name: string | null;
+  normalized_email: string | null;
+  qr_token: string | null;
+};
 
 /**
  * Scan reads + the atomic visit/redeem/birthday mutation. Scan touches loyalty
@@ -118,6 +145,80 @@ export type ScannedCard = LoyaltyCardState;
 @Injectable()
 export class CashScanRepository {
   constructor(private readonly pg: PgService) {}
+
+  private onClient<T>(
+    client: PoolClient | undefined,
+    work: (c: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    return client ? work(client) : this.pg.withMerchant(work);
+  }
+
+  async withLockedCard<T>(
+    merchantId: string,
+    cardId: string,
+    work: (client: PoolClient, card: LockedScannedCard) => Promise<T>,
+    client?: PoolClient,
+  ): Promise<T> {
+    return this.onClient(client, async (c) => {
+      const locked = await c.query<LockedScannedCard>(
+        `SELECT lc.id::text, lc.customer_id::text AS person_id, lc.qr_token,
+                cu.name AS display_name, NULL::text AS normalized_email
+         FROM merchant.loyalty_card lc
+         LEFT JOIN merchant.customer cu ON cu.merchant_id=lc.merchant_id AND cu.id=lc.customer_id
+         WHERE lc.merchant_id=$1::uuid AND lc.id=$2::uuid FOR UPDATE OF lc`,
+        [merchantId, cardId],
+      );
+      if (!locked.rows[0]) throw new NotFoundException('card_not_found');
+      await expireCycleReward(c, merchantId, cardId);
+      return work(c, { ...locked.rows[0], ...(await this.cardState(c, merchantId, cardId)) });
+    });
+  }
+
+  async findScanTarget(
+    c: PoolClient,
+    merchantId: string,
+    identifier: string,
+    allowPhone: boolean,
+  ): Promise<LockedScannedCard | null> {
+    const { rows } = await c.query<LockedScannedCard>(
+      `SELECT lc.id::text, lc.card_number, lc.qr_token, lc.customer_id::text AS person_id,
+              cu.name AS display_name, NULL::text AS normalized_email
+       FROM merchant.loyalty_card lc
+       LEFT JOIN merchant.customer cu ON cu.id=lc.customer_id AND cu.merchant_id=lc.merchant_id
+       WHERE lc.merchant_id=$1::uuid AND (lc.id::text=$2 OR lc.card_number=$2)
+       LIMIT 1`,
+      [merchantId, identifier],
+    );
+    if (rows[0] || !allowPhone) return rows[0] ?? null;
+    const phone = await c.query<{ id: string }>(
+      `SELECT lc.id::text FROM merchant.contact ct
+       JOIN umi.channel_type ch ON ch.id=ct.channel_id
+       JOIN merchant.loyalty_card lc ON lc.customer_id=ct.customer_id AND lc.merchant_id=ct.merchant_id
+       WHERE ct.merchant_id=$1::uuid AND ct.normalized_value=merchant.normalize_phone($2)
+         AND ch.key IN ('phone','whatsapp','sms') AND lc.status='active'
+       ORDER BY ct.is_primary DESC, ct.updated_at DESC, lc.created_at LIMIT 1`,
+      [merchantId, identifier],
+    );
+    return phone.rows[0] ? this.findScanTarget(c, merchantId, phone.rows[0].id, false) : null;
+  }
+
+  async writeLifecycleMessage(c: PoolClient, merchantId: string, cardId: string, message: string) {
+    await c.query(
+      `UPDATE merchant.loyalty_card SET lifecycle_message=$3,
+      lifecycle_message_at=clock_timestamp(), updated_at=clock_timestamp()
+      WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, cardId, message],
+    );
+  }
+
+  async authenticatedStaff(c: PoolClient, merchantId: string, userId: string) {
+    const { rows } = await c.query<{ id: string; name: string }>(
+      `SELECT id::text, name FROM merchant.staff WHERE merchant_id=$1::uuid
+       AND user_id=$2::uuid AND status='active' LIMIT 1`,
+      [merchantId, userId],
+    );
+    return rows[0] ?? null;
+  }
 
   async activeRewardConfig(merchantId: string): Promise<RewardConfig | null> {
     const { rows } = await this.pg.withMerchant((c) =>
@@ -144,12 +245,13 @@ export class CashScanRepository {
   async rewardProfileRows(
     merchantId: string,
     cardId: string,
+    client?: PoolClient,
   ): Promise<{
     defaultConfig: RewardConfigRow | null;
     upgradeConfig: RewardConfigRow | null;
     overrideConfig: RewardConfigRow | null;
   }> {
-    return this.pg.withMerchant(async (c) => {
+    return this.onClient(client, async (c) => {
       const [rows, override] = await Promise.all([
         c.query<Row>(ACTIVE_LADDER_ROWS_SQL, [merchantId]),
         c.query<Row>(CARD_OVERRIDE_ROW_SQL, [merchantId, cardId]),
@@ -164,8 +266,11 @@ export class CashScanRepository {
     });
   }
 
-  async merchantConfig(merchantId: string): Promise<ScanMerchantConfig | null> {
-    const { rows } = await this.pg.withMerchant((c) =>
+  async merchantConfig(
+    merchantId: string,
+    client?: PoolClient,
+  ): Promise<ScanMerchantConfig | null> {
+    const { rows } = await this.onClient(client, (c) =>
       c.query<Row>(
         `SELECT t.name, t.timezone,
                 s.lifecycle_copy AS lifecycle_copy,
@@ -191,12 +296,17 @@ export class CashScanRepository {
   }
 
   /** A visit within the last `seconds` (wallet 60s replay guard). */
-  async recentVisitWithin(merchantId: string, cardId: string, seconds: number): Promise<boolean> {
-    const { rows } = await this.pg.withMerchant((c) =>
+  async recentVisitWithin(
+    merchantId: string,
+    cardId: string,
+    seconds: number,
+    client?: PoolClient,
+  ): Promise<boolean> {
+    const { rows } = await this.onClient(client, (c) =>
       c.query(
         `SELECT 1 FROM merchant.loyalty_visit
          WHERE merchant_id=$1::uuid AND card_id=$2::uuid
-           AND occurred_at >= now() - ($3 || ' seconds')::interval
+           AND occurred_at >= clock_timestamp() - ($3 || ' seconds')::interval
          LIMIT 1`,
         [merchantId, cardId, String(seconds)],
       ),
@@ -205,12 +315,17 @@ export class CashScanRepository {
   }
 
   /** A visit since merchant-timezone local midnight (1-per-day guard). DST-safe. */
-  async visitedToday(merchantId: string, cardId: string, tz: string): Promise<boolean> {
-    const { rows } = await this.pg.withMerchant((c) =>
+  async visitedToday(
+    merchantId: string,
+    cardId: string,
+    tz: string,
+    client?: PoolClient,
+  ): Promise<boolean> {
+    const { rows } = await this.onClient(client, (c) =>
       c.query(
         `SELECT 1 FROM merchant.loyalty_visit
          WHERE merchant_id=$1::uuid AND card_id=$2::uuid
-           AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
+           AND occurred_at >= (date_trunc('day', clock_timestamp() AT TIME ZONE $3) AT TIME ZONE $3)
          LIMIT 1`,
         [merchantId, cardId, tz],
       ),
@@ -228,7 +343,7 @@ export class CashScanRepository {
       c.query<{ occurred_at: Date }>(
         `SELECT occurred_at FROM merchant.loyalty_visit
          WHERE merchant_id=$1::uuid AND card_id=$2::uuid
-           AND occurred_at >= (date_trunc('day', now() AT TIME ZONE $3) AT TIME ZONE $3)
+           AND occurred_at >= (date_trunc('day', clock_timestamp() AT TIME ZONE $3) AT TIME ZONE $3)
          ORDER BY occurred_at DESC
          LIMIT 1`,
         [merchantId, cardId, tz],
@@ -259,71 +374,134 @@ export class CashScanRepository {
    * their cycle position one after the other; otherwise both could read the same
    * "before" and both claim the reward it crossed.
    */
-  async creditSeals(input: CreditSealsInput): Promise<CreditSealsResult> {
-    return this.pg.withMerchant(async (c) => {
-      const locked = await c.query(
-        `SELECT id FROM merchant.loyalty_card
-         WHERE merchant_id = $1::uuid AND id = $2::uuid
-         FOR UPDATE`,
-        [input.merchantId, input.cardId],
-      );
-      // No row → the card is not this merchant's, or RLS hides it. Same answer.
-      if (!locked.rows[0]) throw new NotFoundException({ error: 'Tarjeta no encontrada' });
+  async creditSeals(input: CreditSealsInput, client?: PoolClient): Promise<CreditSealsResult> {
+    if (!Number.isInteger(input.seals) || input.seals < 1 || input.seals > 50)
+      throw new BadRequestException('Invalid stamp quantity');
+    return this.withLockedCard(
+      input.merchantId,
+      input.cardId,
+      async (c) => {
+        const before = await this.cardState(c, input.merchantId, input.cardId);
 
-      const before = await this.cardState(c, input.merchantId, input.cardId);
-
-      const inserted = await c.query<{ id: string }>(
-        `INSERT INTO merchant.loyalty_visit
+        const existing = input.idempotencyKey
+          ? (
+              await c.query<Row>(
+                `SELECT card_id::text, staff_id::text, stamps, note FROM merchant.loyalty_visit
+         WHERE merchant_id=$1::uuid AND idempotency_key=$2`,
+                [input.merchantId, input.idempotencyKey],
+              )
+            ).rows[0]
+          : null;
+        if (existing) {
+          if (
+            existing.card_id !== input.cardId ||
+            existing.staff_id !== input.staffMemberId ||
+            existing.stamps !== input.seals ||
+            existing.note !== input.note
+          ) {
+            throw new ConflictException('IDEMPOTENCY_CONFLICT');
+          }
+          return {
+            replayed: true,
+            cycleBefore: before.visits_this_cycle,
+            visitsRequired: before.visits_required,
+            card: before,
+          };
+        }
+        const enabled = before.reward_policy === 'single_cycle';
+        if (enabled) {
+          const cfg = await this.merchantConfig(input.merchantId, c);
+          if (!cfg?.multiSealEnabled) throw new ForbiddenException('Función no habilitada');
+          if (before.visit_blocked_reason || before.visits_this_cycle + input.seals > 9)
+            throw new BadRequestException('Credit exceeds the remaining cycle capacity');
+        }
+        const inserted = await c.query<{ id: string }>(
+          `INSERT INTO merchant.loyalty_visit
            (merchant_id, card_id, staff_id, source, stamps, note, idempotency_key)
          VALUES ($1::uuid, $2::uuid, $3::uuid, 'manual_bulk', $4, $5, $6)
          ON CONFLICT (merchant_id, idempotency_key) WHERE idempotency_key IS NOT NULL
            DO NOTHING
          RETURNING id`,
-        [
-          input.merchantId,
-          input.cardId,
-          input.staffMemberId,
-          input.seals,
-          input.note,
-          input.idempotencyKey,
-        ],
-      );
-      const replayed = inserted.rows.length === 0;
+          [
+            input.merchantId,
+            input.cardId,
+            input.staffMemberId,
+            input.seals,
+            input.note,
+            input.idempotencyKey,
+          ],
+        );
+        const replayed = inserted.rows.length === 0;
+        if (replayed) {
+          const row = (
+            await c.query<Row>(
+              `SELECT card_id::text, staff_id::text, stamps, note FROM merchant.loyalty_visit
+             WHERE merchant_id=$1::uuid AND idempotency_key=$2`,
+              [input.merchantId, input.idempotencyKey],
+            )
+          ).rows[0];
+          if (
+            !row ||
+            row.card_id !== input.cardId ||
+            row.staff_id !== input.staffMemberId ||
+            row.stamps !== input.seals ||
+            row.note !== input.note
+          ) {
+            throw new ConflictException('IDEMPOTENCY_CONFLICT');
+          }
+        }
 
-      // ⚠️ THE CARD ROW IS TOUCHED ON EVERY APPLIED CREDIT, crossing or not, and that
-      // is not bookkeeping. Apple answers `passesUpdatedSince` by comparing the card
-      // row; a stamp that leaves `updated_at` alone makes the phone ask "anything
-      // new?", hear "no" (204), and show NOTHING — no stamp, and no notification,
-      // because a 204 delivers no changeMessage. Reported from a real phone:
-      // "intenté agregar un sello y me salió que sí se hizo, pero mi wallet no se
-      // actualizó y no me llegó ninguna notificación".
-      //
-      // A bulk credit crosses the threshold as many times as it must — the one place
-      // a single action can complete more than one cycle. Counted as a difference of
-      // floors so a credit landing mid-cycle is worth exactly the crossings it added.
-      if (!replayed) {
-        const crossed =
-          Math.floor(
-            (before.total_visits + input.seals - before.cycle_anchor) / before.visits_required,
-          ) - Math.floor((before.total_visits - before.cycle_anchor) / before.visits_required);
-        await c.query(
-          `UPDATE merchant.loyalty_card
+        // ⚠️ THE CARD ROW IS TOUCHED ON EVERY APPLIED CREDIT, crossing or not, and that
+        // is not bookkeeping. Apple answers `passesUpdatedSince` by comparing the card
+        // row; a stamp that leaves `updated_at` alone makes the phone ask "anything
+        // new?", hear "no" (204), and show NOTHING — no stamp, and no notification,
+        // because a 204 delivers no changeMessage. Reported from a real phone:
+        // "intenté agregar un sello y me salió que sí se hizo, pero mi wallet no se
+        // actualizó y no me llegó ninguna notificación".
+        //
+        // A bulk credit crosses the threshold as many times as it must — the one place
+        // a single action can complete more than one cycle. Counted as a difference of
+        // floors so a credit landing mid-cycle is worth exactly the crossings it added.
+        if (!replayed) {
+          const crossed = enabled
+            ? 0
+            : Math.floor(
+                (before.total_visits + input.seals - before.cycle_anchor) / before.visits_required,
+              ) - Math.floor((before.total_visits - before.cycle_anchor) / before.visits_required);
+          await c.query(
+            `UPDATE merchant.loyalty_card
               SET rewards_earned = rewards_earned + $3,
                   lifecycle_message = $4::text,
                   lifecycle_message_at = CASE WHEN $4 IS NULL THEN NULL ELSE now() END,
                   updated_at = now()
             WHERE merchant_id = $1::uuid AND id = $2::uuid`,
-          [input.merchantId, input.cardId, crossed, input.momentMessage],
-        );
-      }
+            [input.merchantId, input.cardId, crossed, input.momentMessage],
+          );
+        }
 
-      return {
-        replayed,
-        cycleBefore: before.visits_this_cycle,
-        visitsRequired: before.visits_required,
-        card: replayed ? before : await this.cardState(c, input.merchantId, input.cardId),
-      };
-    });
+        if (enabled && !replayed) {
+          const rows = await this.rewardProfileRows(input.merchantId, input.cardId, c);
+          await syncCycleReward(c, {
+            merchantId: input.merchantId,
+            cardId: input.cardId,
+            lifetimeTotal: before.total_visits + input.seals,
+            cycleAnchor: before.cycle_anchor,
+            profile: resolveRewardProfile(
+              rows.defaultConfig,
+              rows.overrideConfig,
+              rows.upgradeConfig,
+            ),
+          });
+        }
+        return {
+          replayed,
+          cycleBefore: before.visits_this_cycle,
+          visitsRequired: before.visits_required,
+          card: replayed ? before : await this.cardState(c, input.merchantId, input.cardId),
+        };
+      },
+      client,
+    );
   }
 
   /** The shared derived state, on a client already inside a transaction. */
@@ -337,12 +515,13 @@ export class CashScanRepository {
     merchantId: string,
     cardId: string,
     seconds: number,
+    client?: PoolClient,
   ): Promise<boolean> {
-    const { rows } = await this.pg.withMerchant((c) =>
+    const { rows } = await this.onClient(client, (c) =>
       c.query(
         `SELECT 1 FROM merchant.loyalty_redemption
          WHERE merchant_id=$1::uuid AND card_id=$2::uuid
-           AND occurred_at >= now() - ($3 || ' seconds')::interval
+           AND occurred_at >= clock_timestamp() - ($3 || ' seconds')::interval
          LIMIT 1`,
         [merchantId, cardId, String(seconds)],
       ),
@@ -350,12 +529,16 @@ export class CashScanRepository {
     return rows.length > 0;
   }
 
-  async activeBirthdayReward(merchantId: string, cardId: string): Promise<{ id: string } | null> {
-    const { rows } = await this.pg.withMerchant((c) =>
+  async activeBirthdayReward(
+    merchantId: string,
+    cardId: string,
+    client?: PoolClient,
+  ): Promise<{ id: string } | null> {
+    const { rows } = await this.onClient(client, (c) =>
       c.query<{ id: string }>(
         `SELECT id::text FROM merchant.loyalty_birthday_grant
          WHERE merchant_id=$1::uuid AND card_id=$2::uuid
-           AND status='active' AND expires_at >= now()
+           AND status='active' AND expires_at > clock_timestamp()
          ORDER BY issued_at DESC LIMIT 1`,
         [merchantId, cardId],
       ),
@@ -367,10 +550,17 @@ export class CashScanRepository {
   async findRedemption(merchantId: string, redemptionId: string): Promise<RedemptionRow | null> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<RedemptionRow>(
-        `SELECT id::text AS id, card_id::text AS "cardId", reward_id::text AS "rewardId",
-                reverted_at AS "revertedAt", cycle_reset AS "cycleReset"
-           FROM merchant.loyalty_redemption
-          WHERE merchant_id = $1::uuid AND id = $2::uuid`,
+        `SELECT r.id::text AS id, r.card_id::text AS "cardId", r.reward_id::text AS "rewardId",
+                r.reverted_at AS "revertedAt", r.cycle_reset AS "cycleReset",
+                CASE WHEN COALESCE(l.claimed_tier, CASE WHEN r.reward_id=e.base_reward_id THEN 'base' ELSE e.tier END)='base'
+                     THEN e.base_reward_name ELSE e.top_reward_name END AS "rewardName",
+                CASE WHEN e.id IS NOT NULL THEN
+                     COALESCE(l.claimed_tier, CASE WHEN r.reward_id=e.base_reward_id THEN 'base' ELSE e.tier END)='base'
+                     ELSE NULL END AS "isBase"
+           FROM merchant.loyalty_redemption r
+           LEFT JOIN merchant.loyalty_reward_redemption_link l ON l.merchant_id=r.merchant_id AND l.redemption_id=r.id
+           LEFT JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id
+          WHERE r.merchant_id = $1::uuid AND r.id = $2::uuid`,
         [merchantId, redemptionId],
       ),
     );
@@ -396,6 +586,7 @@ export class CashScanRepository {
    */
   async revertRedemption(input: {
     merchantId: string;
+    userId?: string;
     redemptionId: string;
     cardId: string;
     staffMemberId: string | null;
@@ -409,26 +600,40 @@ export class CashScanRepository {
     restoreEarnedReward: boolean;
     /** The lock-screen line the customer sees: her reward is back. */
     message: string;
-  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null }> {
-    return this.pg.withMerchant(async (c) => {
-      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`card:${input.cardId}`]);
+  }): Promise<{ alreadyReverted: boolean; card: ScannedCard | null; restoredExpired?: boolean }> {
+    return this.withLockedCard(input.merchantId, input.cardId, async (c, before) => {
+      if (input.userId) {
+        const staff = await this.authenticatedStaff(c, input.merchantId, input.userId);
+        if (!staff || staff.id !== input.staffMemberId)
+          throw new ForbiddenException('Tu usuario no está registrado como personal');
+      }
 
       const fresh = await c.query<Row>(
-        `SELECT reverted_at AS "revertedAt" FROM merchant.loyalty_redemption
-          WHERE merchant_id = $1::uuid AND id = $2::uuid
-          FOR UPDATE`,
-        [input.merchantId, input.redemptionId],
+        `SELECT r.reverted_at AS "revertedAt",
+                EXISTS(SELECT 1 FROM merchant.loyalty_reward_redemption_link l
+                  JOIN merchant.loyalty_reward_entitlement e ON e.merchant_id=l.merchant_id AND e.id=l.entitlement_id
+                  WHERE l.merchant_id=r.merchant_id AND l.redemption_id=r.id AND e.expires_at<=clock_timestamp()) AS "restoredExpired"
+           FROM merchant.loyalty_redemption r
+          WHERE r.merchant_id = $1::uuid AND r.id = $2::uuid AND r.card_id=$3::uuid
+          FOR UPDATE OF r`,
+        [input.merchantId, input.redemptionId, input.cardId],
       );
       if (!fresh.rows[0]) throw new NotFoundException('redemption_not_found');
-      if (fresh.rows[0].revertedAt) return { alreadyReverted: true, card: null };
+      if (fresh.rows[0].revertedAt)
+        return {
+          alreadyReverted: true,
+          card: before,
+          restoredExpired: fresh.rows[0].restoredExpired === true,
+        };
 
+      const restored = await restoreRewardEntitlement(c, input.merchantId, input.redemptionId);
       await c.query(
         `UPDATE merchant.loyalty_redemption
             SET reverted_at = now(), reverted_by_staff_id = $3::uuid
           WHERE merchant_id = $1::uuid AND id = $2::uuid`,
         [input.merchantId, input.redemptionId, input.staffMemberId],
       );
-      if (input.restoreBaseTier) {
+      if (before.reward_policy !== 'single_cycle' && !restored.linked && input.restoreBaseTier) {
         await c.query(
           `UPDATE merchant.loyalty_card SET pending_tier1 = pending_tier1 + 1, updated_at = now()
             WHERE merchant_id = $1::uuid AND id = $2::uuid`,
@@ -438,7 +643,11 @@ export class CashScanRepository {
       // A reverted canje stops counting against pending_rewards by itself (the
       // derivation excludes reverted rows). An early cash-out never counted in the
       // first place, so undoing one has to hand a reward back explicitly.
-      if (input.restoreEarnedReward) {
+      if (
+        before.reward_policy !== 'single_cycle' &&
+        !restored.linked &&
+        input.restoreEarnedReward
+      ) {
         await c.query(
           `UPDATE merchant.loyalty_card SET rewards_earned = rewards_earned + 1, updated_at = now()
             WHERE merchant_id = $1::uuid AND id = $2::uuid`,
@@ -449,14 +658,18 @@ export class CashScanRepository {
         `UPDATE merchant.loyalty_card
             SET lifecycle_message = $3, lifecycle_message_at = now(), updated_at = now()
           WHERE merchant_id = $1::uuid AND id = $2::uuid`,
-        [input.merchantId, input.cardId, input.message],
+        [
+          input.merchantId,
+          input.cardId,
+          restored.expired ? 'Canje revertido. La recompensa ya venció.' : input.message,
+        ],
       );
 
       const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
         input.merchantId,
         input.cardId,
       ]);
-      return { alreadyReverted: false, card: rows[0] };
+      return { alreadyReverted: false, card: rows[0], restoredExpired: restored.expired };
     });
   }
 
@@ -475,9 +688,9 @@ export class CashScanRepository {
    * a staff scan carries a card and a merchant — so a location that keeps its own hours is
    * not consulted here. Worth revisiting when the register carries its device's location.
    */
-  async isAfterHours(merchantId: string, tz: string): Promise<boolean> {
+  async isAfterHours(merchantId: string, tz: string, client?: PoolClient): Promise<boolean> {
     try {
-      const rows = await this.pg.withMerchant((c) =>
+      const rows = await this.onClient(client, (c) =>
         c
           .query<{ open_hours: unknown }>(
             `SELECT open_hours FROM merchant.merchant WHERE id = $1::uuid`,
@@ -515,118 +728,177 @@ export class CashScanRepository {
    * (no caches on merchant.loyalty_card). The visit / reward_redemption inserts are the
    * source of truth the derive reads back.
    */
-  async performScan(input: PerformScanInput): Promise<ScannedCard> {
-    return this.pg.withMerchant(async (c) => {
-      // ONE SCAN AT A TIME PER CARD. The derived numbers used to be pure functions
-      // of the events, so two concurrent scans could not corrupt anything the second
-      // one had not yet written. The card's anchors are that no longer: this is a
-      // read-modify-write, and the same lock the revert path takes keeps a
-      // double-tap, a retry and a two-device race from counting a reward twice.
-      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`card:${input.cardId}`]);
+  async performScan(input: PerformScanInput, client?: PoolClient): Promise<ScannedCard> {
+    return this.withLockedCard(
+      input.merchantId,
+      input.cardId,
+      async (c) => {
+        // ONE SCAN AT A TIME PER CARD. The derived numbers used to be pure functions
+        // of the events, so two concurrent scans could not corrupt anything the second
+        // one had not yet written. The card's anchors are that no longer: this is a
+        // read-modify-write, and the same lock the revert path takes keeps a
+        // double-tap, a retry and a two-device race from counting a reward twice.
 
-      // State as the transaction sees it, UNDER the lock — not the copy the service
-      // read before it. Both anchors ride along in the shared query.
-      const before = await this.cardState(c, input.merchantId, input.cardId);
+        // State as the transaction sees it, UNDER the lock — not the copy the service
+        // read before it. Both anchors ride along in the shared query.
+        const before = await this.cardState(c, input.merchantId, input.cardId);
 
-      let cycleAnchor = before.cycle_anchor;
-      let rewardsEarned = before.rewards_earned;
-
-      if (input.doBirthday && input.birthdayRewardId) {
-        await c.query(
-          `UPDATE merchant.loyalty_birthday_grant SET status='redeemed', redeemed_at=now()
-           WHERE merchant_id=$1::uuid AND id=$2::uuid`,
-          [input.merchantId, input.birthdayRewardId],
+        const enabled = before.reward_policy === 'single_cycle';
+        const profileRows = await this.rewardProfileRows(input.merchantId, input.cardId, c);
+        const profile = resolveRewardProfile(
+          profileRows.defaultConfig,
+          profileRows.overrideConfig,
+          profileRows.upgradeConfig,
         );
-      }
-      if (input.doRedeem && input.rewardConfigId) {
-        await c.query(
-          `INSERT INTO merchant.loyalty_redemption
+        if (
+          enabled &&
+          input.doVisit &&
+          (before.visit_blocked_reason || before.visits_this_cycle >= 9)
+        ) {
+          throw new BadRequestException('Redeem the available reward before another visit');
+        }
+        if (enabled && input.doVisit && input.doRedeem)
+          throw new BadRequestException('Separate visit and redemption');
+        if (
+          enabled &&
+          input.doRedeem &&
+          (!input.externalReceiptNumber?.trim() || !input.commandId || !input.staffMemberId)
+        ) {
+          throw new BadRequestException('Receipt, command and staff required');
+        }
+        let redemptionResult: ScannedCard['redemptionResult'];
+        if (enabled && input.doRedeem) {
+          const selection = input.resetCycle
+            ? 'cycle_base'
+            : before.visits_this_cycle >= 9 && (input.redeemQuantity ?? 1) === 1
+              ? 'cycle_top'
+              : (before.legacy_pending_rewards ?? 0) > 0
+                ? 'legacy'
+                : 'cycle_top';
+          redemptionResult = await redeemRewardEntitlements(c, {
+            merchantId: input.merchantId,
+            cardId: input.cardId,
+            quantity: input.redeemQuantity ?? 1,
+            staffId: input.staffMemberId!,
+            externalReceiptNumber: input.externalReceiptNumber!,
+            commandId: input.commandId,
+            selection,
+          });
+        }
+        let cycleAnchor = redemptionResult
+          ? (await this.cardState(c, input.merchantId, input.cardId)).cycle_anchor
+          : before.cycle_anchor;
+        let rewardsEarned = before.rewards_earned;
+
+        if (input.doBirthday && input.birthdayRewardId) {
+          const birthday = await c.query(
+            `UPDATE merchant.loyalty_birthday_grant SET status='redeemed', redeemed_at=now()
+           WHERE merchant_id=$1::uuid AND card_id=$3::uuid AND id=$2::uuid
+             AND status='active' AND expires_at > clock_timestamp() RETURNING id`,
+            [input.merchantId, input.birthdayRewardId, input.cardId],
+          );
+          if (!birthday.rows[0]) throw new BadRequestException('No active birthday gift');
+        }
+        if (!enabled && input.doRedeem && input.rewardConfigId) {
+          await c.query(
+            `INSERT INTO merchant.loyalty_redemption
              (merchant_id, card_id, reward_id, reason, staff_id, cycle_reset)
            VALUES ($1::uuid, $2::uuid, $3::uuid, 'stamps', $4::uuid, $5)`,
-          [
-            input.merchantId,
-            input.cardId,
-            input.rewardConfigId,
-            input.staffMemberId,
-            input.resetCycle,
-          ],
-        );
-      }
-      // An EARLY CASH-OUT tears the card off: the cycle restarts here, at the stamp
-      // count the customer has reached — which is why the position is not a modulo
-      // of the threshold any more, and why this anchor exists at all. Taken before
-      // the visit below, exactly as umi-cash ordered it (cycleNow = 0, then the
-      // visit lands on the fresh cycle).
-      if (input.doRedeem && input.resetCycle) {
-        cycleAnchor = before.total_visits;
-      }
-      // Handing over a pre-ladder banked reward retires one tag with it — the
-      // counter tracks exactly the rewards that are owed as the LOWER tier, so it
-      // must come down as they are handed over. GREATEST(0, …) so a counter that
-      // somehow drifted below the truth can never go negative (the column carries a
-      // CHECK for that, and a failing scan is worse than a clamped one).
-      if (input.doRedeem && input.decrementPendingTier1) {
-        await c.query(
-          `UPDATE merchant.loyalty_card
+            [
+              input.merchantId,
+              input.cardId,
+              input.rewardConfigId,
+              input.staffMemberId,
+              input.resetCycle,
+            ],
+          );
+        }
+        // An EARLY CASH-OUT tears the card off: the cycle restarts here, at the stamp
+        // count the customer has reached — which is why the position is not a modulo
+        // of the threshold any more, and why this anchor exists at all. Taken before
+        // the visit below, exactly as umi-cash ordered it (cycleNow = 0, then the
+        // visit lands on the fresh cycle).
+        if (!enabled && input.doRedeem && input.resetCycle) {
+          cycleAnchor = before.total_visits;
+        }
+        // Handing over a pre-ladder banked reward retires one tag with it — the
+        // counter tracks exactly the rewards that are owed as the LOWER tier, so it
+        // must come down as they are handed over. GREATEST(0, …) so a counter that
+        // somehow drifted below the truth can never go negative (the column carries a
+        // CHECK for that, and a failing scan is worse than a clamped one).
+        if (!enabled && input.doRedeem && input.decrementPendingTier1) {
+          await c.query(
+            `UPDATE merchant.loyalty_card
               SET pending_tier1 = GREATEST(0, pending_tier1 - 1), updated_at = now()
             WHERE merchant_id = $1::uuid AND id = $2::uuid`,
-          [input.merchantId, input.cardId],
-        );
-      }
-      if (input.doVisit) {
-        await c.query(
-          `INSERT INTO merchant.loyalty_visit (merchant_id, card_id, staff_id)
+            [input.merchantId, input.cardId],
+          );
+        }
+        if (input.doVisit) {
+          await c.query(
+            `INSERT INTO merchant.loyalty_visit (merchant_id, card_id, staff_id)
            VALUES ($1::uuid, $2::uuid, $3::uuid)`,
-          [input.merchantId, input.cardId, input.staffMemberId],
-        );
-        // A visit that crosses the threshold COMPLETES a cycle, and nothing in the
-        // events records that: umi-cash incremented a cache. `rewards_earned` is
-        // that fact, stated. One visit is one stamp, so this is a single crossing at
-        // most, but the floor-difference form keeps it honest if the threshold ever
-        // shrank under a card.
-        const after = before.total_visits + 1;
-        rewardsEarned +=
-          Math.floor((after - cycleAnchor) / before.visits_required) -
-          Math.floor((before.total_visits - cycleAnchor) / before.visits_required);
-      }
-      // Rotate the QR token; stamp the lifecycle moment message on a visit. No
-      // ⚠️ THE MESSAGE IS WRITTEN ON EVERY SCAN, and it may be NULL. umi-cash wrote
-      // it unconditionally (`lifecycleMetadata(fresh.metadata, momentMessage)`), and
-      // that is what makes the field trustworthy: a scan with no moment CLEARS the
-      // previous one, so a "you earned a reward" line from this morning cannot
-      // linger on a pass through an afternoon redemption. Writing it only on visits
-      // left the redeem-only path (banked OR early cash-out — a real thing the
-      // register does) keeping whatever the last visit said. Found by the live
-      // rehearsal in REGISTER_FLIP_PARITY.md.
-      const upd = await c.query<{ card_number: string }>(
-        `UPDATE merchant.loyalty_card SET
+            [input.merchantId, input.cardId, input.staffMemberId],
+          );
+          // A visit that crosses the threshold COMPLETES a cycle, and nothing in the
+          // events records that: umi-cash incremented a cache. `rewards_earned` is
+          // that fact, stated. One visit is one stamp, so this is a single crossing at
+          // most, but the floor-difference form keeps it honest if the threshold ever
+          // shrank under a card.
+          const after = before.total_visits + 1;
+          if (!enabled)
+            rewardsEarned +=
+              Math.floor((after - cycleAnchor) / before.visits_required) -
+              Math.floor((before.total_visits - cycleAnchor) / before.visits_required);
+        }
+        // Rotate the QR token; stamp the lifecycle moment message on a visit. No
+        // ⚠️ THE MESSAGE IS WRITTEN ON EVERY SCAN, and it may be NULL. umi-cash wrote
+        // it unconditionally (`lifecycleMetadata(fresh.metadata, momentMessage)`), and
+        // that is what makes the field trustworthy: a scan with no moment CLEARS the
+        // previous one, so a "you earned a reward" line from this morning cannot
+        // linger on a pass through an afternoon redemption. Writing it only on visits
+        // left the redeem-only path (banked OR early cash-out — a real thing the
+        // register does) keeping whatever the last visit said. Found by the live
+        // rehearsal in REGISTER_FLIP_PARITY.md.
+        const upd = await c.query<{ card_number: string }>(
+          `UPDATE merchant.loyalty_card SET
            lifecycle_message    = $3::text,
            lifecycle_message_at = CASE WHEN $3 IS NULL THEN NULL ELSE now() END,
            qr_token = $4, qr_issued_at = now(), updated_at = now(),
            cycle_anchor = $5, rewards_earned = $6
          WHERE merchant_id=$1::uuid AND id=$2::uuid
          RETURNING card_number`,
-        [
+          [
+            input.merchantId,
+            input.cardId,
+            input.momentMessage,
+            input.newQrToken,
+            cycleAnchor,
+            rewardsEarned,
+          ],
+        );
+        // No row → card vanished mid-scan or is RLS-filtered; surface a clear 404
+        // instead of returning undefined (which callers read as ScannedCard).
+        if (!upd.rows[0]) throw new NotFoundException('card_not_found');
+        if (enabled && input.doVisit)
+          await syncCycleReward(c, {
+            merchantId: input.merchantId,
+            cardId: input.cardId,
+            lifetimeTotal: before.total_visits + 1,
+            cycleAnchor,
+            profile,
+          });
+
+        // Derived summary. The formula lives in one place
+        // because the wallet pass shows the same four numbers to the same customer
+        // at the same moment — see shared/loyalty/card-state.sql.ts.
+        const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
           input.merchantId,
           input.cardId,
-          input.momentMessage,
-          input.newQrToken,
-          cycleAnchor,
-          rewardsEarned,
-        ],
-      );
-      // No row → card vanished mid-scan or is RLS-filtered; surface a clear 404
-      // instead of returning undefined (which callers read as ScannedCard).
-      if (!upd.rows[0]) throw new NotFoundException('card_not_found');
-
-      // Derived summary. The formula lives in one place
-      // because the wallet pass shows the same four numbers to the same customer
-      // at the same moment — see shared/loyalty/card-state.sql.ts.
-      const { rows } = await c.query<LoyaltyCardState>(LOYALTY_CARD_STATE_SQL, [
-        input.merchantId,
-        input.cardId,
-      ]);
-      return rows[0];
-    });
+        ]);
+        return { ...rows[0], ...(redemptionResult ? { redemptionResult } : {}) };
+      },
+      client,
+    );
   }
 }

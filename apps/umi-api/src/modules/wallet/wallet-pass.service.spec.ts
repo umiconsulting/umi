@@ -254,3 +254,30 @@ describe('WalletPassService · the birthday reward line', () => {
     expect(passed.birthdayRewardName).toBeNull();
   });
 });
+
+it('returns a failed durable refresh when Google rejects the update', async () => {
+  const h = makeService();
+  h.repo.merchantForCard.mockResolvedValue('merchant-1');
+  h.google.isConfigured = () => true;
+  h.google.updateObject.mockResolvedValue('failed');
+  expect(await h.service.refreshGoogleObjectWithOutcome('card-1')).toBe(false);
+});
+
+it('passes authoritative base eligibility into wallet rendering', async () => {
+  const render = {
+    ...RENDER,
+    state: {
+      ...RENDER.state,
+      reward_policy: 'single_cycle' as const,
+      visits_this_cycle: 8,
+      cycle_reward_available: true,
+      base_reward_blocked_by_history: true,
+    },
+  };
+  const h = makeService(render);
+  await h.service.renderPass(PASS);
+  expect(h.build.mock.calls[0][0].baseReward).toMatchObject({
+    visitsRequired: 7,
+    canRedeem: false,
+  });
+});

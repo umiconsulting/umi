@@ -3,7 +3,13 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format.js';
+import {
+  LoyaltyOperation,
+  rewardExpiryLabel,
+  rewardVisitCostLabel,
+} from '@/lib/loyalty-operation.js';
 import { XSep } from '@/shell.jsx';
 import { Segmented } from '@/components/segmented.jsx';
 import { PageHead } from '@/components/page-head.jsx';
@@ -635,7 +641,12 @@ function SealsDialog({ account, onClose, onCredited }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
   const count = Number(seals);
-  const valid = Number.isInteger(count) && count >= 1 && count <= 50;
+  const maxSeals =
+    account.rewardPolicy === 'single_cycle'
+      ? Math.max(0, account.visitsRequired - account.visitsThisCycle)
+      : 50;
+  const valid =
+    Number.isInteger(count) && count >= 1 && count <= maxSeals && !account.visitBlockedReason;
   // One random nonce per dialog, composed with the intent (card + amount) into the
   // idempotency key: a retry of the same amount reuses the key so a credit that
   // commits but loses its response lands once, while a corrected amount yields a new
@@ -687,12 +698,12 @@ function SealsDialog({ account, onClose, onCredited }) {
         </div>
         <label style={{ display: 'block', marginTop: 12 }}>
           <span>
-            <Trans>Sellos (1–50)</Trans>
+            <Trans>Sellos (1–{maxSeals})</Trans>
           </span>
           <input
             type="number"
             min={1}
-            max={50}
+            max={maxSeals}
             value={seals}
             onChange={(event) => setSeals(event.target.value)}
             disabled={pending}
@@ -838,12 +849,17 @@ function TopupDialog({ account, onClose, onCredited }) {
   );
 }
 
-function LoyaltyPanel({ cash, onCredited }) {
+function LoyaltyPanel({ cash, onCredited, scanResult, onScanResult }) {
   const { t } = useLingui();
   const [showSeals, setShowSeals] = useState(false);
   const [showTopup, setShowTopup] = useState(false);
   const [scanBusy, setScanBusy] = useState(null); // 'VISIT' | 'REDEEM' | null
   const [scanError, setScanError] = useState(null);
+  const [receipt, setReceipt] = useState('');
+  const [redeemQuantity, setRedeemQuantity] = useState('1');
+  const operation = useRef(new LoyaltyOperation());
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const scanInFlight = useRef(false);
   if (!cash?.available)
     return (
       <EmptyState
@@ -869,21 +885,113 @@ function LoyaltyPanel({ cash, onCredited }) {
   }
 
   async function runScan(action) {
-    if (scanBusy) return;
+    if (scanBusy || scanInFlight.current) return;
+    scanInFlight.current = true;
     setScanBusy(action);
     setScanError(null);
     try {
-      await loyaltyScan({ cardNumber: account.cardNumber, action });
+      const request = operation.current.begin({
+        cardNumber: account.cardNumber,
+        action,
+        ...(action !== 'VISIT'
+          ? {
+              externalReceiptNumber: receipt.trim(),
+              redeemQuantity:
+                action === 'REDEEM_BASE' ||
+                (account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards)
+                  ? 1
+                  : Number(redeemQuantity),
+            }
+          : {}),
+      });
+      setPendingRequest(request);
+      const response = await loyaltyScan(request);
+      if (
+        account.rewardPolicy === 'single_cycle' &&
+        request.action !== 'VISIT' &&
+        !response.redemption
+      )
+        throw new Error(t`La respuesta no confirma el canje. Reintenta la misma operación.`);
+      operation.current.finish(200);
+      setPendingRequest(null);
+      onScanResult(
+        response.redemption
+          ? { ...response.redemption, remainingVisits: response.card?.visitsThisCycle }
+          : null,
+      );
+      setReceipt('');
+      setRedeemQuantity('1');
       onCredited?.();
     } catch (err) {
+      operation.current.finish(err?.status || 0);
+      if (!operation.current.pending) setPendingRequest(null);
       setScanError(err?.message || t`No se pudo registrar la acción.`);
     } finally {
+      scanInFlight.current = false;
       setScanBusy(null);
     }
   }
 
   return (
     <div className="loyalty-panel">
+      {account.rewardPolicy === 'single_cycle' && (
+        <div className="profile-stack">
+          {account.baseReward?.canRedeem && (
+            <p>
+              {account.baseReward.rewardName}:{' '}
+              {rewardVisitCostLabel(account.visitsThisCycle, account.baseReward.visitsRequired)}.
+              {account.visitsThisCycle < account.visitsRequired && (
+                <>
+                  {' '}
+                  <Trans>
+                    Puedes seguir hasta {account.visitsRequired} visitas para {account.rewardName}.
+                  </Trans>
+                </>
+              )}
+            </p>
+          )}
+          {account.visitsThisCycle >= account.visitsRequired && (
+            <p>
+              {account.rewardName}:{' '}
+              {rewardVisitCostLabel(account.visitsThisCycle, account.visitsRequired)}.
+            </p>
+          )}
+          {account.visitBlockedReason && (
+            <p>
+              <Trans>Canjea la recompensa antes de registrar otra visita.</Trans>
+            </p>
+          )}
+          {!!account.legacyPendingRewards && (
+            <p>
+              <Trans>Saldo anterior:</Trans>{' '}
+              <Plural
+                value={account.legacyPendingRewards}
+                one="# recompensa"
+                other="# recompensas"
+              />
+            </p>
+          )}
+          {account.nextRewardExpiresAt && (
+            <p>
+              <Trans>
+                Vence: {rewardExpiryLabel(account.nextRewardExpiresAt, account.merchantTimezone)} (
+                {account.merchantTimezone}).
+              </Trans>
+            </p>
+          )}
+          {account.availableRewards?.map((item, index) => (
+            <p key={index}>
+              <Trans>
+                {item.quantity} × {item.rewardName} · Vence:{' '}
+                {rewardExpiryLabel(item.expiresAt, account.merchantTimezone)}
+              </Trans>
+            </p>
+          ))}
+          <p>
+            <Trans>Elige una recompensa. Conserva las visitas que sobren.</Trans>
+          </p>
+        </div>
+      )}
       <div className="loyalty-grid">
         <Metric
           label={t`Saldo del monedero`}
@@ -894,7 +1002,13 @@ function LoyaltyPanel({ cash, onCredited }) {
         <Metric
           label={t`Visitas totales`}
           value={account.totalVisits || 0}
-          note={t`${account.visitsThisCycle || 0} en este ciclo`}
+          note={
+            <Plural
+              value={account.visitsThisCycle || 0}
+              one="# visita disponible"
+              other="# visitas disponibles"
+            />
+          }
           icon={<I.Stamp size={18} />}
         />
         <Metric
@@ -909,6 +1023,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           <button
             className="btn btn-secondary btn-sm"
             type="button"
+            disabled={scanBusy != null || !!pendingRequest || !!account.visitBlockedReason}
             onClick={() => setShowSeals(true)}
           >
             <I.Plus size={14} /> <Trans>Agregar sellos</Trans>
@@ -916,6 +1031,7 @@ function LoyaltyPanel({ cash, onCredited }) {
           <button
             className="btn btn-secondary btn-sm"
             type="button"
+            disabled={scanBusy != null || !!pendingRequest}
             onClick={() => setShowTopup(true)}
           >
             <I.Wallet size={14} /> <Trans>Recargar saldo</Trans>
@@ -923,27 +1039,114 @@ function LoyaltyPanel({ cash, onCredited }) {
           <button
             className="btn btn-secondary btn-sm"
             type="button"
-            disabled={scanBusy != null}
+            disabled={scanBusy != null || !!pendingRequest || !!account.visitBlockedReason}
             onClick={() => runScan('VISIT')}
           >
             <I.Activity size={14} />{' '}
             {scanBusy === 'VISIT' ? <Trans>Registrando…</Trans> : <Trans>Registrar visita</Trans>}
           </button>
-          {account.pendingRewards > 0 && (
-            <button
-              className="btn btn-sm"
-              type="button"
-              disabled={scanBusy != null}
-              onClick={() => runScan('REDEEM')}
-            >
-              <I.Gift size={14} />{' '}
-              {scanBusy === 'REDEEM' ? (
-                <Trans>Canjeando…</Trans>
-              ) : (
-                <Trans>Canjear recompensa</Trans>
-              )}
-            </button>
+          {account.pendingRewards > 0 &&
+            (account.rewardPolicy !== 'single_cycle' ||
+              account.legacyPendingRewards > 0 ||
+              account.visitsThisCycle >= account.visitsRequired) && (
+              <button
+                className="btn btn-sm"
+                type="button"
+                disabled={
+                  scanBusy != null ||
+                  (account.rewardPolicy === 'single_cycle' && !receipt.trim()) ||
+                  (!!pendingRequest && pendingRequest.action !== 'REDEEM')
+                }
+                onClick={() => runScan('REDEEM')}
+              >
+                <I.Gift size={14} />{' '}
+                {scanBusy === 'REDEEM' ? (
+                  <Trans>Canjeando…</Trans>
+                ) : account.rewardPolicy === 'single_cycle' && !account.legacyPendingRewards ? (
+                  <Trans>Canjear {account.rewardName}</Trans>
+                ) : (
+                  <Trans>Canjear recompensa</Trans>
+                )}
+              </button>
+            )}
+        </div>
+      )}
+      {account.rewardPolicy === 'single_cycle' && account.baseReward?.canRedeem && (
+        <button
+          className="btn btn-sm"
+          disabled={
+            scanBusy != null ||
+            !receipt.trim() ||
+            (!!pendingRequest && pendingRequest.action !== 'REDEEM_BASE')
+          }
+          onClick={() => runScan('REDEEM_BASE')}
+        >
+          <Trans>Canjear {account.baseReward.rewardName}</Trans>
+        </button>
+      )}
+      {account.pendingRewards > 0 && (
+        <div className="profile-stack" style={{ marginTop: 12 }}>
+          <label>
+            <Trans>Número de recibo</Trans>{' '}
+            <input
+              value={receipt}
+              maxLength={200}
+              disabled={scanBusy != null || !!pendingRequest}
+              onChange={(event) => setReceipt(event.target.value)}
+            />
+          </label>
+          {account.legacyPendingRewards > 0 && (
+            <label>
+              <Trans>Cantidad del saldo anterior</Trans>{' '}
+              <input
+                type="number"
+                min="1"
+                max={account.legacyPendingRewards}
+                value={redeemQuantity}
+                disabled={scanBusy != null || !!pendingRequest}
+                onChange={(event) => setRedeemQuantity(event.target.value)}
+              />
+            </label>
           )}
+        </div>
+      )}
+      {!!pendingRequest && scanBusy == null && (
+        <div>
+          <p>
+            <Trans>
+              La respuesta es incierta. Reintenta la misma operación para obtener el resultado.
+            </Trans>
+          </p>
+          <button
+            className="btn btn-sm"
+            disabled={scanBusy != null}
+            onClick={() => runScan(pendingRequest.action)}
+          >
+            <Trans>Reintentar la misma operación</Trans>
+          </button>
+        </div>
+      )}
+      {scanResult && (
+        <div className="profile-stack" role="status" style={{ marginTop: 12 }}>
+          <p>
+            <Trans>
+              Canje: {scanResult.quantity} ·{' '}
+              {scanResult.items.map((item) => `${item.quantity} × ${item.rewardName}`).join(', ')}
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Visitas restantes: {scanResult.remainingVisits ?? account.visitsThisCycle} ·
+              Recompensas restantes: {scanResult.remainingRewards} · Recibo:{' '}
+              {scanResult.externalReceiptNumber}
+            </Trans>
+          </p>
+          <p>
+            <Trans>
+              Operador: {scanResult.operator.name} ·{' '}
+              {rewardExpiryLabel(scanResult.redeemedAt, account.merchantTimezone)}
+            </Trans>
+          </p>
         </div>
       )}
       {scanError && (
@@ -1050,11 +1253,23 @@ function EmptyState({ icon, title, detail }) {
   );
 }
 
-function CustomerProfile({ customerId, onSearch }) {
+function CustomerProfile(props) {
+  const { selectedMerchantId } = useMerchant();
+  // Refreshes keep the committed receipt; changing customer or merchant clears it.
+  return (
+    <CustomerProfileContent
+      key={`${selectedMerchantId || ''}:${props.customerId || ''}`}
+      {...props}
+    />
+  );
+}
+
+function CustomerProfileContent({ customerId, onSearch }) {
   const { t, i18n } = useLingui();
   const [params] = useSearchParams();
   const [tab, setTab] = useState('overview');
   const [refresh, setRefresh] = useState(0);
+  const [loyaltyConfirmation, setLoyaltyConfirmation] = useState(null);
   const { data, loading, error } = useCustomerDetail(customerId, refresh);
   const customer = data?.customer;
 
@@ -1199,7 +1414,12 @@ function CustomerProfile({ customerId, onSearch }) {
         )}
         {activeTab === 'orders' && <OrdersList orders={data?.orders || []} />}
         {activeTab === 'loyalty' && (
-          <LoyaltyPanel cash={data?.cash} onCredited={() => setRefresh((n) => n + 1)} />
+          <LoyaltyPanel
+            cash={data?.cash}
+            scanResult={loyaltyConfirmation}
+            onScanResult={setLoyaltyConfirmation}
+            onCredited={() => setRefresh((n) => n + 1)}
+          />
         )}
         {activeTab === 'notes' && (
           <Timeline items={(data?.timeline || []).filter((item) => item.type === 'memory')} />

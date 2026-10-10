@@ -1,3 +1,7 @@
+import { StampRewardExpiryProcessor } from './jobs/stamp-reward-expiry.processor';
+import { StampRewardExpiryScheduler } from './jobs/stamp-reward-expiry.scheduler';
+import { StampRewardExpiryWallet } from './jobs/stamp-reward-expiry.wallet';
+import { WalletModule } from './modules/wallet/wallet.module';
 import { Module } from '@nestjs/common';
 import { AppConfigModule } from './shared/config/config.module';
 import { DatabaseModule } from './shared/database/database.module';
@@ -44,6 +48,7 @@ import { TenderModule } from './modules/tender/tender.module';
     UsageModule,
     DatabaseModule,
     AdaptersModule,
+    WalletModule,
     LoggingModule,
     // The web AppModule pulls in the global SharedAuthModule; the worker is a
     // separate Nest root, so it must import it too — ConversationsModule's turn
@@ -74,6 +79,9 @@ import { TenderModule } from './modules/tender/tender.module';
     SystemProcessor,
     TurnsProcessor,
     OutboundProcessor,
+    StampRewardExpiryProcessor,
+    StampRewardExpiryScheduler,
+    StampRewardExpiryWallet,
     EnrichmentProcessor,
     IntegrationsProcessor,
     LifecycleProcessor,
