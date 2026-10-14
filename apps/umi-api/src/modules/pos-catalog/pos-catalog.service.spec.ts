@@ -28,7 +28,15 @@ const product = {
 
 const make = (authorized = true) => {
   const repo = {
-    authorize: vi.fn().mockResolvedValue(authorized),
+    // The verdict carries the session's own permissions: an empty list is a dead session
+    // (401, sign in again) and a non-empty one without `catalog.read` is a role gap (403).
+    authorize: vi
+      .fn()
+      .mockResolvedValue(
+        authorized
+          ? { allowed: true, permissions: ['catalog.read'] }
+          : { allowed: false, permissions: ['cart.write'] },
+      ),
     categories: vi.fn().mockResolvedValue([]),
     products: vi.fn().mockResolvedValue([product, { ...product, id: user.id, name: 'Té' }]),
     detail: vi
@@ -106,5 +114,51 @@ describe('PosCatalogService', () => {
       product.id,
       expect.objectContaining({ name: product.name }),
     );
+  });
+
+  it('writes "no hay producto" as its own command, scoped to the named location', async () => {
+    // The owner's 86 state: the till reads it to dim the card and refuse the line. Before
+    // this command existed the only writer of the column was the demo seed and a test
+    // fixture (bug hunt §106), so a café could not take a product off the menu at all.
+    const repo = {
+      setAvailabilityAdministrative: vi.fn().mockResolvedValue({
+        productId: product.id,
+        locationId,
+        status: 'temporarily_unavailable',
+      }),
+    };
+    const integrity = {
+      execute: vi.fn(async (_input, operation) => {
+        const value = await operation({ client: {}, appendAudit: vi.fn() });
+        return { status: 'succeeded', result: value.value, failureCode: null };
+      }),
+    };
+    const service = new PosCatalogService(repo as never, integrity as never);
+    const context = {
+      commandId: user.id,
+      idempotencyKey: user.sessionId,
+      targetAggregateId: product.id,
+      targetVersion: 7,
+      locationId,
+      correlationId: 'availability-test',
+    };
+    await expect(
+      service.executeAdministrative(
+        user as never,
+        { merchantId } as never,
+        context as never,
+        'catalog.availability',
+        { status: 'temporarily_unavailable' },
+      ),
+    ).resolves.toEqual({
+      productId: product.id,
+      locationId,
+      status: 'temporarily_unavailable',
+    });
+    expect(repo.setAvailabilityAdministrative).toHaveBeenCalledWith({}, merchantId, product.id, 7, {
+      locationId,
+      status: 'temporarily_unavailable',
+      availableFrom: null,
+    });
   });
 });

@@ -23,6 +23,7 @@ export const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']),
     UMI_ENVIRONMENT: z.enum(['development', 'test', 'staging', 'pilot', 'production']),
+    FCM_PROJECT_ID: z.string().min(6).optional(),
     PORT: z.coerce.number().int().positive().default(3000),
 
     // Database — two roles (spec §11.2).
@@ -338,6 +339,20 @@ export const configSchema = z
     LEADS_WEBHOOK_SECRET: z.string().optional(),
   })
   .superRefine((cfg, ctx) => {
+    const expectedFcmProject: Record<typeof cfg.UMI_ENVIRONMENT, string | null> = {
+      development: 'umiconsulting-pos-dev',
+      test: null,
+      staging: 'umiconsulting-pos-staging',
+      pilot: 'umiconsulting-pos-pilot',
+      production: 'umiconsulting-pos-prod',
+    };
+    if (cfg.FCM_PROJECT_ID && cfg.FCM_PROJECT_ID !== expectedFcmProject[cfg.UMI_ENVIRONMENT]) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['FCM_PROJECT_ID'],
+        message: 'must match UMI_ENVIRONMENT',
+      });
+    }
     const deployed = ['staging', 'pilot', 'production'].includes(cfg.UMI_ENVIRONMENT);
     const requireValue = (key: keyof typeof cfg) => {
       if (cfg[key] === undefined || cfg[key] === '') {

@@ -25,6 +25,9 @@
  *   --settle <ms>      Wait after each route load (default 3000).
  *   --delay <ms>       Pause between routes (the API allows 300 requests per
  *                      minute per IP; each route load costs several).
+ *   --locale en|es     Pin the Dashboard language before every load (default:
+ *                      whatever the browser has). Spanish is the longer text.
+ *   --theme <name>     Pin the palette: umi (default), dark, midnight.
  *   --tags a,b         axe tags to run (default: the WCAG A/AA/AAA rule sets).
  *   --no-fail          Always exit 0. Reporting mode for the aggregate script.
  *   --fail-on a,b      Impacts that fail the run (default serious,critical).
@@ -45,7 +48,11 @@ import {
   parseViewport,
 } from './lib/collect.mjs';
 
-const WORKSPACE = process.env.UX_WORKSPACE || '/home/jc/umi';
+// The workspace this tool belongs to, derived from its own path: a hard-coded
+// home directory belongs to the machine the harness was first written on, and on
+// any other box `require('@playwright/test')` resolves against a tree that does
+// not exist.
+const WORKSPACE = process.env.UX_WORKSPACE || new URL('../..', import.meta.url).pathname;
 const require = createRequire(`${WORKSPACE}/`);
 const { chromium } = require('@playwright/test');
 const { AxeBuilder } = require('@axe-core/playwright');
@@ -59,6 +66,12 @@ const ROUTES = parseRoutes(arg('--routes'), DEFAULT_ROUTES);
 const VIEWPORT = parseViewport(arg('--viewport', '1280x720'));
 const SETTLE = Number(arg('--settle', '3000'));
 const DELAY = Number(arg('--delay', '0'));
+// THE GATE RAN IN ONE MODE FOR A YEAR. English, default palette, is the mode the
+// machine happened to be in — and Spanish is the longer text, while `midnight` is
+// the darkest palette. A rule about contrast or clipped text only fails in the
+// mode that breaks it, so the mode is a flag instead of an accident.
+const LOCALE = arg('--locale', null);
+const THEME = arg('--theme', null);
 const NO_FAIL = hasFlag('--no-fail');
 const FAIL_ON = (arg('--fail-on', 'serious,critical') || '')
   .split(',')
@@ -75,10 +88,27 @@ async function main() {
   if (!context) throw new Error('No browser context on the CDP connection.');
   const page = await context.newPage();
   await applyViewport(page, VIEWPORT).catch(() => {});
+  if (LOCALE || THEME) {
+    // Both preferences live in `localStorage` and are read at boot, so they are
+    // set before every document loads rather than once after the first paint.
+    await page.addInitScript(
+      ([locale, theme]) => {
+        try {
+          if (locale) localStorage.setItem('umi.dashboard.locale', locale);
+          if (theme) localStorage.setItem('umi-theme', theme);
+        } catch {
+          // Storage can be blocked; the run then audits the mode the browser has.
+        }
+      },
+      [LOCALE, THEME],
+    );
+  }
 
   const report = {
     generatedAt: new Date().toISOString(),
     base: BASE,
+    locale: LOCALE,
+    theme: THEME,
     tool: 'axe-core via @axe-core/playwright',
     tags: TAGS,
     failOn: FAIL_ON,

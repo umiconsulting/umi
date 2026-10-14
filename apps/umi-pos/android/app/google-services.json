@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1064474782021",
+    "project_id": "umiconsulting-pos-dev",
+    "storage_bucket": "umiconsulting-pos-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1064474782021:android:5f06ef344a66ce432bb62c",
+        "android_client_info": {
+          "package_name": "co.umiconsulting.umi_pos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnhRF7P5182wZLC1YVnCIRs_idTVPuYXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1064474782021:android:492f2e2ed61e78402bb62c",
+        "android_client_info": {
+          "package_name": "co.umiconsulting.umi_pos.estacion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnhRF7P5182wZLC1YVnCIRs_idTVPuYXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

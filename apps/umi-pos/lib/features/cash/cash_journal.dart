@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
@@ -23,9 +23,9 @@ final class CashJournal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
 
-    return Card(
+    return PosCard(
       child: Padding(
         // The journal is the one card that may be squeezed: it scrolls. Its
         // minimum is one row plus a header, so the controls above it can never be
@@ -82,7 +82,7 @@ final class CashJournal extends StatelessWidget {
                   child: ListView.separated(
                     padding: EdgeInsets.zero,
                     itemCount: lines.length,
-                    separatorBuilder: (context, index) => Divider(
+                    separatorBuilder: (context, index) => PosDivider(
                       height: 1,
                       color: theme.colorScheme.outlineVariant,
                     ),
@@ -98,8 +98,10 @@ final class CashJournal extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 padding: EdgeInsets.zero,
                 itemCount: lines.length,
-                separatorBuilder: (context, index) =>
-                    Divider(height: 1, color: theme.colorScheme.outlineVariant),
+                separatorBuilder: (context, index) => PosDivider(
+                  height: 1,
+                  color: theme.colorScheme.outlineVariant,
+                ),
                 itemBuilder: (context, index) => _Line(line: lines[index]),
               ),
           ],
@@ -193,7 +195,7 @@ final class _Line extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final type = line['type'] as String? ?? '';
     final currency = _currency();
     final minor =

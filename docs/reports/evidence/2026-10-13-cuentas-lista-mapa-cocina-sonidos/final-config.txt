@@ -1,0 +1,12 @@
+                  id                  |          name          |  status  |                                                       alert_settings                                                        
+--------------------------------------+------------------------+----------+-----------------------------------------------------------------------------------------------------------------------------
+ 31e932c0-cc15-4ee4-bebe-0dd1351e8f72 | Cocina                 | active   | {"readySound": "ready", "arrivalSound": "arrival", "overdueSound": "overdue", "soundsEnabled": true, "overdueSeconds": 900}
+ 86655f73-6afa-4427-9741-cb2e0bedef20 | Barra                  | active   | {"readySound": "ready", "arrivalSound": "arrival", "overdueSound": "overdue", "soundsEnabled": true, "overdueSeconds": 300}
+ d7f02b2c-16ae-4ed1-ba9e-ab038588837d | Verificación KDS final | archived | {"readySound": "ready", "arrivalSound": "arrival", "overdueSound": "overdue", "soundsEnabled": true, "overdueSeconds": 900}
+(3 rows)
+
+                  id                  |   name    | station | route_priority | target_seconds | active | version 
+--------------------------------------+-----------+---------+----------------+----------------+--------+---------
+ 9aa8f1fc-8459-4e5d-8750-e459daf759b6 | Capuccino | Cocina  |             10 |             30 | f      |       2
+(1 row)
+

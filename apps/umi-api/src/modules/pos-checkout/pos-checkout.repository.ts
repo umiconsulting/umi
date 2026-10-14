@@ -14,7 +14,10 @@ import type {
 } from '@umi/contract';
 import type { CustomerValueCommitResult, CustomerValueSelection } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
-import { writeOrder } from '../../shared/orders/order-writer';
+import { syncCartOrderContext } from '../../shared/orders/cart-order-context';
+import { appendOrderItems, writeOrder } from '../../shared/orders/order-writer';
+import { allocateReceiptFolio } from '../../shared/receipts/receipt-folio';
+import { PREVIEW_WINDOW_SECONDS } from '../../shared/loyalty/preview-window';
 import { CashRefusal } from '../pos-cash/cash-refusal';
 import { deviceRegisterHoldDetails, resolveDeviceRegisterHold } from './cash-shift-hold';
 
@@ -37,7 +40,10 @@ export interface CheckoutCart {
   version: number;
   businessDate: string;
   merchantName: string;
+  /** The café's logo URL, as `merchant.logo_url` holds it. Null when none is uploaded. */
+  merchantLogoUrl: string | null;
   locationName: string;
+  timezone?: string;
   operatorName: string;
   customerId: string | null;
   // Channel attribution (ADR 2026-09-13-pos-channel-attribution). The upstream commercial
@@ -45,6 +51,9 @@ export interface CheckoutCart {
   // Copied onto pos_committed_sale at commit as a frozen fact.
   originOrderId: string | null;
   originChannel: string | null;
+  // The order type (plan §8.2 F3, decision D5). The cart carries the operator's
+  // choice and the checkout writes it onto the order.
+  fulfillmentType: 'dine_in' | 'takeout';
   lines: CheckoutLine[];
 }
 
@@ -84,9 +93,81 @@ export interface CheckoutCustomerValueAllocation {
   }>;
 }
 
+export interface PartialPaymentRow {
+  tenderId: string;
+  position: number | null;
+  cartVersion: number;
+  cartFingerprint: string;
+  baseDueMinorUnits: string;
+  currency: string;
+  tenderType: 'cash' | 'manual_terminal' | 'bank_transfer';
+  amountMinorUnits: string;
+  tipMinorUnits: string;
+  receivedMinorUnits: string | null;
+  status: 'confirmed_success' | 'outcome_unknown' | 'operator_reported_failure';
+  confirmationReference: string | null;
+  cashShiftId: string | null;
+}
+
 @Injectable()
 export class PosCheckoutRepository {
   constructor(private readonly pg: PgService) {}
+
+  async partialRows(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    cartId: string,
+  ): Promise<PartialPaymentRow[]> {
+    const { rows } = await client.query<PartialPaymentRow>(
+      `SELECT tender_id::text AS "tenderId",position,cart_version AS "cartVersion",
+              cart_fingerprint AS "cartFingerprint",base_due_minor_units::text AS "baseDueMinorUnits",
+              currency,tender_type AS "tenderType",amount_minor_units::text AS "amountMinorUnits",
+              tip_minor_units::text AS "tipMinorUnits",received_minor_units::text AS "receivedMinorUnits",
+              status,confirmation_reference AS "confirmationReference",
+              cash_shift_id::text AS "cashShiftId"
+         FROM merchant.pos_partial_payment
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
+        ORDER BY created_at,tender_id`,
+      [merchantId, locationId, cartId],
+    );
+    return rows;
+  }
+
+  async partialRowsForPos(
+    merchantId: string,
+    locationId: string,
+    cartId: string,
+    userId: string,
+    operatorSessionId: string,
+    allowOtherOperator: boolean,
+  ): Promise<PartialPaymentRow[] | null> {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const scope = await client.query(
+          `SELECT 1 FROM merchant.pos_cart c
+             JOIN runtime.operator_session current_operator
+               ON current_operator.id=$4::uuid
+              AND current_operator.merchant_id=c.merchant_id
+              AND current_operator.location_id=c.location_id
+              AND current_operator.user_id=$5::uuid
+              AND current_operator.state='active'
+              AND current_operator.expires_at>now()
+             JOIN runtime.operator_session original_operator
+               ON original_operator.id=c.operator_session_id
+            WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid AND c.id=$3::uuid
+              AND (c.operator_session_id=$4::uuid
+                OR original_operator.user_id=current_operator.user_id OR $6::boolean)`,
+          [merchantId, locationId, cartId, operatorSessionId, userId, allowOtherOperator],
+        );
+        if (!scope.rows[0]) return null;
+        return this.partialRows(client, merchantId, locationId, cartId);
+      },
+      locationId,
+    );
+  }
 
   async authorize(
     userId: string,
@@ -130,7 +211,14 @@ export class PosCheckoutRepository {
     const { rows } = await client.query<{
       version: string;
       manualTerminalEnabled: boolean;
+      bankTransferEnabled: boolean;
+      bankTransferHolderName: string | null;
+      bankTransferBankName: string | null;
+      bankTransferClabe: string | null;
+      bankTransferAccountNumber: string | null;
+      merchantLogoUrl: string | null;
       mixedTenderEnabled: boolean;
+      allowDineInWithoutTable: boolean;
       maximumTenderLines: number;
       manualTerminalApprovalThreshold: string;
       tipsEnabled: boolean;
@@ -147,7 +235,14 @@ export class PosCheckoutRepository {
       policyCurrency: string;
     }>(
       `SELECT version,manual_terminal_enabled AS "manualTerminalEnabled",
+              bank_transfer_enabled AS "bankTransferEnabled",
+              bank_transfer_holder_name AS "bankTransferHolderName",
+              bank_transfer_bank_name AS "bankTransferBankName",
+              bank_transfer_clabe AS "bankTransferClabe",
+              bank_transfer_account_number AS "bankTransferAccountNumber",
+              (SELECT logo_url FROM merchant.merchant WHERE id=$1::uuid) AS "merchantLogoUrl",
               mixed_tender_enabled AS "mixedTenderEnabled",
+              allow_dine_in_without_table AS "allowDineInWithoutTable",
               maximum_tender_lines AS "maximumTenderLines",
               manual_terminal_approval_threshold::text AS "manualTerminalApprovalThreshold",
               tips_enabled AS "tipsEnabled",
@@ -172,6 +267,9 @@ export class PosCheckoutRepository {
       return {
         version: 'default-deny',
         manualTerminalEnabled: false,
+        bankTransferEnabled: false,
+        bankTransferDetails: null,
+        merchantLogoUrl: null,
         mixedTenderEnabled: false,
         maximumTenderLines: 1,
         manualTerminalApprovalThreshold: money(0),
@@ -200,7 +298,19 @@ export class PosCheckoutRepository {
     return {
       version: row.version,
       manualTerminalEnabled: row.manualTerminalEnabled,
+      bankTransferEnabled: row.bankTransferEnabled,
+      bankTransferDetails:
+        row.bankTransferHolderName && row.bankTransferBankName
+          ? {
+              holderName: row.bankTransferHolderName,
+              bankName: row.bankTransferBankName,
+              clabe: row.bankTransferClabe,
+              accountNumber: row.bankTransferAccountNumber,
+            }
+          : null,
+      merchantLogoUrl: row.merchantLogoUrl,
       mixedTenderEnabled: row.mixedTenderEnabled,
+      allowDineInWithoutTable: row.allowDineInWithoutTable ?? false,
       maximumTenderLines: row.maximumTenderLines,
       manualTerminalApprovalThreshold: money(Number(row.manualTerminalApprovalThreshold)),
       manualTerminalApprovalPermission: 'checkout.terminal.approve',
@@ -585,9 +695,11 @@ export class PosCheckoutRepository {
       `SELECT c.id::text,c.merchant_id::text AS "merchantId",c.location_id::text AS "locationId",
               c.operator_session_id::text AS "operatorSessionId",c.version,
               c.business_date::text AS "businessDate",b.name AS "merchantName",
-              br.name AS "locationName",$6::text AS "operatorName",
+              b.logo_url AS "merchantLogoUrl",
+              br.name AS "locationName",b.timezone,$6::text AS "operatorName",
               c.customer_id::text AS "customerId",
-              c.origin_order_id::text AS "originOrderId",c.origin_channel AS "originChannel"
+              c.origin_order_id::text AS "originOrderId",c.origin_channel AS "originChannel",
+              c.fulfillment_type AS "fulfillmentType"
        FROM merchant.pos_cart c
        JOIN merchant.merchant b ON b.id=c.merchant_id
        JOIN merchant.location br ON br.id=c.location_id
@@ -892,9 +1004,11 @@ export class PosCheckoutRepository {
           ? 'cash'
           : tender.type === 'manual_terminal'
             ? 'external_terminal'
-            : tender.type === 'wallet'
-              ? 'stored_value'
-              : 'gift_card';
+            : tender.type === 'bank_transfer'
+              ? 'bank_transfer'
+              : tender.type === 'wallet'
+                ? 'stored_value'
+                : 'gift_card';
       // ── The captured tender, linked and believed (workstream G) ────────────
       //
       // A tender draft that was CAPTURED through a provider adapter already has an
@@ -1173,6 +1287,124 @@ export class PosCheckoutRepository {
     };
   }
 
+  /** Post one confirmed cash payment to the shift that received it. */
+  async recordPartialCash(
+    client: PoolClient,
+    cart: CheckoutCart,
+    tender: PaymentSummary['tenders'][number],
+    cashShiftId: string,
+    commandId: string,
+    checkoutId: string,
+  ): Promise<string> {
+    if (tender.type !== 'cash' || !tender.received) {
+      throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+    }
+    const payment = await client.query<{
+      ledgerId: string | null;
+      status: string;
+      amount: string;
+      received: string | null;
+      currency: string;
+      shiftId: string | null;
+      operatorSessionId: string;
+    }>(
+      `SELECT cash_ledger_entry_id::text AS "ledgerId",status,
+              amount_minor_units::text AS amount,received_minor_units::text AS received,
+              currency,cash_shift_id::text AS "shiftId",
+              operator_session_id::text AS "operatorSessionId"
+         FROM merchant.pos_partial_payment
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
+          AND tender_id=$4::uuid AND tender_type='cash'
+        FOR UPDATE`,
+      [cart.merchantId, cart.locationId, cart.id, tender.tenderId],
+    );
+    const row = payment.rows[0];
+    if (
+      !row ||
+      row.status !== 'confirmed_success' ||
+      row.amount !== String(tender.applied.minorUnits) ||
+      row.received !== String(tender.received.minorUnits) ||
+      row.currency !== tender.applied.currency
+    ) {
+      throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+    }
+    if (row.ledgerId) return row.ledgerId;
+    if (row.shiftId !== cashShiftId || row.operatorSessionId !== cart.operatorSessionId) {
+      throw new ConflictException({ code: 'CASH_SHIFT_REQUIRED' });
+    }
+
+    const shift = await client.query<{
+      sequence: string;
+      registerId: string;
+      businessDate: string;
+    }>(
+      `SELECT (ledger_sequence+1)::text AS sequence,
+              register_id::text AS "registerId",business_date::text AS "businessDate"
+         FROM merchant.cash_shift
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND operator_session_id=$4::uuid AND status='open' AND currency=$5
+        FOR UPDATE`,
+      [cashShiftId, cart.merchantId, cart.locationId, cart.operatorSessionId, row.currency],
+    );
+    const activeShift = shift.rows[0];
+    if (!activeShift) {
+      throw new CashRefusal('CASH_SHIFT_REQUIRED', 409, { cashShiftId });
+    }
+    const posted = await client.query<{ id: string }>(
+      `INSERT INTO merchant.cash_ledger_entry
+         (merchant_id,location_id,register_id,shift_id,sequence,entry_type,
+          amount_minor_units,cash_received_minor_units,change_given_minor_units,
+          currency,command_id,sale_id,tender_fact_id,business_date,public_data)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,'cash_sale',
+               $6,$7,$8,$9,$10::uuid,NULL,$11::uuid,$12::date,
+               jsonb_build_object('checkoutId',$13::text,'cartId',$14::text))
+       RETURNING id::text`,
+      [
+        cart.merchantId,
+        cart.locationId,
+        activeShift.registerId,
+        cashShiftId,
+        activeShift.sequence,
+        tender.applied.minorUnits,
+        tender.received.minorUnits,
+        tender.change.minorUnits,
+        row.currency,
+        commandId,
+        tender.tenderId,
+        activeShift.businessDate,
+        checkoutId,
+        cart.id,
+      ],
+    );
+    const ledgerId = posted.rows[0]?.id;
+    if (!ledgerId) throw new Error('Cash payment was not posted.');
+    const advanced = await client.query(
+      `UPDATE merchant.cash_shift
+          SET ledger_sequence=$2,version=version+1
+        WHERE id=$1::uuid AND status='open' AND ledger_sequence=$3`,
+      [cashShiftId, activeShift.sequence, Number(activeShift.sequence) - 1],
+    );
+    if (advanced.rowCount !== 1) {
+      throw new CashRefusal('CASH_SHIFT_REQUIRED', 409, { cashShiftId });
+    }
+    const linked = await client.query(
+      `UPDATE merchant.pos_partial_payment
+          SET cash_ledger_entry_id=$5::uuid,business_date=$6::date
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
+          AND tender_id=$4::uuid AND cash_ledger_entry_id IS NULL`,
+      [
+        cart.merchantId,
+        cart.locationId,
+        cart.id,
+        tender.tenderId,
+        ledgerId,
+        activeShift.businessDate,
+      ],
+    );
+    if (linked.rowCount !== 1) throw new Error('Cash payment was not linked.');
+    return ledgerId;
+  }
+
   async commit(
     client: PoolClient,
     cart: CheckoutCart,
@@ -1191,10 +1423,59 @@ export class PosCheckoutRepository {
     customerValue: CustomerValueSelection | null,
   ): Promise<{
     sale: NonNullable<CheckoutResult['sale']>;
+    /** The receipt as issued, with the ticket folio in `receiptRef` — not the provisional
+     * `POS-<uuid>` the service built before it knew the day. */
+    receipt: ReceiptSnapshot;
     customerValue: CustomerValueCommitResult | null;
   }> {
     const cashTenders = paymentSummary.tenders.filter((tender) => tender.type === 'cash');
-    if (cashTenders.length > 0 && cashShiftId === null) {
+    const partialCash = cashTenders.length
+      ? await client.query<{
+          tenderId: string;
+          amount: string;
+          received: string;
+          currency: string;
+          shiftId: string | null;
+          ledgerId: string | null;
+          ledgerAmount: string | null;
+          ledgerReceived: string | null;
+          ledgerShiftId: string | null;
+        }>(
+          `SELECT p.tender_id::text AS "tenderId",p.amount_minor_units::text AS amount,
+                  p.received_minor_units::text AS received,p.currency,
+                  p.cash_shift_id::text AS "shiftId",
+                  p.cash_ledger_entry_id::text AS "ledgerId",
+                  le.amount_minor_units::text AS "ledgerAmount",
+                  le.cash_received_minor_units::text AS "ledgerReceived",
+                  le.shift_id::text AS "ledgerShiftId"
+             FROM merchant.pos_partial_payment p
+             LEFT JOIN merchant.cash_ledger_entry le
+               ON le.id=p.cash_ledger_entry_id AND le.tender_fact_id=p.tender_id
+            WHERE p.merchant_id=$1::uuid AND p.location_id=$2::uuid
+              AND p.cart_id=$3::uuid AND p.tender_id=ANY($4::uuid[])
+              AND p.tender_type='cash' AND p.status='confirmed_success'
+            FOR UPDATE OF p`,
+          [cart.merchantId, cart.locationId, cart.id, cashTenders.map((tender) => tender.tenderId)],
+        )
+      : { rows: [] };
+    const postedCashById = new Map(partialCash.rows.map((row) => [row.tenderId, row]));
+    for (const tender of cashTenders) {
+      const posted = postedCashById.get(tender.tenderId);
+      if (!posted) continue;
+      if (
+        !posted.ledgerId ||
+        posted.amount !== String(tender.applied.minorUnits) ||
+        posted.received !== String(tender.received?.minorUnits) ||
+        posted.currency !== tender.applied.currency ||
+        posted.shiftId !== posted.ledgerShiftId ||
+        posted.amount !== posted.ledgerAmount ||
+        posted.received !== posted.ledgerReceived
+      ) {
+        throw new ConflictException({ code: 'PAYMENT_UNKNOWN' });
+      }
+    }
+    const cashToPostAtCommit = cashTenders.filter((tender) => !postedCashById.has(tender.tenderId));
+    if (cashToPostAtCommit.length > 0 && cashShiftId === null) {
       // A cash sale that reached the money path with no shift on the request is a
       // CONFLICT with facts attached, not a server fault. The code keeps its name
       // (`CASH_SHIFT_REQUIRED`) and the register and its hold travel in `details`,
@@ -1214,7 +1495,7 @@ export class PosCheckoutRepository {
         ),
       );
     }
-    if (cashTenders.length > 1) {
+    if (cashToPostAtCommit.length > 1) {
       throw new Error('MULTIPLE_CASH_TENDERS_NOT_ALLOWED');
     }
     // THE DAY THE SALE BELONGS TO.
@@ -1227,6 +1508,7 @@ export class PosCheckoutRepository {
     // shift's business day, whatever day the cart was born on. Without a shift
     // there is nothing to disagree with and the cart's own date stands.
     let businessDate = cart.businessDate;
+    let saleCashShiftId = cashShiftId;
     if (cashShiftId) {
       const eligible = await client.query<{ businessDate: string }>(
         `SELECT s.business_date::text AS "businessDate"
@@ -1244,15 +1526,38 @@ export class PosCheckoutRepository {
           checkoutId,
         ],
       );
-      if (!eligible.rows[0]) throw new Error('CASH_SHIFT_NOT_ELIGIBLE');
-      businessDate = eligible.rows[0].businessDate;
+      if (eligible.rows[0]) {
+        businessDate = eligible.rows[0].businessDate;
+      } else if (cashToPostAtCommit.length > 0) {
+        throw new CashRefusal('CASH_SHIFT_REQUIRED', 409, { cashShiftId });
+      } else {
+        // A former shift can remain in the draft after its cash payment was
+        // posted. The final card charge must not attach the sale to that shift.
+        saleCashShiftId = null;
+      }
+    }
+    if (postedCashById.size > 0 && saleCashShiftId === null) {
+      // The last payment can be a card on a later day. The receipt belongs to the
+      // closing day; each cash entry stays in the shift that received that payment.
+      const currentDay = await client.query<{ businessDate: string }>(
+        `SELECT (((now() at time zone m.timezone) -
+                    m.business_day_start::interval))::date::text AS "businessDate"
+           FROM merchant.merchant m WHERE m.id=$1::uuid`,
+        [cart.merchantId],
+      );
+      if (!currentDay.rows[0]) throw new Error('MERCHANT_NOT_FOUND');
+      businessDate = currentDay.rows[0].businessDate;
     }
     const writtenOrder = await writeOrder(client, {
       merchantId: cart.merchantId,
       locationId: cart.locationId,
       customerId: cart.customerId,
       source: 'pos',
-      fulfillmentType: 'dine_in',
+      // The order type is the cart's (plan §8.2 F3, decision D5). A non-fired
+      // takeaway sale now reaches the order as a takeaway, not as a sale eaten in
+      // the café. A fired cart already wrote this order, and `writeOrder` returns
+      // it untouched, so the fire's type stands for a fired sale.
+      fulfillmentType: cart.fulfillmentType,
       externalRef: `pos-cart:${cart.id}`,
       lines: receipt.lines.map((line, index) => ({
         productId: cart.lines[index]?.productId ?? null,
@@ -1268,6 +1573,45 @@ export class PosCheckoutRepository {
       })),
     });
     const orderId = writtenOrder.orderId;
+    await syncCartOrderContext(client, cart.merchantId, cart.id, orderId);
+    await client.query(
+      `SELECT id FROM merchant.customer_order
+        WHERE merchant_id=$1::uuid AND id=$2::uuid FOR UPDATE`,
+      [cart.merchantId, orderId],
+    );
+    // Checkout sends only pending lines on an order that was sent before payment.
+    const pending = await client.query<{ id: string }>(
+      `SELECT id::text FROM merchant.pos_cart_line
+        WHERE merchant_id=$1::uuid AND cart_id=$2::uuid AND fired_at IS NULL
+        ORDER BY created_at,id FOR UPDATE`,
+      [cart.merchantId, cart.id],
+    );
+    const pendingIds = new Set(pending.rows.map((line) => line.id));
+    const pendingIndexes = cart.lines.flatMap((line, index) =>
+      pendingIds.has(line.id) ? [index] : [],
+    );
+    const sent = writtenOrder.created
+      ? { lineIds: writtenOrder.lineIds }
+      : pendingIndexes.length === 0
+        ? { lineIds: [] }
+        : await appendOrderItems(client, {
+            merchantId: cart.merchantId,
+            orderId,
+            lines: pendingIndexes.map((index) => {
+              const line = receipt.lines[index];
+              return {
+                productId: cart.lines[index].productId,
+                name: line.description,
+                variantName: line.variantName ?? null,
+                quantity: line.quantity,
+                courseNumber: cart.lines[index].courseNumber,
+                unitPriceCents: line.unitPrice.minorUnits,
+                notes: line.note ?? null,
+                modifiers: (line.modifiers ?? []).map((name) => ({ name, priceDeltaCents: 0 })),
+              };
+            }),
+          });
+    const sentIndexes = writtenOrder.created ? cart.lines.map((_, index) => index) : pendingIndexes;
     await client.query(
       `INSERT INTO merchant.payment (id,order_id,amount,method,external_ref,status,paid_at)
        VALUES ($1::uuid,$2::uuid,$3,$4,$1::text,'captured',now())
@@ -1292,6 +1636,20 @@ export class PosCheckoutRepository {
         ],
       );
     }
+    // THE TICKET NUMBER THE CUSTOMER READS, ISSUED INSIDE THIS TRANSACTION.
+    //
+    // It is issued here rather than in the service because the day it belongs to is decided
+    // here: a sale paid out of a shift belongs to the shift's business day, whatever day the
+    // cart was born on. `issuedReceipt` is the receipt as it will be handed over, so the
+    // row, the frozen snapshot, the sale's own `receiptRef`, the print payload and the till's
+    // screen all name the same short number. Until this change the paper and the screen
+    // named the payment attempt's UUID.
+    const folio = await allocateReceiptFolio(client, {
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+      businessDate,
+    });
+    const issuedReceipt: ReceiptSnapshot = { ...receipt, receiptRef: folio };
     const receiptRow = await client.query<{ id: string }>(
       `INSERT INTO merchant.receipt_snapshot
          (merchant_id,location_id,order_id,payment_attempt_id,receipt_number,
@@ -1303,14 +1661,14 @@ export class PosCheckoutRepository {
         cart.locationId,
         orderId,
         payments[0].attempt.id,
-        receipt.receiptRef,
+        issuedReceipt.receiptRef,
         // The customer's copy has to name the same day the ledger booked. The
         // receipt is built from the cart, so on a cart that outlived its business
         // date it printed yesterday while the drawer counted it today.
         businessDate,
         receipt.currency,
         receipt.grandTotal.minorUnits,
-        { ...receipt, businessDate },
+        { ...issuedReceipt, businessDate },
         receipt.receiptDestination ?? 'display',
         receipt.receiptDestination === 'digital'
           ? JSON.stringify({ destination: 'digital', deliveryStatus: 'not_sent' })
@@ -1331,7 +1689,7 @@ export class PosCheckoutRepository {
         payments[0].attempt.id,
         receiptRow.rows[0].id,
         confirmation.fingerprint,
-        cashShiftId,
+        saleCashShiftId,
         cart.originOrderId,
         cart.originChannel,
       ],
@@ -1355,8 +1713,8 @@ export class PosCheckoutRepository {
         );
       }
     }
-    if (cashShiftId && cashTenders[0]) {
-      const cash = cashTenders[0];
+    if (cashShiftId && cashToPostAtCommit[0]) {
+      const cash = cashToPostAtCommit[0];
       const shift = await client.query<{ sequence: string; registerId: string }>(
         `SELECT (ledger_sequence+1)::text AS sequence,
                 register_id::text AS "registerId"
@@ -1411,6 +1769,42 @@ export class PosCheckoutRepository {
         correlationId,
       ],
     );
+    // Updating routing metadata triggers the cart edit reservation hook. Commit
+    // inventory first so this update cannot release the reservation being charged.
+    for (const [position, index] of sentIndexes.entries()) {
+      await client.query(
+        `UPDATE merchant.pos_cart_line SET fired_at=COALESCE(fired_at,now()),
+                order_item_id=$3::uuid,updated_at=now()
+          WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [cart.merchantId, cart.lines[index].id, sent.lineIds[position]],
+      );
+    }
+    // THE PREVIEW THIS COMMAND NAMES IS RENEWED, IF ITS WINDOW HAS CLOSED.
+    //
+    // The closeout asserts the earn preview by fingerprint, checkout version and checkout
+    // fingerprint, and refuses it once it has expired (`merchant.assert_loyalty_earn_preview`).
+    // Because the row is append-only with one row per checkout version and a deterministic
+    // fingerprint, an expired row could never be replaced: the cart became un-chargeable for ever on
+    // that version, and the operator's only way out was to abandon the sale (measured on the iMin
+    // D3-504, 2026-10-11 — `40_loyalty_earn_preview_renewal.sql` has the whole story). The renewal
+    // keeps the identity and the earn and moves only the window, and only for the exact pair this
+    // command carries: a cart that changed, another customer or a re-issued policy all still fail
+    // the assertions below.
+    if (customerValue?.previewFingerprint) {
+      await client.query(
+        `SELECT merchant.renew_loyalty_earn_preview($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8)`,
+        [
+          cart.merchantId,
+          cart.locationId,
+          cart.id,
+          cart.customerId,
+          cart.version,
+          customerValueBasisFingerprint,
+          customerValue.previewFingerprint,
+          PREVIEW_WINDOW_SECONDS,
+        ],
+      );
+    }
     const value = await client.query<{ result: Record<string, unknown> }>(
       `SELECT merchant.commit_customer_value_closeout(
         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::uuid,$9,$10,$11,
@@ -1457,11 +1851,12 @@ export class PosCheckoutRepository {
         id: sale.rows[0].id,
         orderId,
         receiptId: receiptRow.rows[0].id,
-        receiptRef: receipt.receiptRef,
+        receiptRef: issuedReceipt.receiptRef,
         status: 'committed',
         committedAt: sale.rows[0].committedAt,
         totals: confirmation.totals,
       },
+      receipt: issuedReceipt,
       customerValue: {
         customerId: cart.customerId,
         earn: null,

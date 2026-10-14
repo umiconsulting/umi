@@ -1,0 +1,15 @@
+ account_number | table_name | version | lifecycle_state | lines 
+----------------+------------+---------+-----------------+-------
+            152 | Mesa 6     |       4 | building_cart   |     1
+            153 |            |       5 | suspended       |     1
+            154 |            |       1 | building_cart   |     0
+            131 |            |      11 | suspended       |     1
+(4 rows)
+
+               table_id               | state  | party_size | group_id |          seated_at          
+--------------------------------------+--------+------------+----------+-----------------------------
+ 39fba3c1-2869-469b-9ed4-91bbc9158c01 | seated |          4 |          | 2026-10-13 20:25:52.007+00
+ 18432a67-3b18-4305-b377-5e47ddb776d6 | seated |          2 |          | 2026-10-13 20:32:25.2126+00
+ ba49f7cf-6454-4dc0-9231-1e6d9b19385d | seated |          4 |          | 2026-10-13 20:32:25.2126+00
+(3 rows)
+

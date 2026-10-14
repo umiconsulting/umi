@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/money.dart';
 import '../../shared/widgets/inline_notice.dart';
 import '../entry/entry_controller.dart';
 import 'offline_journal.dart';
@@ -46,7 +47,7 @@ Future<void> showRecoveryCenter(
   Future<bool> Function()? beforeContextExit,
   Future<OfflineHardwareRecoveryResult> Function(JournalEntry entry)?
   retryOfflineHardware,
-}) => showModalBottomSheet<void>(
+}) => showPosSheet<void>(
   context: context,
   isScrollControlled: true,
   builder: (_) => RecoveryCenter(
@@ -138,10 +139,10 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
             children: [
               Text(
                 l.recoveryCenterTitle,
-                style: Theme.of(context).textTheme.headlineMedium,
+                style: PosTheme.of(context).textTheme.headlineMedium,
               ),
               Semantics(liveRegion: true, child: Text(_statusText(l, status))),
-              LinearProgressIndicator(
+              PosProgress(
                 value: status.total == 0
                     ? null
                     : status.processed / status.total,
@@ -164,11 +165,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                               widget.retryOfflineHardware != null &&
                               provisionalId != null &&
                               entry.command.commandType == 'pos.checkout.cash';
-                          return ListTile(
-                            leading: Icon(
+                          return PosListRow(
+                            leading: PosIcon(
                               conflict == null
-                                  ? Icons.lock_clock_outlined
-                                  : Icons.warning_amber_outlined,
+                                  ? PosGlyphs.lockClockOutlined
+                                  : PosGlyphs.warningAmberOutlined,
                             ),
                             title: Text(
                               entry.command.provisionalId ??
@@ -191,7 +192,7 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                                             'es'
                                         ? 'Reintentar el hardware de forma segura'
                                         : 'Retry hardware safely',
-                                    child: IconButton(
+                                    child: PosIconButton(
                                       tooltip:
                                           Localizations.localeOf(
                                                 context,
@@ -211,11 +212,11 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                                           )
                                           ? const SizedBox.square(
                                               dimension: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
+                                              child: PosSpinner(strokeWidth: 2),
                                             )
-                                          : const Icon(Icons.print_outlined),
+                                          : const PosIcon(
+                                              PosGlyphs.printOutlined,
+                                            ),
                                     ),
                                   )
                                 : Text('#${entry.command.deviceSequence}'),
@@ -234,7 +235,7 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                         l,
                         RecoveryActionCatalog.kind(action),
                       ),
-                      child: FilledButton.tonalIcon(
+                      child: PosButton.tonalIcon(
                         onPressed:
                             status.phase == RecoveryPhase.replaying ||
                                 !widget.executor.canExecute(
@@ -242,7 +243,7 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                                 )
                             ? null
                             : () => _execute(action),
-                        icon: Icon(
+                        icon: PosIcon(
                           _actionIcon(RecoveryActionCatalog.kind(action)),
                         ),
                         label: Text(
@@ -252,7 +253,7 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                     ),
                 ],
               ),
-              TextButton(
+              PosTextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(l.closeAction),
               ),
@@ -324,9 +325,9 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
     List<OfflineHardwareRecoveryItem> items,
   ) async {
     final spanish = Localizations.localeOf(context).languageCode == 'es';
-    await showDialog<void>(
+    await showPosDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(
           spanish ? 'Resultado físico desconocido' : 'Unknown physical result',
         ),
@@ -338,25 +339,25 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
         actions: [
           for (final item in items) ...[
             if (item.verifyPrint != null)
-              TextButton(
+              PosTextButton(
                 onPressed: () =>
                     _runHardwareAction(dialogContext, item.verifyPrint!),
                 child: Text(spanish ? 'Confirmar impresión' : 'Verify print'),
               ),
             if (item.controlledReprint != null)
-              FilledButton.tonal(
+              PosButton.tonal(
                 onPressed: () =>
                     _runHardwareAction(dialogContext, item.controlledReprint!),
                 child: Text(spanish ? 'Imprimir una COPIA' : 'Print a COPY'),
               ),
             if (item.repeatDrawerOpen != null)
-              FilledButton.tonal(
+              PosButton.tonal(
                 onPressed: () =>
                     _runHardwareAction(dialogContext, item.repeatDrawerOpen!),
                 child: Text(spanish ? 'Abrir otra vez' : 'Open again'),
               ),
           ],
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(spanish ? 'Cerrar' : 'Close'),
           ),
@@ -438,9 +439,9 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
     final official = entry.officialCommit == null
         ? null
         : OfficialCommitResult.fromJson(entry.officialCommit!);
-    await showDialog<void>(
+    await showPosDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(AppLocalizations.of(context).recoveryReceiptTitle),
         content: SizedBox(
           width: 520,
@@ -452,17 +453,17 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                     ? AppLocalizations.of(context).pendingSalesSecure
                     : AppLocalizations.of(context).officialReceiptAvailable,
               ),
-              SelectableText(
+              PosSelectableText(
                 official?.officialReceiptNumber ??
                     entry.command.provisionalId ??
                     '#${entry.command.deviceSequence}',
               ),
-              const Divider(),
+              const PosDivider(),
               for (final rawLine in cart.items)
                 Builder(
                   builder: (_) {
                     final line = CartItem.fromJson(rawLine);
-                    return ListTile(
+                    return PosListRow(
                       title: Text(line.productName),
                       subtitle: line.variant == null
                           ? null
@@ -471,17 +472,17 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
                     );
                   },
                 ),
-              const Divider(),
+              const PosDivider(),
               Text(
                 _receiptMoney(total),
-                style: Theme.of(context).textTheme.titleLarge,
+                style: PosTheme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.end,
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(AppLocalizations.of(context).closeAction),
           ),
@@ -493,33 +494,33 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
   String _receiptMoney(Map<String, Object?> money) {
     final currency = money['currency'] as String? ?? '';
     final minorUnits = (money['minorUnits'] as num?)?.toInt() ?? 0;
-    return '$currency ${(minorUnits / 100).toStringAsFixed(2)}';
+    return formatMinorUnits(minorUnits, currency);
   }
 
   Future<String?> _managerCredential() async {
     final controller = TextEditingController();
-    final value = await showDialog<String>(
+    final value = await showPosDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(AppLocalizations.of(context).recoveryManagerTitle),
-        content: TextField(
+        content: PosField(
           controller: controller,
           obscureText: true,
           keyboardType: TextInputType.number,
           maxLength: 12,
           autofocus: true,
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText: AppLocalizations.of(
               context,
             ).recoveryManagerCredentialLabel,
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(AppLocalizations.of(context).closeAction),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context, controller.text),
             child: Text(AppLocalizations.of(context).confirmAction),
           ),
@@ -570,21 +571,21 @@ final class _RecoveryCenterState extends State<RecoveryCenter> {
     RecoveryActionKind.contactSupport => l.recoverySupportDescription,
   };
 
-  IconData _actionIcon(RecoveryActionKind id) => switch (id) {
+  PosGlyph _actionIcon(RecoveryActionKind id) => switch (id) {
     RecoveryActionKind.synchronize ||
     RecoveryActionKind.queryResult ||
     RecoveryActionKind.refreshPolicy ||
-    RecoveryActionKind.refreshSnapshots => Icons.sync,
-    RecoveryActionKind.reauthenticate => Icons.login,
-    RecoveryActionKind.reselectBranch => Icons.store_outlined,
-    RecoveryActionKind.managerReview => Icons.supervisor_account_outlined,
-    RecoveryActionKind.acknowledgeReconciliation => Icons.verified_outlined,
-    RecoveryActionKind.viewReceipt => Icons.receipt_long_outlined,
-    RecoveryActionKind.queryAmbiguousPayment => Icons.manage_search,
+    RecoveryActionKind.refreshSnapshots => PosGlyphs.sync,
+    RecoveryActionKind.reauthenticate => PosGlyphs.login,
+    RecoveryActionKind.reselectBranch => PosGlyphs.storeOutlined,
+    RecoveryActionKind.managerReview => PosGlyphs.supervisorAccountOutlined,
+    RecoveryActionKind.acknowledgeReconciliation => PosGlyphs.verifiedOutlined,
+    RecoveryActionKind.viewReceipt => PosGlyphs.receiptLongOutlined,
+    RecoveryActionKind.queryAmbiguousPayment => PosGlyphs.manageSearch,
     RecoveryActionKind.deviceRecovery ||
-    RecoveryActionKind.credentialRecovery => Icons.phonelink_lock_outlined,
-    RecoveryActionKind.storageRecovery => Icons.storage_outlined,
-    RecoveryActionKind.contactSupport => Icons.support_agent_outlined,
+    RecoveryActionKind.credentialRecovery => PosGlyphs.phonelinkLockOutlined,
+    RecoveryActionKind.storageRecovery => PosGlyphs.storageOutlined,
+    RecoveryActionKind.contactSupport => PosGlyphs.supportAgentOutlined,
   };
 
   String _statusText(AppLocalizations l, RecoveryStatus status) {
@@ -616,7 +617,7 @@ final class _WebRecoveryUnavailable extends StatelessWidget {
           children: [
             Text(
               localizations.recoveryCenterTitle,
-              style: Theme.of(context).textTheme.headlineMedium,
+              style: PosTheme.of(context).textTheme.headlineMedium,
             ),
             Expanded(
               child: Center(
@@ -626,11 +627,14 @@ final class _WebRecoveryUnavailable extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.desktop_windows_outlined, size: 48),
+                      const PosIcon(
+                        PosGlyphs.desktopWindowsOutlined,
+                        size: 48,
+                      ),
                       const SizedBox(height: UmiSpacing.md),
                       Text(
                         localizations.recoveryWebUnsupportedTitle,
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: PosTheme.of(context).textTheme.titleLarge,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: UmiSpacing.sm),
@@ -643,7 +647,7 @@ final class _WebRecoveryUnavailable extends StatelessWidget {
                 ),
               ),
             ),
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(localizations.closeAction),
             ),

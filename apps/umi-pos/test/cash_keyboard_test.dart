@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cash/cash_controller.dart';
 import 'package:umi_pos/features/cash/cash_surface.dart';
 
@@ -28,16 +28,15 @@ Future<void> _pumpCashCenter(WidgetTester tester) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    MaterialApp(
+    PosApp(
       locale: const Locale('es'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
+
         GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
-      home: Scaffold(
+      home: PosPage(
         body: CashCenter(
           controller: controller,
           permissions: OperatorPermissions(const [
@@ -54,114 +53,43 @@ Future<void> _pumpCashCenter(WidgetTester tester) async {
   await tester.pump();
 }
 
-/// The theme the screen hands to its own controls and to the dialogs it opens.
-///
-/// Read from inside the screen's own `AppBar`, which sits below the override —
-/// the test's own `Scaffold` is above it and carries the app's untouched theme.
-ThemeData _screenTheme(WidgetTester tester) =>
-    Theme.of(tester.element(find.byType(AppBar)));
+
+bool _hasFocusRing(WidgetTester tester, Finder region) => tester.widgetList<DecoratedBox>(find.descendant(of: region, matching: find.byType(DecoratedBox))).any((widget) {
+  final decoration = widget.decoration;
+  if (decoration is! BoxDecoration || decoration.border is! Border) return false;
+  final side = (decoration.border! as Border).top;
+  return side.width >= 2 && side.color.a == 1;
+});
 
 void main() {
-  testWidgets(
-    'every button style on this screen thickens its border on focus',
-    (tester) async {
-      await _pumpCashCenter(tester);
-      final theme = _screenTheme(tester);
-      const focused = {WidgetState.focused};
-
-      final styles = <String, ButtonStyle?>{
-        'filled': theme.filledButtonTheme.style,
-        'text': theme.textButtonTheme.style,
-        'icon': theme.iconButtonTheme.style,
-        'outlined': theme.outlinedButtonTheme.style,
-      };
-
-      styles.forEach((name, style) {
-        final side = style?.side?.resolve(focused);
-        expect(
-          side?.width,
-          2,
-          reason: 'the $name button has no ring when it takes focus',
-        );
-        // A ring that is only a hue change is a ring an operator who cannot see
-        // the hue does not have. Two pixels against one is a change in shape.
-        expect(side!.color.a, 1.0, reason: 'the $name ring is translucent');
-      });
-    },
-  );
-
-  testWidgets('nothing moves until something has focus', (tester) async {
+  testWidgets('keyboard focus draws a ring and keeps control geometry', (tester) async {
     await _pumpCashCenter(tester);
-    final theme = _screenTheme(tester);
-
-    // Material draws no border on a filled, text or icon button at rest, and the
-    // screen must not invent one: a focus state that is always on is not a state.
-    expect(theme.filledButtonTheme.style?.side?.resolve({}), BorderSide.none);
-    expect(theme.textButtonTheme.style?.side?.resolve({}), BorderSide.none);
-    expect(theme.iconButtonTheme.style?.side?.resolve({}), BorderSide.none);
-
-    // The movement tiles keep the hairline they rest with — the ring replaces it
-    // rather than adding to it.
-    final tile = tester.widget<OutlinedButton>(
-      find.widgetWithText(OutlinedButton, 'Entrada de efectivo'),
-    );
-    expect(tile.style?.side?.resolve({})?.width, 1);
-    expect(tile.style?.side?.resolve(const {WidgetState.focused})?.width, 2);
+    final tile = find.widgetWithText(PosOutlineButton, 'Entrada de efectivo');
+    final before = tester.getRect(tile);
+    FocusManager.instance.highlightStrategy = FocusHighlightStrategy.alwaysTraditional;
+    var reached = false;
+    for (var step = 0; step < 30; step++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final current = FocusManager.instance.primaryFocus?.context?.findAncestorWidgetOfExactType<PosOutlineButton>();
+      if (identical(current, tester.widget(tile))) { reached = true; break; }
+    }
+    expect(reached, isTrue, reason: 'Keyboard traversal did not reach the cash action');
+    expect(_hasFocusRing(tester, tile), isTrue);
+    expect(tester.getRect(tile), before);
+    FocusManager.instance.highlightStrategy = FocusHighlightStrategy.automatic;
   });
-
-  testWidgets('a dialog opened from this screen keeps the ring and the focus', (
-    tester,
-  ) async {
+  testWidgets('a cash dialog contains keyboard focus and an editable amount', (tester) async {
     await _pumpCashCenter(tester);
-    await tester.tap(
-      find.widgetWithText(OutlinedButton, 'Entrada de efectivo'),
-    );
+    await tester.tap(find.widgetWithText(PosOutlineButton, 'Entrada de efectivo'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-
-    // The modal holds the keyboard: the operator who opened it is inside it, not
-    // wandering the screen behind the barrier.
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.byType(PosAlertDialog), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
     final focused = FocusManager.instance.primaryFocus?.context;
     expect(focused, isNotNull);
-    expect(
-      focused!.findAncestorWidgetOfExactType<AlertDialog>(),
-      isNotNull,
-      reason: 'focus escaped the dialog to the screen behind it',
-    );
-
-    // And the ring travels with it. `showDialog` captures the inherited themes of
-    // the context that opens it, which is how a control inside a dialog inherits
-    // the treatment this screen gives its own.
-    final dialogTheme = Theme.of(tester.element(find.byType(AlertDialog)));
-    expect(
-      dialogTheme.filledButtonTheme.style?.side?.resolve(const {
-        WidgetState.focused,
-      })?.width,
-      2,
-    );
-  });
-
-  testWidgets('the ring is drawn against the surface, not against the accent', (
-    tester,
-  ) async {
-    await _pumpCashCenter(tester);
-    final theme = _screenTheme(tester);
-
-    // On the brand-blue call to action a blue ring is invisible, so a filled
-    // button rings in the surface's own text colour; a control sitting on the
-    // surface rings in the accent.
-    expect(
-      theme.filledButtonTheme.style?.side?.resolve(const {
-        WidgetState.focused,
-      })?.color,
-      theme.colorScheme.onSurface,
-    );
-    expect(
-      theme.textButtonTheme.style?.side?.resolve(const {
-        WidgetState.focused,
-      })?.color,
-      theme.colorScheme.primary,
-    );
+    expect(focused!.findAncestorWidgetOfExactType<PosAlertDialog>(), isNotNull);
+    expect(find.descendant(of: find.byType(PosAlertDialog), matching: find.byType(EditableText)), findsWidgets);
   });
 }

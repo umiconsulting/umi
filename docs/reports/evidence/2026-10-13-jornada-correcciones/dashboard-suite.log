@@ -1,0 +1,137 @@
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+> @umi/dashboard@0.2.0 pretest /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard
+> lingui compile
+
+Compiling message catalogs…
+Done in 350ms
+
+> @umi/dashboard@0.2.0 test /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard
+> vitest run
+
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard
+
+ ✓ src/screens/inventory-model.spec.js (44 tests) 22ms
+ ✓ src/screens/inventory-count-model.spec.js (33 tests) 13ms
+ ✓ src/screens/costing-model.spec.js (19 tests) 21ms
+ ✓ src/screens/recipe-model.spec.js (25 tests) 13ms
+ ✓ src/lib/role-landing.spec.js (11 tests) 8ms
+ ✓ src/screens/device-utils.spec.js (16 tests) 9ms
+ ✓ src/screens/invoice-model.spec.js (21 tests) 9ms
+ ✓ src/screens/floor-plan-model.spec.js (22 tests) 15ms
+stderr | src/lib/auth.spec.js > refresh failure classification > reads the rate limiter by its code, not by the number alone
+session refresh deferred (429); keeping the session, retrying in 15s
+
+ ✓ src/screens/caja-turnos-model.spec.js (14 tests) 8ms
+ ✓ src/screens/kitchen-routing-model.spec.js (9 tests) 13ms
+stderr | src/lib/auth.spec.js > refresh failure classification > reads the rate limiter by its code, not by the number alone
+session refresh deferred (429); keeping the session, retrying in 15s
+
+ ✓ src/screens/variance-model.spec.js (23 tests) 33ms
+stderr | src/lib/auth.spec.js > refresh failure classification > treats 5xx and unreadable bodies as transient
+session refresh deferred (500); keeping the session, retrying in 15s
+
+stderr | src/lib/auth.spec.js > refresh failure classification > treats 5xx and unreadable bodies as transient
+session refresh deferred (503); keeping the session, retrying in 15s
+
+stderr | src/lib/auth.spec.js > refresh failure classification > treats 5xx and unreadable bodies as transient
+session refresh returned no readable session; keeping the session and retrying
+
+stderr | src/lib/auth.spec.js > refresh failure classification > treats 5xx and unreadable bodies as transient
+session refresh deferred (429); keeping the session, retrying in 15s
+
+stderr | src/lib/auth.spec.js > refresh failure classification > treats 401 and 403 as dead whatever the body says
+session refresh refused (401); the session is gone, signing out
+
+ ✓ src/lib/whatsapp-format.spec.js (11 tests) 7ms
+stderr | src/lib/auth.spec.js > refresh failure classification > treats 401 and 403 as dead whatever the body says
+session refresh refused (403); the session is gone, signing out
+
+ ✓ src/lib/module-registry.spec.js (9 tests) 6ms
+stderr | src/lib/auth.spec.js > refresh failure classification > treats an auth-shaped body as dead even under a non-auth status
+session refresh refused (400); the session is gone, signing out
+
+stderr | src/lib/auth.spec.js > refresh failure classification > treats an auth-shaped body as dead even under a non-auth status
+session refresh refused (502); the session is gone, signing out
+
+ ✓ src/data.devices.spec.jsx (5 tests) 9ms
+ ✓ src/data.merchant-logo.spec.jsx (4 tests) 12ms
+ ✓ src/data.mp-point.spec.jsx (7 tests) 11ms
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > keeps the session and arms a retry on 429
+session refresh deferred (429); keeping the session, retrying in 15s
+session refresh deferred (429); keeping the session, retrying in 30s
+
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > keeps the session on a 5xx
+session refresh deferred (500); keeping the session, retrying in 15s
+
+ ✓ src/screens/prep-model.spec.js (10 tests) 8ms
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > keeps the session when the network never answers
+session refresh could not reach the API; keeping the session and retrying TypeError: Failed to fetch
+    at /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard/src/lib/auth.spec.js:302:13
+    at mockCall (file:///home/juan/Projects/umiconsulting/umi/node_modules/.pnpm/@vitest+spy@2.1.9/node_modules/@vitest/spy/dist/index.js:61:17)
+    at fetch (file:///home/juan/Projects/umiconsulting/umi/node_modules/.pnpm/tinyspy@3.0.2/node_modules/tinyspy/dist/index.js:45:80)
+    at performRefresh (/home/juan/Projects/umiconsulting/umi/apps/umi-dashboard/src/lib/auth.jsx:522:23)
+    at run (/home/juan/Projects/umiconsulting/umi/apps/umi-dashboard/src/lib/auth.jsx:486:16)
+    at Object.callback (/home/juan/Projects/umiconsulting/umi/apps/umi-dashboard/src/lib/auth.jsx:320:14)
+    at /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard/src/lib/auth.spec.js:102:23
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > treats a malformed body as transient, not as a dead session
+session refresh returned no readable session; keeping the session and retrying
+
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > reports dead on 401 and leaves clearing to handleSessionExpired
+session refresh refused (401); the session is gone, signing out
+
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > never clears the session for a transient failure, and stops after a bounded number of retries
+session refresh deferred (429); keeping the session, retrying in 15s
+session refresh deferred (429); keeping the session, retrying in 30s
+session refresh deferred (429); keeping the session, retrying in 60s
+session refresh deferred (429); keeping the session, retrying in 120s
+session refresh deferred (429); keeping the session, retrying in 240s
+session refresh still failing after 5 retries; keeping the session and waiting for the next request or focus
+session refresh deferred (429); keeping the session, waiting for the next request
+
+ ✓ src/shell.spec.jsx (5 tests) 48ms
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > honours a rate-limit reset hint instead of retrying inside the window
+session refresh deferred (429); keeping the session, retrying in 45s
+
+stderr | src/lib/auth.spec.js > refreshSession outcome (cookie auth) > honours a rate-limit reset hint instead of retrying inside the window
+session refresh deferred (429); keeping the session, retrying in 30s
+
+ ✓ src/screens/devices.hardware.spec.jsx (5 tests) 20ms
+ ✓ src/screens/devices.pos-card.spec.jsx (6 tests) 28ms
+stderr | src/lib/auth.spec.js > callers treat the union correctly > the proactive timer signs out only when the refresh is dead
+session refresh refused (401); the session is gone, signing out
+
+ ✓ src/screens/devices.mp-point.spec.jsx (19 tests) 95ms
+stderr | src/lib/auth.spec.js > callers treat the union correctly > the proactive timer KEEPS the session when the refresh is transient
+session refresh deferred (429); keeping the session, retrying in 15s
+
+stderr | src/lib/auth.spec.js > callers treat the union correctly > a returning tab retries a transient refresh without bouncing the operator
+session refresh deferred (503); keeping the session, retrying in 15s
+
+ ✓ src/lib/build-config.spec.js (3 tests) 5ms
+ ✓ src/lib/administrative-command-identity.spec.js (2 tests) 5ms
+ ✓ src/lib/theme.spec.js (3 tests) 5ms
+stderr | src/lib/auth.spec.js > cross-tab serialisation (one rotation per browser, Web Locks) > adopts a rotation that lands while its own request is in flight (the 401 race)
+session refresh refused (401) but another tab rotated; adopting its session
+
+stderr | src/lib/auth.spec.js > cross-tab serialisation (one rotation per browser, Web Locks) > still reports dead on a 401 when no other tab rotated
+session refresh refused (401); the session is gone, signing out
+
+ ✓ src/screens/profile-format.spec.js (5 tests) 7ms
+stderr | src/lib/auth.spec.js > cross-tab fallback (browser without Web Locks) > is never wedged for ever by a claim that is never released
+cross-tab refresh lock not acquired in time; refreshing without it
+
+ ✓ src/lib/auth.spec.js (28 tests) 1506ms
+   ✓ refresh failure classification > reads the rate limiter by its code, not by the number alone 669ms
+ ✓ src/data.floor-plan.spec.jsx (1 test) 4ms
+ ✓ src/screens/operations.spec.jsx (2 tests) 18ms
+ ✓ src/screens/devices.add-device.spec.jsx (3 tests) 16ms
+
+ Test Files  29 passed (29)
+      Tests  365 passed (365)
+   Start at  13:08:21
+   Duration  2.50s (transform 5.62s, setup 0ms, collect 12.52s, tests 1.98s, environment 6ms, prepare 4.28s)
+

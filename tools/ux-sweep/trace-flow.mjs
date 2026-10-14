@@ -37,7 +37,11 @@ import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { applyViewport, arg, hasFlag, parseViewport } from './lib/collect.mjs';
 
-const WORKSPACE = process.env.UX_WORKSPACE || '/home/jc/umi';
+// The workspace this tool belongs to, derived from its own path: a hard-coded
+// home directory belongs to the machine the harness was first written on, and on
+// any other box `require('@playwright/test')` resolves against a tree that does
+// not exist.
+const WORKSPACE = process.env.UX_WORKSPACE || new URL('../..', import.meta.url).pathname;
 const require = createRequire(`${WORKSPACE}/`);
 const { chromium } = require('@playwright/test');
 

@@ -45,6 +45,12 @@ export const routes = {
     capabilities: (merchantId: string): string =>
       buildPath('merchants.capabilities', { merchantId }),
     settings: (merchantId: string): string => buildPath('merchants.settings', { merchantId }),
+    /** The café's own logo: `PUT` to upload, and the asset it answers with. */
+    brandingLogo: (merchantId: string): string =>
+      buildPath('merchants.brandingLogo', { merchantId }),
+    /** `DELETE` — forget the logo and stop pointing `logo_url` at it. */
+    brandingLogoRemove: (merchantId: string): string =>
+      buildPath('merchants.brandingLogoRemove', { merchantId }),
     locations: (merchantId: string): string => buildPath('merchants.locations', { merchantId }),
     audit: (merchantId: string): string => buildPath('merchants.audit', { merchantId }),
     operations: (merchantId: string): string => buildPath('merchants.operations', { merchantId }),
@@ -120,6 +126,10 @@ export const routes = {
     completeEnrollment: routePath('devices.completeEnrollment'),
     status: routePath('devices.status'),
   },
+  hardware: {
+    /** The back office's hardware inventory — printers and peripherals, by name. */
+    list: (merchantId: string): string => buildPath('hardware.list', { merchantId }),
+  },
   pos: {
     entryContext: routePath('pos.entryContext'),
     operatorSessions: routePath('pos.operatorSessions'),
@@ -137,11 +147,29 @@ export const routes = {
         buildPath('pos.catalogProduct', { merchantId, productId }),
     },
     cart: {
+      accountDetails: (merchantId: string, cartId: string): string =>
+        buildPath('pos.cartAccountDetails', { merchantId, cartId }),
+      assignAccountTable: (merchantId: string, cartId: string): string =>
+        buildPath('pos.cartAccountAssignTable', { merchantId, cartId }),
+      openAccounts: (merchantId: string): string =>
+        buildPath('pos.cartOpenAccounts', { merchantId }),
+      account: (merchantId: string, cartId: string): string =>
+        buildPath('pos.cartAccountGet', { merchantId, cartId }),
+      openTable: (merchantId: string): string => buildPath('pos.cartTableOpen', { merchantId }),
+      resumeAccount: (merchantId: string, cartId: string): string =>
+        buildPath('pos.cartAccountResume', { merchantId, cartId }),
+      suspend: (merchantId: string): string => buildPath('pos.cartSuspend', { merchantId }),
+      cancelSentLine: (merchantId: string, lineId: string): string =>
+        buildPath('pos.cartSentLineRemove', { merchantId, lineId }),
       base: (merchantId: string): string => buildPath('pos.cartCreate', { merchantId }),
       lines: (merchantId: string): string => buildPath('pos.cartLines', { merchantId }),
       line: (merchantId: string, lineId: string): string =>
         buildPath('pos.cartLineUpdate', { merchantId, lineId }),
       prepare: (merchantId: string): string => buildPath('pos.cartPrepare', { merchantId }),
+    },
+    /** The fired order — sending an order to the kitchen before the money. */
+    order: {
+      fire: (merchantId: string): string => buildPath('pos.orderFire', { merchantId }),
     },
     checkout: {
       base: (merchantId: string): string => buildPath('pos.checkout', { merchantId }),
@@ -149,6 +177,8 @@ export const routes = {
         buildPath('pos.checkoutPayment', { merchantId, paymentId }),
       recovery: (merchantId: string, cartId: string): string =>
         buildPath('pos.checkoutRecovery', { merchantId, cartId }),
+      partialPayments: (merchantId: string, cartId: string): string =>
+        buildPath('pos.checkoutPartialPayments', { merchantId, cartId }),
       cancel: (merchantId: string, cartId: string): string =>
         buildPath('pos.checkoutCancel', { merchantId, cartId }),
     },
@@ -212,6 +242,8 @@ export const routes = {
         buildPath('pos.saleRename', { merchantId, saleId }),
       cancel: (merchantId: string, saleId: string): string =>
         buildPath('pos.saleCancel', { merchantId, saleId }),
+      cancelCarriedOver: (merchantId: string): string =>
+        buildPath('pos.carriedOverAccountsCancel', { merchantId }),
       attachCustomer: (merchantId: string, saleId: string): string =>
         buildPath('pos.saleCustomerAttach', { merchantId, saleId }),
       detachCustomer: (merchantId: string, saleId: string): string =>

@@ -32,6 +32,15 @@ final class _KitchenApi implements ApiClient {
       'priority': 'normal',
       'version': 4,
       'stationIds': ['00000000-0000-4000-8000-000000000012'],
+      'readyItems': [
+        {'id': '00000000-0000-4000-8000-000000000013', 'sound': null},
+      ],
+      'items': [
+        {
+          'sourceOrderItemId': '00000000-0000-4000-8000-000000000014',
+          'status': 'ready',
+        },
+      ],
       'updatedAt': '2026-08-09T12:00:00.000Z',
       // The command route answers with its own envelope, which is what the
       // repository unwraps; the status fields above stay for the read test.
@@ -59,9 +68,62 @@ void main() {
     );
 
     expect(result.status, 'ready');
+    expect(kitchenStatusSummary(result, true), 'Listo · 1 productos listos');
+    expect(kitchenStatusSummary(result, false), 'Ready · 1 items ready');
+    expect(
+      kitchenLineStatuses(result)['00000000-0000-4000-8000-000000000014'],
+      'ready',
+    );
     expect(api.method, ApiMethod.get);
     expect(api.path, contains('/api/v1/pos/merchants/'));
     expect(api.path, contains('locationId='));
+  });
+
+  test('the cart names each fired line from its own kitchen item status', () {
+    CartItem line(String id, {bool fired = true}) => CartItem(
+      id: id,
+      productId: '00000000-0000-4000-8000-000000000020',
+      productName: 'Margarita',
+      saleAction: 'merchandise',
+      quantity: 1,
+      courseNumber: 1,
+      variant: null,
+      modifiers: const [],
+      note: null,
+      fired: fired,
+      firedOrderItemId: id,
+      price: const {},
+    );
+
+    final statuses = {
+      'ready': 'ready',
+      'working': 'preparing',
+      'cancelled': 'cancelled',
+    };
+    expect(
+      kitchenCartLineLabel(line('ready'), statuses, spanish: true),
+      'Listo',
+    );
+    expect(
+      kitchenCartLineLabel(line('working'), statuses, spanish: true),
+      'Preparando',
+    );
+    expect(
+      kitchenCartLineLabel(line('cancelled'), statuses, spanish: true),
+      'Anulado',
+    );
+    expect(
+      kitchenCartLineLabel(line('missing'), statuses, spanish: true),
+      'Enviada',
+    );
+    expect(
+      kitchenCartLineLabel(
+        line('ready', fired: false),
+        statuses,
+        spanish: true,
+      ),
+      'Pendiente de enviar',
+    );
   });
 
   test('firing a course puts that course on the wire', () async {

@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
+import '../../core/errors/app_error.dart';
+import '../../shared/receipt_time.dart';
 import 'hardware_fingerprint.dart';
 import 'hardware_recovery_store.dart';
 import 'hardware_repository.dart';
@@ -100,6 +103,42 @@ final class HardwareService {
   DateTime? _lastRuntimeCachedAt;
   static const _runtimeCacheLifetime = Duration(minutes: 15);
 
+  /// THE NEWEST READING, FOR A SCREEN THAT STAYS OPEN.
+  ///
+  /// The till reads the hardware runtime on the relay tick, every ten seconds,
+  /// and when a screen asks for it. A screen that keeps the reading it loaded when
+  /// it opened shows the state of that moment: on the pilot till a printer was
+  /// found and printed while the centre still read the state of the moment the
+  /// centre opened. The screens follow this value, so the state they show is the
+  /// last state this till measured.
+  final ValueNotifier<HardwareRuntimeSnapshot?> latestRuntime =
+      ValueNotifier<HardwareRuntimeSnapshot?>(null);
+
+  /// THE CADENCE OF THE BACKGROUND READ.
+  ///
+  /// A screen that shows the hardware holds the fast cadence: the relay reads the
+  /// runtime on each tick while one screen watches. With no screen at the hardware the
+  /// relay reads once each minute, because the reading is the same queue of the whole
+  /// location, and no operator is looking at it. The first read always happens, so the
+  /// print path has a runtime before any sale.
+  static const _backgroundReadInterval = Duration(seconds: 60);
+  int _runtimeWatchers = 0;
+
+  /// A screen at the hardware asks for a reading on each relay tick.
+  void watchRuntime() => _runtimeWatchers += 1;
+
+  void unwatchRuntime() {
+    if (_runtimeWatchers > 0) _runtimeWatchers -= 1;
+  }
+
+  /// Whether the relay must read the hardware runtime now.
+  bool get runtimeReadDue {
+    if (_runtimeWatchers > 0) return true;
+    final readAt = _lastRuntimeCachedAt;
+    if (readAt == null) return true;
+    return DateTime.now().toUtc().difference(readAt) >= _backgroundReadInterval;
+  }
+
   Stream<CanonicalScanEvent> get scanEvents => _scanEvents.stream;
 
   void setSensitiveInputActive(bool active) {
@@ -123,6 +162,7 @@ final class HardwareService {
     );
     await _scanEvents.close();
     await _keyboardWedge.dispose();
+    latestRuntime.dispose();
     final resolver = _adapterResolver;
     if (resolver is DisposableDeviceAdapterResolver) {
       await (resolver as DisposableDeviceAdapterResolver).dispose();
@@ -325,21 +365,35 @@ final class HardwareService {
           final device = HardwareDevice.fromJson(raw);
           return {
             ...device.toJson(),
+            // MEASURED, OR NOTHING. The registry's `connection_state` is the
+            // verdict of the LAST diagnostic somebody ran — possibly yesterday, or
+            // from another till — and showing it as the state right now is how a
+            // printer that is switched off reads "Conectado". Found on the till on
+            // 2026-10-11: the chip claimed connected, the printer was not there,
+            // and after finding it nothing looked different. A device this till has
+            // not reached is `unknown`, which is the truth and is what the operator
+            // needs in order to press the test.
             'connectionState':
                 stateResolver.connectionStateFor(device.id) ??
-                device.connectionState,
+                (device.enabled ? 'unknown' : device.connectionState),
           };
         }).toList(),
       });
-      _lastRuntime = effective;
+      _publishRuntime(effective);
       _bindRuntime(scope);
       await _cacheRuntime(scope, effective);
       return effective;
     }
-    _lastRuntime = result;
+    _publishRuntime(result);
     _bindRuntime(scope);
     await _cacheRuntime(scope, result);
     return result;
+  }
+
+  /// Records the newest reading, and shows it to the screens that follow it.
+  void _publishRuntime(HardwareRuntimeSnapshot runtime) {
+    _lastRuntime = runtime;
+    latestRuntime.value = runtime;
   }
 
   Future<void> _configureRuntime(HardwareRuntimeSnapshot runtime) async {
@@ -474,6 +528,9 @@ final class HardwareService {
     if (validMemory) return runtime;
     final restored = await _restoreRuntime(scope);
     _lastRuntime = restored;
+    // A restored reading is a reading too: a screen that opens while the till has
+    // no line shows the last state this till measured, and not an empty page.
+    if (restored != null) latestRuntime.value = restored;
     return restored;
   }
 
@@ -679,6 +736,13 @@ final class HardwareService {
     required int configurationVersion,
     required ReceiptPrintPayload receipt,
     String? commandId,
+    /**
+     * This paper is a duplicate of a finished sale, and it says so. The server
+     * rebuilds the receipt's content (it does not trust a till with a document it
+     * can author), and this flag is the one fact about the print that no content
+     * can carry — see `HardwareCommandRequest.copy` and the COPIA legend.
+     */
+    bool copy = false,
   }) => execute(
     scope.merchantId,
     _command(
@@ -691,6 +755,7 @@ final class HardwareService {
       configurationVersion: configurationVersion,
       printPayload: receipt.toJson(),
       commandId: commandId,
+      copy: copy,
     ),
   );
 
@@ -714,7 +779,42 @@ final class HardwareService {
         printers.firstOrNull;
     final receipt = _receiptPayload(receiptSnapshot, receiptId: receiptId);
     if (printer == null || receipt == null) {
-      throw StateError('HARDWARE_RECEIPT_PRINTER_UNAVAILABLE');
+      // TYPED, SO THE SCREEN CAN SAY SO. This was a bare `StateError`: the
+      // surfaces that print catch `AppException` (that is how every other
+      // refusal reaches `operatorErrorMessage`), so this one escaped through an
+      // unhandled async gap and the operator read nothing — the button simply did
+      // not work (iMin D3-504, 2026-10-11).
+      throw AppException(
+        category: AppErrorCategory.configuration,
+        code: printer == null
+            ? 'HARDWARE_RECEIPT_PRINTER_UNAVAILABLE'
+            : 'HARDWARE_RECEIPT_PAYLOAD_UNAVAILABLE',
+        recoverable: false,
+      );
+    }
+    // A receipt that has already been printed cannot be printed a first time
+    // again: the first job owns both the command's idempotency key and the
+    // unique index that allows one official receipt per receipt and printer. A
+    // second copy is a controlled reprint of that job — the shape the hardware
+    // centre's own queue uses — so `Imprimir recibo` on a sale already printed
+    // answers the operator instead of refusing with `IDEMPOTENCY_CONFLICT`
+    // (measured on the iMin D3-504 on 2026-10-11).
+    final original = (runtime.printJobs ?? const <Map<String, Object?>>[])
+        .map(PrintJob.fromJson)
+        .where(
+          (job) =>
+              job.sourceAggregateType == 'receipt' &&
+              job.sourceAggregateId == receiptId &&
+              job.targetPrinterId == printer.id &&
+              job.originalJobId == null,
+        )
+        .firstOrNull;
+    if (original != null) {
+      return controlledReprint(
+        scope: scope,
+        jobId: original.jobId,
+        reason: 'customer_copy',
+      );
     }
     final results = await _printReceiptSet(
       scope: scope,
@@ -726,6 +826,15 @@ final class HardwareService {
         1,
         3,
       ),
+      // PRINTING FROM THE SALES HISTORY IS A DUPLICATE, ALWAYS.
+      //
+      // The rule this till follows, and the one the market follows: the paper the
+      // SALE printed is the original; anything printed afterwards is a copy and the
+      // person holding it has to be able to tell. This path is reached only from
+      // Ventas (`printAuthoritativeReceipt` is called there and nowhere else), so
+      // the flag belongs here rather than at the call site — a second caller would
+      // otherwise inherit an unlabelled duplicate.
+      copy: true,
     );
     return results.first;
   }
@@ -737,6 +846,7 @@ final class HardwareService {
     required ReceiptPrintPayload receipt,
     required String commandId,
     required int copies,
+    bool copy = false,
   }) async {
     final original = await printReceipt(
       scope: scope,
@@ -744,6 +854,7 @@ final class HardwareService {
       configurationVersion: configurationVersion,
       receipt: receipt,
       commandId: commandId,
+      copy: copy,
     );
     final results = <HardwareCommandResult>[original];
     if (original.command['status'] != 'succeeded') return results;
@@ -837,12 +948,23 @@ final class HardwareService {
     final status = action.command['status'] as String? ?? 'unknown';
     final failureCode = action.failure?['code'] as String?;
     final health = switch (status) {
+      // The port accepted the pulse, but the physical drawer did not answer.
+      'succeeded'
+          when device.type == 'cash_drawer' &&
+              device.transport == 'platform_channel_foundation' =>
+        'unknown',
       'succeeded' => 'healthy',
       'retryable' => 'degraded',
       'failed' => 'unavailable',
       _ => 'unknown',
     };
     final connectionState = switch ((status, failureCode)) {
+      // A terminal-port pulse confirms only that the board accepted a write.
+      // The drawer cable and physical opening still need a direct check.
+      ('succeeded', _)
+          when device.type == 'cash_drawer' &&
+              device.transport == 'platform_channel_foundation' =>
+        'unknown',
       ('succeeded', _) => 'connected',
       ('retryable', 'busy') => 'busy',
       ('retryable', 'disconnected') => 'disconnected',
@@ -936,11 +1058,20 @@ final class HardwareService {
     return results;
   }
 
-  Future<List<Object>> afterCheckoutCompleted(
+  /// Runs the post-sale hardware and reports whether the DRAWER answered.
+  ///
+  /// The drawer pulse is the one result the operator has no other way to learn,
+  /// and its result is independent of the receipt printer. A failure here means
+  /// the till looks finished while the money is still locked in (plan §8.2 F5). The
+  /// caller surfaces `drawerAnswered == false` at the moment, on the receipt the
+  /// cashier is looking at, instead of leaving it in a log.
+  Future<({bool drawerAnswered, List<Object> results})> afterCheckoutCompleted(
     HardwareScope scope,
     CheckoutResult result,
   ) async {
-    if (result.status != 'completed') return const [];
+    if (result.status != 'completed') {
+      return (drawerAnswered: true, results: const <Object>[]);
+    }
     final runtime = await snapshot(scope);
     final devices = runtime.devices.map(HardwareDevice.fromJson).toList();
     final receipt = _receiptPayload(
@@ -1008,9 +1139,7 @@ final class HardwareService {
       );
     }
 
-    final drawer = devices
-        .where((device) => device.enabled && device.type == 'cash_drawer')
-        .firstOrNull;
+    final drawer = _drawerFor(scope, devices);
     if ((policy['openDrawerOnCashSale'] as bool? ?? true) &&
         drawer != null &&
         saleId != null &&
@@ -1024,11 +1153,22 @@ final class HardwareService {
         commandId: _deterministicId('drawer:$saleId:${drawer.id}'),
       );
     }
-    return afterCommittedFinancialAction([
-      ?drawerAction,
+    // Start both ports before waiting for either result. The drawer can fail or
+    // take time to answer; neither condition may hold back an independent USB
+    // printer. Keep the drawer result separate for the cashier's warning.
+    final printResults = afterCommittedFinancialAction([
       ?printAction,
       ?displayAction,
     ]);
+    final drawerResults = drawerAction == null
+        ? Future<List<Object>>.value(const <Object>[])
+        : afterCommittedFinancialAction([drawerAction]);
+    final results = await Future.wait([printResults, drawerResults]);
+    return (
+      drawerAnswered:
+          drawerAction == null || results[1].first is HardwareCommandResult,
+      results: <Object>[...results[1], ...results[0]],
+    );
   }
 
   Future<List<Object>> afterOfflineCheckoutCompleted(
@@ -1057,6 +1197,10 @@ final class HardwareService {
       'registerName': null,
       'receiptNumber': 'PROV-${receipt.provisionalSaleId.substring(0, 8)}',
       'businessDate': snapshot.businessDate,
+      // WHEN THE PAPER WAS HANDED OVER, in this till's own clock. Nothing is answering, so the
+      // till is the only witness there is; the value travels back to the API when the journal
+      // replays, which is why it carries an offset rather than a bare wall clock.
+      'issuedAt': receiptLocalInstant(DateTime.now()),
       'currency': snapshot.currency,
       'items': cart.items.take(500).map((raw) {
         final line = CartItem.fromJson(raw);
@@ -1126,14 +1270,7 @@ final class HardwareService {
         );
       }
     }
-    final drawer = devices
-        .where(
-          (device) =>
-              device.enabled &&
-              device.type == 'cash_drawer' &&
-              device.capabilities.contains('drawer.open'),
-        )
-        .firstOrNull;
+    final drawer = _drawerFor(scope, devices, requireOpenCapability: true);
     if (drawer != null &&
         scope.permissions.contains('hardware.drawer.open') &&
         (policy['openDrawerOnCashSale'] as bool? ?? true)) {
@@ -1409,9 +1546,7 @@ final class HardwareService {
         copies: (policy['receiptCopiesDefault'] as int? ?? 1).clamp(1, 3),
       );
     }
-    final drawer = devices
-        .where((device) => device.enabled && device.type == 'cash_drawer')
-        .firstOrNull;
+    final drawer = _drawerFor(scope, devices);
     if ((policy['openDrawerOnCashRefund'] as bool? ?? true) &&
         drawer != null &&
         _containsCash(result.allocation)) {
@@ -1429,6 +1564,30 @@ final class HardwareService {
     return afterCommittedFinancialAction([?drawerAction, ?printAction]);
   }
 
+  /// The drawer this till may pulse, when the registry gives it one.
+  ///
+  /// A drawer names the terminal that carries it. A handheld in the same
+  /// location sees the counter's drawer in its own snapshot and has no socket to
+  /// pulse it with, so without this rule a cash sale on the tablet answered
+  /// `El cajón no respondió` about a drawer across the counter — a message about
+  /// hardware the operator never had. A drawer with no assignment is still
+  /// eligible: a register's drawer predates the assignment model.
+  HardwareDevice? _drawerFor(
+    HardwareScope scope,
+    List<HardwareDevice> devices, {
+    bool requireOpenCapability = false,
+  }) => devices
+      .where(
+        (device) =>
+            device.enabled &&
+            device.type == 'cash_drawer' &&
+            (device.assignedPosDeviceId == null ||
+                device.assignedPosDeviceId == scope.deviceId) &&
+            (!requireOpenCapability ||
+                device.capabilities.contains('drawer.open')),
+      )
+      .firstOrNull;
+
   Future<List<Object>> afterCashAction(
     HardwareScope scope, {
     required String reason,
@@ -1437,7 +1596,13 @@ final class HardwareService {
     final runtime = await snapshot(scope);
     final drawers = runtime.devices
         .map(HardwareDevice.fromJson)
-        .where((device) => device.enabled && device.type == 'cash_drawer')
+        .where(
+          (device) =>
+              device.type == 'cash_drawer' &&
+              (device.assignedPosDeviceId == null ||
+                  device.assignedPosDeviceId == scope.deviceId),
+        )
+        .where((device) => device.enabled)
         .where(
           (device) =>
               scope.registerId == null || device.registerId == scope.registerId,
@@ -1482,6 +1647,7 @@ final class HardwareService {
     Map<String, Object?>? display,
     Map<String, Object?>? printPayload,
     String? commandId,
+    bool copy = false,
   }) {
     final resolvedCommandId = commandId ?? _identifiers.next();
     final input = {
@@ -1496,6 +1662,7 @@ final class HardwareService {
       'drawer': drawer,
       'display': display,
       'printPayload': printPayload,
+      'copy': copy,
     };
     return HardwareCommandRequest(
       locationId: scope.locationId,
@@ -1512,6 +1679,7 @@ final class HardwareService {
       drawer: drawer,
       display: display,
       printPayload: printPayload,
+      copy: copy ? true : null,
     );
   }
 
@@ -1527,6 +1695,7 @@ final class HardwareService {
     'drawer': command.drawer,
     'display': command.display,
     'printPayload': command.printPayload,
+    'copy': command.copy ?? false,
   };
 
   Future<HardwareCommandResult> _transition(
@@ -1620,6 +1789,7 @@ final class HardwareService {
           source['publicReference'] as String? ??
           'receipt',
       businessDate: source['businessDate'] as String? ?? '1970-01-01',
+      issuedAt: source['issuedAt'] as String?,
       currency: source['currency'] as String? ?? 'MXN',
       items: lines,
       subtotalMinorUnits: amount('subtotal'),
@@ -1634,6 +1804,10 @@ final class HardwareService {
       exceptionMarker: source['exceptionMarker'] as String?,
       qrValue: source['qrValue'] as String?,
       footer: source['footer'] as String?,
+      // The café's mark, so the printer can draw what the paper's customer saw.
+      // The receipt snapshot froze the URL at commit; a café with no logo, or a
+      // document that predates one, simply arrives without it.
+      logoUrl: source['merchantLogoUrl'] as String?,
     );
   }
 

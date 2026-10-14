@@ -66,14 +66,18 @@ static void my_application_activate(GApplication* application) {
     }
   }
 #endif
+  const gchar* window_title =
+      g_strcmp0(g_getenv("UMIPOS_ESTACION_PREVIEW"), "1") == 0
+          ? "UmiPOS · Estación"
+          : "UmiPOS";
   if (use_header_bar && !fullscreen) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "UmiPOS");
+    gtk_header_bar_set_title(header_bar, window_title);
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "UmiPOS");
+    gtk_window_set_title(window, window_title);
   }
 
   gtk_window_set_default_size(window, 1280, 720);

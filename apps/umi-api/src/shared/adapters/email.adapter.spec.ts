@@ -69,4 +69,30 @@ describe('EmailAdapter', () => {
     withTransporter(adapter, vi.fn().mockRejectedValue(new Error('smtp down')));
     expect(await adapter.send({ to: 'a@b.co', subject: 's', html: '<p>x</p>' })).toBeNull();
   });
+
+  it('builds a transport for a relay that authenticates nobody', async () => {
+    // Mailpit — the local stack's own mail sink, and the only way the
+    // password-reset email is testable without sending real mail — has no
+    // credentials. The adapter demanded host AND user AND password, so it answered
+    // `email_adapter_missing_config` and every reset request died in silence
+    // (2026-10-11). A relay that needs no credentials is a relay we still have to
+    // be able to talk to.
+    const adapter = adapterWith({
+      SMTP_HOST: '127.0.0.1',
+      SMTP_PORT: 1025,
+      EMAIL_FROM: 'hola@umiconsulting.co',
+    });
+    const transport = (adapter as unknown as { getTransporter: () => unknown }).getTransporter();
+    expect(transport).not.toBeNull();
+  });
+
+  it('refuses half a credential, which is a misconfiguration', async () => {
+    const adapter = adapterWith({
+      SMTP_HOST: 'smtp.brevo.com',
+      SMTP_USER: 'u',
+      EMAIL_FROM: 'noreply@umi.test',
+    });
+    const transport = (adapter as unknown as { getTransporter: () => unknown }).getTransporter();
+    expect(transport).toBeNull();
+  });
 });

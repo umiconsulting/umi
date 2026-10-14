@@ -1,0 +1,23 @@
+{
+  "apkSha256": "8db01c01bbf40dc7929941dc46ff2c5f104aaf453d370fa8bddb9cc90d4d7daa",
+  "devices": [
+    {
+      "device": "A9 KDS",
+      "serial": "192.168.1.14:35559",
+      "install": "Performing Streamed Install\nSuccess",
+      "version": ["versionCode=93 minSdk=24 targetSdk=36", "versionName=0.1.0"]
+    },
+    {
+      "device": "iMin",
+      "serial": "192.168.1.10:5555",
+      "install": "Performing Streamed Install\nSuccess",
+      "version": ["versionCode=93 minSdk=24 targetSdk=36", "versionName=0.1.0"]
+    },
+    {
+      "device": "A11 POS m\u00f3vil",
+      "serial": "192.168.1.13:38333",
+      "install": "Performing Streamed Install\nSuccess",
+      "version": ["versionCode=93 minSdk=24 targetSdk=36", "versionName=0.1.0"]
+    }
+  ]
+}

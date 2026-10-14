@@ -3,7 +3,10 @@ import 'dart:async';
 import 'hardware_runtime.dart';
 import 'hardware_socket_client.dart';
 import 'hardware_socket_client_contract.dart';
+import 'terminal_cashbox_transport.dart';
+import 'thermal_logo.dart';
 import 'thermal_printer_adapter.dart';
+import 'usb_printer_transport.dart';
 
 export 'hardware_socket_client_contract.dart';
 
@@ -187,16 +190,36 @@ final class PilotHardwareLab
         HardwareRegistryAwareResolver {
   PilotHardwareLab({
     HardwareSocketClient Function()? socketClientFactory,
+    UsbPrinterChannel Function()? usbPrinterFactory,
+    TerminalCashboxChannel Function()? terminalCashboxFactory,
+    ThermalLogoSource? logoSource,
     this.allowSimulator = true,
+    Uri? apiBaseUri,
   }) : _socketClientFactory =
            socketClientFactory ?? createNativeHardwareSocketClient,
+       _usbPrinterFactory = usbPrinterFactory ?? MethodChannelUsbPrinter.new,
+       _terminalCashboxFactory =
+           terminalCashboxFactory ?? MethodChannelTerminalCashbox.new,
+       _logoSource =
+           logoSource ?? HttpThermalLogoSource(apiBaseUri: apiBaseUri),
        _simulators = SimulatorHardwareLab();
 
   final HardwareSocketClient Function() _socketClientFactory;
+  final UsbPrinterChannel Function() _usbPrinterFactory;
+  final TerminalCashboxChannel Function() _terminalCashboxFactory;
+  /// One fetcher for the till: the mark it caches is the café's own.
+  final ThermalLogoSource _logoSource;
   final bool allowSimulator;
   final SimulatorHardwareLab _simulators;
   final Map<String, DeviceAdapter> _adapters = {};
   final Map<String, HardwareByteTransport> _transports = {};
+  // One printer per till, so one USB link: the printer and the drawer that hangs
+  // off its DK port share it. Two opens of the same interface would fight over
+  // the claim.
+  UsbPrinterByteTransport? _usbPrinterTransport;
+  // The terminal's own drawer port is one board resource for the whole till, so
+  // every drawer device that rides it shares one channel.
+  TerminalCashboxChannel? _terminalCashboxChannel;
   final Map<String, String> _configurationFingerprints = {};
   var _retryLimit = 2;
   var _healthInterval = const Duration(seconds: 30);
@@ -237,7 +260,12 @@ final class PilotHardwareLab
       if (prior != null) unawaited(prior.close());
       _adapters.remove(device.id);
       _configurationFingerprints[device.id] = fingerprint;
-      _connectionStates[device.id] = device.transport == 'keyboard_wedge'
+      // Neither of these two transports has a link that can be opened to prove
+      // itself: the wedge proves itself with a scan, the terminal port with a
+      // probe. Until one of those happens the state is honestly unknown.
+      _connectionStates[device.id] =
+          device.transport == 'keyboard_wedge' ||
+              device.transport == 'platform_channel_foundation'
           ? 'unknown'
           : 'disconnected';
     }
@@ -254,6 +282,33 @@ final class PilotHardwareLab
         return GenericThermalPrinterAdapter(
           byteTransport: transport,
           capabilities: device.capabilities,
+          // The café's mark, fetched by URL at print time. The head's own width
+          // comes from the till's paper, not from the picture.
+          logoSource: _logoSource,
+          imageWidthDots: _integer(
+            device.connectionConfiguration['logoWidthDots'],
+            kThermalLogoWidthDots,
+          ),
+          widthColumns: _integer(
+            device.connectionConfiguration['receiptWidthColumns'],
+            42,
+          ),
+          textEncoder:
+              device.connectionConfiguration['characterEncoding'] == 'utf8'
+              ? const ThermalTextEncoder.utf8()
+              : const ThermalTextEncoder.cp850(),
+        );
+      // The same printer, on the till's USB host port. The bytes are identical;
+      // only the link differs.
+      case ('printer', 'usb_foundation'):
+        return GenericThermalPrinterAdapter(
+          byteTransport: _usbTransport(device.id),
+          capabilities: device.capabilities,
+          logoSource: _logoSource,
+          imageWidthDots: _integer(
+            device.connectionConfiguration['logoWidthDots'],
+            kThermalLogoWidthDots,
+          ),
           widthColumns: _integer(
             device.connectionConfiguration['receiptWidthColumns'],
             42,
@@ -279,11 +334,49 @@ final class PilotHardwareLab
                       2)
                   .clamp(1, 255),
         );
+      // The drawer, on a printer the till reaches over USB. The pulse rides the
+      // print link, which is why this transport is the printer's.
+      case ('cash_drawer', 'usb_foundation'):
+        return PrinterAttachedDrawerAdapter(
+          byteTransport: _usbTransport(device.id),
+          pin: _integer(device.connectionConfiguration['drawerPulsePin'], 0),
+          pulseOnUnits:
+              (_integer(
+                        device.connectionConfiguration['drawerPulseOnMs'],
+                        50,
+                      ) ~/
+                      2)
+                  .clamp(1, 255),
+        );
+      // The drawer on the TERMINAL's own port. The pulse never leaves through a
+      // printer, so there is no byte link to build: the board's cashbox line is
+      // written directly by the platform channel.
+      case ('cash_drawer', 'platform_channel_foundation'):
+        return TerminalCashboxDrawerAdapter(
+          channel: _terminalCashboxChannel ??= _terminalCashboxFactory(),
+        );
       case ('barcode_scanner', 'keyboard_wedge'):
         return KeyboardWedgeScannerAdapter();
       default:
         throw StateError('HARDWARE_ADAPTER_UNAVAILABLE');
     }
+  }
+
+  /// The receipt printer on the till's own USB host port (`usb_foundation`, the
+  /// transport the contract reserved for it). One link per till, shared by the
+  /// printer and the drawer that pulses through it; the printer is discovered by
+  /// its printer-class interface, so no configuration names it.
+  ///
+  /// The link is filed under every device that rides it, because that map is
+  /// what the health poll walks. A link that is never filed is never asked
+  /// whether it is there, so the card read "Desconectado" for good.
+  UsbPrinterByteTransport _usbTransport(String deviceId) {
+    final transport =
+        _usbPrinterTransport ??= UsbPrinterByteTransport(
+          channel: _usbPrinterFactory(),
+        );
+    _transports[deviceId] = transport;
+    return transport;
   }
 
   TcpHardwareByteTransport _networkTransport(
@@ -350,6 +443,9 @@ final class PilotHardwareLab
     if (next == _retryLimit) return;
     await Future.wait(_transports.values.map((transport) => transport.close()));
     _transports.clear();
+    final usb = _usbPrinterTransport;
+    _usbPrinterTransport = null;
+    await usb?.close();
     _adapters.clear();
     _configurationFingerprints.clear();
     _retryLimit = next;
@@ -359,11 +455,30 @@ final class PilotHardwareLab
     if (_healthActive) return;
     _healthActive = true;
     try {
+      // One probe per physical link. The printer and the drawer share the USB
+      // transport, and two concurrent opens of the same interface fight over
+      // the claim, so the link is grouped before it is asked.
+      final byTransport = <HardwareByteTransport, List<String>>{};
+      for (final entry in _transports.entries) {
+        byTransport.putIfAbsent(entry.value, () => <String>[]).add(entry.key);
+      }
       await Future.wait(
-        _transports.entries.map((entry) async {
-          final result = await entry.value.health();
-          _connectionStates[entry.key] = result.state;
+        byTransport.entries.map((group) async {
+          final result = await group.key.health();
+          for (final hardwareId in group.value) {
+            _connectionStates[hardwareId] = result.state;
+          }
         }),
+      );
+      // A transport with no bytes to prove itself — the terminal's own drawer
+      // port — is asked through its adapter instead.
+      await Future.wait(
+        _adapters.entries
+            .where((entry) => entry.value is AdapterHealthProbe)
+            .map((entry) async {
+              final health = await (entry.value as AdapterHealthProbe).probe();
+              _connectionStates[entry.key] = health.state;
+            }),
       );
     } finally {
       _healthActive = false;
@@ -405,6 +520,9 @@ final class PilotHardwareLab
   Future<void> dispose() async {
     _healthTimer?.cancel();
     await Future.wait(_transports.values.map((transport) => transport.close()));
+    final usb = _usbPrinterTransport;
+    _usbPrinterTransport = null;
+    await usb?.close();
     await _simulators.dispose();
   }
 }

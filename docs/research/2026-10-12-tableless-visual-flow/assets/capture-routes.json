@@ -1,0 +1,294 @@
+[
+  {
+    "name": "revo-virtual",
+    "url": "https://support.revo.works/es/articles/119",
+    "status": 200,
+    "title": "Revo Support",
+    "images": [
+      {
+        "src": "https://support.revo.works/images/HCK8LuBj4rxOzHyMm0z6FXYBNqo1XoVEZHm98Zmx.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-01.png"
+      },
+      {
+        "src": "https://support.revo.works/images/LXKXV9n4MMukUBORYJmAkXUlQMxqTGPtDBPxuOPt.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-02.png"
+      },
+      {
+        "src": "https://support.revo.works/images/2YOxDhesIHCDoVXaOLi0cUJbEgv8ONeLSeSuIzrD.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-03.png"
+      }
+    ]
+  },
+  {
+    "name": "revo-virtual-mode",
+    "url": "https://support.revo.works/es/articles/711",
+    "status": 200,
+    "title": "Revo Support",
+    "images": [
+      {
+        "src": "https://support.revo.works/images/bCnWRFFhX7IbXYq0PNZY6VEQn4qeZWasElMGbMBE.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-mode-01.png"
+      },
+      {
+        "src": "https://support.revo.works/images/Zhc0bj8drfgr1dQxokBn66ev7lhms93Co5oOEbFB.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-mode-02.png"
+      },
+      {
+        "src": "https://support.revo.works/images/87XlgZVR57GNkMT4kN7DiLvpEzVXX66djT4Qyn8K.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-mode-03.png"
+      },
+      {
+        "src": "https://support.revo.works/images/EHXiwYAS8i02uQwennDazxbAZxokHiGf9PAA0Yu4.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-mode-04.png"
+      },
+      {
+        "src": "https://support.revo.works/images/acHeSKw3z1uEXtGSVsMW9QNDMZseM9aj25yGOtJx.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-mode-05.png"
+      },
+      {
+        "src": "https://support.revo.works/images/p1dHUbb6Z5IyYIjBqWC9cF3J71hMxOet5SNFOxL8.jpg",
+        "alt": "",
+        "w": 2048,
+        "h": 1496,
+        "file": "revo-virtual-mode-06.png"
+      }
+    ]
+  },
+  {
+    "name": "toast-orders",
+    "url": "https://support.toasttab.com/en/article/New-POS-Experience-Ordering-Screens",
+    "status": 200,
+    "title": "Manage Orders With Toast POS",
+    "images": [
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000004Ru5z",
+        "alt": "New POS mode in order screen",
+        "w": 1440,
+        "h": 790,
+        "file": "toast-orders-01.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NKtV",
+        "alt": "search bar and open items",
+        "w": 800,
+        "h": 280,
+        "file": "toast-orders-02.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NKu9",
+        "alt": "labeled screenshot of payment options",
+        "w": 600,
+        "h": 504,
+        "file": "toast-orders-03.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NaVe",
+        "alt": "check details view",
+        "w": 409,
+        "h": 612,
+        "file": "toast-orders-04.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NcsL",
+        "alt": "check details",
+        "w": 894,
+        "h": 489,
+        "file": "toast-orders-05.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NaXp",
+        "alt": "hold send and stay buttons",
+        "w": 1179,
+        "h": 666,
+        "file": "toast-orders-06.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NaXL",
+        "alt": "Quick Order Screen Updates",
+        "w": 1104,
+        "h": 626,
+        "file": "toast-orders-07.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NKyV",
+        "alt": "table service mode top of check",
+        "w": 569,
+        "h": 334,
+        "file": "toast-orders-08.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EM4W000008NKyQ",
+        "alt": "Table Order mode overflow menu",
+        "w": 401,
+        "h": 449,
+        "file": "toast-orders-09.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U8JVYA0/0EMPV00000QyZLh",
+        "alt": "updated tg2 screens",
+        "w": 874,
+        "h": 798,
+        "file": "toast-orders-10.png"
+      }
+    ]
+  },
+  {
+    "name": "toast-tables",
+    "url": "https://support.toasttab.com/en/article/New-POS-Managing-Tables",
+    "status": 200,
+    "title": "Manage Tables With Toast POS",
+    "images": [
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008OFap",
+        "alt": "Table Service Mode",
+        "w": 969,
+        "h": 545,
+        "file": "toast-tables-01.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008NrnQ",
+        "alt": "Lookup Checks Screen",
+        "w": 575,
+        "h": 580,
+        "file": "toast-tables-02.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000009g9u3",
+        "alt": "Table Layout Check Details",
+        "w": 719,
+        "h": 435,
+        "file": "toast-tables-03.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000009g9u8",
+        "alt": "Table Layout Check Details",
+        "w": 786,
+        "h": 489,
+        "file": "toast-tables-04.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008fg5E",
+        "alt": "Table Order Screen",
+        "w": 864,
+        "h": 1728,
+        "file": "toast-tables-05.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008fg54",
+        "alt": "Table Service Settings",
+        "w": 864,
+        "h": 1728,
+        "file": "toast-tables-06.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008NrpW",
+        "alt": "Overflow Menu for Table Service on Toast Go 2",
+        "w": 511,
+        "h": 455,
+        "file": "toast-tables-07.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W0000076lmS",
+        "alt": "Check Details View",
+        "w": 1007,
+        "h": 561,
+        "file": "toast-tables-08.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008NBzI",
+        "alt": "Terminal view (Channel #5 is highlighted)",
+        "w": 562,
+        "h": 252,
+        "file": "toast-tables-09.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2SbYAK/0EM4W000008NBzX",
+        "alt": "Dining options, order #5 is highlighted",
+        "w": 449,
+        "h": 332,
+        "file": "toast-tables-10.png"
+      }
+    ]
+  },
+  {
+    "name": "toast-tab",
+    "url": "https://support.toasttab.com/en/article/Starting-a-Tab-1492811100378",
+    "status": 200,
+    "title": "Start a Tab",
+    "images": [
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM4W000007z3Mx",
+        "alt": "start tab",
+        "w": 722,
+        "h": 1130,
+        "file": "toast-tab-01.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM4W000007z3He",
+        "alt": "tab name",
+        "w": 2036,
+        "h": 1120,
+        "file": "toast-tab-02.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM4W000007z3Nq",
+        "alt": "tab name",
+        "w": 734,
+        "h": 1122,
+        "file": "toast-tab-03.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM3c000003jMWp",
+        "alt": "Guest Receipt Setup Choice.png",
+        "w": 1059,
+        "h": 657,
+        "file": "toast-tab-04.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM3c000003jMXE",
+        "alt": "Show Tab Name.png",
+        "w": 967,
+        "h": 253,
+        "file": "toast-tab-05.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM3c000003jMZ0",
+        "alt": "UI Options Choice.png",
+        "w": 1069,
+        "h": 463,
+        "file": "toast-tab-06.png"
+      },
+      {
+        "src": "https://dwvhey99m5tyy.cloudfront.net/images/ka2PV000000U2Z3YAK/0EM3c000003jMZU",
+        "alt": "Prompt for Tab Name.png",
+        "w": 955,
+        "h": 317,
+        "file": "toast-tab-07.png"
+      }
+    ]
+  }
+]

@@ -3,6 +3,44 @@ import 'package:umi_contract/umi_contract.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/network/api_client.dart';
 
+String kitchenStatusSummary(PosKitchenStatusResult status, bool spanish) {
+  final state = switch (status.status) {
+    'queued' => spanish ? 'En cola' : 'Queued',
+    'in_preparation' => spanish ? 'Preparando' : 'Preparing',
+    'partially_ready' => spanish ? 'Parcialmente listo' : 'Partially ready',
+    'ready' => spanish ? 'Listo' : 'Ready',
+    'completed' => spanish ? 'Terminado' : 'Completed',
+    'cancelled' => spanish ? 'Cancelado' : 'Cancelled',
+    _ => spanish ? 'Sin estado disponible' : 'Status unavailable',
+  };
+  final count = status.readyItems?.length;
+  return count == null
+      ? state
+      : '$state · $count ${spanish ? 'productos listos' : 'items ready'}';
+}
+
+Map<String, String> kitchenLineStatuses(PosKitchenStatusResult status) => {
+  for (final item in status.items ?? const <Map<String, Object?>>[])
+    if (item['sourceOrderItemId'] is String && item['status'] is String)
+      item['sourceOrderItemId'] as String: item['status'] as String,
+};
+
+String kitchenCartLineLabel(
+  CartItem item,
+  Map<String, String> statuses, {
+  required bool spanish,
+}) {
+  if (!item.fired) return spanish ? 'Pendiente de enviar' : 'Not sent';
+  return switch (statuses[item.firedOrderItemId]) {
+    'queued' => spanish ? 'En cola' : 'Queued',
+    'preparing' => spanish ? 'Preparando' : 'Preparing',
+    'ready' => spanish ? 'Listo' : 'Ready',
+    'cancelled' => spanish ? 'Anulado' : 'Cancelled',
+    'exception' => spanish ? 'Incidencia' : 'Exception',
+    _ => spanish ? 'Enviada' : 'Sent',
+  };
+}
+
 abstract interface class KitchenStatusRepository {
   Future<PosKitchenStatusResult> status(
     String merchantId,

@@ -1,0 +1,20 @@
+[
+  {
+    "timestamp": "2026-10-13T16:33:57.152Z",
+    "service": "umi-api",
+    "environment": "development",
+    "release": "0.1.0",
+    "severity": "warn",
+    "message": "409 request_refused POST /api/v1/pos/merchants/e6b14af1-b814-4efe-a6b0-67f5f02f4d53/cart correlationId=8e77e379-ac67-4699-8c86-1e896b47ad93 merchant=e6b14af1-b814-4efe-a6b0-67f5f02f4d53 location=54be4d9e-fa0a-4a42-b95f-402acfccade6 code=CART_ACTOR_BUSY detail=code=CART_ACTOR_BUSY",
+    "category": "AllExceptionsFilter"
+  },
+  {
+    "timestamp": "2026-10-13T16:33:57.287Z",
+    "service": "umi-api",
+    "environment": "development",
+    "release": "0.1.0",
+    "severity": "warn",
+    "message": "409 request_refused POST /api/v1/pos/merchants/e6b14af1-b814-4efe-a6b0-67f5f02f4d53/cart correlationId=f37479b2-457d-4e31-8ae8-c6da30998651 merchant=e6b14af1-b814-4efe-a6b0-67f5f02f4d53 location=54be4d9e-fa0a-4a42-b95f-402acfccade6 code=CART_ACTOR_BUSY detail=code=CART_ACTOR_BUSY",
+    "category": "AllExceptionsFilter"
+  }
+]

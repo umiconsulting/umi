@@ -1,0 +1,37 @@
+[
+  {
+    "id": "2e85ac9f-793f-4c81-bcd2-6e14ef59d39a",
+    "account_number": "96",
+    "table_id": "ec634769-9099-4fac-b765-a1e627800b1b",
+    "table_name": "Mesa 10",
+    "status": "draft",
+    "lifecycle_state": "recovered",
+    "version": 6,
+    "operator_session_id": "78322982-f23c-444a-8a99-b9e26675a2c2",
+    "original_operator_session_id": "57637542-32a7-4628-8ef7-87e5a4120d12",
+    "fired_order_id": "7576dac3-3fc6-4064-aec4-6798a24511a3",
+    "items": [
+      {
+        "id": "1d66dd19-0fef-46a3-a408-0d562f83c53e",
+        "product": "Capuccino",
+        "quantity": 1,
+        "basePrice": 6000,
+        "variantDelta": 0,
+        "modifierTotal": 0
+      }
+    ]
+  },
+  {
+    "id": "04fd63ac-c912-4ae8-bbf6-b72118ce3e02",
+    "account_number": "117",
+    "table_id": null,
+    "table_name": null,
+    "status": "abandoned",
+    "lifecycle_state": "cancelled",
+    "version": 3,
+    "operator_session_id": "78322982-f23c-444a-8a99-b9e26675a2c2",
+    "original_operator_session_id": "78322982-f23c-444a-8a99-b9e26675a2c2",
+    "fired_order_id": null,
+    "items": null
+  }
+]

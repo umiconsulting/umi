@@ -1,0 +1,14 @@
+ carts | last_account 
+-------+--------------
+    86 |          154
+(1 row)
+
+ account_number |  status   | lifecycle_state 
+----------------+-----------+-----------------
+            146 | draft     | suspended
+            150 | draft     | suspended
+            152 | draft     | suspended
+            153 | draft     | recovered
+            154 | abandoned | cancelled
+(5 rows)
+

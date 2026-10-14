@@ -1,10 +1,20 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { FloorPlanState, type FloorPlanDocument, type PosFloorPlanQuery } from '@umi/contract';
+import {
+  FloorPlanState,
+  FloorPlanDocument,
+  PublishedFloorPlan,
+  floorElementBounds,
+  type AddPosTableRequest,
+  type PosFloorPlanQuery,
+  type InitializePosTablesRequest,
+} from '@umi/contract';
+import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
 import { occupiedTablesDisturbed } from '../../shared/floor-plan/plan-tables';
@@ -65,6 +75,10 @@ async function assertOccupiedTablesUndisturbed(
   const occupied = await client.query<{ table_id: string }>(
     `SELECT table_id::text AS table_id FROM merchant.table_state
      WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND seated_at IS NOT NULL
+     UNION
+     SELECT table_id::text AS table_id FROM merchant.pos_cart
+     WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id IS NOT NULL
+       AND status IN ('draft','prepared')
      ORDER BY table_id`,
     [merchantId, locationId],
   );
@@ -81,7 +95,7 @@ async function assertOccupiedTablesUndisturbed(
   if (disturbed.length > 0)
     throw new ConflictException({
       code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
-      message: 'A table with a party on it would be removed or moved by this layout.',
+      message: 'A table with a party or an open account would be removed or moved by this layout.',
       fieldErrors: { tableIds: disturbed },
     });
 }
@@ -98,6 +112,125 @@ export class FloorPlanRepository {
     if (!result.rowCount) throw new NotFoundException({ code: 'LOCATION_NOT_FOUND' });
   }
 
+  private async assertBootstrapOperator(
+    client: PoolClient,
+    user: AuthUser,
+    merchantId: string,
+    dto: PosFloorPlanQuery,
+  ) {
+    const result = await client.query(
+      `SELECT os.id FROM runtime.operator_session os
+       JOIN merchant.device d ON d.id=os.device_id AND d.merchant_id=os.merchant_id
+       WHERE os.id=$1::uuid AND os.user_id=$2::uuid AND os.durable_session_id=$3::uuid
+         AND os.device_id=$4::uuid AND os.merchant_id=$5::uuid AND os.location_id=$6::uuid
+         AND os.state='active' AND os.expires_at>now() AND d.status='active'
+         AND ('cart.write'=ANY(os.permissions) OR '*'=ANY(os.permissions))
+         AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
+           WHERE e->>'featureKey'='pos' AND coalesce((e->>'enabled')::boolean,false))
+       FOR SHARE OF os,d`,
+      [dto.operatorSessionId, user.id, user.sessionId, user.deviceId, merchantId, dto.locationId],
+    );
+    if (!result.rowCount) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+  }
+
+  authorizeBootstrap(user: AuthUser, merchantId: string, dto: PosFloorPlanQuery) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      user.id,
+      (client) => this.assertBootstrapOperator(client, user, merchantId, dto),
+      dto.locationId,
+    );
+  }
+
+  async bootstrapTables(
+    client: PoolClient,
+    user: AuthUser,
+    merchantId: string,
+    dto: InitializePosTablesRequest,
+  ) {
+    await this.assertBootstrapOperator(client, user, merchantId, dto);
+    await this.assertLocation(client, merchantId, dto.locationId);
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `floor_plan:${merchantId}:${dto.locationId}`,
+    ]);
+    const slots = [...dto.slots].sort((a, b) => a - b);
+    const area = {
+      id: randomUUID(),
+      name: 'Mesas',
+      width: 720,
+      height: Math.max(480, (Math.floor(slots.at(-1)! / 4) + 1) * 160 + 40),
+      elements: slots.map((slot, index) => ({
+        id: randomUUID(),
+        kind: 'table' as const,
+        shape: 'square' as const,
+        label: `Mesa ${index + 1}`,
+        capacity: 4,
+        x: 100 + (slot % 4) * 160,
+        y: 100 + Math.floor(slot / 4) * 160,
+        width: 120,
+        height: 120,
+        rotation: 0,
+      })),
+    };
+    const empty = { schemaVersion: 1, areas: [{ ...area, elements: [] }] };
+    await client.query(
+      `INSERT INTO merchant.floor_plan(merchant_id,location_id,draft)
+      VALUES ($1::uuid,$2::uuid,$3::jsonb) ON CONFLICT(merchant_id,location_id) DO NOTHING`,
+      [merchantId, dto.locationId, JSON.stringify(empty)],
+    );
+    const locked = await client.query<Row>(
+      `SELECT version,draft,published_version,published,published_at
+      FROM merchant.floor_plan WHERE merchant_id=$1::uuid AND location_id=$2::uuid FOR UPDATE`,
+      [merchantId, dto.locationId],
+    );
+    const current = locked.rows[0];
+    if (!current || current.published_version !== dto.expectedPublishedVersion)
+      throw new ConflictException({
+        code: 'OPTIMISTIC_VERSION_CONFLICT',
+        currentVersion: current?.published_version ?? 0,
+      });
+    const draft = current.draft == null ? null : FloorPlanDocument.parse(current.draft);
+    const published = current.published == null ? null : FloorPlanDocument.parse(current.published);
+    if (published?.areas.some((room) => room.elements.some((element) => element.kind === 'table')))
+      throw new ConflictException({ code: 'FLOOR_PLAN_ALREADY_CONFIGURED' });
+    const hasDraftElements = draft?.areas.some((room) => room.elements.length > 0) ?? false;
+    if (
+      (published != null && JSON.stringify(draft) !== JSON.stringify(published)) ||
+      (published == null && hasDraftElements)
+    )
+      throw new ConflictException({ code: 'FLOOR_PLAN_DRAFT_PENDING' });
+    const occupied = await client.query(
+      `SELECT 1 FROM merchant.table_state WHERE merchant_id=$1::uuid
+      AND location_id=$2::uuid AND seated_at IS NOT NULL UNION ALL SELECT 1 FROM merchant.pos_cart
+      WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id IS NOT NULL
+        AND status IN ('draft','prepared') LIMIT 1`,
+      [merchantId, dto.locationId],
+    );
+    if (occupied.rowCount)
+      throw new ConflictException({ code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED' });
+    const base = published ?? draft;
+    const priorAreas = base?.areas.filter((room) => room.id !== area.id) ?? [];
+    if (priorAreas.length >= 20)
+      throw new ConflictException({ code: 'FLOOR_PLAN_ALREADY_CONFIGURED' });
+    const names = new Set(priorAreas.map((room) => room.name.toLowerCase()));
+    let suffix = 2;
+    while (names.has(area.name.toLowerCase())) area.name = `Mesas ${suffix++}`;
+    const document = FloorPlanDocument.parse({ schemaVersion: 1, areas: [area, ...priorAreas] });
+    const result = await client.query<Row>(
+      `UPDATE merchant.floor_plan SET draft=$3::jsonb,published=$3::jsonb,
+      version=version+1,published_version=version+1,published_at=now(),updated_at=now()
+      WHERE merchant_id=$1::uuid AND location_id=$2::uuid RETURNING *`,
+      [merchantId, dto.locationId, JSON.stringify(document)],
+    );
+    const row = result.rows[0];
+    return PublishedFloorPlan.parse({
+      locationId: dto.locationId,
+      publishedVersion: row.published_version,
+      published: row.published,
+      publishedAt: row.published_at?.toISOString() ?? null,
+    });
+  }
+
   async read(merchantId: string, locationId: string) {
     return this.pg.withMerchant(async (client) => {
       await this.assertLocation(client, merchantId, locationId);
@@ -106,6 +239,106 @@ export class FloorPlanRepository {
         [merchantId, locationId],
       );
       return floorPlanState(locationId, result.rows[0]);
+    });
+  }
+
+  async addTable(client: PoolClient, user: AuthUser, merchantId: string, dto: AddPosTableRequest) {
+    await this.assertBootstrapOperator(client, user, merchantId, dto);
+    await this.assertLocation(client, merchantId, dto.locationId);
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
+      `floor_plan:${merchantId}:${dto.locationId}`,
+    ]);
+    const locked = await client.query<Row>(
+      `SELECT version,draft,published_version,published,published_at FROM merchant.floor_plan
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid FOR UPDATE`,
+      [merchantId, dto.locationId],
+    );
+    const current = locked.rows[0];
+    if (!current?.published) throw new ConflictException({ code: 'FLOOR_PLAN_NOT_PUBLISHED' });
+    if (current.published_version !== dto.expectedPublishedVersion)
+      throw new ConflictException({
+        code: 'OPTIMISTIC_VERSION_CONFLICT',
+        currentVersion: current.published_version,
+      });
+    const published = FloorPlanDocument.parse(current.published);
+    const draft = FloorPlanDocument.parse(current.draft);
+    const areas = [published, draft].map((doc) => doc.areas.find((area) => area.id === dto.areaId));
+    if (areas.some((area) => !area))
+      throw new ConflictException({ code: 'FLOOR_PLAN_DRAFT_PENDING' });
+    const rooms = areas.map((area) => area!);
+    if (
+      rooms.some((area) =>
+        area.elements.some(
+          (element) =>
+            element.kind === 'table' &&
+            element.label.toLocaleLowerCase('en-US') === dto.label.toLocaleLowerCase('en-US'),
+        ),
+      )
+    )
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        fieldErrors: { label: ['A table already has this name.'] },
+      });
+
+    // Add in the first free position of BOTH snapshots. Never publish unrelated draft edits.
+    const width = Math.min(...rooms.map((area) => area.width));
+    let position: { x: number; y: number } | null = null;
+    for (let y = 80; y <= 4920 && !position; y += 160) {
+      for (let x = 80; x <= width - 80; x += 160) {
+        const overlaps = rooms.some((area) =>
+          area.elements.some((element) => {
+            const bounds = floorElementBounds(element);
+            return (
+              Math.abs(element.x - x) < bounds.halfWidth + 80 &&
+              Math.abs(element.y - y) < bounds.halfHeight + 80
+            );
+          }),
+        );
+        if (!overlaps) {
+          position = { x, y };
+          break;
+        }
+      }
+    }
+    if (!position)
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        fieldErrors: { areaId: ['No space remains in this area.'] },
+      });
+    const table = {
+      id: randomUUID(),
+      kind: 'table' as const,
+      shape: 'square' as const,
+      label: dto.label,
+      capacity: dto.capacity,
+      ...position,
+      width: 120,
+      height: 120,
+      rotation: 0,
+    };
+    for (const area of rooms) {
+      area.elements.push(table);
+      area.height = Math.max(area.height, position.y + 80);
+    }
+    for (const document of [published, draft]) {
+      if (!FloorPlanDocument.safeParse(document).success)
+        throw new BadRequestException({
+          code: 'VALIDATION_ERROR',
+          fieldErrors: { areaId: ['The floor plan has reached its limit.'] },
+        });
+    }
+    const result = await client.query<Row>(
+      `UPDATE merchant.floor_plan SET published=$3::jsonb,draft=$4::jsonb,
+       version=version+1,published_version=version+1,published_at=now(),updated_at=now()
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid RETURNING *`,
+      [merchantId, dto.locationId, JSON.stringify(published), JSON.stringify(draft)],
+    );
+    const row = result.rows[0];
+    return PublishedFloorPlan.parse({
+      locationId: dto.locationId,
+      publishedVersion: row.published_version,
+      published: row.published,
+      publishedAt: row.published_at?.toISOString() ?? null,
     });
   }
 
@@ -120,7 +353,8 @@ export class FloorPlanRepository {
         WHERE os.id=$1::uuid AND os.user_id=$2::uuid AND os.durable_session_id=$3::uuid
           AND os.device_id=$4::uuid AND os.merchant_id=$5::uuid AND os.location_id=$6::uuid
           AND os.state='active' AND os.expires_at>now() AND d.status='active'
-          AND ('sale.lifecycle'=ANY(os.permissions) OR '*'=ANY(os.permissions))
+          AND ('sale.lifecycle'=ANY(os.permissions) OR 'cart.write'=ANY(os.permissions)
+            OR '*'=ANY(os.permissions))
           AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
             WHERE e->>'featureKey'='pos' AND coalesce((e->>'enabled')::boolean,false))`,
           [

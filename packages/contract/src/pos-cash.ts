@@ -681,6 +681,16 @@ export const CashShiftCustodyEventType = z.enum([
   // this one. The constraint `cash_custody_shape` in build-v3-68 enforces the
   // difference: an `orphan_reclaim` carries no count and no expectation.
   'orphan_reclaim',
+  // The terminal that already held the drawer handed it to the operator standing
+  // in front of it: the session and the responsibility moved, the device did NOT.
+  // This is the ordinary shape after an app update — the drawer is still held by
+  // this very till while the session that opened it is gone — and it is distinct
+  // from `device_adoption` for exactly that reason: a reader of the chain must be
+  // able to tell "another terminal took the drawer" from "another person took the
+  // drawer on the terminal that had it". Migration
+  // `015_cash_shift_resume_custody.sql` carries the matching shape, which allows
+  // no counted cash: the money never moved, only the name on it.
+  'operator_resume',
 ]);
 
 /**

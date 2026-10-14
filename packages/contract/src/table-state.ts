@@ -51,6 +51,10 @@ export const TableStateEntry = z
     partySize: PartySize.nullable(),
     /** The merge identity: the tables of one party share it. */
     groupId: Uuid.nullable(),
+    /** An open account on this table or another table in its group. */
+    openAccountId: Uuid.nullable().optional(),
+    openAccountFolio: z.string().min(1).max(64).nullable().optional(),
+    openAccountTableId: Uuid.nullable().optional(),
   })
   .strict()
   .superRefine((entry, ctx) => {

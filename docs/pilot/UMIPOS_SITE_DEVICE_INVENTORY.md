@@ -23,7 +23,7 @@ enrollment identity.
 | Tablet A11 (mobile POS)     | UmiPOS not yet installed                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Epson TM-T20III             | Not on the network yet; IP, port 9100 test and paper width pending                                                                                                                                                                                                                                                                                                                                                                                            |
 | TP-Link Archer C50          | Still `TP-Link_AE61` / `_5G`; rename, DHCP reservations and password rotation pending                                                                                                                                                                                                                                                                                                                                                                         |
-| Cash drawer                 | Wired to the terminal; the pulse path through the printer is untested (§6.4)                                                                                                                                                                                                                                                                                                                                                                                  |
+| Cash drawer                 | **Wired to the terminal's own CashBox socket, not the printer** (closed 2026-10-14, §11). The pulse path is implemented and its node is proven writable; the physical pulse waits for the drawer itself to arrive. The printer's DK port remains the alternative.                                                                                                                                                                                             |
 
 ## 1. The package at a glance
 
@@ -108,7 +108,7 @@ D3-504: large touch display, Android, and a bank of peripheral ports.
 | Ethernet MAC            | `d0:c8:57:4a:10:a5`                                                                                        |
 | Bluetooth               | Unavailable                                                                                                |
 | Storage before the wipe | 11.4 GB data partition, **1.33 GB free (11%)**                                                             |
-| Cash drawer             | Yes, on this terminal (confirm whether the cable runs to the printer's DK port or to the terminal)         |
+| Cash drawer             | Yes, on this terminal, and it is the terminal's own `CashBox RJ12` (§11)                                   |
 
 The device shipped with Parrot's launcher and app, plus standard Android settings.
 
@@ -118,20 +118,81 @@ wipe resolved it — see §9.
 
 ### 2.4 Receipt printer — `UMI-<SITE>-PRN-01`
 
-| Field                                  | Value                                                                                                                               |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Make / family                          | Epson TM-T20III                                                                                                                     |
-| Model on the label                     | `M352A`                                                                                                                             |
-| Serial                                 | `X5Z5120240`                                                                                                                        |
-| Power                                  | AC 100–240 V, 50–60 Hz, 1.0 A                                                                                                       |
-| Manufacture                            | Made in the Philippines (SEIKO EPSON CORP.)                                                                                         |
-| Certifications                         | NOM, TÜV Rheinland, UL Listed, ID `000010000`                                                                                       |
-| Rear-panel ports (verified 2026-10-05) | USB type B · DB9 (likely RS-232, verify) · **RJ45 Ethernet** · wide connector on the right (likely cash drawer DK or power, verify) |
+| Field                                                                                       | Value                                                                                        |
+| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Make / family                                                                               | Epson TM-T20III                                                                              |
+| Model on the label                                                                          | `M352A`                                                                                      |
+| Serial                                                                                      | `X5Z5120240`                                                                                 |
+| Power                                                                                       | AC 100–240 V, 50–60 Hz, 1.0 A                                                                |
+| Manufacture                                                                                 | Made in the Philippines (SEIKO EPSON CORP.)                                                  |
+| Certifications                                                                              | NOM, TÜV Rheinland, UL Listed, ID `000010000`                                                |
+| Rear-panel ports (photograph 2026-10-05; corrected by the owner 2026-10-07, device in hand) | USB type B · DB9 serial (RS-232) · **DK (drawer kick, RJ12)** · power. **No Ethernet port.** |
 
-The TM-T20III ships in several interface configurations. The unit at the site has an
-**RJ45 Ethernet port**, which puts it on the UmiPOS generic-TCP printer path (ESC/POS over
-TCP, port 9100) described in `docs/product/UMIPOS_HARDWARE_RUNTIME.md`. Still to confirm on
-site: that the DB9 is RS-232 and that the wide connector is the drawer's DK port.
+The TM-T20III ships in two interface configurations — USB + serial, or Ethernet. **This unit is
+the USB + serial one.** The rear-panel port that the photograph read as RJ45 is the drawer's
+**DK** port: Epson uses a 6-pin RJ12 there, which is the same shape as Ethernet and narrower
+(`TM-T20III Technical Reference Guide`, "Modular connector RJ12"). The label on the printer
+says `DK`.
+
+That matters, because UmiPOS prints only over TCP. Its printer adapters build a network
+transport for `printer` + `network_tcp` and for `cash_drawer` + `printer_attached`
+(`apps/umi-pos/lib/features/hardware/pilot_hardware_adapters.dart`), and the `Usb…` and
+`Serial…` transports declared in `hardware_runtime.dart` have **no implementation**. A
+USB-attached printer can therefore be seen by the till but not driven by it — no receipt, and
+no drawer pulse, because the pulse leaves through the printer.
+
+To reach the generic-TCP path described in `docs/product/UMIPOS_HARDWARE_RUNTIME.md`, the
+printer needs a serial-to-Ethernet bridge on its DB9 (raw TCP, port 9100), or it must be
+replaced with the Ethernet-variant TM-T20III. The drawer stays on the DK port either way.
+
+**Bench probe, 2026-10-07, printer on a Linux workstation over USB.** Attached to the
+workstation, the unit enumerates as `04b8:0e27` with the product string **`TM-T20IIIL`** — the
+Latin-American variant, and a correction to the `M352A / TM-T20III` above; the two share the
+ESC/POS command set (`GS I` applicability list includes `T20IIIL`). It exposes a single USB
+**printer-class** interface (`Cls=07 Sub=01 Prot=02`, bulk OUT `0x01` / IN `0x82`), the kernel's
+`usblp` driver binds it, and `/dev/usb/lp0` appears. The printer self-identified over the wire
+with `GS I 'C'` → `_TM-T20IIIL`. A `DLE EOT 1` status request answered `0x16` — online, no
+error — so the link is live and bidirectional. Raw ESC/POS written to `lp0` is accepted.
+
+What that means for the client: a USB transport only has to open that bulk OUT endpoint and
+write the same byte stream the TCP transport already writes — plus a `health()` that maps
+`DLE EOT 1` to online/offline. The printer driver, the cable and the terminal are not the
+problem; the app's missing USB transport is.
+
+**Bench results, same session — the open items, closed.**
+
+| Question the plan left open              | Answer                                                                                                                                                                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paper width and column count             | **80 mm, 48 columns** in the default font. A line of exactly 48 characters fits on one line; 49 does not.                                                                                                                                         |
+| Character set                            | **Correct as the app already sends it.** Code page 2 (PC850) with `1B 74 02`, accents (`é ñ á é í ó ú`) print correctly, and the receipts came out clean with the app's own byte stream.                                                          |
+| Does the printer's own byte stream work? | Yes — a receipt built from `thermal_printer_adapter.dart`'s exact sequence prints and cuts.                                                                                                                                                       |
+| Printer configuration                    | Firmware `10.04 ESC/POS`; serial port `38400 8N1`, handshaking `DTR/DSR`, receive error prints `?`; automatic line feed on CR **disabled** (the app sends LF per line, so this is right); buffer 4K; recovery point Factory; print density LIGHT. |
+| Sensor health                            | Online, cover closed, no cutter or recoverable errors, paper present (`DLE EOT` 1/2/3/4 → `16 16 12 12`).                                                                                                                                         |
+| Wear                                     | Thermal head 0.372 km, autocutter 3,085 cuts — a used but healthy unit.                                                                                                                                                                           |
+
+The app defaults to `receiptWidthColumns: 42` (`pilot_hardware_adapters.dart`). This printer
+holds 48, so 42 is six columns conservative: safe, and worth setting to 48 when the printer is
+registered.
+
+**And it prints from the POS itself, 2026-10-07.** With the printer moved to the counter
+terminal (iMin **D3**, Android 11, `user` build, adbd as `shell`, **no root**), the POS
+enumerates it at `/sys/bus/usb/devices/3-1 → 04b8:0e27 TM-T20IIIL`, and `dumpsys usb` reports
+`EPSON / TM-T20IIIL` with its interfaces. The shell cannot print: the USB nodes are root-only
+and `user` builds have no `su`, so Android requires an **app** to claim the interface — which
+is exactly the gap in UmiPOS, whose `hardware_runtime.dart` declares `UsbFoundationTransport`
+and implements nothing.
+
+A throwaway probe app (`com.umiconsulting.usbprintprobe`, Android USB host + the same byte
+sequence `thermal_printer_adapter.dart` builds) proved the rest: it claimed interface 0 —
+`class=7` (printer), two bulk endpoints — and reported `bulkTransfer wrote 111 of 111`. The
+terminal, the cable and the printer carry a USB receipt without root. What UmiPOS lacks is one
+transport, not a capability of the hardware.
+
+**One device detail that only the POS showed.** `DLE EOT 1` is not answered the instant the
+query is written: reading straight after returned nothing (`read=0`), and the same query with a
+250 ms settle answered `read=1, status=0x16` — online, no error. The transport's `status()`
+settles and retries for exactly this reason; on Linux the read had been slow enough by
+accident. Health is therefore a real reading on the till, not an assumption.
 
 ### 2.5 Local network — `UMI-<SITE>-NET-01`
 
@@ -198,23 +259,24 @@ Suggested order of work:
 
 Findings that affect the connection, not just the inventory:
 
-| Finding                                                                                                                                                          | Evidence                                                                        | Consequence                                                                                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| UmiPOS is the Flutter app `apps/umi-pos`. Android is the same app but **is not a v1 release target**; the release target is Linux, with iOS deferred to Gate 13. | `apps/umi-pos/README.md`; `docs/architecture/2026-09-16-pos-is-a-native-app.md` | Decide before promising operation on these tablets. The Android build now installs and boots (§9).                                                                             |
-| The KDS is **no longer a separate app**: it is a mode inside `umi-pos` (`features/kitchen/kitchen_board_surface.dart`). The SwiftUI `umi-kds` was retired.       | `docs/architecture/2026-09-06-unificar-kds-en-pos-modos-por-rol-adr.md`         | One app, two device roles.                                                                                                                                                     |
-| The printer has an **RJ45 Ethernet port**.                                                                                                                       | Rear-panel photograph, 2026-10-05.                                              | The generic-TCP print path is viable. Assign an IP, test port 9100, and confirm paper width and character set.                                                                 |
-| The printer is also the drawer's opening path (the pulse leaves through the printer endpoint).                                                                   | `docs/product/UMIPOS_HARDWARE_RUNTIME.md`                                       | With the printer on the network the drawer pulse is reachable too. Confirm the drawer is wired to the printer's DK port.                                                       |
-| The terminal had **1.33 GB free (11%)**.                                                                                                                         | Device "Storage" screen                                                         | Resolved by the factory reset (§9).                                                                                                                                            |
-| The terminal reported two different IPs across two photos.                                                                                                       | Two "About device" captures                                                     | Might be the same device on two networks. The Archer's factory LAN is `192.168.0.x`, so the site network was already customised. Unify the addressing before reserving leases. |
-| Both Samsung tablets expose a randomised Wi-Fi MAC (the per-network field is empty) beside the hardware MAC.                                                     | Device "Status information" screens                                             | Give and reserve leases by the **hardware MAC**, and disable MAC randomisation for the Umi SSID.                                                                               |
-| The whole package is Parrot's and the router is the current Parrot network.                                                                                      | `parrotconnect`/`iMin` logos; router label                                      | Renaming to Umi touches the router, the SSIDs and all four devices at once. Do it in a maintenance window.                                                                     |
+| Finding                                                                                                                                                          | Evidence                                                                        | Consequence                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UmiPOS is the Flutter app `apps/umi-pos`. Android is the same app but **is not a v1 release target**; the release target is Linux, with iOS deferred to Gate 13. | `apps/umi-pos/README.md`; `docs/architecture/2026-09-16-pos-is-a-native-app.md` | Decide before promising operation on these tablets. The Android build now installs and boots (§9).                                                                                                                                                                          |
+| The KDS is **no longer a separate app**: it is a mode inside `umi-pos` (`features/kitchen/kitchen_board_surface.dart`). The SwiftUI `umi-kds` was retired.       | `docs/architecture/2026-09-06-unificar-kds-en-pos-modos-por-rol-adr.md`         | One app, two device roles.                                                                                                                                                                                                                                                  |
+| The printer reaches the LAN.                                                                                                                                     | Owner, 2026-10-07, device in hand; `TM-T20III Technical Reference Guide`.       | **It does not, as shipped.** The unit is USB + serial, and the RJ45 the photograph showed is the drawer's DK (RJ12). Bridge serial → TCP (raw, port 9100) or swap for the Ethernet-variant T20III; then assign an IP, test 9100, and confirm paper width and character set. |
+| The printer is also the drawer's opening path (the pulse leaves through the printer endpoint).                                                                   | `docs/product/UMIPOS_HARDWARE_RUNTIME.md`                                       | With the printer on the network the drawer pulse is reachable too. Confirm the drawer is wired to the printer's DK port.                                                                                                                                                    |
+| The terminal had **1.33 GB free (11%)**.                                                                                                                         | Device "Storage" screen                                                         | Resolved by the factory reset (§9).                                                                                                                                                                                                                                         |
+| The terminal reported two different IPs across two photos.                                                                                                       | Two "About device" captures                                                     | Might be the same device on two networks. The Archer's factory LAN is `192.168.0.x`, so the site network was already customised. Unify the addressing before reserving leases.                                                                                              |
+| Both Samsung tablets expose a randomised Wi-Fi MAC (the per-network field is empty) beside the hardware MAC.                                                     | Device "Status information" screens                                             | Give and reserve leases by the **hardware MAC**, and disable MAC randomisation for the Umi SSID.                                                                                                                                                                            |
+| The whole package is Parrot's and the router is the current Parrot network.                                                                                      | `parrotconnect`/`iMin` logos; router label                                      | Renaming to Umi touches the router, the SSIDs and all four devices at once. Do it in a maintenance window.                                                                                                                                                                  |
 
 ## 6. Open items
 
 1. Confirm the site's physical location and the `<SITE>` code.
 2. Confirm the D3-504's exact model string (`i20002` vs `i20D02`).
 3. Printer: pin its IP (DHCP reservation or static) and test port 9100.
-4. Cash drawer: confirm the wiring (printer DK or the terminal).
+4. ~~Cash drawer: confirm the wiring (printer DK or the terminal).~~ **Closed 2026-10-14** — the
+   terminal's own cashbox socket, §11.
 5. Confirm whether there is a barcode scanner and a customer display.
 6. Confirm the site's Internet plan and whether the Archer stays a router or becomes an AP.
 7. Decide the operating platform per device, given Android is not a v1 target.
@@ -377,3 +439,39 @@ ends.
 | `4.35.10 PM (2).jpeg`                   | D3-504 on-device manual                           |
 | `4.38.19 PM.jpeg`                       | Epson TM-T20III label                             |
 | Rear panel (separate photo, 2026-10-05) | Printer ports: USB-B, DB9, RJ45 Ethernet          |
+
+## 2026-10-12 — Native order flow verification
+
+The Galaxy Tab A11 `SM-X133`, serial `R8YL41106HT`, connected through wireless debugging.
+It serves as the mobile POS. The iMin D3 serves as the fixed POS.
+Both use native Estación build 37 and the usual API on port 4001.
+The tablet retains its existing `co.umiconsulting.umi_pos` package and has a separate Estación installation.
+
+The active iMin connection uses ADB server 5037 at `192.168.1.10:5555`.
+The tablet connection uses SDK ADB server 5038 at `192.168.1.13:35975`.
+The separate server preserves the existing iMin debugging session.
+Android can change the tablet connection port; read its wireless debugging screen if reconnection fails.
+No pairing code is recorded here.
+
+[The order flow report](../reports/2026-10-12-order-entry.md) records the physical screenshots and the isolated test database.
+
+## 11. 2026-10-14 — The drawer's socket, and the open items around it, closed
+
+The drawer was still off site, so it could not be pulsed. What could be settled without it was
+settled, on the terminal, over ADB.
+
+| Question that was open                                   | Answer                                                                                                                                                                                                                 |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Printer DK, or the terminal?                             | **The terminal.** `IminSDKManager.opencashBox(this)` is what the Parrot-era POS called on every cash sale and withdrawal while it printed over the Epson's USB, and the terminal carries its own drawer socket for it. |
+| Does the terminal have that socket?                      | Yes: `/dev/imin/cashbox_ctl` (`cashbox_ctl`/`cashbox_det`/`rj11_vcc`, plus `ttyRJ11 -> /dev/ttyS3`) and the vendor's `neostra_gpioctl` node.                                                                           |
+| Can UmiPOS pulse it without root?                        | Yes. The node is `rw-rw-rw-`, and an app-domain process can write it: `run-as co.umiconsulting.umi_pos.estacion sh -c 'echo 1 > /sys/class/neostra_gpioctl/dev/gpioctl'` returned 0.                                   |
+| What is the drawer-detect reading today, with no drawer? | `1`, from `/dev/imin/cashbox_det`. The polarity is undocumented; the reading with the drawer attached is what makes it mean something.                                                                                 |
+| Is the Epson link real?                                  | Yes, and it prints in the field. The unit enumerates at `/sys/bus/usb/devices/3-1` as `04b8:0e27 TM-T20IIIL`, one printer-class interface.                                                                             |
+
+UmiPOS now drives **both** sockets: the terminal's own port through the new
+`platform_channel_foundation` cash-drawer transport, and the printer's DK port through the
+drawer pulse it already sends on the printer's link. The commissioning steps, the registry
+fields for each path, and the day-of checklist are in
+[UMIPOS_CASH_DRAWER_COMMISSIONING.md](./UMIPOS_CASH_DRAWER_COMMISSIONING.md).
+
+The physical pulse remains unproven, for the one reason it always was: the drawer is elsewhere.

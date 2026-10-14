@@ -168,10 +168,10 @@ const roleColumns = new Map([
   ['Viewer', 9],
 ]);
 const expectedRoleCounts = new Map([
-  ['Owner', 63],
+  ['Owner', 62],
   ['Admin', 63],
-  ['Manager', 59],
-  ['Supervisor', 56],
+  ['Manager', 58],
+  ['Supervisor', 55],
   ['Cashier', 48],
   ['Staff', 48],
   ['Viewer', 8],

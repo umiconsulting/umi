@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cash/cash_journal.dart';
 
 Map<String, Object?> _line({
@@ -30,16 +30,15 @@ Map<String, Object?> _line({
 
 Future<void> _pump(WidgetTester tester, List<Map<String, Object?>> lines) =>
     tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
-        home: Scaffold(
+        home: PosPage(
           body: SingleChildScrollView(child: CashJournal(lines: lines)),
         ),
       ),

@@ -40,7 +40,12 @@ const setRefs =
 // it re-renders when the OS preference flips or another tab changes the choice.
 // Theme names are fixed labels, not localized.
 const THEME_ICON = { umi: I.Sun, dark: I.Moon, midnight: I.Moon };
-const THEME_NAME = { umi: 'Umi', dark: 'Oscuro', midnight: 'Midnight' };
+// The console is a Spanish-language product (owner, 2026-10-12): the two dark
+// themes read as Oscuro and Medianoche, the way they do on the till.
+// Fixed labels, not copy: they name a colour, and there is no second language
+// for a hue.
+// eslint-disable-next-line lingui/no-unlocalized-strings
+const THEME_NAME = { umi: 'Umi', dark: 'Oscuro', midnight: 'Medianoche' };
 const THEME_ORDER = ['umi', 'dark', 'midnight'];
 // A blank leading slot, so the unselected rows align with the checked one.
 const Blank = () => null;

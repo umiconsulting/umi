@@ -349,6 +349,24 @@ export const COLLECT = (options) => {
     })
     .map((el) => {
       const rect = el.getBoundingClientRect();
+      // THE TARGET IS WHAT THE FINGER HITS, NOT THE LEAF NODE.
+      //
+      // A 13px radio inside a 44px `<label>` is a 44px target: the label is what
+      // the pointer lands on, and a click anywhere in it activates the control.
+      // Measuring the leaf reported three controls as undersized that no thumb
+      // can miss — and the plan's acceptance line ("the click inventory reports
+      // zero undersized controls", §5.2) is about the target, not the box the
+      // engine happens to paint. The rule stays narrow: only a labelable control
+      // inside its own `<label>`, and the label must be a real box.
+      const labelBox = (() => {
+        if (!['input', 'select', 'textarea'].includes(el.tagName.toLowerCase())) return null;
+        const label = el.closest('label');
+        if (!label || label === el) return null;
+        const box = label.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 ? box : null;
+      })();
+      const target = labelBox || rect;
+      const targetLabel = Boolean(labelBox);
       const role =
         el.getAttribute('role') ||
         ({ A: 'link', BUTTON: 'button', INPUT: 'input', SELECT: 'combobox', TEXTAREA: 'textbox' }[
@@ -368,10 +386,13 @@ export const COLLECT = (options) => {
           el.disabled === true ||
           el.getAttribute('aria-disabled') === 'true' ||
           el.hasAttribute('disabled'),
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        x: Math.round(rect.x),
-        y: Math.round(rect.y),
+        width: Math.round(target.width),
+        height: Math.round(target.height),
+        x: Math.round(target.x),
+        y: Math.round(target.y),
+        targetFromLabel: targetLabel,
+        leafWidth: Math.round(rect.width),
+        leafHeight: Math.round(rect.height),
         href: el.getAttribute('href') || null,
         testId: el.getAttribute('data-testid') || null,
       };

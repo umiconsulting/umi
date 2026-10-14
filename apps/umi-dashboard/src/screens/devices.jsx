@@ -11,6 +11,7 @@ import { RegionHead, XSep } from '@/shell.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { REALTIME_STATE, useDevicesRealtime } from '@/lib/device-realtime.js';
 import {
+  deviceEnrollmentRequest,
   locationName,
   mpPointStoreRefusalCode,
   mpPointStoreRefusalMessage,
@@ -30,10 +31,10 @@ import {
   denyDevicePairing,
   denyPosEnrollmentRequest,
   disconnectMpPointAccount,
-  generateDevicePairingPin,
   getMpPointAuthorization,
   getPosDevices,
   getPosEnrollmentRequests,
+  getHardware,
   revokeDevice,
   revokePosDevice,
   unbindMpPointTerminal,
@@ -92,6 +93,12 @@ const DevicesScreen = () => {
   const [posRequests, setPosRequests] = useState([]);
   const [posRequestError, setPosRequestError] = useState(null);
   const [posDevices, setPosDevices] = useState([]);
+  const [hardware, setHardware] = useState([]);
+  // When this screen read the estate. The hardware card dates every claim against
+  // it, and it is set where the read lands rather than during a render: reading the
+  // clock while rendering is impure, and a value that changes between two renders of
+  // the same data is exactly how a chip ends up disagreeing with itself.
+  const [hardwareReadAt, setHardwareReadAt] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   // The Mercado Pago OAuth callback lands back HERE, with the outcome on the query string.
   // It is read ONCE, on mount, into this state and then dropped from the URL by the effect
@@ -186,15 +193,19 @@ const DevicesScreen = () => {
       // The requests and the devices are one picture — a request disappears exactly as
       // its device appears — so they are read together and fail together. Two effects
       // would let the grid show a terminal while the card above still offered to
-      // approve it.
+      // approve it. The hardware rides along: it is the same estate, and a printer whose
+      // read failed should say so on the same line as the terminals it serves.
       Promise.all([
         getPosEnrollmentRequests(effectiveLocationId),
         getPosDevices(effectiveLocationId),
+        getHardware(effectiveLocationId),
       ])
-        .then(function ([requestResult, deviceResult]) {
+        .then(function ([requestResult, deviceResult, hardwareResult]) {
           if (!active) return;
           setPosRequests(requestResult.requests || []);
           setPosDevices(deviceResult.devices || []);
+          setHardware(hardwareResult.devices || []);
+          setHardwareReadAt(Date.now());
           setPosRequestError(null);
         })
         .catch(function (error) {
@@ -240,10 +251,15 @@ const DevicesScreen = () => {
     return d.status === 'live';
   }).length;
   const totalDevices = devices.length + posCards.length;
+  // The header counts by MODE, not by registry: a terminal the owner moved to the
+  // kitchen is a KDS, and calling it a `caja UmiPOS` beside its own UMIKDS chip would
+  // read as two different devices.
+  const kdsModeCount = devices.length + posCards.filter((d) => d.mode === 'kds').length;
+  const tillCount = posCards.filter((d) => d.mode !== 'kds').length;
   const headNote = posCards.length ? (
     <>
-      <Trans>{liveCount} KDS en vivo</Trans> ·{' '}
-      <Plural value={posCards.length} one="# caja UmiPOS" other="# cajas UmiPOS" />
+      <Trans>{kdsModeCount} KDS</Trans> ·{' '}
+      <Plural value={tillCount} one="# caja UmiPOS" other="# cajas UmiPOS" />
     </>
   ) : (
     <Trans>{liveCount} en vivo ahora mismo.</Trans>
@@ -325,7 +341,7 @@ const DevicesScreen = () => {
                     height: 40,
                     borderRadius: 12,
                     background: 'var(--canvas-2)',
-                    color: 'var(--umi-navy)',
+                    color: 'var(--navy-ink)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -449,6 +465,8 @@ const DevicesScreen = () => {
         })}
       </div>
 
+      {posProductEnabled && <HardwareCard devices={hardware} now={hardwareReadAt} />}
+
       {(pairings || []).length > 0 && (
         <PairingRequestsCard
           pairings={pairings}
@@ -491,10 +509,6 @@ const DevicesScreen = () => {
       {addOpen && (
         <AddDevicePanel
           onClose={() => setAddOpen(false)}
-          stations={(stations || []).filter(
-            (station) => station.location_id === effectiveLocationId,
-          )}
-          pairings={pairings || []}
           products={deviceProducts}
           locations={locations}
           branchId={effectiveLocationId}
@@ -536,6 +550,188 @@ const POS_STATUS_LABELS = {
 };
 
 /**
+ * WHAT THE CAFÉ OWNS, READ FROM THE BACK OFFICE.
+ *
+ * The printers were invisible here until now: the only reader of `merchant.hardware_device`
+ * was the till's own hardware centre, so "how many printers do we have, and which one
+ * serves the counter?" could only be answered by walking to the till. Inventory is a back
+ * office question, so the answer belongs on this screen, beside the terminals the hardware
+ * hangs off.
+ *
+ * IT STATES, IT DOES NOT DRIVE. Registering, assigning and testing stay where an operator
+ * session proves who is standing at the hardware; this card would otherwise hand a
+ * back-office session the power to open somebody's cash drawer.
+ */
+const HARDWARE_TYPE_LABELS = {
+  printer: msg`Impresora`,
+  cash_drawer: msg`Cajón de dinero`,
+  barcode_scanner: msg`Lector de códigos`,
+  customer_display: msg`Pantalla de cliente`,
+  payment_terminal_foundation: msg`Terminal de pago`,
+  scale_foundation: msg`Báscula`,
+};
+
+const HARDWARE_TRANSPORT_LABELS = {
+  simulator: msg`Simulador`,
+  network_tcp: msg`Red`,
+  printer_attached: msg`Conectado a la impresora`,
+  keyboard_wedge: msg`Teclado`,
+  usb_foundation: msg`USB`,
+  bluetooth_foundation: msg`Bluetooth`,
+  network_foundation: msg`Red`,
+  serial_foundation: msg`Puerto serie`,
+  platform_channel_foundation: msg`Canal del sistema`,
+};
+
+const HARDWARE_CONNECTION_LABELS = {
+  connected: msg`Conectado`,
+  disconnected: msg`Desconectado`,
+  connecting: msg`Conectando`,
+  busy: msg`Ocupado`,
+  recovering: msg`Recuperando`,
+  failed: msg`Falló`,
+  disabled: msg`Deshabilitado`,
+  error: msg`Error`,
+  unknown: msg`Sin dato`,
+};
+
+/**
+ * How long a probe stays current. The till re-measures every 30 s while somebody is
+ * looking at its hardware screen and on every test, and it writes the verdict with
+ * the diagnostic. Beyond this the console is showing history, so it says so instead
+ * of dressing it as the present.
+ */
+const HARDWARE_STATUS_FRESH_MS = 10 * 60 * 1000;
+
+/**
+ * "hace 3 min", the way a person says it, from the console's own locale. `now` is
+ * handed in — the moment the estate was read — so nothing here reads a clock.
+ */
+function relativeAge(i18n, iso, now) {
+  const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (minutes < 60) return i18n._(msg`hace ${minutes} min`);
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return i18n._(msg`hace ${hours} h`);
+  return i18n._(msg`hace ${Math.round(hours / 24)} d`);
+}
+
+export const HardwareCard = ({ devices, now = null }) => {
+  const { t, i18n } = useLingui();
+  const rows = devices || [];
+  return (
+    <section className="card fade-up d3" style={{ padding: '18px 22px' }}>
+      <div>
+        <div className="eyebrow">
+          <Trans>Equipo</Trans>
+        </div>
+        <h2 className="h-section" style={{ marginTop: 4 }}>
+          <Trans>Hardware registrado</Trans>
+        </h2>
+      </div>
+      {rows.length === 0 ? (
+        <p style={{ color: 'var(--ink-3)', marginBottom: 0, marginTop: 10 }}>
+          <Trans>No hay impresoras ni periféricos registrados en esta sucursal.</Trans>
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          {rows.map((device) => {
+            // THE STATE IS A MEASUREMENT, AND IT HAS AN AGE.
+            //
+            // `connection_state` is written by the last diagnostic a till ran —
+            // possibly yesterday, possibly from another terminal. Rendering it as
+            // the state right now is how a printer that is switched off reads
+            // "Conectado" in this card. Past the freshness window the card stops
+            // claiming: it says when it was last seen, and leaves the verdict open.
+            const probedAt = device.lastDiagnosticAt || device.lastHeartbeatAt || null;
+            const probedMs = probedAt && now != null ? now - new Date(probedAt).getTime() : null;
+            const fresh =
+              probedMs != null && Number.isFinite(probedMs) && probedMs <= HARDWARE_STATUS_FRESH_MS;
+            const reachable = device.enabled && fresh && device.connectionState === 'connected';
+            const label = fresh
+              ? i18n._(HARDWARE_CONNECTION_LABELS[device.connectionState]) || device.connectionState
+              : probedAt
+                ? t`Sin verificar · visto ${relativeAge(i18n, probedAt, now)}`
+                : t`Sin verificar`;
+            return (
+              <div
+                key={device.id}
+                className="list-card"
+                style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 11,
+                    background: 'var(--canvas-2)',
+                    color: 'var(--navy-ink)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <I.Printer size={16} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                      marginBottom: 3,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--ink-1)' }}>
+                      {device.manufacturer} {device.model}
+                    </span>
+                    <span className="chip" style={{ fontSize: 10, height: 20, flexShrink: 0 }}>
+                      {i18n._(HARDWARE_TYPE_LABELS[device.type]) || device.type}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: 'var(--ink-3)',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className={'s-dot ' + (reachable ? 'live' : 'offline')} />
+                      {label}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      {i18n._(HARDWARE_TRANSPORT_LABELS[device.transport]) || device.transport}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                      {device.publicReference}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div className="eyebrow" style={{ fontSize: 9, marginBottom: 2 }}>
+                    <Trans>SIRVE A</Trans>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>
+                    {device.registerName || device.assignedDeviceName || t`Sin asignar`}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+};
+
+/**
  * The POS half of the device grid. It shares the KDS card's frame on purpose — one grid,
  * one shape — and differs only where the two devices differ: a register carries a
  * platform and a floor-use label where an iPad carries a station, and it reports no
@@ -569,7 +765,7 @@ export const PosDeviceCard = ({ device, onEdit }) => {
             height: 40,
             borderRadius: 12,
             background: 'var(--canvas-2)',
-            color: 'var(--umi-navy)',
+            color: 'var(--navy-ink)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -612,6 +808,22 @@ export const PosDeviceCard = ({ device, onEdit }) => {
               }}
             >
               {device.platformLabel.toUpperCase()}
+            </span>
+            {/* The mode is the loudest fact about the card: two tablets can sit side by
+                side, one taking orders and one cooking them, and nothing else on the
+                card tells them apart. */}
+            <span
+              className="chip"
+              style={{
+                fontSize: 10,
+                height: 20,
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                flexShrink: 0,
+                color: device.mode === 'kds' ? 'var(--navy-ink)' : 'var(--ink-1)',
+              }}
+            >
+              {device.modeLabel.toUpperCase()}
             </span>
             <span
               className="chip"
@@ -660,7 +872,7 @@ export const PosDeviceCard = ({ device, onEdit }) => {
             e.stopPropagation();
             onEdit();
           }}
-          aria-label={t`Editar caja`}
+          aria-label={t`Editar dispositivo`}
         >
           <I.Edit size={15} />
         </button>
@@ -679,6 +891,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
   const uid = useId();
   const [name, setName] = useState(device.name);
   const [mobility, setMobility] = useState(device.mobility || 'static');
+  const [mode, setMode] = useState(device.mode === 'kds' ? 'kds' : 'pos_terminal');
   const [reveal, setReveal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -689,7 +902,11 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
     setSaving(true);
     setError(null);
     try {
-      await updatePosDevice(device.id, { displayName: name.trim(), mobility }, branchId);
+      await updatePosDevice(
+        device.id,
+        { displayName: name.trim(), mobility, type: mode },
+        branchId,
+      );
       onSaved && onSaved();
     } catch (failure) {
       console.error('[umipos] device update failed', failure);
@@ -718,10 +935,10 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
         <div className="sheet-head">
           <div>
             <div className="eyebrow">
-              <Trans>UmiPOS · Dispositivo</Trans>
+              <Trans>Dispositivo</Trans>
             </div>
             <h2 className="h-section" style={{ marginTop: 4 }}>
-              <Trans>Gestionar caja</Trans>
+              <Trans>Gestionar dispositivo</Trans>
             </h2>
           </div>
           <button className="btn-icon" onClick={onClose} aria-label={t`Cerrar`}>
@@ -739,7 +956,7 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
                 height: 40,
                 borderRadius: 12,
                 background: 'var(--canvas-2)',
-                color: 'var(--umi-navy)',
+                color: 'var(--navy-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -791,6 +1008,35 @@ export const EditPosDevicePanel = ({ device, branchId, onClose, onSaved }) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+          </div>
+
+          <div className="field">
+            <label htmlFor={`${uid}-pos-device-mode`}>
+              <Trans>Modo</Trans>
+            </label>
+            <Select
+              id={`${uid}-pos-device-mode`}
+              className="select"
+              style={{ height: 52, borderRadius: 14 }}
+              value={mode}
+              onChange={(e) => setMode(e.target.value)}
+            >
+              <option value="pos_terminal">{t`UmiPOS · Caja`}</option>
+              <option value="kds">{t`UmiKDS · Cocina`}</option>
+            </Select>
+            <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+              {mode === 'kds' ? (
+                <Trans>
+                  UmiKDS muestra los pedidos en la cocina. Al guardar, reinicia la tablet para que
+                  tome el nuevo modo.
+                </Trans>
+              ) : (
+                <Trans>
+                  UmiPOS es la caja: cobra y toma pedidos. Al guardar, reinicia la tablet para que
+                  tome el nuevo modo.
+                </Trans>
+              )}
+            </span>
           </div>
 
           <div className="field">
@@ -1209,7 +1455,7 @@ const EditDevicePanel = ({ device, stations, onClose, onSaved }) => {
                 height: 40,
                 borderRadius: 12,
                 background: 'var(--canvas-2)',
-                color: 'var(--umi-navy)',
+                color: 'var(--navy-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1512,7 +1758,7 @@ const StationRow = ({ station, count, onChanged, onError }) => {
             height: 34,
             borderRadius: 10,
             background: 'var(--canvas-2)',
-            color: 'var(--umi-navy)',
+            color: 'var(--navy-ink)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1677,10 +1923,8 @@ const StationPanel = ({ onClose, devices, stations, onChanged }) => {
   );
 };
 
-const AddDevicePanel = ({
+export const AddDevicePanel = ({
   onClose,
-  stations,
-  pairings,
   products,
   locations,
   branchId,
@@ -1693,17 +1937,14 @@ const AddDevicePanel = ({
   const kdsEnabled = products?.kds === true;
   const posEnabled = products?.pos === true;
   const [deviceProduct, setDeviceProduct] = useState(kdsEnabled ? 'kds' : posEnabled ? 'pos' : '');
-  const [name, setName] = useState('');
-  const [station, setStation] = useState('');
-  const [pairing, setPairing] = useState(null);
+  const [deviceName, setDeviceName] = useState('');
+  // Android, not Web: a browser build is refused as a production POS, so a Web default
+  // hands the person a device that cannot ever work.
+  const [devicePlatform, setDevicePlatform] = useState('android');
+  const [deviceMobility, setDeviceMobility] = useState('static');
+  const [created, setCreated] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [posName, setPosName] = useState('');
-  const [posPlatform, setPosPlatform] = useState('web');
-  const [posMobility, setPosMobility] = useState('static');
-  const [posCreated, setPosCreated] = useState(null);
-  const [posSaving, setPosSaving] = useState(false);
-  const [posError, setPosError] = useState(null);
   const activeDeviceProduct =
     deviceProduct === 'kds' && kdsEnabled
       ? 'kds'
@@ -1715,68 +1956,40 @@ const AddDevicePanel = ({
             ? 'pos'
             : '';
 
-  const hasStations = (stations || []).length > 0;
-  const {
-    name: newStationName,
-    setName: setNewStationName,
-    busy: creatingStation,
-    create: createStationInline,
-  } = useCreateStation(function (createdStation) {
-    if (createdStation && createdStation.id) setStation(createdStation.id);
-    onProvisioned && onProvisioned();
-  });
-
-  const selectedStationId = station || stations?.[0]?.id || '';
-
-  function addStation() {
-    return createStationInline(setError);
-  }
-
+  /**
+   * ONE ENROLMENT FOR BOTH JOBS.
+   *
+   * The product still decides what the tablet runs — UmiPOS is the till, UmiKDS is the
+   * kitchen board — and the server stores that as the device's `kind`. What it no longer
+   * decides is which of two completely different enrolment machines to use. The KDS
+   * option used to mint a legacy iPad pairing PIN, which produced a `runtime.session`
+   * device that this app cannot even start on; picking the honest option for a kitchen
+   * tablet handed the owner a device that would never work. Both options now create the
+   * same enrolment request, differing only in the type it declares.
+   */
   async function createDevice() {
     setSaving(true);
     setError(null);
     try {
-      const result = await generateDevicePairingPin({
-        device_name: name,
-        station_id: selectedStationId,
-      });
-      setPairing(result.pairing);
+      const result = await createPosEnrollmentRequest(
+        deviceEnrollmentRequest({
+          product: activeDeviceProduct,
+          name: deviceName,
+          platform: devicePlatform,
+          mobility: deviceMobility,
+          locationId: branchId,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      );
+      setCreated(result);
       onProvisioned && onProvisioned();
-    } catch (err) {
-      setError(err.message);
+    } catch (failure) {
+      console.error('[umipos] enrollment request failed', failure);
+      setError(t`No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.`);
     } finally {
       setSaving(false);
     }
   }
-
-  async function createPosRequest() {
-    setPosSaving(true);
-    setPosError(null);
-    try {
-      const result = await createPosEnrollmentRequest({
-        locationId: branchId || null,
-        displayName: posName.trim(),
-        type: 'pos_terminal',
-        platform: posPlatform,
-        mobility: posMobility,
-        idempotencyKey: crypto.randomUUID(),
-      });
-      setPosCreated(result);
-      onProvisioned && onProvisioned();
-    } catch (failure) {
-      console.error('[umipos] enrollment request failed', failure);
-      setPosError(t`No se pudo crear el código. Verifica la sucursal y vuelve a intentarlo.`);
-    } finally {
-      setPosSaving(false);
-    }
-  }
-
-  const selectedStation = (stations || []).find(function (s) {
-    return s.id === selectedStationId;
-  });
-  const activePairings = (pairings || []).filter(function (p) {
-    return p.status === 'pending' || p.status === 'approved';
-  });
 
   return (
     <>
@@ -1805,13 +2018,10 @@ const AddDevicePanel = ({
               className="select"
               style={{ height: 52, borderRadius: 14 }}
               value={branchId || ''}
-              disabled={Boolean(pairing || posCreated)}
+              disabled={Boolean(created)}
               onChange={(event) => {
-                setStation('');
-                setPairing(null);
-                setPosCreated(null);
+                setCreated(null);
                 setError(null);
-                setPosError(null);
                 onBranchChange?.(event.target.value);
               }}
             >
@@ -1823,7 +2033,7 @@ const AddDevicePanel = ({
               ))}
             </Select>
             <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-              <Trans>El dispositivo y sus estaciones quedarán vinculados a esta sucursal.</Trans>
+              <Trans>El dispositivo quedará vinculado a esta sucursal.</Trans>
             </span>
           </div>
 
@@ -1840,7 +2050,6 @@ const AddDevicePanel = ({
               onChange={(event) => {
                 setDeviceProduct(event.target.value);
                 setError(null);
-                setPosError(null);
               }}
             >
               {!activeDeviceProduct && <option value="">{t`Selecciona un producto`}</option>}
@@ -1881,191 +2090,32 @@ const AddDevicePanel = ({
             )}
           </div>
 
-          {activeDeviceProduct === 'kds' && (
+          {activeDeviceProduct !== '' && (
             <>
-              <div className="field">
-                <label htmlFor={`${uid}-device-name`}>
-                  <Trans>Nombre del dispositivo</Trans>
-                </label>
-                <input
-                  id={`${uid}-device-name`}
-                  className="input tall"
-                  placeholder={t`p. ej. Cocina Caliente 2`}
-                  value={name}
-                  onChange={function (e) {
-                    setName(e.target.value);
-                  }}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor={`${uid}-assign-to-station`}>
-                  <Trans>Estación asignada</Trans>
-                </label>
-                {hasStations ? (
-                  <Select
-                    id={`${uid}-assign-to-station`}
-                    className="select"
-                    style={{ height: 52, borderRadius: 14 }}
-                    value={selectedStationId}
-                    onChange={function (e) {
-                      setStation(e.target.value);
-                    }}
-                  >
-                    {(stations || []).map(function (s) {
-                      return (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      );
-                    })}
-                  </Select>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginBottom: 8 }}>
-                      <Trans>
-                        No hay estaciones todavía. Crea una para asignar este dispositivo.
-                      </Trans>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        className="input"
-                        placeholder={t`Nombre de la estación`}
-                        value={newStationName}
-                        onChange={function (e) {
-                          setNewStationName(e.target.value);
-                        }}
-                        onKeyDown={function (e) {
-                          if (e.key === 'Enter') addStation();
-                        }}
-                      />
-                      <button
-                        className="btn btn-secondary focusable"
-                        onClick={addStation}
-                        disabled={creatingStation || !newStationName.trim()}
-                        style={{ whiteSpace: 'nowrap' }}
-                      >
-                        <I.Plus size={16} />{' '}
-                        {creatingStation ? <Trans>Creando…</Trans> : <Trans>Crear estación</Trans>}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-              {error && (
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    color: 'var(--danger)',
-                    background: 'var(--danger-soft)',
-                    borderRadius: 10,
-                    padding: '10px 12px',
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-              {pairing && (
-                <div className="field">
-                  <span className="field-label">
-                    <Trans>PIN de primer pareo</Trans>
-                  </span>
-                  <div
-                    className="card-warm"
-                    style={{
-                      padding: '20px 24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 18,
-                    }}
-                  >
-                    <div>
-                      <div
-                        className="display"
-                        style={{
-                          fontSize: 42,
-                          fontFamily: 'var(--font-mono)',
-                          letterSpacing: '0.12em',
-                          color: 'var(--ink-warm)',
-                          lineHeight: 1,
-                        }}
-                      >
-                        {pairing.pin.slice(0, 3)} {pairing.pin.slice(3)}
-                      </div>
-                      <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--ink-warm-soft)' }}>
-                        <Trans>Esperando solicitud del iPad</Trans>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="eyebrow on-warm" style={{ marginBottom: 4 }}>
-                        <Trans>estación</Trans>
-                      </div>
-                      <div style={{ fontWeight: 600, color: 'var(--ink-warm)' }}>
-                        {selectedStation?.name || pairing.station_id}
-                      </div>
-                      <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--ink-warm-soft)' }}>
-                        <Trans>Expira {formatTime(pairing.expires_at)}</Trans>
-                      </div>
-                    </div>
-                  </div>
-                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-3)' }}>
-                    <Trans>
-                      Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes
-                      pendientes, apruébalo desde esta pantalla.
-                    </Trans>
-                  </p>
-                </div>
-              )}
-              {activePairings.length > 0 && (
-                <div className="field">
-                  <span className="field-label">
-                    <Trans>Solicitudes activas</Trans>
-                  </span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {activePairings.map(function (p) {
-                      return (
-                        <div key={p.id} className="list-card" style={{ padding: 12 }}>
-                          <div style={{ paddingLeft: 12, flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{p.device_name}</div>
-                            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-                              {p.requested_name || t`Esperando iPad`} <XSep /> {p.status}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {activeDeviceProduct === 'pos' && (
-            <>
-              {!posCreated ? (
+              {!created ? (
                 <>
                   <div className="field">
-                    <label htmlFor={`${uid}-pos-name`}>
+                    <label htmlFor={`${uid}-device-name`}>
                       <Trans>Nombre del dispositivo</Trans>
                     </label>
                     <input
-                      id={`${uid}-pos-name`}
+                      id={`${uid}-device-name`}
                       className="input tall"
-                      value={posName}
+                      value={deviceName}
                       maxLength={120}
-                      onChange={(event) => setPosName(event.target.value)}
-                      placeholder={t`Caja principal`}
+                      onChange={(event) => setDeviceName(event.target.value)}
+                      placeholder={activeDeviceProduct === 'kds' ? t`Cocina` : t`Caja principal`}
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor={`${uid}-pos-platform`}>
+                    <label htmlFor={`${uid}-device-platform`}>
                       <Trans>Plataforma</Trans>
                     </label>
                     <Select
-                      id={`${uid}-pos-platform`}
+                      id={`${uid}-device-platform`}
                       className="select"
-                      value={posPlatform}
-                      onChange={(event) => setPosPlatform(event.target.value)}
+                      value={devicePlatform}
+                      onChange={(event) => setDevicePlatform(event.target.value)}
                     >
                       <option value="web">Web</option>
                       <option value="linux">Linux</option>
@@ -2076,14 +2126,14 @@ const AddDevicePanel = ({
                     </Select>
                   </div>
                   <div className="field">
-                    <label htmlFor={`${uid}-pos-mobility`}>
+                    <label htmlFor={`${uid}-device-mobility`}>
                       <Trans>Modalidad</Trans>
                     </label>
                     <Select
-                      id={`${uid}-pos-mobility`}
+                      id={`${uid}-device-mobility`}
                       className="select"
-                      value={posMobility}
-                      onChange={(event) => setPosMobility(event.target.value)}
+                      value={deviceMobility}
+                      onChange={(event) => setDeviceMobility(event.target.value)}
                     >
                       <option value="static">{mobilityLabel('static')}</option>
                       <option value="mobile">{mobilityLabel('mobile')}</option>
@@ -2107,7 +2157,7 @@ const AddDevicePanel = ({
                     <Trans>Código de configuración</Trans>
                   </div>
                   <div
-                    aria-label={t`Código ${posCreated.setupCode}`}
+                    aria-label={t`Código ${created.setupCode}`}
                     style={{
                       fontFamily: 'var(--font-mono)',
                       fontSize: 38,
@@ -2116,21 +2166,22 @@ const AddDevicePanel = ({
                       color: 'var(--ink-warm)',
                     }}
                   >
-                    {posCreated.setupCode.slice(0, 4)} {posCreated.setupCode.slice(4)}
+                    {created.setupCode.slice(0, 4)} {created.setupCode.slice(4)}
                   </div>
                   <p style={{ color: 'var(--ink-warm-soft)', marginBottom: 0 }}>
                     <Trans>
-                      Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla.
+                      Escribe este código en la tablet. Después, aprueba la solicitud en esta
+                      pantalla.
                     </Trans>
                   </p>
                   <p style={{ color: 'var(--ink-warm-soft)', fontSize: 12 }}>
-                    <Trans>Expira a las {formatTime(posCreated.expiresAt)}.</Trans>
+                    <Trans>Expira a las {formatTime(created.expiresAt)}.</Trans>
                   </p>
                 </div>
               )}
-              {posError && (
+              {error && (
                 <div role="alert" style={{ color: 'var(--danger)' }}>
-                  {posError}
+                  {error}
                 </div>
               )}
             </>
@@ -2140,33 +2191,13 @@ const AddDevicePanel = ({
           <button className="btn btn-ghost" onClick={onClose}>
             <Trans>Cerrar</Trans>
           </button>
-          {activeDeviceProduct === 'kds' && (
-            <button
-              className="btn btn-primary"
-              disabled={!branchId || !name.trim() || !selectedStationId || saving || pairing}
-              style={{
-                opacity:
-                  branchId && name.trim() && selectedStationId && !saving && !pairing ? 1 : 0.5,
-              }}
-              onClick={createDevice}
-            >
-              <I.Refresh size={15} />{' '}
-              {saving ? (
-                <Trans>Generando…</Trans>
-              ) : pairing ? (
-                <Trans>PIN generado</Trans>
-              ) : (
-                <Trans>Generar PIN</Trans>
-              )}
-            </button>
-          )}
-          {activeDeviceProduct === 'pos' && !posCreated && (
+          {activeDeviceProduct !== '' && !created && (
             <button
               className="btn btn-primary focusable"
-              disabled={!branchId || !posName.trim() || posSaving}
-              onClick={createPosRequest}
+              disabled={!branchId || !deviceName.trim() || saving}
+              onClick={createDevice}
             >
-              {posSaving ? <Trans>Creando…</Trans> : <Trans>Crear código</Trans>}
+              {saving ? <Trans>Creando…</Trans> : <Trans>Crear código</Trans>}
             </button>
           )}
         </div>
@@ -2474,7 +2505,7 @@ const MpPointTerminalRow = ({
               height: 30,
               borderRadius: 9,
               background: 'var(--canvas-2)',
-              color: 'var(--umi-navy)',
+              color: 'var(--navy-ink)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -2951,7 +2982,7 @@ export const MpPointStoreSection = ({ terminals, onChanged }) => {
                 height: 40,
                 borderRadius: 12,
                 background: 'var(--canvas-2)',
-                color: 'var(--umi-navy)',
+                color: 'var(--navy-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -3018,7 +3049,7 @@ export const MpPointStoreSection = ({ terminals, onChanged }) => {
                 height: 40,
                 borderRadius: 12,
                 background: 'var(--canvas-2)',
-                color: 'var(--umi-navy)',
+                color: 'var(--navy-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -3253,7 +3284,7 @@ export const MercadoPagoPointCard = ({ refresh, onChanged, registers, locations,
                 height: 40,
                 borderRadius: 12,
                 background: 'var(--canvas-2)',
-                color: 'var(--umi-navy)',
+                color: 'var(--navy-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -3305,7 +3336,7 @@ export const MercadoPagoPointCard = ({ refresh, onChanged, registers, locations,
                 height: 40,
                 borderRadius: 12,
                 background: 'var(--canvas-2)',
-                color: 'var(--umi-navy)',
+                color: 'var(--navy-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

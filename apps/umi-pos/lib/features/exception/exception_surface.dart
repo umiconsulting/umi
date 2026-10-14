@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/money.dart';
 import '../../shared/widgets/inline_notice.dart';
 import 'exception_controller.dart';
 
@@ -10,9 +11,9 @@ Future<void> showSaleExceptionDialog(
   BuildContext context, {
   required SaleExceptionController controller,
   required String saleId,
-}) => showDialog<void>(
+}) => showPosDialog<void>(
   context: context,
-  builder: (_) => Dialog(
+  builder: (_) => PosDialog(
     clipBehavior: Clip.antiAlias,
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 920, maxHeight: 760),
@@ -35,6 +36,12 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   String _reason = 'customer_changed_mind';
   final _note = TextEditingController();
   final _managerPin = TextEditingController();
+
+  /// The manager PIN as the contract spells it: four to eight digits, nothing else. The field is
+  /// obscure and numeric, but a person can still leave it empty and press the action, so the action
+  /// asks this first.
+  bool get _managerPinLooksValid =>
+      RegExp(r'^\d{4,8}$').hasMatch(_managerPin.text.trim());
   final Map<String, int> _quantities = {};
   final Map<String, String> _restock = {};
   String _fullRestock = 'restock';
@@ -90,18 +97,18 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
                 Expanded(
                   child: Text(
                     l.saleExceptionTitle,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: PosTheme.of(context).textTheme.headlineSmall,
                   ),
                 ),
-                IconButton(
+                PosIconButton(
                   tooltip: l.closeAction,
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: const PosIcon(PosGlyphs.close),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          const PosDivider(height: 1),
           Expanded(
             child: Semantics(
               liveRegion: true,
@@ -110,7 +117,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
                 padding: const EdgeInsets.all(UmiSpacing.lg),
                 child: switch (state.phase) {
                   SaleExceptionPhase.loading || SaleExceptionPhase.committing =>
-                    const Center(child: CircularProgressIndicator()),
+                    const Center(child: PosSpinner()),
                   SaleExceptionPhase.blocked => _blocked(l, state),
                   SaleExceptionPhase.failure => _failure(l, state),
                   SaleExceptionPhase.committed ||
@@ -142,7 +149,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         .map((code) => _blockDetail(spanish, '$code'))
         .join('\n');
     return _status(
-      Icons.block_outlined,
+      PosGlyphs.blockOutlined,
       spanish
           ? 'No se puede reembolsar esta venta'
           : 'This sale cannot be refunded',
@@ -159,7 +166,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
     // Title is a fixed heading; the body carries the specific cause and the
     // next step for the returned error code — the two must never be identical.
     return _status(
-      Icons.error_outline,
+      PosGlyphs.errorOutline,
       l.refundOperationFailedMessage,
       _errorDetail(spanish, state.errorCode),
     );
@@ -173,20 +180,20 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         ? l.verifyTerminalAction
         : '${l.verifyTerminalAction}\n${l.correlationLabel}: $correlation';
     return _status(
-      Icons.help_outline,
+      PosGlyphs.helpOutline,
       l.paymentOutcomeUnknownMessage,
       guidance,
     );
   }
 
-  Widget _status(IconData icon, String title, String message) => Center(
+  Widget _status(PosGlyph icon, String title, String message) => Center(
     child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 560),
       child: Column(
         children: [
-          Icon(icon, size: 52),
+          PosIcon(icon, size: 52),
           const SizedBox(height: UmiSpacing.md),
-          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          Text(title, style: PosTheme.of(context).textTheme.titleLarge),
           const SizedBox(height: UmiSpacing.sm),
           Text(message, textAlign: TextAlign.center),
         ],
@@ -212,7 +219,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           runSpacing: UmiSpacing.sm,
           children: eligibility.allowedTypes
               .map(
-                (type) => ChoiceChip(
+                (type) => PosChoice(
                   selected: _exceptionType == type,
                   label: Text(_typeLabel(l, type)),
                   onSelected: (_) => setState(() {
@@ -220,6 +227,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
                     _reason = type == 'void'
                         ? 'operator_error'
                         : 'customer_changed_mind';
+                    _note.clear();
                   }),
                 ),
               )
@@ -233,17 +241,17 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           const SizedBox(height: UmiSpacing.lg),
           Text(
             l.restockIntentLabel,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: PosTheme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: UmiSpacing.sm),
-          SegmentedButton<String>(
+          PosSegmented<String>(
             segments: [
-              ButtonSegment(value: 'restock', label: Text(l.restockAction)),
-              ButtonSegment(
+              PosSegment(value: 'restock', label: Text(l.restockAction)),
+              PosSegment(
                 value: 'do_not_restock',
                 label: Text(l.doNotRestockAction),
               ),
-              ButtonSegment(
+              PosSegment(
                 value: 'inspection_required',
                 label: Text(l.inspectionRequiredAction),
               ),
@@ -255,47 +263,56 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           ),
         ],
         const SizedBox(height: UmiSpacing.lg),
-        DropdownButtonFormField<String>(
+        PosSelectFormField<String>(
           key: ValueKey(_exceptionType == 'void'),
           initialValue: _reasons(_exceptionType == 'void').contains(_reason)
               ? _reason
               : _reasons(_exceptionType == 'void').first,
-          decoration: InputDecoration(labelText: l.refundReasonLabel),
+          decoration: PosFieldDecoration(labelText: l.refundReasonLabel),
           items: _reasons(_exceptionType == 'void')
               .map(
-                (reason) => DropdownMenuItem(
+                (reason) => PosSelectItem(
                   value: reason,
                   child: Text(_reasonLabel(l, reason)),
                 ),
               )
               .toList(),
-          onChanged: (value) => setState(() => _reason = value ?? _reason),
+          onChanged: (value) => setState(() {
+            _reason = value ?? _reason;
+            if (_reason != 'other_approved_reason') _note.clear();
+          }),
         ),
-        const SizedBox(height: UmiSpacing.md),
-        TextField(
-          controller: _note,
-          maxLength: 160,
-          decoration: InputDecoration(labelText: l.refundReasonLabel),
-        ),
+        if (_reason == 'other_approved_reason') ...[
+          const SizedBox(height: UmiSpacing.md),
+          PosField(
+            controller: _note,
+            maxLength: 160,
+            decoration: PosFieldDecoration(labelText: l.otherReasonDetailLabel),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
         const SizedBox(height: UmiSpacing.md),
         if (_validation != null) ...[
           InlineNotice(message: _validation!),
           const SizedBox(height: UmiSpacing.md),
         ],
-        FilledButton.icon(
-          onPressed: _createPreview,
-          icon: const Icon(Icons.preview_outlined),
+        PosButton.icon(
+          onPressed:
+              _reason == 'other_approved_reason' && _note.text.trim().isEmpty
+              ? null
+              : _createPreview,
+          icon: const PosIcon(PosGlyphs.previewOutlined),
           label: Text(l.refundPreviewAction),
         ),
         if (widget.controller.state.history?.entries.isNotEmpty ?? false) ...[
           const SizedBox(height: UmiSpacing.lg),
           Text(
             l.exceptionHistoryLabel,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: PosTheme.of(context).textTheme.titleMedium,
           ),
           ...widget.controller.state.history!.entries.map(
-            (entry) => ListTile(
-              leading: const Icon(Icons.history),
+            (entry) => PosListRow(
+              leading: const PosIcon(PosGlyphs.history),
               title: Text(_typeLabel(l, '${entry['exceptionType']}')),
               subtitle: Text(_reasonLabel(l, '${entry['reason']}')),
               trailing: Text(_money(entry['amount']! as Map<String, Object?>)),
@@ -312,7 +329,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
     final remaining = quantity['remaining']! as int;
     final selected = _quantities[id] ?? 0;
     final service = line['isService']! as bool;
-    return Card(
+    return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.md),
         child: Column(
@@ -320,7 +337,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           children: [
             Row(
               children: [
-                Checkbox(
+                PosCheck(
                   value: selected > 0,
                   onChanged: (value) => setState(() {
                     _quantities[id] = value ?? false ? 1 : 0;
@@ -336,35 +353,35 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
                     ],
                   ),
                 ),
-                IconButton(
+                PosIconButton(
                   tooltip: l.decreaseRefundQuantityTooltip,
                   onPressed: selected > 0
                       ? () => setState(() => _quantities[id] = selected - 1)
                       : null,
-                  icon: const Icon(Icons.remove),
+                  icon: const PosIcon(PosGlyphs.remove),
                 ),
                 Semantics(
                   label: '${l.remainingRefundableQuantityLabel}: $selected',
                   child: Text('$selected'),
                 ),
-                IconButton(
+                PosIconButton(
                   tooltip: l.increaseRefundQuantityTooltip,
                   onPressed: selected < remaining
                       ? () => setState(() => _quantities[id] = selected + 1)
                       : null,
-                  icon: const Icon(Icons.add),
+                  icon: const PosIcon(PosGlyphs.add),
                 ),
               ],
             ),
             if (selected > 0 && !service)
-              SegmentedButton<String>(
+              PosSegmented<String>(
                 segments: [
-                  ButtonSegment(value: 'restock', label: Text(l.restockAction)),
-                  ButtonSegment(
+                  PosSegment(value: 'restock', label: Text(l.restockAction)),
+                  PosSegment(
                     value: 'do_not_restock',
                     label: Text(l.doNotRestockAction),
                   ),
-                  ButtonSegment(
+                  PosSegment(
                     value: 'inspection_required',
                     label: Text(l.inspectionRequiredAction),
                   ),
@@ -423,7 +440,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
       exceptionType: type,
       reason: _reason,
       lines: lines,
-      note: _note.text,
+      note: _reason == 'other_approved_reason' ? _note.text : null,
     );
   }
 
@@ -435,8 +452,29 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
       children: [
         Text(
           _typeLabel(l, preview.exceptionType),
-          style: Theme.of(context).textTheme.titleLarge,
+          style: PosTheme.of(context).textTheme.titleLarge,
         ),
+        if (state.errorCode != null) ...[
+          const SizedBox(height: UmiSpacing.md),
+          Text(
+            _errorDetail(
+              Localizations.localeOf(context).languageCode == 'es',
+              state.errorCode,
+            ),
+            style: PosTheme.of(context).textTheme.bodyMedium?.copyWith(
+              color: PosTheme.of(context).colorScheme.error,
+            ),
+          ),
+        ],
+        if (state.errorCode == 'REFUND_PREVIEW_EXPIRED')
+          PosOutlineButton(
+            onPressed: widget.controller.refreshPreview,
+            child: Text(
+              Localizations.localeOf(context).languageCode == 'es'
+                  ? 'Actualizar revisión'
+                  : 'Refresh review',
+            ),
+          ),
         const SizedBox(height: UmiSpacing.md),
         _moneyRow(
           l.taxRefundLabel,
@@ -450,18 +488,23 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           l.tipRefundLabel,
           preview.tip['amount']! as Map<String, Object?>,
         ),
-        const Divider(),
+        const PosDivider(),
+        // THE REFUND'S OWN AMOUNT, NOT WHAT IS LEFT TO REFUND. This row used to wear
+        // `refundableAmountLabel` — "Importe restante reembolsable" — so the preview and the
+        // confirmation read "remaining refundable MXN 64.99" about the money being handed back.
+        // Measured on the iMin on 2026-10-11: the committed dialog showed `Importe restante
+        // reembolsable MXN 64.99` for a sale with MXN 150.01 still refundable.
         _moneyRow(
-          l.refundableAmountLabel,
+          l.refundAmountLabel,
           preview.allocation['total']! as Map<String, Object?>,
         ),
         const SizedBox(height: UmiSpacing.md),
         ...preview.tenders.map(
-          (tender) => ListTile(
-            leading: Icon(
+          (tender) => PosListRow(
+            leading: PosIcon(
               tender['tenderType'] == 'cash'
-                  ? Icons.payments_outlined
-                  : Icons.credit_card,
+                  ? PosGlyphs.paymentsOutlined
+                  : PosGlyphs.creditCard,
             ),
             title: Text(
               tender['tenderType'] == 'cash'
@@ -476,10 +519,10 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         const SizedBox(height: UmiSpacing.sm),
         Text(
           l.restockIntentLabel,
-          style: Theme.of(context).textTheme.titleMedium,
+          style: PosTheme.of(context).textTheme.titleMedium,
         ),
         ...preview.lines.map(
-          (line) => ListTile(
+          (line) => PosListRow(
             dense: true,
             title: Text(
               '${line['quantity']} × ${_restockLabel(l, '${line['restockDecision']}')}',
@@ -493,26 +536,26 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
                     'operator_reported_failure')) ...[
           Text(
             l.manualTerminalRefundProviderNotice,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: PosTheme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: UmiSpacing.sm),
           Wrap(
             spacing: UmiSpacing.sm,
             runSpacing: UmiSpacing.sm,
             children: [
-              FilledButton.tonal(
+              PosButton.tonal(
                 onPressed: () => widget.controller.recordTerminalOutcome(
                   'confirmed_success',
                 ),
                 child: Text(l.terminalRefundSuccessAction),
               ),
-              OutlinedButton(
+              PosOutlineButton(
                 onPressed: () => widget.controller.recordTerminalOutcome(
                   'operator_reported_failure',
                 ),
                 child: Text(l.terminalRefundFailureAction),
               ),
-              OutlinedButton(
+              PosOutlineButton(
                 onPressed: () =>
                     widget.controller.recordTerminalOutcome('outcome_unknown'),
                 child: Text(l.terminalRefundUnknownAction),
@@ -523,22 +566,35 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         if (preview.manualTerminal != null && providerBacked) ...[
           Text(
             l.manualTerminalRefundOnCommitNotice,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: PosTheme.of(context).textTheme.titleMedium,
           ),
         ],
         if (preview.approvalRequired && state.approval == null) ...[
           const SizedBox(height: UmiSpacing.lg),
-          TextField(
+          PosField(
             controller: _managerPin,
             obscureText: true,
             keyboardType: TextInputType.number,
             autofillHints: const [],
-            decoration: InputDecoration(labelText: l.managerPinLabel),
+            decoration: PosFieldDecoration(labelText: l.managerPinLabel),
             onSubmitted: _approve,
+            // The action's enabled state depends on what is in here, so every keystroke rebuilds.
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: UmiSpacing.sm),
-          FilledButton.tonal(
-            onPressed: () => _approve(_managerPin.text),
+          PosButton.tonal(
+            // THE PIN IS A CREDENTIAL, NOT A TEXT FIELD THE API VALIDATES LATER. The contract
+            // requires `managerPin` to match `^\d{4,8}$`, and an empty field used to be sent
+            // anyway: the API answered `400 VALIDATION_FAILED` ("The request does not match the
+            // public contract"), which the surface shows as "Vuelve a intentar… (Código:
+            // VALIDATION_FAILED)" — advice to retry, about a field nobody named. Measured on the
+            // iMin on 2026-10-11 at 09:42:52. A control that cannot succeed is disabled, the way
+            // the sign-in keypad disables `Continuar` until four digits have landed.
+            onPressed:
+                _managerPinLooksValid &&
+                    state.errorCode != 'REFUND_PREVIEW_EXPIRED'
+                ? () => _approve(_managerPin.text)
+                : null,
             child: Text(l.approvalRequiredMessage),
           ),
         ],
@@ -547,9 +603,9 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
                 providerBacked ||
                 state.terminalOutcome?.status == 'confirmed_success')) ...[
           const SizedBox(height: UmiSpacing.lg),
-          FilledButton.icon(
+          PosButton.icon(
             onPressed: () => _confirmCommit(l),
-            icon: const Icon(Icons.check_circle_outline),
+            icon: const PosIcon(PosGlyphs.checkCircleOutline),
             label: Text(l.commitRefundAction),
           ),
         ],
@@ -558,17 +614,17 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   }
 
   Future<void> _confirmCommit(AppLocalizations l) async {
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(l.refundConfirmationTitle),
         content: Text(l.refundConfirmationBody),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(l.closeAction),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(l.commitRefundAction),
           ),
@@ -589,7 +645,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   Widget _receipt(AppLocalizations l, SaleExceptionResult? result) {
     if (result == null) {
       return _status(
-        Icons.receipt_long_outlined,
+        PosGlyphs.receiptLongOutlined,
         l.compensatingReceiptTitle,
         l.recoveredRefundMessage,
       );
@@ -597,11 +653,11 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
     final receipt = result.receipt;
     return Column(
       children: [
-        const Icon(Icons.check_circle_outline, size: 56),
+        const PosIcon(PosGlyphs.checkCircleOutline, size: 56),
         const SizedBox(height: UmiSpacing.md),
         Text(
           l.compensatingReceiptTitle,
-          style: Theme.of(context).textTheme.headlineSmall,
+          style: PosTheme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: UmiSpacing.sm),
         Text(
@@ -610,7 +666,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         ),
         const SizedBox(height: UmiSpacing.lg),
         _moneyRow(
-          l.refundableAmountLabel,
+          l.refundAmountLabel,
           result.allocation['total']! as Map<String, Object?>,
         ),
         Text(l.refundCommittedMessage),
@@ -631,10 +687,10 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
     ),
   );
 
-  String _money(Map<String, Object?> value) {
-    final minor = value['minorUnits']! as int;
-    return '${value['currency']} ${(minor / 100).toStringAsFixed(2)}';
-  }
+  String _money(Map<String, Object?> value) => formatMinorUnits(
+    value['minorUnits']! as int,
+    value['currency'] as String? ?? '',
+  );
 
   String _typeLabel(AppLocalizations l, String type) => switch (type) {
     'void' => l.voidSaleAction,
@@ -674,6 +730,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           'duplicate_sale',
           'incorrect_tender',
           'sale_entered_by_mistake',
+          'other_approved_reason',
         ]
       : const [
           'customer_changed_mind',
@@ -684,6 +741,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
           'quality_issue',
           'order_preparation_error',
           'pricing_error',
+          'other_approved_reason',
         ];
 
   // Server eligibility block codes -> a specific reason plus what to do next.
@@ -717,6 +775,10 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   // Server error codes on a failed commit -> a specific cause plus what to do
   // next. The default keeps the code visible so support can trace it.
   String _errorDetail(bool spanish, String? code) => switch (code) {
+    'REFUND_PREVIEW_EXPIRED' =>
+      spanish
+          ? 'La revisión de la devolución venció. Actualízala antes de pedir autorización. Se conserva tu selección.'
+          : 'The refund review expired. Refresh it before requesting approval. Your selection is preserved.',
     'PERMISSION_DENIED' || 'PERMISSION_REVOKED' =>
       spanish
           ? 'No tienes permiso para esta acción. Pide a un gerente que la autorice.'

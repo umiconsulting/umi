@@ -1,0 +1,545 @@
+C merchant.contact.channel_id api=w/postgres
+C merchant.contact.contact_type api=w/postgres
+C merchant.contact.created_at api=w/postgres
+C merchant.contact.customer_id api=w/postgres
+C merchant.contact.id api=w/postgres
+C merchant.contact.is_primary api=w/postgres
+C merchant.contact.merchant_id api=w/postgres
+C merchant.contact.raw_phone_number api=w/postgres
+C merchant.contact.raw_value api=w/postgres
+C merchant.contact.updated_at api=w/postgres
+C merchant.contact.verification_status api=w/postgres
+C merchant.contact.verified api=w/postgres
+C merchant.contact.verified_via api=w/postgres
+C merchant.contact.version api=w/postgres
+C merchant.customer_order.cancel_reason api=w/postgres
+C merchant.customer_order.conversation_id api=w/postgres
+C merchant.customer_order.created_at api=w/postgres
+C merchant.customer_order.customer_id api=w/postgres
+C merchant.customer_order.external_ref api=w/postgres
+C merchant.customer_order.fulfillment_type api=w/postgres
+C merchant.customer_order.id api=w/postgres
+C merchant.customer_order.location_id api=w/postgres
+C merchant.customer_order.merchant_id api=w/postgres
+C merchant.customer_order.notes api=w/postgres
+C merchant.customer_order.pickup_person api=w/postgres
+C merchant.customer_order.placed_at api=w/postgres
+C merchant.customer_order.source api=w/postgres
+C merchant.customer_order.status api=w/postgres
+C merchant.customer_order.updated_at api=w/postgres
+C merchant.customer_order.version api=w/postgres
+C merchant.device_replay_cursor.last_accepted_sequence api=w/postgres
+C merchant.device_replay_cursor.reconciliation_required api=w/postgres
+C merchant.device_replay_cursor.updated_at api=w/postgres
+C merchant.loyalty_wallet_pass.card_id api=arw/postgres,readonly=r/postgres
+C merchant.loyalty_wallet_pass.created_at api=arw/postgres,readonly=r/postgres
+C merchant.loyalty_wallet_pass.external_object_id api=arw/postgres,readonly=r/postgres
+C merchant.loyalty_wallet_pass.id api=arw/postgres,readonly=r/postgres
+C merchant.loyalty_wallet_pass.platform api=arw/postgres,readonly=r/postgres
+C merchant.loyalty_wallet_pass.status api=arw/postgres,readonly=r/postgres
+C merchant.loyalty_wallet_pass.updated_at api=arw/postgres,readonly=r/postgres
+C merchant.mp_point_credential.access_token_expires_at readonly=r/postgres
+C merchant.mp_point_credential.created_at readonly=r/postgres
+C merchant.mp_point_credential.merchant_id readonly=r/postgres
+C merchant.mp_point_credential.mp_user_id readonly=r/postgres
+C merchant.mp_point_credential.refresh_attempts readonly=r/postgres
+C merchant.mp_point_credential.refresh_failed_at readonly=r/postgres
+C merchant.mp_point_credential.updated_at readonly=r/postgres
+C merchant.offline_reconciliation.acknowledged_at api=w/postgres
+C merchant.offline_replay_conflict.last_observed_at api=w/postgres
+C merchant.offline_replay_conflict.resolution_acknowledged_at api=w/postgres
+C merchant.offline_replay_conflict.resolution_state api=w/postgres
+C merchant.pos_cart.cancellation_reason api=w/postgres
+C merchant.pos_cart.cancelled_at api=w/postgres
+C merchant.pos_cart.created_at api=w/postgres
+C merchant.pos_cart.customer_id api=w/postgres
+C merchant.pos_cart.display_label api=w/postgres
+C merchant.pos_cart.id api=w/postgres
+C merchant.pos_cart.lifecycle_state api=w/postgres
+C merchant.pos_cart.location_id api=w/postgres
+C merchant.pos_cart.merchant_id api=w/postgres
+C merchant.pos_cart.operator_session_id api=w/postgres
+C merchant.pos_cart.operator_user_id api=w/postgres
+C merchant.pos_cart.origin_channel api=w/postgres
+C merchant.pos_cart.origin_order_id api=w/postgres
+C merchant.pos_cart.original_operator_session_id api=w/postgres
+C merchant.pos_cart.original_operator_user_id api=w/postgres
+C merchant.pos_cart.status api=w/postgres
+C merchant.pos_cart.suspended_at api=w/postgres
+C merchant.pos_cart.updated_at api=w/postgres
+C merchant.pos_cart.version api=w/postgres
+C umi.user.created_at api=r/postgres,readonly=r/postgres
+C umi.user.email api=ar/postgres,readonly=r/postgres
+C umi.user.full_name api=ar/postgres,readonly=r/postgres
+C umi.user.id api=r/postgres,readonly=r/postgres
+C umi.user.last_login_at api=r/postgres,readonly=r/postgres
+C umi.user.status api=ar/postgres,readonly=r/postgres
+C umi.user.updated_at api=r/postgres,readonly=r/postgres
+D merchant r readonly=r/postgres,worker=arwd/postgres
+D runtime r readonly=r/postgres,worker=arwd/postgres
+D umi r worker=r/postgres
+F merchant.activate_sale_funded_gift_card(p_merchant_id uuid, p_location_id uuid, p_cart_id uuid, p_sale_id uuid, p_command_id uuid, p_idempotency_key uuid, p_operator_id uuid, p_device_id uuid, p_business_date date, p_funded jsonb) postgres=X/postgres
+F merchant.append_customer_consent(p_merchant_id uuid, p_customer_id uuid, p_consent_type text, p_status text, p_policy_version text, p_actor_user_id uuid, p_command_id uuid) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.append_gift_card_fact(p_merchant_id uuid, p_gift_card_id uuid, p_fact jsonb) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.append_loyalty_points(p_merchant_id uuid, p_customer_id uuid, p_account_id uuid, p_entry_type text, p_direction text, p_points bigint, p_source_type text, p_source_id uuid, p_sale_id uuid, p_refund_id uuid, p_reward_id uuid, p_authorization_id uuid, p_operator_id uuid, p_device_id uuid, p_command_id uuid, p_idempotency_key uuid, p_fingerprint text, p_business_date date) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.append_stock_ledger(p_merchant_id uuid, p_location_id uuid, p_inventory_location_id uuid, p_inventory_item_id uuid, p_entry_type text, p_quantity bigint, p_command_id uuid, p_idempotency_key uuid, p_fingerprint text, p_source_type text, p_source_id uuid, p_operator_id uuid, p_device_id uuid, p_credential_version integer, p_business_date date, p_correlation_id text, p_sale_id uuid, p_sale_line_id uuid, p_refund_id uuid, p_count_id uuid, p_public_data jsonb, p_lot_id uuid) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.append_stored_value_fact(p_merchant_id uuid, p_card_id uuid, p_fact jsonb) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.assert_customer_value_write_scope(p_merchant_id uuid, p_device_id uuid) postgres=X/postgres
+F merchant.assert_hardware_scope(p_merchant_id uuid, p_location_id uuid, p_operator_session_id uuid, p_permission text) -
+F merchant.assert_loyalty_earn_preview(p_merchant_id uuid, p_location_id uuid, p_cart_id uuid, p_customer_id uuid, p_checkout_version integer, p_checkout_fingerprint text, p_preview_fingerprint text) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.assign_hardware_device(p_assignment jsonb) api=X/postgres,postgres=X/postgres
+F merchant.cash_denominations_valid(lines jsonb, declared_total bigint, declared_currency text) -
+F merchant.commit_customer_value(p_merchant_id uuid, p_location_id uuid, p_cart_id uuid, p_sale_id uuid, p_order_id uuid, p_customer_id uuid, p_command_id uuid, p_idempotency_key uuid, p_checkout_fingerprint text, p_business_date date, p_operator_id uuid, p_device_id uuid, p_selection jsonb) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.commit_customer_value_closeout(p_merchant_id uuid, p_location_id uuid, p_cart_id uuid, p_sale_id uuid, p_order_id uuid, p_customer_id uuid, p_command_id uuid, p_idempotency_key uuid, p_preview_fingerprint text, p_checkout_version integer, p_checkout_fingerprint text, p_business_date date, p_operator_id uuid, p_device_id uuid, p_selection jsonb) postgres=X/postgres
+F merchant.commit_customer_value_closeout(p_merchant_id uuid, p_location_id uuid, p_cart_id uuid, p_sale_id uuid, p_order_id uuid, p_customer_id uuid, p_command_id uuid, p_idempotency_key uuid, p_preview_fingerprint text, p_checkout_version integer, p_checkout_fingerprint text, p_business_date date, p_operator_id uuid, p_device_id uuid, p_stored_value_fingerprint text, p_selection jsonb) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.commit_points_adjustment(p_merchant_id uuid, p_customer_id uuid, p_account_id uuid, p_direction text, p_points bigint, p_reason text, p_operator_id uuid, p_device_id uuid, p_command_id uuid, p_idempotency_key uuid, p_fingerprint text, p_business_date date) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.commit_sale_inventory(p_reservation_id uuid, p_sale_id uuid, p_command_id uuid, p_operator_id uuid, p_device_id uuid, p_credential_version integer, p_business_date date, p_correlation_id text) =X/postgres,api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.consume_gift_card_lookup_budget(p_merchant_id uuid, p_location_id uuid, p_bucket_hash bytea, p_now timestamp with time zone) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.create_controlled_reprint(p_merchant_id uuid, p_location_id uuid, p_operator_session_id uuid, p_original_job_id uuid, p_job_id uuid, p_command_id uuid, p_idempotency_key text, p_reason text, p_correlation_id text, p_payload_fingerprint text) api=X/postgres,postgres=X/postgres
+F merchant.create_hardware_command(p_command jsonb) api=X/postgres,postgres=X/postgres
+F merchant.customer_survivor(p_customer_id uuid) -
+F merchant.default_contact_type() -
+F merchant.default_public_reference() -
+F merchant.device_is_usable(p_device_id uuid) =X/postgres,api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.expire_customer_value_authorizations(p_merchant_id uuid, p_batch_size integer) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.expire_customer_value_authorizations_worker(p_merchant_id uuid, p_batch_size integer) postgres=X/postgres,worker=X/postgres
+F merchant.expire_inventory_reservations(p_merchant_id uuid, p_location_id uuid) =X/postgres,api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.explode_inventory_recipe(p_merchant_id uuid, p_recipe_id uuid, p_max_depth integer, p_include_retired_root boolean) api=X/postgres,postgres=X/postgres,readonly=X/postgres,worker=X/postgres
+F merchant.hardware_immutable() -
+F merchant.inventory_item_allergen_labels(p_merchant_id uuid, p_item_id uuid) api=X/postgres,postgres=X/postgres,readonly=X/postgres,worker=X/postgres
+F merchant.inventory_item_subtree(p_merchant_id uuid, p_item_id uuid, p_max_depth integer) api=X/postgres,postgres=X/postgres,readonly=X/postgres,worker=X/postgres
+F merchant.location_search_text(p_name text, p_aliases text[]) -
+F merchant.normalize_identity(p_channel text, p_value text) -
+F merchant.normalize_phone(p_phone text) -
+F merchant.pos_cart_lifecycle_guard() -
+F merchant.prepare_gift_card_fact() -
+F merchant.prepare_stored_value_fact() -
+F merchant.preview_points_adjustment(p_merchant_id uuid, p_customer_id uuid, p_account_id uuid, p_direction text, p_points bigint, p_reason text, p_command_fingerprint text) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.product_allergen_labels(p_merchant_id uuid, p_product_id uuid, p_variant_id uuid) api=X/postgres,postgres=X/postgres,readonly=X/postgres,worker=X/postgres
+F merchant.project_customer_value_fact() -
+F merchant.read_customer_history_event_scoped(p_merchant_id uuid, p_customer_id uuid, p_operator_session_id uuid) api=X/postgres,postgres=X/postgres
+F merchant.read_hardware_runtime(p_merchant_id uuid, p_location_id uuid, p_operator_session_id uuid, p_register_id uuid) api=X/postgres,postgres=X/postgres
+F merchant.rebuild_stock_balance(p_inventory_location_id uuid, p_inventory_item_id uuid) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.record_hardware_diagnostic(p_diagnostic jsonb) api=X/postgres,postgres=X/postgres
+F merchant.register_hardware_device(p_device jsonb) api=X/postgres,postgres=X/postgres
+F merchant.release_cart_inventory_on_cancel() -
+F merchant.release_cart_inventory_on_edit() -
+F merchant.release_inventory_reservation(p_reservation_id uuid, p_entry_type text) =X/postgres,api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.release_modifier_inventory_on_edit() -
+F merchant.reveal_gift_card_secret_delivery(p_merchant_id uuid, p_location_id uuid, p_token_hash bytea, p_operator_id uuid, p_device_id uuid, p_reveal_session_id uuid) api=X/postgres,postgres=X/postgres
+F merchant.reverse_customer_value(p_merchant_id uuid, p_location_id uuid, p_sale_id uuid, p_exception_id uuid, p_command_id uuid, p_idempotency_key uuid, p_fingerprint text, p_business_date date, p_operator_id uuid, p_device_id uuid) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.store_gift_card_secret_delivery(p_merchant_id uuid, p_location_id uuid, p_gift_card_id uuid, p_issuance_command_id uuid, p_token_hash bytea, p_ciphertext bytea, p_nonce bytea, p_auth_tag bytea, p_operator_id uuid, p_device_id uuid, p_expires_at timestamp with time zone) api=X/postgres,postgres=X/postgres
+F merchant.tg_append_only() -
+F merchant.tg_audit_event_hash() -
+F merchant.tg_bump_customer_activity() -
+F merchant.tg_bump_customer_activity_by_conversation() -
+F merchant.tg_business_date() -
+F merchant.tg_cash_close_guard() -
+F merchant.tg_cash_count_guard() -
+F merchant.tg_cash_fact_immutable() -
+F merchant.tg_cash_ledger_open_shift() -
+F merchant.tg_cash_reconciliation_guard() -
+F merchant.tg_cash_shift_scope() -
+F merchant.tg_closed_cash_shift_immutable() -
+F merchant.tg_contact_normalize() -
+F merchant.tg_customer_order_version() -
+F merchant.tg_dashboard_exception_context_immutable() -
+F merchant.tg_integrity_scope() -
+F merchant.tg_notify_conversation_message() -
+F merchant.tg_notify_tender_attempt() -
+F merchant.tg_order_item_signal_change() -
+F merchant.tg_order_item_void_only() -
+F merchant.tg_pos_cash_compensation_binding() -
+F merchant.tg_pos_checkout_terminal_immutable() -
+F merchant.tg_pos_exception_append_only() -
+F merchant.tg_pos_exception_approval_binding() -
+F merchant.tg_pos_exception_line_limit() -
+F merchant.tg_pos_exception_preview_transition() -
+F merchant.tg_pos_tender_committed_immutable() -
+F merchant.tg_pos_tender_compensation_limit() -
+F merchant.tg_table_state_keep_turn_timer() -
+F merchant.transition_hardware_command(p_merchant_id uuid, p_location_id uuid, p_operator_session_id uuid, p_command_id uuid, p_status text, p_failure_code text, p_safe_result jsonb) api=X/postgres,postgres=X/postgres
+F merchant.unaccent(p_text text) -
+F merchant.update_hardware_device(p_device jsonb) api=X/postgres,postgres=X/postgres
+F merchant.update_hardware_pilot_policy(p_input jsonb) api=X/postgres,postgres=X/postgres
+F merchant.validate_customer_history_cursor(p_merchant_id uuid, p_customer_id uuid, p_cursor_merchant uuid, p_cursor_customer uuid) api=X/postgres,postgres=X/postgres,worker=X/postgres
+F merchant.validate_customer_merge_scope() -
+F merchant.validate_hardware_connection(p_transport text, p_device_type text, p_configuration jsonb) api=X/postgres,postgres=X/postgres
+F merchant.validate_inventory_recipe_acyclic() -
+F merchant.validate_inventory_recipe_modifier_scope() -
+F merchant.validate_offline_replay_authority() -
+F merchant.with_append_only_writable(target text, stmt text) -
+F runtime.invalidate_operator_sessions_for_rbac() -
+F runtime.revoke_device_sessions() -
+F umi.current_device() -
+F umi.current_location() -
+F umi.current_merchant() -
+F umi.e164(p_raw text) -
+F umi.resolve_staff_permissions(p_staff_id uuid) api=X/postgres,postgres=X/postgres,worker=X/postgres
+P merchant.administrative_command policies=3
+P merchant.aggregate_version policies=1
+P merchant.audit_event policies=2
+P merchant.audit_log policies=1
+P merchant.business_command policies=2
+P merchant.cash_count_attempt policies=3
+P merchant.cash_ledger_entry policies=3
+P merchant.cash_movement policies=3
+P merchant.cash_reconciliation policies=3
+P merchant.cash_shift policies=4
+P merchant.cash_shift_close policies=3
+P merchant.cash_shift_custody_event policies=3
+P merchant.cash_shift_handoff policies=3
+P merchant.cash_shift_policy policies=3
+P merchant.cash_variance_resolution policies=3
+P merchant.contact policies=1
+P merchant.conversation policies=1
+P merchant.customer policies=1
+P merchant.customer_consent_current policies=2
+P merchant.customer_consent_history policies=2
+P merchant.customer_fact policies=1
+P merchant.customer_merge_mapping policies=2
+P merchant.customer_order policies=2
+P merchant.customer_value_authorization policies=5
+P merchant.customer_value_tender_allocation policies=4
+P merchant.device policies=2
+P merchant.device_point_terminal policies=1
+P merchant.device_replay_cursor policies=3
+P merchant.financial_event policies=2
+P merchant.fiscal_document policies=1
+P merchant.floor_plan policies=1
+P merchant.gift_card_funding_assignment policies=4
+P merchant.gift_card_lookup_attempt policies=4
+P merchant.gift_card_secret_delivery policies=5
+P merchant.hardware_assignment policies=4
+P merchant.hardware_command policies=4
+P merchant.hardware_command_event policies=3
+P merchant.hardware_device policies=4
+P merchant.hardware_diagnostic policies=4
+P merchant.hardware_pilot_policy policies=4
+P merchant.hardware_print_job policies=4
+P merchant.hardware_print_job_event policies=3
+P merchant.integration policies=1
+P merchant.inventory_allergen policies=1
+P merchant.inventory_catalog_mapping policies=2
+P merchant.inventory_command_result policies=3
+P merchant.inventory_count policies=4
+P merchant.inventory_count_line policies=2
+P merchant.inventory_item policies=2
+P merchant.inventory_item_allergen policies=1
+P merchant.inventory_location policies=3
+P merchant.inventory_policy policies=3
+P merchant.inventory_recipe policies=2
+P merchant.inventory_recipe_component policies=2
+P merchant.inventory_reconciliation policies=3
+P merchant.inventory_reservation policies=2
+P merchant.inventory_reservation_line policies=3
+P merchant.inventory_restock_outcome policies=3
+P merchant.inventory_unit_conversion policies=2
+P merchant.kitchen_command policies=2
+P merchant.kitchen_device_station policies=2
+P merchant.kitchen_event policies=2
+P merchant.kitchen_order policies=2
+P merchant.kitchen_order_item policies=2
+P merchant.kitchen_route policies=2
+P merchant.knowledge_chunk policies=1
+P merchant.knowledge_document policies=1
+P merchant.location policies=1
+P merchant.loyalty_birthday_grant policies=1
+P merchant.loyalty_card policies=1
+P merchant.loyalty_earn_preview policies=4
+P merchant.loyalty_gift_card policies=2
+P merchant.loyalty_gift_card_balance policies=2
+P merchant.loyalty_gift_card_ledger policies=1
+P merchant.loyalty_points_account policies=2
+P merchant.loyalty_points_balance policies=2
+P merchant.loyalty_points_ledger policies=2
+P merchant.loyalty_program policies=1
+P merchant.loyalty_redemption policies=1
+P merchant.loyalty_reward policies=1
+P merchant.loyalty_sale_policy_snapshot policies=4
+P merchant.loyalty_stored_value_balance policies=2
+P merchant.loyalty_stored_value_ledger policies=1
+P merchant.loyalty_visit policies=1
+P merchant.loyalty_wallet_pass policies=1
+P merchant.merchant policies=1
+P merchant.message policies=1
+P merchant.mp_point_credential policies=1
+P merchant.no_sale_drawer_event policies=3
+P merchant.offline_provisional_mapping policies=3
+P merchant.offline_reconciliation policies=3
+P merchant.offline_replay_command policies=3
+P merchant.offline_replay_conflict policies=3
+P merchant.order_discount policies=1
+P merchant.order_event policies=1
+P merchant.order_item policies=1
+P merchant.order_item_modifier policies=1
+P merchant.payment policies=1
+P merchant.physical_register policies=3
+P merchant.pos_cart policies=2
+P merchant.pos_cart_line policies=1
+P merchant.pos_cart_line_modifier policies=1
+P merchant.pos_cash_compensation policies=3
+P merchant.pos_checkout_draft policies=4
+P merchant.pos_checkout_policy policies=3
+P merchant.pos_committed_sale policies=2
+P merchant.pos_exception_policy policies=3
+P merchant.pos_exception_preview policies=4
+P merchant.pos_exception_receipt policies=3
+P merchant.pos_offline_cash_policy policies=2
+P merchant.pos_offline_policy policies=1
+P merchant.pos_payment_attempt policies=2
+P merchant.pos_restock_intent policies=3
+P merchant.pos_sale_exception policies=4
+P merchant.pos_sale_exception_line policies=3
+P merchant.pos_tender_compensation policies=3
+P merchant.pos_tender_fact policies=3
+P merchant.product policies=1
+P merchant.product_category policies=1
+P merchant.product_location_availability policies=2
+P merchant.product_media policies=1
+P merchant.product_modifier policies=1
+P merchant.product_option_group policies=1
+P merchant.product_variant policies=1
+P merchant.purchase_order policies=1
+P merchant.purchase_order_line policies=1
+P merchant.purchase_order_receipt policies=1
+P merchant.purchase_order_receipt_line policies=1
+P merchant.receipt_snapshot policies=2
+P merchant.refund policies=1
+P merchant.role policies=1
+P merchant.role_permission policies=1
+P merchant.staff policies=1
+P merchant.staff_permission_override policies=1
+P merchant.station policies=2
+P merchant.stock_balance policies=3
+P merchant.stock_ledger_entry policies=3
+P merchant.stock_lot policies=1
+P merchant.supplier policies=1
+P merchant.supplier_invoice policies=1
+P merchant.supplier_invoice_line policies=1
+P merchant.table_order policies=1
+P merchant.table_order_credential policies=1
+P merchant.table_reservation policies=1
+P merchant.table_state policies=1
+P runtime.audit_event_internal policies=1
+P runtime.conversation_cart policies=1
+P runtime.conversation_turn policies=1
+P runtime.device_enrollment_challenge policies=1
+P runtime.elevation_grant policies=1
+P runtime.idempotency_key policies=1
+P runtime.operator_session policies=2
+P runtime.reminder_sent policies=1
+P runtime.security_audit_event policies=1
+P umi.ai_usage policies=1
+P umi.entitlement_override policies=1
+P umi.invoice policies=1
+P umi.subscription policies=1
+P umi.subscription_item policies=1
+S kds postgres=UC/postgres,readonly=U/postgres,worker=U/postgres
+S merchant api=U/postgres,postgres=UC/postgres,readonly=U/postgres,worker=U/postgres
+S runtime api=U/postgres,postgres=UC/postgres,readonly=U/postgres,worker=U/postgres
+S umi api=U/postgres,postgres=UC/postgres,readonly=U/postgres,worker=U/postgres
+T kds.station_event postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T kds.station_order postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.administrative_command api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.aggregate_version api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.audit_event api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.audit_log api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.business_command api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_count_attempt api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_ledger_entry api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_movement api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_reconciliation api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_shift api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_shift_close api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_shift_custody_event api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_shift_handoff api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_shift_policy api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.cash_variance_resolution api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.contact api=ard/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.conversation api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.conversation_analytics api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer_consent_current api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer_consent_history api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.customer_fact api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer_history_event postgres=arwdDxtm/postgres
+T merchant.customer_history_event_scoped postgres=arwdDxtm/postgres
+T merchant.customer_merge_mapping api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer_order api=ard/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer_value_authorization api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.customer_value_tender_allocation api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.device api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.device_point_terminal api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.device_replay_cursor api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.financial_event api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.fiscal_document api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.floor_plan api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.gift_card_funding_assignment api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.gift_card_lookup_attempt postgres=arwdDxtm/postgres
+T merchant.gift_card_secret_delivery postgres=arwdDxtm/postgres
+T merchant.hardware_assignment api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_command api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_command_event api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_device api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_diagnostic api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_pilot_policy api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_print_job api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.hardware_print_job_event api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.integration api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_allergen api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_catalog_mapping api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_command_result api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_count api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_count_line api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_item api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_item_allergen api=ard/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_location api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_policy api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_recipe api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_recipe_component api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.inventory_reconciliation api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_reservation api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_reservation_line api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_restock_outcome api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.inventory_unit_conversion api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.kitchen_command api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.kitchen_device_station api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.kitchen_event api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.kitchen_event_sequence_seq -
+T merchant.kitchen_order api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.kitchen_order_item api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.kitchen_route api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.knowledge_chunk api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.knowledge_document api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.location api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_birthday_grant api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_card api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_earn_preview api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.loyalty_gift_card api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_gift_card_balance api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_gift_card_ledger api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.loyalty_points_account api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_points_balance api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_points_ledger api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.loyalty_program api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_redemption api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_reward api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_sale_policy_snapshot api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.loyalty_stored_value_balance api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_stored_value_ledger api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.loyalty_visit api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.loyalty_wallet_pass api=d/postgres,postgres=arwdDxtm/postgres,worker=arwd/postgres
+T merchant.merchant api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.message api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.mp_point_credential api=arw/postgres,postgres=arwdDxtm/postgres,worker=arwd/postgres
+T merchant.no_sale_drawer_event api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.offline_provisional_mapping api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.offline_reconciliation api=ard/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.offline_replay_command api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.offline_replay_conflict api=ard/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.order_discount api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.order_event api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.order_event_sequence_seq -
+T merchant.order_item api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.order_item_modifier api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.order_ticket api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.order_total api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.payment api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.physical_register api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_cart api=ard/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_cart_line api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_cart_line_modifier api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_cash_compensation api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_checkout_draft api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_checkout_policy api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_committed_sale api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.pos_exception_policy api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_exception_preview api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_exception_receipt api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_offline_cash_policy api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_offline_policy api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_payment_attempt api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_restock_intent api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_sale_exception api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_sale_exception_line api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_tender_compensation api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.pos_tender_fact api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product_category api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product_location_availability api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product_media api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product_modifier api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product_option_group api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.product_variant api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.purchase_order api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.purchase_order_line api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.purchase_order_receipt api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.purchase_order_receipt_line api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.receipt_snapshot api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.refund api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.role api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.role_permission api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.staff api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.staff_permission_override api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.station api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.stock_balance api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.stock_ledger_entry api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=r/postgres
+T merchant.stock_lot api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T merchant.supplier api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.supplier_invoice api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.supplier_invoice_line api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.table_order api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.table_order_credential api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.table_reservation api=arw/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T merchant.table_state api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.audit_event_internal api=a/postgres,postgres=arwdDxtm/postgres,worker=ar/postgres
+T runtime.conversation_cart api=arwd/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.conversation_turn postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.dashboard_session postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.dead_letter postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.device_enrollment_challenge api=arw/postgres,postgres=arwdDxtm/postgres,worker=arwd/postgres
+T runtime.device_enrollment_request postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.device_pairing_session postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.elevation_grant api=arw/postgres,postgres=arwdDxtm/postgres,worker=arwd/postgres
+T runtime.idempotency_key api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.inbound_event postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.integration_sync postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.knowledge_embedding postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.message_embedding postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.operator_session api=arw/postgres,postgres=arwdDxtm/postgres,worker=arwd/postgres
+T runtime.otp postgres=arwdDxtm/postgres,worker=arwd/postgres
+T runtime.outbox_event postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.pairing postgres=arwdDxtm/postgres,worker=arwd/postgres
+T runtime.pass_device postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.password_reset_token postgres=arwdDxtm/postgres,worker=arwd/postgres
+T runtime.platform_bootstrap_command postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.platform_elevation postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.product_embedding api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.reminder_sent api=ar/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.schema_migration postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T runtime.security_audit_event api=a/postgres,postgres=arwdDxtm/postgres,worker=ar/postgres
+T runtime.session postgres=arwdDxtm/postgres,worker=arwd/postgres
+T umi.access_grant postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.ai_usage postgres=arwdDxtm/postgres,readonly=r/postgres,worker=ar/postgres
+T umi.audit_log postgres=arwdDxtm/postgres,worker=ar/postgres
+T umi.audit_retention_policy postgres=arwdDxtm/postgres,worker=arwd/postgres
+T umi.channel_type api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.effective_entitlement api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.entitlement_override api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.feature api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.invoice api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.permission api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.plan api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.plan_feature api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.prospect postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.prospect_event postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.role api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.role_permission api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.role_template api=r/postgres,postgres=arwdDxtm/postgres,worker=r/postgres
+T umi.role_template_revision api=r/postgres,postgres=arwdDxtm/postgres,worker=r/postgres
+T umi.role_template_revision_permission api=r/postgres,postgres=arwdDxtm/postgres,worker=r/postgres
+T umi.subscription api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.subscription_item api=r/postgres,postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres
+T umi.user postgres=arwdDxtm/postgres,worker=arwd/postgres
+T umi.user_role postgres=arwdDxtm/postgres,readonly=r/postgres,worker=arwd/postgres

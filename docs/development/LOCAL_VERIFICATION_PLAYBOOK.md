@@ -9,21 +9,50 @@ Read this before sweeping, before trusting a number, and before concluding that 
 
 ## 1. The local stack
 
-| Piece                                   | Where                                                  | Start it with                                                |
-| --------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------ |
-| Dashboard (Vite)                        | http://127.0.0.1:4000                                  | `pnpm --filter @umi/dashboard dev`                           |
-| API                                     | http://127.0.0.1:4001                                  | `cd apps/umi-api && pnpm dev` (that is `nest start --watch`) |
-| Postgres                                | 127.0.0.1:4003, DB `umi_transition_rehearsal_20260901` | `docker compose -f deploy/local/compose.yml up -d`           |
-| Redis                                   | 127.0.0.1:4004                                         | same compose file                                            |
-| Native POS (the real client)            | an X window titled `UmiPOS`                            | `bash tools/ux-sweep/pos-native-launch.sh`                   |
-| CDP browser for the dashboard harnesses | http://127.0.0.1:9222                                  | `./scripts/ux-browser.sh`                                    |
+| Piece                                   | Where                                                 | Start it with                                                |
+| --------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------ |
+| Dashboard (Vite)                        | http://127.0.0.1:4000                                 | `pnpm --filter @umi/dashboard dev`                           |
+| API                                     | http://127.0.0.1:4001                                 | `cd apps/umi-api && pnpm dev` (that is `nest start --watch`) |
+| Postgres                                | 127.0.0.1:4003, the database `DATABASE_URL_APP` names | `docker compose -f deploy/local/compose.yml up -d`           |
+| Redis                                   | 127.0.0.1:4004                                        | same compose file                                            |
+| Native POS (the real client)            | an X window titled `UmiPOS`                           | `bash tools/ux-sweep/pos-native-launch.sh`                   |
+| CDP browser for the dashboard harnesses | http://127.0.0.1:9222                                 | `./scripts/ux-browser.sh`                                    |
+| Mail sink (Mailpit)                     | http://127.0.0.1:8025                                 | `docker compose -f deploy/local/compose.yml up -d mailpit`   |
 
 **Credentials for the rehearsal data.** Every seeded `@kalalacafe.mx` user shares one password
 locally: `Umi2026!` (a shared-hash condition the security gate flags as a real defect — read
 it as a local fixture, not as an example). Merchant **Kalala Café**
 `1860305f-e864-d745-29e6-fb0830926cc6`; locations **Chapultepec**
 `7cb0a615-45e2-7e8e-b756-f95b295ec356` and **Congreso**; the seeded POS operator PIN is `1234`.
-Postgres as superuser: `docker exec umi-buildv3-local-postgres-1 psql -U postgres -d <db>`.
+Postgres as superuser: the container that publishes 4003 — `docker ps | awk '/:4003->/'` names
+it, today `umi-bv3-pg` — then `docker exec <container> psql -U postgres -d <db>`. The database
+names rot: two `db:reset` runs ago the field read `umi_transition_rehearsal_20260901`, and that
+database no longer exists. Read the name from `apps/umi-api/.env`, not from this table.
+
+**The mail sink holds every message the API sends.** The password-reset link and the MFA code
+arrive at http://127.0.0.1:8025, not in a real inbox. `apps/umi-api/.env` points `SMTP_HOST` at
+the sink on port 1025. Without that config the API drops the message and logs
+`email_adapter_missing_config`.
+
+**The local café the POS flows need.** `pnpm ux:pos:native` drives seven flows with real clicks.
+Six facts must hold in the local database. Without them a flow stops for a reason that is not the
+product.
+
+- **A second person holds `cash.reconcile`.** The variance approval joins the acting session with
+  `acting.user_id <> s.user_id`, so one operator alone can never close a short drawer. The local
+  café holds a `Gerente` with PIN `9999` and a "Gerente" merchant role that copies the Cajero
+  permissions (145 of them, `cash.reconcile` included).
+- **A published floor plan with tables.** An empty room proves nothing. The tables flows report
+  "no tables" without a plan.
+- **The register matches the enrolled device.** The register list applies
+  `assignment_policy = 'operator_selects' OR assigned_device_id = <this device>`. A register that
+  still names an old device keeps "Abrir turno de caja" disabled.
+- **One customer exists.** The "open a customer profile" flow needs a row to open.
+- **A checkout policy row exists for the location.** The manual terminal and the split come from
+  `merchant.pos_checkout_policy`, not from a provider. With no row, the till offers cash only.
+  Set `manual_terminal_enabled` and `mixed_tender_enabled` for the tender flows.
+- **The window is an X11 window.** The launcher sets `GDK_BACKEND=x11`. On Wayland the app maps no
+  X window, and `xdotool` then finds nothing to click.
 
 **The platform administrator.** One account holds the platform role, and that role is the
 only way to see every café and switch between them. `pnpm db:reset` grants it to
@@ -62,21 +91,70 @@ this check. GNOME Keyring is the supported provider; install and unlock it as
 
 ## 2. The commands that prove things
 
-| Question                                                          | Command                    |
-| ----------------------------------------------------------------- | -------------------------- |
-| Every control, its size, its accessible name, per dashboard route | `pnpm ux:inventory`        |
-| Accessibility: zero serious or critical violations                | `pnpm ux:a11y`             |
-| Tap and millisecond budgets for the dashboard flows               | `pnpm ux:flows`            |
-| Real operator workflows on the **native** POS, with real clicks   | `pnpm ux:pos:native`       |
-| Visual regression, pinned viewports                               | `pnpm ux:visual`           |
-| Every applicable POS surface, its state and first paint per route | `pnpm ux:verify`           |
-| Can a role reach a surface it should not?                         | `pnpm check:role-surfaces` |
-| Lint, formatting, migrations, contract checksum, use cases        | `pnpm check:pr`            |
+| Question                                                          | Command                     |
+| ----------------------------------------------------------------- | --------------------------- |
+| Every control, its size, its accessible name, per dashboard route | `pnpm ux:inventory`         |
+| Accessibility: zero serious or critical violations                | `pnpm ux:a11y`              |
+| Tap and millisecond budgets for the dashboard flows               | `pnpm ux:flows`             |
+| Real operator workflows on the **native** POS, with real clicks   | `pnpm ux:pos:native`        |
+| Every control and its size, on the **iMin device** over ADB       | `pnpm ux:pos:device`        |
+| Every safe control pressed, on the **iMin device**                | `pnpm ux:pos:device:clicks` |
+| The forgotten-password journey, in a real browser                 | `pnpm ux:forgot-password`   |
+| Visual regression, pinned viewports                               | `pnpm ux:visual`            |
+| Every applicable POS surface, its state and first paint per route | `pnpm ux:verify`            |
+| Can a role reach a surface it should not?                         | `pnpm check:role-surfaces`  |
+| Lint, formatting, migrations, contract checksum, use cases        | `pnpm check:pr`             |
 
 `pnpm ux:verify` and `pnpm ux:a11y` need the CDP browser; start it with
 `./scripts/ux-browser.sh` and stop it with `./scripts/ux-browser.sh --stop`. **Do not leave it
 running.** It costs ~700 MB RSS, and this box (7.7 GB, and it swaps) feels it — measured
 available memory went 1.7 GB → 2.2 GB and swap in use 6.2 GB → 4.7 GB when it was stopped.
+
+**A palette is a mode, and an unmeasured mode is an unverified one.** Until 2026-10-10 the
+accessibility gate only ever ran in English on the default light palette, because that is the
+mode the shared browser happened to be in. Auditing the same 24 routes across the themes found
+**7 serious contrast violations on `midnight` and 22 on `dark`** — navy ink and the muted greys
+were chosen against white and never re-read against black. Both are fixed; four modes measure
+0 serious now. Run the gate per mode:
+
+```sh
+node tools/ux-sweep/accessibility-gate.mjs --locale es --theme dark
+node tools/ux-sweep/accessibility-gate.mjs --locale en --theme midnight
+```
+
+### The role-surface gate needs its own database, and one command builds it
+
+`pnpm check:role-surfaces` signs in as the four roles that
+`config/umipos-surface-permissions.json` names — cashier, manager, admin and owner at Kalala Café —
+and asserts the **measured** status of 22 surfaces: 23 rows that must be refused, 65 that must be
+allowed. It refuses to pass a row it could not test, so a database that cannot sign a role in
+produces 45 mismatches that are all fixture and none product. The local stack's own database
+cannot run it at all: it holds ONCA and the platform administrator, not this café.
+
+Four facts, each of which cost a session:
+
+- **The rehearsal copy is missing three rows, and each one fakes a verdict.**
+  `umi_rehearsal_20261006` has the four accounts but not the manager login the contract names, no
+  membership of this café for the owner, and **no `pos` entitlement for Kalala Café at all**.
+  UmiPOS is sold, not bundled into a public plan (`002_onca_onboarding.sql` writes the override
+  for ONCA and says so), so every `@RequireProduct('pos')` route answers 403 `product_not_active`
+  for **every** role: a `refused` verdict passes there for the wrong reason, and an `allowed`
+  verdict can never pass. The gate cannot tell an entitlement refusal from a permission refusal —
+  only the fixture can.
+- **Build the copy, then point the API at it.** `pnpm check:role-surfaces:fixture` copies the
+  rehearsal data into `umi_role_surfaces_gate` and applies
+  `scripts/umipos-role-surface-fixture.sql` (the entitlement, the manager login, the owner
+  membership). Add `--yes` to copy the source again and `--serve` to start the API over the copy
+  and print the one command that runs the gate. It refuses to touch a database whose name does not
+  start with `umi_role_surfaces`.
+- **BOTH connection strings must name the copy.** `DATABASE_URL_APP` alone is not enough: the
+  login reads its row through `DATABASE_URL_WORKER`, and with only the first one overridden the
+  API answers 401 `Credenciales incorrectas` for the three café accounts while the owner — the one
+  account that exists in _both_ databases — signs in. Three failures and one success look exactly
+  like a drifted fixture, and the cause is the environment. `--serve` sets both.
+- **The measured result, 2026-10-10:** 4/4 sign-ins, 88 assertions, 0 failed. That closes the gap
+  the 2026-10-09 bug hunt left open in §135, where the contract's verdicts were checked by
+  deriving them from `umi.role_permission` rather than by asking the running API.
 
 ### The dashboard is verified in a real browser, with real clicks
 
@@ -158,6 +236,49 @@ node tools/ux-sweep/kitchen-command-probe.mjs --base http://127.0.0.1:4013 --tic
 - The one refusal it expects is `recall` without `kitchen.recall`
   (`KITCHEN_PERMISSION_REQUIRED`, naming the permission). Everything else must be a 2xx, or the
   tool exits non-zero and says the path is not the one it promises.
+
+### The forgotten-password journey needs a second API
+
+`tools/ux-sweep/dashboard-forgot-password.mjs` walks what a locked-out person walks: the sign-in
+screen, the request view, the message, the link in it, and the new-password form — with real
+clicks in the real browser. Two facts about the local stack shape how it runs.
+
+**The account must have a LOCAL credential.** The endpoint answers `201` and sends nothing for an
+address it does not know; that is deliberate, so it cannot be used to enumerate accounts. Of the
+seeded users only the platform admin (`hola@umiconsulting.co`) can sign in — every `@onca.mx`
+account is `invited` with no hash. A walk therefore borrows the admin's credential under its own
+address, and deletes it afterwards (the delete cascades to its reset tokens):
+
+```sql
+insert into umi."user" (email, full_name, password_hash, password_salt, password_algorithm, status)
+select 'prueba-reset@umiconsulting.co', 'Prueba Reset',
+       password_hash, password_salt, password_algorithm, 'active'
+  from umi."user" where email = 'hola@umiconsulting.co';
+```
+
+**The message has to be readable, and the live API sends real mail.** `apps/umi-api/.env` names the
+real relay, so the tool must not be pointed at the running API to read the link. Bring up a second
+instance on another port with the Mailpit sink as its SMTP host — the two share the database, so a
+token minted by one is consumed by the other, and the dashboard keeps talking to the API it already
+proxies to:
+
+```sh
+cd apps/umi-api && setsid env PORT=4021 SMTP_HOST=127.0.0.1 SMTP_PORT=1025 \
+  SMTP_USER=mailpit SMTP_PASSWORD=mailpit node dist/main.js > /tmp/umi-api-4021.log 2>&1 &
+
+pnpm ux:forgot-password -- --email prueba-reset@umiconsulting.co \
+  --password 'ClaveNueva2026!' --mint-api http://127.0.0.1:4021
+```
+
+The address typed into the visible form is a different thing from the account under test, and the
+tool keeps them apart on purpose: the form is driven with `nadie@ejemplo.invalid`, so the request
+view is exercised without posting mail to a stranger.
+
+Real delivery is a separate leg, and it is measured in the log rather than in the inbox: an
+instance started **without** SMTP overrides uses the real relay, and a send that fails leaves
+`reset_email_send_failed` (plus, in development, `reset_link_dev`) in its output. A run on
+2026-10-11 walked 11 of 11 steps, and the reset invalidated the previous password (`401` on the old
+one, `201` on the new one).
 
 ### Reading a console route the way a screen reads it
 
@@ -304,6 +425,60 @@ Three details make this work:
   top client-side-decoration shadow, so measure the feature in the image and click that same
   number. Clicking blind is how a sweep produces findings about the wrong screen.
 
+**The driver's own screenshots were black rectangles until 2026-10-10, and every report that
+quoted one quoted nothing.** `pos-native-driver.mjs` wrote them with `ffmpeg -f x11grab` at the
+window's coordinates — a _root window_ grab, and on this compositing session Hyprland does not
+draw XWayland clients into the X root window. Every frame came out 9 KB of black while the run
+printed `shot <path>`, which is the worst shape a piece of evidence can take. It now captures
+with `magick import -window <id>` — the window's OWN pixels, read from the X server — and warns on
+the console when a frame is too flat to be a screen. Verify a screenshot by looking at it: if it is
+black, the run is wrong, not the till.
+
+**A harness window lives on a workspace nobody is looking at, and the screen never moves.** House
+rule, asked for by the owner on 2026-10-10 while a game was running. Three consequences, all
+measured:
+
+- **Place it before it maps.** A window mapped while somebody is using the machine lands on _their_
+  workspace and takes focus. `pos-native-launch.sh` installs a Hyprland rule first
+  (`hl.window_rule({match={class='[Cc]o[.]umiconsulting[.]umi_pos$'}, workspace=N,
+no_initial_focus=true})`) and then moves it by pid as a second guarantee;
+  `scripts/ux-browser.sh` moves its Chromium by pid with
+  `tools/ux-sweep/window-empty-workspace.sh`. Both pick the first workspace with no windows on it.
+- **Do not follow the window.** Hyprland's `movetoworkspace` follows what it moves; the first
+  version of the browser fix left the operator staring at the harness workspace instead of their
+  game. The move is silent (`follow = false`), which is the whole point of a background run.
+- **A click at a window nobody is showing is LOSSY, and the flows inherit it.** Measured on
+  2026-10-11: four presses aimed at the till's PIN keypad moved its counter by two, while the
+  semantics tree answered normally and the app's isolate was healthy (the VM service replied in
+  9 ms). The same sequence moves every digit when the workspace is showing. So a desktop flow that
+  fails on "the click did not land" while the owner is using the machine has not measured the
+  product — `pos-native-driver.mjs` now appends the workspace pair to that verdict, and the device
+  pass (`pnpm ux:pos:device:clicks`) is the check that does not depend on who is looking at what.
+- **Capture the window, never the screen.** This is why `grim` was wrong here: it reads the
+  composited output, which is whatever workspace is _visible_. `magick import -window <id>` works
+  for a window nobody is displaying. Verified with the till on workspace 5: the semantics tree
+  read, the capture came out 1896x1016 of the real PIN screen, and the operator's workspace never
+  changed.
+
+**`no_focus` also means the harness cannot TYPE into the window.** Clicks are pointer events at
+screen coordinates and they land on their target whether or not it is focused; keys do not.
+`xdotool type` sends to the X input focus, and with the launcher's rule that is _somebody else's_
+window — measured on 2026-10-10, when an enrollment code meant for the till went nowhere in the
+till. `xdotool type --window <id>` is not the answer either: it delivers synthetic events, and
+Flutter ignores them. A typed step (the device enrollment's eight-character code) needs the window
+focused at the compositor level, which moves the operator's screen for the duration:
+
+```sh
+hyprctl eval 'if umi_pos_workspace_rule then umi_pos_workspace_rule:set_enabled(false) end'
+hyprctl eval 'for _, w in ipairs(hl.get_windows()) do
+  if (w.class or ""):lower():find("umi_pos") then hl.dispatch(hl.dsp.focus({window=w})) end end'
+xdotool type --delay 60 'CODE1234'
+hyprctl dispatch "hl.dsp.focus({workspace=\"$OPERATOR_WORKSPACE\"})"   # put it back
+```
+
+Do it in one go and restore the workspace immediately. A till that will not take its code by typing
+may simply not have focus, not a broken keypad.
+
 **A screen with a live clock breaks the driver's change detection.** `pos-native-driver.mjs`
 decides whether a click landed by comparing the tree before and after: nothing changed means the
 press was swallowed and is retried; something changed means the press worked and is never
@@ -332,6 +507,75 @@ Two more things a 45-step hand sweep learned the hard way:
 When reviewing many frames, keep the vision cost down: `ffmpeg -vf scale=900:-1` for a whole
 window, and `crop` to zoom the one region in question. `convert` and `import` are not
 installed on this workstation; `ffmpeg` is the image tool.
+
+### The iMin till, over ADB
+
+The counter till that ships is an iMin D3-504 on Android 11, and it is reachable from this
+workstation — `adb connect 192.168.1.10:5555`. The screens the café touches are those, so the
+device is a first-class verification target, not a port of the desktop walk. Two instruments
+drive it: `pos-device-inventory.mjs` (every pressable control, its size and its accessible name,
+per surface) and `pos-device-click-pass.mjs` (presses every safe control and reports which press
+moved nothing). Both read the labels through `uiautomator dump` and tap with `input tap`.
+
+```sh
+adb connect 192.168.1.10:5555
+adb -s 192.168.1.10:5555 reverse tcp:4013 tcp:4013      # the demo API the Estación build calls
+node tools/ux-sweep/pos-device-inventory.mjs --serial 192.168.1.10:5555 --pin 1111 \
+  --out /tmp/ux/imin/inventory.json --md /tmp/ux/imin/inventory.md --shots /tmp/ux/imin/shots
+```
+
+**Flutter publishes its accessibility tree only while the platform asks for it, and this device
+stops asking.** A `uiautomator dump` then returns a valid root with no labelled children while
+the screen renders correctly, and a pass that trusts it mislabels its own results — the first
+click pass reported five presses as `gone` about controls that were on the screen. One call
+proves the cause:
+
+```sh
+adb -s 192.168.1.10:5555 forward tcp:43919 tcp:43919   # the VM URI and its token are in logcat
+curl -s "http://127.0.0.1:43919/<token>=/ext.flutter.debugDumpSemanticsTreeInTraversalOrder?isolateId=<id>"
+# Semantics not generated … the framework only generates semantics when asked to do so by the platform
+```
+
+The APK is AOT, so `evaluate` cannot switch the tree on (`Debugger is disabled in AOT mode`).
+**Restart the app and the tree comes back on the first read** — `am force-stop` then `monkey -p
+<pkg> -c android.intent.category.LAUNCHER 1`. A pass that walks for more than a few minutes should
+re-check that the tree is populated and restart the app when it is not, rather than reporting its
+own blindness as a product defect.
+
+Four more facts about this device, all measured:
+
+- **A label can carry a live clock.** A table's accessible name is
+  `Mesa 1, 2 lugares, Ocupada, 2 personas, Tiempo 29:42 h`, so a label recorded before a press and
+  looked up after it does not match. Mask the timer, or match by position.
+- **`selected="true"` is published.** A tab that is already active cannot change the screen; read
+  its own state instead of calling the press dead.
+- **The soft keyboard is a separate actor.** The tendered-amount field is a real
+  `android.widget.EditText`, so tapping it raises Gboard over the lower half of the till.
+  `dumpsys input_method | grep mInputShown` says whether it is up, and one `input keyevent 4`
+  puts it away before the next tap.
+- **The window is 1014 px tall, not 1080 — and its density is 1.375.** The navigation bar takes 66
+  device pixels, and 220 dpi makes the app's LOGICAL canvas **1396 x 737**. That is the number a
+  widget test has to model: rendering at 1920x1014 _logical_ is half again as tall as the till and
+  will report a screen as fitting while the device clips it. That mistake cost this session a
+  vacuous test on the sign-in screen at `Muy grande` — the test passed against the broken layout
+  until `devicePixelRatio = 1.375` went in, and then it failed exactly as the device did.
+- **The pointer floor has two numbers.** The plan's §5.2 says 44, the rubric says 48, and the
+  product's own token is `UmiTouchTarget.minimum = 48.0`. Measure both where it matters:
+  `node tools/ux-sweep/pos-device-inventory.mjs --control-min 48`. On the iMin both pass today
+  (0 controls under 48 px on all seven surfaces).
+- **The largest text size is its own layout case.** `Muy grande` is a text scale of 2
+  (`PosTextSize.extraLarge` clamps to `minScaleFactor: 2`), and Android's scaler is non-linear, so
+  the effective factor at 16 px is smaller than 2 — model it with the linear value the app computes
+  rather than the platform's. `apps/umi-pos/test/device_pairing_test.dart` pins the entry screens
+  at 100 %, 150 % and 200 %: the action must be inside the window AND tappable where it stands.
+- **A press can move the ground the next press stands on.** Tapping an area tab on the room, or a
+  filter on the sales list, takes those controls off the screen, and a pass that enumerated them
+  first then reports them as `gone`. That is the pass losing its aim, not the till breaking: the
+  room switch is the product working. Read `gone` as "re-enumerate", never as a defect.
+
+`uiautomator` coordinates are device pixels and need no window offset, which is the one thing that
+is simpler here than on the X11 desktop. Type with `input text` only into a focused `EditText`;
+the Flutter keypads on screen are tapped like any other control.
 
 ## 4. Traps that have already cost somebody an hour
 
@@ -805,6 +1049,27 @@ update umi.user u set email = 'gerente@example.mx'
 
 `tools/ux-sweep/pos-operator-probe.mjs create --name <n> --role Manager --pin 1234` drives the
 Dashboard half of this, including the PIN.
+
+**The click pass needs the viewport pinned, or it reports 115 broken controls and clicks
+nothing.** `click-audit.mjs` in its `UX_CLICK_CONFIRM=disposable` mode clicks the safe control
+on each route. Without `--viewport` the browser keeps its own window size, and the sidebar's nav
+items then resolve, call themselves visible and stable, and sit **outside the viewport Playwright
+may click in** — so every sidebar click times out with `element is outside of the viewport`,
+which reads like a screen full of dead controls. The report is worse than the read: nothing at
+all is written, and the API log holds one request for the whole run. `1280x720` is now the
+default, because that is the reference viewport the other sweeps pin. Read the run's own
+evidence before believing a clean report: **`grep -c '"method":"POST"' ` on the API log is the
+proof that a "write pass" wrote something.**
+
+**One session's budget is 240 requests a minute, and every sweep spends from the same purse.**
+`operational.interceptor.ts` prices a principal at `LIMITS.user = 240/min`, and each Dashboard
+route load costs ~40 of them. A 24-route read sweep is ~1,000 requests, so a second sweep started
+inside the same minute is answered 429 — and a 429 renders the same **"could not be loaded"** text
+as an outage, which is how a rate limit gets written down as a product failure. `click-audit.mjs`
+and `visual-regression.spec.mjs` now pace themselves at three quarters of the budget and say so
+in their output; the visual suite also reloads once when a 429 lands anyway, which is why a full
+visual run takes about six minutes. Spacing (`--delay 2500`) is not enough on its own: it spaces
+routes without bounding the minute.
 
 ## 5. How to treat a number
 

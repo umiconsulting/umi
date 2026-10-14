@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
@@ -114,13 +114,15 @@ final class CashDrawerAccount {
 /// way a receipt ends in its total.
 Widget cashFiguresAndTotal({required Widget figures, required Widget total}) =>
     LayoutBuilder(
-      builder: (context, constraints) => constraints.maxWidth >= 600
+      builder: (context, constraints) =>
+          constraints.maxWidth / MediaQuery.textScalerOf(context).scale(1) >=
+              600
           ? Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(child: figures),
+                Expanded(flex: 6, child: figures),
                 const SizedBox(width: UmiSpacing.lg),
-                total,
+                Flexible(flex: 5, child: total),
               ],
             )
           : Column(
@@ -161,7 +163,7 @@ final class CashEquation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final currency = expectedCash?['currency'] as String? ?? account.currency;
 
     final terms = <({String label, int amount, bool subtract})>[
@@ -204,18 +206,20 @@ final class CashEquation extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.lock_outline,
+            PosIcon(
+              PosGlyphs.lockOutline,
               size: 18,
               color: theme.colorScheme.outline,
             ),
             const SizedBox(width: UmiSpacing.sm),
-            Text(
-              '$currency ••••••',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.outline,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            Flexible(
+              child: Text(
+                '$currency ••••••',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.outline,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
           ],
@@ -238,7 +242,7 @@ final class CashEquation extends StatelessWidget {
       ),
     );
 
-    return Card(
+    return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: Column(
@@ -387,7 +391,7 @@ final class _Term extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final labelStyle = theme.textTheme.labelSmall?.copyWith(
       color: theme.colorScheme.outline,
       letterSpacing: 0.7,
@@ -450,7 +454,7 @@ final class CashPolicyTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final currency = policy['currency'] as String? ?? 'MXN';
 
     int minor(String key) =>
@@ -534,7 +538,7 @@ final class CashPolicyTable extends StatelessWidget {
         children: [
           for (final (index, row) in rows.indexed) ...[
             if (index > 0)
-              Divider(height: 1, color: theme.colorScheme.outlineVariant),
+              PosDivider(height: 1, color: theme.colorScheme.outlineVariant),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: UmiSpacing.sm),
               child: Row(
@@ -548,12 +552,14 @@ final class CashPolicyTable extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: UmiSpacing.md),
-                  Text(
-                    row.value,
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                  Flexible(
+                    child: Text(
+                      row.value,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
                 ],

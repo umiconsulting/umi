@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
@@ -9,6 +10,9 @@ import 'package:umi_pos/core/localization/app_localizations_en.dart';
 import 'package:umi_pos/core/localization/app_localizations_es.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
+import 'package:umi_pos/core/theme/display_preferences.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
+import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/kitchen/kitchen_board_controller.dart';
@@ -64,17 +68,21 @@ KitchenOrderProjection order({
   int firedThroughCourse = 1,
   String reference = 'A-101',
   List<Map<String, Object?>>? items,
+  String station = '00000000-0000-4000-8000-0000000000e1',
+  String? stationName,
+  String businessDate = '2026-09-16',
 }) => KitchenOrderProjection.fromJson({
   'id': orderId,
   'sourceOrderId': '00000000-0000-4000-8000-0000000000d1',
   'publicReference': reference,
   'merchantId': merchantId,
   'locationId': locationId,
-  'stationId': '00000000-0000-4000-8000-0000000000e1',
+  'stationId': station,
+  'stationName': ?stationName,
   'source': 'pos',
   'status': status,
   'priority': 'normal',
-  'businessDate': '2026-09-16',
+  'businessDate': businessDate,
   'queuedAt': '2026-09-16T17:58:00.000Z',
   'preparationStartedAt': null,
   'updatedAt': serverClock,
@@ -83,13 +91,26 @@ KitchenOrderProjection order({
   'firedThroughCourse': firedThroughCourse,
   'items':
       items ??
-      [itemJson(itemLatte, 'Latte'), itemJson(itemToast, 'Toast', quantity: 2)],
+      [
+        itemJson(
+          itemLatte,
+          'Latte',
+          status: status == 'ready' ? 'ready' : 'queued',
+        ),
+        itemJson(
+          itemToast,
+          'Toast',
+          quantity: 2,
+          status: status == 'ready' ? 'ready' : 'queued',
+        ),
+      ],
 });
 
 final class FakeBoardRepository implements KitchenBoardRepository {
   List<KitchenOrderProjection> orders = const [];
   int reads = 0;
   Object? failure;
+  Future<List<KitchenOrderProjection>> Function()? onSnapshot;
 
   /// Today's counts, as the all-day route answers them.
   List<KitchenAllDayItem> allDayItems = const [];
@@ -100,14 +121,30 @@ final class FakeBoardRepository implements KitchenBoardRepository {
   /// working without it.
   Object? allDayFailure;
 
+  /// LAS ESTACIONES DE LA COCINA. Empty by default, which is the till whose list read has
+  /// not answered: the tabs then fall back to the stations the tickets mention.
+  List<KitchenStation> kitchenStations = const [];
+  Object? stationsFailure;
+
+  @override
+  Future<List<KitchenStation>> stations(
+    String merchantId,
+    PosKitchenOrderQuery query,
+  ) async {
+    if (stationsFailure != null) throw stationsFailure!;
+    return kitchenStations;
+  }
+
   /// What the next watch calls answer, in order. A watch with nothing queued HOLDS,
   /// exactly like the server's held request, so the loop parks instead of spinning.
   final List<bool> watchAnswers = [];
   int watchReads = 0;
+  Future<bool> Function()? onWatch;
 
   @override
   Future<bool> watch(String merchantId, PosKitchenOrderQuery query) async {
     watchReads += 1;
+    if (onWatch != null) return onWatch!();
     if (watchAnswers.isNotEmpty) return watchAnswers.removeAt(0);
     await Completer<void>().future;
     return false;
@@ -119,6 +156,7 @@ final class FakeBoardRepository implements KitchenBoardRepository {
     PosKitchenOrderQuery query,
   ) async {
     reads += 1;
+    if (onSnapshot != null) return onSnapshot!();
     final failure = this.failure;
     if (failure != null) throw failure;
     return orders;
@@ -250,6 +288,48 @@ loadedBoard({List<KitchenOrderProjection>? orders}) async {
 }
 
 void main() {
+  testWidgets(
+    'a queued ticket crosses its station threshold without a refresh',
+    (tester) async {
+      var now = DateTime.parse('2026-09-16T18:02:59Z');
+      final ticket = KitchenOrderProjection.fromJson({
+        ...order().toJson(),
+        'overdueSeconds': 300,
+      });
+      final harness = await pumpBoard(
+        tester,
+        orders: [ticket],
+        clock: () => now,
+        locale: const Locale('es'),
+      );
+      expect(find.text('Tiempo vencido'), findsNothing);
+      now = now.add(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Tiempo vencido'), findsOneWidget);
+      final red = PosTheme.of(
+        tester.element(find.text('Tiempo vencido')),
+      ).colorScheme.error;
+      expect(
+        find.byWidgetPredicate((w) => w is Container && w.color == red),
+        findsWidgets,
+      );
+      await harness.dispose(tester);
+    },
+  );
+  setUpAll(() async {
+    final body = FontLoader('IBM Plex Sans');
+    for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+      body.addFont(rootBundle.load('assets/fonts/IBMPlexSans-$weight.ttf'));
+    }
+    await body.load();
+    final heading = FontLoader('Bricolage Grotesque');
+    for (final weight in ['SemiBold', 'Bold']) {
+      heading.addFont(
+        rootBundle.load('assets/fonts/BricolageGrotesque12pt-$weight.ttf'),
+      );
+    }
+    await heading.load();
+  });
   group('the board works the tickets', () {
     test(
       'a per-item bump names that line, and every attempt gets a fresh key',
@@ -289,7 +369,7 @@ void main() {
 
         await harness.board.startPreparation(ticket);
         expect(harness.kitchen.sent.single.commandType, 'start_preparation');
-        expect(harness.kitchen.sent.single.itemIds, isEmpty);
+        expect(harness.kitchen.sent.single.itemIds, [itemLatte, itemToast]);
 
         await harness.board.complete(ticket);
         expect(harness.kitchen.sent.last.commandType, 'complete');
@@ -574,6 +654,45 @@ void main() {
       expect(harness.board.state.errorCode, 'TRANSPORT_FAILURE');
     });
 
+    test(
+      'command failure and dismissal preserve station and daily metadata',
+      () async {
+        final harness = await loadedBoard();
+        harness.room.allDayItems = const [
+          KitchenAllDayItem(
+            productName: 'Latte',
+            variantName: null,
+            ordered: 7,
+            outstanding: 2,
+          ),
+        ];
+        await harness.board.load(merchantId, query);
+        final counts = harness.board.state.allDay;
+        final stations = harness.board.state.stations;
+        harness.kitchen.gate = Completer<void>();
+        harness.kitchen.failure = const AppException(
+          category: AppErrorCategory.transport,
+          code: 'NETWORK_UNAVAILABLE',
+          recoverable: true,
+        );
+        final pending = harness.board.markItemReady(
+          harness.board.state.orders.single,
+          itemLatte,
+        );
+        expect(harness.board.state.allDay, same(counts));
+        expect(harness.board.state.businessDate, '2026-09-16');
+        harness.kitchen.gate!.complete();
+        expect(await pending, isFalse);
+        expect(harness.board.state.allDay, same(counts));
+        expect(harness.board.state.stations, same(stations));
+        harness.board.dismissError();
+        expect(harness.board.state.errorCode, isNull);
+        expect(harness.board.state.allDay, same(counts));
+        expect(harness.board.state.businessDate, '2026-09-16');
+        harness.board.dispose();
+      },
+    );
+
     test('the all-day count reaches the line it counts', () async {
       final harness = await loadedBoard();
       harness.room.allDayItems = const [
@@ -690,6 +809,92 @@ void main() {
       expect(harness.room.watchReads, greaterThanOrEqualTo(1));
       expect(harness.room.reads, readsBefore + 1);
     });
+
+    test('a closed board cannot report a late poll failure', () async {
+      final harness = await loadedBoard();
+      addTearDown(harness.board.dispose);
+      addTearDown(harness.connectivity.dispose);
+      harness.connectivity.apiReachable(authorityValid: true);
+      final pending = Completer<List<KitchenOrderProjection>>();
+      harness.room.onSnapshot = () => pending.future;
+      final loading = harness.board.load(merchantId, query);
+      harness.board.stopWatching();
+      pending.completeError(
+        const AppException(
+          category: AppErrorCategory.timeout,
+          code: 'REQUEST_TIMEOUT',
+          recoverable: true,
+        ),
+      );
+      await loading;
+      expect(harness.connectivity.state, PosConnectivity.online);
+      expect(harness.board.state.orders, hasLength(1));
+      expect(harness.board.state.errorCode, isNull);
+    });
+
+    test('a stopped watch cannot report a late connection failure', () async {
+      final harness = await loadedBoard();
+      addTearDown(harness.board.dispose);
+      addTearDown(harness.connectivity.dispose);
+      harness.connectivity.apiReachable(authorityValid: true);
+      final pending = Completer<bool>();
+      harness.room.onWatch = () => pending.future;
+      final watching = harness.board.startWatching();
+      harness.board.stopWatching();
+      pending.completeError(
+        const AppException(
+          category: AppErrorCategory.timeout,
+          code: 'REQUEST_TIMEOUT',
+          recoverable: true,
+        ),
+      );
+      await watching;
+      expect(harness.connectivity.state, PosConnectivity.online);
+      expect(harness.room.watchReads, 1);
+    });
+
+    test('a stopped watch cannot report a late connection success', () async {
+      final harness = await loadedBoard();
+      addTearDown(harness.board.dispose);
+      addTearDown(harness.connectivity.dispose);
+      final pending = Completer<bool>();
+      harness.room.onWatch = () => pending.future;
+      final watching = harness.board.startWatching();
+      harness.board.stopWatching();
+      harness.connectivity.networkDown();
+      pending.complete(false);
+      await watching;
+      expect(harness.connectivity.state, PosConnectivity.offline);
+      expect(harness.room.watchReads, 1);
+    });
+
+    test(
+      'a restarted watch ignores the old request and keeps one loop',
+      () async {
+        final harness = await loadedBoard();
+        addTearDown(harness.board.dispose);
+        addTearDown(harness.connectivity.dispose);
+        final pending = <Completer<bool>>[];
+        harness.room.onWatch = () {
+          final request = Completer<bool>();
+          pending.add(request);
+          return request.future;
+        };
+        final before = harness.room.reads;
+        final oldWatch = harness.board.startWatching();
+        harness.board.stopWatching();
+        final newWatch = harness.board.startWatching();
+        pending[0].complete(true);
+        await pumpEventQueue();
+        expect(harness.room.reads, before);
+        expect(harness.room.watchReads, 2);
+        harness.board.stopWatching();
+        for (final request in pending.where((r) => !r.isCompleted)) {
+          request.complete(false);
+        }
+        await Future.wait([oldWatch, newWatch]);
+      },
+    );
   });
 
   group('the poll and the bump do not fight', () {
@@ -735,6 +940,195 @@ void main() {
   });
 
   group('the surface', () {
+    testWidgets(
+      'day filter separates older commands and keeps them reachable',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          locale: const Locale('es'),
+          orders: [
+            order(
+              reference: 'Cuenta 004 · Mesa 2',
+              items: [itemJson(itemLatte, 'Café de hoy')],
+            ),
+            order(
+              reference: 'Cuenta 004 · Mesa 1',
+              businessDate: '2026-09-15',
+              items: [itemJson(itemToast, 'Pizza anterior')],
+            ),
+          ],
+        );
+        expect(find.text('Café de hoy'), findsOneWidget);
+        expect(find.text('Cuenta 004 · Mesa 2'), findsOneWidget);
+        expect(find.text('Pizza anterior'), findsNothing);
+        expect(find.text('Anteriores (1)'), findsOneWidget);
+        await tester.tap(find.text('Anteriores (1)'));
+        await tester.pump();
+        expect(find.text('Pizza anterior'), findsOneWidget);
+        expect(find.text('Cuenta 004 · Mesa 1 · 2026-09-15'), findsOneWidget);
+        expect(find.text('Café de hoy'), findsNothing);
+        await tester.tap(find.text('Todos (2)'));
+        await tester.pump();
+        expect(find.text('Pizza anterior'), findsOneWidget);
+        expect(find.text('Café de hoy'), findsOneWidget);
+        expect(find.text('Cuenta 004 · Mesa 2'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await harness.dispose(tester);
+      },
+    );
+    testWidgets('station filter narrows orders and Todos restores the pass', (
+      tester,
+    ) async {
+      final harness = await pumpBoard(
+        tester,
+        locale: const Locale('es'),
+        orders: [
+          order(
+            reference: 'Cuenta 019',
+            station: '00000000-0000-4000-8000-0000000000e1',
+            stationName: 'Barra',
+            items: [itemJson(itemLatte, 'Capuccino')],
+          ),
+          order(
+            reference: 'Cuenta 019',
+            station: '00000000-0000-4000-8000-0000000000e2',
+            stationName: 'Plancha',
+            items: [itemJson(itemToast, 'Margarita')],
+          ),
+        ],
+      );
+
+      expect(find.text('Capuccino'), findsOneWidget);
+      expect(find.text('Margarita'), findsOneWidget);
+      await tester.tap(find.text('Plancha').first);
+      await tester.pump();
+      expect(find.text('Margarita'), findsOneWidget);
+      expect(find.text('Capuccino'), findsNothing);
+      await tester.tap(find.text('Todos'));
+      await tester.pump();
+      expect(find.text('Capuccino'), findsOneWidget);
+      expect(find.text('Margarita'), findsOneWidget);
+      await harness.dispose(tester);
+    });
+
+    // One station is not a filter: a control with a single option cannot narrow
+    // anything, and the merchant who never split their kitchen should not have to read
+    // a chip row to learn that.
+    testWidgets('one station gets no filter at all', (tester) async {
+      final harness = await pumpBoard(
+        tester,
+        locale: const Locale('es'),
+        orders: [
+          order(stationName: 'Cocina', items: [itemJson(itemLatte, 'Latte')]),
+        ],
+      );
+
+      expect(find.text('Todos'), findsNothing);
+      expect(find.text('Latte'), findsOneWidget);
+      await harness.dispose(tester);
+    });
+
+    // All stations remain selectable even when one has no tickets.
+    testWidgets('configured station filter remains available when empty', (
+      tester,
+    ) async {
+      final harness = await pumpBoard(
+        tester,
+        locale: const Locale('es'),
+        kitchenStations: const [
+          KitchenStation(
+            id: 'barra',
+            key: 'barra',
+            name: 'Barra',
+            sortOrder: 0,
+          ),
+          KitchenStation(
+            id: 'plancha',
+            key: 'plancha',
+            name: 'Plancha',
+            sortOrder: 1,
+          ),
+        ],
+        orders: [
+          order(
+            reference: 'Cuenta 019',
+            station: 'barra',
+            stationName: 'Barra',
+            items: [itemJson(itemLatte, 'Capuccino')],
+          ),
+        ],
+      );
+
+      expect(find.text('Capuccino'), findsOneWidget);
+      expect(find.text('Todos'), findsOneWidget);
+      expect(find.text('Plancha'), findsOneWidget);
+      await tester.tap(find.text('Plancha'));
+      await tester.pump();
+      expect(find.text('Capuccino'), findsNothing);
+      await tester.tap(find.text('Todos'));
+      await tester.pump();
+      expect(find.text('Capuccino'), findsOneWidget);
+      await harness.dispose(tester);
+    });
+
+    // A SCREEN THAT LIVES ON A STATION OPENS ON THAT FILTER.
+    testWidgets('a screen remembered as a station opens on it', (tester) async {
+      final harness = await pumpBoard(
+        tester,
+        locale: const Locale('es'),
+        screenStationId: '00000000-0000-4000-8000-0000000000e2',
+        screenStationName: 'Plancha',
+        orders: [
+          order(
+            reference: 'Cuenta 019',
+            items: [itemJson(itemLatte, 'Capuccino')],
+          ),
+          order(
+            reference: 'Cuenta 020',
+            station: '00000000-0000-4000-8000-0000000000e2',
+            stationName: 'Plancha',
+            items: [itemJson(itemToast, 'Margarita')],
+          ),
+        ],
+      );
+
+      // The device's saved station assignment is respected without rendering
+      // user-selectable station filter chips.
+      expect(find.text('Margarita'), findsOneWidget);
+      expect(find.text('Capuccino'), findsNothing);
+      expect(find.text('Todos'), findsOneWidget);
+      await tester.tap(find.text('Todos'));
+      await tester.pump();
+      expect(find.text('Capuccino'), findsOneWidget);
+      await harness.dispose(tester);
+    });
+
+    testWidgets('a screen assigned to an empty station stays scoped there', (
+      tester,
+    ) async {
+      final harness = await pumpBoard(
+        tester,
+        locale: const Locale('es'),
+        screenStationId: '00000000-0000-4000-8000-0000000000e2',
+        screenStationName: 'Plancha',
+        orders: [
+          order(
+            reference: 'Cuenta 019',
+            stationName: 'Barra',
+            items: [itemJson(itemLatte, 'Capuccino')],
+          ),
+        ],
+      );
+
+      expect(find.text('Capuccino'), findsNothing);
+      expect(find.text('Plancha'), findsOneWidget);
+      expect(find.text('Todos'), findsOneWidget);
+      await tester.tap(find.text('Todos'));
+      await tester.pump();
+      expect(find.text('Capuccino'), findsOneWidget);
+      await harness.dispose(tester);
+    });
+
     testWidgets('tapping one line bumps that line, not the ticket', (
       tester,
     ) async {
@@ -747,6 +1141,146 @@ void main() {
       final request = harness.kitchen.sent.single;
       expect(request.commandType, 'mark_item_ready');
       expect(request.itemIds, [itemToast]);
+      await harness.dispose(tester);
+    });
+
+    testWidgets(
+      'a ready station can finish while the whole order stays partial',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          orders: [
+            order(
+              status: 'partially_ready',
+              items: [itemJson(itemLatte, 'Latte', status: 'ready')],
+            ),
+          ],
+        );
+        expect(find.text('Complete'), findsOneWidget);
+        await tester.tap(find.text('Complete'));
+        await tester.pump();
+        expect(harness.kitchen.sent.single.commandType, 'complete');
+        expect(harness.kitchen.sent.single.itemIds, [itemLatte]);
+        await harness.dispose(tester);
+      },
+    );
+
+    testWidgets(
+      'another station can start its queued item while the whole order stays partial',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          orders: [
+            order(
+              status: 'partially_ready',
+              items: [itemJson(itemToast, 'Toast')],
+            ),
+          ],
+        );
+        expect(find.text('Start'), findsOneWidget);
+        await tester.tap(find.text('Start'));
+        await tester.pump();
+        expect(harness.kitchen.sent.single.commandType, 'start_preparation');
+        expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+        await harness.dispose(tester);
+      },
+    );
+
+    testWidgets(
+      'a routed item can be ready while the whole order has an exception',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          orders: [
+            order(
+              status: 'exception',
+              items: [itemJson(itemToast, 'Toast', status: 'preparing')],
+            ),
+          ],
+        );
+        expect(find.text('Whole order: Exception'), findsOneWidget);
+        await tester.tap(find.text('Toast'));
+        await tester.pump();
+        expect(harness.kitchen.sent.single.commandType, 'mark_item_ready');
+        expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+        await harness.dispose(tester);
+      },
+    );
+
+    testWidgets(
+      'a ready station can finish while another item has an exception',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          orders: [
+            order(
+              status: 'exception',
+              items: [itemJson(itemToast, 'Toast', status: 'ready')],
+            ),
+          ],
+        );
+        await tester.tap(find.text('Complete'));
+        await tester.pump();
+        expect(harness.kitchen.sent.single.commandType, 'complete');
+        expect(harness.kitchen.sent.single.itemIds, [itemToast]);
+        await harness.dispose(tester);
+      },
+    );
+
+    testWidgets(
+      'cancelled tickets only offer discard and never item preparation',
+      (tester) async {
+        final harness = await pumpBoard(
+          tester,
+          orders: [order(status: 'cancelled')],
+        );
+        expect(find.text('Cancelled'), findsOneWidget);
+        expect(find.text('Start'), findsNothing);
+        expect(find.text('Complete'), findsNothing);
+        expect(find.text('Recall'), findsNothing);
+        await tester.tap(find.text('Latte'));
+        await tester.pump();
+        expect(harness.kitchen.sent, isEmpty);
+        await tester.tap(find.text('Discard'));
+        await tester.pump();
+        expect(harness.kitchen.sent.single.commandType, 'cancel_ack');
+        expect(harness.kitchen.sent.single.itemIds, [itemLatte, itemToast]);
+        await harness.dispose(tester);
+      },
+    );
+
+    testWidgets('discard requires kitchen.cancel_ack', (tester) async {
+      final harness = await pumpBoard(
+        tester,
+        orders: [order(status: 'cancelled')],
+        permissions: const [
+          'kitchen.read',
+          'kitchen.prepare',
+          'kitchen.ready',
+          'kitchen.complete',
+        ],
+      );
+      expect(find.text('Cancelled'), findsOneWidget);
+      expect(find.text('Discard'), findsNothing);
+      expect(find.text('Start'), findsNothing);
+      await harness.dispose(tester);
+    });
+
+    testWidgets('an unrouted item is an exception, not a void', (tester) async {
+      final harness = await pumpBoard(
+        tester,
+        orders: [
+          order(
+            status: 'exception',
+            items: [itemJson(itemToast, 'Toast', status: 'exception')],
+          ),
+        ],
+      );
+      expect(find.text('No station assigned'), findsOneWidget);
+      expect(find.text('VOIDED'), findsNothing);
+      await tester.tap(find.text('Toast'));
+      await tester.pump();
+      expect(harness.kitchen.sent, isEmpty);
       await harness.dispose(tester);
     });
 
@@ -908,7 +1442,7 @@ void main() {
       // Nothing is sent until a reason is chosen.
       expect(harness.kitchen.sent, isEmpty);
       final confirm = find.byKey(const Key('kitchen-recall-confirm'));
-      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+      expect(tester.widget<PosButton>(confirm).onPressed, isNull);
 
       await tester.tap(find.text('The wrong dish went out'));
       await _settle(tester);
@@ -1053,150 +1587,16 @@ void main() {
     });
   });
 
-  group('the prep tab (plan 8.4)', () {
-    testWidgets('it asks with the till own scope and works the largest first', (
-      tester,
-    ) async {
-      final harness = await pumpBoard(tester);
-      harness.room.prepListResult = PrepList(
-        items: [
-          prepItem(
-            '00000000-0000-4000-8000-0000000000c3',
-            'Pico de gallo',
-            reference: 'PICO-01',
-            prep: 500,
-          ),
-          prepItem(
-            '00000000-0000-4000-8000-0000000000c4',
-            'Salsa verde',
-            reference: 'SALSA-01',
-            prep: 4500,
-          ),
-        ],
-        locationId: locationId,
-        from: '2026-09-01',
-        to: '2026-09-28',
-        asOf: serverClock,
-        correlationId: '00000000-0000-4000-8000-0000000000f2',
-      );
-
-      // The rail is the default view, and the list waits for its own tab.
-      expect(find.text('Latte'), findsOneWidget);
-      expect(harness.room.prepListReads, 0);
-
-      await tester.tap(find.text('Preparation'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-
-      // The till's own scope: its merchant and its location. No other cafe's
-      // list can arrive on this screen.
-      expect(harness.room.prepListReads, 1);
-      expect(harness.room.lastPrepListMerchantId, merchantId);
-      expect(harness.room.lastPrepListQuery?.locationId, locationId);
-      expect(harness.room.lastPrepListQuery?.includeAbovePar, isFalse);
-
-      // The window is the one the response stated, not a guess.
-      expect(find.textContaining('2026-09-28'), findsOneWidget);
-
-      // The kitchen works the largest quantity first.
-      final firstRow = tester.getTopLeft(find.text('Salsa verde')).dy;
-      final secondRow = tester.getTopLeft(find.text('Pico de gallo')).dy;
-      expect(firstRow, lessThan(secondRow));
-
-      // The list is read once when the tab opens. Coming back to it is not a
-      // second read.
-      await tester.tap(find.text('Tickets'));
-      await _settle(tester);
-      await tester.tap(find.text('Preparation'));
-      await _settle(tester);
-      expect(harness.room.prepListReads, 1);
-
-      await harness.dispose(tester);
-    });
-
-    testWidgets('an item with no par shows no quantity and says so', (
-      tester,
-    ) async {
-      final harness = await pumpBoard(tester);
-      harness.room.prepListResult = PrepList(
-        items: [
-          prepItem(
-            '00000000-0000-4000-8000-0000000000c5',
-            'Caldo base',
-            reference: 'CALDO-01',
-            par: null,
-            prep: 0,
-          ),
-        ],
-        locationId: locationId,
-        from: '2026-09-01',
-        to: '2026-09-28',
-        asOf: serverClock,
-        correlationId: '00000000-0000-4000-8000-0000000000f3',
-      );
-
-      await tester.tap(find.text('Preparation'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-
-      expect(find.text('No par'), findsOneWidget);
-      // A zero would be a claim about a work order this item does not have.
-      expect(find.text('0 kg'), findsNothing);
-
-      await harness.dispose(tester);
-    });
-
-    testWidgets('a failed read shows its own error state, and the rail stays', (
-      tester,
-    ) async {
-      final harness = await pumpBoard(tester);
-      harness.room.prepListFailure = AppException.fromApi(
-        const ApiError(
-          code: 'PREP_LIST_UNREACHABLE',
-          message: 'no answer',
-          retryable: true,
-          correlationId: '00000000-0000-4000-8000-0000000000f4',
-        ),
-      );
-
-      await tester.tap(find.text('Preparation'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 50));
-
-      expect(find.text('Could not load the prep list.'), findsOneWidget);
-      expect(find.text('Retry'), findsOneWidget);
-
-      // The board's own view is untouched by the prep tab's refusal.
-      await tester.tap(find.text('Tickets'));
-      await _settle(tester);
-      expect(find.text('Latte'), findsOneWidget);
-
-      // The retry asks again, and the list renders when the server answers.
-      harness.room.prepListFailure = null;
-      harness.room.prepListResult = PrepList(
-        items: [
-          prepItem(
-            '00000000-0000-4000-8000-0000000000c6',
-            'Salsa verde',
-            reference: 'SALSA-01',
-          ),
-        ],
-        locationId: locationId,
-        from: '2026-09-01',
-        to: '2026-09-28',
-        asOf: serverClock,
-        correlationId: '00000000-0000-4000-8000-0000000000f5',
-      );
-      await tester.tap(find.text('Preparation'));
-      await _settle(tester);
-      await tester.tap(find.text('Retry'));
-      await _settle(tester);
-
-      expect(harness.room.prepListReads, 2);
-      expect(find.text('Salsa verde'), findsOneWidget);
-
-      await harness.dispose(tester);
-    });
+  testWidgets('the KDS no longer reads or displays the prep list', (
+    tester,
+  ) async {
+    final harness = await pumpBoard(tester);
+    expect(find.text('Latte'), findsOneWidget);
+    expect(find.text('Preparation'), findsNothing);
+    expect(find.text('Preparación'), findsNothing);
+    expect(harness.room.prepListReads, 0);
+    expect(tester.takeException(), isNull);
+    await harness.dispose(tester);
   });
 
   test('every failure code becomes a typed message with a recovery action', () {
@@ -1210,6 +1610,7 @@ void main() {
       'KITCHEN_INVALID_TRANSITION',
       'PERMISSION_DENIED',
       'KITCHEN_PERMISSION_DENIED',
+      'KITCHEN_PERMISSION_REQUIRED',
       'TICKET_NOT_FOUND',
       'RESOURCE_NOT_FOUND',
       'DEVICE_REVOKED',
@@ -1249,6 +1650,7 @@ void main() {
     );
     expect(byCode['TICKET_NOT_FOUND'], byCode['RESOURCE_NOT_FOUND']);
     expect(byCode['PERMISSION_DENIED'], byCode['KITCHEN_PERMISSION_DENIED']);
+    expect(byCode['PERMISSION_DENIED'], byCode['KITCHEN_PERMISSION_REQUIRED']);
     expect(byCode['DEVICE_REVOKED'], byCode['AUTHENTICATION_REQUIRED']);
     expect(byCode.values.toSet(), hasLength(7));
     expect(
@@ -1294,6 +1696,279 @@ void main() {
       hasLength(kitchenRecallReasons.length),
     );
   });
+  for (final language in ['es', 'en']) {
+    for (final size in [const Size(375, 812), const Size(1280, 1000)]) {
+      testWidgets(
+        'populated ticket keeps reference, quantity and held instruction $language $size at 200%',
+        (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final l = language == 'es'
+              ? AppLocalizationsEs()
+              : AppLocalizationsEn();
+          final ticket = KitchenOrderProjection.fromJson({
+            ...order(
+              reference: 'N26 · Terraza · pedido 0042',
+              items: [
+                {
+                  ...itemJson(itemLatte, 'Latte', quantity: 2),
+                  'variantName': 'Grande · leche de avena',
+                  'preparationNote':
+                      'Sin azúcar. Entregar las dos bebidas juntas.',
+                },
+                itemJson(
+                  itemToast,
+                  'Cheesecake',
+                  courseNumber: 2,
+                  fired: false,
+                ),
+              ],
+            ).toJson(),
+            'priority': 'urgent',
+          });
+          final harness = await pumpBoard(
+            tester,
+            orders: [ticket],
+            locale: Locale(language),
+            textScale: 2,
+            reservedHeight: size.width < 600 ? 184 : 0,
+          );
+          final reference = tester.renderObject<RenderParagraph>(
+            find.text(ticket.publicReference),
+          );
+          expect(
+            reference.didExceedMaxLines,
+            isFalse,
+            reason: 'The complete ticket identity must remain readable',
+          );
+          final quantity = tester.renderObject<RenderParagraph>(
+            find.text('2×'),
+          );
+          final boxes = quantity.getBoxesForSelection(
+            const TextSelection(baseOffset: 0, extentOffset: 2),
+          );
+          expect(
+            boxes.map((b) => b.top).toSet(),
+            hasLength(1),
+            reason: 'The quantity and multiplication mark form one unit',
+          );
+          final held = tester.renderObject<RenderParagraph>(
+            find.text(l.kitchenCourseHeldNote),
+          );
+          expect(
+            held.didExceedMaxLines,
+            isFalse,
+            reason: 'The instruction explaining a held course must be complete',
+          );
+          expect(tester.takeException(), isNull);
+          await tester.ensureVisible(find.text('Cheesecake'));
+          await _settle(tester);
+          await tester.tap(find.text('Cheesecake'));
+          await _settle(tester);
+          expect(
+            harness.kitchen.sent,
+            isEmpty,
+            reason: 'Reading a held line must not mark it ready',
+          );
+          expect(harness.board.state.orders.single.toJson(), ticket.toJson());
+          await harness.dispose(tester);
+        },
+      );
+    }
+    testWidgets(
+      'populated board retains ticket and recovers failed refresh $language at 200%',
+      (tester) async {
+        tester.view.physicalSize = const Size(375, 812);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final l = language == 'es'
+            ? AppLocalizationsEs()
+            : AppLocalizationsEn();
+        final harness = await pumpBoard(
+          tester,
+          locale: Locale(language),
+          textScale: 2,
+          reservedHeight: 184,
+        );
+        final original = harness.board.state.orders.single.toJson();
+        harness.room.failure = const AppException(
+          category: AppErrorCategory.transport,
+          code: 'NETWORK_UNAVAILABLE',
+          recoverable: true,
+        );
+        await harness.board.load(
+          merchantId,
+          const PosKitchenOrderQuery(
+            locationId: locationId,
+            operatorSessionId: operatorSessionId,
+          ),
+        );
+        await _settle(tester);
+        expect(harness.board.state.orders.single.toJson(), original);
+        expect(find.textContaining(l.kitchenFailureTitle), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        harness.room.failure = null;
+        await tester.ensureVisible(find.text(l.kitchenFailureRefresh));
+        await _settle(tester);
+        await tester.tap(find.text(l.kitchenFailureRefresh));
+        await _settle(tester);
+        expect(harness.board.state.errorCode, isNull);
+        expect(harness.board.state.orders.single.toJson(), original);
+        expect(harness.kitchen.sent, isEmpty);
+        expect(tester.takeException(), isNull);
+        await harness.dispose(tester);
+      },
+    );
+  }
+  for (final language in ['es', 'en']) {
+    testWidgets('daily count is distinct from ticket quantity $language', (
+      tester,
+    ) async {
+      final l = language == 'es' ? AppLocalizationsEs() : AppLocalizationsEn();
+      final harness = await pumpBoard(tester, locale: Locale(language));
+      harness.room.allDayItems = const [
+        KitchenAllDayItem(
+          productName: 'Latte',
+          variantName: null,
+          ordered: 7,
+          outstanding: 2,
+        ),
+      ];
+      await harness.board.load(
+        merchantId,
+        const PosKitchenOrderQuery(
+          locationId: locationId,
+          operatorSessionId: operatorSessionId,
+        ),
+      );
+      await _settle(tester);
+      expect(find.text('1×'), findsOneWidget);
+      expect(find.text(l.kitchenAllDayCount(7)), findsOneWidget);
+      expect(find.text('×7'), findsNothing);
+      expect(find.byTooltip(l.kitchenAllDayTooltip(7, 2)), findsOneWidget);
+      expect(harness.kitchen.sent, isEmpty);
+      expect(tester.takeException(), isNull);
+      await harness.dispose(tester);
+    });
+  }
+  for (final language in ['es', 'en']) {
+    for (final status in ['queued', 'ready']) {
+      testWidgets(
+        'read-only kitchen role has no command affordances $language $status',
+        (tester) async {
+          final l = language == 'es'
+              ? AppLocalizationsEs()
+              : AppLocalizationsEn();
+          final ticket = order(
+            status: status,
+            items: [
+              itemJson(
+                itemLatte,
+                'Latte',
+                status: status == 'ready' ? 'ready' : 'queued',
+              ),
+              if (status == 'queued')
+                itemJson(itemToast, 'Toast', courseNumber: 2, fired: false),
+            ],
+          );
+          final harness = await pumpBoard(
+            tester,
+            locale: Locale(language),
+            permissions: const ['kitchen.read'],
+            orders: [ticket],
+          );
+          expect(find.text(l.kitchenTicketStartAction), findsNothing);
+          expect(find.text(l.kitchenTicketRecallAction), findsNothing);
+          expect(find.text(l.kitchenTicketCompleteAction), findsNothing);
+          expect(find.byKey(const Key('kitchen-fire-course')), findsNothing);
+          await tester.tap(find.text('Latte'));
+          await _settle(tester);
+          expect(harness.kitchen.sent, isEmpty);
+          expect(harness.board.state.orders.single.toJson(), ticket.toJson());
+          expect(tester.takeException(), isNull);
+          await harness.dispose(tester);
+        },
+      );
+    }
+  }
+  testWidgets('waiter can inspect both stations without changing tickets', (
+    tester,
+  ) async {
+    final l = AppLocalizationsEs();
+    final harness = await pumpBoard(
+      tester,
+      locale: const Locale('es'),
+      permissions: const [
+        'cart.write',
+        'catalog.read',
+        'customer.attach',
+        'customer.read',
+        'customer.search',
+        'loyalty.read',
+        'offline.replay',
+        'order.fire',
+        'kitchen.read',
+      ],
+      orders: [
+        order(
+          reference: 'Cuenta 019 · Mesa 2',
+          stationName: 'Barra',
+          items: [itemJson(itemLatte, 'Capuccino')],
+        ),
+        order(
+          reference: 'Cuenta 019 · Mesa 2',
+          station: '00000000-0000-4000-8000-0000000000e2',
+          stationName: 'Cocina',
+          status: 'ready',
+          items: [itemJson(itemToast, 'Margarita', status: 'ready')],
+        ),
+      ],
+    );
+    expect(find.text('Capuccino'), findsOneWidget);
+    expect(find.text('Margarita'), findsOneWidget);
+    expect(find.text('Cuenta 019 · Mesa 2'), findsNWidgets(2));
+    await tester.tap(find.text('Barra').first);
+    await tester.pump();
+    expect(find.text('Capuccino'), findsOneWidget);
+    expect(find.text('Margarita'), findsNothing);
+    await tester.tap(find.text('Capuccino'));
+    await _settle(tester);
+    expect(find.text('Margarita'), findsNothing);
+    await tester.tap(find.text('Todos'));
+    await tester.pump();
+    expect(find.text('Capuccino'), findsOneWidget);
+    expect(find.text('Margarita'), findsOneWidget);
+    await tester.tap(find.text('Margarita'));
+    await _settle(tester);
+    for (final label in [
+      l.kitchenTicketStartAction,
+      l.kitchenTicketRecallAction,
+      l.kitchenTicketCompleteAction,
+    ]) {
+      expect(find.text(label), findsNothing);
+    }
+    expect(harness.kitchen.sent, isEmpty);
+    expect(tester.takeException(), isNull);
+    await harness.dispose(tester);
+  });
+
+  testWidgets('preparation permission does not imply ready permission', (
+    tester,
+  ) async {
+    final harness = await pumpBoard(
+      tester,
+      permissions: const ['kitchen.read', 'kitchen.prepare'],
+    );
+    expect(find.text('Start'), findsOneWidget);
+    await tester.tap(find.text('Latte'));
+    await _settle(tester);
+    expect(harness.kitchen.sent, isEmpty);
+    await tester.tap(find.text('Start'));
+    await _settle(tester);
+    expect(harness.kitchen.sent.single.commandType, 'start_preparation');
+    await harness.dispose(tester);
+  });
 }
 
 /// The surface, on a till whose operator session is already open.
@@ -1321,6 +1996,8 @@ final class BoardHarness {
 }
 
 class _SessionGateway implements EntryGateway {
+  const _SessionGateway(this.permissions);
+  final List<String> permissions;
   @override
   Future<OperatorSessionView> startOperator(
     String merchantId,
@@ -1333,7 +2010,7 @@ class _SessionGateway implements EntryGateway {
     locationId: locationId,
     deviceId: 'device',
     state: 'active',
-    permissions: const ['kitchen.prepare'],
+    permissions: permissions,
     entitlements: const [],
     startedAt: '2026-09-13T00:00:00Z',
     lastActivityAt: '2026-09-13T00:00:00Z',
@@ -1353,9 +2030,30 @@ class _SessionGateway implements EntryGateway {
 Future<BoardHarness> pumpBoard(
   WidgetTester tester, {
   List<KitchenOrderProjection>? orders,
+  Locale? locale,
+
+  /// The station this SCREEN is, as the device remembers it. Null is the till:
+  /// show commands from every station.
+  String? screenStationId,
+  String? screenStationName,
+
+  /// The kitchen's stations, as the configuration read answers them: every station of the
+  /// merchant, whether or not it has work today.
+  List<KitchenStation> kitchenStations = const [],
+  double textScale = 1,
+  DateTime Function()? clock,
+  double reservedHeight = 0,
+  List<String> permissions = const [
+    'kitchen.read',
+    'kitchen.prepare',
+    'kitchen.ready',
+    'kitchen.complete',
+    'kitchen.recall',
+    'kitchen.cancel_ack',
+  ],
 }) async {
   final entry = EntryController(
-    gateway: _SessionGateway(),
+    gateway: _SessionGateway(permissions),
     vault: CredentialVault(MemorySecureStorage()),
     telemetry: SafeTelemetry(
       enabled: false,
@@ -1383,7 +2081,9 @@ Future<BoardHarness> pumpBoard(
       ],
     }),
   );
-  final room = FakeBoardRepository()..orders = orders ?? [order()];
+  final room = FakeBoardRepository()
+    ..orders = orders ?? [order()]
+    ..kitchenStations = kitchenStations;
   final kitchen = FakeCommandRepository();
   final connectivity = ConnectivityController();
   final board = KitchenBoardController(
@@ -1391,14 +2091,37 @@ Future<BoardHarness> pumpBoard(
     commands: kitchen,
     connectivity: connectivity,
   );
+  final preferences = DisplayPreferences(TestPreferences())
+    ..busy = false
+    ..kitchenStationId = screenStationId
+    ..kitchenStationName = screenStationName;
   await tester.pumpWidget(
-    MaterialApp(
+    PosApp(
+      theme: UmiTheme.light(),
+      locale: locale,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      home: KitchenBoardSurface(
-        controller: board,
-        entry: entry,
-        connectivity: connectivity,
+      home: DisplayPreferencesScope(
+        preferences: preferences,
+        child: Column(
+          children: [
+            Expanded(
+              child: KitchenBoardSurface(
+                clock: clock ?? () => DateTime.parse(serverClock),
+                controller: board,
+                entry: entry,
+                connectivity: connectivity,
+              ),
+            ),
+            if (reservedHeight > 0) SizedBox(height: reservedHeight),
+          ],
+        ),
       ),
     ),
   );

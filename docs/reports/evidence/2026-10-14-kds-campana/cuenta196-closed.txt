@@ -1,0 +1,5 @@
+ account_number | daily_account_number | business_date |  status   | lifecycle_state 
+----------------+----------------------+---------------+-----------+-----------------
+            196 |                  196 | 2026-10-14    | abandoned | cancelled
+(1 row)
+

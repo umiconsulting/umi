@@ -10,6 +10,8 @@ import { randomUUID } from 'node:crypto';
 import type {
   AttachSaleCustomerRequest,
   CancelSaleRequest,
+  CancelCarriedOverAccountsRequest,
+  CancelCarriedOverAccountsResult,
   PosCustomerSearchQuery,
   RenameSuspendedSaleRequest,
   ResumeSaleRequest,
@@ -38,7 +40,7 @@ export class PosSaleService {
   }
 
   async current(user: AuthUser, merchantId: string, query: SaleHistoryQuery) {
-    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId);
+    await this.authorize(user, merchantId, query.locationId, query.operatorSessionId, 'cart.write');
     const sale = await this.repo.current(merchantId, query.locationId, query.operatorSessionId);
     if (!sale) throw new NotFoundException({ code: 'SALE_NOT_FOUND' });
     return sale;
@@ -132,11 +134,68 @@ export class PosSaleService {
           merchantId,
           saleId,
           dto.expectedVersion,
+          dto.reasonCode,
           dto.reason,
           dto.operatorSessionId,
         ),
       saleId,
     );
+  }
+
+  async cancelCarriedOver(
+    user: AuthUser,
+    merchantId: string,
+    dto: CancelCarriedOverAccountsRequest,
+  ): Promise<CancelCarriedOverAccountsResult> {
+    await this.authorize(user, merchantId, dto.locationId, dto.operatorSessionId);
+    const mayCancelOtherOperator = await this.repo.authorize(
+      user.id,
+      user.sessionId,
+      user.deviceId!,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+      'sale.resume.any',
+    );
+    const result = await this.integrity.execute<CancelCarriedOverAccountsResult>(
+      {
+        merchantId,
+        locationId: dto.locationId,
+        commandId: randomUUID(),
+        idempotencyKey: dto.idempotencyKey,
+        commandType: 'sale.carried_over_cancelled',
+        payload: dto,
+      },
+      async (context) => {
+        const cancelled = await this.repo.cancelCarriedOver(
+          context.client,
+          merchantId,
+          user.id,
+          mayCancelOtherOperator,
+          dto,
+        );
+        for (const sale of cancelled) {
+          await context.appendAudit({
+            eventType: 'sale.cancelled',
+            entityType: 'pos_sale_lifecycle',
+            entityId: sale.id,
+            outcome: 'success',
+            publicData: {
+              state: sale.state,
+              version: sale.cart.version,
+              cancellationReasonCode: sale.cancellationReasonCode,
+              cancellationReason: sale.cancellationReason,
+              carriedOver: true,
+            },
+          });
+        }
+        return { ok: true, value: { cancelled } };
+      },
+    );
+    if (result.status !== 'succeeded' || !result.result) {
+      throw new ConflictException({ code: result.failureCode ?? 'SALE_STATE_CONFLICT' });
+    }
+    return result.result;
   }
 
   async attachCustomer(

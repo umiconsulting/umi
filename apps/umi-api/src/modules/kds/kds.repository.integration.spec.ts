@@ -641,6 +641,7 @@ describeDatabase('Gate 4A POS kitchen command', () => {
       // The board's wake-up bus (§8H step 8). Its `waitForChange` is not exercised from here —
       // the watch route has its own test — but the service cannot be constructed without it.
       new KitchenBoardEvents(),
+      {} as never,
     );
 
     const role = await pool.query<{ id: string }>(

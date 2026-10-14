@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cash/denomination_counter.dart';
 
 /// The drawer counter is read with a finger on a terminal and with a keyboard on
@@ -11,16 +11,15 @@ Future<void> _pump(
   ValueChanged<DenominationTally> onChanged, {
   List<int> denominations = const [100000, 50000, 20000],
 }) => tester.pumpWidget(
-  MaterialApp(
+  PosApp(
     locale: const Locale('es'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
       AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
+
       GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
     ],
-    home: Scaffold(
+    home: PosPage(
       body: SingleChildScrollView(
         child: DenominationCounter(
           currency: 'MXN',
@@ -39,7 +38,7 @@ void main() {
     DenominationTally? tally;
     await _pump(tester, (value) => tally = value);
 
-    await tester.enterText(find.byType(TextField).first, '12');
+    await tester.enterText(find.byType(PosField).first, '12');
     await tester.pump();
 
     expect(tally?.totalMinorUnits, 1200000);
@@ -59,32 +58,32 @@ void main() {
   ) async {
     DenominationTally? tally;
     await _pump(tester, (value) => tally = value);
-    final field = find.byType(TextField).first;
+    final field = find.byType(PosField).first;
 
     await tester.enterText(field, '1a2');
     await tester.pump();
-    expect(tester.widget<TextField>(field).controller?.text, '12');
+    expect(tester.widget<PosField>(field).controller?.text, '12');
 
     await tester.enterText(field, '12345');
     await tester.pump();
     // A drawer with twelve thousand of one note is a typo, not a count.
-    expect(tester.widget<TextField>(field).controller?.text, '123');
+    expect(tester.widget<PosField>(field).controller?.text, '123');
     expect(tally?.totalMinorUnits, 12300000);
   });
 
   testWidgets('the buttons write the number into the field', (tester) async {
     DenominationTally? tally;
     await _pump(tester, (value) => tally = value);
-    final field = find.byType(TextField).first;
+    final field = find.byType(PosField).first;
 
-    await tester.tap(find.byTooltip('Aumentar cantidad').first);
+    await tester.tap(find.byTooltip('Aumentar cantidad de MXN 1,000.00'));
     await tester.pump();
-    expect(tester.widget<TextField>(field).controller?.text, '1');
+    expect(tester.widget<PosField>(field).controller?.text, '1');
     expect(tally?.totalMinorUnits, 100000);
 
-    await tester.tap(find.byTooltip('Disminuir cantidad').first);
+    await tester.tap(find.byTooltip('Disminuir cantidad de MXN 1,000.00'));
     await tester.pump();
-    expect(tester.widget<TextField>(field).controller?.text, '');
+    expect(tester.widget<PosField>(field).controller?.text, '');
     expect(tally?.totalMinorUnits, 0);
   });
 
@@ -92,12 +91,12 @@ void main() {
     tester,
   ) async {
     await _pump(tester, (_) {});
-    final field = find.byType(TextField).first;
+    final field = find.byType(PosField).first;
 
     await tester.enterText(field, '12');
     await tester.pump();
-    final controller = tester.widget<TextField>(field).controller!;
-    final focus = tester.widget<TextField>(field).focusNode!;
+    final controller = tester.widget<PosField>(field).controller!;
+    final focus = tester.widget<PosField>(field).focusNode!;
 
     focus.unfocus();
     await tester.pump();
@@ -112,7 +111,7 @@ void main() {
     final handle = tester.ensureSemantics();
     await _pump(tester, (_) {});
 
-    final node = tester.getSemantics(find.byType(TextField).first);
+    final node = tester.getSemantics(find.byType(PosField).first);
     // A screen reader on a row that says "Cantidad de MXN 1,000.00" and nothing
     // else is the difference between a count and a guess.
     expect(node.label, contains('MXN 1,000.00'));
@@ -129,16 +128,15 @@ void main() {
     // width is not negotiable — two 48 px tap targets and a field sit in it — so
     // this is where the count used to run 10 px past its own card.
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
-        home: Scaffold(
+        home: PosPage(
           body: Align(
             alignment: Alignment.topLeft,
             child: SizedBox(
@@ -168,16 +166,15 @@ void main() {
     Future<void> pump(double scale) async {
       tester.platformDispatcher.textScaleFactorTestValue = scale;
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           locale: const Locale('es'),
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [
             AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
+
             GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
           ],
-          home: Scaffold(
+          home: PosPage(
             body: Align(
               alignment: Alignment.topLeft,
               child: SizedBox(
@@ -224,7 +221,7 @@ void main() {
       (value) => tally = value,
       denominations: const [100000],
     );
-    await tester.enterText(find.byType(TextField).first, '3');
+    await tester.enterText(find.byType(PosField).first, '3');
     await tester.pump();
     expect(tally?.totalMinorUnits, 300000);
 
@@ -236,6 +233,6 @@ void main() {
       denominations: const [100000, 50000],
     );
     await tester.pump();
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(PosField), findsNWidgets(2));
   });
 }

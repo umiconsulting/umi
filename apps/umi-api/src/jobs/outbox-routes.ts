@@ -39,5 +39,15 @@ export class OutboxRoutesRegistrar implements OnModuleInit {
       jobName: 'whatsapp.lifecycle',
       priority: JobPriority.Background,
     });
+    this.router.register('pos.kitchen_item_ready', {
+      queue: QUEUES.outbound,
+      jobName: 'pos.kitchen_item_ready',
+      priority: JobPriority.Interactive,
+    });
+    this.router.register('pos.kitchen_order_ready', {
+      queue: QUEUES.outbound,
+      jobName: 'pos.kitchen_order_ready',
+      priority: JobPriority.Interactive,
+    });
   }
 }

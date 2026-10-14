@@ -15,6 +15,7 @@ import type {
   SaleExceptionResult,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
+import { allocateReceiptFolio } from '../../shared/receipts/receipt-folio';
 import {
   calculateRefundPreview,
   type RefundAllocationPolicy,
@@ -122,7 +123,7 @@ interface StoredLine {
 
 interface StoredTender {
   id: string;
-  type: 'cash' | 'manual_terminal' | 'wallet' | 'gift_card';
+  type: 'cash' | 'manual_terminal' | 'bank_transfer' | 'wallet' | 'gift_card';
   amount: number;
 }
 
@@ -581,7 +582,11 @@ export class PosExceptionRepository {
         ),
       locationId,
     );
-    if (!found.rows[0]) throw new ConflictException({ code: 'STALE_PREVIEW' });
+    if (!found.rows[0])
+      throw new ConflictException({
+        code: 'OPTIMISTIC_VERSION_CONFLICT',
+        details: { reason: 'refund_preview_expired' },
+      });
   }
 
   async approvalActor(
@@ -1021,7 +1026,18 @@ export class PosExceptionRepository {
       total: money(Number(preview.totalMinorUnits), preview.currency),
     };
     const receiptId = randomUUID();
-    const receiptReference = `EX-${receiptId}`;
+    // A REFUND IS ANOTHER RECEIPT, SO IT GETS ITS OWN TICKET NUMBER.
+    //
+    // It comes from the same per-merchant, per-location, per-day counter as a sale's, under
+    // the `EX-` prefix — the prefix is what keeps two different documents of the same day
+    // from answering to the same name (ADR `2026-10-12-folio-visible-del-recibo`, decision
+    // 8). The date rule is this table's own: `current_date`, the same day the INSERT below
+    // writes, so the counter row and the receipt agree by construction.
+    const receiptReference = `EX-${await allocateReceiptFolio(client, {
+      merchantId,
+      locationId: dto.locationId,
+      businessDate: null,
+    })}`;
     const receipt = {
       id: receiptId,
       publicReference: receiptReference,
@@ -1811,7 +1827,7 @@ export class PosExceptionRepository {
     });
     const tenderRows = await client.query<{
       id: string;
-      type: 'cash' | 'manual_terminal' | 'wallet' | 'gift_card';
+      type: 'cash' | 'manual_terminal' | 'bank_transfer' | 'wallet' | 'gift_card';
       amount: string;
       refunded: string;
       status: string;
@@ -1908,11 +1924,13 @@ export class PosExceptionRepository {
     const operatorAllowed =
       source.cartOperatorSessionId === authorization.operatorSessionId ||
       hasPermission(authorization, 'sale.refund.other_operator');
+    const bankTransfer = source.tenders.some((tender) => tender.type === 'bank_transfer');
     const refundAllowed =
       policy.refundsEnabled &&
       hasRemaining &&
       withinRefundWindow &&
       !source.ambiguousPayment &&
+      !bankTransfer &&
       operatorAllowed;
     const prior = source.previouslyRefunded > 0;
     const voidAllowed =
@@ -1921,6 +1939,7 @@ export class PosExceptionRepository {
       !prior &&
       withinVoidWindow &&
       !source.ambiguousPayment &&
+      !bankTransfer &&
       operatorAllowed &&
       !source.tenders.some((tender) => tender.type === 'manual_terminal');
     const allowedTypes: SaleExceptionEligibility['allowedTypes'] = [];
@@ -2006,15 +2025,21 @@ export class PosExceptionRepository {
           : [
               source.ambiguousPayment
                 ? 'payment_outcome_unknown'
-                : !operatorAllowed
-                  ? 'other_operator_permission_required'
-                  : !withinRefundWindow
-                    ? 'policy_window_expired'
-                    : !policy.refundsEnabled
-                      ? 'policy_disabled'
-                      : 'fully_refunded',
+                : bankTransfer
+                  ? 'bank_transfer_refund_requires_support'
+                  : !operatorAllowed
+                    ? 'other_operator_permission_required'
+                    : !withinRefundWindow
+                      ? 'policy_window_expired'
+                      : !policy.refundsEnabled
+                        ? 'policy_disabled'
+                        : 'fully_refunded',
             ],
-        supportCodes: source.ambiguousPayment ? ['payment_reconciliation_required'] : [],
+        supportCodes: source.ambiguousPayment
+          ? ['payment_reconciliation_required']
+          : bankTransfer
+            ? ['bank_transfer_refund_requires_support']
+            : [],
       },
       voidEligibility: {
         allowed: voidAllowed,
@@ -2023,7 +2048,9 @@ export class PosExceptionRepository {
         blockCodes: voidAllowed
           ? []
           : [
-              source.tenders.some((tender) => tender.type === 'manual_terminal')
+              source.tenders.some(
+                (tender) => tender.type === 'manual_terminal' || tender.type === 'bank_transfer',
+              )
                 ? 'externally_settled'
                 : prior
                   ? 'prior_refund_exists'

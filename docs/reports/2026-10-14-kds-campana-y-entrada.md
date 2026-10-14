@@ -1,0 +1,27 @@
+# Campana de llegada del KDS y recuperación de la entrada — 2026-10-14
+
+El sonido de llegada del KDS ahora es el archivo `mixkit-cooking-bell-ding-1791.wav` que proporcionó el dueño. Se instaló en el asset local `apps/umi-pos/assets/audio/kitchen_arrival.wav`; el motor y las reglas de alertas existentes siguen iguales. En la A9, el tablero recibió una Margarita enviada desde la iMin y registró `kds.audio sound=arrival playback=started`. El build `0.1.0+123` quedó instalado en iMin, A9 y A11.
+
+## Qué se cambió
+
+- Se sustituyó sólo el asset de llegada. El archivo original contenía audio PCM estéreo de 44,1 kHz y una imagen MJPEG incrustada. FFmpeg copió **sin recodificar** únicamente la pista de audio; el resultado dura 1,587823 s, ocupa 280422 bytes y tiene SHA-256 `3e43710d3eb32c0a677c1e284e8819089445a52d8159413fe7f5a4a300331c17`. Se usó una herramienta para el binario porque `apply_patch` edita texto, no WAV. Comando: `ffmpeg -hide_banner -loglevel error -y -i /home/juan/Downloads/mixkit-cooking-bell-ding-1791.wav -map 0:a:0 -c:a copy apps/umi-pos/assets/audio/kitchen_arrival.wav`.
+- La A9 había permanecido más de 15 minutos en «Comprobando tu terminal». Su registro mostró que el bootstrap llegó a `readyForAuthentication` a las 10:22:21, pero antes de reiniciar no apareció una petición de estado del dispositivo en la API. La red hacia la API respondía. Al forzar el cierre y abrir la app, la petición `GET /api/v1/devices/status` respondió 200 y apareció el PIN. Esto **sitúa** el atasco en la transición local de entrada; no identifica con certeza qué operación quedó pendiente.
+- En `EntryController.initialize`, las lecturas iniciales de identidad y emparejamiento del almacenamiento local ahora tienen un límite de 10 s y una ruta de error. Si la lectura no termina, la interfaz muestra «Almacenamiento seguro no disponible» y permite reintentar, en lugar de mantener el indicador de carga indefinidamente. Una prueba con almacenamiento que nunca responde fija este comportamiento. No se cambió la API ni la base de datos para este ajuste.
+
+## Herramientas y fuentes
+
+- **FFmpeg n9.0.2** para extraer la pista WAV sin recodificación; su [documentación oficial](https://ffmpeg.org/ffmpeg.html) documenta la selección de streams con `-map` y la copia con `-c copy`.
+- **Flutter 3.47.5** para análisis, pruebas y build Android. El POS ya dependía de **audioplayers 6.8.1**, publicado en [pub.dev](https://pub.dev/packages/audioplayers); se reutilizó su reproducción de assets locales, sin añadir otra librería ni depender de red para el sonido.
+- **ADB 1.0.41 / Android Platform Tools 37.0.0** para instalación, lanzamiento, capturas y `logcat`; **Prettier 3.9.4** para este Markdown.
+- [Mixkit, «Cooking bell ding»](https://mixkit.co/free-sound-effects/cooking/) identifica el efecto descargado. Su [licencia gratuita para efectos de sonido](https://mixkit.co/license/modal/sfxFree/) permite proyectos comerciales, pero restringe redistribuir el archivo por separado, en herramientas o con archivos fuente. El uso en este build local se probó técnicamente; **antes de publicar el APK o el repositorio** hay que resolver si el empaquetado en un POS entra en esa restricción o sustituirlo por un efecto CC0 con permiso explícito para apps. No se afirma que la licencia de producción esté verificada.
+
+## Verificación
+
+- `flutter analyze`: sin hallazgos.
+- `flutter test test/device_pairing_test.dart test/features/kitchen/kitchen_alerts_test.dart test/features/kitchen/kitchen_board_test.dart --reporter compact`: 104 pruebas aprobadas.
+- `flutter test --reporter compact`: suite completa del POS, 974 pruebas aprobadas. Registros de ejecución: `/tmp/umi-kds-bell-entry-focused-tests.log` y `/tmp/umi-kds-bell-entry-full-tests.log`.
+- Build profile Android ARM64 `0.1.0+123` exitoso (35,0 MB); se verificó que el APK contiene `assets/flutter_assets/assets/audio/kitchen_arrival.wav` con 280422 bytes. Registro: `/tmp/umi-kds-bell-build123.log`. `adb install -r` respondió `Success` y `dumpsys package` confirmó `versionCode=123` en iMin `192.168.1.10:5555`, A9 `192.168.1.14:35559` y A11 `192.168.1.13:46475`.
+- En la [iMin se envió Margarita de la cuenta 196 a cocina](evidence/2026-10-14-kds-campana/imin-after-send.png). La [A9 mostró esa comanda en Cocina](evidence/2026-10-14-kds-campana/a9-after-arrival.png); el [log del dispositivo](evidence/2026-10-14-kds-campana/a9-audio-log.txt) registró el inicio de reproducción a las 10:45:47. El [log de la API](evidence/2026-10-14-kds-campana/api-kds-arrival.jsonl) contiene `GET /kitchen/board/watch` y `GET /kitchen/board`, ambos 200 a las 17:45:47 UTC.
+- La cuenta 196 era un borrador previo que el till reanudó. Se [canceló en la iMin](evidence/2026-10-14-kds-campana/imin-after-cancel.png) y la comanda cancelada se [descartó en A9](evidence/2026-10-14-kds-campana/a9-after-discard.png). La [fila de Postgres](evidence/2026-10-14-kds-campana/cuenta196-closed.txt) quedó `status=abandoned`, `lifecycle_state=cancelled`; no se dejó una cuenta de prueba abierta.
+
+No se midió con micrófono el volumen o la calidad audible de la bocina; el registro acredita que el reproductor inició, no que una persona oyó el sonido. Tampoco se reprodujo de manera determinista la operación exacta que hizo esperar a la A9 antes del reinicio, ni se verificó la interfaz de la A11: su pantalla estaba bloqueada/protegida aunque el build sí quedó instalado. No hubo despliegue ni prueba en staging o producción.

@@ -26,6 +26,22 @@ packages/contract/generated/
 docs/migration/build-v3/security-audit-2026-07-12.raw.json
 docs/migration/build-v3/schema_diagram.html
 
+# The POS-native design-research capture (2026-10-08). 1,087 of the repo's Prettier
+# offenders and all four hard parse errors live here: AT-SPI trees, window dumps,
+# screenshots' JSON sidecars, and third-party pages saved verbatim as research
+# sources. Two of those saved pages are not well-formed HTML — Prettier stops with
+# a SyntaxError on `<img …></img>` and on an implied-end-tag `h5` — so "format it"
+# is not an option that exists. The directories are untracked, so CI never sees
+# them; this rule is what keeps `pnpm format:check` honest on the workstation that
+# has them.
+docs/research/2026-10-08-pos-native-estacion/
+docs/research/2026-10-08-pos-estacion/
+
+# The fork's private run state: enrollment.json, the isolated keyring's XDG trees
+# and the archived iMin APKs. Ignored by git for the same reason — it is machine
+# state, not source.
+apps/umi-pos/.estacion-runtime/
+
 # Per-developer local files. Untracked, so CI never sees them — but without this
 # `pnpm format:check` is red on a clean checkout for whoever has them, and a gate
 # that is red for reasons the repo cannot fix teaches people to ignore it.

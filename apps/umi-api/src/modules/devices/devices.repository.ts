@@ -262,8 +262,14 @@ export class DevicesRepository {
   }
 
   /**
-   * The enrolled POS terminals for one merchant — the devices themselves, not the
-   * requests that produced them.
+   * The enrolled terminals for one merchant — the devices themselves, not the
+   * requests that produced them — in BOTH modes.
+   *
+   * A row enrolled through this module always carries a device credential, and
+   * that credential is what marks it as this module's device: the legacy iPad
+   * KDS registers a runtime session instead and leaves `credential_hash` NULL.
+   * Reading the credential rather than `kind` is what keeps a tablet that the
+   * owner switched to `kds` on this screen, where it can be switched back.
    *
    * A device whose `location_id` is NULL is included in EVERY branch view rather than
    * none. Such a row is a defect from an enrolment that ran before the API required a
@@ -274,7 +280,7 @@ export class DevicesRepository {
       `SELECT ${DEVICE_PROJECTION}
          FROM merchant.device d
         WHERE d.merchant_id = $1::uuid
-          AND d.kind = 'pos_terminal'
+          AND d.credential_hash IS NOT NULL
           AND d.status NOT IN ('revoked', 'replaced', 'retired')
           AND ($2::uuid[] IS NULL OR d.location_id = any($2::uuid[]) OR d.location_id IS NULL)
         ORDER BY d.registered_at DESC
@@ -285,26 +291,38 @@ export class DevicesRepository {
   }
 
   /**
-   * Rename a terminal and restate how it is used on the floor. Neither field is
-   * security material, so this does not touch the credential columns and cannot move
-   * the device to another branch — a branch change means enrolling again.
+   * Rename a terminal, restate how it is used on the floor, and set the mode it
+   * runs. None of the three is security material, so this does not touch the
+   * credential columns and cannot move the device to another branch — a branch
+   * change means enrolling again.
+   *
+   * `kind` defaults to the device's current value, so a rename that does not
+   * mention a mode leaves the mode alone.
    */
   async updateDevice(input: {
     merchantId: string;
     deviceId: string;
     displayName: string;
     mobility: 'static' | 'mobile';
+    kind?: 'pos_terminal' | 'kds';
     allowedBranchIds: string[] | null;
   }): Promise<DeviceSummary | null> {
     const { rows } = await this.pg.worker.query<DeviceSummary>(
       `UPDATE merchant.device AS d
-          SET name = $3, mobility = $4, updated_at = now()
+          SET name = $3, mobility = $4, kind = COALESCE($5, d.kind), updated_at = now()
         WHERE d.id = $2::uuid AND d.merchant_id = $1::uuid
-          AND d.kind = 'pos_terminal'
+          AND d.credential_hash IS NOT NULL
           AND d.status NOT IN ('revoked', 'replaced')
-          AND ($5::uuid[] IS NULL OR d.location_id = any($5::uuid[]) OR d.location_id IS NULL)
+          AND ($6::uuid[] IS NULL OR d.location_id = any($6::uuid[]) OR d.location_id IS NULL)
         RETURNING ${DEVICE_PROJECTION}`,
-      [input.merchantId, input.deviceId, input.displayName, input.mobility, input.allowedBranchIds],
+      [
+        input.merchantId,
+        input.deviceId,
+        input.displayName,
+        input.mobility,
+        input.kind ?? null,
+        input.allowedBranchIds,
+      ],
     );
     return rows[0] ?? null;
   }
@@ -401,6 +419,33 @@ export class DevicesRepository {
       let deviceId: string | null = null;
       if (input.approve) {
         if (!input.credentialHash) throw new Error('credential_hash_required');
+        /**
+         * THE INSTALLATION'S PREVIOUS DEVICE IS SUPERSEDED HERE, NOT LEFT TO THE INDEX.
+         *
+         * A till that lost its own credential — a wipe, a restored keystore, or a bootstrap that
+         * ended in DEVICE_CREDENTIAL_INVALID — asks for a new setup code and claims it with the
+         * SAME `installation_hash`. The partial unique index `device_active_installation_uq`
+         * refuses a second active row for one installation, so the INSERT below used to fail with
+         * a raw `duplicate key value violates unique constraint "device_active_installation_uq"`.
+         * That reached the dashboard as `INTERNAL_ERROR` marked **retryable**, and retrying could
+         * never work: the row it collided with was the one it was replacing.
+         *
+         * Measured on the iMin on 2026-10-11: the approve answered 500 and the till sat on
+         * "Se requiere la aprobación del administrador" forever. The same installation is the same
+         * terminal, so the previous row is retired here in the same transaction, with the same
+         * shape the explicit `replaces_device_id` path writes — `replaced`, credential cleared,
+         * pointing at its successor. `replaces_device_id` stays for the case where an operator
+         * names a DIFFERENT device to retire.
+         */
+        const superseded = await client.query<{ id: string }>(
+          `UPDATE merchant.device
+             SET status = 'replaced', revoked_at = now(),
+                 revocation_reason = 're_enrolled', credential_hash = null, updated_at = now()
+           WHERE merchant_id = $1::uuid AND installation_hash = $2
+             AND status NOT IN ('revoked', 'replaced')
+           RETURNING id::text`,
+          [request.businessId, request.installationHash],
+        );
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO merchant.device
              (merchant_id, location_id, name, kind, status, platform,
@@ -421,6 +466,13 @@ export class DevicesRepository {
           ],
         );
         deviceId = inserted.rows[0].id;
+        for (const retired of superseded.rows) {
+          await client.query(
+            `UPDATE merchant.device SET replacement_device_id = $2::uuid, updated_at = now()
+             WHERE id = $1::uuid`,
+            [retired.id, deviceId],
+          );
+        }
         if (request.replacesDeviceId) {
           await client.query(
             `UPDATE merchant.device

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:umi_contract/umi_contract.dart' show UmiRoutes;
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/security/device_key.dart';
 import 'package:umi_pos/core/security/tpm_device_key.dart';
@@ -98,7 +99,7 @@ void main() {
       clock: () => DateTime.utc(2026, 9, 3, 12),
     );
 
-    final headers = await provider.deviceHeaders();
+    final headers = await provider.deviceHeaders(path: UmiRoutes.posPinLogin);
 
     expect(headers['x-umi-device-proof-alg'], 'es256');
     expect(base64Url.decode(headers['x-umi-device-proof']!).length, 64);

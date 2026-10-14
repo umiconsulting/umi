@@ -39,7 +39,7 @@ export const ReportsSalesTotals = z
 // (that needs a payments gateway), so the mix is honest about the four it does capture.
 export const ReportsPaymentSlice = z
   .object({
-    method: z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']),
+    method: z.enum(['cash', 'manual_terminal', 'bank_transfer', 'wallet', 'gift_card']),
     amountMinorUnits: Money,
   })
   .strict();

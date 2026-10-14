@@ -73,6 +73,18 @@ services:
     mem_limit: 192m
     restart: unless-stopped
 
+  # Local mail sink. The API sends password-reset and MFA messages through SMTP.
+  # With no sink the adapter finds no credentials and drops every message, so the
+  # reset link never arrives. Mailpit accepts the mail on 1025 and shows it at
+  # http://127.0.0.1:8025. It never forwards anything.
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
+    mem_limit: 128m
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

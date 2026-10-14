@@ -3,6 +3,7 @@
 -- ============================================================================
 do $$
 declare n int;
+        v_tbl text;
 begin
   -- schemas
   if not exists (select 1 from information_schema.schemata where schema_name='umi')     then raise exception 'missing schema umi';     end if;
@@ -1103,6 +1104,35 @@ begin
         end if;
     end;
   end;
+
+  -- ---- build-v3-022: the ticket number a person reads ----
+  --
+  -- Asserted BY DEFINITION, and the reason is the defect this guards: the old constraint was
+  -- declared inline, so it had a name PostgreSQL chose, and a name-based check would happily
+  -- pass a database where the old merchant-wide unique is still there beside the scoped one.
+  -- What has to be true is the SHAPE — a receipt number is unique inside its merchant, its
+  -- location and its business day — plus the counter it is issued from, with one policy and
+  -- RLS forced.
+  if to_regclass('merchant.receipt_counter') is null then
+    raise exception 'build-v3-022: merchant.receipt_counter is missing';
+  end if;
+  if not (select relrowsecurity and relforcerowsecurity from pg_class
+           where oid = 'merchant.receipt_counter'::regclass) then
+    raise exception 'build-v3-022: merchant.receipt_counter does not force row level security';
+  end if;
+  if (select count(*) from pg_policies where tablename = 'receipt_counter') <> 1 then
+    raise exception 'build-v3-022: merchant.receipt_counter must carry exactly one policy';
+  end if;
+  for v_tbl in select unnest(array['receipt_snapshot','pos_exception_receipt']) loop
+    if not exists (
+      select 1 from pg_constraint c
+       where c.conrelid = format('merchant.%I', v_tbl)::regclass
+         and c.contype = 'u'
+         and pg_get_constraintdef(c.oid) like '%UNIQUE (merchant_id, location_id, business_date, receipt_number)%'
+    ) then
+      raise exception 'build-v3-022: merchant.% carries no scoped unique on its receipt number', v_tbl;
+    end if;
+  end loop;
 
   -- counts (sanity)
   select count(*) into n from information_schema.tables where table_schema='umi'     and table_type='BASE TABLE'; raise notice 'umi base tables:     %', n;

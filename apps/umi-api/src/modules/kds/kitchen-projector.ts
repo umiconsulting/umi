@@ -32,20 +32,25 @@ interface RouteRow {
   categoryId: string | null;
   priority: number;
   targetSeconds: number | null;
+  stationName: string;
 }
 
-export async function projectKitchenOrder(
+interface KitchenProjection {
+  rows: ProjectionLineRow[];
+  routeRows: RouteRow[];
+  routeByLine: Map<string, { stationId: string | null; status: string; routeId: string | null }>;
+  routeSnapshot: Array<{ lineId: string; routeId: string | null; stationId: string | null }>;
+  status: string;
+  locationId: string;
+}
+
+/** Read an order's preparation lines and their routes. Shared by the create and the append paths. */
+export async function loadKitchenProjection(
   client: Pick<PoolClient, 'query'>,
   merchantId: string,
   sourceOrderId: string,
-): Promise<{ kitchenOrderId: string; created: boolean } | null> {
-  const existing = await client.query<{ id: string }>(
-    `SELECT id::text FROM merchant.kitchen_order
-      WHERE merchant_id=$1::uuid AND source_order_id=$2::uuid`,
-    [merchantId, sourceOrderId],
-  );
-  if (existing.rows[0]) return { kitchenOrderId: existing.rows[0].id, created: false };
-
+  lockRoutes = false,
+): Promise<KitchenProjection | null> {
   const source = await client.query<ProjectionLineRow>(
     `SELECT o.id::text AS "orderId",o.merchant_id::text AS "merchantId",
             o.location_id::text AS "locationId",
@@ -77,13 +82,13 @@ export async function projectKitchenOrder(
   const routeRows = await client.query<RouteRow>(
     `SELECT r.id::text,r.station_id::text AS "stationId",
             r.product_id::text AS "productId",r.category_id::text AS "categoryId",
-            r.route_priority AS priority,r.target_seconds AS "targetSeconds"
+            r.route_priority AS priority,r.target_seconds AS "targetSeconds",s.name AS "stationName"
        FROM merchant.kitchen_route r
        JOIN merchant.station s ON s.id=r.station_id AND s.merchant_id=r.merchant_id
       WHERE r.merchant_id=$1::uuid AND r.location_id=$2::uuid
         AND r.active AND r.requires_preparation AND s.status='active'
         AND s.location_id=$2::uuid
-      ORDER BY r.route_priority,r.id`,
+      ORDER BY r.route_priority,r.id ${lockRoutes ? 'FOR SHARE OF r,s' : ''}`,
     [merchantId, first.locationId],
   );
   const routing = resolveKitchenRoutes(
@@ -104,40 +109,32 @@ export async function projectKitchenOrder(
     routeId: route.routeId,
     stationId: route.stationId,
   }));
-  const inserted = await client.query<{ id: string }>(
-    `INSERT INTO merchant.kitchen_order
-       (merchant_id,location_id,source_order_id,public_reference,source,fulfillment_type,
-        business_date,status,route_snapshot,queued_at)
-     VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7::date,$8,$9::jsonb,$10::timestamptz)
-     ON CONFLICT (merchant_id,source_order_id) DO NOTHING
-     RETURNING id::text`,
-    [
-      merchantId,
-      first.locationId,
-      sourceOrderId,
-      first.publicReference,
-      first.source,
-      first.fulfillmentType,
-      first.businessDate,
-      status,
-      JSON.stringify(routeSnapshot),
-      first.queuedAt,
-    ],
-  );
-  if (!inserted.rows[0]) {
-    const recovered = await client.query<{ id: string }>(
-      `SELECT id::text FROM merchant.kitchen_order
-        WHERE merchant_id=$1::uuid AND source_order_id=$2::uuid`,
-      [merchantId, sourceOrderId],
-    );
-    return recovered.rows[0] ? { kitchenOrderId: recovered.rows[0].id, created: false } : null;
-  }
-  const kitchenOrderId = inserted.rows[0].id;
+  return {
+    rows: source.rows,
+    routeRows: routeRows.rows,
+    routeByLine,
+    routeSnapshot,
+    status,
+    locationId: first.locationId,
+  };
+}
 
-  for (const line of source.rows) {
-    const assignment = routeByLine.get(line.lineId);
+/**
+ * Insert the projection's items into an existing kitchen order, and refresh its route
+ * snapshot. Idempotent per source line, so a re-run adds nothing and an appended line
+ * (which has no row yet) is the only thing that lands.
+ */
+async function insertKitchenItems(
+  client: Pick<PoolClient, 'query'>,
+  merchantId: string,
+  sourceOrderId: string,
+  kitchenOrderId: string,
+  projection: KitchenProjection,
+): Promise<void> {
+  for (const line of projection.rows) {
+    const assignment = projection.routeByLine.get(line.lineId);
     if (!assignment) continue;
-    const selectedRoute = routeRows.rows.find((route) => route.id === assignment.routeId);
+    const selectedRoute = projection.routeRows.find((route) => route.id === assignment.routeId);
     await client.query(
       `INSERT INTO merchant.kitchen_order_item
          (merchant_id,location_id,kitchen_order_id,source_order_id,source_order_item_id,
@@ -148,7 +145,7 @@ export async function projectKitchenOrder(
        ON CONFLICT (merchant_id,source_order_item_id) DO NOTHING`,
       [
         merchantId,
-        first.locationId,
+        projection.locationId,
         kitchenOrderId,
         sourceOrderId,
         line.lineId,
@@ -171,8 +168,59 @@ export async function projectKitchenOrder(
   await client.query(
     `UPDATE merchant.kitchen_order SET route_snapshot=$3::jsonb
       WHERE merchant_id=$1::uuid AND id=$2::uuid`,
-    [merchantId, kitchenOrderId, JSON.stringify(routeSnapshot)],
+    [merchantId, kitchenOrderId, JSON.stringify(projection.routeSnapshot)],
   );
+}
+
+export async function projectKitchenOrder(
+  client: Pick<PoolClient, 'query'>,
+  merchantId: string,
+  sourceOrderId: string,
+): Promise<{ kitchenOrderId: string; created: boolean } | null> {
+  const existing = await client.query<{ id: string }>(
+    `SELECT id::text FROM merchant.kitchen_order
+      WHERE merchant_id=$1::uuid AND source_order_id=$2::uuid`,
+    [merchantId, sourceOrderId],
+  );
+  if (existing.rows[0]) return { kitchenOrderId: existing.rows[0].id, created: false };
+
+  const projection = await loadKitchenProjection(client, merchantId, sourceOrderId);
+  if (!projection) return null;
+  const first = projection.rows[0];
+  const { locationId, status } = projection;
+
+  const inserted = await client.query<{ id: string }>(
+    `INSERT INTO merchant.kitchen_order
+       (merchant_id,location_id,source_order_id,public_reference,source,fulfillment_type,
+        business_date,status,route_snapshot,queued_at)
+     VALUES ($1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7::date,$8,$9::jsonb,$10::timestamptz)
+     ON CONFLICT (merchant_id,source_order_id) DO NOTHING
+     RETURNING id::text`,
+    [
+      merchantId,
+      locationId,
+      sourceOrderId,
+      first.publicReference,
+      first.source,
+      first.fulfillmentType,
+      first.businessDate,
+      status,
+      JSON.stringify(projection.routeSnapshot),
+      first.queuedAt,
+    ],
+  );
+  if (!inserted.rows[0]) {
+    const recovered = await client.query<{ id: string }>(
+      `SELECT id::text FROM merchant.kitchen_order
+        WHERE merchant_id=$1::uuid AND source_order_id=$2::uuid`,
+      [merchantId, sourceOrderId],
+    );
+    return recovered.rows[0] ? { kitchenOrderId: recovered.rows[0].id, created: false } : null;
+  }
+  const kitchenOrderId = inserted.rows[0].id;
+
+  await insertKitchenItems(client, merchantId, sourceOrderId, kitchenOrderId, projection);
+
   await client.query(
     `INSERT INTO merchant.kitchen_event
        (event_id,merchant_id,location_id,kitchen_order_id,kind,aggregate_version,status,
@@ -181,10 +229,12 @@ export async function projectKitchenOrder(
              jsonb_build_object('stationIds',$5::jsonb),$6)`,
     [
       merchantId,
-      first.locationId,
+      locationId,
       kitchenOrderId,
       status,
-      JSON.stringify([...new Set(routing.flatMap((route) => route.stationId ?? []))]),
+      JSON.stringify([
+        ...new Set([...projection.routeByLine.values()].flatMap((route) => route.stationId ?? [])),
+      ]),
       `kitchen:create:${sourceOrderId}`,
     ],
   );
@@ -201,10 +251,96 @@ export async function projectKitchenOrder(
   await client.query(`SELECT pg_notify('umi_kitchen_board', $1::text)`, [
     JSON.stringify({
       merchant_id: merchantId,
-      location_id: first.locationId,
+      location_id: locationId,
       kitchen_order_id: kitchenOrderId,
     }),
   ]);
 
   return { kitchenOrderId, created: true };
+}
+
+/**
+ * Send the lines an order gained AFTER it was first projected — the second round
+ * (plan §8.2 F6).
+ *
+ * `projectKitchenOrder` projects an order once and returns the existing ticket on
+ * every later call, so it cannot grow a ticket. This is the other half: it finds
+ * the ticket the order already has, inserts the items that are missing, and
+ * appends the `order_updated` event a puller needs to see that the ticket changed.
+ * Nothing happens when the order has no ticket: a cart that never fired has
+ * nothing to grow.
+ *
+ * A ticket that already reached `ready` or `completed` goes back to `queued` when
+ * it gains items, because those items ARE new work and a ticket the board drew as
+ * done would hide them.
+ */
+export async function appendKitchenItems(
+  client: Pick<PoolClient, 'query'>,
+  merchantId: string,
+  sourceOrderId: string,
+): Promise<string | null> {
+  const existing = await client.query<{ id: string }>(
+    `SELECT id::text FROM merchant.kitchen_order
+      WHERE merchant_id=$1::uuid AND source_order_id=$2::uuid`,
+    [merchantId, sourceOrderId],
+  );
+  // A ROUND THAT FINDS NO TICKET CREATES ONE. The first round of an order may have had nothing for
+  // the kitchen at all — `projectKitchenOrder` writes no ticket when no line routes to an active
+  // station, which is right: a counter round of drinks and cookies is not kitchen work. The SECOND
+  // round is where the work can start, and this function used to return null here: the new dish was
+  // fired, the till marked the line sent, `POST /orders/fire` answered 201, and no station ever saw
+  // it. Measured on the iMin D3-504 on 2026-10-11 — a Latte added after Americano + Galleta left
+  // `merchant.kitchen_order` without a row for that order.
+  if (!existing.rows[0]) {
+    const projected = await projectKitchenOrder(client, merchantId, sourceOrderId);
+    return projected?.kitchenOrderId ?? null;
+  }
+  const kitchenOrderId = existing.rows[0].id;
+
+  const projection = await loadKitchenProjection(client, merchantId, sourceOrderId);
+  if (!projection) return null;
+  await insertKitchenItems(client, merchantId, sourceOrderId, kitchenOrderId, projection);
+
+  const reopened = await client.query<{ version: number; status: string }>(
+    `UPDATE merchant.kitchen_order
+        SET status = CASE WHEN status IN ('ready','completed','cancelled') THEN 'queued' ELSE status END,
+            version = version + 1,
+            cancelled_at = NULL,
+            cancellation_code = NULL,
+            updated_at = now()
+      WHERE merchant_id=$1::uuid AND id=$2::uuid
+      RETURNING version,status`,
+    [merchantId, kitchenOrderId],
+  );
+  const version = Number(reopened.rows[0]?.version ?? 1);
+  const status = reopened.rows[0]?.status ?? projection.status;
+
+  await client.query(
+    `INSERT INTO merchant.kitchen_event
+       (event_id,merchant_id,location_id,kitchen_order_id,kind,aggregate_version,status,
+        safe_payload,correlation_id)
+     VALUES (gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,'order_updated',$4,$5,
+             jsonb_build_object('stationIds',$6::jsonb),$7)`,
+    [
+      merchantId,
+      projection.locationId,
+      kitchenOrderId,
+      version,
+      status,
+      JSON.stringify([
+        ...new Set([...projection.routeByLine.values()].flatMap((route) => route.stationId ?? [])),
+      ]),
+      `kitchen:append:${sourceOrderId}`,
+    ],
+  );
+
+  await client.query(`SELECT pg_notify('umi_kitchen_board', $1::text)`, [
+    JSON.stringify({
+      merchant_id: merchantId,
+      location_id: projection.locationId,
+      kitchen_order_id: kitchenOrderId,
+    }),
+  ]);
+
+  return kitchenOrderId;
 }

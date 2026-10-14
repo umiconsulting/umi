@@ -1,0 +1,62 @@
+
+> umi-workspace@ format:check /home/juan/Projects/umiconsulting/umi
+> prettier --check .
+
+Checking formatting...
+[warn] apps/umi-api/src/modules/kds/kitchen-projector.spec.ts
+[warn] apps/umi-api/src/modules/pos-cart/account-metadata.integration.ts
+[warn] apps/umi-api/src/modules/pos-cash/pos-cash.repository.ts
+[warn] apps/umi-api/src/modules/pos-cash/shift-resume.integration.ts
+[warn] apps/umi-api/src/modules/pos-catalog/pos-catalog.service.spec.ts
+[warn] apps/umi-api/src/modules/pos-checkout/checkout-order-kitchen.integration.ts
+[warn] apps/umi-api/src/shared/http/all-exceptions.filter.spec.ts
+[warn] apps/umi-api/src/shared/http/error-code-publication.spec.ts
+[warn] docs/architecture/2026-10-12-cierre-de-turno-de-caja-adr.md
+[warn] docs/architecture/2026-10-12-cuentas-abiertas-adr.md
+[warn] docs/design/2026-10-12-promos.md
+[warn] docs/design/UMIPOS_IPHONE_DESIGN.md
+[warn] docs/pilot/UMIPOS_SITE_DEVICE_INVENTORY.md
+[warn] docs/reports/2026-10-11-one-api-one-database.md
+[warn] docs/reports/2026-10-11-the-drawer-the-till-could-not-take-back.md
+[warn] docs/reports/2026-10-11-the-mark-that-reached-the-paper.md
+[warn] docs/reports/2026-10-12-a-takeaway-sale-could-not-be-written.md
+[warn] docs/reports/2026-10-12-midnight-color-exposure.md
+[warn] docs/reports/2026-10-12-order-entry.md
+[warn] docs/reports/2026-10-12-the-state-that-moved-only-when-the-screen-did.md
+[warn] docs/reports/evidence/2026-10-11-dashboard-forgot-password/journey.json
+[warn] docs/reports/evidence/2026-10-11-imin-device-retest/pos-device-click-pass.json
+[warn] docs/reports/evidence/2026-10-11-merchant-logo/walk.json
+[warn] docs/reports/evidence/2026-10-11-onca-console/walk.json
+[warn] docs/reports/evidence/2026-10-12-midnight-audit/color-metrics.json
+[warn] docs/reports/evidence/2026-10-12-midnight-exposure/metrics.json
+[warn] docs/reports/evidence/2026-10-13-cuentas-lista-mapa-cocina-sonidos/dashboard-clicks.json
+[warn] docs/reports/evidence/2026-10-13-tab-a11-layout/landscape-inventory.json
+[warn] docs/reports/evidence/2026-10-13-tab-a11-layout/portrait-inventory.json
+[warn] docs/research/2026-10-12-dark-midnight-color-exposure.md
+[warn] docs/research/2026-10-12-first-use-no-tables.md
+[warn] docs/research/2026-10-12-first-use-no-tables/assets/gallery-check.json
+[warn] docs/research/2026-10-12-first-use-no-tables/assets/INDEX.md
+[warn] docs/research/2026-10-12-first-use-no-tables/assets/routes-extra.json
+[warn] docs/research/2026-10-12-first-use-no-tables/assets/routes.json
+[warn] docs/research/2026-10-12-first-use-no-tables/report.html
+[warn] docs/research/2026-10-12-midnight-color-method.md
+[warn] docs/research/2026-10-12-polotab-menu.md
+[warn] docs/research/2026-10-12-polotab-menu/assets/capture-routes.json
+[warn] docs/research/2026-10-12-polotab-menu/assets/gallery-check.json
+[warn] docs/research/2026-10-12-polotab-menu/assets/gallery.json
+[warn] docs/research/2026-10-12-polotab-menu/assets/INDEX.md
+[warn] docs/research/2026-10-12-polotab-menu/assets/tables-gallery.json
+[warn] docs/research/2026-10-12-polotab-menu/report.html
+[warn] docs/research/2026-10-12-send-pay-handheld.md
+[warn] docs/research/2026-10-12-send-pay-handheld/assets/capture-routes.json
+[warn] docs/research/2026-10-12-send-pay-handheld/assets/INDEX.md
+[warn] docs/research/2026-10-12-service-course-naming.md
+[warn] docs/research/2026-10-12-tableless-visual-flow/assets/capture-routes-extra.json
+[warn] docs/research/2026-10-12-tableless-visual-flow/assets/capture-routes-square.json
+[warn] docs/research/2026-10-12-tableless-visual-flow/assets/capture-routes.json
+[warn] docs/research/2026-10-13-android-pos-updates.md
+[warn] packages/contract/src/schemas.ts
+[warn] tools/ux-sweep/dashboard-merchant-logo.mjs
+[warn] tools/ux-sweep/pos-device-inventory.mjs
+[warn] Code style issues found in 55 files. Run Prettier with --write to fix.
+ ELIFECYCLE  Command failed with exit code 1.

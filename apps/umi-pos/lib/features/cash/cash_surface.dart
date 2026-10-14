@@ -1,31 +1,35 @@
-import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/errors/app_error.dart';
 import '../../core/errors/operator_error_message.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/business_day.dart';
 import '../../shared/widgets/inline_notice.dart';
-import 'cash_approval.dart';
+import '../../shared/widgets/manager_approval.dart';
+import '../../shared/widgets/station_document.dart';
 import 'cash_controller.dart';
 import 'cash_equation.dart';
 import 'cash_journal.dart';
 import 'denomination_counter.dart';
 import 'money_input.dart';
 
-Future<void> showCashCenter(
+Future<bool?> showCashCenter(
   BuildContext context, {
   required CashController controller,
   required OperatorPermissions permissions,
   Future<void> Function()? onHandoffCompleted,
-}) => showDialog<void>(
+  bool returnToCheckout = false,
+}) => showPosDialog<bool>(
   context: context,
-  builder: (_) => Dialog.fullscreen(
+  builder: (_) => PosDialog.fullscreen(
     child: CashCenter(
       controller: controller,
       permissions: permissions,
       onHandoffCompleted: onHandoffCompleted,
+      returnToCheckout: returnToCheckout,
     ),
   ),
 );
@@ -35,11 +39,15 @@ final class CashCenter extends StatefulWidget {
     required this.controller,
     required this.permissions,
     this.onHandoffCompleted,
+    this.returnToCheckout = false,
+    this.embedded = false,
     super.key,
   });
 
   final CashController controller;
   final OperatorPermissions permissions;
+  final bool returnToCheckout;
+  final bool embedded;
   final Future<void> Function()? onHandoffCompleted;
 
   @override
@@ -47,6 +55,7 @@ final class CashCenter extends StatefulWidget {
 }
 
 final class _CashCenterState extends State<CashCenter> {
+  final _mainKey = GlobalKey(debugLabel: 'cash-ready-main');
   @override
   void initState() {
     super.initState();
@@ -106,25 +115,34 @@ final class _CashCenterState extends State<CashCenter> {
     final snapshot = state.snapshot;
     final notice = _noticeFor(context, l, state);
     // The keyboard's cursor for everything on this screen, dialogs included:
-    // `showDialog` captures the inherited themes of the context that opens it, so
+    // `showPosDialog` captures the inherited themes of the context that opens it, so
     // a ring set here reaches the count, movement and close dialogs too.
-    return Theme(
-      data: _cashControls(Theme.of(context)),
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l.cashCenterTitle),
-          leading: Navigator.canPop(context)
-              ? IconButton(
+    return PosTheme(
+      data: _cashControls(PosTheme.of(context)),
+      child: PosPage(
+        appBar: PosHeader(
+          automaticallyImplyLeading: !widget.embedded,
+          title: StationHeading(title: l.cashCenterTitle),
+          leading: !widget.embedded && (ModalRoute.of(context)?.canPop ?? false)
+              ? PosIconButton(
                   tooltip: l.closeAction,
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: const PosIcon(PosGlyphs.close),
                 )
               : null,
           actions: [
-            IconButton(
+            if (widget.returnToCheckout &&
+                widget.controller.activeShiftId != null)
+              PosButton(
+                onPressed: state.busy
+                    ? null
+                    : () => Navigator.pop(context, true),
+                child: Text(l.returnAndChargeAction),
+              ),
+            PosIconButton(
               tooltip: l.retryAction,
               onPressed: state.busy ? null : widget.controller.load,
-              icon: const Icon(Icons.refresh),
+              icon: const PosIcon(PosGlyphs.refresh),
             ),
           ],
         ),
@@ -139,7 +157,7 @@ final class _CashCenterState extends State<CashCenter> {
                   const SizedBox(height: UmiSpacing.md),
                 ],
                 if (state.busy) ...[
-                  const LinearProgressIndicator(),
+                  const PosProgress(),
                   const SizedBox(height: UmiSpacing.md),
                 ],
                 Expanded(
@@ -164,48 +182,59 @@ final class _CashCenterState extends State<CashCenter> {
     );
   }
 
-  /// The whole screen in one viewport, with no page-level scroll view.
-  ///
-  /// The reference viewport for the till is 1280 x 720 logical, and this screen
-  /// used to be a single centred 1040-wide column of stacked cards that ran past
-  /// it: on a counter terminal the operator had to scroll a *cash* screen to
-  /// reach "close the shift". The width was what the layout was wasting. The
-  /// same content fits side by side, and the drawer state, the movements and the
-  /// close path are all visible at once without anything moving under the hand.
   Widget _ready(
     BuildContext context,
     AppLocalizations l,
     CashCenterSnapshot snapshot,
-  ) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _StatusCard(
-        title: _statusHeadline(l, snapshot),
-        register: _registerName(snapshot),
-        businessDate: snapshot.businessDate,
-        // A shift that is open on another terminal still has a drawer, a moment
-        // it opened, and a person holding it. The strip names those too, so the
-        // headline and the panel below it never describe two different days.
-        openedAt:
-            (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt']
-                as String?,
-        closedAt: snapshot.currentShift?['closedAt'] as String?,
-        lastReadAt: widget.controller.lastReadAt,
-        policy: snapshot.policy,
-      ),
-      if (snapshot.summary != null) ...[
-        const SizedBox(height: UmiSpacing.md),
-        _ClosedSummaryCard(summary: snapshot.summary!),
-      ],
-      // An expired policy is a blocking state, not an empty screen: the drawer
-      // is untouched and the terminal cannot move it. The screen says so in
-      // words, and shows the policy it was holding so the owner can see what
-      // lapsed.
-      if (snapshot.recoveryState == 'policy_expired') ...[
-        const SizedBox(height: UmiSpacing.md),
-        Expanded(child: _PolicyExpired(snapshot: snapshot)),
-      ] else ...[
-        if (widget.controller.reclaimableRegisters.isNotEmpty) ...[
+  ) => LayoutBuilder(
+    builder: (context, constraints) {
+      final expired = snapshot.recoveryState == 'policy_expired';
+      final headers = <Widget>[
+        // A SHIFT FROM ANOTHER DAY IS SAID OUT LOUD, BEFORE ANYTHING ELSE.
+        //
+        // The owner's till had a drawer open for more than a hundred hours: the
+        // screen said "abierto hace 113 h 19 min" in the same grey as everything
+        // else, and a number that big reads as a fact rather than as the problem it
+        // is. The drawer belongs to a day, and a shift that crossed the 04:00
+        // boundary is last night's until someone closes it. This is the industry's
+        // cheapest guardrail — the alert Fudo shows when an arqueo is missing, and
+        // the "open shift from yesterday" ChannelDock and Wizerp carry forward —
+        // and it is deliberately a notice and not a lock: the block comes later,
+        // once the system can close a stale shift on its own (owner, 2026-10-12).
+        if (_carriedOverShift(snapshot)) ...[
+          InlineNotice(
+            message: l.cashCarriedOverShiftNotice,
+            tone: InlineNoticeTone.warning,
+          ),
+          const SizedBox(height: UmiSpacing.md),
+        ],
+        _StatusCard(
+          title: _statusHeadline(l, snapshot),
+          register: _registerName(snapshot),
+          businessDate: snapshot.businessDate,
+          openedAt:
+              (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt']
+                  as String?,
+          closedAt: snapshot.currentShift?['closedAt'] as String?,
+          lastReadAt: widget.controller.lastReadAt,
+          policy: snapshot.policy,
+        ),
+        if (snapshot.summary != null) ...[
+          const SizedBox(height: UmiSpacing.md),
+          if (snapshot.currentShift?['status'] == 'closed')
+            _ClosedSummaryCard(summary: snapshot.summary!)
+          else
+            PosDisclosure(
+              title: Text(l.previousShiftSummaryLabel),
+              children: [
+                _ClosedSummaryCard(
+                  summary: snapshot.summary!,
+                  historical: true,
+                ),
+              ],
+            ),
+        ],
+        if (!expired && widget.controller.reclaimableRegisters.isNotEmpty) ...[
           const SizedBox(height: UmiSpacing.md),
           _ReclaimRegisterSection(
             controller: widget.controller,
@@ -213,9 +242,30 @@ final class _CashCenterState extends State<CashCenter> {
           ),
         ],
         const SizedBox(height: UmiSpacing.md),
-        Expanded(child: _main(snapshot)),
-      ],
-    ],
+      ];
+      final main = KeyedSubtree(
+        key: _mainKey,
+        child: expired ? _PolicyExpired(snapshot: snapshot) : _main(snapshot),
+      );
+      if (constraints.maxWidth < 600 &&
+          MediaQuery.textScalerOf(context).scale(16) >= 24) {
+        return CustomScrollView(
+          slivers: [
+            for (final header in headers) SliverToBoxAdapter(child: header),
+            SliverToBoxAdapter(
+              child: SizedBox(height: constraints.maxHeight, child: main),
+            ),
+          ],
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...headers,
+          Expanded(child: main),
+        ],
+      );
+    },
   );
 
   Widget _main(CashCenterSnapshot snapshot) {
@@ -503,7 +553,7 @@ final class _SkeletonCard extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => PosCard(
     child: Padding(
       padding: const EdgeInsets.all(UmiSpacing.lg),
       child: Column(
@@ -533,7 +583,7 @@ final class _SkeletonBar extends StatelessWidget {
     width: width,
     height: height,
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: PosTheme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(corner),
     ),
   );
@@ -570,7 +620,7 @@ final class _PolicyExpired extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Center(
       child: SingleChildScrollView(
         child: ConstrainedBox(
@@ -578,7 +628,7 @@ final class _PolicyExpired extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Card(
+              PosCard(
                 child: Padding(
                   padding: const EdgeInsets.all(UmiSpacing.lg),
                   child: Column(
@@ -586,8 +636,8 @@ final class _PolicyExpired extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(
-                            Icons.warning_amber_outlined,
+                          const PosIcon(
+                            PosGlyphs.warningAmberOutlined,
                             size: 24,
                             color: UmiTheme.warning,
                           ),
@@ -625,7 +675,7 @@ final class _PolicyExpired extends StatelessWidget {
 /// The Caja screen's own failure surface.
 ///
 /// Shown when the first load never produced a snapshot. Before this existed the
-/// screen rendered a bare `CircularProgressIndicator` for that state, so a
+/// screen rendered a bare `PosSpinner` for that state, so a
 /// failed load was indistinguishable from a slow one and an operator had nothing
 /// to press — the plan's §4 bar requires a typed message with a recovery action,
 /// and the refresh icon in the app bar was the only way out (and is disabled
@@ -640,13 +690,13 @@ final class _CashUnavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
-          child: Card(
+          child: PosCard(
             child: Padding(
               padding: const EdgeInsets.all(UmiSpacing.lg),
               child: Column(
@@ -655,8 +705,8 @@ final class _CashUnavailable extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.error_outline,
+                      PosIcon(
+                        PosGlyphs.errorOutline,
                         size: 24,
                         color: theme.colorScheme.error,
                       ),
@@ -685,11 +735,11 @@ final class _CashUnavailable extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: UmiSpacing.lg),
-                  FilledButton.icon(
+                  PosButton.icon(
                     onPressed: onRetry,
-                    icon: const Icon(Icons.refresh),
+                    icon: const PosIcon(PosGlyphs.refresh),
                     label: Text(l.retryAction),
-                    style: FilledButton.styleFrom(
+                    style: PosButton.styleFrom(
                       minimumSize: const Size(0, UmiTouchTarget.primary),
                     ),
                   ),
@@ -704,9 +754,10 @@ final class _CashUnavailable extends StatelessWidget {
 }
 
 final class _ClosedSummaryCard extends StatelessWidget {
-  const _ClosedSummaryCard({required this.summary});
+  const _ClosedSummaryCard({required this.summary, this.historical = false});
 
   final Map<String, Object?> summary;
+  final bool historical;
 
   @override
   Widget build(BuildContext context) {
@@ -716,9 +767,9 @@ final class _ClosedSummaryCard extends StatelessWidget {
     // closure announcement rides on the semantics node so a screen reader hears
     // the change of state even though the words moved.
     return Semantics(
-      liveRegion: true,
-      label: l.shiftClosedMessage,
-      child: Card(
+      liveRegion: !historical,
+      label: historical ? l.previousShiftSummaryLabel : l.shiftClosedMessage,
+      child: PosCard(
         child: Padding(
           padding: const EdgeInsets.all(UmiSpacing.lg),
           child: Column(
@@ -726,7 +777,7 @@ final class _ClosedSummaryCard extends StatelessWidget {
             children: [
               Text(
                 l.cashVarianceTitle,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: PosTheme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: UmiSpacing.md),
               Wrap(
@@ -766,6 +817,21 @@ final class _ClosedSummaryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// THE DRAWER'S DAY STARTS AT 04:00 — the same boundary the ledger books by.
+///
+/// A café's day does not end at midnight: it ends when the last guests leave, and
+/// this product already decided that the operational day turns at four in the
+/// morning. A shift opened before the boundary that closes the current business day
+/// belongs to the day before, however small the elapsed time on the screen looks, and
+/// it has to be dealt with before today's money is counted into the same drawer.
+bool _carriedOverShift(CashCenterSnapshot snapshot) {
+  final raw = (snapshot.currentShift ?? snapshot.adoptableShift)?['openedAt'];
+  if (raw is! String) return false;
+  final opened = DateTime.tryParse(raw);
+  if (opened == null) return false;
+  return opened.isBefore(operationalDayStart(DateTime.now()));
 }
 
 final class _StatusCard extends StatelessWidget {
@@ -843,78 +909,58 @@ final class _StatusCard extends StatelessWidget {
         // what a person needs either way.
         '${l.cashPolicyExpiresAtLabel} ${_datePart(expiresAt)}',
     ].join(' · ');
-    return Card(
+    final theme = PosTheme.of(context);
+    final metadata = <Widget>[
+      if (register.isNotEmpty) Text(register),
+      Text(businessDate),
+      if (openFor != null) Text(openFor),
+      if (lastReadAt != null)
+        Text(
+          '${l.cashLastReadLabel} '
+          '${lastReadAt!.hour.toString().padLeft(2, '0')}:'
+          '${lastReadAt!.minute.toString().padLeft(2, '0')}',
+        ),
+      if (policyIdentity.isNotEmpty) Text(policyIdentity),
+    ];
+    final headline = Semantics(
+      container: true,
+      liveRegion: true,
+      child: Text(title, style: theme.textTheme.titleLarge),
+    );
+    return PosCard(
       child: Padding(
-        padding: const EdgeInsets.all(UmiSpacing.lg),
-        // One strip that scrolls sideways instead of wrapping: the state strip
-        // must never grow taller. The state belongs at the top; the thresholds
-        // that govern it have their own card in the right column, where they can
-        // be read as rules instead of as a row of fragments.
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              Icon(
-                Icons.point_of_sale,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: UmiSpacing.md),
-              // The live region is the state, and only the state. It used to wrap
-              // the whole screen, which told a screen reader that every change
-              // anywhere — a spinner, a refresh — was an announcement worth
-              // interrupting for.
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.headlineSmall,
+        padding: const EdgeInsets.all(UmiSpacing.md),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PosIcon(
+                      PosGlyphs.pointOfSale,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: UmiSpacing.md),
+                    Expanded(child: headline),
+                  ],
                 ),
-              ),
-              if (register.isNotEmpty) ...[
-                const SizedBox(width: UmiSpacing.xl),
-                Text(register),
-              ],
-              const SizedBox(width: UmiSpacing.xl),
-              Text(businessDate),
-              if (openFor != null) ...[
-                const SizedBox(width: UmiSpacing.xl),
-                Icon(
-                  Icons.schedule,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
-                const SizedBox(width: UmiSpacing.xs),
-                Text(openFor),
-              ],
-              // The state of the drawer as of a moment ago. On a counter where
-              // two people can touch the same drawer, "how old is this screen?"
-              // is the question behind every disagreement about a number — and
-              // the only honest answer is a time, not a green dot.
-              if (lastReadAt != null) ...[
-                const SizedBox(width: UmiSpacing.xl),
-                Text(
-                  '${l.cashLastReadLabel} '
-                  '${lastReadAt!.hour.toString().padLeft(2, '0')}:'
-                  '${lastReadAt!.minute.toString().padLeft(2, '0')}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
+                const SizedBox(height: UmiSpacing.sm),
+                DefaultTextStyle(
+                  style: theme.textTheme.bodySmall!.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  child: Wrap(
+                    spacing: UmiSpacing.md,
+                    runSpacing: UmiSpacing.xs,
+                    children: metadata,
                   ),
                 ),
               ],
-              // Which policy this till is holding, and the day it lapses. An
-              // operator on the phone with support is asked both, and the second
-              // is worth seeing before it bites rather than only after.
-              if (policyIdentity.isNotEmpty) ...[
-                const SizedBox(width: UmiSpacing.xl),
-                Text(
-                  policyIdentity,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                ),
-              ],
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -936,7 +982,7 @@ final class _AdoptShiftSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final state = controller.state;
     final snapshot = state.snapshot;
     final shift = snapshot?.adoptableShift;
@@ -962,7 +1008,7 @@ final class _AdoptShiftSection extends StatelessWidget {
       work: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Card(
+          PosCard(
             child: Padding(
               padding: const EdgeInsets.all(UmiSpacing.lg),
               child: Column(
@@ -975,13 +1021,13 @@ final class _AdoptShiftSection extends StatelessWidget {
                   const SizedBox(height: UmiSpacing.md),
                   Text(l.adoptShiftMessage, style: theme.textTheme.bodyLarge),
                   const SizedBox(height: UmiSpacing.lg),
-                  FilledButton.icon(
+                  PosButton.icon(
                     onPressed: state.busy || !canAdopt
                         ? null
                         : () => controller.adoptShift(),
-                    icon: const Icon(Icons.sync_alt),
+                    icon: const PosIcon(PosGlyphs.syncAlt),
                     label: Text(l.adoptShiftAction),
-                    style: FilledButton.styleFrom(
+                    style: PosButton.styleFrom(
                       minimumSize: const Size(0, UmiTouchTarget.primary),
                     ),
                   ),
@@ -1031,26 +1077,55 @@ final class _AdoptShiftSection extends StatelessWidget {
 /// layout at the moment they have the least attention to spare — and before this
 /// shell existed, both of these screens were a 720 px card floating in a 1920 px
 /// void, which reads as a dialog that failed to open rather than as a screen.
-final class _ShiftShell extends StatelessWidget {
-  const _ShiftShell({required this.work, required this.rail});
+final class _ShiftShell extends StatefulWidget {
+  const _ShiftShell({required this.work, required this.rail, this.footer});
 
   final Widget work;
   final List<Widget> rail;
+  final Widget? footer;
+
+  @override
+  State<_ShiftShell> createState() => _ShiftShellState();
+}
+
+final class _ShiftShellState extends State<_ShiftShell> {
+  // Responsive layouts move these sections between different scroll views.
+  // Keep their state, field controllers and focus when their parent changes.
+  final _workKey = GlobalKey(debugLabel: 'cash-shift-work');
+  final _railKey = GlobalKey(debugLabel: 'cash-shift-rail');
+  final _footerKey = GlobalKey(debugLabel: 'cash-shift-footer');
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final railColumn = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final (index, card) in rail.indexed) ...[
-            if (index > 0) const SizedBox(height: UmiSpacing.md),
-            card,
+      final work = KeyedSubtree(key: _workKey, child: widget.work);
+      final footer = widget.footer == null
+          ? null
+          : KeyedSubtree(key: _footerKey, child: widget.footer!);
+      final railColumn = KeyedSubtree(
+        key: _railKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (index, card) in widget.rail.indexed) ...[
+              if (index > 0) const SizedBox(height: UmiSpacing.md),
+              card,
+            ],
           ],
-        ],
+        ),
       );
-      if (constraints.maxWidth < 1000) {
+      if (footer != null &&
+          constraints.maxHeight <
+              160 * MediaQuery.textScalerOf(context).scale(1)) {
         return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [work, railColumn, footer],
+          ),
+        );
+      }
+      if (constraints.maxWidth < 1000) {
+        final content = SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1060,11 +1135,28 @@ final class _ShiftShell extends StatelessWidget {
             ],
           ),
         );
+        if (footer == null) return content;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: content),
+            footer,
+          ],
+        );
       }
       return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(flex: 3, child: SingleChildScrollView(child: work)),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: SingleChildScrollView(child: work)),
+                ?footer,
+              ],
+            ),
+          ),
           const SizedBox(width: UmiSpacing.lg),
           Expanded(flex: 2, child: SingleChildScrollView(child: railColumn)),
         ],
@@ -1072,6 +1164,15 @@ final class _ShiftShell extends StatelessWidget {
     },
   );
 }
+
+/// True when the location's policy hides the drawer total until the count is in.
+///
+/// The policy is the owner's rule, and the screen follows it: a blind location
+/// never reads its own drawer before the count, a visible one reads it all the
+/// time. The card used to hide the total whenever the server withheld it, which
+/// made the flag decorative.
+bool _blindCount(CashCenterSnapshot? snapshot) =>
+    (snapshot?.policy['blindCountRequired'] as bool?) ?? true;
 
 /// `HH:mm` in the terminal's own zone, for a moment the operator remembers
 /// rather than a timestamp they have to convert.
@@ -1103,7 +1204,7 @@ final class _ReclaimRegisterSection extends StatelessWidget {
     final canReclaim =
         permissions.allows('cash.shift.open') && state.snapshot != null;
     final registers = controller.reclaimableRegisters;
-    return Card(
+    return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: Column(
@@ -1111,13 +1212,13 @@ final class _ReclaimRegisterSection extends StatelessWidget {
           children: [
             Text(
               l.reclaimRegisterTitle,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: PosTheme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: UmiSpacing.sm),
             Text(l.reclaimRegisterMessage),
             const SizedBox(height: UmiSpacing.lg),
             for (final register in registers) ...[
-              FilledButton.tonal(
+              PosButton.tonal(
                 onPressed: state.busy || !canReclaim
                     ? null
                     : () =>
@@ -1186,6 +1287,10 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
         widget.permissions.allows('cash.shift.open') &&
         (snapshot?.allowedActions.contains('open_shift') ?? false);
     final shortFloat = floatRequired && floatTally.totalMinorUnits <= 0;
+    final maximum = policy?['maximumOpeningFloat'];
+    final maximumMinor = maximum is Map ? maximum['minorUnits'] : null;
+    final exceedsMaximum =
+        maximumMinor is num && floatTally.totalMinorUnits > maximumMinor;
     // The drawer in front of the operator was left behind by a terminal that is
     // gone. Opening a shift here is allowed — and it costs something the form
     // never mentioned: the stranded shift is blocked without a count, and its
@@ -1199,82 +1304,132 @@ final class _OpenShiftSectionState extends State<_OpenShiftSection> {
         selectedRegister != null &&
         !widget.controller.state.busy &&
         canOpen &&
-        !shortFloat;
+        !shortFloat &&
+        !exceedsMaximum;
 
-    // The work is the count. The drawer and the policy are facts about the shift
-    // the count is about to open, so they sit in the rail where the running
-    // shift keeps the same two things.
+    final counted = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(l.countedTotalLabel),
+        Text(
+          _money({
+            'minorUnits': floatTally.totalMinorUnits,
+            'currency': currency,
+          }),
+          style: PosTheme.of(context).textTheme.headlineSmall,
+        ),
+      ],
+    );
+    final opening = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PosButton.icon(
+          onPressed: enabled
+              ? () => widget.controller.openShift(
+                  registerId: selectedRegister!,
+                  amountMinorUnits: floatTally.totalMinorUnits,
+                  denominations: floatTally.lines,
+                )
+              : null,
+          icon: const PosIcon(PosGlyphs.lockOpen),
+          label: Text(l.openShiftAction),
+          style: PosButton.styleFrom(
+            minimumSize: const Size(0, UmiTouchTarget.primary),
+          ),
+        ),
+        if (shortFloat) ...[
+          const SizedBox(height: UmiSpacing.sm),
+          Text(
+            l.openingFloatRequiredHint,
+            textAlign: TextAlign.center,
+            style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+              color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+        if (exceedsMaximum) ...[
+          const SizedBox(height: UmiSpacing.sm),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              l.openingFloatExceedsMaximum(
+                formatMinorUnits(maximumMinor.toInt(), currency),
+              ),
+              textAlign: TextAlign.center,
+              style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+                color: PosTheme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
     return _ShiftShell(
-      work: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(UmiSpacing.lg),
+      work: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.md),
+        child: StationSection(
+          title: l.openingFloatLabel,
+          inlineTitle: false,
+          padding: const EdgeInsets.symmetric(vertical: UmiSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                l.openingFloatLabel,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: UmiSpacing.md),
               DenominationCounter(
                 key: ValueKey(currency),
                 currency: currency,
                 denominations: denominationsFromPolicy(policy),
+                showTotal: false,
                 onChanged: (value) => setState(() => floatTally = value),
               ),
-              // What this particular drawer costs before the form is filled in,
-              // not after it fails.
               if (stranded) ...[
                 const SizedBox(height: UmiSpacing.md),
                 _Note(
-                  icon: Icons.warning_amber_outlined,
+                  icon: PosGlyphs.warningAmberOutlined,
                   text: l.openShiftOnStrandedDrawerMessage,
-                ),
-              ],
-              const SizedBox(height: UmiSpacing.lg),
-              Divider(
-                height: 1,
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-              const SizedBox(height: UmiSpacing.md),
-              FilledButton.icon(
-                onPressed: enabled
-                    ? () => widget.controller.openShift(
-                        registerId: selectedRegister!,
-                        amountMinorUnits: floatTally.totalMinorUnits,
-                        denominations: floatTally.lines,
-                      )
-                    : null,
-                icon: const Icon(Icons.lock_open),
-                label: Text(l.openShiftAction),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, UmiTouchTarget.primary),
-                ),
-              ),
-              // A button that refuses without saying why is a dead end. The one
-              // rule the operator can fix on this screen is stated under it.
-              if (shortFloat) ...[
-                const SizedBox(height: UmiSpacing.sm),
-                Text(
-                  l.openingFloatRequiredHint,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
                 ),
               ],
             ],
           ),
         ),
       ),
+      footer: PosCard(
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        child: Padding(
+          padding: const EdgeInsets.all(UmiSpacing.md),
+          child: LayoutBuilder(
+            builder: (context, box) =>
+                box.maxWidth >= 560 &&
+                    MediaQuery.textScalerOf(context).scale(16) < 24
+                ? Row(
+                    children: [
+                      SizedBox(width: 216, child: counted),
+                      const SizedBox(width: 24),
+                      Expanded(child: opening),
+                    ],
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      counted,
+                      const SizedBox(height: UmiSpacing.sm),
+                      opening,
+                    ],
+                  ),
+          ),
+        ),
+      ),
       rail: [
         _SectionCard(
           title: l.registerAssignedLabel,
-          child: DropdownButtonFormField<String>(
+          child: PosSelectFormField<String>(
             initialValue: selectedRegister,
             items: widget.registers
                 .map(
-                  (register) => DropdownMenuItem(
+                  (register) => PosSelectItem(
                     value: register['id'] as String,
                     child: Text(register['displayName'] as String? ?? ''),
                   ),
@@ -1320,28 +1475,28 @@ final class _ActiveShiftSection extends StatelessWidget {
       if (actions.contains('movement') &&
           permissions.allows('cash.movement.paid_in'))
         _Action(
-          icon: Icons.add_circle_outline,
+          icon: PosGlyphs.addCircleOutline,
           label: l.paidInAction,
           onPressed: () => _movement(context, controller, 'paid_in'),
         ),
       if (actions.contains('movement') &&
           permissions.allows('cash.movement.paid_out'))
         _Action(
-          icon: Icons.remove_circle_outline,
+          icon: PosGlyphs.removeCircleOutline,
           label: l.paidOutAction,
           onPressed: () => _movement(context, controller, 'paid_out'),
         ),
       if (actions.contains('movement') &&
           permissions.allows('cash.movement.safe_drop'))
         _Action(
-          icon: Icons.savings_outlined,
+          icon: PosGlyphs.savingsOutlined,
           label: l.safeDropAction,
           onPressed: () => _movement(context, controller, 'safe_drop'),
         ),
       if (actions.contains('no_sale') &&
           permissions.allows('cash.drawer.no_sale'))
         _Action(
-          icon: Icons.point_of_sale_outlined,
+          icon: PosGlyphs.pointOfSaleOutlined,
           label: l.noSaleDrawerAction,
           onPressed: () => _noSale(context, controller),
         ),
@@ -1352,20 +1507,20 @@ final class _ActiveShiftSection extends StatelessWidget {
       if (actions.contains('suspend') &&
           permissions.allows('cash.shift.suspend'))
         _Action(
-          icon: Icons.pause_circle_outline,
+          icon: PosGlyphs.pauseCircleOutline,
           label: l.suspendShiftAction,
           onPressed: () => controller.suspendOrResume(suspend: true),
         ),
       if (actions.contains('resume') && permissions.allows('cash.shift.resume'))
         _Action(
-          icon: Icons.play_circle_outline,
+          icon: PosGlyphs.playCircleOutline,
           label: l.resumeShiftAction,
           onPressed: () => controller.suspendOrResume(suspend: false),
         ),
       if (actions.contains('handoff') &&
           permissions.allows('cash.shift.handoff'))
         _Action(
-          icon: Icons.swap_horiz,
+          icon: PosGlyphs.swapHoriz,
           label: l.handoffShiftAction,
           onPressed: () => _handoff(context, controller, onHandoffCompleted),
         ),
@@ -1473,7 +1628,9 @@ final class _ActiveShiftSection extends StatelessWidget {
     final ({String label, VoidCallback onPressed})? nextStep =
         !countDone && canCount
         ? (
-            label: l.blindCountAction,
+            label: _blindCount(snapshot)
+                ? l.blindCountAction
+                : l.countDrawerAction,
             onPressed: () => _count(context, controller),
           )
         : canResolve && resolveNeeded
@@ -1490,7 +1647,7 @@ final class _ActiveShiftSection extends StatelessWidget {
           )
         : null;
 
-    Widget closeCard() => Card(
+    Widget closeCard() => PosCard(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: Column(
@@ -1501,7 +1658,7 @@ final class _ActiveShiftSection extends StatelessWidget {
               // The same weight as every other card title on the screen: the
               // state strip carries the screen's headline, and each card below
               // it is a section of it, not a screen of its own.
-              style: Theme.of(context).textTheme.titleMedium,
+              style: PosTheme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: UmiSpacing.md),
             _closeSteps(
@@ -1522,18 +1679,21 @@ final class _ActiveShiftSection extends StatelessWidget {
                 liveRegion: true,
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.lock_outline,
+                    PosIcon(
+                      PosGlyphs.lockOutline,
                       size: 18,
-                      color: Theme.of(context).colorScheme.outline,
+                      color: PosTheme.of(context).colorScheme.outline,
                     ),
                     const SizedBox(width: UmiSpacing.sm),
                     Expanded(
                       child: Text(
                         l.shiftClosedMessage,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                        style: PosTheme.of(context).textTheme.bodyMedium
+                            ?.copyWith(
+                              color: PosTheme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                       ),
                     ),
                   ],
@@ -1544,14 +1704,14 @@ final class _ActiveShiftSection extends StatelessWidget {
               // A hairline, then the one action. Without it the button reads as
               // the fourth step's own control instead of the next step's.
               const SizedBox(height: UmiSpacing.md),
-              Divider(
+              PosDivider(
                 height: 1,
-                color: Theme.of(context).colorScheme.outlineVariant,
+                color: PosTheme.of(context).colorScheme.outlineVariant,
               ),
               const SizedBox(height: UmiSpacing.md),
-              FilledButton(
+              PosButton(
                 onPressed: state.busy ? null : nextStep.onPressed,
-                style: FilledButton.styleFrom(
+                style: PosButton.styleFrom(
                   minimumSize: const Size(0, UmiTouchTarget.primary),
                 ),
                 child: Text(nextStep.label),
@@ -1559,7 +1719,7 @@ final class _ActiveShiftSection extends StatelessWidget {
             ],
             if (countDone && canCount) ...[
               const SizedBox(height: UmiSpacing.sm),
-              TextButton(
+              PosTextButton(
                 onPressed: state.busy
                     ? null
                     : () => _count(context, controller),
@@ -1572,11 +1732,11 @@ final class _ActiveShiftSection extends StatelessWidget {
             // did not mean to end.
             if (canCancelCount) ...[
               const SizedBox(height: UmiSpacing.xs),
-              TextButton.icon(
+              PosTextButton.icon(
                 onPressed: state.busy
                     ? null
                     : () => _cancelCount(context, controller),
-                icon: const Icon(Icons.undo),
+                icon: const PosIcon(PosGlyphs.undo),
                 label: Text(l.cancelCountAction),
               ),
             ],
@@ -1595,7 +1755,7 @@ final class _ActiveShiftSection extends StatelessWidget {
           title: l.cashReadOnlyTitle,
           child: Text(
             l.cashReadOnlyMessage,
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: PosTheme.of(context).textTheme.bodyMedium,
           ),
         ),
         const SizedBox(height: UmiSpacing.md),
@@ -1766,7 +1926,7 @@ final class _SectionCard extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => PosCard(
     child: Padding(
       // One padding for every card on the screen. The eye reads the left edge of
       // a column of cards as one line, and a card whose content starts 8 px
@@ -1775,7 +1935,7 @@ final class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          Text(title, style: PosTheme.of(context).textTheme.titleMedium),
           const SizedBox(height: UmiSpacing.md),
           child,
         ],
@@ -1807,7 +1967,7 @@ final class _CloseStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final complete = done || skipped;
     final active = complete || current;
@@ -1840,8 +2000,8 @@ final class _CloseStep extends StatelessWidget {
                     ? Duration.zero
                     : UmiMotion.fast,
                 child: complete
-                    ? Icon(
-                        Icons.check,
+                    ? PosIcon(
+                        PosGlyphs.check,
                         key: const ValueKey('done'),
                         size: 18,
                         color: scheme.onPrimary,
@@ -1933,13 +2093,13 @@ final class _Action extends StatelessWidget {
     required this.onPressed,
   });
 
-  final IconData icon;
+  final PosGlyph icon;
   final String label;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     // A till is read in a hurry and in low light. A bare outline on a near-black
     // surface is a shape the eye files as a panel, not as a control — the tiles
@@ -1948,12 +2108,12 @@ final class _Action extends StatelessWidget {
     // me" without competing with the single primary action in the rail.
     return SizedBox(
       height: UmiTouchTarget.minimum,
-      child: OutlinedButton.icon(
+      child: PosOutlineButton.icon(
         onPressed: onPressed,
-        icon: Icon(icon, size: 20),
+        icon: PosIcon(icon, size: 20),
         label: Text(label),
         style:
-            OutlinedButton.styleFrom(
+            PosOutlineButton.styleFrom(
               foregroundColor: scheme.onSurface,
               backgroundColor: scheme.surfaceContainerHighest,
               iconColor: scheme.primary,
@@ -1979,7 +2139,7 @@ final class _VarianceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final signed = variance['signedVariance']! as Map<String, Object?>;
 
     // The card that decides whether the shift can move on states the outcome in
@@ -2002,7 +2162,7 @@ final class _VarianceCard extends StatelessWidget {
         ? l.cashVarianceApprovalRequiredLabel
         : l.cashVarianceNoApprovalLabel;
 
-    return Card(
+    return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: cashFiguresAndTotal(
@@ -2141,7 +2301,7 @@ String _datePart(String timestamp) {
 /// drop back to the resting border when it does not: a change in *shape* that
 /// survives being read by someone who cannot see the colour at all.
 WidgetStateProperty<BorderSide?> _focusSide(
-  ThemeData theme, {
+  PosThemeData theme, {
   required bool filled,
   BorderSide resting = BorderSide.none,
 }) => WidgetStateProperty.resolveWith((states) {
@@ -2157,56 +2317,15 @@ WidgetStateProperty<BorderSide?> _focusSide(
 
 /// This screen's controls, with the keyboard's cursor drawn on every one of them.
 ///
-/// Material 3 draws a focus border for outlined buttons only. A filled button, a
+/// PosSurface 3 draws a focus border for outlined buttons only. A filled button, a
 /// text button and an icon button change on focus by an overlay alone — and the
 /// theme sets that overlay to 22 % of the accent, which on this near-black ground
 /// moves the fill by about seven per cent. On a counter where the operator's next
 /// press spends money, "about seven per cent" is not a state.
 ///
-/// The resting side is `none` for these three, which is exactly what Material
+/// The resting side is `none` for these three, which is exactly what PosSurface
 /// gives them, so nothing about the screen changes until a control has focus.
-ThemeData _cashControls(ThemeData base) {
-  final scheme = base.colorScheme;
-  return base.copyWith(
-    // Two clauses of the design language that the shared theme sets on the large
-    // sizes only: weight 600 for titles, and 1.45–1.5 line height for
-    // operational text. The card titles on this screen are `titleMedium`, and
-    // the journal's detail lines, the step notes and the masked-total hint are
-    // `bodySmall` — so they opt in here, where the till's own controls live.
-    textTheme: base.textTheme.copyWith(
-      titleMedium: base.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
-      bodySmall: base.textTheme.bodySmall?.copyWith(height: 1.45),
-    ),
-    filledButtonTheme: FilledButtonThemeData(
-      style: (base.filledButtonTheme.style ?? const ButtonStyle()).copyWith(
-        side: _focusSide(base, filled: true),
-      ),
-    ),
-    textButtonTheme: TextButtonThemeData(
-      style: (base.textButtonTheme.style ?? const ButtonStyle()).copyWith(
-        side: _focusSide(base, filled: false),
-      ),
-    ),
-    iconButtonTheme: IconButtonThemeData(
-      style: (base.iconButtonTheme.style ?? const ButtonStyle()).copyWith(
-        side: _focusSide(base, filled: false),
-      ),
-    ),
-    // Outlined buttons already carry a border, so theirs has to keep the resting
-    // colour Material would have drawn and thicken into the ring on focus.
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: (base.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
-        side: _focusSide(
-          base,
-          filled: false,
-          resting: BorderSide(color: scheme.outline),
-        ),
-      ),
-    ),
-  );
-}
+PosThemeData _cashControls(PosThemeData base) => base;
 
 /// One paragraph of context inside a cash dialog.
 ///
@@ -2221,13 +2340,13 @@ final class _Note extends StatelessWidget {
     this.figures = const [],
   });
 
-  final IconData icon;
+  final PosGlyph icon;
   final String text;
   final List<Widget> figures;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
@@ -2242,7 +2361,11 @@ final class _Note extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                PosIcon(
+                  icon,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: UmiSpacing.sm),
                 Expanded(
                   child: Text(
@@ -2279,7 +2402,7 @@ final class _Figure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2313,14 +2436,10 @@ Future<void> _noSale(BuildContext context, CashController controller) async {
     title: l.managerApprovalTitle,
     confirmLabel: l.confirmAction,
     cancelLabel: l.closeAction,
-    above: (context, _) => _Note(icon: Icons.history, text: l.noSaleDialogHint),
+    above: (context, _) =>
+        _Note(icon: PosGlyphs.history, text: l.noSaleDialogHint),
     fields: [
-      CashDialogField(
-        label: l.managerPinLabel,
-        obscure: true,
-        numeric: true,
-        autofocus: true,
-      ),
+      cashManagerPinField(l, autofocus: true),
     ],
   );
   if (answer == null || !context.mounted) return;
@@ -2328,6 +2447,9 @@ Future<void> _noSale(BuildContext context, CashController controller) async {
     managerPin: answer.values.first,
     reasonCode: reasonCode,
   );
+  // A refused approval is on the screen and the drawer stays shut. Asking anyway
+  // would pulse a drawer the manager did not authorise.
+  if (approval == null || !context.mounted) return;
   await controller.requestNoSale(
     reasonCode,
     approvalId: approval.approvalId,
@@ -2408,7 +2530,7 @@ Future<void> _movement(
           // interrupts and a till that explains.
           if (threshold != null)
             _Note(
-              icon: Icons.info_outline,
+              icon: PosGlyphs.infoOutline,
               text: l.cashMovementApprovalHint(
                 formatMinorUnits(threshold.toInt(), currency),
               ),
@@ -2485,7 +2607,7 @@ Future<void> _movement(
         // The design language asks for the operation, the scope and the amount
         // *before* the PIN. The approval dialog carries all three, and the
         // refusal from the last attempt, over the drawer it is authorizing.
-        final managerPin = await showCashApprovalDialog(
+        final managerPin = await showManagerApprovalDialog(
           context,
           request: prompt,
           failure: pinRefusal?.message,
@@ -2543,7 +2665,7 @@ Future<void> _handoff(
     confirmLabel: l.confirmAction,
     cancelLabel: l.closeAction,
     above: (context, _) =>
-        _Note(icon: Icons.swap_horiz, text: l.handoffDialogHint),
+        _Note(icon: PosGlyphs.swapHoriz, text: l.handoffDialogHint),
     fields: [
       CashDialogField(
         label: l.incomingOperatorPinLabel,
@@ -2564,22 +2686,40 @@ Future<void> _handoff(
 Future<void> _count(BuildContext context, CashController controller) async {
   final l = AppLocalizations.of(context);
   if (controller.state.count != null) {
-    await controller.requestRecount();
-    if (controller.state.errorCode != null) return;
+    // A drawer that is ALREADY under count does not need a recount request: that
+    // is the state a recount leaves behind, and the count was never submitted
+    // because the sheet was closed mid-count. Asking again is refused - correctly
+    // - and bailing out here left the operator with no control that could submit
+    // the count, so the shift could never leave `counting` and the drawer could
+    // never be closed. The dialog below IS what submits it.
+    final alreadyCounting =
+        (controller.state.snapshot?.currentShift?['status'] as String?) == 'counting';
+    if (!alreadyCounting) {
+      await controller.requestRecount();
+      if (controller.state.errorCode != null) return;
+    }
     if (!context.mounted) return;
   }
   final snapshot = controller.state.snapshot;
   final currency = snapshot?.currentShift?['currency'] as String? ?? 'MXN';
+  final blind = _blindCount(snapshot);
+  // The policy decides the shape of the count, and the two settings travel
+  // together: a blind location counts the drawer piece by piece, a visible one
+  // only asks for the total. The till follows the policy the owner set.
+  final totalOnly =
+      (snapshot?.policy['countMethod'] as String?) == 'total_only';
   final previous = controller.state.count;
   final attempt =
       ((previous?.count['attemptNumber'] as num?)?.toInt() ?? 0) + 1;
   var tally = const DenominationTally(0, <Map<String, Object?>>[]);
-  final accepted = await showDialog<bool>(
+  final total = TextEditingController();
+  int? totalMinorUnits;
+  final accepted = await showPosDialog<bool>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) => AlertDialog(
-        title: Text(l.blindCountAction),
-        // A teller counting on a small window gets the whole drawer. Material's
+      builder: (context, setState) => PosAlertDialog(
+        title: Text(blind ? l.blindCountAction : l.countDrawerAction),
+        // A teller counting on a small window gets the whole drawer. PosSurface's
         // default 40 px inset on each side left the quantity rows 10 px wider
         // than the content box, and the dialog reported it as an overflow stripe
         // across the steppers.
@@ -2608,40 +2748,66 @@ Future<void> _count(BuildContext context, CashController controller) async {
                 // one replaces the last. Both are facts the operator has to know
                 // *before* they add up the drawer, not after they submit it.
                 _Note(
-                  icon: Icons.visibility_off_outlined,
+                  icon: blind
+                      ? PosGlyphs.visibilityOffOutlined
+                      : PosGlyphs.visibilityOutlined,
                   text: previous == null
-                      ? l.countDialogBlindHint
+                      ? (blind
+                            ? l.countDialogBlindHint
+                            : l.countDialogVisibleHint)
                       : l.countDialogRecountHint(attempt),
                 ),
                 const SizedBox(height: UmiSpacing.md),
-                DenominationCounter(
-                  currency: currency,
-                  denominations: denominationsFromPolicy(snapshot?.policy),
-                  onChanged: (value) => setState(() => tally = value),
-                ),
+                if (totalOnly)
+                  PosField(
+                    controller: total,
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: PosFieldDecoration(
+                      labelText: l.countedCashLabel,
+                      prefixText: '$currency ',
+                    ),
+                    onChanged: (value) => setState(
+                      () => totalMinorUnits = parseMinorUnits(value),
+                    ),
+                  )
+                else
+                  DenominationCounter(
+                    currency: currency,
+                    denominations: denominationsFromPolicy(snapshot?.policy),
+                    onChanged: (value) => setState(() => tally = value),
+                  ),
               ],
             ),
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(l.closeAction),
           ),
-          FilledButton(
-            onPressed: tally.totalMinorUnits <= 0
+          PosButton(
+            onPressed:
+                (totalOnly
+                    ? (totalMinorUnits ?? 0) <= 0
+                    : tally.totalMinorUnits <= 0)
                 ? null
                 : () => Navigator.pop(dialogContext, true),
-            child: Text(l.submitBlindCountAction),
+            child: Text(blind ? l.submitBlindCountAction : l.submitCountAction),
           ),
         ],
       ),
     ),
   );
-  if ((accepted ?? false) && tally.totalMinorUnits > 0) {
+  total.dispose();
+  if (accepted ?? false) {
     await controller.submitCount(
-      amountMinorUnits: tally.totalMinorUnits,
-      denominations: tally.lines,
+      amountMinorUnits: totalOnly
+          ? totalMinorUnits ?? 0
+          : tally.totalMinorUnits,
+      denominations: totalOnly ? const [] : tally.lines,
     );
   }
 }
@@ -2653,17 +2819,17 @@ Future<void> _cancelCount(
   CashController controller,
 ) async {
   final l = AppLocalizations.of(context);
-  final accepted = await showDialog<bool>(
+  final accepted = await showPosDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
+    builder: (dialogContext) => PosAlertDialog(
       title: Text(l.cancelCountAction),
-      content: _Note(icon: Icons.undo, text: l.cancelCountMessage),
+      content: _Note(icon: PosGlyphs.undo, text: l.cancelCountMessage),
       actions: [
-        TextButton(
+        PosTextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
           child: Text(l.closeAction),
         ),
-        FilledButton(
+        PosButton(
           onPressed: () => Navigator.pop(dialogContext, true),
           child: Text(l.confirmAction),
         ),
@@ -2698,7 +2864,7 @@ Future<void> _resolve(BuildContext context, CashController controller) async {
         // is chosen against the fact instead of from memory.
         if (variance != null) ...[
           _Note(
-            icon: reading.short ? Icons.trending_down : Icons.trending_up,
+            icon: reading.short ? PosGlyphs.trendingDown : PosGlyphs.trendingUp,
             text:
                 '${l.cashVarianceLabel}: '
                 '${formatMinorUnits(reading.minorUnits, reading.currency)} · '
@@ -2714,27 +2880,27 @@ Future<void> _resolve(BuildContext context, CashController controller) async {
           ),
           const SizedBox(height: UmiSpacing.md),
         ],
-        DropdownButtonFormField<String>(
+        PosSelectFormField<String>(
           initialValue: state.choice,
-          decoration: InputDecoration(labelText: l.varianceReasonLabel),
+          decoration: PosFieldDecoration(labelText: l.varianceReasonLabel),
           items: [
-            DropdownMenuItem(
+            PosSelectItem(
               value: 'no_variance',
               child: Text(l.varianceReasonNone),
             ),
-            DropdownMenuItem(
+            PosSelectItem(
               value: 'counting_error',
               child: Text(l.varianceReasonCounting),
             ),
-            DropdownMenuItem(
+            PosSelectItem(
               value: 'change_error',
               child: Text(l.varianceReasonChange),
             ),
-            DropdownMenuItem(
+            PosSelectItem(
               value: 'cash_handling_error',
               child: Text(l.varianceReasonHandling),
             ),
-            DropdownMenuItem(
+            PosSelectItem(
               value: 'unknown_operational_difference',
               child: Text(l.varianceReasonUnknown),
             ),
@@ -2747,11 +2913,7 @@ Future<void> _resolve(BuildContext context, CashController controller) async {
     ),
     fields: approvalRequired
         ? [
-            CashDialogField(
-              label: l.managerPinLabel,
-              obscure: true,
-              numeric: true,
-            ),
+            cashManagerPinField(l),
           ]
         : const [],
   );
@@ -2759,6 +2921,9 @@ Future<void> _resolve(BuildContext context, CashController controller) async {
   final approvalId = approvalRequired
       ? await controller.approveVariance(answer.values.first)
       : null;
+  // Refused: the notice names why and the variance stays unanswered. Recording it
+  // without the approval it asked for would book a difference nobody authorised.
+  if (approvalRequired && approvalId == null) return;
   await controller.resolveVariance(
     reason: answer.choice ?? 'no_variance',
     approvalId: approvalId,
@@ -2785,7 +2950,7 @@ Future<void> _close(BuildContext context, CashController controller) async {
     // the three numbers the close is made of beside the sentence that says it
     // cannot be undone, so nobody confirms a shape they have not read.
     above: (context, _) => _Note(
-      icon: Icons.lock_outline,
+      icon: PosGlyphs.lockOutline,
       text: [
         l.confirmCloseShiftBody,
         if (approvalRequired) l.closeDialogApprovalHint,
@@ -2806,11 +2971,7 @@ Future<void> _close(BuildContext context, CashController controller) async {
     ),
     fields: approvalRequired
         ? [
-            CashDialogField(
-              label: l.managerPinLabel,
-              obscure: true,
-              numeric: true,
-            ),
+            cashManagerPinField(l),
           ]
         : const [],
   );
@@ -2818,6 +2979,9 @@ Future<void> _close(BuildContext context, CashController controller) async {
   final approvalId = approvalRequired
       ? await controller.approveClose(answer.values.first)
       : null;
+  // Refused: the notice names why, and the shift stays open so the operator can
+  // fix the count or recount instead of leaving a half-closed drawer behind.
+  if (approvalRequired && approvalId == null) return;
   await controller.closeShiftWithApproval(approvalId: approvalId);
 }
 
@@ -2861,6 +3025,33 @@ final class CashDialogField {
   /// one that closes and does nothing.
   final String? Function(String value)? validate;
 }
+
+/// The manager's PIN, as every cash dialog asks for it.
+///
+/// THE FIELD STATES ITS OWN REQUIREMENT, because a control that posts an empty PIN is not a control
+/// the API can answer: `ManagerApprovalRequest.managerPin` is `^\d{4,8}$`, and the elevation route
+/// answers `400 VALIDATION_FAILED` for anything else. A field without this gate let the close send
+/// `"managerPin": ""` on the iMin D3-504 on 2026-10-11, and the shift stayed in `closing`. One
+/// builder, so every dialog that asks for a PIN asks for the same thing the same way.
+CashDialogField cashManagerPinField(
+  AppLocalizations l, {
+  bool autofocus = false,
+}) => CashDialogField(
+  label: l.managerPinLabel,
+  obscure: true,
+  numeric: true,
+  autofocus: autofocus,
+  helper: l.operatorPinHint,
+  validate: (value) => _managerPinLooksValid(value) ? null : l.operatorPinHint,
+);
+
+/// Four to eight digits, the shape the contract accepts (and the one the sign-in keypad enforces).
+///
+/// No trimming, deliberately: the dialog hands the field's text to the wire unchanged, so a stray
+/// space has to be refused HERE — where the operator can see why — rather than by the API, whose
+/// `^\d{4,8}$` would answer it with a 400 the till would have to explain.
+bool _managerPinLooksValid(String value) =>
+    RegExp(r'^\d{4,8}$').hasMatch(value);
 
 /// The dialog's own state, for a control beside the fields.
 ///
@@ -2974,13 +3165,17 @@ final class _CashFieldsDialogState extends State<CashFieldsDialog> {
     // while the list has no answer or a field has nothing usable in it, and wake
     // up when either changes.
     listenable: Listenable.merge([_state, ..._controllers]),
-    builder: (context, _) => AlertDialog(
+    builder: (context, _) => PosAlertDialog(
       title: Text(widget.title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      // ONE SCROLLABLE, NOT TWO. `PosAlertDialog` already puts its content in a scroll view, and
+      // nesting a second one inside it is what left the movement dialog's reason field riding the
+      // viewport's edge with its label sliced through the middle on the iMin (measured 2026-10-11:
+      // a 290 px viewport inside which the field could not be brought into view, because the focus
+      // never had one scrollable ancestor to reveal it in).
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
             if (widget.above != null) ...[
               widget.above!(context, _state),
               if (widget.fields.isNotEmpty)
@@ -2988,7 +3183,7 @@ final class _CashFieldsDialogState extends State<CashFieldsDialog> {
             ],
             for (final (index, field) in widget.fields.indexed) ...[
               if (index > 0) const SizedBox(height: UmiSpacing.md),
-              TextField(
+              PosField(
                 controller: _controllers[index],
                 autofocus: field.autofocus,
                 obscureText: field.obscure,
@@ -2999,7 +3194,7 @@ final class _CashFieldsDialogState extends State<CashFieldsDialog> {
                 onChanged: (_) {
                   if (_touched.add(index)) setState(() {});
                 },
-                decoration: InputDecoration(
+                decoration: PosFieldDecoration(
                   labelText: field.label,
                   prefixText: field.prefix,
                   hintText: field.hint,
@@ -3010,13 +3205,12 @@ final class _CashFieldsDialogState extends State<CashFieldsDialog> {
             ],
           ],
         ),
-      ),
       actions: [
-        TextButton(
+        PosTextButton(
           onPressed: () => Navigator.pop(context),
           child: Text(widget.cancelLabel),
         ),
-        FilledButton(
+        PosButton(
           onPressed: (widget.requireChoice && _state.choice == null) || !_valid
               ? null
               : _submit,
@@ -3036,7 +3230,7 @@ Future<({String? choice, List<String> values})?> _cashDialog(
   Widget Function(BuildContext context, CashDialogState state)? above,
   String? initialChoice,
   bool requireChoice = false,
-}) => showDialog<({String? choice, List<String> values})>(
+}) => showPosDialog<({String? choice, List<String> values})>(
   context: context,
   builder: (_) => CashFieldsDialog(
     title: title,

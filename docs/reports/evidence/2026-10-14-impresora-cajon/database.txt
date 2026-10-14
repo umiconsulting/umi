@@ -1,0 +1,26 @@
+          created_at           |    command_type    |         source_aggregate_id          |   status    | failure_code |                                                                safe_result                                                                
+-------------------------------+--------------------+--------------------------------------+-------------+--------------+-------------------------------------------------------------------------------------------------------------------------------------------
+ 2026-10-14 18:59:41.386987+00 | print_test_page    | 3500e292-da10-4df7-8ef3-d0ad2695aaa6 | succeeded   |              | {"acknowledged": true}
+ 2026-10-14 18:59:59.725457+00 | open_drawer        | 1bf29d73-1a2e-436e-bdbf-d2a6cb5d36cb | dispatching |              | {}
+ 2026-10-14 19:00:14.809739+00 | open_drawer        | 91b8ffdc-f032-4fed-9a5d-b9c1f81fa4aa | dispatching |              | {}
+ 2026-10-14 19:10:13.664945+00 | print_receipt      | 902fce7a-529b-481c-8bc5-fa34e4673a2c | succeeded   |              | {"acknowledged": true}
+ 2026-10-14 19:10:14.231973+00 | controlled_reprint | 902fce7a-529b-481c-8bc5-fa34e4673a2c | succeeded   |              | {"acknowledged": true}
+ 2026-10-14 19:11:25.750723+00 | print_receipt      | 4732e7c6-3672-462d-9c16-d43249434fd7 | succeeded   |              | {"acknowledged": true}
+ 2026-10-14 19:11:25.765287+00 | open_drawer        | a8f25d79-d681-49ac-a6df-5bc612cd0d86 | succeeded   |              | {"pulseNode": "/sys/class/neostra_gpioctl/dev/gpioctl", "pulsePath": "sysfs", "pulseValue": "1", "acknowledged": true, "drawerSensor": 1}
+ 2026-10-14 19:11:26.167951+00 | controlled_reprint | 4732e7c6-3672-462d-9c16-d43249434fd7 | succeeded   |              | {"acknowledged": true}
+(8 rows)
+
+          created_at           |     job_type     |         source_aggregate_id          | status  | failure_code 
+-------------------------------+------------------+--------------------------------------+---------+--------------
+ 2026-10-14 18:59:41.387877+00 | test_page        | 3500e292-da10-4df7-8ef3-d0ad2695aaa6 | printed | 
+ 2026-10-14 19:10:13.666212+00 | official_receipt | 902fce7a-529b-481c-8bc5-fa34e4673a2c | printed | 
+ 2026-10-14 19:10:14.232426+00 | receipt_copy     | 902fce7a-529b-481c-8bc5-fa34e4673a2c | printed | 
+ 2026-10-14 19:11:25.751148+00 | official_receipt | 4732e7c6-3672-462d-9c16-d43249434fd7 | printed | 
+ 2026-10-14 19:11:26.168373+00 | receipt_copy     | 4732e7c6-3672-462d-9c16-d43249434fd7 | printed | 
+(5 rows)
+
+                  id                  | receipt_number | business_date |           issued_at           
+--------------------------------------+----------------+---------------+-------------------------------
+ 4732e7c6-3672-462d-9c16-d43249434fd7 | 0010           | 2026-10-14    | 2026-10-14 19:11:25.254615+00
+(1 row)
+

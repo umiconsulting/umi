@@ -165,11 +165,37 @@ interface Failure {
 const UNCOVERED_EXPECTED: ReadonlyArray<{ file: string; count: number; why: string }> = [
   {
     file: 'modules/kds/kds.repository.ts',
-    count: 2,
+    count: 5,
     // ACCEPTED. `${limitParam}` and `${patch}` are values chosen at run time, so
     // no static rebuild can produce the statement the database will see.
     // Blanking yields the minimal form, which is judged and reported separately.
-    why: 'true run-time clause; accepted 2026-08-14',
+    // The counter release added three more of the same shape: `${locClause}` in
+    // the reads the till makes when it has to name a location, and the two
+    // statements that inline the shared `commercialCancellationSql` fragment.
+    why: 'true run-time clause and shared TS fragments; accepted 2026-10-14',
+  },
+  {
+    file: 'modules/kds/kitchen-unassigned.ts',
+    count: 2,
+    // ACCEPTED. Both statements inline `${commercialCancellationSql('ko')}` — the
+    // shared expression that decides whether a ticket the kitchen never started
+    // still counts as commercial. It is assembled in TypeScript, so no static
+    // rebuild can produce the SQL the database will see.
+    why: 'shared SQL fragment built in TS; accepted 2026-10-14',
+  },
+  {
+    file: 'modules/pos-catalog/pos-catalog.repository.ts',
+    count: 2,
+    // ACCEPTED. Both reads inline `${availabilityStateSql('a')}`, the shared
+    // expression that resolves a product's availability for a location.
+    why: 'shared SQL fragment built in TS; accepted 2026-10-14',
+  },
+  {
+    file: 'modules/pos-cart/pos-cart.repository.ts',
+    count: 1,
+    // ACCEPTED. The eligibility predicate inlines `${availabilityStateSql('a')}`
+    // beside a literal comparison, so the blanked form does not parse.
+    why: 'shared SQL fragment built in TS; accepted 2026-10-14',
   },
   {
     file: 'modules/cash/cash.repository.ts',

@@ -1,0 +1,13 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+[Nest] 1176007  - 10/13/2026, 9:48:07 AM   ERROR [PosCartService] day close sweep failed for 00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004: permission denied
+ ✓ src/modules/pos-cart/pos-cart.service.spec.ts (13 tests) 11ms
+ ✓ src/modules/pos-cart/pos-cart.repository.spec.ts (22 tests) 14ms
+
+ Test Files  2 passed (2)
+      Tests  35 passed (35)
+   Start at  09:48:07
+   Duration  649ms (transform 291ms, setup 0ms, collect 740ms, tests 25ms, environment 0ms, prepare 99ms)
+

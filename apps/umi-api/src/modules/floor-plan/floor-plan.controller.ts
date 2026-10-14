@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import {
   FloorPlanQuery,
+  AddPosTableRequest,
+  InitializePosTablesRequest,
   PosFloorPlanQuery,
   PublishFloorPlanRequest,
   SaveFloorPlanRequest,
@@ -50,6 +52,14 @@ export class FloorPlanController {
 @Controller('api/v1/pos/merchants/:merchantId/floor-plan')
 export class PosFloorPlanController {
   constructor(private readonly plans: FloorPlanService) {}
+  @Post('tables')
+  addTable(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(AddPosTableRequest)) dto: AddPosTableRequest,
+  ) {
+    return this.plans.addTable(user, merchantId, dto);
+  }
   @Get()
   read(
     @CurrentUser() user: AuthUser,
@@ -57,5 +67,13 @@ export class PosFloorPlanController {
     @Query(new ZodValidationPipe(PosFloorPlanQuery)) query: PosFloorPlanQuery,
   ) {
     return this.plans.readForPos(user, merchantId, query);
+  }
+  @Post('bootstrap-tables')
+  bootstrapTables(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(InitializePosTablesRequest)) dto: InitializePosTablesRequest,
+  ) {
+    return this.plans.bootstrapTables(user, merchantId, dto);
   }
 }

@@ -34,6 +34,24 @@ describe('Gate 3D refund allocation', () => {
     expect(result.tenders).toEqual([{ id: 'cash', type: 'cash', amount: 363 }]);
   });
 
+  it('refunds exactly what the customer paid for the units, never a cent less', () => {
+    // Two Lattes at MXN 65.00: the receipt stores the line as quantity 2, merchandise 11207 and
+    // tax 1793 (total 13000). Refunding ONE of them has to return 6500 — the amount paid for that
+    // cup — and not 5603 + 896. The iMin recorded 6499 on 2026-10-11 before this case existed.
+    const latted = {
+      currency: 'MXN',
+      lines: [{ id: 'latte', quantity: 2, merchandise: 11207, tax: 1793, discount: 0, tip: 0 }],
+      tenders: [{ id: 'cash', type: 'cash' as const, amount: 13000, refunded: 0 }],
+    };
+    const one = calculateRefundPreview(latted, [{ lineId: 'latte', quantity: 1 }], 'cash_first');
+    expect(one.lines[0]).toMatchObject({ merchandise: 5603, tax: 897, total: 6500 });
+    expect(one.total).toBe(6500);
+
+    // Both of them still add up to the whole line, and a single-quantity line is untouched.
+    const both = calculateRefundPreview(latted, [{ lineId: 'latte', quantity: 2 }], 'cash_first');
+    expect(both.lines[0]).toMatchObject({ merchandise: 11207, tax: 1793, total: 13000 });
+  });
+
   it('rejects a quantity above the remaining quantity', () => {
     expect(() =>
       calculateRefundPreview(sale, [{ lineId: 'a', quantity: 4 }], 'proportional'),

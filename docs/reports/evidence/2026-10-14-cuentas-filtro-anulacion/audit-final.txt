@@ -1,0 +1,2 @@
+80f741a1-aecd-421b-be84-7a82bf77f353|sale.cancelled|success|true|3
+dbdc7839-a1c8-4134-949b-72e775881ca1|sale.cancelled|success|true|6

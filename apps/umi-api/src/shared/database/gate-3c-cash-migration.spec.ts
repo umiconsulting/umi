@@ -102,8 +102,11 @@ describe('Gate 3C cash persistence', () => {
     expect(sql).toContain('shift_row.business_date<>new.business_date');
     expect(checkout).toContain('let businessDate = cart.businessDate;');
     expect(checkout).toContain('businessDate = eligible.rows[0].businessDate;');
-    // The customer's copy names the same day the ledger booked.
-    expect(checkout).toContain('{ ...receipt, businessDate }');
+    // The customer's copy names the same day the ledger booked — and it names it with the
+    // ticket folio issued for THAT day, not with the reference the service drafted before it
+    // knew the day (`issuedReceipt`, ADR 2026-10-12-folio-visible-del-recibo).
+    expect(checkout).toContain('{ ...issuedReceipt, businessDate }');
+    expect(checkout).toContain('const folio = await allocateReceiptFolio(client, {');
     // And the ledger insert takes the resolved date, not the cart's.
     const ledger = checkout.indexOf('INSERT INTO merchant.cash_ledger_entry');
     expect(ledger).toBeGreaterThan(-1);
@@ -169,13 +172,32 @@ describe('Gate 3C cash persistence', () => {
     expect(repository).toContain('APPROVAL_FINGERPRINT_MISMATCH');
   });
 
-  it('rebinds a new session without changing an unresolved financial state', () => {
-    expect(repository).toContain(
-      "'counting',\n            'reconciliation_required',\n            'closing'",
+  it('rebinds a new session, and refuses by name when the shift cannot move', () => {
+    // This used to assert the opposite, and the opposite was the defect. The
+    // resume listed `counting`, `reconciliation_required` and `closing` as
+    // admitted sources and then kept the status it already had, so the API
+    // answered SUCCESS for a move that never happened — four of those no-ops sit
+    // in the audit table as `cash.shift_open` `success` against a drawer that
+    // never opened (bug-hunt §140). A version the caller no longer holds, a
+    // drawer on another terminal and a status the move does not admit are now
+    // refused with `INVALID_SHIFT_TRANSITION` and the reason in `details`,
+    // instead of the bare `Error` that reached the operator as a 500.
+    const transition = repository.slice(
+      repository.indexOf('  async transition('),
+      repository.indexOf('  async incomingPinRecord('),
     );
-    expect(repository).toContain(
-      "WHEN $7='open' AND status IN ('counting','reconciliation_required','closing')",
-    );
-    expect(repository).toContain("rows[0].status === 'reconciliation_required'");
+    expect(transition).toContain("throw new CashRefusal('INVALID_SHIFT_TRANSITION'");
+    expect(transition).toContain("reason: 'shift_state_not_movable'");
+    expect(transition).toContain("reason: 'shift_held_by_another_device'");
+    expect(transition).toContain("['open', 'suspended', 'handoff_pending']");
+    expect(transition).not.toContain('THEN status\n');
+    // THE DRAWER FOLLOWS THE TERMINAL, NOT THE PERSON. Matching the write on the
+    // responsible operator is what stranded the ONCA till: the drawer was held by
+    // this very device while the operator standing at it was somebody else, and
+    // the resume the cash screen advertised could never succeed.
+    expect(transition).toContain('AND version=$6 AND holding_device_id=$5::uuid');
+    expect(transition).not.toContain('AND responsible_operator_id=$4::uuid');
+    expect(transition).toContain("WHEN $7='open' THEN $4::uuid");
+    expect(repository).toContain("'operator_resume'");
   });
 });

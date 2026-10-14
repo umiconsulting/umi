@@ -1,0 +1,6 @@
+ public_reference |     status      | product_name |  status   |     station_completed_at     
+------------------+-----------------+--------------+-----------+------------------------------
+ Cuenta 131       | partially_ready | Capuccino    | ready     | 2026-10-13 20:21:48.98422+00
+ Cuenta 131       | partially_ready | Margarita    | preparing | 
+(2 rows)
+

@@ -1,0 +1,6 @@
+ public_reference |     status     | product_name |  status   |     station_completed_at     
+------------------+----------------+--------------+-----------+------------------------------
+ Cuenta 131       | in_preparation | Margarita    | preparing | 
+ Cuenta 131       | in_preparation | Capuccino    | cancelled | 2026-10-13 20:21:48.98422+00
+(2 rows)
+

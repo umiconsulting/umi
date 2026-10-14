@@ -109,6 +109,8 @@ void main() {
         operatorSessionId: _id(4),
         status: 'prepared',
         version: 2,
+        firedOrderId: null,
+        fulfillmentType: 'dine_in',
         items: const [],
         totals: _totals(),
         checkoutEnabled: true,

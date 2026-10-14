@@ -80,6 +80,13 @@ Each drawer command binds to one committed cash fact. The same fact cannot emit 
 The pilot drawer adapter sends one generic pulse through its assigned printer endpoint.
 An ambiguous write becomes `unknown_outcome`. The runtime does not send a second automatic pulse.
 
+A drawer has two possible lines on a counter till, and the registry's transport says which one.
+`printer_attached` and `usb_foundation` pulse through the printer (network or USB); the terminal's
+own cashbox port is `platform_channel_foundation`, where the pulse is the board's line rather than
+an ESC/POS byte, and the adapter answers the health poll itself because there is no byte link to
+ask. The transport is a wiring fact, not a vendor fact: the runtime does not branch on a model
+name.
+
 ## Scanner runtime
 
 The scanner emits a canonical event with symbology, normalized value, and sequence.

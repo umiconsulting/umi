@@ -193,27 +193,212 @@ async function screenShows(driver, name) {
 }
 
 /**
- * Close the sale-complete dialog with its own "Nuevo pedido" button.
+ * A floor-plan table, read from the product's own words.
  *
- * The floating "Listo para el siguiente cliente." bar the catalog used to raise
- * over this button is gone from the product — the till shows no bottom
- * notifications at all now, and the `waitForNoSnackbar` step this file used to
- * need has gone with it. A swallowed first press is still possible for other
- * reasons, and a press that only dismissed something moves no money, so one
- * explicit second press is safe — and is what an operator does anyway.
+ * A table publishes its NAME and its STATE together, and the two layouts compose
+ * it differently: the canvas reads `Mesa 1, 2 lugares, Libre` and the narrow list
+ * `Mesa 1 | Libre · 2 lugares`. The old detectors keyed on the old plan's
+ * `T2, 4, open` naming, so a plan drawn today reported "no tables" / "0 free
+ * table(s)" while the screen was showing five.
+ */
+const FLOOR_STATES = 'Libre|Ocupada|Pedido tomado|Servido|Por cobrar|Por limpiar';
+// The state is a FIELD between separators, and it is not always the last one: a
+// seated table reads `Mesa 5, 6 lugares, Ocupada, 8 personas, Tiempo 24 s`, so an
+// anchor at the end of the label matched the free tables and missed the busy ones.
+// The comma (or the list's pipe) in front is what keeps a legend word such as a
+// lone `Ocupada` out.
+const speaksTableState = (label) =>
+  new RegExp(`[,|]\\s*(${FLOOR_STATES})(\\s*[,|·]|\\s*$)`).test(label || '');
+const isTableNode = (node) => /[,|]/.test(node.label || '') && speaksTableState(node.label);
+const isFreeTable = (node) => /[,|]\s*Libre(\s*[,|·]|\s*$)/.test(node.label || '');
+const tableName = (label) => String(label).split(/[,|]/)[0].trim();
+
+/**
+ * Open the product sheet for one Americano and pick its variant.
+ *
+ * The tile is addressed by NAME, not by "Americano  ·  MXN 55.00": this design
+ * separates the name from the price with a comma and the price is data, so a
+ * hard-coded line stalled the whole prelude on a label that no longer exists.
+ * The sheet's variant words are `Caliente` / `Frío` — the old sheet's `CH` /
+ * `Normal` are gone too.
+ */
+async function openAmericanoSheet(driver) {
+  // A sheet left open by an earlier step is already the state this wants: the
+  // catalog grid is behind it, and looking for the tile then reports the product
+  // as missing.
+  // The sheet is recognised by a control it always publishes - "Nota del
+  // operador" - because its action button is DISABLED until a variant is chosen
+  // and a disabled control is not published as actionable at all.
+  const alreadyOpen = (await driver.findAll('Nota del operador')).some((node) =>
+    driver.isVisible(node),
+  );
+  if (!alreadyOpen) {
+    // The grid arrives from the catalog read after the route does, so the tile is
+    // polled for rather than read once.
+    const deadline = Date.now() + 15000;
+    let tiles = [];
+    for (;;) {
+      tiles = (await driver.findAll('Americano,', { actionable: true }).catch(() => [])).filter(
+        (node) => driver.isVisible(node),
+      );
+      if (tiles.length || Date.now() > deadline) break;
+      await sleep(400);
+    }
+    if (!tiles.length) throw new Error('The catalog published no Americano tile.');
+    await driver.clickNode(tiles[0], {
+      expect: { appears: 'Agregar a la comanda', timeout: 15000 },
+      label: 'Americano',
+    });
+  }
+  await driver
+    .clickText('Caliente', { expect: { appears: 'Agregar a la comanda', timeout: 8000 } })
+    .catch(() => say('   the product sheet offered no "Caliente" variant'));
+  // The action only becomes ACTIONABLE once a variant is chosen, so this is the
+  // proof the variant took. Without it a press that missed leaves the sheet
+  // disabled while every later step reports the cart as empty.
+  const enabled = Date.now() + 8000;
+  for (;;) {
+    const add = (await driver.findAll('Agregar a la comanda', { actionable: true })).filter(
+      (node) => driver.isVisible(node),
+    );
+    if (add.length) break;
+    if (Date.now() > enabled) {
+      say('   the sheet never enabled "Agregar a la comanda"');
+      break;
+    }
+    await sleep(250);
+  }
+}
+
+/**
+ * Tap a bottom-navigation destination, opening the overflow when it is folded.
+ *
+ * The bar shows three destinations plus `Más secciones` once the window is
+ * narrow (the reference till is 942 logical pixels wide, and the flow's own
+ * window is), so `Mesas` is published as a child of the overflow rather than as
+ * a button of its own. A flow that looks for it directly reports the product as
+ * missing a screen it simply folded away.
+ */
+const OVERFLOW_LABELS = ['Más secciones', 'Más'];
+
+/**
+ * The overflow toggle, if the bar is folded at this width.
+ *
+ * Its NAME changes with where the operator is: on the catalog it reads
+ * "Más secciones", and once a folded destination is open the same slot is
+ * labelled with that destination ("Mesas"). So the label cannot be the whole
+ * search — the toggle is the RIGHTMOST cell of the bottom bar, and that is what
+ * this finds. (Width, not label: the bar folds at the reference 942 px and at
+ * the 467 px this window measures.)
+ */
+async function overflowToggle(driver) {
+  for (const name of OVERFLOW_LABELS) {
+    const found = (await driver.findAll(name, { actionable: true }).catch(() => [])).filter(
+      (node) => driver.isVisible(node),
+    );
+    if (found.length) return found[found.length - 1];
+  }
+  return rightmostBarCell(driver);
+}
+
+/** The rightmost cell of the bottom bar — where the folded destinations live. */
+async function rightmostBarCell(driver) {
+  const bar = (await driver.nodes()).filter(
+    (node) =>
+      node.actions.includes('tap') &&
+      node.absolute.top > driver.viewSize.height - 90 &&
+      node.absolute.width < driver.viewSize.width / 3,
+  );
+  if (!bar.length) return null;
+  return bar.reduce((rightmost, node) =>
+    node.absolute.left > rightmost.absolute.left ? node : rightmost,
+  );
+}
+
+async function tapNav(driver, label, expect) {
+  const direct = (await driver.findAll(label, { actionable: true }).catch(() => [])).filter(
+    (node) => driver.isVisible(node),
+  );
+  if (direct.length) {
+    await driver.clickNode(direct[0], expect);
+    return;
+  }
+  // The bar is folded. Open the overflow and press the destination — but only
+  // after the destination is actually PUBLISHED: pressing a slot blindly can be
+  // a navigation to somewhere else, and a candidate that opens nothing is
+  // dismissed again before the next one is tried.
+  const candidates = [];
+  for (const name of OVERFLOW_LABELS) {
+    for (const node of await driver.findAll(name, { actionable: true }).catch(() => [])) {
+      if (driver.isVisible(node)) candidates.push(node);
+    }
+  }
+  const rightmost = await rightmostBarCell(driver);
+  if (rightmost) candidates.push(rightmost);
+
+  for (const candidate of candidates) {
+    const opened = await driver
+      .clickNode(candidate, { expect: { appears: label, timeout: 6000 } })
+      .then(
+        () => true,
+        () => false,
+      );
+    if (!opened) {
+      await driver.pressKey('Escape').catch(() => {});
+      continue;
+    }
+    // The destination is also the LABEL of the toggle slot behind the sheet, so
+    // the match must exclude the bottom bar: clicking that just toggles the sheet
+    // again, which is exactly how this reported "Actualizar never appeared" with
+    // the sheet still open.
+    const folded = (await driver.findAll(label, { actionable: true }).catch(() => [])).filter(
+      (node) => driver.isVisible(node) && node.absolute.top < driver.viewSize.height - 90,
+    );
+    if (!folded.length) continue;
+    await driver.clickNode(folded[0], expect);
+    return;
+  }
+  throw new Error(`"${label}" is not in the navigation, open or folded.`);
+}
+
+/**
+ * Leave whatever is standing over the catalog and get back to it.
+ *
+ * The labels here are the design's own, read from `app_es.arb` and confirmed on
+ * the running till: a completed sale offers `Finalizar e iniciar otra comanda`
+ * (`finishSaleAction`), the catalog's app bar offers `Nueva venta`
+ * (`newSaleAction`), and the receipt/history views close with `Cerrar`
+ * (`closeAction`). The button this used to press, "Nuevo pedido", no longer
+ * exists anywhere in the app, so every flow after the money path stalled on a
+ * label the product had renamed.
+ *
+ * A swallowed first press is still possible, and a press that only dismissed
+ * something moves no money, so one explicit second press is safe — and is what
+ * an operator does anyway.
  */
 async function tapNewOrder(driver) {
-  try {
-    await driver.clickText('Nuevo pedido', {
-      expect: { appears: 'Comer aquí', timeout: 12000 },
-    });
-  } catch (error) {
-    say(
-      `   the first "Nuevo pedido" press was swallowed (${error.message.slice(0, 60)}…); pressing again`,
-    );
-    await driver.clickText('Nuevo pedido', {
-      expect: { appears: 'Comer aquí', timeout: 20000 },
-    });
+  // A COMPLETED SALE is its own screen, and its two controls are the product's
+  // own words: `Ver comprobante` and `Nuevo pedido`. The other labels cover the
+  // catalog's app bar ("Nueva venta"), the close-step wording of a finished
+  // shift, and a full-screen destination's "Cerrar".
+  const labels = ['Nuevo pedido', 'Finalizar e iniciar otra comanda', 'Nueva venta', 'Cerrar'];
+  for (const label of labels) {
+    const targets = await driver.findAll(label, { actionable: true }).catch(() => []);
+    if (!targets.some((node) => driver.isVisible(node))) continue;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const hit = await driver
+        .clickText(label, { expect: { appears: 'Comer aquí', timeout: 12000 } })
+        .then(
+          () => true,
+          (error) => {
+            say(
+              `   "${label}" press ${attempt + 1} did not return to the catalog (${error.message.slice(0, 50)}…)`,
+            );
+            return false;
+          },
+        );
+      if (hit) return;
+    }
   }
 }
 
@@ -225,19 +410,19 @@ async function tapNewOrder(driver) {
  * and the money path's own "add one Americano" would silently add to it.
  */
 async function resetCart(driver) {
-  if (await screenShows(driver, 'Abre un producto para iniciar este carrito')) return false;
-  const opener = (await driver.findAll('Vaciar carrito', { actionable: true })).find((node) =>
+  if (await screenShows(driver, 'Elige un producto de la carta para empezar.')) return false;
+  const opener = (await driver.findAll('Vaciar comanda', { actionable: true })).find((node) =>
     driver.isVisible(node),
   );
   if (!opener) return false;
-  await driver.clickText('Vaciar carrito', {
-    expect: { appears: '¿Vaciar este carrito?', timeout: 8000 },
+  await driver.clickText('Vaciar comanda', {
+    expect: { appears: '¿Vaciar esta comanda?', timeout: 8000 },
   });
-  const confirm = (await driver.findAll('Vaciar carrito', { actionable: true })).filter((node) =>
+  const confirm = (await driver.findAll('Vaciar comanda', { actionable: true })).filter((node) =>
     driver.isVisible(node),
   );
   await driver.clickNode(confirm[confirm.length - 1], {
-    expect: { appears: 'Abre un producto para iniciar este carrito', timeout: 12000 },
+    expect: { appears: 'Elige un producto de la carta para empezar.', timeout: 12000 },
   });
   say('   the till was carrying a previous cart; emptied it before the sale');
   return true;
@@ -254,15 +439,13 @@ async function resetCart(driver) {
  */
 async function catalogIsUp(driver) {
   if (await screenShows(driver, 'Ingresa tu PIN')) return false;
-  if (!(await screenShows(driver, 'Carrito actual'))) return false;
+  if (!(await screenShows(driver, 'Comanda'))) return false;
   // Confirm across two reads. A transitively empty tree makes every screen look
   // absent, and "the keypad is gone" alone was read from exactly that frame -
   // which ended the sign-in loop after three digits and reported a pass about a
   // sign-in that had not happened.
   await sleep(250);
-  return (
-    (await screenShows(driver, 'Carrito actual')) && !(await screenShows(driver, 'Ingresa tu PIN'))
-  );
+  return (await screenShows(driver, 'Comanda')) && !(await screenShows(driver, 'Ingresa tu PIN'));
 }
 
 /** Poll for the catalog, instead of sampling it once right after an event. */
@@ -320,9 +503,28 @@ async function waitForAny(driver, names, { timeout = 30000 } = {}) {
  * previous flow finished. Each flow states its own precondition instead.
  */
 async function ensureCatalog(driver) {
+  // A folded bar's overflow is a MODAL: while its sheet is open the semantics
+  // tree carries the sheet and not the destinations behind it, so a flow that
+  // only looks for "Comanda" reports the catalog as unreachable. Close it first.
+  const toggle = await overflowToggle(driver);
+  if (toggle && !(await screenShows(driver, 'Comanda'))) {
+    await driver.clickNode(toggle, { expect: { gone: 'Ajustes', timeout: 8000 } }).catch(() => {});
+  } else if (!(await screenShows(driver, 'Comanda'))) {
+    // The tree carries only the sheet while it is open, so the toggle behind it
+    // is not reachable either. Escape is the product's own dismiss.
+    await driver.pressKey('Escape').catch(() => {});
+    await sleep(500);
+  }
   await waitForAny(
     driver,
-    ['Carrito actual', 'Ingresa tu PIN', 'Atrás', 'Cerrar', 'Comanda | Pestaña', 'Nuevo pedido'],
+    [
+      'Comanda',
+      'Ingresa tu PIN',
+      'Cerrar',
+      'Nueva venta',
+      'Finalizar e iniciar otra comanda',
+      'Nuevo pedido',
+    ],
     {
       timeout: 40000,
     },
@@ -331,10 +533,9 @@ async function ensureCatalog(driver) {
   if (await onCatalog()) return;
   // The sale-complete dialog stands over the catalog and hides the bottom
   // navigation, so a flow that starts right after a sale has to close it first.
-  if (await screenShows(driver, 'Nuevo pedido')) {
-    await driver.clickText('Nuevo pedido', {
-      expect: { appears: 'Comer aquí', timeout: 20000 },
-    });
+  for (const label of ['Nuevo pedido', 'Finalizar e iniciar otra comanda', 'Nueva venta']) {
+    if (!(await screenShows(driver, label))) continue;
+    await driver.clickText(label, { expect: { appears: 'Comer aquí', timeout: 20000 } });
     return;
   }
   if (await screenShows(driver, 'Ingresa tu PIN')) {
@@ -342,7 +543,7 @@ async function ensureCatalog(driver) {
     return;
   }
   // Any screen that still shows the bottom navigation can go straight back.
-  const tab = await driver.findAll('Comanda | Pestaña', { actionable: true }).catch(() => []);
+  const tab = await driver.findAll('Comanda', { actionable: true }).catch(() => []);
   if (tab.length) {
     await driver.clickNode(tab[0], { expect: { appears: 'Comer aquí', timeout: 15000 } });
     return;
@@ -376,7 +577,6 @@ async function ensureCatalog(driver) {
   throw new Error('The till is not on the catalog and offers no way back to it.');
 }
 
-/** Open the operator menu in the app bar (the control hard against the right edge). */
 /**
  * Make sure this session holds an open cash shift.
  *
@@ -386,9 +586,36 @@ async function ensureCatalog(driver) {
  * goes to Caja, counts the float, and opens the shift if the screen offers it.
  */
 async function ensureCashShift(driver) {
-  await driver.clickText('Caja | Pestaña 2 de 7', {
+  await tapNav(driver, 'Caja', {
     expect: { appears: 'Centro de caja', timeout: 20000 },
   });
+  // A shift this till opened and then lost (a re-enrolment, a wiped credential)
+  // comes back as an ADOPT invitation: the money is in the drawer, the shift is
+  // still open, and this terminal is not the one holding it. It is a real state
+  // of the product and the till has to take the shift before it can charge, so
+  // the flow adopts it instead of reporting "no open shift and no float form".
+  const adopt = (
+    await driver.findAll('Traer el turno a esta terminal', { actionable: true }).catch(() => [])
+  ).filter((node) => driver.isVisible(node));
+  if (adopt.length) {
+    await driver.clickNode(adopt[0], {
+      expect: { appears: 'Turno abierto', timeout: 25000 },
+      shotName: 'cash-shift-adopted',
+    });
+  }
+  // A suspended shift is this till's own drawer, paused. The product's own way
+  // back is "Reanudar turno", and without it the screen offers no open shift and
+  // no float form - which the flow used to report as the screen not answering.
+  if (await screenShows(driver, 'Reanudar turno')) {
+    await driver
+      .clickText('Reanudar turno', {
+        expect: { appears: 'Turno abierto', timeout: 20000 },
+        shotName: 'cash-shift-resumed',
+      })
+      .catch((error) =>
+        say(`   "Reanudar turno" did not return the drawer: ${error.message.slice(0, 70)}`),
+      );
+  }
   // Wait for an ANSWER, not for the pixels to stop moving.
   //
   // This used to be `waitReady` and then one look, and the loading screen is a
@@ -400,8 +627,16 @@ async function ensureCashShift(driver) {
   // polls for one of the two states the screen can actually be in.
   const deadline = Date.now() + 30000;
   let plus = null;
+  let counting = false;
   for (;;) {
     if (await screenShows(driver, 'Turno abierto')) break;
+    // A shift with a count in progress is an ANSWER from this screen, not a
+    // missing one: the drawer is open, somebody started counting it, and the
+    // product's own way back is "Cancelar conteo y volver a abierto".
+    if (await screenShows(driver, 'Conteo de efectivo en curso')) {
+      counting = true;
+      break;
+    }
     plus = (await driver.findAll('Aumentar cantidad'))[1];
     if (plus) break;
     if (Date.now() > deadline) {
@@ -409,28 +644,87 @@ async function ensureCashShift(driver) {
     }
     await sleep(300);
   }
+  if (counting) {
+    // The count stands between the drawer and a cash sale; cancelling it is the
+    // product's documented round trip (the count stays in the history). The
+    // control sits below the fold on the reference window, so it is scrolled to
+    // rather than assumed visible.
+    const cancel =
+      (await driver
+        .scrollToFind('Cancelar conteo y volver a abierto', { times: 8 })
+        .catch(() => null)) ?? null;
+    if (cancel) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const cancelled = await driver
+          .clickNode(cancel, {
+            expect: { appears: 'Turno abierto', timeout: 15000 },
+            shotName: 'cash-count-cancelled',
+          })
+          .then(
+            () => true,
+            () => false,
+          );
+        if (cancelled) break;
+      }
+    } else {
+      say('   the cash count offers no "Cancelar conteo y volver a abierto"; staying on the count');
+    }
+  }
   const open = await screenShows(driver, 'Turno abierto');
   if (!open) {
-    await driver.clickNode(plus, { expect: { appears: 'Total contado' } });
+    // The opening float is a denomination counter now (`DenominationCounter`,
+    // `Fondo inicial`): each row is a "Aumentar cantidad de <denominación>"
+    // stepper and the card hides its own total, so the old "tap it and wait for
+    // Total contado" expectation waited for a label this screen never prints.
+    // One increment is enough to open a shift with money in the drawer.
+    await driver
+      .clickNode(plus, {
+        expect: { appears: 'Fondo inicial', timeout: 8000 },
+      })
+      .catch(() => {});
     await driver.clickText('Abrir turno de caja', {
       expect: { appears: 'Turno abierto', timeout: 25000 },
       shotName: 'cash-shift-open',
     });
   }
-  await driver.clickText('Cerrar', { expect: { appears: 'Comer aquí', timeout: 15000 } });
+  // Leave the cash center. Once a shift is OPEN its screen is the drawer's own
+  // controls - Entrada/Salida de efectivo, Contar el cajón, Suspender turno - and
+  // there is no `Cerrar` on it at all, so the bottom navigation is the way out.
+  const backOut = await driver.findAll('Cerrar', { actionable: true }).catch(() => []);
+  if (backOut.some((node) => driver.isVisible(node))) {
+    await driver.clickText('Cerrar', { expect: { appears: 'Comer aquí', timeout: 15000 } });
+  } else {
+    await tapNav(driver, 'Comanda', { expect: { appears: 'Comer aquí', timeout: 15000 } });
+  }
 }
 
-/** Open the operator menu in the app bar (the control hard against the right edge). */
+/**
+ * Open the account menu.
+ *
+ * The control is the consolidated account button of the top-bar redesign
+ * (`_AccountMenu` in `catalog_surface.dart`), and it publishes its own name:
+ * `Cuenta` in Spanish, `Account` in English. Geometry is only the fallback now —
+ * the old rule ("a wide tappable node hard against the right edge") described a
+ * design whose app bar ran edge to edge, and the new one sits inside a padded
+ * panel, so the wide-node test matched nothing and every sign-in said the till
+ * had no operator control.
+ */
 async function openAccountMenu(driver) {
+  for (const label of ['Cuenta', 'Account']) {
+    const named = (await driver.findAll(label, { actionable: true }).catch(() => [])).filter(
+      (node) => driver.isVisible(node),
+    );
+    if (!named.length) continue;
+    const account = named[named.length - 1];
+    await driver.clickNode(account, { expect: { appears: 'Cerrar sesión', timeout: 12000 } });
+    return account;
+  }
   const candidates = (await driver.nodes()).filter(
     (node) =>
       node.actions.includes('tap') &&
-      node.absolute.top < 60 &&
-      node.absolute.right >= driver.viewSize.width - 1 &&
-      // The operator chip is the wide one; a plain 48px icon button parked in
-      // the same corner (there is one on several screens) is not the account
-      // control, and clicking it opened nothing for 13 seconds.
-      node.absolute.width >= 100,
+      node.absolute.top < 90 &&
+      node.absolute.right >= driver.viewSize.width - 60 &&
+      node.absolute.width >= 60,
   );
   const account = candidates[candidates.length - 1];
   if (!account) throw new Error('The till shows no operator control in its app bar.');
@@ -558,8 +852,8 @@ const flows = [
       await ensureCatalog(driver);
       const base = driver.steps.length;
       const started = Date.now();
-      await driver.clickText('Mesas | Pestaña 4 de 7', {
-        expect: { appears: 'Plano actualizado', timeout: 20000 },
+      await tapNav(driver, 'Mesas', {
+        expect: { appears: 'Actualizar', timeout: 20000 },
         shotName: 'floor-plan',
       });
       // Wait for the surface's own content to stop changing instead of sleeping
@@ -583,10 +877,28 @@ const flows = [
             'mid-flow, so the destination could not render.',
         );
       }
-      const tables = (await driver.nodes()).filter((node) => /^T\d+, \d+/.test(node.label || ''));
+      // A table publishes its NAME and its STATE together, and the two layouts
+      // compose it differently: the canvas reads "Mesa 1, 2 lugares, Libre" and
+      // the narrow list reads "Mesa 1 | Libre · 2 lugares". The old detector
+      // keyed on the old plan's "T1, 4 seats" naming, so a plan drawn today
+      // reported "no tables" while the screen was showing five of them. The
+      // state words are the product's own vocabulary in both shapes.
+      // The plan arrives from the API after the route does, so the canvas is
+      // legitimately empty for a moment. Poll for the tables instead of reading
+      // the tree once and calling the product empty.
+      const tablesDeadline = Date.now() + 15000;
+      let tables = [];
+      for (;;) {
+        tables = (await driver.nodes()).filter(isTableNode);
+        if (tables.length || Date.now() > tablesDeadline) break;
+        await sleep(400);
+      }
       if (!tables.length) throw new Error('The floor plan rendered no tables.');
-      // The table detail is a dialog; its close button is the reliable marker,
-      // since the body names the seat count only for some plans. A single tap
+      // The table detail is a side panel, and its reliable marker is an ACTION:
+      // the panel publishes `Seleccionar` (and `Sentar`) for the table it shows.
+      // It used to be `Cerrar`, which this panel does not have — a tap that
+      // opened the detail perfectly well was reported as "changed the screen
+      // without opening its detail". A single tap
       // can miss on a canvas that is still laying out, so a couple of other
       // tables are tried - but only when the driver *proves* the failed tap did
       // nothing at all (`clickVerdict: 'inert'`). A tap that changed the screen
@@ -594,16 +906,22 @@ const flows = [
       // says so rather than blaming the product for the driver's aim.
       let opened = null;
       const attempted = [];
-      for (const table of tables.slice(0, 3)) {
+      // A party's panel does not offer `Seleccionar` (it offers the release), so
+      // free tables are tried first and the rest are kept as the fallback.
+      const candidates = [
+        ...tables.filter(isFreeTable),
+        ...tables.filter((node) => !isFreeTable(node)),
+      ].slice(0, 3);
+      for (const table of candidates) {
         try {
           await driver.clickNode(table, {
-            expect: { appears: 'Cerrar', timeout: 8000 },
+            expect: { appears: 'Seleccionar', timeout: 8000 },
             shotName: 'table-detail',
           });
           opened = table;
           break;
         } catch (error) {
-          const name = table.label.split(' | ')[0];
+          const name = tableName(table.label);
           attempted.push(`${name}: ${error.message.slice(0, 90)}`);
           say(`   ${name} did not open its detail: ${error.message.slice(0, 90)}`);
           if (error.clickVerdict === 'screen-changed') {
@@ -620,12 +938,11 @@ const flows = [
             `Tried: ${attempted.join(' | ')}`,
         );
       }
-      await driver.clickText('Cerrar', {
-        expect: { appears: 'Plano actualizado', timeout: 12000 },
-      });
-      await driver.clickText('Atrás', {
-        expect: { appears: 'Comer aquí', timeout: 15000 },
-      });
+      // Leaving the detail: the panel has no close control of its own, so the
+      // product's own dismiss (Escape) is what puts the plan back.
+      await driver.pressKey('Escape').catch(() => {});
+      await sleep(400);
+      await tapNav(driver, 'Comanda', { expect: { appears: 'Comer aquí', timeout: 15000 } });
       return {
         measured: {
           taps: driver.steps.slice(base).filter((step) => step.action === 'click').length,
@@ -649,8 +966,8 @@ const flows = [
     async run(driver) {
       await ensureCatalog(driver);
       const started = Date.now();
-      await driver.clickText('Mesas | Pestaña 4 de 7', {
-        expect: { appears: 'Plano actualizado', timeout: 20000 },
+      await tapNav(driver, 'Mesas', {
+        expect: { appears: 'Actualizar', timeout: 20000 },
         shotName: 'floor-plan-before-merge',
       });
       const settled = await driver.waitSettled({ stable: 3, timeout: 10000 });
@@ -665,9 +982,24 @@ const flows = [
 
       const canAct = async (name) =>
         (await driver.findAll(name, { actionable: true }).catch(() => [])).length > 0;
-      const tablesNow = async () =>
-        (await driver.nodes()).filter((n) => /^T\d+, /.test(n.label || ''));
-      const nameOf = (node) => (node.label || '').split(',')[0];
+      /**
+       * THE PLAN ARRIVES AFTER THE ROUTE, AND WHILE IT ARRIVES THE ROOM IS A STABLE PICTURE.
+       *
+       * The canvas publishes `Carga del plano…` in the middle of an otherwise finished screen, so
+       * `waitSettled` settles on it and a single read of the tree calls a room it has not seen
+       * yet empty — this flow reported "The plan offers 0 free table(s)" about a Salón with five
+       * free tables in it (2026-10-11). Poll for the tables instead. `pos-tables-open` already
+       * did; this is the same wait, in the one place every read goes through.
+       */
+      const tablesNow = async (timeoutMs = 15000) => {
+        const deadline = Date.now() + timeoutMs;
+        for (;;) {
+          const tables = (await driver.nodes()).filter(isTableNode);
+          if (tables.length || Date.now() > deadline) return tables;
+          await sleep(400);
+        }
+      };
+      const nameOf = (node) => tableName(node.label);
 
       // Housekeeping, run whether the gesture works or not. A flow that leaves a
       // party behind makes the NEXT run fail on its precondition, which is how a
@@ -676,11 +1008,17 @@ const flows = [
       // state it must put back.
       const restore = async () => {
         for (const table of await tablesNow()) {
-          const label = table.label || '';
-          if (/,\s*open/.test(label)) continue;
+          if (isFreeTable(table)) continue;
           try {
+            // Which panel this is depends on the table's own state: a party
+            // offers the release, and a table left to be cleaned offers "Mesa
+            // lista". Opening one while expecting the other's control is what
+            // left the room dirty for the next run.
+            const panelMarker = /Por limpiar/.test(table.label || '')
+              ? 'Mesa lista'
+              : 'Liberar mesa';
             await driver.clickText(nameOf(table), {
-              expect: { appears: 'Cerrar', timeout: 12000 },
+              expect: { appears: panelMarker, timeout: 12000 },
             });
             if (await canAct('Liberar mesa')) {
               // Releasing asks first: the action opens a confirm dialog.
@@ -691,22 +1029,18 @@ const flows = [
               // so the map is what to wait for. `Por limpiar` is the table's word
               // on the map, not a label inside the sheet.
               await driver.clickText('Confirmar', {
-                expect: { appears: 'Plano actualizado', timeout: 12000 },
+                expect: { appears: 'Actualizar', timeout: 12000 },
               });
-              if (await canAct(nameOf(table))) {
-                await driver.clickText(nameOf(table), {
-                  expect: { appears: 'Cerrar', timeout: 12000 },
-                });
-              }
             }
             if (await canAct('Mesa lista')) {
               await driver.clickText('Mesa lista', {
-                expect: { appears: 'Plano actualizado', timeout: 12000 },
+                expect: { appears: 'Actualizar', timeout: 12000 },
               });
             }
-            await driver.clickText('Cerrar', {
-              expect: { appears: 'Plano actualizado', timeout: 12000 },
-            });
+            // The detail panel has no close control of its own; Escape is the
+            // product's own dismiss.
+            await driver.pressKey('Escape').catch(() => {});
+            await sleep(300);
           } catch (error) {
             say(`   restoring ${nameOf(table)} stopped early: ${error.message.slice(0, 80)}`);
           }
@@ -719,7 +1053,8 @@ const flows = [
         // A table left `dirty` by an earlier run is one tap from usable, and it is
         // the flow's own mess, so it clears it rather than refusing.
         for (const table of await tablesNow()) {
-          if (!/,\s*needs cleaning/.test(table.label || '')) continue;
+          // The state word is the product's, in the language the terminal is set to.
+          if (!/,\s*(needs cleaning|por limpiar)/i.test(table.label || '')) continue;
           await driver.clickText(nameOf(table), { expect: { appears: 'Cerrar', timeout: 12000 } });
           await driver.clickText('Mesa lista', {
             expect: { appears: 'Plano actualizado', timeout: 12000 },
@@ -738,9 +1073,11 @@ const flows = [
         const gestureAt = Date.now();
 
         // Two tables nobody is sitting at. The surface publishes the state in the
-        // node's own name (`T2, 4, open`), so this reads the product rather than
-        // guessing from geometry.
-        const free = (await tablesNow()).filter((node) => /,\s*open/.test(node.label || ''));
+        // node's own name, and the two layouts word it differently: the canvas
+        // reads `Mesa 1, 2 lugares, Libre` and the narrow list `Mesa 1 | Libre ·
+        // 2 lugares`. The old detector keyed on the old plan's `T2, 4, open`, so a
+        // room full of free tables answered "0 free table(s)".
+        const free = (await tablesNow()).filter(isFreeTable);
         if (free.length < 2) {
           throw new Error(
             `The plan offers ${free.length} free table(s); a merge needs two, and this flow will not ` +
@@ -751,7 +1088,7 @@ const flows = [
         const second = free[1];
 
         await driver.clickNode(first, {
-          expect: { appears: 'Cerrar', timeout: 10000 },
+          expect: { appears: 'Seleccionar', timeout: 10000 },
           shotName: 'merge-first-table',
         });
         await driver.clickText('Seleccionar', {
@@ -765,24 +1102,56 @@ const flows = [
           expect: { appears: 'Combinar mesas', timeout: 10000 },
         });
         await driver.clickText('Confirmar', {
-          expect: { appears: 'Plano actualizado', timeout: 15000 },
+          expect: { appears: 'Actualizar', timeout: 15000 },
           shotName: 'merged',
         });
 
-        // Prove the merge from the product's own words, re-resolving by NAME: the
-        // node captured before the merge now reads `seated`, so a stale reference
-        // cannot be found and the verification would fail on a merge that worked.
+        // Prove the merge from the product's own words. A group is published as
+        // BOTH tables carrying ONE party size — `Ocupada, 8 personas` on each —
+        // so the assertion is that the two named tables now agree on the seats,
+        // re-resolved by NAME because the pre-merge nodes are gone.
+        const seatsOf = (label) => (String(label).match(/Ocupada,\s*(\d+)\s*personas/) || [])[1];
+        const afterMerge = await tablesNow();
+        // The list is re-read from the API after the command lands, so the two
+        // tables are polled for rather than read the instant the plan returns.
+        let seatsFirst = seatsOf(
+          afterMerge.find((n) => tableName(n.label) === nameOf(first))?.label,
+        );
+        let seatsSecond = seatsOf(
+          afterMerge.find((n) => tableName(n.label) === nameOf(second))?.label,
+        );
+        const grouped = Date.now() + 12000;
+        while ((!seatsFirst || seatsFirst !== seatsSecond) && Date.now() < grouped) {
+          await sleep(400);
+          const now = await tablesNow();
+          seatsFirst = seatsOf(now.find((n) => tableName(n.label) === nameOf(first))?.label);
+          seatsSecond = seatsOf(now.find((n) => tableName(n.label) === nameOf(second))?.label);
+        }
+        if (!seatsFirst || seatsFirst !== seatsSecond) {
+          throw new Error(
+            `After the merge the two tables read "${seatsFirst ?? 'no party'}" and ` +
+              `"${seatsSecond ?? 'no party'}"; a merged party carries one seat count on both.`,
+          );
+        }
+        evidence.push(
+          `merged ${nameOf(first)} + ${nameOf(second)} into one party of ${seatsFirst} seats`,
+        );
+
         await driver.clickText(nameOf(first), {
-          expect: { appears: 'Grupo de 2 mesas', timeout: 12000 },
+          expect: { appears: 'Dividir', timeout: 12000 },
           shotName: 'merged-group',
         });
-        evidence.push(`merged ${nameOf(first)} + ${nameOf(second)} into one party`);
-
         await driver.clickText('Dividir', {
-          expect: { gone: 'Grupo de 2 mesas', timeout: 15000 },
+          expect: { gone: 'Dividir', timeout: 15000 },
           shotName: 'split',
         });
-        evidence.push("the sheet read 'Grupo de 2 mesas' before the split, and not after it");
+        await driver.pressKey('Escape').catch(() => {});
+        const afterSplit = await tablesNow();
+        const alone = seatsOf(afterSplit.find((n) => tableName(n.label) === nameOf(second))?.label);
+        if (alone && alone === seatsFirst) {
+          throw new Error('The split left the second table still carrying the merged party.');
+        }
+        evidence.push('the group read one seat count on both tables, and not after the split');
 
         // Count OPERATOR taps, not presses. The driver presses again when it can
         // prove a press was swallowed (`retries` on the step), and that second
@@ -819,15 +1188,9 @@ const flows = [
       await ensureCashShift(driver);
       await resetCart(driver);
       // ---- prelude: build a cart -------------------------------------------
-      await driver.clickText('Americano  ·  MXN 55.00', {
-        expect: { appears: 'Modificadores', timeout: 15000 },
-        shotName: 'product-modifiers',
-      });
-      await driver.clickText('CH', { expect: { appears: 'CH' } });
-      await driver.clickText('Caliente', { expect: { appears: 'Caliente' } });
-      await driver.clickText('Normal', { expect: { appears: 'Normal' } });
-      await driver.clickText('Agregar al carrito', {
-        expect: { gone: 'Abre un producto para iniciar este carrito', timeout: 20000 },
+      await openAmericanoSheet(driver);
+      await driver.clickText('Agregar a la comanda', {
+        expect: { gone: 'Elige un producto de la carta para empezar.', timeout: 20000 },
         shotName: 'cart-with-line',
       });
       const preludeSteps = driver.steps.length;
@@ -843,7 +1206,10 @@ const flows = [
       await driver.clickText('Importe exacto', {
         expect: { appears: 'Cambio', timeout: 12000 },
       });
-      const confirm = await driver.scrollToFind('Cobrar · MXN');
+      // The charge action carries its amount ("Cobrar · MXN 50.00"); a bare
+      // "Cobrar" also prefix-matches the SHEET'S TITLE ("Cobrar pedido"), which
+      // is a heading - the flow pressed that three times and moved no money.
+      const confirm = await driver.scrollToFind('Cobrar ·', { times: 8 }).catch(() => null);
       if (!confirm) throw new Error('The tender screen never offered a charge button.');
       await driver.clickNode(confirm, {
         // NOT "Cambio a dar": this sale is paid with Importe exacto, so there is
@@ -884,14 +1250,9 @@ const flows = [
       await ensureCatalog(driver);
       await ensureCashShift(driver);
       await resetCart(driver);
-      await driver.clickText('Americano  ·  MXN 55.00', {
-        expect: { appears: 'Modificadores', timeout: 15000 },
-      });
-      await driver.clickText('CH', { expect: { appears: 'CH' } });
-      await driver.clickText('Caliente', { expect: { appears: 'Caliente' } });
-      await driver.clickText('Normal', { expect: { appears: 'Normal' } });
-      await driver.clickText('Agregar al carrito', {
-        expect: { gone: 'Abre un producto para iniciar este carrito', timeout: 20000 },
+      await openAmericanoSheet(driver);
+      await driver.clickText('Agregar a la comanda', {
+        expect: { gone: 'Elige un producto de la carta para empezar.', timeout: 20000 },
       });
       await driver.clickText('Cobrar', {
         expect: { appears: 'Selección de pago', timeout: 15000 },
@@ -930,8 +1291,8 @@ const flows = [
       // do NOTHING at all, and the driver then refuses its own retry: activating
       // the window (which every click does first) moves the accessibility focus,
       // and the driver's screen fingerprint reads that as "the press had an
-      // effect". The money-path flow carries the same lesson for "Nuevo pedido"
-      // and presses again; here the repeat is licensed by the tender's own state
+      // effect". The money-path flow carries the same lesson for the
+      // sale-complete button and presses again; here the repeat is licensed by the tender's own state
       // rather than by a guess - the terminal is still off, so no method has been
       // selected and pressing again cannot double anything.
       for (let attempt = 1; ; attempt += 1) {
@@ -967,8 +1328,8 @@ const flows = [
         );
       }
       // Leave the till out of the sheet, on the catalog, which is where the next
-      // flow expects to find it. "Nuevo pedido" is the receipt dialog's own
-      // button and there is no sale here to dismiss, so this closes the sheet.
+      // flow expects to find it. There is no sale here to dismiss, so this is
+      // the sheet's own Cerrar.
       await driver.clickText('Cerrar', {
         expect: { appears: 'Comer aquí', timeout: 15000 },
       });
@@ -993,14 +1354,9 @@ const flows = [
       await ensureCatalog(driver);
       await ensureCashShift(driver);
       await resetCart(driver);
-      await driver.clickText('Americano  ·  MXN 55.00', {
-        expect: { appears: 'Modificadores', timeout: 15000 },
-      });
-      await driver.clickText('CH', { expect: { appears: 'CH' } });
-      await driver.clickText('Caliente', { expect: { appears: 'Caliente' } });
-      await driver.clickText('Normal', { expect: { appears: 'Normal' } });
-      await driver.clickText('Agregar al carrito', {
-        expect: { gone: 'Abre un producto para iniciar este carrito', timeout: 20000 },
+      await openAmericanoSheet(driver);
+      await driver.clickText('Agregar a la comanda', {
+        expect: { gone: 'Elige un producto de la carta para empezar.', timeout: 20000 },
       });
       await driver.clickText('Cobrar', {
         expect: { appears: 'Selección de pago', timeout: 15000 },
@@ -1158,7 +1514,7 @@ const flows = [
       // The recovery the till is supposed to have done by itself: no operator
       // tap said "resume". Prove the shift came back before spending taps on a
       // charge that would otherwise fail for the reason this flow exists.
-      await driver.clickText('Caja | Pestaña 2 de 7', {
+      await tapNav(driver, 'Caja', {
         expect: { appears: 'Centro de caja', timeout: 20000 },
       });
       // Wait for the screen to ANSWER, not for the pixels to stop moving. The
@@ -1190,18 +1546,20 @@ const flows = [
             ': the till did not recover its own shift.',
         );
       }
-      await driver.clickText('Cerrar', { expect: { appears: 'Comer aquí', timeout: 15000 } });
+      // Same exit as `ensureCashShift`: an OPEN shift's screen is the drawer's own
+      // controls and carries no `Cerrar`, so the bottom navigation is the way out.
+      const leaveCash = await driver.findAll('Cerrar', { actionable: true }).catch(() => []);
+      if (leaveCash.some((node) => driver.isVisible(node))) {
+        await driver.clickText('Cerrar', { expect: { appears: 'Comer aquí', timeout: 15000 } });
+      } else {
+        await tapNav(driver, 'Comanda', { expect: { appears: 'Comer aquí', timeout: 15000 } });
+      }
 
       await resetCart(driver);
       // ---- prelude: build a cart -------------------------------------------
-      await driver.clickText('Americano  ·  MXN 55.00', {
-        expect: { appears: 'Modificadores', timeout: 15000 },
-      });
-      await driver.clickText('CH', { expect: { appears: 'CH' } });
-      await driver.clickText('Caliente', { expect: { appears: 'Caliente' } });
-      await driver.clickText('Normal', { expect: { appears: 'Normal' } });
-      await driver.clickText('Agregar al carrito', {
-        expect: { gone: 'Abre un producto para iniciar este carrito', timeout: 20000 },
+      await openAmericanoSheet(driver);
+      await driver.clickText('Agregar a la comanda', {
+        expect: { gone: 'Elige un producto de la carta para empezar.', timeout: 20000 },
       });
       const preludeSteps = driver.steps.length;
       const preludeClicks = driver.steps.filter((step) => step.action === 'click').length;
@@ -1215,7 +1573,9 @@ const flows = [
       await driver.clickText('Importe exacto', {
         expect: { appears: 'Cambio', timeout: 12000 },
       });
-      const confirm = await driver.scrollToFind('Cobrar · MXN');
+      // Same target as the money path: the action that carries the amount, not
+      // the sheet's heading, which shares the "Cobrar" prefix.
+      const confirm = await driver.scrollToFind('Cobrar ·', { times: 8 }).catch(() => null);
       if (!confirm) throw new Error('The tender screen never offered a charge button.');
       await driver.clickNode(confirm, {
         // Same as the money path: an exact-cash sale owes no change, so the

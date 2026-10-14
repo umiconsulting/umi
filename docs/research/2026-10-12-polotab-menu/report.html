@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="es">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>PoloTab · Menú y mesas</title
+  ><style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #f4f5f7;
+      color: #20242b;
+      font:
+        17px/1.55 system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1260px;
+      margin: auto;
+      padding: 28px 24px;
+    }
+    h1 {
+      font-size: 34px;
+      line-height: 1.2;
+    }
+    h2 {
+      margin-top: 36px;
+    }
+    h3 {
+      font-size: 20px;
+      margin: 8px 0;
+    }
+    a {
+      color: #175cad;
+    }
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      margin: 20px 0;
+    }
+    .note {
+      background: #e8eef8;
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 470px), 1fr));
+      gap: 20px;
+    }
+    figure {
+      margin: 0;
+      padding: 16px;
+      border: 1px solid #dce1e8;
+      border-radius: 12px;
+      background: white;
+    }
+    img {
+      display: block;
+      width: 100%;
+      height: 360px;
+      object-fit: contain;
+      background: #edf0f4;
+    }
+    .image {
+      display: block;
+    }
+    figcaption p {
+      margin: 10px 0;
+    }
+    small {
+      color: #526071;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 15px;
+    }
+    td,
+    th {
+      border-bottom: 1px solid #dce1e8;
+      padding: 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .scroll {
+      overflow: auto;
+    }
+    footer {
+      margin: 32px 0;
+      font-size: 14px;
+      color: #526071;
+    }
+    @media (max-width: 600px) {
+      main {
+        padding: 20px 14px;
+      }
+      img {
+        height: 270px;
+      }
+      h1 {
+        font-size: 28px;
+      }
+    }
+  </style>
+  <main>
+    <h1>PoloTab: menú y mesas</h1>
+    <p>
+      Referencias del catálogo del operador, los modificadores y PoloMini. Consulta: 12 de octubre
+      de 2026. Toca una imagen para verla completa.
+    </p>
+    <div class="note">
+      <strong>Inferencia para Umi:</strong> tarjetas oscuras compactas con nombre, precio y franja
+      de color; borde y marca para la selección; detalle del producto en el área del catálogo. En
+      portátil, categorías grandes y resumen inferior. Esto respalda reducir la exposición del color
+      en Midnight; no demuestra que debamos copiar toda la distribución.
+    </div>
+    <nav>
+      <a href="#mesas">Mesas y cuenta abierta</a><a href="#screens">Menú y modificadores</a
+      ><a href="#compare">Qué tomar para Umi</a><a href="#videos">Videos oficiales</a
+      ><a href="../2026-10-12-polotab-menu.md">Notas y fuentes</a>
+    </nav>
+    <section id="mesas">
+      <h2>Mesas: del selector a la cuenta abierta</h2>
+      <p>
+        <strong>Recorrido observado:</strong> A mesa → M1 → personas → encargado → Sentar →
+        productos → enviar. Las siete referencias siguen el mismo tutorial oficial.
+      </p>
+      <p class="note">
+        <strong>Hecho documentado:</strong> el portal crea mesas por zonas y prefijos; luego se
+        refresca el POS. <a href="https://www.polotab.com/soporte/crear-mesas">Crear mesas</a>.
+        <strong>No verificado:</strong> creación de una mesa al vuelo desde el POS o recuperación de
+        una cuenta al tocar una mesa ocupada. <strong>Inferencia para Umi:</strong> una cuadrícula
+        de mesas puede funcionar sin dibujar un plano; evitar pedir otra vez datos que la cuenta ya
+        tiene.
+      </p>
+      <div class="grid">
+        <figure>
+          <a class="image" href="assets/comandero-030s.png" target="_blank"
+            ><img src="assets/comandero-030s.png" alt="1. Vista de mesas en el POS"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:30 · Hecho observado</small>
+            <h3>1. Vista de mesas en el POS</h3>
+            <p>
+              Tarjetas M1–M10 y T1–T5. Arriba aparecen Mis mesas, Ocupadas y Disponibles, con
+              contadores. Esta vista no dibuja posiciones físicas.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-037s.png" target="_blank"
+            ><img src="assets/comandero-037s.png" alt="2. Elegir el tipo A mesa"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:37 · Hecho observado</small>
+            <h3>2. Elegir el tipo A mesa</h3>
+            <p>
+              Desde el selector de servicio aparece Tipo de pedido, con Para llevar, A mesa,
+              Delivery y Para recoger.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-038s.png" target="_blank"
+            ><img src="assets/comandero-038s.png" alt="3. Elegir la mesa"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:38 · Hecho observado</small>
+            <h3>3. Elegir la mesa</h3>
+            <p>Mesa a comandar muestra una cuadrícula de mesas nombradas. El operador toca M1.</p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-039s.png" target="_blank"
+            ><img src="assets/comandero-039s.png" alt="4. Indicar personas"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:39 · Hecho observado</small>
+            <h3>4. Indicar personas</h3>
+            <p>
+              Después de M1 aparece Número de personas, con opciones rápidas y una opción adicional.
+              El video selecciona dos personas; no prueba si este paso puede omitirse.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-040s.png" target="_blank"
+            ><img src="assets/comandero-040s.png" alt="5. Asignar encargado y sentar"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:40 · Hecho observado</small>
+            <h3>5. Asignar encargado y sentar</h3>
+            <p>Personal asignado muestra Alejandro, la referencia M1 y el botón Sentar.</p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-044s.png" target="_blank"
+            ><img src="assets/comandero-044s.png" alt="6. Mesa abierta y catálogo"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:44 · Hecho observado</small>
+            <h3>6. Mesa abierta y catálogo</h3>
+            <p>
+              El portátil entra al catálogo de M1. La tarjeta M1 del POS muestra el encargado y dos
+              personas; su cabecera cambia respecto a las mesas libres.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-070s.png" target="_blank"
+            ><img src="assets/comandero-070s.png" alt="7. Enviar y conservar la cuenta"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 01:10 · Hecho observado</small>
+            <h3>7. Enviar y conservar la cuenta</h3>
+            <p>
+              La confirmación de cocina conserva M1 y muestra Nueva orden. El resumen inferior
+              conserva dos productos, $110.00 y Cobrar.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Soporte oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video original</a
+            >
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+    <section id="screens">
+      <h2>Pantallas y flujo</h2>
+      <p>
+        Se distinguen las imágenes comerciales de los fotogramas del tutorial oficial. Las fotos
+        tienen reflejos y perspectiva: no sirven para medir contraste normativo. PoloMini muestra
+        rellenos distintos entre la imagen comercial y el tutorial; no podemos afirmar que ambos
+        usen la misma versión o configuración.
+      </p>
+      <div class="grid">
+        <figure>
+          <a class="image" href="assets/pos-device.png" target="_blank"
+            ><img src="assets/pos-device.png" alt="POS · Categorías y productos"
+          /></a>
+          <figcaption>
+            <small>Imagen comercial oficial · Hecho observado</small>
+            <h3>POS · Categorías y productos</h3>
+            <p>
+              La comanda está a la izquierda; las categorías, en el centro; los productos, a la
+              derecha. Nombre y precio en tarjetas oscuras con franja de color. Sin + visible en
+              estas tarjetas.
+            </p>
+            <a href="https://www.polotab.com/" target="_blank">Página oficial</a> ·
+            <a href="https://www.polotab.com/producto/posHandPrint-1400.avif" target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/promo-17s.png" target="_blank"
+            ><img src="assets/promo-17s.png" alt="POS en uso · Catálogo de Fríos"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:17 · Hecho observado</small>
+            <h3>POS en uso · Catálogo de Fríos</h3>
+            <p>
+              La columna de categorías permanece visible. El catálogo usa tarjetas compactas de
+              texto y precio. La categoría seleccionada tiene borde y encabezado.
+            </p>
+            <a
+              href="https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos"
+              target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+              target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/promo-22s.png" target="_blank"
+            ><img src="assets/promo-22s.png" alt="POS en uso · Catálogo y comanda"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:22 · Hecho observado</small>
+            <h3>POS en uso · Catálogo y comanda</h3>
+            <p>
+              Los productos añadidos aparecen en la comanda de la izquierda. El total y Cobrar
+              permanecen en su pie.
+            </p>
+            <a
+              href="https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos"
+              target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+              target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/pos-home.png" target="_blank"
+            ><img src="assets/pos-home.png" alt="POS · Grupos de modificadores"
+          /></a>
+          <figcaption>
+            <small>Imagen comercial oficial · Hecho observado</small>
+            <h3>POS · Grupos de modificadores</h3>
+            <p>
+              El detalle reemplaza el catálogo de productos. La comanda y las categorías permanecen
+              visibles. Los grupos indican requisitos y límites; cantidad y Agregar quedan abajo.
+            </p>
+            <a href="https://www.polotab.com/" target="_blank">Página oficial</a> ·
+            <a href="https://www.polotab.com/producto/puntoDeVentaNewFeat.avif" target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/promo-05s.png" target="_blank"
+            ><img src="assets/promo-05s.png" alt="POS en uso · Tamaño, extras y leche"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:05 · Hecho observado</small>
+            <h3>POS en uso · Tamaño, extras y leche</h3>
+            <p>
+              Las opciones muestran precio adicional. Requerido aparece junto a los grupos. La
+              selección usa un borde y una marca; Agregar es la acción final.
+            </p>
+            <a
+              href="https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos"
+              target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+              target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/promo-08s.png" target="_blank"
+            ><img src="assets/promo-08s.png" alt="POS en uso · Acción secundaria"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:08 · Hecho observado</small>
+            <h3>POS en uso · Acción secundaria</h3>
+            <p>
+              El tutorial abre promociones desde el menú de tres puntos. La documentación confirma
+              que esa acción está disponible para un producto o una cuenta.
+            </p>
+            <a
+              href="https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos"
+              target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+              target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/polomini-menu.png" target="_blank"
+            ><img src="assets/polomini-menu.png" alt="PoloMini · Categorías en dos columnas"
+          /></a>
+          <figcaption>
+            <small>Imagen comercial oficial · Hecho observado</small>
+            <h3>PoloMini · Categorías en dos columnas</h3>
+            <p>
+              Bebidas, Todo tu menú y Alimentos arriba; categorías grandes; resumen de productos y
+              total abajo. Algunas categorías usan fotos atenuadas.
+            </p>
+            <a href="https://www.polotab.com/polomini" target="_blank">Página oficial</a> ·
+            <a href="https://www.polotab.com/producto/handHeldPosP.avif" target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/mobile-comanda.png" target="_blank"
+            ><img src="assets/mobile-comanda.png" alt="PoloMini · Referencia adicional"
+          /></a>
+          <figcaption>
+            <small>Imagen comercial oficial · Hecho observado</small>
+            <h3>PoloMini · Referencia adicional</h3>
+            <p>
+              Otra vista comercial de la pantalla portátil. Sirve para comparar distribución; no
+              prueba la secuencia de interacción.
+            </p>
+            <a href="https://www.polotab.com/tipo-negocio/restaurante" target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a href="https://www.polotab.com/featureCardsBank/comMob.avif" target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/polomini-trio.png" target="_blank"
+            ><img src="assets/polomini-trio.png" alt="PoloMini · Operador y cliente"
+          /></a>
+          <figcaption>
+            <small>Imagen comercial oficial · Hecho observado</small>
+            <h3>PoloMini · Operador y cliente</h3>
+            <p>
+              El dispositivo central muestra categorías del operador. Las pantallas laterales son de
+              propina y pago para el cliente; no son menús de productos.
+            </p>
+            <a href="https://www.polotab.com/polomini" target="_blank">Página oficial</a> ·
+            <a href="https://www.polotab.com/producto/trioHandHeld.avif" target="_blank"
+              >Original / video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-060s.png" target="_blank"
+            ><img src="assets/comandero-060s.png" alt="PoloMini en uso · Categorías y resumen"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 01:00 · Hecho observado</small>
+            <h3>PoloMini en uso · Categorías y resumen</h3>
+            <p>
+              Categorías en dos columnas, nombre del servicio arriba y productos, total, Cobrar y
+              menú de opciones abajo.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-050s.png" target="_blank"
+            ><img src="assets/comandero-050s.png" alt="PoloMini en uso · Productos de Café"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 00:50 · Hecho observado</small>
+            <h3>PoloMini en uso · Productos de Café</h3>
+            <p>
+              Los productos muestran nombre y precio, sin + dentro de cada tarjeta visible. Asiento
+              aparece como selector encima del catálogo.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video</a
+            >
+          </figcaption>
+        </figure>
+        <figure>
+          <a class="image" href="assets/comandero-070s.png" target="_blank"
+            ><img src="assets/comandero-070s.png" alt="PoloMini en uso · Cuenta enviada"
+          /></a>
+          <figcaption>
+            <small>Tutorial oficial · 01:10 · Hecho observado</small>
+            <h3>PoloMini en uso · Cuenta enviada</h3>
+            <p>
+              La confirmación indica que la comanda se envió a cocina. Muestra M1, Nueva orden y un
+              resumen con Cobrar.
+            </p>
+            <a href="https://www.polotab.com/soporte/conoce-tu-polomini" target="_blank"
+              >Página oficial</a
+            >
+            ·
+            <a
+              href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+              target="_blank"
+              >Video</a
+            >
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+    <section id="compare">
+      <h2>Qué tomar para Umi</h2>
+      <p>Esta tabla contiene inferencias de diseño, no resultados de una prueba de rapidez.</p>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Referencia observada</th>
+              <th>Decisión propuesta</th>
+              <th>Límite</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Color en franjas sobre superficies oscuras</td>
+              <td>
+                Conservar el color exacto en áreas pequeñas; texto sobre una superficie controlada
+              </td>
+              <td>El encabezado de categoría todavía tiene un relleno intenso</td>
+            </tr>
+            <tr>
+              <td>Productos compactos, nombre y precio, sin + visible</td>
+              <td>Usar toda la tarjeta como acción; evaluar más densidad en el iMin</td>
+              <td>La captura no prueba el tamaño táctil ni la rapidez</td>
+            </tr>
+            <tr>
+              <td>Detalle en el área del catálogo</td>
+              <td>Conservar la comanda visible mientras se eligen variantes y extras</td>
+              <td>No hace falta invertir la posición de la comanda de Umi</td>
+            </tr>
+            <tr>
+              <td>Borde y marca para selección</td>
+              <td>Mostrar selección y requisitos sin depender solo del color</td>
+              <td>No copiar contraste sin medir nuestros tokens</td>
+            </tr>
+            <tr>
+              <td>PoloMini: categorías grandes y resumen abajo</td>
+              <td>Adaptar la navegación al ancho del portátil</td>
+              <td>Fotos y colores completos requieren comprobar legibilidad</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section id="videos">
+      <h2>Videos oficiales para profundizar</h2>
+      <ul>
+        <li>
+          <a href="https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+            >Aplicar una promoción en el POS</a
+          >: fuente de los fotogramas de esta galería.
+        </li>
+        <li>
+          <a href="https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+            >Introducción a PoloMini Comandero</a
+          >: enlazado desde soporte.
+        </li>
+        <li>
+          <a href="https://www.youtube.com/watch?v=25bEodVqSsQ"
+            >El nuevo poder de tus modificadores</a
+          >: tutorial del operador.
+        </li>
+        <li>
+          <a href="https://www.youtube.com/watch?v=7A9DS9aJrLM">Modificadores más Inteligentes</a>:
+          opciones repetidas y fraccionadas.
+        </li>
+        <li>
+          <a href="https://www.youtube.com/watch?v=u3JaBuDiSZw">Las tres formas de usar PoloMini</a
+          >: vista general del portátil.
+        </li>
+        <li>
+          <a href="https://www.youtube.com/watch?v=K9Yebg6ZAM0">Cómo crear y gestionar tu menú</a>:
+          administración; no es la pantalla de venta.
+        </li>
+      </ul>
+    </section>
+    <footer>
+      Consulta visual de un proveedor por petición del usuario. No se modificó Umi ni la sesión
+      inalámbrica del iMin durante esta investigación. Versión instalada de PoloTab: no verificada.
+    </footer>
+  </main>
+</html>

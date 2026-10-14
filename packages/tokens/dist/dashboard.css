@@ -81,8 +81,8 @@
   --sidebar-bg-deep: #04070E;
   --ink-1: #EDF1F8;
   --ink-2: #99A2B5;
-  --ink-3: #727B8F;
-  --ink-4: #565E70;
+  --ink-3: #7E8799;
+  --ink-4: #79829C;
   --ink-warm: #EDEDED;
   --ink-warm-soft: #A0A0A0;
   --ink-warm-mute: #6E6E6E;
@@ -115,8 +115,8 @@
     --sidebar-bg-deep: #04070E;
     --ink-1: #EDF1F8;
     --ink-2: #99A2B5;
-    --ink-3: #727B8F;
-    --ink-4: #565E70;
+    --ink-3: #7E8799;
+    --ink-4: #79829C;
     --ink-warm: #EDEDED;
     --ink-warm-soft: #A0A0A0;
     --ink-warm-mute: #6E6E6E;
@@ -138,7 +138,7 @@
   }
 }
 
-/* Midnight theme — explicit choice via <html data-theme="midnight">. */
+/* Medianoche theme — explicit choice via <html data-theme="midnight">. */
 [data-theme="midnight"] {
   --canvas: #000000;
   --canvas-2: #0D0D0D;
@@ -150,7 +150,7 @@
   --ink-1: #F2F2F2;
   --ink-2: #B0B0B0;
   --ink-3: #8A8A8A;
-  --ink-4: #6A6A6A;
+  --ink-4: #7E7E7E;
   --ink-warm: #EDEDED;
   --ink-warm-soft: #A0A0A0;
   --ink-warm-mute: #6E6E6E;

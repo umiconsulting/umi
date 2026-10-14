@@ -377,6 +377,10 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                         padding: '0 10px',
                         fontFamily: 'var(--font-mono)',
                         flex: 1,
+                        // The grid column shrinks (see `.day-row`): a time field
+                        // that refuses to go below its intrinsic width is what
+                        // pushed this row's copy button out of the card.
+                        minWidth: 0,
                       }}
                       value={h.from}
                       disabled={!h.open}
@@ -394,6 +398,7 @@ const HoursScreen = ({ ordersPaused, setOrdersPaused }) => {
                         padding: '0 10px',
                         fontFamily: 'var(--font-mono)',
                         flex: 1,
+                        minWidth: 0,
                       }}
                       value={h.to}
                       disabled={!h.open}

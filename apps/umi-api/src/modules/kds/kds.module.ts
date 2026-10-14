@@ -7,13 +7,14 @@ import { KdsService } from './kds.service';
 import { KdsRepository } from './kds.repository';
 import { KdsPosController } from './kds-pos.controller';
 import { KdsLocationGuard } from './kds-location.guard';
+import { IntegrityModule } from '../integrity/integrity.module';
 
 /**
  * The UMI API owns kitchen projections and transitions.
  * The existing iPad KDS, the POS, and the Dashboard use this module as clients.
  */
 @Module({
-  imports: [AuthModule, MerchantsModule],
+  imports: [AuthModule, MerchantsModule, IntegrityModule],
   controllers: [KdsController, KdsDashboardController, KdsAdminController, KdsPosController],
   providers: [KdsService, KdsRepository, KdsLocationGuard],
   exports: [KdsService],

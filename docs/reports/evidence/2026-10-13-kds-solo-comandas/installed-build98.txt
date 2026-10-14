@@ -1,0 +1,16 @@
+APK: apps/umi-pos/build/app/outputs/flutter-apk/app-profile.apk
+Build: 0.1.0+98 (profile, android-arm64)
+SHA-256: 68467ac9e708c4911fae650db0ca013941a1eee418d78793fb3e809991d6c50b
+Flutter: 3.47.5
+Dart: 3.13.4
+ADB: 37.0.0
+
+Installation command (same APK on all devices):
+adb -s 192.168.1.10:5555 install -r build/app/outputs/flutter-apk/app-profile.apk
+adb -s 192.168.1.14:35559 install -r build/app/outputs/flutter-apk/app-profile.apk
+adb -s 192.168.1.13:38333 install -r build/app/outputs/flutter-apk/app-profile.apk
+
+Verification: dumpsys package co.umiconsulting.umi_pos.estacion reported
+versionCode=98 and versionName=0.1.0 on iMin 192.168.1.10:5555,
+A9 192.168.1.14:35559, and A11 192.168.1.13:38333.
+All three adb install invocations returned Success.

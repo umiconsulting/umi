@@ -1,0 +1,73 @@
+Resolving dependencies...
+Downloading packages...
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.1.0 available)
+  connectivity_plus 7.3.1 (7.3.2 available)
+  cryptography 2.7.0 (2.9.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  flutter_secure_storage 9.2.4 (11.2.0 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.3 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.1.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  hooks 2.0.2 (2.2.0 available)
+  http 1.5.0 (1.6.0 available)
+  jni 1.0.0 (1.1.0 available)
+  jni_flutter 1.0.1 (1.0.4+1 available)
+  js 0.6.7 (0.7.2 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  nm 0.5.0 (0.6.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  package_config 2.2.0 (3.0.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  process 5.0.5 (5.0.6 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences 2.5.3 (2.5.6 available)
+  shared_preferences_android 2.4.27 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.12 (0.7.15 available)
+  vm_service 15.2.0 (15.3.0 available)
+  webdriver 3.1.0 (3.2.0 available)
+  win32 5.15.0 (6.4.0 available)
+  xml 7.0.1 (7.1.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+35 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart: a refused account stays in the list with its owner notice
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart: a refused account stays in the list with its owner notice
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:00 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: entry remains usable at compact width and 200 percent text
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:00 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:01 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: going takeout on a table account warns that the table is emptied
+00:01 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: assigned account shows its name and keeps its reference in details
+00:01 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: 120 character account name keeps the actions reachable on iMin at 200%
+00:01 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the ordinary cart offers no save-and-leave and keeps its actions reachable
+00:01 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: cart actions stay on the till screen at 200% in es
+00:01 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: cart action words remain complete at 200% in es
+00:02 +14: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:02 +15: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 2.0
+00:02 +16: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: cart actions stay on the till screen at 200% in en
+00:03 +17: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: cart action words remain complete at 200% in en
+00:03 +18: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 1.0
+00:03 +19: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 2.0
+00:03 +20: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the cart opens on a short viewport without overflowing
+00:03 +21: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: a failed account open explains the conflict and can recover the account
+00:03 +22: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the bar about a closed account clears once the till is working again
+00:04 +23: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: Nueva cuenta stands down on an empty account and writes nothing
+00:04 +24: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: an account is bare only when nothing identifies it
+00:04 +25: All tests passed!

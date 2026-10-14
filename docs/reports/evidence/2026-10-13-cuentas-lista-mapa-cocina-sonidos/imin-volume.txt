@@ -1,0 +1,21 @@
+- STREAM_MUSIC:
+   Muted: false
+   Muted Internally: false
+   Min: 0
+   Max: 15
+   streamVolume:11
+   Current: 40000000 (default): 11
+   Devices: speaker
+- STREAM_ALARM:
+   Muted: false
+--
+- VOLUME GROUP AUDIO_STREAM_MUSIC:
+   Min: 0
+   Max: 15
+   Current: 40000000 (default): 11
+   Devices: speaker
+- VOLUME GROUP AUDIO_STREAM_NOTIFICATION:
+   Min: 0
+   Max: 7
+   Current: 40000000 (default): 5
+   Devices: speaker

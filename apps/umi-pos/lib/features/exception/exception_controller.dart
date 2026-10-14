@@ -68,6 +68,7 @@ final class SaleExceptionController extends ChangeNotifier {
   String? _operatorSessionId;
   String? _commandId;
   String? _idempotencyKey;
+  RefundPreviewRequest? _previewRequest;
   bool _busy = false;
 
   Future<void> setContext({
@@ -139,19 +140,17 @@ final class SaleExceptionController extends ChangeNotifier {
     );
     try {
       final sale = eligibility.sale;
-      final preview = await _repository.preview(
-        _merchantId!,
-        saleId,
-        RefundPreviewRequest(
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          exceptionType: exceptionType,
-          reason: reason,
-          note: note?.trim().isEmpty ?? true ? null : note!.trim(),
-          lines: lines,
-          expectedSaleVersion: sale['version']! as int,
-        ),
+      final request = RefundPreviewRequest(
+        locationId: _locationId!,
+        operatorSessionId: _operatorSessionId!,
+        exceptionType: exceptionType,
+        reason: reason,
+        note: note?.trim().isEmpty ?? true ? null : note!.trim(),
+        lines: lines,
+        expectedSaleVersion: sale['version']! as int,
       );
+      _previewRequest = request;
+      final preview = await _repository.preview(_merchantId!, saleId, request);
       _commandId = _uuid();
       _idempotencyKey = _uuid();
       final requiresDeclaration =
@@ -236,11 +235,28 @@ final class SaleExceptionController extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshPreview() async {
+    final request = _previewRequest;
+    if (request == null) return;
+    await createPreview(
+      exceptionType: request.exceptionType,
+      reason: request.reason,
+      lines: request.lines,
+      note: request.note,
+    );
+  }
+
   Future<void> approve(String managerPin) async {
     final preview = _state.preview;
     final saleId = _state.saleId;
     final commandId = _commandId;
-    if (_busy || preview == null || saleId == null || commandId == null) return;
+    if (_busy ||
+        preview == null ||
+        saleId == null ||
+        commandId == null ||
+        _state.errorCode == 'REFUND_PREVIEW_EXPIRED') {
+      return;
+    }
     _busy = true;
     try {
       final fingerprint = sha256
@@ -281,14 +297,18 @@ final class SaleExceptionController extends ChangeNotifier {
         ),
       );
     } on AppException catch (error) {
-      _failure(
-        saleId,
-        error.code,
-        eligibility: _state.eligibility,
-        preview: preview,
-        approval: _state.approval,
-        terminalOutcome: _state.terminalOutcome,
-        history: _state.history,
+      _set(
+        SaleExceptionState(
+          phase: SaleExceptionPhase.approvalRequired,
+          saleId: saleId,
+          errorCode: error.details?['reason'] == 'refund_preview_expired'
+              ? 'REFUND_PREVIEW_EXPIRED'
+              : error.code,
+          eligibility: _state.eligibility,
+          preview: preview,
+          terminalOutcome: _state.terminalOutcome,
+          history: _state.history,
+        ),
       );
     } finally {
       _busy = false;
@@ -346,6 +366,16 @@ final class SaleExceptionController extends ChangeNotifier {
           commandId: commandId,
           idempotencyKey: idempotencyKey,
           offline: false,
+          // THE MOTIVE IS NOT OPTIONAL IN THE CONTRACT'S EYES. `fiscalMotive` is
+          // `z.enum(['01','02','03','04']).default('02')`: Zod applies that default when the key is
+          // ABSENT, and refuses `null`. The Dart model carries a nullable field and its `toJson`
+          // writes the key either way, so leaving it unset sent `"fiscalMotive": null` and every
+          // commit was refused with "The request does not match the public contract" —
+          // `fieldErrors: {"fiscalMotive": ["Expected '01' | '02' | '03' | '04', received
+          // null"]}`, measured on the iMin on 2026-10-11 with the body captured in front of the
+          // API. `02` is the motive a counter sale uses: `01` needs the UUID of a related CFDI,
+          // which a sale at the counter cannot supply (contract `pos-exception.ts`).
+          fiscalMotive: '02',
         ),
       );
       await _recoveryStore.clear(_merchantId!, _locationId!);

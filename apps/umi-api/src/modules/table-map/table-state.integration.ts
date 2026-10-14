@@ -12,6 +12,9 @@ import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
 import { TableMapRepository } from './table-map.repository';
 import { TableMapService } from './table-map.service';
+import { KdsRepository } from '../kds/kds.repository';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
+import { PosCartRepository } from '../pos-cart/pos-cart.repository';
 
 /**
  * WORKSTREAM D, STEPS 3 TO 5 — the live state of a table, against the REAL schema.
@@ -529,6 +532,248 @@ describe('table state · the room, the turn timer, merge/split and the publish g
     });
   });
 
+  it('moves the open account and its product before releasing the original table', async () => {
+    await seat(T2, 2);
+    const rollback = new Error('rollback fixture');
+    await expect(
+      pg.workerTx(async (client) => {
+        const cart = randomUUID();
+        const product = randomUUID();
+        const line = randomUUID();
+        await client.query(
+          `INSERT INTO merchant.pos_cart(id,merchant_id,location_id,operator_session_id,
+        original_operator_session_id,original_operator_user_id,operator_user_id,table_id,table_name,table_visit_id)
+        SELECT $1::uuid,$2::uuid,$3::uuid,$4::uuid,$4::uuid,$5::uuid,$5::uuid,table_id,'T2',visit_id
+        FROM merchant.table_state WHERE merchant_id=$2::uuid AND location_id=$3::uuid AND table_id=$6::uuid`,
+          [cart, MERCHANT, LOCATION, OPERATOR_SESSION, USER, T2],
+        );
+        await client.query(
+          `INSERT INTO merchant.product(id,merchant_id,name) VALUES($1::uuid,$2::uuid,'Regression drink')`,
+          [product, MERCHANT],
+        );
+        await client.query(
+          `INSERT INTO merchant.pos_cart_line(id,merchant_id,cart_id,product_id,identity_key,product_name,quantity,base_price,tax_rate_basis_points)
+          VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,repeat('a',64),'Regression drink',1,6000,1600)`,
+          [line, MERCHANT, cart, product],
+        );
+        const moved = await new TableMapRepository(pg).move(client, MERCHANT, LOCATION, {
+          fromTableId: T2,
+          toTableId: T3,
+        });
+        expect(moved.find((entry) => entry.tableId === T2)?.state).toBe('dirty');
+        const result = await client.query(
+          `SELECT c.table_id::text,c.table_name,c.table_visit_id=s.visit_id AS correct_visit,
+        l.id::text AS line_id,l.base_price FROM merchant.pos_cart c JOIN merchant.pos_cart_line l ON l.cart_id=c.id
+        JOIN merchant.table_state s ON s.table_id=c.table_id AND s.merchant_id=c.merchant_id
+        WHERE c.id=$1::uuid`,
+          [cart],
+        );
+        expect(result.rows[0]).toMatchObject({
+          table_id: T3,
+          table_name: 'T3',
+          correct_visit: true,
+          line_id: line,
+          base_price: '6000',
+        });
+        await client.query(
+          `UPDATE merchant.pos_cart SET status='abandoned',lifecycle_state='cancelled',
+          cancellation_reason_code='other',cancellation_reason='Error comercial',cancelled_at=now() WHERE id=$1::uuid`,
+          [cart],
+        );
+        const empty = randomUUID();
+        await client.query(
+          `INSERT INTO merchant.pos_cart(id,merchant_id,location_id,operator_session_id,
+          original_operator_session_id,original_operator_user_id,operator_user_id,status,lifecycle_state,cancellation_reason)
+          VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$4::uuid,$5::uuid,$5::uuid,'abandoned','cancelled',
+            'Cuenta vacía: se cierra al apartarla.')`,
+          [empty, MERCHANT, LOCATION, OPERATOR_SESSION, USER],
+        );
+        const saleRepo = new PosSaleRepository(
+          {
+            runWithMerchant: async (
+              _m: string,
+              _u: unknown,
+              work: (c: typeof client) => Promise<unknown>,
+            ) => work(client),
+          } as unknown as PgService,
+          new PosCartRepository(pg),
+        );
+        const history = await saleRepo.history(
+          MERCHANT,
+          {
+            locationId: LOCATION,
+            operatorSessionId: OPERATOR_SESSION,
+            search: '',
+            sort: 'newest',
+            limit: 30,
+          },
+          null,
+        );
+        expect(history.items.some((item) => item.id === cart)).toBe(true);
+        expect(history.items.some((item) => item.id === empty)).toBe(false);
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
+  });
+
+  it('each station starts and finishes its own items while the other station stays pending', async () => {
+    const rollback = new Error('rollback kitchen fixture');
+    await expect(
+      pg.workerTx(async (client) => {
+        const order = randomUUID(),
+          ticket = randomUUID();
+        const stations = [randomUUID(), randomUUID()];
+        const items = [randomUUID(), randomUUID()];
+        const sourceItems = [randomUUID(), randomUUID()];
+        await client.query(
+          `INSERT INTO merchant.customer_order(id,merchant_id,location_id,source,status)
+        VALUES($1::uuid,$2::uuid,$3::uuid,'pos','placed')`,
+          [order, MERCHANT, LOCATION],
+        );
+        await client.query(
+          `INSERT INTO merchant.kitchen_order(id,merchant_id,location_id,source_order_id,public_reference,source,business_date,queued_at)
+        SELECT $1::uuid,$2::uuid,$3::uuid,id,'Regression stations','pos',business_date,now()
+        FROM merchant.customer_order WHERE id=$4::uuid`,
+          [ticket, MERCHANT, LOCATION, order],
+        );
+        for (let i = 0; i < 2; i++) {
+          const sourceItem = sourceItems[i];
+          await client.query(
+            `INSERT INTO merchant.station(id,merchant_id,location_id,key,name)
+          VALUES($1::uuid,$2::uuid,$3::uuid,$4,$4)`,
+            [stations[i], MERCHANT, LOCATION, `station-${i}`],
+          );
+          await client.query(
+            `INSERT INTO merchant.order_item(id,order_id,name) VALUES($1::uuid,$2::uuid,'Regression dish')`,
+            [sourceItem, order],
+          );
+          await client.query(
+            `INSERT INTO merchant.kitchen_order_item(id,merchant_id,location_id,kitchen_order_id,source_order_id,
+          source_order_item_id,station_id,product_name,quantity,display_order,route_reason)
+          VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,'Regression dish',1,$8,'test')`,
+            [items[i], MERCHANT, LOCATION, ticket, order, sourceItem, stations[i], i],
+          );
+        }
+        const repo = new KdsRepository({
+          workerTx: async (work: (c: typeof client) => Promise<unknown>) => work(client),
+        } as unknown as PgService);
+        let version = 1;
+        const command = async (
+          commandType: 'start_preparation' | 'mark_item_ready' | 'complete',
+          index: number,
+        ) => {
+          const result = await repo.executeKitchenCommand({
+            session: {
+              deviceId: null,
+              merchantId: MERCHANT,
+              locationId: LOCATION,
+              stationId: null,
+              deviceName: null,
+              permissions: ['kitchen.prepare', 'kitchen.ready', 'kitchen.complete'],
+            },
+            actorUserId: USER,
+            order: {
+              id: ticket,
+              merchant_id: MERCHANT,
+              location_id: LOCATION,
+              station_ids: stations,
+            } as never,
+            stationScope: stations,
+            commandId: randomUUID(),
+            idempotencyKey: randomUUID(),
+            correlationId: randomUUID(),
+            expectedVersion: version,
+            commandType,
+            targetStatus: null,
+            itemIds: [items[index]],
+            reasonCode: null,
+            reasonNote: null,
+            priority: null,
+            payloadFingerprint: 'a'.repeat(64),
+          });
+          expect(result.status).toBe('succeeded');
+          version++;
+          return result.result;
+        };
+        await command('start_preparation', 0);
+        expect(
+          (
+            await client.query(`SELECT status FROM merchant.kitchen_order_item WHERE id=$1::uuid`, [
+              items[1],
+            ])
+          ).rows[0].status,
+        ).toBe('queued');
+        await command('mark_item_ready', 0);
+        expect((await command('complete', 0)).status).toBe('partially_ready');
+        expect(
+          (
+            await client.query(
+              `SELECT station_completed_at FROM merchant.kitchen_order_item WHERE id=$1::uuid`,
+              [items[0]],
+            )
+          ).rows[0].station_completed_at,
+        ).toBeInstanceOf(Date);
+        await command('start_preparation', 1);
+        await command('mark_item_ready', 1);
+        expect((await command('complete', 1)).status).toBe('completed');
+        const cart = randomUUID(),
+          line = randomUUID(),
+          product = randomUUID();
+        await client.query(
+          `INSERT INTO merchant.pos_cart(id,merchant_id,location_id,operator_session_id,
+          original_operator_session_id,original_operator_user_id,operator_user_id,fired_order_id)
+          VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$4::uuid,$5::uuid,$5::uuid,$6::uuid)`,
+          [cart, MERCHANT, LOCATION, OPERATOR_SESSION, USER, order],
+        );
+        await client.query(
+          `INSERT INTO merchant.product(id,merchant_id,name) VALUES($1::uuid,$2::uuid,'Regression dish')`,
+          [product, MERCHANT],
+        );
+        await client.query(
+          `INSERT INTO merchant.pos_cart_line(id,merchant_id,cart_id,product_id,identity_key,product_name,
+          quantity,base_price,tax_rate_basis_points,fired_at,order_item_id)
+          VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,repeat('b',64),'Regression dish',1,6000,1600,now(),$5::uuid)`,
+          [line, MERCHANT, cart, product, sourceItems[0]],
+        );
+        await client.query(
+          `UPDATE runtime.operator_session SET permissions=ARRAY['sale.lifecycle','cart.write','order.fire'] WHERE id=$1::uuid`,
+          [OPERATOR_SESSION],
+        );
+        await client.query(
+          `SELECT set_config('app.current_merchant',$1,true),set_config('app.current_location',$2,true),
+          set_config('app.current_device',$3,true),set_config('app.user_id',$4,true)`,
+          [MERCHANT, LOCATION, DEVICE, USER],
+        );
+        const cancel = async (forced: boolean) =>
+          (
+            await client.query(
+              `SELECT merchant.cancel_sent_cart_line(
+          $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,1,'customer_changed',$6,$7) AS state`,
+              [MERCHANT, LOCATION, cart, line, OPERATOR_SESSION, randomUUID(), forced],
+            )
+          ).rows[0].state;
+        expect(await cancel(false)).toBe('preparation_started');
+        expect(await cancel(true)).toBe('cancelled');
+        expect(
+          (
+            await client.query(`SELECT status FROM merchant.kitchen_order WHERE id=$1::uuid`, [
+              ticket,
+            ])
+          ).rows[0].status,
+        ).toBe('completed');
+        expect(
+          (
+            await client.query(`SELECT status FROM merchant.kitchen_order_item WHERE id=$1::uuid`, [
+              items[1],
+            ])
+          ).rows[0].status,
+        ).toBe('ready');
+        expect(await cancel(true)).toBe('rejected');
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
+  });
+
   it('refuses a move onto an occupied table', async () => {
     await seat(T2, 4);
     await seat(T3, 2);
@@ -592,16 +837,16 @@ describe('table state · the room, the turn timer, merge/split and the publish g
     await expect(merge([T1, T2], 6)).resolves.toMatchObject({ commandId: expect.any(String) });
   });
 
-  it('SPLITS a merged group: the nominated table keeps the party, the rest go dirty', async () => {
+  it('SPLITS a merged group within each table capacity and preserves all guests', async () => {
     await merge([T2, T3], 6);
     const splitResult = await split(T3);
     const survivor = splitResult.changed.find((entry) => entry.tableId === T3);
     const released = splitResult.changed.find((entry) => entry.tableId === T2);
-    expect(survivor).toMatchObject({ state: 'seated', partySize: 6, groupId: null });
+    expect(survivor).toMatchObject({ state: 'seated', partySize: 4, groupId: null });
     expect(released).toMatchObject({
-      state: 'dirty',
-      seatedAt: null,
-      partySize: null,
+      state: 'seated',
+      seatedAt: expect.any(String),
+      partySize: 2,
       groupId: null,
     });
   });

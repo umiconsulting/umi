@@ -1,0 +1,16 @@
+[
+  {
+    "kind": "previous",
+    "apkPath": "apps/umi-pos/.estacion-runtime/imin-comparison-20261009T175313Z/previous.apk",
+    "bytes": 34952551,
+    "sha256": "07ca1d1dcc71b9966eef9a72425bbc8c60367e0ab75c551feccd6586660eaa61",
+    "aotSha256": "bd1b12a907dabc1dfb2f92ad542806bb28ef0942144827c6aa5cb402405147e3"
+  },
+  {
+    "kind": "current",
+    "apkPath": "apps/umi-pos/.estacion-runtime/imin-comparison-20261009T175313Z/current.apk",
+    "bytes": 32687335,
+    "sha256": "19551dd744bc0f1fff89a9249610340897dac771379fddfd98087ddadede324c",
+    "aotSha256": "c2afd3e0fdc9b2e2f8ecd5487913ec7b26454a1ab0c2bb1a449f1eb7f0a04a0a"
+  }
+]

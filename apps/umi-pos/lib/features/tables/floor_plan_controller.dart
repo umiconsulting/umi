@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
@@ -8,9 +10,50 @@ abstract interface class FloorPlanRepository {
   Future<PublishedFloorPlan> load(String merchantId, PosFloorPlanQuery query);
 }
 
-final class ApiFloorPlanRepository implements FloorPlanRepository {
+abstract interface class BootstrapFloorPlanRepository
+    implements FloorPlanRepository {
+  Future<PublishedFloorPlan> bootstrapTables(
+    String merchantId,
+    InitializePosTablesRequest request,
+  );
+}
+
+abstract interface class AdditionalFloorPlanRepository
+    implements FloorPlanRepository {
+  Future<PublishedFloorPlan> addTable(
+    String merchantId,
+    AddPosTableRequest request,
+  );
+}
+
+final class ApiFloorPlanRepository
+    implements BootstrapFloorPlanRepository, AdditionalFloorPlanRepository {
   const ApiFloorPlanRepository(this._api);
   final ApiClient _api;
+
+  @override
+  Future<PublishedFloorPlan> addTable(
+    String merchantId,
+    AddPosTableRequest request,
+  ) async => PublishedFloorPlan.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posFloorPlanAddTable(merchantId),
+      body: request.toJson(),
+    ),
+  );
+
+  @override
+  Future<PublishedFloorPlan> bootstrapTables(
+    String merchantId,
+    InitializePosTablesRequest request,
+  ) async => PublishedFloorPlan.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posFloorPlanBootstrapTables(merchantId),
+      body: request.toJson(),
+    ),
+  );
 
   @override
   Future<PublishedFloorPlan> load(
@@ -39,10 +82,176 @@ final class FloorPlanController extends ChangeNotifier {
   String? _scope;
   int _generation = 0;
   bool _disposed = false;
+  InitializePosTablesRequest? _bootstrapRequest;
+  String? _bootstrapScope;
+  AddPosTableRequest? _addRequest;
+  String? _addScope;
+  String? errorCode;
+
+  bool get supportsBootstrap => _repository is BootstrapFloorPlanRepository;
+  bool get supportsAdditionalTables =>
+      _repository is AdditionalFloorPlanRepository;
+
+  Future<PublishedFloorPlan?> addTable(
+    String merchantId,
+    PosFloorPlanQuery query, {
+    required String areaId,
+    required String label,
+    required int capacity,
+  }) async {
+    final repository = _repository;
+    if (repository is! AdditionalFloorPlanRepository || loading) return null;
+    final scope = '$merchantId:${query.locationId}:${query.operatorSessionId}';
+    final previous = _addRequest;
+    if (_addScope != scope ||
+        previous == null ||
+        previous.areaId != areaId ||
+        previous.label != label ||
+        previous.capacity != capacity) {
+      _addScope = scope;
+      _addRequest = AddPosTableRequest(
+        locationId: query.locationId,
+        operatorSessionId: query.operatorSessionId,
+        expectedPublishedVersion: plan?.publishedVersion ?? 0,
+        idempotencyKey: _uuid(),
+        areaId: areaId,
+        label: label,
+        capacity: capacity,
+      );
+    }
+    loading = true;
+    failed = false;
+    errorCode = null;
+    final generation = ++_generation;
+    notifyListeners();
+    try {
+      final result = await repository.addTable(merchantId, _addRequest!);
+      if (_disposed || generation != _generation) return null;
+      if (result.locationId != query.locationId || result.published == null) {
+        throw const FormatException('Location mismatch');
+      }
+      plan = result;
+      refreshedAt = DateTime.now();
+      _addRequest = null;
+      return result;
+    } catch (error) {
+      if (_disposed || generation != _generation) return null;
+      failed = true;
+      errorCode = error is AppException ? error.code : null;
+      if (errorCode == 'OPTIMISTIC_VERSION_CONFLICT') {
+        try {
+          final current = await repository.load(merchantId, query);
+          if (!_disposed &&
+              generation == _generation &&
+              current.locationId == query.locationId) {
+            plan = current;
+            refreshedAt = DateTime.now();
+            _addRequest = null;
+          }
+        } catch (_) {
+          // Preserve the command until a retry can establish its outcome.
+        }
+      }
+      return null;
+    } finally {
+      if (!_disposed && generation == _generation) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<PublishedFloorPlan?> bootstrapTables(
+    String merchantId,
+    PosFloorPlanQuery query,
+    List<int> slots,
+  ) async {
+    final repository = _repository;
+    if (repository is! BootstrapFloorPlanRepository || loading) return null;
+    final scope = '$merchantId:${query.locationId}:${query.operatorSessionId}';
+    final ordered = List<int>.of(slots)..sort();
+    final previous = _bootstrapRequest;
+    if (_bootstrapScope != scope ||
+        previous == null ||
+        !listEquals(previous.slots, ordered)) {
+      _bootstrapScope = scope;
+      _bootstrapRequest = InitializePosTablesRequest(
+        locationId: query.locationId,
+        operatorSessionId: query.operatorSessionId,
+        expectedPublishedVersion: plan?.publishedVersion ?? 0,
+        idempotencyKey: _uuid(),
+        slots: ordered,
+      );
+    }
+    loading = true;
+    failed = false;
+    final generation = ++_generation;
+    notifyListeners();
+    try {
+      final result = await repository.bootstrapTables(
+        merchantId,
+        _bootstrapRequest!,
+      );
+      if (_disposed || generation != _generation) return null;
+      if (result.locationId != query.locationId || result.published == null) {
+        throw const FormatException('Location mismatch');
+      }
+      plan = result;
+      refreshedAt = DateTime.now();
+      _bootstrapRequest = null;
+      return result;
+    } on AppException catch (error) {
+      if (_disposed || generation != _generation) return null;
+      if (error.code == 'FLOOR_PLAN_ALREADY_CONFIGURED' ||
+          error.code == 'OPTIMISTIC_VERSION_CONFLICT') {
+        try {
+          final current = await repository.load(merchantId, query);
+          if (_disposed || generation != _generation) return null;
+          if (current.locationId == query.locationId) {
+            plan = current;
+            refreshedAt = DateTime.now();
+            _bootstrapRequest = null;
+          }
+          final document = current.published;
+          if (current.locationId == query.locationId &&
+              document != null &&
+              FloorPlanDocument.fromJson(document).areas
+                  .map(FloorPlanArea.fromJson)
+                  .any(
+                    (area) => area.elements.any(
+                      (element) => element['kind'] == 'table',
+                    ),
+                  )) {
+            plan = current;
+            refreshedAt = DateTime.now();
+            _bootstrapRequest = null;
+            return current;
+          }
+        } catch (_) {
+          // A failed refresh preserves the request for retry.
+        }
+      }
+      failed = true;
+      return null;
+    } catch (_) {
+      if (!_disposed && generation == _generation) failed = true;
+      return null;
+    } finally {
+      if (!_disposed && generation == _generation) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
 
   void clear() {
     _generation++;
     _scope = null;
+    _bootstrapRequest = null;
+    _bootstrapScope = null;
+    _addScope = null;
+    _addRequest = null;
+    errorCode = null;
     plan = null;
     refreshedAt = null;
     loading = false;
@@ -90,4 +299,15 @@ final class FloorPlanController extends ChangeNotifier {
     _generation++;
     super.dispose();
   }
+}
+
+String _uuid() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  final hex = bytes
+      .map((value) => value.toRadixString(16).padLeft(2, '0'))
+      .join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
 }

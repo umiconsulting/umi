@@ -27,6 +27,19 @@ export const SaleLifecycleState = z.enum([
   'recovered',
 ]);
 
+/**
+ * WHY a sale was cancelled, from a fixed list (plan §8.3, from the legacy data in
+ * §3.5): 16 of the till's 17 cancellations said "prueba", so free text produced a
+ * history nobody can measure. The code is the fact; the note is the comment.
+ */
+export const CancelSaleReason = z.enum([
+  'customer_changed',
+  'operator_mistake',
+  'duplicate',
+  'other',
+]);
+export type CancelSaleReason = z.infer<typeof CancelSaleReason>;
+
 export const SaleCustomerSummary = z
   .object({
     id: Uuid,
@@ -46,6 +59,9 @@ export const SaleSnapshot = z
     currentOperatorSessionId: Uuid.nullable(),
     suspendedAt: Timestamp.nullable(),
     cancelledAt: Timestamp.nullable(),
+    /** The typed reason the operator chose (plan §8.3), or null for an old row. */
+    cancellationReasonCode: CancelSaleReason.nullable(),
+    /** The operator's optional note. Never the only reason. */
     cancellationReason: z.string().max(160).nullable(),
     committedSaleId: Uuid.nullable(),
     sourceOrderId: Uuid.nullable(),
@@ -80,8 +96,27 @@ export const RenameSuspendedSaleRequest = SaleMutationRequest.extend({
 }).strict();
 
 export const CancelSaleRequest = SaleMutationRequest.extend({
+  reasonCode: CancelSaleReason,
+  // Optional, and never a substitute for the code: a cancellation with only a note
+  // is the free-text case this change exists to remove.
+  reason: SafeText.nullable().default(null),
+}).strict();
+
+export const CancelCarriedOverAccountsRequest = SaleContextRequest.extend({
+  accounts: z
+    .array(z.object({ cartId: Uuid, expectedVersion: z.number().int().positive() }).strict())
+    .min(1)
+    .max(50)
+    .refine(
+      (accounts) => new Set(accounts.map((account) => account.cartId)).size === accounts.length,
+    ),
+  reasonCode: CancelSaleReason,
   reason: SafeText,
 }).strict();
+
+export const CancelCarriedOverAccountsResult = z
+  .object({ cancelled: z.array(SaleSnapshot).min(1).max(50) })
+  .strict();
 
 export const AttachSaleCustomerRequest = SaleMutationRequest.extend({
   customerId: Uuid,
@@ -143,6 +178,8 @@ export type SuspendSaleRequest = z.infer<typeof SuspendSaleRequest>;
 export type ResumeSaleRequest = z.infer<typeof ResumeSaleRequest>;
 export type RenameSuspendedSaleRequest = z.infer<typeof RenameSuspendedSaleRequest>;
 export type CancelSaleRequest = z.infer<typeof CancelSaleRequest>;
+export type CancelCarriedOverAccountsRequest = z.infer<typeof CancelCarriedOverAccountsRequest>;
+export type CancelCarriedOverAccountsResult = z.infer<typeof CancelCarriedOverAccountsResult>;
 export type AttachSaleCustomerRequest = z.infer<typeof AttachSaleCustomerRequest>;
 export type SaleHistoryQuery = z.infer<typeof SaleHistoryQuery>;
 export type PosCustomerSearchQuery = z.infer<typeof PosCustomerSearchQuery>;
@@ -150,6 +187,7 @@ export type SaleReceiptResult = z.infer<typeof SaleReceiptResult>;
 
 export const posSaleModels = {
   SaleLifecycleState,
+  CancelSaleReason,
   SaleCustomerSummary,
   SaleSnapshot,
   SaleContextRequest,
@@ -158,6 +196,8 @@ export const posSaleModels = {
   ResumeSaleRequest,
   RenameSuspendedSaleRequest,
   CancelSaleRequest,
+  CancelCarriedOverAccountsRequest,
+  CancelCarriedOverAccountsResult,
   AttachSaleCustomerRequest,
   SaleHistoryQuery,
   SaleHistoryPage,

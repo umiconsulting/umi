@@ -13,8 +13,13 @@ const pilotMatrix = JSON.parse(
 const cashierPermissions = pilotMatrix.profiles.find(
   (profile) => profile.role === 'cashier',
 )!.permissions;
-const managerPermissions = pilotMatrix.profiles.find(
-  (profile) => profile.role === 'manager',
+/**
+ * Authorizing is the ADMIN's, by the owner's decision of 2026-10-12: no other role holds a
+ * `*.approve` permission. A journey that walks an authorization therefore runs as the
+ * admin — before that rule it ran as the manager, who no longer holds one.
+ */
+const adminPermissions = pilotMatrix.profiles.find(
+  (profile) => profile.role === 'admin',
 )!.permissions;
 
 const authorization = {
@@ -473,7 +478,7 @@ describe('Gate 3C cash application boundary', () => {
   it('recovers an orphaned shift under the variance authority and books the difference', async () => {
     const audits: Array<{ eventType: string; publicData: unknown }> = [];
     const repo = {
-      authorize: vi.fn().mockResolvedValue({ ...authorization, permissions: managerPermissions }),
+      authorize: vi.fn().mockResolvedValue({ ...authorization, permissions: adminPermissions }),
       recover: vi.fn().mockResolvedValue({
         summary: { shift: { id: id(9), status: 'recovered' } },
         custody: { responsibleOperatorId: id(21), variance: money(-150) },

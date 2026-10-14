@@ -45,6 +45,7 @@ export function calculateCheckout(
   policy: CheckoutPolicy,
   lineDiscountBases: ReadonlyMap<string, number> = new Map(),
   rewardDiscount: { authorizationId: string; amountMinorUnits: number } | null = null,
+  registeredPartial = false,
 ): CheckoutCalculation {
   const currency = source.totals.grandTotal.currency;
   const money = (minorUnits: number) => ({ minorUnits, currency });
@@ -116,6 +117,34 @@ export function calculateCheckout(
 
   const discountedSubtotal = source.totals.subtotal.minorUnits - discountTotal;
   let tipAmount = 0;
+  const perTenderTip = command.tenderDrafts.reduce(
+    (total, tender) => safeAdd(total, tender.tipAmount?.minorUnits ?? 0),
+    0,
+  );
+  if (perTenderTip > 0 && command.tipDraft !== null) {
+    return failure('TIP_REJECTED', source, null, approvalRequired);
+  }
+  if (perTenderTip > 0) {
+    if (
+      !policy.tip.enabled ||
+      command.tenderDrafts.some(
+        (tender) => (tender.tipAmount?.minorUnits ?? 0) > policy.tip.maximumTip.minorUnits,
+      )
+    ) {
+      return failure('TIP_REJECTED', source, null, approvalRequired);
+    }
+    if (
+      command.tenderDrafts.some(
+        (tender) =>
+          tender.tipAmount &&
+          (tender.tipAmount.currency !== currency ||
+            tender.tipAmount.minorUnits >= tender.amount.minorUnits),
+      )
+    ) {
+      return failure('TIP_REJECTED', source, null, approvalRequired);
+    }
+    tipAmount = perTenderTip;
+  }
   if (command.tipDraft && command.tipDraft.kind !== 'none') {
     if (!policy.tip.enabled) return failure('TIP_REJECTED', source, null, approvalRequired);
     if (command.tipDraft.fixedAmount && command.tipDraft.fixedAmount.currency !== currency) {
@@ -208,7 +237,7 @@ export function calculateCheckout(
     );
   }
 
-  if (command.tenderDrafts.length > policy.maximumTenderLines) {
+  if (command.tenderDrafts.length > (registeredPartial ? 32 : policy.maximumTenderLines)) {
     return failure('INVALID_TENDER_AMOUNT', confirmation, null, approvalRequired);
   }
   if (
@@ -223,7 +252,17 @@ export function calculateCheckout(
   ) {
     return failure('INVALID_TENDER_AMOUNT', confirmation, null, approvalRequired);
   }
-  if (command.tenderDrafts.length > 1 && !policy.mixedTenderEnabled) {
+  if (
+    command.tenderDrafts.some((draft) => draft.type === 'bank_transfer') &&
+    (!policy.bankTransferEnabled || !policy.bankTransferDetails)
+  ) {
+    return failure('INVALID_TENDER_AMOUNT', confirmation, null, approvalRequired);
+  }
+  if (
+    command.tenderDrafts.length > 1 &&
+    !policy.mixedTenderEnabled &&
+    (!registeredPartial || new Set(command.tenderDrafts.map((draft) => draft.type)).size > 1)
+  ) {
     return failure('INVALID_TENDER_AMOUNT', confirmation, null, approvalRequired);
   }
 
@@ -246,6 +285,9 @@ export function calculateCheckout(
         return failure('REMAINING_BALANCE', confirmation, null, approvalRequired);
       }
     }
+    if (draft.type === 'bank_transfer' && draft.status !== 'confirmed_success') {
+      return failure('REMAINING_BALANCE', confirmation, null, approvalRequired);
+    }
     const received = draft.type === 'cash' ? draft.amountReceived : null;
     if (
       draft.type === 'cash' &&
@@ -262,6 +304,7 @@ export function calculateCheckout(
       applied: draft.amount,
       received,
       change: money(tenderChange),
+      tipAmount: draft.tipAmount,
       status: draft.status,
       authorizationId: draft.authorizationId ?? null,
     });
@@ -285,13 +328,18 @@ export function calculateCheckout(
     remainingBalance: money(Math.max(remaining, 0)),
     change: money(change),
     partialPaymentState: state,
-    tip: command.tipDraft
-      ? {
-          draft: command.tipDraft,
-          amount: money(tipAmount),
-          policyVersion: policy.tip.version,
-        }
-      : null,
+    tip:
+      command.tipDraft || perTenderTip > 0
+        ? {
+            draft: command.tipDraft ?? {
+              kind: 'fixed',
+              basisPoints: null,
+              fixedAmount: money(perTenderTip),
+            },
+            amount: money(tipAmount),
+            policyVersion: policy.tip.version,
+          }
+        : null,
     discounts: confirmation.discounts,
   };
   if (terminalUnknown) {

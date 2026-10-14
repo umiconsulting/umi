@@ -1,0 +1,14 @@
+Cuenta 141 / carrito b6b08195-53f5-4403-9614-f30c6449bf9f. Extracto de /tmp/umi-api-4001.log, UTC 2026-10-14:
+
+14:15:33 POST /cart/accounts/b6b08195-53f5-4403-9614-f30c6449bf9f/resume -> 201
+14:15:44 GET /checkout/policy?currency=MXN -> 200
+14:15:44 GET /cart/accounts/b6b08195-53f5-4403-9614-f30c6449bf9f -> 200
+14:15:44 GET /checkout/carts/b6b08195-53f5-4403-9614-f30c6449bf9f/partial-payments -> 404 RESOURCE_NOT_FOUND (todavía no existe ledger)
+14:15:54 GET /checkout/carts/b6b08195-53f5-4403-9614-f30c6449bf9f/partial-payments -> 404 RESOURCE_NOT_FOUND
+14:17:06 GET /checkout/carts/b6b08195-53f5-4403-9614-f30c6449bf9f/partial-payments -> 404 RESOURCE_NOT_FOUND
+14:17:15 POST /checkout/carts/b6b08195-53f5-4403-9614-f30c6449bf9f/cancel -> 201 (cancelación del borrador al cerrar la pantalla)
+
+No hubo POST /partial-payments para esta cuenta durante el recorrido. Consulta posterior:
+
+docker exec umi-bv3-pg psql -U postgres -d umi_local -Atc "select 'partial_payments=' || count(*) from merchant.pos_partial_payment where cart_id = 'b6b08195-53f5-4403-9614-f30c6449bf9f';"
+partial_payments=0

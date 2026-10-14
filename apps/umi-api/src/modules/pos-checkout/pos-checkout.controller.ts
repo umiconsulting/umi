@@ -2,6 +2,8 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import {
   CheckoutCancellationRequest,
   CheckoutCommand,
+  CheckoutPartialPaymentQuery,
+  CheckoutPartialPaymentRequest,
   CheckoutRecoveryQuery,
   CheckoutTerminalRecoveryRequest,
   PaymentStatusQuery,
@@ -61,6 +63,26 @@ export class PosCheckoutController {
     @Query(new ZodValidationPipe(CheckoutRecoveryQuery)) query: CheckoutRecoveryQuery,
   ) {
     return this.checkoutService.recovery(user, merchantId, cartId, query);
+  }
+
+  @Get('carts/:cartId/partial-payments')
+  partialPayments(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('cartId') cartId: string,
+    @Query(new ZodValidationPipe(CheckoutPartialPaymentQuery)) query: CheckoutPartialPaymentQuery,
+  ) {
+    return this.checkoutService.partialPayments(user, merchantId, cartId, query);
+  }
+
+  @Post('carts/:cartId/partial-payments')
+  collectPartialPayment(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('cartId') cartId: string,
+    @Body(new ZodValidationPipe(CheckoutPartialPaymentRequest)) dto: CheckoutPartialPaymentRequest,
+  ) {
+    return this.checkoutService.collectPartialPayment(user, merchantId, cartId, dto);
   }
 
   // The operator says the terminal did NOT charge. `cancel` below refuses a draft

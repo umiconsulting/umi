@@ -1,0 +1,33 @@
+{
+  "iMin": {
+    "serial": "192.168.1.10:5555",
+    "package": [
+      "versionCode=75 minSdk=24 targetSdk=36",
+      "versionName=0.1.0",
+      "lastUpdateTime=2026-10-13 04:27:02"
+    ]
+  },
+  "A9": {
+    "serial": "192.168.1.14:35559",
+    "package": [
+      "versionCode=75 minSdk=24 targetSdk=36",
+      "versionName=0.1.0",
+      "lastUpdateTime=2026-10-13 04:27:26"
+    ]
+  },
+  "A11": {
+    "serial": "192.168.1.13:35975",
+    "package": [
+      "versionCode=81 minSdk=24 targetSdk=36",
+      "versionName=0.1.0",
+      "lastUpdateTime=2026-10-13 04:37:45"
+    ]
+  },
+  "artifact": {
+    "path": "/tmp/umi-cuentas-cocina-build75.apk",
+    "sha256": "df2c250b05c3ea7312cc8d208cfdc9185b0279912ec670bd7b36a580a9408e4f",
+    "bytes": 33167798,
+    "versionCode": 75,
+    "recoveredFrom": "iMin; shared build output overwritten by another session with 81"
+  }
+}

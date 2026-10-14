@@ -5,6 +5,23 @@ import { InventoryAllergenRef } from './pos-inventory';
 const IdempotencyKey = z.string().trim().min(8).max(200);
 const KitchenCorrelationId = z.string().trim().min(8).max(200);
 
+export const KitchenAlertSettings = z
+  .object({
+    overdueSeconds: z.number().int().min(30).max(86400),
+    soundsEnabled: z.boolean(),
+    arrivalSound: z.enum(['arrival', 'overdue', 'ready']),
+    overdueSound: z.enum(['arrival', 'overdue', 'ready']),
+    readySound: z.enum(['arrival', 'overdue', 'ready']),
+  })
+  .strict();
+const optionalAlertSettings = {
+  overdueSeconds: KitchenAlertSettings.shape.overdueSeconds.optional(),
+  soundsEnabled: KitchenAlertSettings.shape.soundsEnabled.optional(),
+  arrivalSound: KitchenAlertSettings.shape.arrivalSound.optional(),
+  overdueSound: KitchenAlertSettings.shape.overdueSound.optional(),
+  readySound: KitchenAlertSettings.shape.readySound.optional(),
+};
+
 export const KitchenOrderStatus = z.enum([
   'queued',
   'in_preparation',
@@ -67,6 +84,18 @@ export const KitchenOrderProjection = z
     merchantId: Uuid,
     locationId: Uuid,
     stationId: Uuid,
+    /**
+     * The station's display name (`merchant.station.name`), so a board that is not a
+     * station device can tell one ticket from another without reading a uuid.
+     *
+     * The till's kitchen tab is the one caller that needs it: a POS device has no
+     * station, so the server answers with every station's tickets — the same ticket
+     * twice, once for the bar and once for the kitchen — and without the name the two
+     * cards are indistinguishable. A station device gets rows for its own stations
+     * only, where the name is a label rather than a disambiguator.
+     */
+    stationName: z.string().min(1).max(160).optional(),
+    ...optionalAlertSettings,
     source: z.enum(['whatsapp', 'pos', 'web', 'dashboard']),
     status: KitchenOrderStatus,
     priority: KitchenPriority,
@@ -164,6 +193,34 @@ export const KitchenBoardResponse = z
   })
   .strict();
 
+export const KitchenUnassignedOrderProjection = KitchenOrderProjection.extend({
+  stationId: z.null(),
+  routingFingerprint: z.string().length(64),
+  proposedRoutes: z
+    .array(
+      z
+        .object({
+          itemId: Uuid,
+          productName: z.string().min(1).max(300),
+          stationId: Uuid.nullable(),
+          stationName: z.string().min(1).max(160).nullable(),
+        })
+        .strict(),
+    )
+    .max(500),
+}).strict();
+export const KitchenUnassignedResponse = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(KitchenUnassignedOrderProjection),
+  })
+  .strict();
+export const KitchenUnassignedCommandResult = KitchenCommandResult.extend({
+  resolvedItems: z.number().int().nonnegative(),
+  remainingItems: z.number().int().nonnegative(),
+  discardedItems: z.number().int().nonnegative(),
+}).strict();
+
 /**
  * THE ALL-DAY COUNT (§8H step 6): how many of each item the kitchen has been
  * asked for on the trading day it is working.
@@ -229,6 +286,33 @@ export const PosKitchenOrderQuery = z
   .strict();
 
 /**
+ * LAS ESTACIONES DE ESTA COCINA, TODAS — TENGAN TRABAJO O NO.
+ *
+ * The board's chips used to be built from the tickets on the rail, so a station existed
+ * on screen only while it had something to cook. That is right for a filter and wrong for
+ * a kitchen: the person standing at the bar wants their station's tab there at 8 a.m.,
+ * before the first ticket, and a merchant with two stations wants to SEE both — the
+ * owner's words (2026-10-13). The list is the merchant's own stations for this location,
+ * which is what makes the chips stable, and it is also what lets a screen be fixed to a
+ * station before service instead of only when two stations happen to have work.
+ */
+export const KitchenStation = z
+  .object({
+    id: Uuid,
+    key: z.string().trim().min(1).max(64),
+    name: z.string().trim().min(1).max(160),
+    sortOrder: z.number().int(),
+    ...optionalAlertSettings,
+  })
+  .strict();
+export const KitchenStationListResponse = z
+  .object({
+    ok: z.literal(true),
+    data: z.array(KitchenStation).max(50),
+  })
+  .strict();
+
+/**
  * The all-day read. Same authorisation pair as the board — the till has no
  * station, so the PERSON at it is authorised by `locationId` +
  * `operatorSessionId` — with an optional day so a manager can ask about a past
@@ -259,6 +343,12 @@ export const PosKitchenAllDayQuery = z
 export const PosKitchenCommandRequest = KitchenCommandRequest.extend(
   PosKitchenOrderQuery.shape,
 ).strict();
+export const PosKitchenUnassignedCommandRequest = PosKitchenOrderQuery.extend({
+  kitchenOrderId: Uuid,
+  expectedVersion: z.number().int().positive(),
+  idempotencyKey: Uuid,
+  routingFingerprint: z.string().length(64).optional(),
+}).strict();
 export const PosKitchenStatusResult = z
   .object({
     kitchenOrderId: Uuid,
@@ -268,6 +358,30 @@ export const PosKitchenStatusResult = z
     priority: KitchenPriority,
     version: z.number().int().positive(),
     stationIds: z.array(Uuid).max(100),
+    // The cart's firedOrderItemId names the source item. Keep that identity in
+    // the status read so the handheld can label each line without kitchen.read.
+    items: z
+      .array(
+        z
+          .object({
+            sourceOrderItemId: Uuid,
+            status: KitchenItemStatus,
+          })
+          .strict(),
+      )
+      .max(500)
+      .optional(),
+    readyItems: z
+      .array(
+        z
+          .object({
+            id: Uuid,
+            sound: z.enum(['arrival', 'overdue', 'ready']).nullable(),
+          })
+          .strict(),
+      )
+      .max(500)
+      .optional(),
     updatedAt: z.string().datetime({ offset: true }),
   })
   .strict();
@@ -283,6 +397,8 @@ export type KitchenBoardWatchResponse = z.infer<typeof KitchenBoardWatchResponse
 export type PosKitchenOrderQuery = z.infer<typeof PosKitchenOrderQuery>;
 export type PosKitchenAllDayQuery = z.infer<typeof PosKitchenAllDayQuery>;
 export type PosKitchenCommandRequest = z.infer<typeof PosKitchenCommandRequest>;
+export type PosKitchenUnassignedCommandRequest = z.infer<typeof PosKitchenUnassignedCommandRequest>;
+export type KitchenUnassignedCommandResult = z.infer<typeof KitchenUnassignedCommandResult>;
 
 export const posKitchenModels = {
   KitchenOrderStatus,
@@ -296,8 +412,14 @@ export const posKitchenModels = {
   KitchenCommandResult,
   KitchenEventProjection,
   KitchenBoardResponse,
+  KitchenUnassignedOrderProjection,
+  KitchenUnassignedResponse,
+  KitchenUnassignedCommandResult,
+  PosKitchenUnassignedCommandRequest,
   KitchenAllDayItem,
   KitchenAllDayResponse,
+  KitchenStation,
+  KitchenStationListResponse,
   KitchenCommandResponse,
   KitchenBoardWatchResponse,
   PosKitchenOrderQuery,

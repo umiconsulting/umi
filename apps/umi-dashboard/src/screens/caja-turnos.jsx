@@ -1,8 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useOperationsData, useCashShiftDetail } from '@/data.jsx';
+import {
+  fetchCashPolicy,
+  setCashPolicy,
+  fetchCheckoutPolicy,
+  setCheckoutPolicy,
+  useOperationsData,
+  useCashShiftDetail,
+} from '@/data.jsx';
+import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatOperationMoney, formatOperationDate } from './operations-format.js';
+import { bankTransferDraft, prepareBankTransfer } from './bank-transfer-policy.js';
 import {
   ATTENTION_STATUSES as ATTENTION,
   BUCKETS as BUCKET_IDS,
@@ -50,6 +59,221 @@ function toneOf(v, tolerance = 0) {
   if (Math.abs(v) <= tolerance) return 'var(--warning)';
   return v < 0 ? 'var(--danger)' : 'var(--warning)';
 }
+
+function CheckoutRules({ merchantId, locationId }) {
+  const { t } = useLingui();
+  const [policy, setPolicy] = useState(null);
+  const [bankDraft, setBankDraft] = useState(bankTransferDraft());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [bankError, setBankError] = useState(null);
+  const [bankSaved, setBankSaved] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!merchantId || !locationId) return undefined;
+    fetchCheckoutPolicy(merchantId, locationId)
+      .then((value) => {
+        if (!cancelled) {
+          setPolicy(value);
+          setBankDraft(bankTransferDraft(value?.bankTransferDetails, value?.bankTransferEnabled));
+          setError(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError(t`No se pudo leer la configuración de cobro.`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [merchantId, locationId, t]);
+  async function change(key, value) {
+    if (!policy || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const changed = await setCheckoutPolicy(merchantId, locationId, {
+        manualTerminalEnabled: policy.manualTerminalEnabled,
+        mixedTenderEnabled: policy.mixedTenderEnabled,
+        allowDineInWithoutTable: policy.allowDineInWithoutTable,
+        bankTransferEnabled: policy.bankTransferEnabled,
+        bankTransferDetails: policy.bankTransferDetails,
+        [key]: value,
+      });
+      setPolicy(changed);
+    } catch {
+      setError(t`No se guardó el cambio. Se conserva la configuración anterior.`);
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function saveBankTransfer(event) {
+    event.preventDefault();
+    if (!policy || saving) return;
+    const prepared = prepareBankTransfer(bankDraft);
+    if (prepared.error) {
+      const messages = {
+        identity: t`Escribe el titular y el banco.`,
+        length: t`El titular y el banco admiten hasta 120 caracteres.`,
+        destination: t`Escribe una CLABE o un número de cuenta.`,
+        clabe: t`La CLABE debe tener 18 dígitos.`,
+        account: t`El número de cuenta debe tener entre 1 y 24 dígitos.`,
+      };
+      setBankError(messages[prepared.error]);
+      return;
+    }
+    setSaving(true);
+    setBankError(null);
+    setBankSaved(false);
+    try {
+      const changed = await setCheckoutPolicy(merchantId, locationId, {
+        manualTerminalEnabled: policy.manualTerminalEnabled,
+        mixedTenderEnabled: policy.mixedTenderEnabled,
+        allowDineInWithoutTable: policy.allowDineInWithoutTable,
+        ...prepared,
+      });
+      setPolicy(changed);
+      setBankDraft(bankTransferDraft(changed.bankTransferDetails, changed.bankTransferEnabled));
+      setBankSaved(true);
+    } catch {
+      setBankError(t`No se guardaron los datos bancarios. Revisa los campos e inténtalo otra vez.`);
+    } finally {
+      setSaving(false);
+    }
+  }
+  function editBank(key, value) {
+    setBankDraft((current) => ({ ...current, [key]: value }));
+    setBankError(null);
+    setBankSaved(false);
+  }
+  return (
+    <section style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 14 }}>
+      <div className="eyebrow">
+        <Trans>Reglas del cobro</Trans>
+      </div>
+      {[
+        [
+          'manualTerminalEnabled',
+          t`Permitir tarjeta en terminal manual`,
+          t`El cajero declara el resultado de la terminal externa. No activa ni sustituye una terminal integrada.`,
+        ],
+        [
+          'mixedTenderEnabled',
+          t`Permitir pagos mixtos`,
+          t`Una cuenta puede combinar efectivo y tarjeta según los métodos habilitados.`,
+        ],
+        [
+          'allowDineInWithoutTable',
+          t`Permitir Comer aquí sin mesa`,
+          t`La cuenta conserva Comer aquí sin asignar una mesa ficticia.`,
+        ],
+      ].map(([key, label, detail]) => (
+        <label
+          key={key}
+          style={{ display: 'flex', gap: 10, minHeight: 'var(--control-min)', marginTop: 10 }}
+        >
+          <input
+            type="checkbox"
+            checked={policy?.[key] === true}
+            disabled={!policy || saving}
+            onChange={(event) => change(key, event.target.checked)}
+          />
+          <span>
+            <span style={{ display: 'block', fontWeight: 600 }}>{label}</span>
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{detail}</span>
+          </span>
+        </label>
+      ))}
+      <form
+        onSubmit={saveBankTransfer}
+        style={{
+          marginTop: 18,
+          padding: 18,
+          border: '1px solid var(--line-soft)',
+          borderRadius: 14,
+          background: 'var(--canvas-2)',
+        }}
+      >
+        <div style={{ fontWeight: 650, fontSize: 15 }}>
+          <Trans>Transferencia bancaria</Trans>
+        </div>
+        <p style={{ color: 'var(--ink-3)', fontSize: 12, margin: '6px 0 14px' }}>
+          <Trans>
+            Estos datos se mostrarán al cajero durante el cobro. Activa el método cuando los datos
+            estén listos.
+          </Trans>
+        </p>
+        <label style={{ display: 'flex', gap: 10, minHeight: 'var(--control-min)' }}>
+          <input
+            type="checkbox"
+            checked={bankDraft.enabled}
+            disabled={!policy || saving}
+            onChange={(event) => editBank('enabled', event.target.checked)}
+          />
+          <span style={{ fontWeight: 600 }}>
+            <Trans>Permitir transferencia bancaria</Trans>
+          </span>
+        </label>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12,
+          }}
+        >
+          {[
+            ['holderName', t`Titular de la cuenta`, 'text', 120],
+            ['bankName', t`Banco`, 'text', 120],
+            ['clabe', t`CLABE (18 dígitos)`, 'numeric', 32],
+            ['accountNumber', t`Número de cuenta (opcional si hay CLABE)`, 'numeric', 32],
+          ].map(([key, label, inputMode, maxLength]) => (
+            <label className="field" key={key}>
+              <span className="field-label">{label}</span>
+              <input
+                className="input"
+                name={key}
+                type="text"
+                inputMode={inputMode}
+                autoComplete="off"
+                maxLength={maxLength}
+                value={bankDraft[key]}
+                disabled={!policy || saving}
+                onChange={(event) => editBank(key, event.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+        <p style={{ color: 'var(--ink-3)', fontSize: 12, margin: '12px 0' }}>
+          <Trans>Escribe la CLABE o el número de cuenta. Puedes guardar ambos.</Trans>
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <button className="btn btn-primary" type="submit" disabled={!policy || saving}>
+            {saving ? t`Guardando…` : t`Guardar transferencia`}
+          </button>
+          {bankSaved ? (
+            <span role="status" style={{ color: 'var(--success)', fontSize: 12 }}>
+              <Trans>Transferencia guardada para esta sucursal.</Trans>
+            </span>
+          ) : null}
+        </div>
+        {bankError ? (
+          <p role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>
+            {bankError}
+          </p>
+        ) : null}
+      </form>
+      {error ? (
+        <p role="alert" style={{ color: 'var(--danger)' }}>
+          {error}
+        </p>
+      ) : null}
+      {!policy && !error ? (
+        <p>
+          <Trans>No hay política de cobro para esta sucursal.</Trans>
+        </p>
+      ) : null}
+    </section>
+  );
+}
 function signedMoney(v, currency) {
   return `${v < 0 ? '−' : '+'}${formatOperationMoney(Math.abs(v), currency)}`;
 }
@@ -73,9 +297,11 @@ function Kpi({ label, value, note, tone }) {
       <div
         className="figures"
         style={{
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-body)',
           fontWeight: 600,
-          fontSize: 26,
+          // Small enough for "MX$1,205.00" to hold its column, big enough to lead
+          // the card. The money columns are what the eye compares, not the size.
+          fontSize: 22,
           letterSpacing: '-0.02em',
           lineHeight: 1,
           color: tone || 'var(--ink-1)',
@@ -176,7 +402,7 @@ function VarianceTrend({ series, currency }) {
                 width: 44,
                 textAlign: 'center',
                 fontSize: 10.5,
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-body)',
                 color: 'var(--ink-3)',
               }}
             >
@@ -230,7 +456,9 @@ function ShiftTable({ items, selectedId, onSelect }) {
   const arrow = (key) => (sort.key === key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '');
 
   const th = (key, label, align) => (
-    <th scope="col" style={{ textAlign: align || 'left', whiteSpace: 'nowrap' }}>
+    // The same 8 px the body cells carry, so a header label sits over its column
+    // instead of drifting toward the numbers it names.
+    <th scope="col" style={{ textAlign: align || 'left', whiteSpace: 'nowrap', padding: '0 8px' }}>
       <button
         type="button"
         onClick={() => toggle(key)}
@@ -271,7 +499,9 @@ function ShiftTable({ items, selectedId, onSelect }) {
                 background: on
                   ? 'color-mix(in srgb, var(--merchant-brand) 12%, transparent)'
                   : 'var(--surface)',
-                color: on ? 'var(--merchant-brand)' : 'var(--ink-2)',
+                // The selected filter's LABEL is 12px text on a tint of its own
+                // colour, so it takes the accent INK rather than the accent.
+                color: on ? 'var(--accent-ink, var(--merchant-brand))' : 'var(--ink-2)',
                 fontWeight: 600,
               }}
             >
@@ -317,18 +547,18 @@ function ShiftTable({ items, selectedId, onSelect }) {
                 color: 'var(--ink-3)',
               }}
             >
-              <th scope="col" style={{ whiteSpace: 'nowrap' }}>
+              <th scope="col" style={{ whiteSpace: 'nowrap', padding: '0 8px' }}>
                 <Trans>Caja</Trans>
               </th>
-              <th scope="col">
+              <th scope="col" style={{ padding: '0 8px' }}>
                 <Trans>Operador</Trans>
               </th>
               {th('date', i18n._(msg`Fecha comercial`))}
-              <th scope="col">
+              <th scope="col" style={{ padding: '0 8px' }}>
                 <Trans>Estado</Trans>
               </th>
               {th('expected', i18n._(msg`Esperado`), 'right')}
-              <th scope="col" style={{ textAlign: 'right' }}>
+              <th scope="col" style={{ textAlign: 'right', padding: '0 8px' }}>
                 <Trans>Contado</Trans>
               </th>
               {th('variance', i18n._(msg`Diferencia`), 'right')}
@@ -379,7 +609,7 @@ function ShiftTable({ items, selectedId, onSelect }) {
                     className="figures"
                     style={{
                       padding: '0 8px',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-body)',
                       color: 'var(--ink-2)',
                     }}
                   >
@@ -393,7 +623,7 @@ function ShiftTable({ items, selectedId, onSelect }) {
                     style={{
                       padding: '0 8px',
                       textAlign: 'right',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-body)',
                     }}
                   >
                     {formatOperationMoney(s.facts?.expectedCashMinorUnits ?? 0, s.currency)}
@@ -403,7 +633,7 @@ function ShiftTable({ items, selectedId, onSelect }) {
                     style={{
                       padding: '0 8px',
                       textAlign: 'right',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-body)',
                       color: 'var(--ink-2)',
                     }}
                   >
@@ -416,7 +646,7 @@ function ShiftTable({ items, selectedId, onSelect }) {
                     style={{
                       padding: '0 8px',
                       textAlign: 'right',
-                      fontFamily: 'var(--font-mono)',
+                      fontFamily: 'var(--font-body)',
                       fontWeight: 600,
                       color: toneOf(v) || 'var(--ink-3)',
                     }}
@@ -452,7 +682,13 @@ function StatusPill({ status }) {
           : attn
             ? 'color-mix(in srgb, var(--warning) 16%, transparent)'
             : 'color-mix(in srgb, var(--merchant-brand) 14%, transparent)',
-        color: closed ? 'var(--ink-3)' : attn ? 'var(--warning)' : 'var(--merchant-brand)',
+        // The pill's LABEL is 12px text on a tint of its own colour: it takes the
+        // accent's ink, which is the darkened value on the light shell.
+        color: closed
+          ? 'var(--ink-3)'
+          : attn
+            ? 'var(--warning)'
+            : 'var(--accent-ink, var(--merchant-brand))',
         fontWeight: 600,
         whiteSpace: 'nowrap',
       }}
@@ -478,7 +714,7 @@ function DenominationTable({ title, rows, currency }) {
           width: '100%',
           borderCollapse: 'collapse',
           fontSize: 12.5,
-          fontFamily: 'var(--font-mono)',
+          fontFamily: 'var(--font-body)',
         }}
       >
         <tbody>
@@ -630,7 +866,7 @@ function ShiftDetail({ shiftId }) {
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>
                   {term.label}
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 15 }}>
+                <div style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: 15 }}>
                   {term.value}
                 </div>
               </div>
@@ -654,10 +890,17 @@ function ShiftDetail({ shiftId }) {
               minWidth: 110,
             }}
           >
-            <div style={{ fontSize: 11, color: 'var(--merchant-brand)', marginBottom: 4 }}>
+            <div
+              style={{
+                fontSize: 11,
+                // 11px text on a 12% tint of its own colour: the accent's ink.
+                color: 'var(--accent-ink, var(--merchant-brand))',
+                marginBottom: 4,
+              }}
+            >
               <Trans>Efectivo esperado</Trans>
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 16 }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: 16 }}>
               {formatOperationMoney(m.expectedMinorUnits, d.currency)}
             </div>
           </div>
@@ -683,7 +926,7 @@ function ShiftDetail({ shiftId }) {
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 4 }}>
               <Trans>Efectivo contado</Trans>
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 16 }}>
+            <div style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: 16 }}>
               {m.countedMinorUnits == null ? (
                 <Trans>Pendiente</Trans>
               ) : (
@@ -717,7 +960,7 @@ function ShiftDetail({ shiftId }) {
             <div
               className="figures"
               style={{
-                fontFamily: 'var(--font-mono)',
+                fontFamily: 'var(--font-body)',
                 fontWeight: 600,
                 fontSize: 18,
                 color: vTone || 'var(--ink-1)',
@@ -793,7 +1036,7 @@ function ShiftDetail({ shiftId }) {
                     <div
                       className="figures"
                       style={{
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-body)',
                         fontWeight: 600,
                         fontSize: 13.5,
                         color,
@@ -837,7 +1080,7 @@ function ShiftDetail({ shiftId }) {
                   <span style={{ color: 'var(--ink-3)' }}>
                     <Trans>Intento {c.attempt}</Trans> · {c.state.replaceAll('_', ' ')}
                   </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                  <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600 }}>
                     {formatOperationMoney(c.countedMinorUnits, d.currency)}
                   </span>
                 </div>
@@ -863,6 +1106,7 @@ function ShiftDetail({ shiftId }) {
                     style={{
                       fontSize: 11.5,
                       color: 'var(--ink-3)',
+                      // A moment inside the trace is an identifier, not money.
                       fontFamily: 'var(--font-mono)',
                     }}
                   >
@@ -880,9 +1124,49 @@ function ShiftDetail({ shiftId }) {
 
 export default function CajaTurnos() {
   const { t } = useLingui();
+  const ctx = useMerchant();
+  const merchantId = ctx?.selectedMerchantId || ctx?.capabilities?.merchant?.id;
+  const locationId = ctx?.selectedLocationId || ctx?.capabilities?.selectedLocation?.id || '';
   const state = useOperationsData('cash_shifts', 0, 0, false);
   const items = (state.data?.items || []).filter((it) => it.facts);
   const [selected, setSelected] = useState(null);
+
+  // The drawer count rule of this location. It lives here because the owner reads
+  // it beside the shifts: it decides what every count on the till will ask for.
+  const [policy, setPolicy] = useState(null);
+  const [policySaving, setPolicySaving] = useState(false);
+  const [policyError, setPolicyError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    // No merchant or no location means no policy to read: the switch stays off
+    // and disabled until the screen has a scope. Setting state here would be a
+    // synchronous update inside an effect, which React reads as a cascade.
+    if (!merchantId || !locationId) return undefined;
+    fetchCashPolicy(merchantId, locationId)
+      .then((value) => {
+        if (!cancelled) setPolicy(value);
+      })
+      .catch(() => {
+        if (!cancelled) setPolicy(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [merchantId, locationId]);
+
+  async function toggleBlindCount(next) {
+    if (!merchantId || !locationId) return;
+    setPolicySaving(true);
+    setPolicyError(null);
+    try {
+      setPolicy(await setCashPolicy(merchantId, locationId, next));
+    } catch {
+      setPolicyError(t`No se guardó el conteo. Intenta de nuevo.`);
+    } finally {
+      setPolicySaving(false);
+    }
+  }
   // Derive the effective selection during render (no effect): the clicked shift when it is
   // still in the list, otherwise the first shift that needs attention, otherwise the first.
   const effectiveSelected =
@@ -899,71 +1183,131 @@ export default function CajaTurnos() {
   const net = closed.reduce((sum, s) => sum + (variance(s.facts) ?? 0), 0);
 
   // Serie y tendencia: the same difference the till shows today, grouped by business day
-  // over the window the operations feed covers. The window label states what it covers,
+  // over the window the operations feed covers. The block says which window that is,
   // because a trend without its window is a claim the data cannot support.
   const series = buildVarianceSeries(items);
-  const daysCovered = new Set(items.map((s) => s.facts?.businessDate).filter(Boolean)).size;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Pulse and trend: the day's custody at a glance, then the same number over time. */}
-      <section className="card" style={{ padding: '18px 20px', display: 'grid', gap: 18 }}>
+      <section className="card" style={{ padding: '18px 20px', display: 'grid', gap: 16 }}>
+        {/* The title, and nothing else: no band, no rule, no sentence under it. */}
+        <h3 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22 }}>
+          <Trans>Turno actual</Trans>
+        </h3>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 2fr)',
-            gap: 24,
-            alignItems: 'start',
+            // Four equal figures on one row. An auto-fit grid broke this card
+            // into two rows with an empty half, which read as missing data.
+            gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+            gap: 20,
           }}
           className="cash-pulse-grid"
         >
-          <div>
-            <div className="eyebrow">
-              <Trans>Custodia de efectivo</Trans>
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 6 }}>
-              {daysCovered > 1 ? (
-                <Trans>{daysCovered} días comerciales en la ventana de turnos cargada.</Trans>
+          <Kpi
+            label={<Trans>Cajas abiertas</Trans>}
+            value={openCount}
+            note={<Trans>ahora mismo</Trans>}
+          />
+          <Kpi
+            label={<Trans>Efectivo esperado</Trans>}
+            value={formatOperationMoney(expected, currency)}
+            note={<Trans>en las cajas abiertas</Trans>}
+          />
+          <Kpi
+            label={<Trans>Requieren atención</Trans>}
+            value={attention}
+            note={<Trans>arqueo, traspaso o cierre</Trans>}
+            tone={attention ? 'var(--warning)' : undefined}
+          />
+          <Kpi
+            label={<Trans>Diferencia neta</Trans>}
+            value={closed.length ? signedMoney(net, currency) : '—'}
+            note={
+              closed.length ? (
+                <Trans>{closed.length} turnos cerrados</Trans>
               ) : (
-                <Trans>La ventana de turnos cargada cubre un día comercial.</Trans>
-              )}
+                <Trans>sin cierres en la ventana</Trans>
+              )
+            }
+            tone={net < 0 ? 'var(--danger)' : net > 0 ? 'var(--warning)' : undefined}
+          />
+        </div>
+
+        {/* The rule every count on the till follows. It is a setting, so it reads
+            as a row of its own instead of sitting under the figures as a fifth one. */}
+        <div
+          style={{
+            borderTop: '1px solid var(--line-soft)',
+            paddingTop: 14,
+            display: 'flex',
+            gap: 18,
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ minWidth: 280, flex: '1 1 320px' }}>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              <Trans>Regla del conteo</Trans>
             </div>
+            {/* One switch, two coupled settings: a blind location counts the drawer
+                by denomination without seeing the expected, and a visible one only
+                asks the cashier for the total. The server writes both together. */}
+            <label
+              style={{
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                // The row is the target (the checkbox itself is 13px), and the
+                // two lines of copy under it measured 40px: four short of the
+                // floor. `--control-min` is the same 44px every other control
+                // takes.
+                minHeight: 'var(--control-min)',
+                cursor: policySaving ? 'progress' : 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={policy?.blindCountRequired === true}
+                disabled={!policy || policySaving}
+                onChange={(event) => toggleBlindCount(event.target.checked)}
+              />
+              <span>
+                <span style={{ fontSize: 13.5, fontWeight: 600 }}>
+                  <Trans>Activar conteo ciego</Trans>
+                </span>
+                <span
+                  style={{
+                    display: 'block',
+                    fontSize: 12,
+                    color: 'var(--ink-3)',
+                    marginTop: 2,
+                  }}
+                >
+                  <Trans>
+                    Ciego: la caja cuenta por denominación sin ver el esperado. Visible: la caja
+                    solo pide el total.
+                  </Trans>
+                </span>
+              </span>
+            </label>
+            {policyError ? (
+              <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 6 }}>
+                {policyError}
+              </div>
+            ) : null}
           </div>
           <div
+            className="status-pill"
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: 18,
+              alignSelf: 'flex-start',
+              whiteSpace: 'nowrap',
+              color: policy ? 'var(--ink-1)' : 'var(--ink-3)',
             }}
           >
-            <Kpi
-              label={<Trans>Cajas abiertas</Trans>}
-              value={openCount}
-              note={<Trans>ahora mismo</Trans>}
-            />
-            <Kpi
-              label={<Trans>Efectivo esperado</Trans>}
-              value={formatOperationMoney(expected, currency)}
-              note={<Trans>en las cajas abiertas</Trans>}
-            />
-            <Kpi
-              label={<Trans>Requieren atención</Trans>}
-              value={attention}
-              note={<Trans>arqueo, traspaso o cierre</Trans>}
-              tone={attention ? 'var(--warning)' : undefined}
-            />
-            <Kpi
-              label={<Trans>Diferencia neta</Trans>}
-              value={closed.length ? signedMoney(net, currency) : '—'}
-              note={
-                closed.length ? (
-                  <Trans>{closed.length} turnos cerrados</Trans>
-                ) : (
-                  <Trans>sin cierres en la ventana</Trans>
-                )
-              }
-              tone={net < 0 ? 'var(--danger)' : net > 0 ? 'var(--warning)' : undefined}
-            />
+            {policy ? (policy.blindCountRequired ? t`Ciego` : t`Visible · total`) : t`Sin política`}
           </div>
         </div>
 
@@ -973,6 +1317,11 @@ export default function CajaTurnos() {
           </div>
           <VarianceTrend series={series} currency={currency} />
         </div>
+        <CheckoutRules
+          key={`${merchantId}:${locationId}`}
+          merchantId={merchantId}
+          locationId={locationId}
+        />
       </section>
 
       {state.loading && !state.loaded ? (
@@ -989,6 +1338,10 @@ export default function CajaTurnos() {
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)',
             gap: 20,
+            // The list stops where its rows stop. Stretched to the height of the
+            // detail beside it, one shift left a card of empty white that read as
+            // a screen still loading.
+            alignItems: 'start',
           }}
           className="caja-grid"
         >

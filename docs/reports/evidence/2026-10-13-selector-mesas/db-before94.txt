@@ -1,0 +1,36 @@
+BEGIN
+          captured_at          
+-------------------------------
+ 2026-10-13 22:14:26.694458+00
+(1 row)
+
+ version | published_version | published_tables 
+---------+-------------------+------------------
+      12 |                12 |               15
+(1 row)
+
+  area   |               table_id               |  label  | capacity | state  | party_size |               visit_id               | account_number | lifecycle_state 
+---------+--------------------------------------+---------+----------+--------+------------+--------------------------------------+----------------+-----------------
+ Mesas 2 | b390142b-ca2e-467f-8589-4a20142b7f4e | Mesa 1  | 4        | seated |          1 | f5932bc6-840f-4d75-ab28-52e08f11fae0 |            141 | suspended
+ Mesas 2 | 8ba6403c-b61c-4ad7-91c5-38663dcbdd49 | Mesa 10 | 4        |        |            |                                      |                | 
+ Mesas 2 | 3c8cc3d8-6113-48ad-b5b3-4ef31d05b7fe | Mesa 11 | 4        |        |            |                                      |                | 
+ Mesas 2 | 95d8d7dc-4f0f-45a5-a707-7c8965fe0c70 | Mesa 12 | 4        |        |            |                                      |                | 
+ Mesas 2 | ad61a3cb-8f36-47f6-8af4-64267d2174a6 | Mesa 13 | 4        |        |            |                                      |                | 
+ Mesas 2 | 5e901306-7c3d-4570-8451-4ca5cd3b7a7d | Mesa 14 | 4        |        |            |                                      |                | 
+ Mesas 2 | ffcfe418-46f7-4b28-aefd-82ce46efaf6f | Mesa 15 | 4        |        |            |                                      |                | 
+ Mesas 2 | faeecca8-992b-44bd-909e-ca17363b2bc2 | Mesa 2  | 4        | dirty  |            |                                      |                | 
+ Mesas 2 | 326ca60a-a010-4ef0-8158-65c72561b154 | Mesa 3  | 4        | seated |          1 | 96d0f6b2-cc2d-4db8-826e-814a2158feb2 |            150 | recovered
+ Mesas 2 | ba49f7cf-6454-4dc0-9231-1e6d9b19385d | Mesa 4  | 4        | seated |          4 | 7c8403c8-d311-4dcf-ab5a-d0993256b5f4 |                | 
+ Mesas 2 | 18432a67-3b18-4305-b377-5e47ddb776d6 | Mesa 5  | 4        | seated |          2 | 5529ad2e-8c65-4fbc-8cad-e9b29fdf35a9 |                | 
+ Mesas 2 | 39fba3c1-2869-469b-9ed4-91bbc9158c01 | Mesa 6  | 4        | seated |          4 | 15a94ef7-375f-45ff-9ab4-9e0c032c2e65 |            152 | suspended
+ Mesas 2 | 8c904414-a740-4de0-a3f5-7d29d875f10d | Mesa 7  | 4        |        |            |                                      |                | 
+ Mesas 2 | 274918f6-7d0d-40d1-adb7-5f69fa49c266 | Mesa 8  | 4        |        |            |                                      |                | 
+ Mesas 2 | 05a04cb9-382a-4e76-aa45-7d2eee660035 | Mesa 9  | 4        |        |            |                                      |                | 
+(15 rows)
+
+ saved_accounts | open_accounts 
+----------------+---------------
+             89 |            11
+(1 row)
+
+COMMIT

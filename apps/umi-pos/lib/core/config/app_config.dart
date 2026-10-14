@@ -18,6 +18,7 @@ final class AppConfig {
     required this.release,
     this.runningOnWeb = false,
     this.deviceKeyKind = '',
+    this.secureStorageKind = '',
     this.updateGithubOwner = '',
     this.updateGithubRepo = '',
   });
@@ -55,6 +56,13 @@ final class AppConfig {
       'UMIPOS_DEVICE_KEY',
       defaultValue: '',
     );
+    // Which secure-storage backend the build uses: '' (default) keeps the
+    // platform credential service. 'tpm' seals the vault to the TPM 2.0 with
+    // systemd-creds, so no keyring prompter can appear on a counter terminal.
+    const secureStorage = String.fromEnvironment(
+      'UMIPOS_SECURE_STORAGE',
+      defaultValue: '',
+    );
     // The GitHub repo that publishes desktop release artifacts. When set (and the
     // build runs as a Linux AppImage), the in-app updater pulls the latest
     // release AppImage from here. Empty disables the in-app updater.
@@ -82,6 +90,7 @@ final class AppConfig {
       release: ReleaseIdentity.fromEnvironment(),
       runningOnWeb: kIsWeb,
       deviceKeyKind: deviceKey,
+      secureStorageKind: secureStorage,
       updateGithubOwner: updateOwner,
       updateGithubRepo: updateRepo,
     );
@@ -106,6 +115,13 @@ final class AppConfig {
 
   /// True when the build opted into the hardware TPM device key (desktop).
   bool get useTpmDeviceKey => deviceKeyKind == 'tpm';
+
+  /// The secure-storage backend the build asked for: '' (the platform
+  /// credential service, the default) or 'tpm' (a vault sealed to the TPM 2.0).
+  final String secureStorageKind;
+
+  /// True when the build seals the vault to the TPM 2.0.
+  bool get useTpmSealedStorage => secureStorageKind == 'tpm';
 
   /// True when the build opted into the mobile platform-keystore device key.
   bool get useKeystoreDeviceKey => deviceKeyKind == 'keystore';

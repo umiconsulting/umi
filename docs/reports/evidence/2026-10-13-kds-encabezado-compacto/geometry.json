@@ -1,0 +1,20 @@
+{
+  "a9-before-tickets": {
+    "size": [1920, 1200],
+    "firstTicketTopPx": 509
+  },
+  "a9-after-tickets": {
+    "size": [1920, 1200],
+    "firstTicketTopPx": 251
+  },
+  "imin-before": {
+    "size": [1920, 1080],
+    "firstTicketTopPx": 458
+  },
+  "imin-after": {
+    "size": [1920, 1080],
+    "firstTicketTopPx": 221
+  },
+  "a9SavedPixels": 258,
+  "iminSavedPixels": 237
+}

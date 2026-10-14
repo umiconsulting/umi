@@ -164,6 +164,16 @@ const I = {
       <line x1="12" y1="16" x2="12" y2="20" />
     </Icon>
   ),
+  // The receipt printer: a body with the paper leaving the top, which is the shape a
+  // person recognises on the counter. It marks the hardware inventory, so it has to be
+  // distinguishable from the Monitor that marks a till.
+  Printer: (p) => (
+    <Icon {...p}>
+      <path d="M7 9V3h10v6" />
+      <rect x="3" y="9" width="18" height="8" rx="2" />
+      <path d="M7 14h10v7H7z" />
+    </Icon>
+  ),
   Sun: (p) => (
     <Icon {...p}>
       <circle cx="12" cy="12" r="4" />

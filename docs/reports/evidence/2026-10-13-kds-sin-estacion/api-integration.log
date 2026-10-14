@@ -1,0 +1,16 @@
+
+> @umi/api@0.1.0 test:integration:kitchen /home/juan/Projects/umiconsulting/umi/apps/umi-api
+> vitest run --config vitest.integration.config.ts src/modules/kds/kitchen-station-actions.integration.ts src/modules/kds/kitchen-unassigned.integration.ts
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/kds/kitchen-unassigned.integration.ts (12 tests) 344ms
+ ✓ src/modules/kds/kitchen-station-actions.integration.ts (6 tests) 118ms
+
+ Test Files  2 passed (2)
+      Tests  18 passed (18)
+   Start at  15:17:43
+   Duration  1.32s (transform 401ms, setup 0ms, collect 681ms, tests 462ms, environment 0ms, prepare 50ms)
+

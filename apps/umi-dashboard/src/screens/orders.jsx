@@ -29,9 +29,10 @@ const ORDER_STATUS_META = {
 
 // Fuller tones for the lifecycle rail DOTS. The muted status tokens (soft periwinkle for
 // placed, grey for completed) read washed-out, so completed uses the deep ink instead of
-// grey. Only THEME-AWARE tokens here — --umi-navy is not redefined for the dark theme, so
-// it would be invisible on a dark canvas; --info/--ink-1/--success/--warning/--danger all
-// follow the theme.
+// grey. Only THEME-AWARE tokens here — --info/--ink-1/--success/--warning/--danger all
+// follow the theme, and since 2026-10-10 so does the navy when it is used as TEXT
+// (`--navy-ink`, defined per theme in styles.css). A navy FILL is still the unthemed
+// `--umi-navy`, which is why it stays out of a rail drawn on the canvas.
 const TIMELINE_TONE = {
   placed: 'var(--info)', // theme-aware blue
   preparing: 'var(--warning)', // amber

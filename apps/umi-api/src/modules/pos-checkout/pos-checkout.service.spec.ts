@@ -1,5 +1,5 @@
 import { ConflictException, HttpException, UnauthorizedException } from '@nestjs/common';
-import type { PaymentSummary } from '@umi/contract';
+import type { PaymentSummary, ReceiptSnapshot } from '@umi/contract';
 import { describe, expect, it, vi } from 'vitest';
 import { CashRefusal } from '../pos-cash/cash-refusal';
 import { PosCheckoutService } from './pos-checkout.service';
@@ -42,6 +42,7 @@ const cart = {
   version: 3,
   businessDate: '2026-07-28',
   merchantName: 'Umi Café',
+  merchantLogoUrl: null,
   locationName: 'Centro',
   operatorName: 'Ada',
   customerId: null,
@@ -64,6 +65,7 @@ function harness() {
       permissions: ['checkout.commit', 'checkout.discount.apply', 'checkout.terminal.confirm'],
     }),
     lockCart: vi.fn().mockResolvedValue(cart),
+    partialRows: vi.fn().mockResolvedValue([]),
     policy: vi.fn().mockResolvedValue({
       version: '1',
       manualTerminalEnabled: true,
@@ -159,18 +161,41 @@ function harness() {
           ambiguity: null,
         })),
     ),
-    commit: vi.fn().mockResolvedValue({
-      sale: {
-        id: id(12),
-        orderId: id(13),
-        receiptId: id(14),
-        receiptRef: `POS-${id(11)}`,
-        status: 'committed',
-        committedAt: '2026-07-28T19:00:00.000Z',
-        totals: {},
-      },
-      customerValue: null,
-    }),
+    // The repository issues the ticket folio once it knows which day the sale belongs to, so
+    // it hands the receipt back AS ISSUED: the draft it was given, with the folio in place.
+    // The double echoes the same shape, which is what keeps the totals assertion below
+    // reading the receipt the service actually drafted.
+    commit: vi.fn(
+      async (
+        _client: unknown,
+        _cart: unknown,
+        _confirmation: unknown,
+        _payments: unknown,
+        _summary: unknown,
+        _checkoutId: unknown,
+        _reservation: unknown,
+        draftedReceipt: ReceiptSnapshot,
+        _cashShiftId: unknown,
+        _commandId: unknown,
+        _authorization: unknown,
+        _correlationId: unknown,
+        _idempotencyKey: unknown,
+        _customerValueBasisFingerprint: unknown,
+        _customerValue: unknown,
+      ) => ({
+        sale: {
+          id: id(12),
+          orderId: id(13),
+          receiptId: id(14),
+          receiptRef: '0042',
+          status: 'committed',
+          committedAt: '2026-07-28T19:00:00.000Z',
+          totals: {},
+        },
+        receipt: { ...draftedReceipt, receiptRef: '0042' },
+        customerValue: null,
+      }),
+    ),
     saveCommittedResult: vi.fn().mockResolvedValue(undefined),
     recovery: vi.fn().mockResolvedValue(null),
     cancelDraft: vi.fn().mockResolvedValue({ id: id(19), blocked: false }),
@@ -211,6 +236,75 @@ function harness() {
 }
 
 describe('PosCheckoutService', () => {
+  it('rechaza cierre si la lista de cobros no coincide con el ledger parcial', async () => {
+    const { service, repo } = harness();
+    repo.partialRows.mockResolvedValueOnce([
+      {
+        tenderId: id(90),
+        position: 0,
+        cartVersion: 3,
+        cartFingerprint: 'f'.repeat(64),
+        baseDueMinorUnits: '23200',
+        currency: 'MXN',
+        tenderType: 'cash',
+        amountMinorUnits: '10000',
+        tipMinorUnits: '0',
+        receivedMinorUnits: '10000',
+        status: 'confirmed_success',
+        confirmationReference: null,
+        cashShiftId: id(91),
+      },
+    ]);
+    await expect(service.checkout(user, id(1), base)).rejects.toMatchObject({
+      response: { code: 'CHECKOUT_PARTIAL_LEDGER_CONFLICT' },
+    });
+    expect(repo.saveDraft).not.toHaveBeenCalled();
+  });
+
+  it('cierra sólo con el mismo tramo confirmado y fingerprint del total', async () => {
+    const { service, repo } = harness();
+    const tender = {
+      ...base.tenderDrafts[0],
+      status: 'confirmed_success' as const,
+      tipAmount: { minorUnits: 0, currency: 'MXN' },
+    };
+    const source = await service.checkout(user, id(1), {
+      ...base,
+      tenderDrafts: [tender],
+      idempotencyKey: id(100),
+    });
+    repo.partialRows.mockResolvedValue([
+      {
+        tenderId: tender.id,
+        position: 0,
+        cartVersion: 3,
+        cartFingerprint: source.confirmation.catalogVersion,
+        baseDueMinorUnits: '23200',
+        currency: 'MXN',
+        tenderType: 'cash',
+        amountMinorUnits: '23200',
+        tipMinorUnits: '0',
+        receivedMinorUnits: '23200',
+        status: 'confirmed_success',
+        confirmationReference: null,
+        cashShiftId: id(91),
+      },
+    ]);
+    const preview = await service.checkout(user, id(1), {
+      ...base,
+      tenderDrafts: [tender],
+      idempotencyKey: id(101),
+    });
+    expect(preview.status).toBe('confirmation_required');
+    const finished = await service.checkout(user, id(1), {
+      ...base,
+      tenderDrafts: [tender],
+      totalsFingerprint: preview.confirmation.fingerprint,
+      idempotencyKey: id(102),
+    });
+    expect(finished.status).toBe('completed');
+    expect(repo.payments).toHaveBeenCalledTimes(1);
+  });
   it('requires explicit confirmation of freshly repriced totals', async () => {
     const { service, repo } = harness();
     const result = await service.checkout(user, id(1), base);
@@ -538,7 +632,37 @@ describe('PosCheckoutService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('requires separate approvals for a discount and a sensitive terminal allocation', async () => {
+  it('does not ask a manager to approve a terminal payment', async () => {
+    const { service, repo } = harness();
+    repo.policy.mockResolvedValue({
+      ...(await repo.policy()),
+      manualTerminalApprovalThreshold: { minorUnits: 0, currency: 'MXN' },
+    });
+    const request = {
+      ...base,
+      paymentMethod: 'external_terminal' as const,
+      tenderDrafts: [
+        {
+          id: id(18),
+          type: 'manual_terminal' as const,
+          amount: { minorUnits: 23200, currency: 'MXN' },
+          amountReceived: null,
+          status: 'confirmed_success' as const,
+          correlationId: 'terminal-test',
+        },
+      ],
+    };
+    const preview = await service.checkout(user, id(1), request);
+    const result = await service.checkout(user, id(1), {
+      ...request,
+      totalsFingerprint: preview.confirmation.fingerprint,
+    });
+    expect(result.status).toBe('completed');
+    expect(repo.consumeApprovals).not.toHaveBeenCalled();
+    expect(repo.commit).toHaveBeenCalledOnce();
+  });
+
+  it('still requires an approval for a manager discount on a terminal payment', async () => {
     const { service, repo } = harness();
     repo.policy.mockResolvedValue({
       ...(await repo.policy()),
@@ -546,7 +670,7 @@ describe('PosCheckoutService', () => {
     });
     repo.consumeApprovals.mockResolvedValueOnce({
       approved: false,
-      missingPermission: 'checkout.terminal.approve',
+      missingPermission: 'checkout.discount.approve',
     });
     const request = {
       ...base,
@@ -582,11 +706,11 @@ describe('PosCheckoutService', () => {
       expect.anything(),
       [id(43)],
       expect.objectContaining({
-        permissions: ['checkout.discount.approve', 'checkout.terminal.approve'],
+        permissions: ['checkout.discount.approve'],
         fingerprint: preview.confirmation.fingerprint,
       }),
     );
-    expect(result.failure?.requiredPermission).toBe('checkout.terminal.approve');
+    expect(result.failure?.requiredPermission).toBe('checkout.discount.approve');
     expect(repo.commit).not.toHaveBeenCalled();
   });
 

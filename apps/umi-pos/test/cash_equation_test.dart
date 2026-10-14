@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cash/cash_equation.dart';
 import 'package:umi_pos/features/cash/money_input.dart';
 
@@ -83,16 +83,15 @@ const _policy = {
 };
 
 Future<void> _pump(WidgetTester tester, Widget child) => tester.pumpWidget(
-  MaterialApp(
+  PosApp(
     locale: const Locale('es'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [
       AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
+
       GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
     ],
-    home: Scaffold(body: SingleChildScrollView(child: child)),
+    home: PosPage(body: SingleChildScrollView(child: child)),
   ),
 );
 
@@ -223,21 +222,20 @@ void main() {
 
     testWidgets('stands still when the platform asks it to', (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           locale: const Locale('es'),
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [
             AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
+
             GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
           ],
           home: const MediaQuery(
             data: MediaQueryData(
               size: Size(1200, 800),
               disableAnimations: true,
             ),
-            child: Scaffold(
+            child: PosPage(
               body: SingleChildScrollView(
                 child: CashEquation(
                   account: _account,

@@ -1,0 +1,21 @@
+apps/umi-dashboard                       |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+> @umi/dashboard@0.2.0 pretest /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard
+> lingui compile
+
+Compiling message catalogs…
+Done in 292ms
+
+> @umi/dashboard@0.2.0 test /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard
+> vitest run src/screens/kitchen-routing-model.spec.js
+
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-dashboard
+
+ ✓ src/screens/kitchen-routing-model.spec.js (9 tests) 3ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  04:42:43
+   Duration  451ms (transform 197ms, setup 0ms, collect 200ms, tests 3ms, environment 0ms, prepare 60ms)
+

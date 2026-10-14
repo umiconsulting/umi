@@ -1,0 +1,15 @@
+ daily_account_number |  status   | lifecycle_state |            fired_order_id            
+----------------------+-----------+-----------------+--------------------------------------
+                  213 | abandoned | cancelled       | 9a0f9744-e714-48c7-ac4d-e4cab509b8d6
+(1 row)
+
+ public_reference |  status   |           source_order_id            
+------------------+-----------+--------------------------------------
+ Cuenta 213       | completed | 9a0f9744-e714-48c7-ac4d-e4cab509b8d6
+(1 row)
+
+         source_order_item_id         | status 
+--------------------------------------+--------
+ 71ecbe85-798a-4254-9848-b7e06e4cc473 | ready
+(1 row)
+

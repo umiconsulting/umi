@@ -23,3 +23,21 @@ export function resolveLocationAuthority(
   }
   return access.locationId;
 }
+
+/**
+ * The branch filter a merchant-scoped READ hands to its query: one branch, every branch
+ * the caller may switch to, or none at all.
+ *
+ * `[]` is not `null`. An empty array matches no row, which is the right answer for a
+ * caller pinned to a branch that does not exist; `null` means "unscoped" and would hand
+ * that caller the whole merchant. Callers must pass the result straight into an
+ * `IS NULL OR x = any($n)` predicate, never through a truthiness check.
+ */
+export function locationScopeFor(
+  access: MerchantAccess,
+  requestedLocationId?: string | null,
+): string[] | null {
+  const locationId = resolveLocationAuthority(access, requestedLocationId);
+  if (locationId) return [locationId];
+  return canSwitchLocations(access) ? null : [];
+}

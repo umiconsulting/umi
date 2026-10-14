@@ -18,8 +18,21 @@ export class EmailAdapter {
     const host = this.config.get('SMTP_HOST', { infer: true });
     const user = this.config.get('SMTP_USER', { infer: true });
     const pass = this.config.get('SMTP_PASSWORD', { infer: true });
-    if (!host || !user || !pass) {
+    // A RELAY THAT NEEDS NO CREDENTIALS IS A RELAY WE STILL HAVE TO BE ABLE TO TALK TO.
+    //
+    // This demanded host AND user AND password, so the local stack's own mail sink
+    // — Mailpit, which authenticates nobody, and is what makes the password-reset
+    // email testable without sending real mail — could not be used at all: the
+    // adapter answered `email_adapter_missing_config` and every reset request died
+    // in silence. The password then has to be non-empty, and the pair has to be
+    // complete: half a credential is a misconfiguration, and sending without the
+    // other half fails in a way that reads like a provider fault.
+    if (!host) {
       this.logger.warn('email_adapter_missing_config');
+      return null;
+    }
+    if ((user && !pass) || (!user && pass)) {
+      this.logger.warn('email_adapter_partial_credentials');
       return null;
     }
 
@@ -28,7 +41,7 @@ export class EmailAdapter {
       host,
       port,
       secure: port === 465, // implicit TLS on 465; STARTTLS otherwise
-      auth: { user, pass },
+      auth: user && pass ? { user, pass } : undefined,
     });
     return this.transporter;
   }

@@ -1,18 +1,23 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../bootstrap/bootstrap_state.dart';
 import '../bootstrap/composition_root.dart';
 import '../core/localization/app_localizations.dart';
 import '../core/navigation/app_navigation.dart';
+import '../core/security/operator_permissions.dart';
+import '../core/theme/display_preferences.dart';
 import '../core/theme/umi_theme.dart';
 import '../core/update/desktop_updater.dart';
 import '../features/catalog/catalog_surface.dart';
 import '../features/entry/entry_controller.dart';
 import '../features/entry/entry_surface.dart';
+import '../features/kitchen/kitchen_audio.dart';
+import '../features/kitchen/kitchen_push_notifications.dart';
 import '../shared/widgets/status_card.dart';
 import 'activity_listener.dart';
 
@@ -51,15 +56,38 @@ final class UmiPosApp extends StatefulWidget {
   State<UmiPosApp> createState() => _UmiPosAppState();
 }
 
-final class _UmiPosAppState extends State<UmiPosApp> {
+final class _UmiPosAppState extends State<UmiPosApp>
+    with WidgetsBindingObserver {
+  late final DisplayPreferences _display;
+  late final KitchenPushNotifications _push;
+  final KitchenAudio _pushAudio = KitchenAudio();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  PushSession? _lastPushSession;
+  OverlayEntry? _pushNotice;
+  Timer? _pushNoticeTimer;
+  final ValueNotifier<KitchenPushNotice?> _openedKitchenNotice = ValueNotifier(
+    null,
+  );
   final HardwareKeyboardWedgeRouter _keyboardRouter =
       HardwareKeyboardWedgeRouter();
 
   @override
   void initState() {
     super.initState();
+    _display = DisplayPreferences(widget.root.preferences);
+    unawaited(_display.load());
+    _push = KitchenPushNotifications(
+      api: widget.root.apiClient,
+      transport: FirebaseKitchenPushTransport(),
+      onNotice: _showPushNotice,
+      onOpen: _openPushNotice,
+    );
+    widget.root.entry.beforeLogout = _push.unregister;
     widget.root.controller.addListener(_changed);
     widget.root.entry.addListener(_changed);
+    widget.root.connectivity.addListener(_retryPushSession);
+    WidgetsBinding.instance.addObserver(this);
+    _syncPushSession();
     FocusManager.instance.addListener(_focusChanged);
     FocusManager.instance.addEarlyKeyEventHandler(_hardwareKeyEvent);
   }
@@ -70,7 +98,7 @@ final class _UmiPosAppState extends State<UmiPosApp> {
     final editable = own is EditableText
         ? own
         : context?.findAncestorWidgetOfExactType<EditableText>();
-    final textField = context?.findAncestorWidgetOfExactType<TextField>();
+    final textField = context?.findAncestorWidgetOfExactType<PosField>();
     return _keyboardRouter.route(
       acceptCodeUnit: widget.root.hardware?.acceptKeyboardCodeUnit,
       event: event,
@@ -93,15 +121,25 @@ final class _UmiPosAppState extends State<UmiPosApp> {
 
   @override
   void dispose() {
+    _pushNoticeTimer?.cancel();
+    _pushNotice?.remove();
+    _openedKitchenNotice.dispose();
+    widget.root.entry.beforeLogout = null;
+    _push.dispose();
+    _pushAudio.dispose();
     widget.root.controller.removeListener(_changed);
     widget.root.entry.removeListener(_changed);
+    widget.root.connectivity.removeListener(_retryPushSession);
+    WidgetsBinding.instance.removeObserver(this);
     FocusManager.instance.removeListener(_focusChanged);
     FocusManager.instance.removeEarlyKeyEventHandler(_hardwareKeyEvent);
+    _display.dispose();
     widget.root.dispose();
     super.dispose();
   }
 
   void _changed() {
+    _syncPushSession();
     if (widget.root.entry.state.phase != EntryPhase.ready) {
       widget.root.sales.clear();
       widget.root.cash.clear();
@@ -112,41 +150,155 @@ final class _UmiPosAppState extends State<UmiPosApp> {
     }
   }
 
+  void _syncPushSession() {
+    final state = widget.root.entry.state;
+    final operator = state.operator;
+    final session =
+        !kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android &&
+            state.phase == EntryPhase.ready &&
+            state.device?.type != 'kds' &&
+            operator != null &&
+            OperatorPermissions(operator.permissions).allows('order.fire') &&
+            state.selectedTenant != null
+        ? (merchantId: state.selectedTenant!.id, operatorSessionId: operator.id)
+        : null;
+    if (session == _lastPushSession) return;
+    _lastPushSession = session;
+    _retryPushSession();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _retryPushSession();
+  }
+
+  void _retryPushSession() {
+    final session = _lastPushSession;
+    if (session == null) return;
+    unawaited(
+      _push.updateSession(session).catchError((Object error) {
+        debugPrint('push.token registration=failed error=$error');
+      }),
+    );
+  }
+
+  void _showPushNotice(KitchenPushNotice notice) {
+    if (!mounted || _lastPushSession == null) return;
+    if (!_display.kitchenSoundsMuted) {
+      unawaited(_pushAudio.play('ready'));
+    }
+    final overlay = _navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
+    _pushNoticeTimer?.cancel();
+    _pushNotice?.remove();
+    final orderReady = notice.type == 'kitchen_order_ready';
+    _pushNotice = OverlayEntry(
+      builder: (context) => SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Semantics(
+            liveRegion: true,
+            button: true,
+            child: GestureDetector(
+              onTap: () => _openPushNotice(notice),
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF173B35),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DefaultTextStyle(
+                  style: const TextStyle(
+                    color: Color(0xFFFFFFFF),
+                    fontSize: 17,
+                  ),
+                  child: Text(
+                    notice.message ??
+                        (orderReady
+                            ? 'La orden está lista. Consulta la cuenta.'
+                            : 'Un producto está listo. Consulta la cuenta.'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_pushNotice!);
+    _pushNoticeTimer = Timer(const Duration(seconds: 6), () {
+      _pushNotice?.remove();
+      _pushNotice = null;
+    });
+  }
+
+  void _openPushNotice(KitchenPushNotice notice) {
+    if (!mounted) return;
+    _pushNoticeTimer?.cancel();
+    _pushNotice?.remove();
+    _pushNotice = null;
+    _openedKitchenNotice.value = notice;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final platformBrightness =
-        WidgetsBinding.instance.platformDispatcher.platformBrightness;
-    return MaterialApp(
-      title: 'UmiPOS',
-      debugShowCheckedModeBanner: false,
-      theme: UmiTheme.light(),
-      darkTheme: UmiTheme.dark(),
-      themeMode: platformBrightness == Brightness.dark
-          ? ThemeMode.dark
-          : ThemeMode.system,
-      supportedLocales: AppLocalizations.supportedLocales,
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      localeResolutionCallback: (locale, supported) =>
-          supported.contains(locale) ? locale : const Locale('es'),
-      // Wrap the whole navigator, so a press on any route or dialog counts as
-      // activity and pushes back the idle auto-lock.
-      builder: (context, child) => ActivityListener(
-        onActivity: widget.root.entry.noteActivity,
-        child: child ?? const SizedBox.shrink(),
-      ),
-      home: TurnClosesSurfaces(
-        session: widget.root.entry,
-        hasTurn: () =>
-            widget.root.entry.navigationStage == TrustedEntryStage.ready,
-        child: _GuardedSurface(root: widget.root),
-      ),
-      onUnknownRoute: (_) => MaterialPageRoute<void>(
-        builder: (_) => _UnknownRoute(root: widget.root),
+    return DisplayPreferencesScope(
+      preferences: _display,
+      child: AnimatedBuilder(
+        animation: _display,
+        builder: (context, _) => PosApp(
+          title: 'UmiPOS · Estación',
+          debugShowCheckedModeBanner: false,
+          theme: UmiTheme.light(),
+          darkTheme: UmiTheme.dark(),
+          midnightTheme: UmiTheme.midnight(),
+          themeMode: _display.themeMode,
+          locale: _display.language == null ? null : Locale(_display.language!),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          localeResolutionCallback: (locale, supported) => supported.firstWhere(
+            (candidate) => candidate.languageCode == locale?.languageCode,
+            orElse: () => const Locale('es'),
+          ),
+          // Wrap the whole navigator, so a press on any route or dialog counts as
+          // activity and pushes back the idle auto-lock.
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: _display.textScalerFor(
+                MediaQuery.textScalerOf(context),
+              ),
+              disableAnimations:
+                  _display.reduceMotion ||
+                  MediaQuery.disableAnimationsOf(context),
+            ),
+            child: ActivityListener(
+              onActivity: widget.root.entry.noteActivity,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+          home: TurnClosesSurfaces(
+            session: widget.root.entry,
+            hasTurn: () =>
+                widget.root.entry.navigationStage == TrustedEntryStage.ready,
+            child: _GuardedSurface(
+              root: widget.root,
+              notificationOpen: _openedKitchenNotice,
+            ),
+          ),
+          onUnknownRoute: (_) => PosPageRoute<void>(
+            builder: (_) => _UnknownRoute(root: widget.root),
+          ),
+          navigatorKey: _navigatorKey,
+        ),
       ),
     );
   }
@@ -229,8 +381,9 @@ final class _TurnClosesSurfacesState extends State<TurnClosesSurfaces> {
 }
 
 final class _GuardedSurface extends StatelessWidget {
-  const _GuardedSurface({required this.root});
+  const _GuardedSurface({required this.root, required this.notificationOpen});
   final AppCompositionRoot root;
+  final ValueListenable<KitchenPushNotice?> notificationOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +402,7 @@ final class _GuardedSurface extends StatelessWidget {
       AppRoute.branchSelection ||
       AppRoute.operatorSession => EntrySurface(controller: root.entry),
       AppRoute.mainShell => CatalogSurface(
+        notificationOpen: notificationOpen,
         entry: root.entry,
         catalog: root.catalog,
         cart: root.cart,
@@ -282,11 +436,16 @@ final class _LoadingSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
+    return PosPage(
       body: Semantics(
         liveRegion: true,
         label: l10n.bootstrapLoadingTitle,
-        child: const Center(child: CircularProgressIndicator()),
+        child: StatusCard(
+          icon: PosGlyphs.pointOfSaleOutlined,
+          title: l10n.bootstrapLoadingTitle,
+          message: l10n.entryLoadingBody,
+          action: PosSpinner(semanticsLabel: l10n.bootstrapLoadingTitle),
+        ),
       ),
     );
   }
@@ -330,56 +489,50 @@ class _FailureSurfaceState extends State<_FailureSurface> {
         controller.state.phase == BootstrapPhase.recoverableFailure ||
         controller.state.phase == BootstrapPhase.storageUnavailable;
 
-    late final IconData icon;
+    late final PosGlyph icon;
     late final String title;
     late final String message;
     Widget? action;
 
     if (_stage == _UpdateStage.updating) {
-      icon = Icons.downloading_outlined;
+      icon = PosGlyphs.downloadingOutlined;
       title = l10n.updateAvailableTitle;
       message = l10n.updateInProgress;
       action = const Padding(
         padding: EdgeInsets.only(top: 8),
-        child: CircularProgressIndicator(),
+        child: PosSpinner(),
       );
     } else if (_stage == _UpdateStage.ready) {
-      icon = Icons.check_circle_outline;
+      icon = PosGlyphs.checkCircleOutline;
       title = l10n.updateReadyTitle;
       message = l10n.updateReadyBody;
-      action = ElevatedButton(
+      action = PosButton(
         onPressed: widget.root.updater.relaunch,
         child: Text(l10n.updateRestartAction),
       );
     } else if (_stage == _UpdateStage.failed) {
-      icon = Icons.error_outline;
+      icon = PosGlyphs.errorOutline;
       title = l10n.updateAvailableTitle;
       message = l10n.updateFailedBody;
-      action = ElevatedButton(
-        onPressed: _runUpdate,
-        child: Text(l10n.updateAction),
-      );
+      action = PosButton(onPressed: _runUpdate, child: Text(l10n.updateAction));
     } else if (_canSelfUpdate) {
-      icon = Icons.system_update_alt_outlined;
+      icon = PosGlyphs.systemUpdateAltOutlined;
       title = l10n.updateAvailableTitle;
       message = l10n.updateRequiredBody;
-      action = ElevatedButton(
-        onPressed: _runUpdate,
-        child: Text(l10n.updateAction),
-      );
+      action = PosButton(onPressed: _runUpdate, child: Text(l10n.updateAction));
     } else {
-      icon = Icons.error_outline;
+      icon = PosGlyphs.errorOutline;
       title = l10n.recoverableFailureTitle;
       message = l10n.configurationInvalidBody;
       action = retryable
-          ? ElevatedButton(
+          ? PosButton(
               onPressed: controller.retry,
               child: Text(l10n.retryAction),
             )
           : null;
     }
 
-    return Scaffold(
+    return PosPage(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -401,9 +554,9 @@ final class _DiagnosticsSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.diagnosticsTitle)),
-      body: SelectionArea(
+    return PosPage(
+      appBar: PosHeader(title: Text(l10n.diagnosticsTitle)),
+      body: PosSelectionArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
@@ -421,12 +574,12 @@ final class _UnknownRoute extends StatelessWidget {
   const _UnknownRoute({required this.root});
   final AppCompositionRoot root;
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PosPage(
     body: SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: StatusCard(
-          icon: Icons.route_outlined,
+          icon: PosGlyphs.routeOutlined,
           title: AppLocalizations.of(context).unknownRouteTitle,
           message: AppLocalizations.of(context).unknownRouteBody,
         ),

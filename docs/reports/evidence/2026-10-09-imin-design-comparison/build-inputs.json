@@ -1,0 +1,1219 @@
+{
+  "startedAt": "20261009T175313Z",
+  "device": "192.168.1.10:5555",
+  "apiBaseUrl": "http://127.0.0.1:4013",
+  "transport": "adb reverse tcp:4013 tcp:4013",
+  "previousCommit": "de883b38dd4bdc6550bef128cd6a5be79ffef399",
+  "currentCommit": "955cdf1abf0a62c5899b6f6f8a9b1558a845bbd2",
+  "versions": [
+    {
+      "kind": "previous",
+      "label": "UMI · Anterior",
+      "applicationId": "co.umiconsulting.umi_pos.anterior",
+      "root": "/home/juan/Projects/umiconsulting/umi/apps/umi-pos/.estacion-runtime/imin-comparison-20261009T175313Z/previous",
+      "inputs": [
+        {
+          "path": "apps/umi-pos/lib/app/activity_listener.dart",
+          "sha256": "2794ff6dc0c32bbf6149c6de9c59ada65eab893cd6f04d6ec266179e4c2331a1"
+        },
+        {
+          "path": "apps/umi-pos/lib/app/umi_pos_app.dart",
+          "sha256": "d246cc8327df9b5359f0bc9555569c8ef9423f37b48337e47d3757066f1c1590"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/bootstrap_controller.dart",
+          "sha256": "1e544d6104e216ecdcd3eb6dbd6cf834ef8bc2b6bb7a7d0363146d2de66a150e"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/bootstrap_state.dart",
+          "sha256": "5320d636f0a43755ef9e5330836568181b1350ee47bac1f8d766897a1a2d67a6"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/composition_root.dart",
+          "sha256": "e55dc7e4c7615dc5caf5597e25ed4827d6f9303c552603744eed411fdbc85812"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/entrypoint.dart",
+          "sha256": "c69a115cef5352d3e64db4a8fa2b7122981613cff64f82d0ef2dc36240f0156d"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/config/app_config.dart",
+          "sha256": "d8f47fe9a357798c5491161082a32ee25cb1fbc1372349a0b2e24cdeeb2bcdd9"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/contracts/contract_gateway.dart",
+          "sha256": "ef5bcd6842d46ee100215179de846e95950c4c2a93b191d3188b5284c77c2a9d"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/errors/app_error.dart",
+          "sha256": "c856e97c70025d56adb6ba5df46056b044d683ace413087e309dc96736f6ab3f"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/errors/operator_error_message.dart",
+          "sha256": "21073f383054b71ae73bbab7c89d2ece8988dbf0509b4bd31b1b20e19252114e"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/feature_flags/feature_flags.dart",
+          "sha256": "646e2f9a755ac9c11612dff193c425a0d06cffe2e1eb2c8ad5f8eeba2cfd5927"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_en.arb",
+          "sha256": "1caf2095ef29dafedceaec39d5aead7f04b2575a48ff055b5368bd7e5af5fe53"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_es.arb",
+          "sha256": "d495faae64bf6d61857d2fbf0dfe302b8a3961b1c6e37a9fb72b967646f10c30"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_localizations.dart",
+          "sha256": "8d62ac331c8fd0f4879fccb9415039526a31b827fcf76692716b3e16f5b213a7"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_localizations_en.dart",
+          "sha256": "a694394f4a08131c9ec751682210d14ca8503f77d1ce68d6160d1a829352d940"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_localizations_es.dart",
+          "sha256": "2bd119b570fd7359713dbf221acbb688ef0466f9a030b77b2c234039475e1ea8"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/navigation/app_navigation.dart",
+          "sha256": "e83a6781f1c9b4d0c734c743b139bc2a77f3dd9c9394f188f46ad864c66f3fb0"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/network/api_client.dart",
+          "sha256": "3cdd472f40e0699ffa427454d885e1dae29be551e432e1d3b9183a9fe5a10c3c"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/observability/telemetry.dart",
+          "sha256": "3fce8d6d81cdb1d1da5bb737c671eebfd21f81e0fd539c83c2e4c2c8f2d42ba6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/platform/connectivity_plus_adapter.dart",
+          "sha256": "75cca7264da0e2d8d3a7faa58e31907a5adce2656979d3c646b25f958a9dd75b"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/platform/platform_adapters.dart",
+          "sha256": "b4842d1248b0f95219aeab708a8fd1efa4b3d24fd65a20bbc3499b7c92692a83"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/release/release_compatibility.dart",
+          "sha256": "1c0bb933505caeb1db870ec5a1dcc87ee9921d22ad63a50a8a963c1267ccb7ee"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/credential_vault.dart",
+          "sha256": "267b3910e421945fc5a0ff90677264fc31bd056f9d5bba37a91d21d698e501a6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/device_key.dart",
+          "sha256": "7413215dec5cf8b718ec7becb68fb941a64b413c654008ba039b3602b3499308"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/es256_encoding.dart",
+          "sha256": "b9280518ea7c14a00b4521de85104fca6b8d5dc95ebef8b293cfb3417ea4406f"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/keystore_device_key.dart",
+          "sha256": "999761ebceb8e5d0f4f322deb30e9b07a743860dcba811d345a9582de775c5fb"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/operator_permissions.dart",
+          "sha256": "b5e553a431e41e1e690353e3bc02513ecd88f6163cf5d46f1790449581651644"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_backend.dart",
+          "sha256": "c4fa1649d889cf0a9e1bdb4585493da804e7472d2e964f9d40ed8c4a506811a1"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_backend_io.dart",
+          "sha256": "ad32a9caaf41fb033d8546cf224732bf2a39c3b13c2912750e9b8e034eb4a9f2"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_backend_stub.dart",
+          "sha256": "06b7eea2dd0efa43def780ce228b90e8b217f2beaeb55f3c6aceeea39c0c5abc"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_device_key.dart",
+          "sha256": "cae7af8030a518fd705bc3f5866def42fed757140e89256eb2d081a058e135e8"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/storage/storage.dart",
+          "sha256": "96fdc06a68532ab0fcfb601396f0bdb57643021169469104eeca1d3cb9dc7632"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/umi_theme.dart",
+          "sha256": "b4846cdb25a269588313b2d930a89586db23310c1ce41f2a7d52bcde7f9631f1"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/update/desktop_updater.dart",
+          "sha256": "7bbfe0c3d14cb9db034a37e93545c2b9d3deedd44a4e55a81e86572c199508f6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/update/desktop_updater_io.dart",
+          "sha256": "a64ca09a5809ed555ab236cf255aefd796dd02dd5c3e11a1e9c25a8f87b62c04"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/update/desktop_updater_platform.dart",
+          "sha256": "54818f7dba51715392cc674e0807d07d3a0df2b2b09415d2840ef9e12f107795"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/cart_controller.dart",
+          "sha256": "3142ba8a6118519b9d9adb6e04c2b55323fe4fae868c205a31bc49affeba37a2"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/cart_repository.dart",
+          "sha256": "576b59226d49c5215254dbfab3279a2fe8d3747ed3551dc4fe96910aee719f51"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/course_control.dart",
+          "sha256": "96155876232b4fa0590a4495ae6a872790014973ab031b92f13de41e9c27cee3"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/incoming_orders_controller.dart",
+          "sha256": "276400819f160a112150b0aa796aad96e74a1971f613c85e2496f39cc1b4cbc6"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/incoming_orders_surface.dart",
+          "sha256": "cb89cafb5c4b5bb5fe35b39602ebee995d0b951ddb4339eed9fccee9afe1e8fe"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_approval.dart",
+          "sha256": "30619d12d8fa9fb1dade7b5066bda90f5b11eb254f630c957a2fe745aeae6f3d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_controller.dart",
+          "sha256": "9ae1779a215587cd0a297f86da7e98ffe228d9964fc4f7eda499e9e5f8c0c3d2"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_equation.dart",
+          "sha256": "c60509f7256d351ef9e722f978092bc70d5c111ab605b997eca67f51afc5cf5f"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_journal.dart",
+          "sha256": "d06f90fefa61c1c9c2b438e314546de2184e96d6a9ec35d3eb66355a34cef45a"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_recovery_store.dart",
+          "sha256": "b6eded1b0965e6e86db5df10ec44cc86e8be5ad2dc3553fc116bb7ac1951ff2d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_repository.dart",
+          "sha256": "2da34469ff1fc48e61dbf3abc70c7e2cf9d85eb38400e82711c300bc9f5104fe"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_surface.dart",
+          "sha256": "79e96779dc2e7251b3bb3426b0c6bd0a6b244c1d0c948a887cb81f640ffe92e8"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/denomination_counter.dart",
+          "sha256": "59d8585adc398ae7e7b4b4be2f206e01c107c718e37397872d350f580c415437"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/money_input.dart",
+          "sha256": "bbe6db874948df1f5a11cf8a255b745a1e2af488a9b2573290d986f3b5b0004f"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/catalog_controller.dart",
+          "sha256": "1ddd898e5c121fe24fec1d64f78ff66aaca04c1b45236d0e6bed78b8f09c7461"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/catalog_repository.dart",
+          "sha256": "ac850c3f3bd564c8cb2a965a10d1d37e4bbff3d584c5b30096d205bca249ac60"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/catalog_surface.dart",
+          "sha256": "ece540dac494ceb500435b9978583cf6cfb1046141bbfea95f7adf1c26f6dd8b"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/frequent_products.dart",
+          "sha256": "6faf826cb3bdfd6fecf08747e60e3624bbc893808e71055e6caccc3a62f31b3a"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/checkout_controller.dart",
+          "sha256": "70e3ec62346064cda9ca713ad67a75de134f88583912d162db439951f5694453"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/checkout_repository.dart",
+          "sha256": "1a12292d90010d7ff47c34376f8de6eb3b64a8680e6e41b5f9fbefb1278bf54d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/checkout_surface.dart",
+          "sha256": "2e0581bc1a73ec86eaa5ff2d7cd81fd1db05e41855251ca7b122951bf4070c9b"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/tender_identity.dart",
+          "sha256": "cc2392a06e6849a060ddc5391791a8318db296419f7b1d2b2b8a959321d0f4c7"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/customer_value/customer_value_controller.dart",
+          "sha256": "d6d525914394279e7d882b001bfacc05cd42ef99091503604d1c0d48b20527cd"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/customer_value/customer_value_repository.dart",
+          "sha256": "a1d0fa560099a3c1feae4f4905d86f1ec5407168e106d6a032f06fbb598a3193"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/customer_value/customer_value_surface.dart",
+          "sha256": "9b4785dd3d0563bc97a98d802e3916ac3e00220d27e260432be01287dd21fa9b"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/device_channel_socket_client.dart",
+          "sha256": "2893b153792fefd2c75042d7cc48a961d96830020a5bd8b28c51a79fbf68b7aa"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/entry_controller.dart",
+          "sha256": "56ed3e740ba57b5808206562c61a54f77e92b3dfdd6b89caf0a7c1309f0887ab"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/entry_gateway.dart",
+          "sha256": "26a75c16346c1cfdd9c899d6577c34a51d8a4728d9c665623491186a922e4713"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/entry_surface.dart",
+          "sha256": "30f0ab2e2ea37e5cb255206f31f95ef5c3bf6b8e1ae6a3018c7ea1fc4176ce61"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/pairing_socket_client.dart",
+          "sha256": "4d88fd70b3a1983fc5aa3f3076bd9b7a66d4d881db02aa2ba04623ce12a4db95"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_controller.dart",
+          "sha256": "c74d55811a033fe99cee3439eb11412dc7a237ce8df96d6e78bcff41a2a46515"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_recovery_store.dart",
+          "sha256": "7f6c87e1f2efceee0001ab4a2d92066a51f21aac82dc1268633f0f5d9bdd67b8"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_repository.dart",
+          "sha256": "dea9184566e3715d3c1d5ac09fbf6f1316ec6c127adf874c549f3500c290e771"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_surface.dart",
+          "sha256": "8149235171d9ef14969eb9e4478aee38ca29114b91857a1beaf835e16e3b3c01"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_fingerprint.dart",
+          "sha256": "1b1b32421536e4dc83e120c8f602c4dfaeb7407af2151d0944a670511bd0dc00"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_recovery_store.dart",
+          "sha256": "8ccda93d66a749d8ec56575273cab63e5a786a954dc53bf0bb450de3d767fd93"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_repository.dart",
+          "sha256": "6b7007d08a7a0066ce30bca403668866547f5960815f1dfe6205fb4d7c8d536e"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_runtime.dart",
+          "sha256": "dad4b3df50627d7a64a51314ae866e8c9f2f2eff3bc2dff3e091a18daec50602"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_service.dart",
+          "sha256": "cf273850b29b87805cbe4d9131cb2d7e71448298bdcf103a62d7e41544c5b96e"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client.dart",
+          "sha256": "13b7b089329565d9bd9770a54b5f92bf90a871adeda53700038fe6386f607227"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client_contract.dart",
+          "sha256": "60a4595c0a2f8c4b0fe7f7bcf216974f5b00894c344aef5885f22853044a4cf6"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client_io.dart",
+          "sha256": "f98169b75c0c1fcc960f6540ee5998587c55f2c16e80b524828e85b4aba2ace9"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client_stub.dart",
+          "sha256": "7e857694b9ef2f6b213c21431a3121f245c47e0de2fa6510a10d321661136bcf"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_surface.dart",
+          "sha256": "c8c80e657e23fcc6709435ed701bf222e47ba4974971ed6a76f947489697dc29"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/pilot_hardware_adapters.dart",
+          "sha256": "b70f2de0aad1160ab85e2b5c7171d2f78803468779b3662d075ca3a2005e1ffd"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/thermal_printer_adapter.dart",
+          "sha256": "4ad1c0dfafcd8c6a61742b94a7ccd8ded369380a91300ca6d366836cb51ef68d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/usb_printer_transport.dart",
+          "sha256": "bec70aca682a2df65a7f4d1f29ae15b4b2bb8e87f985511c01c2ac31a5ffbf11"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_controller.dart",
+          "sha256": "47c9245a61fd216d29b84be39a5966121e49b0f7775d5231eed22314202249ad"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_repository.dart",
+          "sha256": "fe3528bde187018cf7e49ed75ff0d594c18ec4d4f6343ea74b8135f224c336bb"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_surface.dart",
+          "sha256": "c0c77f4d28669d23f406912803a096afe029a4e4feb3889a286c9747f9753819"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/kitchen_board_controller.dart",
+          "sha256": "33d616c0c216cf49956d553f9af91ab1547faa62ff598d7a1b1f21bf43927552"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/kitchen_board_surface.dart",
+          "sha256": "0f987da699084d54a483ead946119a60600841b0361449c08113b1b2aaa97f76"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/kitchen_status_repository.dart",
+          "sha256": "d0923d584deca16677b020b6d51fd8a2e31b68d8bdb8f1c3604d66f8bc43d4e0"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/prep_list_controller.dart",
+          "sha256": "897e8402d1fd2ef0fa536a1a9c3f3675c0baa404a415863b247aca456a347ec7"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/prep_list_model.dart",
+          "sha256": "bc6af0eae864e837039a28a9a907fe6b7fc1c84bdb09b8e4c47a6856b4805230"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/connectivity_controller.dart",
+          "sha256": "410c2d613b81042acf6183f4b548a602a693de6df51ac4cada8feea34db1089c"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/offline_checkout_service.dart",
+          "sha256": "cc635c65c9d79253e10da011c21671fdff27960011750c0ae1e4b3ca9c59332d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/offline_journal.dart",
+          "sha256": "6dcb4c40712e7e47c7ec9afcaacc64066648c324e8ef9703cb4ed050ae16d913"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/offline_policy.dart",
+          "sha256": "b1fe4e972ed216e8281a07ea735943b3d60203d208876f15695f43157e15e4e5"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/recovery_actions.dart",
+          "sha256": "a1a0faa27f7a6c1faf369630e07acbf9e92afb1bacb692093cee4b42e321bcfe"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/recovery_center.dart",
+          "sha256": "72ab0f37f25aa7c40e80f89f8d243199fd99893200df1fb6765639cc19ff5d21"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/replay_engine.dart",
+          "sha256": "647e3fb826d18a5231ab455b1858482e43db001ef74a0d30f26162f209e54267"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/sale/sale_lifecycle_controller.dart",
+          "sha256": "1c0df5a3a87d9128a7ac3a502b34c52b6cfe605b6bdfe5c70ff71321c26d519c"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/sale/sale_repository.dart",
+          "sha256": "202e0e254ac79e30d928476e6e8f6227e18ceb4b8d7deb00910f8fd55e4de210"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/sale/sale_surface.dart",
+          "sha256": "7a770529c9428e05b6f6ea2424bbc41f5d91f2741511c1331aa0f16b02151575"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/floor_plan_controller.dart",
+          "sha256": "6f486c7cb361792374b8e6b7bd0627e4fc96db921e87c8980953bbbc8a87e47f"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/floor_plan_surface.dart",
+          "sha256": "a7131f100a0e1f629cc44f223143beb73245df6bb72cec374feeb33fce0c58a2"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/table_state_controller.dart",
+          "sha256": "6012fca54850fea084ef2e69e1d8eec46923f1657c02ca3059b059486f702f37"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/table_state_repository.dart",
+          "sha256": "43f9a27e3f1cd4427b74df6642803b5d0c61dc50afb3c21461ee4570234c2a2d"
+        },
+        {
+          "path": "apps/umi-pos/lib/main.dart",
+          "sha256": "306a34d4c6385b43a22ce848e6ee5177acdf7b31d5bc61f1180ad2a6cd0c2195"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/connectivity_label.dart",
+          "sha256": "1fe4387516864879b1f18b6c2d9dea9fad3e89589de96d76247bb13a74685c37"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/inline_notice.dart",
+          "sha256": "c5a20c6b33a172c3b312244ddc6a0261a7680f9702292523b7bcccf4ddb7b3e6"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/pin_entry.dart",
+          "sha256": "530cdfd2894b5c73c4cf12c4f23ff7f783b44f4c36ee1a459477d53605b39fb3"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/status_card.dart",
+          "sha256": "31b27d73f19795a64d5a51b20b612e3dd133323541acc44c750d347a2fae2081"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/debug/AndroidManifest.xml",
+          "sha256": "f843b6386a098abd5be82bcb1baf84a921f8e43c67d52901482ada794fb5b3f7"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/AndroidManifest.xml",
+          "sha256": "4411f499fff7aa523c8774ee99d32392a8fc2a4ddd413b3fba423740bd0784c7"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/kotlin/co/umiconsulting/umi_pos/DeviceKeySigner.kt",
+          "sha256": "69f93bf26fdc4da5ac309a2fedf4169d624b655e420a32fb31cb3f1debbf15ea"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/kotlin/co/umiconsulting/umi_pos/MainActivity.kt",
+          "sha256": "fe9190aeecdabb34efbae6b8711c757f953762cfaecb27cb01ca7ba3f7afe54e"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/kotlin/co/umiconsulting/umi_pos/UsbPrinterChannel.kt",
+          "sha256": "35ad6e4dc42f93db91ec83f7a43f50bbbf0f8d49217aa4519b36ee85987b3ae0"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/drawable/ic_compare.xml",
+          "sha256": "9816e9af5d1535a2e4043bc3e18766c203dc029d51beadcf8c466499adff1c72"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/drawable/launch_background.xml",
+          "sha256": "94433756fe10005ddd6fc55cc5c0b1e9f3c10b66a08ceac795ece6713d34e28a"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/drawable-v21/launch_background.xml",
+          "sha256": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+          "sha256": "6a7c8f0d703e3682108f9662f813302236240d3f8f638bb391e32bfb96055fef"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+          "sha256": "c7c0c0189145e4e32a401c61c9bdc615754b0264e7afae24e834bb81049eaf81"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+          "sha256": "e14aa40904929bf313fded22cf7e7ffcbf1d1aac4263b5ef1be8bfce650397aa"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+          "sha256": "4d470bf22d5c17d84edc5f82516d1ba8a1c09559cd761cefb792f86d9f52b540"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+          "sha256": "3c34e1f298d0c9ea3455d46db6b7759c8211a49e9ec6e44b635fc5c87dfb4180"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/values/styles.xml",
+          "sha256": "937d7c82f539c72eb94fd3a3773f29b3d3fef1997213c92cb632298cedf4bda9"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/values-night/styles.xml",
+          "sha256": "8c5bad5152f217e837519f9c15211d19f39bd45f5f67faf6dd81cb4b299e518f"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/profile/AndroidManifest.xml",
+          "sha256": "4e4a0e0726baf45d2d878ea5d0e0666e08ea6e9dbdc33ecd2a74a3525cf5ba51"
+        },
+        {
+          "path": "apps/umi-pos/test_driver/driver_main.dart",
+          "sha256": "3d631463e86094f8b6d928626f241aef1edc5bc2a523caeb334086e7585a4155"
+        }
+      ],
+      "defines": {
+        "UMIPOS_ENVIRONMENT": "development",
+        "UMIPOS_API_BASE_URL": "http://127.0.0.1:4013",
+        "UMIPOS_DEVICE_KEY": "",
+        "UMIPOS_CONTRACT_VERSION": "2.27.0",
+        "UMIPOS_RELEASE_VERSION": "0.1.0",
+        "UMIPOS_RELEASE_GIT_COMMIT": "de883b38dd4bdc6550bef128cd6a5be79ffef399",
+        "UMIPOS_RELEASE_BUILD_TIMESTAMP": "2026-10-09T17:53:31.737991+00:00",
+        "UMIPOS_CONFIG_SCHEMA_VERSION": "1",
+        "UMIPOS_DEVELOPMENT_DIAGNOSTICS": "true",
+        "UMIPOS_FEATURE_BOOTSTRAP": "disabled",
+        "UMIPOS_HARDWARE_SIMULATOR_ENABLED": "false"
+      },
+      "command": [
+        "/home/juan/.local/opt/flutter/bin/flutter",
+        "build",
+        "apk",
+        "--profile",
+        "--target-platform",
+        "android-arm64",
+        "--build-name",
+        "0.1.0",
+        "--build-number",
+        "1",
+        "--dart-define=UMIPOS_ENVIRONMENT=development",
+        "--dart-define=UMIPOS_API_BASE_URL=http://127.0.0.1:4013",
+        "--dart-define=UMIPOS_DEVICE_KEY=",
+        "--dart-define=UMIPOS_CONTRACT_VERSION=2.27.0",
+        "--dart-define=UMIPOS_RELEASE_VERSION=0.1.0",
+        "--dart-define=UMIPOS_RELEASE_GIT_COMMIT=de883b38dd4bdc6550bef128cd6a5be79ffef399",
+        "--dart-define=UMIPOS_RELEASE_BUILD_TIMESTAMP=2026-10-09T17:53:31.737991+00:00",
+        "--dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1",
+        "--dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true",
+        "--dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled",
+        "--dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false"
+      ],
+      "exitCode": 0,
+      "buildSeconds": 39.8
+    },
+    {
+      "kind": "current",
+      "label": "UMI · Estación",
+      "applicationId": "co.umiconsulting.umi_pos.estacion",
+      "root": "/home/juan/Projects/umiconsulting/umi/apps/umi-pos/.estacion-runtime/imin-comparison-20261009T175313Z/current",
+      "inputs": [
+        {
+          "path": "apps/umi-pos/lib/app/activity_listener.dart",
+          "sha256": "2794ff6dc0c32bbf6149c6de9c59ada65eab893cd6f04d6ec266179e4c2331a1"
+        },
+        {
+          "path": "apps/umi-pos/lib/app/umi_pos_app.dart",
+          "sha256": "afdda9cf3d0f159f2adac182bd3b22a32dc26a2e8449e7cf7857b9f32dd5e901"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/bootstrap_controller.dart",
+          "sha256": "1e544d6104e216ecdcd3eb6dbd6cf834ef8bc2b6bb7a7d0363146d2de66a150e"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/bootstrap_state.dart",
+          "sha256": "5320d636f0a43755ef9e5330836568181b1350ee47bac1f8d766897a1a2d67a6"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/composition_root.dart",
+          "sha256": "e55dc7e4c7615dc5caf5597e25ed4827d6f9303c552603744eed411fdbc85812"
+        },
+        {
+          "path": "apps/umi-pos/lib/bootstrap/entrypoint.dart",
+          "sha256": "c69a115cef5352d3e64db4a8fa2b7122981613cff64f82d0ef2dc36240f0156d"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/config/app_config.dart",
+          "sha256": "d8f47fe9a357798c5491161082a32ee25cb1fbc1372349a0b2e24cdeeb2bcdd9"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/contracts/contract_gateway.dart",
+          "sha256": "ef5bcd6842d46ee100215179de846e95950c4c2a93b191d3188b5284c77c2a9d"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/errors/app_error.dart",
+          "sha256": "c856e97c70025d56adb6ba5df46056b044d683ace413087e309dc96736f6ab3f"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/errors/operator_error_message.dart",
+          "sha256": "21073f383054b71ae73bbab7c89d2ece8988dbf0509b4bd31b1b20e19252114e"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/feature_flags/feature_flags.dart",
+          "sha256": "646e2f9a755ac9c11612dff193c425a0d06cffe2e1eb2c8ad5f8eeba2cfd5927"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_en.arb",
+          "sha256": "0e9e6f720cbe440d5361daec2ca1c640be014f43270788ccf5e64e43e18cc380"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_es.arb",
+          "sha256": "887d03f86a3fd170f313ed2689f39fd15edd1482f1629654084868308e4995a2"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_localizations.dart",
+          "sha256": "afab03139487bc4351e30e1b98798f8b72c1df933d0d72c349294f560d3f69bc"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_localizations_en.dart",
+          "sha256": "6c5ec0a636b6850dcffc42af3bf3cf5d8b84bebefd8134560d051baf38fcf553"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/localization/app_localizations_es.dart",
+          "sha256": "1d896c3fc466e5f2dc8e9a48d9e11d914a1c9a8b921438f3910d14f78bfb1e1e"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/navigation/app_navigation.dart",
+          "sha256": "e83a6781f1c9b4d0c734c743b139bc2a77f3dd9c9394f188f46ad864c66f3fb0"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/network/api_client.dart",
+          "sha256": "3cdd472f40e0699ffa427454d885e1dae29be551e432e1d3b9183a9fe5a10c3c"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/observability/telemetry.dart",
+          "sha256": "3fce8d6d81cdb1d1da5bb737c671eebfd21f81e0fd539c83c2e4c2c8f2d42ba6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/platform/connectivity_plus_adapter.dart",
+          "sha256": "75cca7264da0e2d8d3a7faa58e31907a5adce2656979d3c646b25f958a9dd75b"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/platform/platform_adapters.dart",
+          "sha256": "b4842d1248b0f95219aeab708a8fd1efa4b3d24fd65a20bbc3499b7c92692a83"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/release/release_compatibility.dart",
+          "sha256": "1c0bb933505caeb1db870ec5a1dcc87ee9921d22ad63a50a8a963c1267ccb7ee"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/credential_vault.dart",
+          "sha256": "267b3910e421945fc5a0ff90677264fc31bd056f9d5bba37a91d21d698e501a6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/device_key.dart",
+          "sha256": "7413215dec5cf8b718ec7becb68fb941a64b413c654008ba039b3602b3499308"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/es256_encoding.dart",
+          "sha256": "b9280518ea7c14a00b4521de85104fca6b8d5dc95ebef8b293cfb3417ea4406f"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/keystore_device_key.dart",
+          "sha256": "999761ebceb8e5d0f4f322deb30e9b07a743860dcba811d345a9582de775c5fb"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/operator_permissions.dart",
+          "sha256": "b5e553a431e41e1e690353e3bc02513ecd88f6163cf5d46f1790449581651644"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_backend.dart",
+          "sha256": "c4fa1649d889cf0a9e1bdb4585493da804e7472d2e964f9d40ed8c4a506811a1"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_backend_io.dart",
+          "sha256": "ad32a9caaf41fb033d8546cf224732bf2a39c3b13c2912750e9b8e034eb4a9f2"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_backend_stub.dart",
+          "sha256": "06b7eea2dd0efa43def780ce228b90e8b217f2beaeb55f3c6aceeea39c0c5abc"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/security/tpm_device_key.dart",
+          "sha256": "cae7af8030a518fd705bc3f5866def42fed757140e89256eb2d081a058e135e8"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/storage/storage.dart",
+          "sha256": "96fdc06a68532ab0fcfb601396f0bdb57643021169469104eeca1d3cb9dc7632"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/display_preferences.dart",
+          "sha256": "36255011a5ca0114d5a9eebeb8903639c975f7f514bafe751ac2d85b5a393aca"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/pos_collections.dart",
+          "sha256": "889c3f9627ef54b3c3c42019ea1784862f30e8d857782f6dc0c872d7aaf8ccd6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/pos_fields.dart",
+          "sha256": "bce724d4f39a75cc9de7800a50e2ec7132553d5b40f7849e5ef2c542fd505ef8"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/pos_icons.dart",
+          "sha256": "2e9d729345a4169963fe4fd42fe45996d20675ca56d8bd70b45525421854ddf6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/pos_theme.dart",
+          "sha256": "fb3c98196215da7ec7659096560c6c53b4ca692ba9d6056f3d9b7173859fb485"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/pos_ui.dart",
+          "sha256": "51584070ffd942685563958e24cca677aa5d712a1dedb3f808eaf1d9de1bdcda"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/theme/umi_theme.dart",
+          "sha256": "1bf63936149a2a291618e742ef44cf9867e616efd20b597fc7a88de7c2bf6870"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/update/desktop_updater.dart",
+          "sha256": "7bbfe0c3d14cb9db034a37e93545c2b9d3deedd44a4e55a81e86572c199508f6"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/update/desktop_updater_io.dart",
+          "sha256": "a64ca09a5809ed555ab236cf255aefd796dd02dd5c3e11a1e9c25a8f87b62c04"
+        },
+        {
+          "path": "apps/umi-pos/lib/core/update/desktop_updater_platform.dart",
+          "sha256": "54818f7dba51715392cc674e0807d07d3a0df2b2b09415d2840ef9e12f107795"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/cart_controller.dart",
+          "sha256": "3142ba8a6118519b9d9adb6e04c2b55323fe4fae868c205a31bc49affeba37a2"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/cart_repository.dart",
+          "sha256": "576b59226d49c5215254dbfab3279a2fe8d3747ed3551dc4fe96910aee719f51"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/course_control.dart",
+          "sha256": "0c4b7d40938c1e1b6a547ce6c4e2df3e64695eede93d3a40b87d280b0c0e1def"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/incoming_orders_controller.dart",
+          "sha256": "276400819f160a112150b0aa796aad96e74a1971f613c85e2496f39cc1b4cbc6"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cart/incoming_orders_surface.dart",
+          "sha256": "3f4417c740fa0984e9b0147bcbd2dc9c5a9ae2e58821141e684a518f34cd14e8"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_approval.dart",
+          "sha256": "8ea4489324de436a6051500ff109b1da6bcf0a650f83635a7d57141986a9b024"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_controller.dart",
+          "sha256": "c7324fe399c305aa90b52c682e3f1ab4f7ee0b14e46a758191865285ba90d8c2"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_equation.dart",
+          "sha256": "b6662cc14a0ec9a5450ce09573b19d6fbeaa4f67393a18c821b435c1423811cd"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_journal.dart",
+          "sha256": "047041ffaa462a7c70dfa9edae90e0e3e0a51dbbacde6dd7b53783befc5b1731"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_recovery_store.dart",
+          "sha256": "b6eded1b0965e6e86db5df10ec44cc86e8be5ad2dc3553fc116bb7ac1951ff2d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_repository.dart",
+          "sha256": "2da34469ff1fc48e61dbf3abc70c7e2cf9d85eb38400e82711c300bc9f5104fe"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/cash_surface.dart",
+          "sha256": "b2e739dce995af4bec45c690a464c3ece2677ec1747e41532438223e1cd6bb2d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/denomination_counter.dart",
+          "sha256": "e7d13b20c1fc242e5b6767a8cee67e1b66042eabade1279c3afeb4f9ab5c4450"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/cash/money_input.dart",
+          "sha256": "bbe6db874948df1f5a11cf8a255b745a1e2af488a9b2573290d986f3b5b0004f"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/catalog_controller.dart",
+          "sha256": "1ddd898e5c121fe24fec1d64f78ff66aaca04c1b45236d0e6bed78b8f09c7461"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/catalog_repository.dart",
+          "sha256": "ac850c3f3bd564c8cb2a965a10d1d37e4bbff3d584c5b30096d205bca249ac60"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/catalog_surface.dart",
+          "sha256": "01d7e32b4e2b651f54fc398432ff3dd47e0894fd33744d45c9af00cb9902943d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/catalog/frequent_products.dart",
+          "sha256": "6faf826cb3bdfd6fecf08747e60e3624bbc893808e71055e6caccc3a62f31b3a"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/checkout_controller.dart",
+          "sha256": "70e3ec62346064cda9ca713ad67a75de134f88583912d162db439951f5694453"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/checkout_repository.dart",
+          "sha256": "1a12292d90010d7ff47c34376f8de6eb3b64a8680e6e41b5f9fbefb1278bf54d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/checkout_surface.dart",
+          "sha256": "7e51055926e399a8ae763d5e87058ac17665df5ffee8f960983be2aac50dd0a1"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/checkout/tender_identity.dart",
+          "sha256": "cc2392a06e6849a060ddc5391791a8318db296419f7b1d2b2b8a959321d0f4c7"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/customer_value/customer_value_controller.dart",
+          "sha256": "d6d525914394279e7d882b001bfacc05cd42ef99091503604d1c0d48b20527cd"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/customer_value/customer_value_repository.dart",
+          "sha256": "a1d0fa560099a3c1feae4f4905d86f1ec5407168e106d6a032f06fbb598a3193"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/customer_value/customer_value_surface.dart",
+          "sha256": "b980fb9d771ecdbee78b8f68232dc1a71c1ab1ac17c185f036f9f262b3e220a8"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/device_channel_socket_client.dart",
+          "sha256": "2893b153792fefd2c75042d7cc48a961d96830020a5bd8b28c51a79fbf68b7aa"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/entry_controller.dart",
+          "sha256": "56ed3e740ba57b5808206562c61a54f77e92b3dfdd6b89caf0a7c1309f0887ab"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/entry_gateway.dart",
+          "sha256": "26a75c16346c1cfdd9c899d6577c34a51d8a4728d9c665623491186a922e4713"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/entry_surface.dart",
+          "sha256": "5a3c0e2519e67f154897e61f7e10ce67a43278d121ead564387575407a77dad6"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/entry/pairing_socket_client.dart",
+          "sha256": "4d88fd70b3a1983fc5aa3f3076bd9b7a66d4d881db02aa2ba04623ce12a4db95"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_controller.dart",
+          "sha256": "c74d55811a033fe99cee3439eb11412dc7a237ce8df96d6e78bcff41a2a46515"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_recovery_store.dart",
+          "sha256": "7f6c87e1f2efceee0001ab4a2d92066a51f21aac82dc1268633f0f5d9bdd67b8"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_repository.dart",
+          "sha256": "dea9184566e3715d3c1d5ac09fbf6f1316ec6c127adf874c549f3500c290e771"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/exception/exception_surface.dart",
+          "sha256": "7c75fcf57bf4d879bbb9978af5e23672b24ea882293d5a16d55e022b42fe8ec8"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_fingerprint.dart",
+          "sha256": "1b1b32421536e4dc83e120c8f602c4dfaeb7407af2151d0944a670511bd0dc00"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_recovery_store.dart",
+          "sha256": "8ccda93d66a749d8ec56575273cab63e5a786a954dc53bf0bb450de3d767fd93"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_repository.dart",
+          "sha256": "6b7007d08a7a0066ce30bca403668866547f5960815f1dfe6205fb4d7c8d536e"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_runtime.dart",
+          "sha256": "dad4b3df50627d7a64a51314ae866e8c9f2f2eff3bc2dff3e091a18daec50602"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_service.dart",
+          "sha256": "cf273850b29b87805cbe4d9131cb2d7e71448298bdcf103a62d7e41544c5b96e"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client.dart",
+          "sha256": "13b7b089329565d9bd9770a54b5f92bf90a871adeda53700038fe6386f607227"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client_contract.dart",
+          "sha256": "60a4595c0a2f8c4b0fe7f7bcf216974f5b00894c344aef5885f22853044a4cf6"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client_io.dart",
+          "sha256": "f98169b75c0c1fcc960f6540ee5998587c55f2c16e80b524828e85b4aba2ace9"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_socket_client_stub.dart",
+          "sha256": "7e857694b9ef2f6b213c21431a3121f245c47e0de2fa6510a10d321661136bcf"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/hardware_surface.dart",
+          "sha256": "9ad8a66de0d358ebba048d50c64b459cf2d7117a2847925d54c68175845489e7"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/pilot_hardware_adapters.dart",
+          "sha256": "b70f2de0aad1160ab85e2b5c7171d2f78803468779b3662d075ca3a2005e1ffd"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/thermal_printer_adapter.dart",
+          "sha256": "4ad1c0dfafcd8c6a61742b94a7ccd8ded369380a91300ca6d366836cb51ef68d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/hardware/usb_printer_transport.dart",
+          "sha256": "bec70aca682a2df65a7f4d1f29ae15b4b2bb8e87f985511c01c2ac31a5ffbf11"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_controller.dart",
+          "sha256": "47c9245a61fd216d29b84be39a5966121e49b0f7775d5231eed22314202249ad"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_quantity.dart",
+          "sha256": "759d5e8ca7e9dc809b6fa652d7e8650c25432f37c59e82994f5fa350835830ee"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_repository.dart",
+          "sha256": "fe3528bde187018cf7e49ed75ff0d594c18ec4d4f6343ea74b8135f224c336bb"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/inventory/inventory_surface.dart",
+          "sha256": "8d54f1063923e70194528d6de4da397ef3b81ab8b222667817a2096cfffcef80"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/kitchen_board_controller.dart",
+          "sha256": "24496fc507ba38340676b8888ae953c815590469dd6306769129cc4463b3b0c3"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/kitchen_board_surface.dart",
+          "sha256": "00142b6c32fcb58016b0e59739fa4d1b9c6211724590e0ab98a0ff060dca1ee5"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/kitchen_status_repository.dart",
+          "sha256": "d0923d584deca16677b020b6d51fd8a2e31b68d8bdb8f1c3604d66f8bc43d4e0"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/prep_list_controller.dart",
+          "sha256": "897e8402d1fd2ef0fa536a1a9c3f3675c0baa404a415863b247aca456a347ec7"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/kitchen/prep_list_model.dart",
+          "sha256": "bc6af0eae864e837039a28a9a907fe6b7fc1c84bdb09b8e4c47a6856b4805230"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/connectivity_controller.dart",
+          "sha256": "410c2d613b81042acf6183f4b548a602a693de6df51ac4cada8feea34db1089c"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/offline_checkout_service.dart",
+          "sha256": "cc635c65c9d79253e10da011c21671fdff27960011750c0ae1e4b3ca9c59332d"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/offline_journal.dart",
+          "sha256": "6dcb4c40712e7e47c7ec9afcaacc64066648c324e8ef9703cb4ed050ae16d913"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/offline_policy.dart",
+          "sha256": "b1fe4e972ed216e8281a07ea735943b3d60203d208876f15695f43157e15e4e5"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/recovery_actions.dart",
+          "sha256": "a1a0faa27f7a6c1faf369630e07acbf9e92afb1bacb692093cee4b42e321bcfe"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/recovery_center.dart",
+          "sha256": "adc5aea471d87cce97668f73879cda85d8c75ff59d506c13f8bc9db762672b5b"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/offline/replay_engine.dart",
+          "sha256": "647e3fb826d18a5231ab455b1858482e43db001ef74a0d30f26162f209e54267"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/sale/sale_lifecycle_controller.dart",
+          "sha256": "bf3ab3f62469640ef4690d7e00cad342974f7a852973aaa7891e2a9d359eff94"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/sale/sale_repository.dart",
+          "sha256": "202e0e254ac79e30d928476e6e8f6227e18ceb4b8d7deb00910f8fd55e4de210"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/sale/sale_surface.dart",
+          "sha256": "226cc1bf085d571832812cb33bab805135fbbe26a0eb071760cc8468fe7d5c67"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/settings/display_settings_surface.dart",
+          "sha256": "1a6c5ee4e6eb4e3d9b5b06be46a55c86bc5aa162ed8c50b83a30acf10653aed0"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/floor_plan_controller.dart",
+          "sha256": "6f486c7cb361792374b8e6b7bd0627e4fc96db921e87c8980953bbbc8a87e47f"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/floor_plan_surface.dart",
+          "sha256": "c99999928d9b78af58dc09a7d5bf55412e1010e796cda12b6a1c79f0506d5ee4"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/table_state_controller.dart",
+          "sha256": "6012fca54850fea084ef2e69e1d8eec46923f1657c02ca3059b059486f702f37"
+        },
+        {
+          "path": "apps/umi-pos/lib/features/tables/table_state_repository.dart",
+          "sha256": "43f9a27e3f1cd4427b74df6642803b5d0c61dc50afb3c21461ee4570234c2a2d"
+        },
+        {
+          "path": "apps/umi-pos/lib/main.dart",
+          "sha256": "306a34d4c6385b43a22ce848e6ee5177acdf7b31d5bc61f1180ad2a6cd0c2195"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/connectivity_label.dart",
+          "sha256": "ccade43f1aa9ce4f083d9b6dec315ca5174b91a663257d2e14e7322c2613109c"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/inline_notice.dart",
+          "sha256": "d09f8750398b601630b7c8099a343fb2c35f072f92c3d7a5bcc6ea34eeb7fb94"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/pin_entry.dart",
+          "sha256": "50f341a738cd37cd27f1f0ac1299eafb3929bcc03ce7b8befafe1de1fadef713"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/product_sketch.dart",
+          "sha256": "f8dc575a8ac3ac69c0fa0c2a763ef90350ea5736dbe82c6bb782c60414cbb1ce"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/receipt_document.dart",
+          "sha256": "93a284c5bde9cb049acff63e756d5f4c3e69ebf38b9424cbd133ebd387997208"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/station_document.dart",
+          "sha256": "3c4aa12240f273bc3828cdcac0ca51732eac5ed98944c878f1c9a40ef4d441c5"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/station_signature.dart",
+          "sha256": "029721f817f0050bf7b2405f65f4ec0b09c1d9ce6f0189f88c2454f8dab303a5"
+        },
+        {
+          "path": "apps/umi-pos/lib/shared/widgets/status_card.dart",
+          "sha256": "795dac98bbceb9f6a9114cd81b634fa65399b8fa353055036e5f41601e97d30e"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/Bricolage-OFL.txt",
+          "sha256": "4b5a7d8f37f5602621c8a8d7358a6a2e71317e6c231c661e15aef0275d3e07ba"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/BricolageGrotesque12pt-Bold.ttf",
+          "sha256": "b832e0d13b20794dd20c6e1711eab89a96e96b89268172f3ccd863657aa6157e"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/BricolageGrotesque12pt-SemiBold.ttf",
+          "sha256": "b3c5133bc53549fdac082b999117efd76f52c92ed6032895bc91e01aa14d93d2"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/IBM-Plex-OFL.txt",
+          "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/IBMPlexSans-Bold.ttf",
+          "sha256": "9e6c74a889a700d707613d24548fe4ffa6bc59559a0689d2cf9e133bdcdafb2f"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/IBMPlexSans-Italic.ttf",
+          "sha256": "a9c6ef9942c49e49d11e11a6dacc0b3a087978757e9b22a06b8ac22a6400fb15"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/IBMPlexSans-Medium.ttf",
+          "sha256": "331c8639d7598b2cde62a911a71db195e30cb655cd6bdf2e324a7e984955f907"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/IBMPlexSans-Regular.ttf",
+          "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/IBMPlexSans-SemiBold.ttf",
+          "sha256": "a20caf8286023a6a7a85e40b1d2a4ae9fc3e3b1f9eda8f4c542dd4986af67bb1"
+        },
+        {
+          "path": "apps/umi-pos/assets/fonts/provenance.json",
+          "sha256": "ab12e8284d474b441e9db1ad8b77be40ee6c17fc1a4a50da1437495e8c369276"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/debug/AndroidManifest.xml",
+          "sha256": "f843b6386a098abd5be82bcb1baf84a921f8e43c67d52901482ada794fb5b3f7"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/AndroidManifest.xml",
+          "sha256": "98debeac49395234c6f7c41768dbb17864b4c3ef75d36d389a012d00380ceec5"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/kotlin/co/umiconsulting/umi_pos/DeviceKeySigner.kt",
+          "sha256": "69f93bf26fdc4da5ac309a2fedf4169d624b655e420a32fb31cb3f1debbf15ea"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/kotlin/co/umiconsulting/umi_pos/MainActivity.kt",
+          "sha256": "fe9190aeecdabb34efbae6b8711c757f953762cfaecb27cb01ca7ba3f7afe54e"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/kotlin/co/umiconsulting/umi_pos/UsbPrinterChannel.kt",
+          "sha256": "35ad6e4dc42f93db91ec83f7a43f50bbbf0f8d49217aa4519b36ee85987b3ae0"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/drawable/ic_compare.xml",
+          "sha256": "b392346f5c17043c226c6051fe9bd87f61b9fb8607156beb4fd6c0d83b02dfaf"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/drawable/launch_background.xml",
+          "sha256": "94433756fe10005ddd6fc55cc5c0b1e9f3c10b66a08ceac795ece6713d34e28a"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/drawable-v21/launch_background.xml",
+          "sha256": "7ca6d5cec2169c5a98661a119db23a6f3399c8fef2256ff04f3a642831282478"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+          "sha256": "6a7c8f0d703e3682108f9662f813302236240d3f8f638bb391e32bfb96055fef"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+          "sha256": "c7c0c0189145e4e32a401c61c9bdc615754b0264e7afae24e834bb81049eaf81"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+          "sha256": "e14aa40904929bf313fded22cf7e7ffcbf1d1aac4263b5ef1be8bfce650397aa"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+          "sha256": "4d470bf22d5c17d84edc5f82516d1ba8a1c09559cd761cefb792f86d9f52b540"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+          "sha256": "3c34e1f298d0c9ea3455d46db6b7759c8211a49e9ec6e44b635fc5c87dfb4180"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/values/styles.xml",
+          "sha256": "937d7c82f539c72eb94fd3a3773f29b3d3fef1997213c92cb632298cedf4bda9"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/main/res/values-night/styles.xml",
+          "sha256": "8c5bad5152f217e837519f9c15211d19f39bd45f5f67faf6dd81cb4b299e518f"
+        },
+        {
+          "path": "apps/umi-pos/android/app/src/profile/AndroidManifest.xml",
+          "sha256": "4e4a0e0726baf45d2d878ea5d0e0666e08ea6e9dbdc33ecd2a74a3525cf5ba51"
+        },
+        {
+          "path": "apps/umi-pos/test_driver/driver_main.dart",
+          "sha256": "b6507b2629db61386db4e17526af15d9c67ee9ecc291815c7585f43a02107f73"
+        },
+        {
+          "path": "apps/umi-pos/test_driver/navigation_probe.dart",
+          "sha256": "f651c8ae28847ad27a21b931782bed9f556f3e0d9d7ac1d867d75f5db38cf4fe"
+        },
+        {
+          "path": "apps/umi-pos/test_driver/pos_tooltip_finder.dart",
+          "sha256": "797492a777c15235ce7697208b16ed45fd74b2f4b9acb6b133c3e9df9a82311b"
+        },
+        {
+          "path": "apps/umi-pos/test_driver/receipt_probe.dart",
+          "sha256": "a2334019ab9425d6135d8fa976e25adf5eefdc93689647ad4abeb80e0f35a3a7"
+        }
+      ],
+      "defines": {
+        "UMIPOS_ENVIRONMENT": "development",
+        "UMIPOS_API_BASE_URL": "http://127.0.0.1:4013",
+        "UMIPOS_DEVICE_KEY": "",
+        "UMIPOS_CONTRACT_VERSION": "2.27.0",
+        "UMIPOS_RELEASE_VERSION": "0.1.0",
+        "UMIPOS_RELEASE_GIT_COMMIT": "955cdf1abf0a62c5899b6f6f8a9b1558a845bbd2",
+        "UMIPOS_RELEASE_BUILD_TIMESTAMP": "2026-10-09T18:13:30.855892+00:00",
+        "UMIPOS_CONFIG_SCHEMA_VERSION": "1",
+        "UMIPOS_DEVELOPMENT_DIAGNOSTICS": "true",
+        "UMIPOS_FEATURE_BOOTSTRAP": "disabled",
+        "UMIPOS_HARDWARE_SIMULATOR_ENABLED": "false"
+      },
+      "command": [
+        "/home/juan/.local/opt/flutter/bin/flutter",
+        "build",
+        "apk",
+        "--profile",
+        "--target-platform",
+        "android-arm64",
+        "--build-name",
+        "0.1.0",
+        "--build-number",
+        "1",
+        "--dart-define=UMIPOS_ENVIRONMENT=development",
+        "--dart-define=UMIPOS_API_BASE_URL=http://127.0.0.1:4013",
+        "--dart-define=UMIPOS_DEVICE_KEY=",
+        "--dart-define=UMIPOS_CONTRACT_VERSION=2.27.0",
+        "--dart-define=UMIPOS_RELEASE_VERSION=0.1.0",
+        "--dart-define=UMIPOS_RELEASE_GIT_COMMIT=955cdf1abf0a62c5899b6f6f8a9b1558a845bbd2",
+        "--dart-define=UMIPOS_RELEASE_BUILD_TIMESTAMP=2026-10-09T18:13:30.855892+00:00",
+        "--dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1",
+        "--dart-define=UMIPOS_DEVELOPMENT_DIAGNOSTICS=true",
+        "--dart-define=UMIPOS_FEATURE_BOOTSTRAP=disabled",
+        "--dart-define=UMIPOS_HARDWARE_SIMULATOR_ENABLED=false"
+      ],
+      "exitCode": 0,
+      "buildSeconds": 37.0,
+      "touchFix": "Preserve the editor across keyboard resize with a keyed form row; activate the full input surface."
+    }
+  ]
+}

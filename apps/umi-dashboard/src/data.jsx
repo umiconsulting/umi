@@ -654,6 +654,84 @@ async function saveMerchantSettings(patch) {
   });
 }
 
+/**
+ * The café's logo (migration 014). One upload, one row, and `merchant.logo_url`
+ * points at it — which is the same field the wallet pass builders and the till
+ * already read, so nothing downstream has to learn a new name.
+ *
+ * The bytes are shrunk HERE, before they travel. Not because the API cannot do it
+ * (it does, and refuses anything over 256 KB on arrival) but because the edge
+ * refuses a body over 1 MB — so a 4 MB phone photo would die at Caddy as a 413
+ * instead of reaching the code that resizes it. A logo drawn on a 384-dot receipt
+ * head never needs more than 768 px, which is what this produces.
+ */
+const LOGO_MAX_EDGE = 768;
+/** The same cap the API enforces, so we only send what would be stored. */
+const LOGO_MAX_BYTES = 262_144;
+const LOGO_TYPES = ['image/png', 'image/jpeg'];
+
+function _canvasBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error(t`No pudimos preparar la imagen.`))),
+      type,
+      quality,
+    );
+  });
+}
+
+function _blobBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(t`No pudimos leer el archivo.`));
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function saveMerchantLogo(file) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  if (!LOGO_TYPES.includes(file.type)) {
+    throw new Error(t`Elige una imagen PNG o JPG.`);
+  }
+
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+
+  // PNG first: a logo is flat art and keeps its edges and transparency. A
+  // photographic JPEG can still exceed the cap at 768 px as a PNG, so it goes back
+  // to JPEG — the same choice the API makes when it normalises.
+  let blob = await _canvasBlob(canvas, 'image/png');
+  let contentType = 'image/png';
+  if (blob.size > LOGO_MAX_BYTES) {
+    blob = await _canvasBlob(canvas, 'image/jpeg', 0.9);
+    contentType = 'image/jpeg';
+  }
+  if (blob.size > LOGO_MAX_BYTES) {
+    throw new Error(t`La imagen es demasiado pesada. Prueba con una más simple.`);
+  }
+
+  return _apiFetch(routes.merchants.brandingLogo(merchantId), {
+    method: 'PUT',
+    body: JSON.stringify({ contentType, dataBase64: await _blobBase64(blob) }),
+  });
+}
+
+async function removeMerchantLogo() {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(routes.merchants.brandingLogoRemove(merchantId), {
+    method: 'DELETE',
+  });
+}
+
 async function saveRewardConfig(patch) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
@@ -860,6 +938,15 @@ async function getPosDevices(locationId) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   return _apiFetch(deviceEnrollmentPath(routes.devices.list(merchantId), locationId));
+}
+
+// The café's hardware, for INVENTORY: a printer is a thing the business bought, and the
+// person who counts it is in the back office, not standing at a till. The till's own
+// hardware centre drives the device; this read only says what is there.
+async function getHardware(locationId) {
+  const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
+  if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
+  return _apiFetch(deviceEnrollmentPath(routes.hardware.list(merchantId), locationId));
 }
 
 async function updatePosDevice(deviceId, patch, locationId) {
@@ -1783,6 +1870,11 @@ export {
   // eslint-disable-next-line react-refresh/only-export-components
   loadSaleReceipt,
   saveMerchantSettings,
+  // Data-module functions, not components. Keeps the react-refresh baseline flat.
+  // eslint-disable-next-line react-refresh/only-export-components
+  saveMerchantLogo,
+  // eslint-disable-next-line react-refresh/only-export-components
+  removeMerchantLogo,
   saveRewardConfig,
   saveBusinessHours,
   saveMerchantVoice,
@@ -1814,6 +1906,7 @@ export {
   createPosEnrollmentRequest,
   getPosEnrollmentRequests,
   getPosDevices,
+  getHardware,
   updatePosDevice,
   revokePosDevice,
   approvePosEnrollmentRequest,
@@ -1892,6 +1985,121 @@ export function changeFloorPlan(merchantId, payload, publish = false) {
 export function fetchTableState(merchantId, locationId) {
   return _apiFetch(
     `${buildPath('tableState.read', { merchantId })}?locationId=${encodeURIComponent(locationId)}`,
+  );
+}
+
+// The drawer count rule of one location. The switch on Caja y turnos reads it and
+// writes it; the till reads the same row before it counts. The two fields travel
+// together — a blind location counts by denomination, a visible one only needs
+// the total — so the switch sends one boolean and the server moves both.
+// eslint-disable-next-line react-refresh/only-export-components
+export function fetchCashPolicy(merchantId, locationId) {
+  return _apiFetch(
+    `${routes.merchants.operations(merchantId)}/cash-policy?locationId=${encodeURIComponent(locationId)}`,
+  );
+}
+// eslint-disable-next-line react-refresh/only-export-components
+export function setCashPolicy(merchantId, locationId, blindCountRequired) {
+  return _apiFetch(`${routes.merchants.operations(merchantId)}/cash-policy`, {
+    method: 'PATCH',
+    body: JSON.stringify({ locationId, blindCountRequired }),
+  });
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function fetchCheckoutPolicy(merchantId, locationId) {
+  return _apiFetch(
+    `${routes.merchants.operations(merchantId)}/checkout-policy?locationId=${encodeURIComponent(locationId)}`,
+  );
+}
+// eslint-disable-next-line react-refresh/only-export-components
+export function setCheckoutPolicy(merchantId, locationId, policy) {
+  return _apiFetch(`${routes.merchants.operations(merchantId)}/checkout-policy`, {
+    method: 'PATCH',
+    body: JSON.stringify({ locationId, ...policy }),
+  });
+}
+
+// ── Estaciones de cocina y su ruteo ───────────────────────────────────────────────
+//
+// The kitchen's own dashboard surface (`/api/merchants/:id/kds/...`): `kitchen.station.read`
+// to look, `kitchen.station.manage` to change. What the panel writes here are ROUTES, and
+// that is where "esta categoría va a Barra" lives: a category route sends the whole
+// category, a product route overrides one plate, and the route with neither id is the
+// general one — the predeterminada that catches whatever nobody claimed.
+//
+// Which route WINS is not re-implemented here: `screens/kitchen-routing-model.js` states
+// the rule for the screen, and the API applies the same one when a ticket is written.
+//
+// The two reads come back as RAW ROWS (snake_case columns), and the screen that consumes
+// them — and the routing model behind it — speak the contract's language. The mapping
+// happens here, once, so the model stays a pure function of tidy objects.
+// eslint-disable-next-line react-refresh/only-export-components
+export function fetchKitchenStations(merchantId, locationId) {
+  return _apiFetch(
+    `${routes.merchants.base(merchantId)}/kds/stations?locationId=${encodeURIComponent(locationId)}`,
+  ).then((res) => ({
+    stations: (res?.stations || []).map((row) => ({
+      id: row.id,
+      key: row.station_key,
+      name: row.name,
+      status: row.status,
+      sortOrder: row.sort_order,
+      alertSettings: row.alert_settings,
+    })),
+  }));
+}
+// eslint-disable-next-line react-refresh/only-export-components
+export function fetchKitchenRoutes(merchantId, locationId) {
+  return _apiFetch(
+    `${routes.merchants.base(merchantId)}/kds/routes?locationId=${encodeURIComponent(locationId)}`,
+  ).then((res) => ({
+    routes: (res?.routes || []).map((row) => ({
+      id: row.id,
+      categoryId: row.category_id,
+      productId: row.product_id,
+      stationId: row.station_id,
+      stationName: row.station_name,
+      routePriority: row.route_priority,
+      targetSeconds: row.target_seconds,
+      active: row.active,
+      version: row.version,
+    })),
+  }));
+}
+/** One category, one product, or the general route: at most one of the two ids is set. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function createKitchenRoute(merchantId, locationId, route) {
+  return _apiFetch(
+    `${routes.merchants.base(merchantId)}/kds/routes?locationId=${encodeURIComponent(locationId)}`,
+    { method: 'POST', body: JSON.stringify(route) },
+  );
+}
+/** Move a route to another station, or switch it off (`active: false`). */
+// eslint-disable-next-line react-refresh/only-export-components
+export function updateKitchenRoute(merchantId, routeId, route) {
+  return _apiFetch(`${routes.merchants.base(merchantId)}/kds/routes/${routeId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(route),
+  });
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function saveKitchenStation(merchantId, locationId, stationId, station) {
+  const base = `${routes.merchants.base(merchantId)}/kds/stations`;
+  return _apiFetch(
+    stationId ? `${base}/${stationId}` : `${base}?locationId=${encodeURIComponent(locationId)}`,
+    {
+      method: stationId ? 'PATCH' : 'POST',
+      body: JSON.stringify(station),
+    },
+  );
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function searchKitchenProducts(merchantId, search) {
+  return _apiFetch(
+    `${routes.merchants.base(merchantId)}/kds/products?search=${encodeURIComponent(search)}`,
   );
 }
 

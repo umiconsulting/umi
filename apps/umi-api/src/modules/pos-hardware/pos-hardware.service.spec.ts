@@ -66,6 +66,23 @@ describe('Gate 3G-A hardware application boundary', () => {
     ).rejects.toMatchObject({ response: { code: 'DEVICE_NOT_ENROLLED' } });
   });
 
+  /**
+   * The back office's inventory read carries no operator session and asks for nothing
+   * beyond the branch scope the caller already resolved. That is the point: a person
+   * counting printers is not standing at a till, and the route must not demand the
+   * session that proves they are.
+   */
+  it('reads the hardware inventory for the branches the caller may see', async () => {
+    const rows = [{ id: id(11), type: 'printer' as const }];
+    const repo = { listForDashboard: vi.fn().mockResolvedValue(rows) };
+    const service = new PosHardwareService(repo as never, integrity as never);
+
+    await expect(service.listForDashboard(id(6), [scope.locationId])).resolves.toEqual({
+      devices: rows,
+    });
+    expect(repo.listForDashboard).toHaveBeenCalledWith(id(6), [scope.locationId]);
+  });
+
   it('updates pilot policy through exact hardware management permission', async () => {
     const result = {
       merchantId: id(6),
@@ -282,5 +299,32 @@ describe('Gate 3G-A hardware application boundary', () => {
         { hardwareId: id(8), expectedConfigurationVersion: 1 },
       ),
     ).rejects.toMatchObject({ response: { code: 'EXECUTION_DEVICE_UNAVAILABLE' } });
+  });
+
+  it('tells the runtime read which terminal is asking', async () => {
+    // A USB printer is assigned to the TERMINAL, not to a register, so a read
+    // scoped only by register cannot see the printer plugged into the till that is
+    // asking for it. Measured on the iMin D3-504 on 2026-10-11: `Imprimir recibo`
+    // answered `Bad state: HARDWARE_RECEIPT_PRINTER_UNAVAILABLE` with the Epson
+    // registered, enabled and `connected` — assigned to the device and to no
+    // register. The service must hand the repository the caller's device, or the
+    // query has nothing to match on.
+    const repo = {
+      authorize: vi.fn().mockResolvedValue({ operatorId: user.id, deviceId: user.deviceId }),
+      snapshot: vi.fn().mockResolvedValue({ devices: [] }),
+    };
+    const service = new PosHardwareService(repo as never, integrity as never);
+    await service.registry(user, id(6), {
+      locationId: scope.locationId,
+      operatorSessionId: scope.operatorSessionId,
+      registerId: id(9),
+      includeDisabled: false,
+    });
+    expect(repo.snapshot).toHaveBeenCalledWith(
+      user.id,
+      id(6),
+      expect.objectContaining({ registerId: id(9) }),
+      user.deviceId,
+    );
   });
 });

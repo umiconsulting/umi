@@ -1,0 +1,6 @@
+  name  |                                                       alert_settings                                                        
+--------+-----------------------------------------------------------------------------------------------------------------------------
+ Cocina | {"readySound": "ready", "arrivalSound": "arrival", "overdueSound": "overdue", "soundsEnabled": true, "overdueSeconds": 900}
+ Barra  | {"readySound": "ready", "arrivalSound": "arrival", "overdueSound": "overdue", "soundsEnabled": true, "overdueSeconds": 300}
+(2 rows)
+

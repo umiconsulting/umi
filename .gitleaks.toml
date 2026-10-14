@@ -105,3 +105,30 @@ regexTarget = 'secret'
 regexes = [
   '''sha-[0-9a-f]{40}''',
 ]
+
+[[allowlists]]
+description = "Firebase Android configs (google-services.json)"
+# The three environment files of the POS app. Google's own Android setup guide
+# puts this file in the repository: the API key it carries ships inside every APK
+# we build, so it is public by design and is protected in the Firebase console by
+# the package name and signing-certificate restrictions, not by secrecy.
+#
+# Allowlisted by exact value, not by path, so a real credential pasted into one of
+# these files is still caught.
+regexes = [
+  '''AIzaSyCnhRF7P5182wZLC1YVnCIRs_idTVPuYXg''',
+  '''AIzaSyDXCJSrjWSoqjjBuP686Pm9NILezmfNKq4''',
+  '''AIzaSyBvDVCfEoNLvKf9mB4qnhRUIeuwaTgqCvo''',
+]
+
+[[allowlists]]
+description = "Local rehearsal fixture's password digest"
+# scripts/umipos-role-surface-fixture.sql seeds one account in a throwaway local
+# database so the role-surface checks can sign in. What is written down is the
+# scrypt digest and its salt — not the password, and nothing a deployed
+# environment accepts. Allowlisted by exact value, not by path, so a real
+# credential pasted into that fixture is still caught.
+regexes = [
+  '''e514b830de5067c1847d8028e002fa53054946c06de3942a94ab060971361815392b7362a7c9f3dcb8dcdc0c55f64eebb49363438f3dbf74b9931b7a4b41044c''',
+  '''bc5847b3184062f8a9f75fa3f5c123d2''',
+]

@@ -1,0 +1,13 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/pos-hardware/pos-hardware.repository.spec.ts (2 tests) 5ms
+[Nest] 3000257  - 10/14/2026, 12:06:05 PM    WARN [PosHardwareService] hardware command refused (EXECUTION_DEVICE_UNAVAILABLE): EXECUTION_DEVICE_UNAVAILABLE
+ ✓ src/modules/pos-hardware/pos-hardware.service.spec.ts (10 tests) 12ms
+
+ Test Files  2 passed (2)
+      Tests  12 passed (12)
+   Start at  12:06:05
+   Duration  430ms (transform 138ms, setup 0ms, collect 393ms, tests 17ms, environment 0ms, prepare 90ms)
+

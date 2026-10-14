@@ -1,16 +1,23 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
+import '../../core/security/operator_permissions.dart';
+import '../../core/theme/display_preferences.dart';
 import '../../core/theme/umi_theme.dart';
 import '../../shared/widgets/connectivity_label.dart';
+import '../../shared/widgets/station_document.dart';
 import '../entry/entry_controller.dart';
 import '../offline/connectivity_controller.dart';
+import 'kitchen_alerts.dart';
+import 'kitchen_audio.dart';
 import 'kitchen_board_controller.dart';
-import 'prep_list_controller.dart';
-import 'prep_list_model.dart';
+import 'kitchen_ticket_age.dart';
+import 'kitchen_unassigned_surface.dart';
+
+export 'kitchen_ticket_age.dart' show formatTicketAge;
 
 /// Opens the unified KDS mode (PoloTab pattern): the same app, on a device that
 /// runs the kitchen, shows the order board full-screen.
@@ -20,7 +27,7 @@ Future<void> showKitchenBoard(
   required EntryController entry,
   required ConnectivityController connectivity,
 }) => Navigator.of(context).push(
-  MaterialPageRoute<void>(
+  PosPageRoute<void>(
     fullscreenDialog: true,
     builder: (_) => KitchenBoardSurface(
       controller: controller,
@@ -50,6 +57,8 @@ final class KitchenBoardSurface extends StatefulWidget {
     required this.controller,
     required this.entry,
     required this.connectivity,
+    this.embedded = false,
+    this.clock = DateTime.now,
     super.key,
   });
   final KitchenBoardController controller;
@@ -58,28 +67,34 @@ final class KitchenBoardSurface extends StatefulWidget {
   /// The till's own view of the network, shown when it is anything but online.
   final ConnectivityController connectivity;
 
+  /// True when the board is the shell's own body instead of a pushed route.
+  ///
+  /// The board is a cook's home (plan §8.2 F1), so the shell places it inside
+  /// its own PosPage under the tab bar. In that position there is nothing to
+  /// "close" — the shell owns the exit — so the close control is dropped. A
+  /// seller who opens the board from the till still gets the close control.
+  final bool embedded;
+  final DateTime Function() clock;
+
   @override
   State<KitchenBoardSurface> createState() => _KitchenBoardSurfaceState();
 }
 
-class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
-    with SingleTickerProviderStateMixin {
+class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
   Timer? _ticker;
-
-  /// The two views of one kitchen: the tickets to work, and what to make.
-  /// The ticket rail stays the default view.
-  late final TabController _tabs;
-
-  /// The prep list has its own state, so its refusal never touches the rail.
-  late final PrepListController _prepList;
+  Timer? _alertTicker;
+  final _alerts = KitchenAlertTracker();
+  final _audio = KitchenAudio();
+  bool _localMuted = false;
+  String _dayFilter = 'today';
+  bool get _muted => _preferences?.kitchenSoundsMuted ?? _localMuted;
+  String? _stationFilter;
 
   @override
   void initState() {
     super.initState();
-    _prepList = PrepListController(widget.controller.repository);
-    _prepList.addListener(_changed);
-    _tabs = TabController(length: 2, vsync: this)..addListener(_tabChanged);
     widget.controller.addListener(_changed);
+    widget.entry.addListener(_changed);
     widget.connectivity.addListener(_changed);
     _load();
     // The kitchen board refreshes on its own so a cook never taps to see a new
@@ -90,44 +105,46 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
     // laptop slept, a ticket written straight into SQL — and milliseconds when
     // it is not.
     _ticker = Timer.periodic(const Duration(seconds: 8), (_) => _load());
+    _alertTicker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _changed(),
+    );
     unawaited(widget.controller.startWatching());
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _alertTicker?.cancel();
+    _audio.dispose();
     widget.controller.stopWatching();
-    _tabs.dispose();
-    _prepList.removeListener(_changed);
-    _prepList.dispose();
     widget.connectivity.removeListener(_changed);
     widget.controller.removeListener(_changed);
+    widget.entry.removeListener(_changed);
     super.dispose();
   }
 
   void _changed() {
+    if (!mounted) return;
+    if (widget.controller.state.phase == KitchenBoardPhase.ready) {
+      for (final sound in _alerts.observe(
+        widget.controller.state.orders,
+        widget.clock(),
+        stationId: _screenStationId ?? _stationFilter,
+        muted: _muted,
+      )) {
+        unawaited(_audio.play(sound));
+      }
+    }
+    setState(() {});
+  }
+
+  Future<void> _toggleSounds() async {
+    final next = !_muted;
+    setState(() => _localMuted = next);
+    if (next) await _audio.silence();
+    await _preferences?.setKitchenSoundsMuted(next);
     if (mounted) setState(() {});
-  }
-
-  /// The prep list is read when its tab opens, not on the board's poll.
-  void _tabChanged() {
-    if (_tabs.index == 1) _loadPrepList(once: true);
-  }
-
-  /// Read the prep list with the till's own merchant and location.
-  ///
-  /// [once] leaves an already loaded list alone, which is what opening the tab
-  /// does. The refresh control calls again with `once: false`.
-  void _loadPrepList({required bool once}) {
-    final state = widget.entry.state;
-    final merchant = state.selectedTenant?.id;
-    final location = state.selectedBranch?.id;
-    final operatorSessionId = state.operator?.id;
-    if (merchant == null || location == null || operatorSessionId == null) return;
-    if (once && _prepList.state.phase != PrepListPhase.idle) return;
-    unawaited(
-      _prepList.load(merchant, locationId: location, operatorSessionId: operatorSessionId),
-    );
   }
 
   void _load() {
@@ -147,7 +164,7 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
   /// A recall needs a reason, so the board asks for one before it sends
   /// anything. Cancelling the dialog sends no command at all.
   Future<void> _recall(KitchenOrderProjection order) async {
-    final reason = await showDialog<({String code, String? note})>(
+    final reason = await showPosDialog<({String code, String? note})>(
       context: context,
       builder: (context) => _RecallDialog(order: order),
     );
@@ -159,22 +176,74 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
     );
   }
 
+  /// The station THIS SCREEN is, remembered on the device (see
+  /// `DisplayPreferences.kitchenStationId`). A bar screen and a kitchen screen are
+  /// different screens, not two tilings of one: the person in front of each works its
+  /// assigned station without needing to choose it from a filter on every visit.
+  String? _screenStationId;
+  bool _screenStationRestored = false;
+  DisplayPreferences? _preferences;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _preferences = DisplayPreferencesScope.maybeOf(context);
+    if (_screenStationRestored) return;
+    _screenStationRestored = true;
+    final id = _preferences?.kitchenStationId;
+    if (id != null && id.isNotEmpty) {
+      _screenStationId = id;
+      _screenStationName = _preferences?.kitchenStationName;
+      _stationFilter = id;
+    }
+  }
+
+  String? _screenStationName;
+
+  void _selectStation(String? id, String? name) {
+    setState(() {
+      _stationFilter = id;
+      _screenStationId = id;
+      _screenStationName = name;
+    });
+    final preferences = _preferences;
+    if (preferences != null) {
+      unawaited(preferences.setKitchenStation(id: id, name: name));
+    }
+  }
+
+  List<({String id, String name})> _stationsIn(
+    List<KitchenOrderProjection> orders,
+  ) {
+    final seen = <String, String>{};
+    for (final order in orders) {
+      final name = order.stationName;
+      if (name == null || name.isEmpty) continue;
+      seen.putIfAbsent(order.stationId, () => name);
+    }
+    return [
+      for (final entry in seen.entries) (id: entry.key, name: entry.value),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final state = widget.controller.state;
     final orders = state.orders;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.kitchenBoardTitle),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: [
-            Tab(text: l10n.kitchenBoardTabTickets),
-            Tab(text: l10n.kitchenPrepTab),
-          ],
-        ),
+    return PosPage(
+      appBar: PosHeader(
+        key: const ValueKey('kitchen-toolbar'),
+        automaticallyImplyLeading: false,
+        toolbarHeight: 56,
+        titleSpacing: 12,
+        title: StationHeading(title: l10n.kitchenBoardTitle),
         actions: [
+          PosIconButton(
+            onPressed: _toggleSounds,
+            tooltip: _muted ? l10n.kitchenSoundsEnable : l10n.kitchenSoundsMute,
+            icon: PosIcon(_muted ? PosGlyphs.volumeOff : PosGlyphs.volumeUp),
+          ),
           // The connection, when it is not the one the board is built for.
           //
           // A board whose poll AND wake-up are both failing shows the last
@@ -188,120 +257,295 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
               child: _Pill(
                 label: connectivityLabel(context, widget.connectivity.state),
                 color: widget.connectivity.state == PosConnectivity.offline
-                    ? Theme.of(context).colorScheme.error
-                    : Theme.of(context).colorScheme.outline,
+                    ? PosTheme.of(context).colorScheme.error
+                    : PosTheme.of(context).colorScheme.outline,
               ),
             ),
-          IconButton(
+          PosIconButton(
             tooltip: l10n.kitchenBoardRefresh,
-            // The refresh control follows the visible tab, so a cook on the
-            // prep list never reads a stale list after a tap on the icon.
-            onPressed: () {
-              if (_tabs.index == 1) {
-                _loadPrepList(once: false);
-              } else {
-                _load();
-              }
-            },
-            icon: const Icon(Icons.refresh),
+            onPressed: _load,
+            icon: const PosIcon(PosGlyphs.refresh),
           ),
-          IconButton(
-            tooltip: l10n.closeAction,
-            onPressed: () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.close),
-          ),
+          // Hidden when the board is the shell's home: there is no route to
+          // close, and the tab bar owns the way out.
+          if (!widget.embedded)
+            PosIconButton(
+              tooltip: l10n.closeAction,
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const PosIcon(PosGlyphs.close),
+            ),
         ],
       ),
       body: SafeArea(
-        child: TabBarView(
-          controller: _tabs,
+        child: Column(
           children: [
-            _ticketRail(context, l10n, state, orders),
-            _PrepListTab(
-              controller: _prepList,
-              l10n: l10n,
-              onRefresh: () => _loadPrepList(once: false),
-            ),
+            if (_canReadKitchen)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: UmiSpacing.md,
+                    vertical: UmiSpacing.xs,
+                  ),
+                  child: _unassignedButton(l10n),
+                ),
+              ),
+            Expanded(child: _ticketRail(context, l10n, state, orders)),
           ],
         ),
       ),
     );
   }
 
-  /// The ticket rail, exactly as it was before the prep list joined the board.
+  bool get _canReadKitchen => OperatorPermissions(
+    widget.entry.state.operator?.permissions ?? const [],
+  ).allows('kitchen.read');
+
+  Widget _unassignedButton(AppLocalizations l10n) => PosTextButton(
+    key: const ValueKey('open-unassigned-kitchen'),
+    onPressed: () {
+      unawaited(widget.controller.refresh());
+      Navigator.of(context).push(
+        PosPageRoute<void>(
+          builder: (_) => KitchenUnassignedSurface(
+            controller: widget.controller,
+            entry: widget.entry,
+          ),
+        ),
+      );
+    },
+    child: Text(
+      '${l10n.localeName.startsWith('es') ? 'Sin estación' : 'Unassigned'} · ${widget.controller.unassignedLoaded ? widget.controller.unassignedOrders.length : '…'}',
+    ),
+  );
+
+  /// The order rail is the only KDS view. Station and day controls only narrow it.
   Widget _ticketRail(
     BuildContext context,
     AppLocalizations l10n,
     KitchenBoardState state,
     List<KitchenOrderProjection> orders,
-  ) => Column(
-    children: [
-      if (state.errorCode != null)
-        _failureBanner(context, l10n, state.errorCode!),
-      Expanded(
-        child: switch (state.phase) {
-          KitchenBoardPhase.loading when orders.isEmpty => const Center(
-            child: CircularProgressIndicator(),
-          ),
-          KitchenBoardPhase.failure when orders.isEmpty => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.cloud_off_outlined, size: 56),
-                const SizedBox(height: UmiSpacing.md),
-                Text(l10n.kitchenBoardLoadFailed),
-                const SizedBox(height: UmiSpacing.md),
-                FilledButton(
-                  onPressed: _load,
-                  child: Text(l10n.retryAction),
-                ),
-              ],
+  ) {
+    final stations = _stationsIn(orders);
+    final known = <({String id, String name})>[
+      for (final station in state.stations)
+        (id: station.id, name: station.name),
+      for (final station in stations)
+        if (!state.stations.any((known) => known.id == station.id)) station,
+    ];
+    if (_stationFilter != null &&
+        _stationFilter != _screenStationId &&
+        !stations.any((station) => station.id == _stationFilter)) {
+      _stationFilter = null;
+    }
+    final chipStations = [...known];
+    if (_stationFilter != null &&
+        !chipStations.any((station) => station.id == _stationFilter)) {
+      chipStations.add((
+        id: _stationFilter!,
+        name: _screenStationName ?? l10n.kitchenStationAll,
+      ));
+    }
+    final stationOrders = _stationFilter == null
+        ? orders
+        : orders.where((order) => order.stationId == _stationFilter).toList();
+    final businessDate = state.businessDate;
+    final previous = businessDate == null
+        ? <KitchenOrderProjection>[]
+        : stationOrders
+              .where((order) => order.businessDate.compareTo(businessDate) < 0)
+              .toList();
+    final today = businessDate == null
+        ? stationOrders
+        : stationOrders
+              .where((order) => order.businessDate == businessDate)
+              .toList();
+    final visible = switch (_dayFilter) {
+      'previous' => previous,
+      'all' => stationOrders,
+      _ => today,
+    };
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    return LayoutBuilder(
+      builder: (context, railConstraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: railConstraints.maxHeight * .5,
             ),
-          ),
-          _ when orders.isEmpty => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.restaurant_menu_outlined,
-                  size: 56,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(height: UmiSpacing.md),
-                Text(
-                  l10n.kitchenBoardEmpty,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
-          ),
-          _ => SingleChildScrollView(
-            padding: const EdgeInsets.all(UmiSpacing.md),
-            child: Wrap(
-              spacing: UmiSpacing.md,
-              runSpacing: UmiSpacing.md,
-              children: [
-                for (final order in orders)
-                  _TicketCard(
-                    order: order,
-                    l10n: l10n,
-                    allDayFor: state.allDayFor,
-                    busyTarget: state.busyTarget,
-                    onItemTap: (itemId) =>
-                        widget.controller.markItemReady(order, itemId),
-                    onFire: (courseNumber) => widget.controller.fireCourse(
-                      order,
-                      courseNumber: courseNumber,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    key: const ValueKey('kitchen-filters'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                    onStart: () => widget.controller.startPreparation(order),
-                    onComplete: () => widget.controller.complete(order),
-                    onRecall: () => _recall(order),
+                    child: Wrap(
+                      alignment: WrapAlignment.start,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 16,
+                      runSpacing: 6,
+                      children: [
+                        if (chipStations.length > 1 || _stationFilter != null)
+                          _stationChips(context, l10n, chipStations),
+                        if (businessDate != null)
+                          Wrap(
+                            spacing: UmiSpacing.sm,
+                            runSpacing: 6,
+                            children: [
+                              for (final choice in [
+                                (
+                                  id: 'today',
+                                  label: spanish ? 'Hoy' : 'Today',
+                                  count: today.length,
+                                ),
+                                (
+                                  id: 'previous',
+                                  label: spanish ? 'Anteriores' : 'Previous',
+                                  count: previous.length,
+                                ),
+                                (
+                                  id: 'all',
+                                  label: spanish ? 'Todos' : 'All',
+                                  count: stationOrders.length,
+                                ),
+                              ])
+                                PosTooltip(
+                                  message:
+                                      choice.id == 'previous' &&
+                                          previous.isNotEmpty
+                                      ? (spanish
+                                            ? '${previous.length} pendientes de jornadas anteriores. Revisa Anteriores.'
+                                            : '${previous.length} pending from previous business days. Review Previous.')
+                                      : choice.label,
+                                  child: _StationChip(
+                                    label: '${choice.label} (${choice.count})',
+                                    widthLabel:
+                                        '${choice.label} (${'8' * orders.length.toString().length})',
+                                    icon: choice.id == 'previous'
+                                        ? PosGlyphs.history
+                                        : null,
+                                    selected: _dayFilter == choice.id,
+                                    onTap: () =>
+                                        setState(() => _dayFilter = choice.id),
+                                  ),
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
-              ],
+                  if (state.errorCode != null)
+                    _failureBanner(context, l10n, state.errorCode!),
+                ],
+              ),
             ),
           ),
-        },
+          Expanded(
+            child: switch (state.phase) {
+              KitchenBoardPhase.loading when orders.isEmpty => const Center(
+                child: PosSpinner(),
+              ),
+              KitchenBoardPhase.failure when orders.isEmpty => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const PosIcon(PosGlyphs.cloudOffOutlined, size: 56),
+                    const SizedBox(height: UmiSpacing.md),
+                    Text(l10n.kitchenBoardLoadFailed),
+                    const SizedBox(height: UmiSpacing.md),
+                    PosButton(onPressed: _load, child: Text(l10n.retryAction)),
+                  ],
+                ),
+              ),
+              _ when visible.isEmpty => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PosIcon(
+                      PosGlyphs.restaurantMenuOutlined,
+                      size: 56,
+                      color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: UmiSpacing.md),
+                    Text(
+                      l10n.kitchenBoardEmpty,
+                      style: PosTheme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+              _ => LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  padding: const EdgeInsets.all(UmiSpacing.md),
+                  child: Wrap(
+                    spacing: UmiSpacing.md,
+                    runSpacing: UmiSpacing.md,
+                    children: [
+                      for (final order in visible)
+                        _TicketCard(
+                          now: widget.clock(),
+                          currentBusinessDate: businessDate,
+                          permissions: OperatorPermissions(
+                            widget.entry.state.operator?.permissions ??
+                                const [],
+                          ),
+                          width:
+                              (320 * MediaQuery.textScalerOf(context).scale(1))
+                                  .clamp(
+                                    0.0,
+                                    (constraints.maxWidth - 2 * UmiSpacing.md)
+                                        .clamp(0.0, double.infinity),
+                                  )
+                                  .toDouble(),
+                          order: order,
+                          l10n: l10n,
+                          allDayFor: state.allDayFor,
+                          busyTarget: state.busyTarget,
+                          onItemTap: (itemId) =>
+                              widget.controller.markItemReady(order, itemId),
+                          onFire: (courseNumber) => widget.controller
+                              .fireCourse(order, courseNumber: courseNumber),
+                          onStart: () =>
+                              widget.controller.startPreparation(order),
+                          onComplete: () => widget.controller.complete(order),
+                          onDiscard: () => widget.controller.discard(order),
+                          onRecall: () => _recall(order),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            },
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _stationChips(
+    BuildContext context,
+    AppLocalizations l10n,
+    List<({String id, String name})> stations,
+  ) => Wrap(
+    spacing: UmiSpacing.sm,
+    runSpacing: UmiSpacing.sm,
+    children: [
+      _StationChip(
+        label: l10n.kitchenStationAll,
+        selected: _stationFilter == null,
+        onTap: () => _selectStation(null, null),
+      ),
+      for (final station in stations)
+        _StationChip(
+          label: station.name,
+          selected: _stationFilter == station.id,
+          onTap: () => _selectStation(station.id, station.name),
+        ),
     ],
   );
 
@@ -315,19 +559,19 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
       l10n,
       reference: widget.controller.state.errorReference,
     );
-    return MaterialBanner(
+    return PosNoticeBanner(
       content: Text(
         '${failure.title}\n${failure.message}\n${failure.recovery}',
       ),
       actions: [
-        TextButton(
+        PosTextButton(
           onPressed: () {
             widget.controller.dismissError();
             _load();
           },
           child: Text(l10n.kitchenFailureRefresh),
         ),
-        TextButton(
+        PosTextButton(
           onPressed: widget.controller.dismissError,
           child: Text(l10n.closeAction),
         ),
@@ -337,27 +581,6 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface>
 }
 
 /// A refusal the cook can read: what did not happen, why, and what to do next.
-/// How long a ticket has been waiting, in units a cook can read at a glance:
-/// `now`, `12 min`, `2 h 5 min`, `10 d 5 h`.
-///
-/// The board used to render minutes for every age, so a ticket from ten days ago
-/// read `14747 min` — a number nobody can turn into "that is from last week"
-/// while plating. Two units, and the second only once the first stops being a
-/// glance. (Defect D33 found it on the live screen.)
-String formatTicketAge(
-  Duration age, {
-  required String now,
-  required String Function(int minutes) minutes,
-  required String Function(int hours, int minutes) hoursMinutes,
-  required String Function(int days, int hours) daysHours,
-}) {
-  final safe = age.isNegative ? Duration.zero : age;
-  if (safe.inMinutes <= 0) return now;
-  if (safe.inDays >= 1) return daysHours(safe.inDays, safe.inHours % 24);
-  if (safe.inHours >= 1) return hoursMinutes(safe.inHours, safe.inMinutes % 60);
-  return minutes(safe.inMinutes);
-}
-
 final class KitchenBoardFailure {
   const KitchenBoardFailure({
     required this.title,
@@ -399,7 +622,9 @@ KitchenBoardFailure describeKitchenBoardFailure(
     message: l10n.kitchenFailureInvalidTransitionMessage,
     recovery: l10n.kitchenFailureInvalidTransitionRecovery,
   ),
-  'PERMISSION_DENIED' || 'KITCHEN_PERMISSION_DENIED' => KitchenBoardFailure(
+  'PERMISSION_DENIED' ||
+  'KITCHEN_PERMISSION_DENIED' ||
+  'KITCHEN_PERMISSION_REQUIRED' => KitchenBoardFailure(
     title: l10n.kitchenFailureTitle,
     message: l10n.kitchenFailurePermissionDeniedMessage,
     recovery: l10n.kitchenFailurePermissionDeniedRecovery,
@@ -432,8 +657,89 @@ KitchenBoardFailure describeKitchenBoardFailure(
 bool _namesTicket(String? reference) =>
     reference != null && reference.trim().isNotEmpty;
 
+final class _StationChip extends StatelessWidget {
+  const _StationChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+    this.widthLabel,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final PosGlyph? icon;
+  final String? widthLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = PosTheme.of(context);
+    final style = theme.textTheme.labelLarge?.copyWith(
+      color: selected
+          ? theme.colorScheme.primary
+          : theme.colorScheme.onSurfaceVariant,
+    );
+    double? labelWidth;
+    if (widthLabel != null) {
+      final painter = TextPainter(
+        text: TextSpan(text: widthLabel, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        maxLines: 1,
+      )..layout();
+      labelWidth = painter.width.ceilToDouble();
+      painter.dispose();
+    }
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: PosTapRegion(
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: UmiTouchTarget.minimum),
+          padding: const EdgeInsets.symmetric(
+            horizontal: UmiSpacing.md,
+            vertical: UmiSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? theme.colorScheme.primaryContainer
+                : const Color(0x00000000),
+            border: Border.all(
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant,
+            ),
+            borderRadius: BorderRadius.circular(UmiRadius.control),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                PosIcon(icon!, size: 18),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: SizedBox(
+                  width: labelWidth,
+                  child: Text(label, style: style),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 final class _TicketCard extends StatelessWidget {
   const _TicketCard({
+    required this.now,
+    required this.currentBusinessDate,
+    required this.width,
+    required this.permissions,
     required this.order,
     required this.l10n,
     required this.allDayFor,
@@ -442,9 +748,14 @@ final class _TicketCard extends StatelessWidget {
     required this.onFire,
     required this.onStart,
     required this.onComplete,
+    required this.onDiscard,
     required this.onRecall,
   });
 
+  final double width;
+  final DateTime now;
+  final String? currentBusinessDate;
+  final OperatorPermissions permissions;
   final KitchenOrderProjection order;
   final AppLocalizations l10n;
 
@@ -458,6 +769,7 @@ final class _TicketCard extends StatelessWidget {
   final ValueChanged<int> onFire;
   final VoidCallback onStart;
   final VoidCallback onComplete;
+  final VoidCallback onDiscard;
   final VoidCallback onRecall;
 
   /// A line can be bumped while the station still owes it AND the kitchen has
@@ -469,27 +781,38 @@ final class _TicketCard extends StatelessWidget {
   static bool bumpable(KitchenOrderItem item) =>
       item.fired && (item.status == 'queued' || item.status == 'preparing');
 
-  ({Color color, String label}) _statusStyle(
-    ColorScheme scheme,
-  ) => switch (order.status) {
-    'ready' => (color: const Color(0xFF3cb44b), label: l10n.kitchenStatusReady),
-    'partially_ready' => (
-      color: const Color(0xFFf58231),
-      label: l10n.kitchenStatusPartiallyReady,
-    ),
-    'in_preparation' => (
-      color: const Color(0xFF2E7DFF),
-      label: l10n.kitchenStatusInPreparation,
-    ),
-    'exception' => (color: scheme.error, label: l10n.kitchenStatusException),
-    _ => (color: scheme.outline, label: l10n.kitchenStatusQueued),
-  };
+  ({Color color, String label}) _statusStyle(PosPalette scheme) =>
+      kitchenOrderOverdue(order, now)
+      ? (color: scheme.error, label: l10n.kitchenTimeOverdue)
+      : switch (kitchenStationStatus(order)) {
+          'ready' => (
+            color: const Color(0xFF3cb44b),
+            label: l10n.kitchenStatusReady,
+          ),
+          'partially_ready' => (
+            color: const Color(0xFF2E7DFF),
+            label: l10n.kitchenStatusPartiallyReady,
+          ),
+          'in_preparation' => (
+            color: const Color(0xFF2E7DFF),
+            label: l10n.kitchenStatusInPreparation,
+          ),
+          'exception' => (
+            color: scheme.error,
+            label: l10n.kitchenStatusException,
+          ),
+          'cancelled' => (
+            color: scheme.error,
+            label: l10n.kitchenStatusCancelled,
+          ),
+          _ => (color: scheme.outline, label: l10n.kitchenStatusQueued),
+        };
 
   String _elapsed() {
     final queued = DateTime.tryParse(order.queuedAt);
     if (queued == null) return '';
     return formatTicketAge(
-      DateTime.now().toUtc().difference(queued.toUtc()),
+      now.toUtc().difference(queued.toUtc()),
       now: l10n.kitchenElapsedNow,
       minutes: l10n.kitchenElapsedMinutes,
       hoursMinutes: l10n.kitchenElapsedHoursMinutes,
@@ -499,7 +822,7 @@ final class _TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     final status = _statusStyle(scheme);
     final urgent = order.priority == 'urgent';
     final high = order.priority == 'high';
@@ -514,8 +837,8 @@ final class _TicketCard extends StatelessWidget {
     final groups = groupCourses(order);
     final nextCourse = nextHeldCourse(order);
     return SizedBox(
-      width: 320,
-      child: Material(
+      width: width,
+      child: PosSurface(
         color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
@@ -532,26 +855,34 @@ final class _TicketCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          order.publicReference,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
+                          currentBusinessDate != null &&
+                                  order.businessDate != currentBusinessDate
+                              ? '${order.publicReference} · ${order.businessDate}'
+                              : order.publicReference,
+                          style: PosTheme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
                       Text(
                         _elapsed(),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                        style: PosTheme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Row(
+                  Wrap(
+                    spacing: UmiSpacing.sm,
+                    runSpacing: UmiSpacing.xs,
                     children: [
+                      // Which station owes this ticket. A till is handed one card per
+                      // station for the same cuenta, so without the name two cards are
+                      // the same card; a station device has one, where the label is a
+                      // caption rather than the only way to tell them apart.
+                      if ((order.stationName ?? '').isNotEmpty)
+                        _Pill(color: scheme.primary, label: order.stationName!),
                       _Pill(color: status.color, label: status.label),
                       if (urgent || high) ...[
-                        const SizedBox(width: UmiSpacing.sm),
                         _Pill(
                           color: accent,
                           label: urgent
@@ -561,10 +892,25 @@ final class _TicketCard extends StatelessWidget {
                       ],
                     ],
                   ),
-                  const Divider(height: UmiSpacing.lg),
+                  const PosDivider(height: UmiSpacing.lg),
+                  if (kitchenStationStatus(order) != order.status)
+                    Text(
+                      '${l10n.localeName.startsWith('es') ? 'Pedido completo' : 'Whole order'}: ${switch (order.status) {
+                        'partially_ready' => l10n.kitchenStatusPartiallyReady,
+                        'in_preparation' => l10n.kitchenStatusInPreparation,
+                        'ready' => l10n.kitchenStatusReady,
+                        'exception' => l10n.kitchenStatusException,
+                        'cancelled' => l10n.kitchenStatusCancelled,
+                        _ => l10n.kitchenStatusQueued,
+                      }}',
+                      style: PosTheme.of(context).textTheme.bodySmall,
+                    ),
                   for (var index = 0; index < groups.length; index++) ...[
                     if (index > 0) const SizedBox(height: UmiSpacing.sm),
                     _CourseBlock(
+                      canMarkReady:
+                          order.status != 'cancelled' &&
+                          permissions.allows('kitchen.ready'),
                       group: groups[index],
                       l10n: l10n,
                       allDayFor: allDayFor,
@@ -575,7 +921,9 @@ final class _TicketCard extends StatelessWidget {
                   // One action, and only when there is a course left to start:
                   // an ordinary ticket arrives already fired through course 1,
                   // so this line is absent from every single-course sale.
-                  if (nextCourse != null) ...[
+                  if (order.status != 'cancelled' &&
+                      nextCourse != null &&
+                      permissions.allows('kitchen.prepare')) ...[
                     const SizedBox(height: UmiSpacing.md),
                     _FireCourseAction(
                       courseNumber: nextCourse,
@@ -592,11 +940,13 @@ final class _TicketCard extends StatelessWidget {
                   ],
                   const SizedBox(height: UmiSpacing.sm),
                   _TicketActions(
+                    permissions: permissions,
                     order: order,
                     l10n: l10n,
                     busy: busyTarget == order.id,
                     onStart: onStart,
                     onComplete: onComplete,
+                    onDiscard: onDiscard,
                     onRecall: onRecall,
                   ),
                 ],
@@ -619,6 +969,7 @@ final class _TicketCard extends StatelessWidget {
 final class _CourseBlock extends StatelessWidget {
   const _CourseBlock({
     required this.group,
+    required this.canMarkReady,
     required this.l10n,
     required this.allDayFor,
     required this.busyTarget,
@@ -626,6 +977,7 @@ final class _CourseBlock extends StatelessWidget {
   });
 
   final KitchenCourseGroup group;
+  final bool canMarkReady;
   final AppLocalizations l10n;
   final KitchenAllDayItem? Function(KitchenOrderItem item) allDayFor;
   final String? busyTarget;
@@ -633,13 +985,13 @@ final class _CourseBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           l10n.kitchenCourseGroup(group.courseNumber),
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          style: PosTheme.of(context).textTheme.labelLarge?.copyWith(
             color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w700,
           ),
@@ -647,6 +999,7 @@ final class _CourseBlock extends StatelessWidget {
         const SizedBox(height: UmiSpacing.xs),
         for (final item in group.fired)
           _ItemRow(
+            canMarkReady: canMarkReady,
             item: item,
             l10n: l10n,
             allDay: allDayFor(item),
@@ -688,7 +1041,7 @@ final class _HeldCourseBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(top: UmiSpacing.xs),
       padding: const EdgeInsets.symmetric(
@@ -704,29 +1057,31 @@ final class _HeldCourseBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.schedule, size: 16, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Text(
-                l10n.kitchenCourseHeld(group.heldQuantity),
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
+              PosIcon(
+                PosGlyphs.schedule,
+                size: 16,
+                color: scheme.onSurfaceVariant,
               ),
-              const SizedBox(width: UmiSpacing.sm),
-              // Ellipsised rather than wrapped: the count is the fact and this
-              // is the sentence that explains it, so the sentence gives way.
-              Flexible(
+              const SizedBox(width: 6),
+              Expanded(
                 child: Text(
-                  l10n.kitchenCourseHeldNote,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  l10n.kitchenCourseHeld(group.heldQuantity),
+                  style: PosTheme.of(context).textTheme.labelMedium?.copyWith(
                     color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: UmiSpacing.xs),
+          Text(
+            l10n.kitchenCourseHeldNote,
+            style: PosTheme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
           for (final item in group.held)
             _ItemRow(
@@ -768,21 +1123,21 @@ final class _FireCourseAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
-    child: FilledButton.icon(
+    child: PosButton.icon(
       key: buttonKey,
       onPressed: enabled && !busy ? onFire : null,
       icon: busy
           ? const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              child: PosSpinner(strokeWidth: 2),
             )
-          : const Icon(Icons.local_fire_department, size: 18),
+          : const PosIcon(PosGlyphs.localFireDepartment, size: 18),
       label: Text(
         l10n.kitchenCourseFire(courseNumber),
         overflow: TextOverflow.ellipsis,
       ),
-      style: FilledButton.styleFrom(
+      style: PosButton.styleFrom(
         minimumSize: const Size(0, UmiTouchTarget.minimum),
       ),
     ),
@@ -799,6 +1154,7 @@ final class _ItemRow extends StatelessWidget {
     required this.busy,
     required this.onTap,
     this.held = false,
+    this.canMarkReady = false,
   });
 
   final KitchenOrderItem item;
@@ -815,14 +1171,16 @@ final class _ItemRow extends StatelessWidget {
   /// row says so in its own mark and in what a screen reader hears, and it is
   /// never tappable however the ticket's own status reads.
   final bool held;
+  final bool canMarkReady;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final voided = item.status == 'cancelled' || item.status == 'exception';
+    final scheme = PosTheme.of(context).colorScheme;
+    final voided = item.status == 'cancelled';
+    final missingRoute = item.status == 'exception';
     final ready = item.status == 'ready';
-    final bumpable = !held && _TicketCard.bumpable(item);
+    final bumpable = canMarkReady && !held && _TicketCard.bumpable(item);
     // §8.5: the labels come from the payload, never from a code table here. A
     // label the till does not know is still a label the cook must read.
     final allergenLabels = item.allergens
@@ -836,8 +1194,10 @@ final class _ItemRow extends StatelessWidget {
           ? l10n.kitchenItemHeld(item.productName)
           : bumpable
           ? l10n.kitchenItemMarkReady(item.productName)
-          : l10n.kitchenItemAlreadyReady(item.productName),
-      child: InkWell(
+          : ready
+          ? l10n.kitchenItemAlreadyReady(item.productName)
+          : item.productName,
+      child: PosTapRegion(
         onTap: bumpable ? onTap : null,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
@@ -849,104 +1209,111 @@ final class _ItemRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 28,
-                  child: Text(
-                    '${item.quantity}×',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      decoration: voided ? TextDecoration.lineThrough : null,
-                    ),
+                Text(
+                  '${item.quantity}×',
+                  style: PosTheme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    decoration: voided ? TextDecoration.lineThrough : null,
                   ),
                 ),
+                const SizedBox(width: UmiSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              item.productName,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    decoration: voided
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: voided
-                                        ? scheme.onSurfaceVariant
-                                        : null,
-                                  ),
+                      Text(
+                        item.productName,
+                        style: PosTheme.of(context).textTheme.bodyLarge
+                            ?.copyWith(
+                              decoration: voided
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: voided ? scheme.onSurfaceVariant : null,
                             ),
-                          ),
-                          if (ready) ...[
-                            const SizedBox(width: UmiSpacing.sm),
-                            Text(
-                              l10n.kitchenStatusReady,
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: const Color(0xFF3cb44b),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                          ],
-                          if (voided) ...[
-                            const SizedBox(width: UmiSpacing.sm),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: scheme.error.withValues(alpha: .16),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                l10n.kitchenItemVoided,
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(
-                                      color: scheme.error,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 0.5,
-                                    ),
-                              ),
-                            ),
-                          ],
-                          // The all-day count (§8H step 6): how many of this dish
-                          // the kitchen has been asked for today, which is the
-                          // number a cook reads first and the one a ticket cannot
-                          // answer — a ticket is one order. A cancelled line shows
-                          // no count, because it is not being cooked.
-                          if (allDay != null && !voided) ...[
-                            const SizedBox(width: UmiSpacing.sm),
-                            Tooltip(
-                              message: l10n.kitchenAllDayTooltip(
-                                allDay!.ordered,
-                                allDay!.outstanding,
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 1,
+                      ),
+                      if (ready || voided || missingRoute || allDay != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: UmiSpacing.xs),
+                          child: Wrap(
+                            spacing: UmiSpacing.sm,
+                            runSpacing: UmiSpacing.xs,
+                            children: [
+                              if (missingRoute)
+                                Text(
+                                  l10n.kitchenItemRouteMissing,
+                                  style: TextStyle(color: scheme.error),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: scheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  '×${allDay!.ordered}',
-                                  style: Theme.of(context).textTheme.labelSmall
+                              if (ready) ...[
+                                Text(
+                                  l10n.kitchenStatusReady,
+                                  style: PosTheme.of(context)
+                                      .textTheme
+                                      .labelSmall
                                       ?.copyWith(
-                                        color: scheme.onSurfaceVariant,
+                                        color: const Color(0xFF3cb44b),
                                         fontWeight: FontWeight.w700,
                                       ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                              ],
+                              if (voided) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: scheme.error.withValues(alpha: .16),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    l10n.kitchenItemVoided,
+                                    style: PosTheme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: scheme.error,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                              // The all-day count (§8H step 6): how many of this dish
+                              // the kitchen has been asked for today, which is the
+                              // number a cook reads first and the one a ticket cannot
+                              // answer — a ticket is one order. A cancelled line shows
+                              // no count, because it is not being cooked.
+                              if (allDay != null && !voided) ...[
+                                PosTooltip(
+                                  message: l10n.kitchenAllDayTooltip(
+                                    allDay!.ordered,
+                                    allDay!.outstanding,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: scheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      l10n.kitchenAllDayCount(allDay!.ordered),
+                                      style: PosTheme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: scheme.onSurfaceVariant,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       // The allergens sit under the name on their own wrapped
                       // row. A long label truncates inside its own badge, so it
                       // cannot cover the quantity or the course below.
@@ -968,7 +1335,7 @@ final class _ItemRow extends StatelessWidget {
                             if (item.variantName != null) item.variantName!,
                             ...item.modifiers,
                           ].join(' · '),
-                          style: Theme.of(context).textTheme.bodySmall
+                          style: PosTheme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: scheme.onSurfaceVariant,
                                 decoration: voided
@@ -979,7 +1346,7 @@ final class _ItemRow extends StatelessWidget {
                       if (item.preparationNote != null)
                         Text(
                           item.preparationNote!,
-                          style: Theme.of(context).textTheme.bodySmall
+                          style: PosTheme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: scheme.error,
                                 fontStyle: FontStyle.italic,
@@ -993,21 +1360,25 @@ final class _ItemRow extends StatelessWidget {
                   const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: PosSpinner(strokeWidth: 2),
                   )
                 else if (ready)
-                  const Icon(
-                    Icons.check_box,
+                  const PosIcon(
+                    PosGlyphs.checkBox,
                     size: 22,
                     color: Color(0xFF3cb44b),
                   )
                 else if (voided)
-                  Icon(Icons.block, size: 22, color: scheme.error)
+                  PosIcon(PosGlyphs.block, size: 22, color: scheme.error)
                 else if (held)
-                  Icon(Icons.schedule, size: 22, color: scheme.onSurfaceVariant)
+                  PosIcon(
+                    PosGlyphs.schedule,
+                    size: 22,
+                    color: scheme.onSurfaceVariant,
+                  )
                 else
-                  Icon(
-                    Icons.check_box_outline_blank,
+                  PosIcon(
+                    PosGlyphs.checkBoxOutlineBlank,
                     size: 22,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -1032,7 +1403,7 @@ final class KitchenAllergenBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -1044,7 +1415,7 @@ final class KitchenAllergenBadge extends StatelessWidget {
         label,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        style: PosTheme.of(context).textTheme.labelMedium?.copyWith(
           color: scheme.onTertiaryContainer,
           fontWeight: FontWeight.w700,
         ),
@@ -1059,18 +1430,22 @@ final class KitchenAllergenBadge extends StatelessWidget {
 final class _TicketActions extends StatelessWidget {
   const _TicketActions({
     required this.order,
+    required this.permissions,
     required this.l10n,
     required this.busy,
     required this.onStart,
     required this.onComplete,
+    required this.onDiscard,
     required this.onRecall,
   });
 
   final KitchenOrderProjection order;
+  final OperatorPermissions permissions;
   final AppLocalizations l10n;
   final bool busy;
   final VoidCallback onStart;
   final VoidCallback onComplete;
+  final VoidCallback onDiscard;
   final VoidCallback onRecall;
 
   @override
@@ -1081,33 +1456,48 @@ final class _TicketActions extends StatelessWidget {
           const SizedBox(
             width: 16,
             height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: PosSpinner(strokeWidth: 2),
           ),
           const SizedBox(width: UmiSpacing.sm),
           Text(
             l10n.kitchenTicketSending,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: PosTheme.of(context).textTheme.bodySmall,
           ),
         ],
       );
     }
+    if (order.status == 'cancelled') {
+      if (!permissions.allows('kitchen.cancel_ack')) {
+        return const SizedBox.shrink();
+      }
+      return PosButton.icon(
+        onPressed: onDiscard,
+        icon: const PosIcon(PosGlyphs.close, size: 18),
+        label: Text(l10n.kitchenTicketDiscardAction),
+      );
+    }
     final actions = <Widget>[
-      if (order.status == 'queued')
-        FilledButton.tonalIcon(
+      if (order.items
+              .map(KitchenOrderItem.fromJson)
+              .any((item) => item.fired && item.status == 'queued') &&
+          permissions.allows('kitchen.prepare'))
+        PosButton.tonalIcon(
           onPressed: onStart,
-          icon: const Icon(Icons.play_arrow, size: 18),
+          icon: const PosIcon(PosGlyphs.playArrow, size: 18),
           label: Text(l10n.kitchenTicketStartAction),
         ),
-      if (order.status == 'ready')
-        FilledButton.tonalIcon(
+      if (kitchenStationStatus(order) == 'ready' &&
+          permissions.allows('kitchen.recall'))
+        PosButton.tonalIcon(
           onPressed: onRecall,
-          icon: const Icon(Icons.undo, size: 18),
+          icon: const PosIcon(PosGlyphs.undo, size: 18),
           label: Text(l10n.kitchenTicketRecallAction),
         ),
-      if (order.status == 'ready')
-        FilledButton.icon(
+      if (kitchenStationStatus(order) == 'ready' &&
+          permissions.allows('kitchen.complete'))
+        PosButton.icon(
           onPressed: onComplete,
-          icon: const Icon(Icons.check, size: 18),
+          icon: const PosIcon(PosGlyphs.check, size: 18),
           label: Text(l10n.kitchenTicketCompleteAction),
         ),
     ];
@@ -1143,7 +1533,7 @@ class _RecallDialogState extends State<_RecallDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return AlertDialog(
+    return PosAlertDialog(
       title: Text(l10n.kitchenRecallTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1152,7 +1542,7 @@ class _RecallDialogState extends State<_RecallDialog> {
           Text(l10n.kitchenRecallBody),
           const SizedBox(height: UmiSpacing.sm),
           for (final reason in kitchenRecallReasons)
-            RadioListTile<String>(
+            PosRadioRow<String>(
               value: reason.code,
               // ignore: deprecated_member_use
               groupValue: _code,
@@ -1162,19 +1552,21 @@ class _RecallDialogState extends State<_RecallDialog> {
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
-          TextField(
+          PosField(
             controller: _note,
             maxLength: 500,
-            decoration: InputDecoration(labelText: l10n.kitchenRecallNoteLabel),
+            decoration: PosFieldDecoration(
+              labelText: l10n.kitchenRecallNoteLabel,
+            ),
           ),
         ],
       ),
       actions: [
-        TextButton(
+        PosTextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.kitchenRecallCancel),
         ),
-        FilledButton(
+        PosButton(
           key: const Key('kitchen-recall-confirm'),
           onPressed: _code == null
               ? null
@@ -1206,266 +1598,10 @@ final class _Pill extends StatelessWidget {
     ),
     child: Text(
       label,
-      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+      style: PosTheme.of(context).textTheme.labelMedium?.copyWith(
         color: color,
         fontWeight: FontWeight.w600,
       ),
-    ),
-  );
-}
-
-/// The board's second tab: what the kitchen must make today (§8.4).
-///
-/// The server owns the arithmetic (plan D13). The till shows the par, the
-/// on-hand, the forecast usage over the window the response states, and the
-/// quantity to make. The largest quantity comes first, because that is the order
-/// the kitchen works in.
-final class _PrepListTab extends StatelessWidget {
-  const _PrepListTab({
-    required this.controller,
-    required this.l10n,
-    required this.onRefresh,
-  });
-
-  final PrepListController controller;
-  final AppLocalizations l10n;
-  final VoidCallback onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final state = controller.state;
-    final list = state.list;
-    if (list == null) {
-      return switch (state.phase) {
-        PrepListPhase.failure => _PrepFailure(l10n: l10n, onRetry: onRefresh),
-        _ => const Center(child: CircularProgressIndicator()),
-      };
-    }
-    final rows = sortPrepItems(list.items);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            UmiSpacing.md,
-            UmiSpacing.sm,
-            UmiSpacing.sm,
-            0,
-          ),
-          child: Row(
-            children: [
-              // The window comes from the response, never from a guess about
-              // the shelf life the server used.
-              Expanded(
-                child: Text(
-                  l10n.kitchenPrepWindow(list.from, list.to),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: l10n.kitchenPrepRefresh,
-                onPressed: onRefresh,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-        ),
-        // One failed refresh keeps the last list readable and says what
-        // happened. The error state is the surface's own, not a blank list.
-        if (state.phase == PrepListPhase.failure)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.md),
-            child: Text(
-              l10n.kitchenPrepLoadFailed,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-        Expanded(
-          child: rows.isEmpty
-              ? Center(
-                  child: Text(
-                    l10n.kitchenPrepEmpty,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(UmiSpacing.md),
-                    child: _prepTable(context, rows),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-
-  Widget _prepTable(BuildContext context, List<PrepListItem> rows) {
-    final theme = Theme.of(context);
-    final header = theme.textTheme.labelMedium?.copyWith(
-      fontWeight: FontWeight.w700,
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-    final number = theme.textTheme.bodyMedium;
-    return DataTable(
-      columnSpacing: UmiSpacing.md,
-      horizontalMargin: UmiSpacing.sm,
-      headingRowHeight: 40,
-      dataRowMinHeight: 48,
-      dataRowMaxHeight: 96,
-      columns: [
-        DataColumn(label: Text(l10n.kitchenPrepItemColumn, style: header)),
-        DataColumn(label: Text(l10n.kitchenPrepUnitColumn, style: header)),
-        DataColumn(
-          numeric: true,
-          label: Text(l10n.kitchenPrepParColumn, style: header),
-        ),
-        DataColumn(
-          numeric: true,
-          label: Text(l10n.kitchenPrepOnHandColumn, style: header),
-        ),
-        DataColumn(
-          numeric: true,
-          label: Text(l10n.kitchenPrepForecastColumn, style: header),
-        ),
-        DataColumn(
-          numeric: true,
-          label: Text(l10n.kitchenPrepQuantityColumn, style: header),
-        ),
-      ],
-      rows: [
-        for (final item in rows)
-          DataRow(
-            cells: [
-              DataCell(
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.displayName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      item.publicReference,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              DataCell(Text(kitchenUnitLabel(l10n, item.unit), style: number)),
-              DataCell(
-                Text(
-                  scaledQuantityText(
-                        l10n,
-                        scaledQuantityView(item.parQuantity),
-                      ) ??
-                      '·',
-                  style: number,
-                ),
-              ),
-              DataCell(
-                Text(
-                  scaledQuantityText(
-                        l10n,
-                        scaledQuantityView(item.onHandQuantity),
-                      ) ??
-                      '·',
-                  style: number,
-                ),
-              ),
-              DataCell(
-                Text(
-                  scaledQuantityText(
-                        l10n,
-                        scaledQuantityView(item.forecastUsageQuantity),
-                      ) ??
-                      '·',
-                  style: number,
-                ),
-              ),
-              DataCell(_prepQuantityCell(theme, item)),
-            ],
-          ),
-      ],
-    );
-  }
-
-  /// The cell the cook reads. An item with no par has no work order, so the
-  /// cell names that state instead of printing a zero.
-  Widget _prepQuantityCell(ThemeData theme, PrepListItem item) {
-    final quantity = prepQuantityView(item);
-    if (quantity == null) return _NoParBadge(label: l10n.kitchenPrepNoPar);
-    final text = scaledQuantityText(l10n, quantity);
-    if (text == null) return Text('·', style: theme.textTheme.bodyMedium);
-    return Text(
-      text,
-      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-    );
-  }
-}
-
-/// The named state for an item with no par. It is not a zero: a zero means a
-/// par the cafe already meets, and this item has no par to meet.
-final class _NoParBadge extends StatelessWidget {
-  const _NoParBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: scheme.onSecondaryContainer,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-/// The prep tab's own failure state: what failed and one way to try again.
-final class _PrepFailure extends StatelessWidget {
-  const _PrepFailure({required this.l10n, required this.onRetry});
-
-  final AppLocalizations l10n;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.cloud_off_outlined, size: 56),
-        const SizedBox(height: UmiSpacing.md),
-        Text(l10n.kitchenPrepLoadFailed),
-        const SizedBox(height: UmiSpacing.md),
-        FilledButton(onPressed: onRetry, child: Text(l10n.retryAction)),
-      ],
     ),
   );
 }

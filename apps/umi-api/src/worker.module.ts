@@ -25,6 +25,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { LifecycleModule } from './modules/lifecycle/lifecycle.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { PosCustomerValueModule } from './modules/pos-customer-value/pos-customer-value.module';
+import { PosPushModule } from './modules/pos-push/pos-push.module';
 import { CustomerValueExpiryScheduler } from './jobs/customer-value-expiry.scheduler';
 import { MercadoPagoPointProcessor } from './jobs/mercado-pago-point.processor';
 import { PointCredentialRenewalScheduler } from './jobs/mp-point-credential.scheduler';
@@ -60,6 +61,7 @@ import { TenderModule } from './modules/tender/tender.module';
     LifecycleModule,
     LeadsModule,
     PosCustomerValueModule,
+    PosPushModule,
     // The Point notification job resolves a tender attempt, so the worker needs the
     // tender path itself — the same module the web process uses, not a second copy of it.
     TenderModule,
@@ -74,8 +76,8 @@ import { TenderModule } from './modules/tender/tender.module';
   // the global QueueModule.
   providers: [
     DeadLetterService,
-    OutboxRelayService,
     OutboxRoutesRegistrar,
+    OutboxRelayService,
     SystemProcessor,
     TurnsProcessor,
     OutboundProcessor,

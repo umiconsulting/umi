@@ -1,0 +1,40 @@
+                  id                  |   name    | variant_name |           voided_at           |   void_reason    
+--------------------------------------+-----------+--------------+-------------------------------+------------------
+ 2454e74c-b293-4495-a261-1b1c4d18980c | Americano | Caliente     | 2026-10-12 09:58:00.450821+00 | operator_mistake
+ b50cf6f4-5056-4af9-b8ff-cab663fe0b80 | Americano | Frío         |                               | 
+ cb22a85f-74da-4c4a-826b-14ca25555fb7 | Aeropress | Caliente     |                               | 
+(3 rows)
+
+                  id                  | amount |  status  
+--------------------------------------+--------+----------
+ 71ced4c2-fa69-4644-91f5-4007ed698e75 |  14000 | captured
+(1 row)
+
+   name    | variant_name |  status   
+-----------+--------------+-----------
+ Americano | Caliente     | cancelled
+ Americano | Frío         | queued
+ Aeropress | Caliente     | queued
+(3 rows)
+
+ tickets 
+---------
+       1
+(1 row)
+
+  status   | lifecycle_state | reservation_state |            table_visit_id            
+-----------+-----------------+-------------------+--------------------------------------
+ committed | committed       | committed         | 0f0a7ad5-5879-499e-95ea-b50460458efd
+(1 row)
+
+                  id                  |  status   | lifecycle_state |            table_visit_id            
+--------------------------------------+-----------+-----------------+--------------------------------------
+ 13ec457a-7256-4c30-b798-b1fc37390ca0 | committed | committed       | 0f0a7ad5-5879-499e-95ea-b50460458efd
+ 815b1541-87fe-4f0d-a748-c1d325c5f065 | draft     | building_cart   | 0f0a7ad5-5879-499e-95ea-b50460458efd
+(2 rows)
+
+                  id                  | lifecycle_state |            table_visit_id            | sent | can_send | can_charge 
+--------------------------------------+-----------------+--------------------------------------+------+----------+------------
+ 883212f0-ea8f-47d1-b453-4c8e84fab62c | suspended       | 0f0a7ad5-5879-499e-95ea-b50460458efd |    1 | t        | f
+(1 row)
+

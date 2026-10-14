@@ -1,0 +1,82 @@
+[
+  {
+    "path": "artifacts.json",
+    "sha256": "da68d2f397016650db1a95fa1d29efe01fddd6f9d375252e84f9a33ac1eb2cc2",
+    "bytes": 635
+  },
+  {
+    "path": "build-inputs.json",
+    "sha256": "d08c0f7fa737674f9074b6c384727184148e4282a4bc01ed1005868b06aa1ddb",
+    "bytes": 55956
+  },
+  {
+    "path": "current-artifact.json",
+    "sha256": "ed04cb004f243408d563db82de41d0be633a2c9ef2d49c434e7ca0a28726471a",
+    "bytes": 218
+  },
+  {
+    "path": "current-catalog.png",
+    "sha256": "fa8b221c68751238ed03b4c6a3eb19935b62bff51e254cb14a15a465bd976295",
+    "bytes": 428921
+  },
+  {
+    "path": "current-keyboard.png",
+    "sha256": "1bd8f67db4e68586d8b64e2d8124657703676750122d9a10eaa707db8f9f8e2a",
+    "bytes": 93457
+  },
+  {
+    "path": "current-pin.png",
+    "sha256": "32fb6de1384944ebf63a43244dc8af12ab13630e39dc2bf84dbbde3c7d7472e4",
+    "bytes": 86364
+  },
+  {
+    "path": "current-sales.png",
+    "sha256": "6faa3e6933bb6ef59abc481cbbf75219f7806dc0971bb761273ba2dbb5cbb3d0",
+    "bytes": 114042
+  },
+  {
+    "path": "current-signature.txt",
+    "sha256": "ca0dd7e4f9dd75505af28e5d08fddbadf9504d277dc658070ef885b34b7f74a9",
+    "bytes": 307
+  },
+  {
+    "path": "installed-packages.json",
+    "sha256": "a4984387f5e5892a98aee6edffcb628bc90ab31bf9d86c8959cc7fe163a8d2a5",
+    "bytes": 1109
+  },
+  {
+    "path": "launcher.png",
+    "sha256": "60db8e6be2749647f221ddb121d4b28144cfd7ddab71c84b33bf61d35ed24a67",
+    "bytes": 872594
+  },
+  {
+    "path": "main-source-preservation.json",
+    "sha256": "18809d12727e786a65ad1bf11882554ba20e50f29898b79cf5c561409314fab8",
+    "bytes": 48
+  },
+  {
+    "path": "previous-catalog.png",
+    "sha256": "3decf74813e1ccc385e7e906345219f08015859dbff6924b0c8b3c876683b80f",
+    "bytes": 336369
+  },
+  {
+    "path": "previous-pin.png",
+    "sha256": "c3e84ce6746e77690eb079774739cd27c07d01a82e2d93ffcbc0879dade7aeff",
+    "bytes": 52415
+  },
+  {
+    "path": "previous-sales.png",
+    "sha256": "3cc62a1e333b1f9ffcd8fa719afffa759a862a034f29a0759afe3ccb737c61d3",
+    "bytes": 165865
+  },
+  {
+    "path": "previous-signature.txt",
+    "sha256": "ca0dd7e4f9dd75505af28e5d08fddbadf9504d277dc658070ef885b34b7f74a9",
+    "bytes": 307
+  },
+  {
+    "path": "validation.json",
+    "sha256": "a6d9bb17ca8dfe7f535280321c3f777a6af4e4a9c4f1fd98c8455c57ec3d0af9",
+    "bytes": 798
+  }
+]

@@ -1,0 +1,79 @@
+[
+  {
+    "name": "square-create",
+    "url": "https://squareup.com/help/us/en/article/6427-building-your-floor-plan",
+    "status": 200,
+    "imgs": []
+  },
+  {
+    "name": "fudo-create",
+    "url": "https://soporte.fu.do/es/articles/11730986-salas-y-mesas",
+    "status": 200,
+    "imgs": [
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609921501/a7751a54bb6d7612d238af877e22/salas_gif-height%3D252-name%3Dsalas.gif-width%3D688?expires=1791810000&signature=a9cdbba590df39967419d845fe08fa38128f5a908c4fc3eab458c7eedb53e74e&req=dSYnH8B8nIRfWPMW1HO4zQS%2B5y%2B3QVF8OftfqiLxLgVgeS9ZX4bPTWODbsWp%0ARICS%0A",
+        "width": 1891,
+        "height": 693
+      },
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609921523/766cdf3c70989dfaf6316499e89a/zoom_salas_gif-height%3D494-name%3Dzoom_salas.gif-width%3D658?expires=1791810000&signature=e436eff17e6b3098916f6bc70e575a23b4ca6f75e69b238dfa911b52da959678&req=dSYnH8B8nIRdWvMW1HO4zUeGAl7NLvJmu6UPdDd5XZhEBlq2ZCWtJZZtP1gi%0AXb8QpdLaXJERyEokNlI%3D%0A",
+        "width": 658,
+        "height": 494
+      },
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609921547/2ce4faa60720d85a1da5e7364399/ventas_info_gif-height%3D344-name%3Dventas_info.gif-width%3D688?expires=1791810000&signature=af02784a32bb7868af31d55fc82ba3f8f4c8d940612105a4b3a3605e20b01700&req=dSYnH8B8nIRbXvMW1HO4zQCshGbLhcjrsBGnIp2pINyXKFEmacKJJTLL0%2BRx%0ACi9EL2zOQ%2F17WSuy7dw%3D%0A",
+        "width": 1232,
+        "height": 616
+      },
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609921645/582a86b81c969f1282780e8e4e16/moviendo_gif-height%3D344-name%3Dmoviendo.gif-width%3D688?expires=1791810000&signature=027350d8258d72854ab28a3cefe926a9b13e96834c6142b9f71ff3a4243f8dd2&req=dSYnH8B8nIdbXPMW1HO4zTu4RR%2BGCeZg1mGRGTgljXmGHk3iUnST1Li6t5ir%0AULK0%0A",
+        "width": 1232,
+        "height": 616
+      }
+    ]
+  },
+  {
+    "name": "polotab-install",
+    "url": "https://www.polotab.com/soporte/instalar-tu-punto-de-venta",
+    "status": 200,
+    "imgs": [
+      {
+        "src": "https://www.polotab.com/poloLogos/poloLogoBlue.avif",
+        "width": 158,
+        "height": 60
+      },
+      {
+        "src": "https://cdn.sanity.io/images/l4fhnlwf/production/8aa8d5da689bc0613d01ff723983bf3bee504d91-640x640.jpg?fm=webp&q=70",
+        "width": 640,
+        "height": 640
+      },
+      {
+        "src": "https://www.polotab.com/poloLogos/poloFooterLogo.avif",
+        "width": 106,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "name": "polotab-create",
+    "url": "https://www.polotab.com/soporte/crear-mesas",
+    "status": 200,
+    "imgs": [
+      {
+        "src": "https://www.polotab.com/poloLogos/poloLogoBlue.avif",
+        "width": 158,
+        "height": 60
+      },
+      {
+        "src": "https://cdn.sanity.io/images/l4fhnlwf/production/8aa8d5da689bc0613d01ff723983bf3bee504d91-640x640.jpg?fm=webp&q=70",
+        "width": 640,
+        "height": 640
+      },
+      {
+        "src": "https://www.polotab.com/poloLogos/poloFooterLogo.avif",
+        "width": 106,
+        "height": 40
+      }
+    ]
+  }
+]

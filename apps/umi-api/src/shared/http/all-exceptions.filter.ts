@@ -26,7 +26,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // top of the original error. Let the ws layer handle its own failures.
     if (host.getType() !== 'http') throw exception;
 
-    const reply = host.switchToHttp().getResponse<FastifyReply>();
+    const http = host.switchToHttp();
+    const reply = http.getResponse<FastifyReply>();
+    // The METHOD and the URL, for the refusal line below. The comment there says the
+    // route is what lets a caller be found, and it was not in the line: a commissioning
+    // session produced eleven `403 ... code=PERMISSION_DENIED` records with no way to
+    // tell which surface was refused, and the answer — a role missing one permission —
+    // had to be guessed. `url` is the path WITHOUT the query string, because a query
+    // carries operator session ids and the log is not the place for them.
+    //
+    // Read defensively, because this is the ERROR path: a filter that throws while
+    // reporting a failure replaces a 400 with a 500 and says nothing about either.
+    // A real host always answers `getRequest`; a test double or a future adapter that
+    // does not must still get its error reported.
+    const request =
+      typeof http.getRequest === 'function'
+        ? http.getRequest<{ method?: string; url?: string }>()
+        : undefined;
+    const route = `${request?.method ?? '?'} ${(request?.url ?? '?').split('?')[0]}`;
 
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -44,7 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // the caller already knew.
       const detail = exception instanceof Error ? exception.message : String(exception);
       this.logger.error(
-        `${status} request_failed correlationId=${correlationId} type=${errorType} detail=${detail}`,
+        `${status} request_failed ${route} correlationId=${correlationId} type=${errorType} detail=${detail}`,
         exception instanceof Error ? exception.stack : undefined,
       );
     } else {
@@ -59,7 +76,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? `merchant=${scope.merchantId ?? 'none'} location=${scope.locationId ?? 'none'}`
         : 'unknown_scope';
       this.logger.warn(
-        `${status} request_refused correlationId=${correlationId} ${requestScope} code=${publicError(status, payload, correlationId).code} detail=${describeRefusal(payload)}`,
+        `${status} request_refused ${route} correlationId=${correlationId} ${requestScope} code=${publicError(status, payload, correlationId).code} detail=${describeRefusal(payload)}`,
       );
     }
 

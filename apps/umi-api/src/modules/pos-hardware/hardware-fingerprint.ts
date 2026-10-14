@@ -27,6 +27,12 @@ export function hardwareCommandFingerprint(command: HardwareCommandRequest): str
     drawer: command.drawer,
     display: command.display,
     printPayload: command.printPayload,
+    // PART OF THE COMMAND'S IDENTITY, because it changes the DOCUMENT: a print
+    // that says COPIA is not the print that says nothing (`HardwareCommandRequest`).
+    // Normalised to a boolean so an absent flag and `false` are one command — both
+    // this and the till's own fingerprint input normalise it the same way, and the
+    // two are compared byte for byte before the command is accepted.
+    copy: command.copy ?? false,
   });
   return createHash('sha256').update(canonicalJson(safe)).digest('hex');
 }

@@ -12,6 +12,7 @@ import { DeadLetterService } from './dead-letter.service';
 import { TwilioAdapter } from '../shared/adapters/twilio.adapter';
 import { LoggingService } from '../shared/logging/logging.service';
 import { toWhatsAppMarkdown } from '../shared/format/whatsapp';
+import { PosPushService } from '../modules/pos-push/pos-push.service';
 
 /**
  * Outbound queue consumer (Phase 3d) — the delivery side of the transactional
@@ -29,6 +30,7 @@ export class OutboundProcessor extends BaseProcessor {
     deadLetters: DeadLetterService,
     private readonly twilio: TwilioAdapter,
     private readonly log: LoggingService,
+    private readonly posPush: PosPushService,
     private readonly stampRewards: StampRewardExpiryProcessor,
   ) {
     super(deadLetters);
@@ -39,6 +41,10 @@ export class OutboundProcessor extends BaseProcessor {
     const to = String(p.to ?? '');
 
     switch (job.name) {
+      case 'pos.kitchen_item_ready':
+      case 'pos.kitchen_order_ready':
+        await this.posPush.sendReadyEvent(p);
+        return;
       case STAMP_REWARD_REMINDER_TOPIC:
         await this.stampRewards.deliverReminder(p as unknown as ReminderGroup);
         return;

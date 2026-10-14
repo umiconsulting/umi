@@ -4,6 +4,19 @@
   "defaultLifetimeSeconds": 300,
   "boundaries": [
     {
+      "action": "cancel_sent_line_after_preparation",
+      "actingPermission": "cart.write",
+      "approvalPermission": "order.void_after_preparation.approve",
+      "selfApproval": false,
+      "actorSeparation": true,
+      "scope": "location",
+      "lifetimeSeconds": 300,
+      "oneUse": true,
+      "fingerprintBound": true,
+      "auditRequired": true,
+      "policy": "cart.line.voidAfterPreparation"
+    },
+    {
       "action": "cash_refund_above_threshold",
       "actingPermission": "sale.refund.cash",
       "approvalPermission": "sale.refund.approve",
@@ -445,5 +458,11 @@
       "auditRequired": true,
       "policy": "exception.voidWindow"
     }
-  ]
+  ],
+  "selfApprovalException": {
+    "role": "admin",
+    "reason": "Quien TIENE la autorización puede aprobar su propio acto. El control es la credencial (PIN + permisión + auditoría de aprobación), no una segunda persona: cuando las autorizaciones vivían en cajeros y gerentes, la separación de actores era el control, y con la regla de 2026-10-13 (solo admin autoriza) quedó al revés — en un café con un solo admin, exigir a otra persona dejaba la operación sensible imposible. `boundaries[].selfApproval` sigue describiendo el caso por defecto (nadie más se autoaprueba); esta excepción es la única.",
+    "recordedAt": "2026-10-13",
+    "decidedBy": "owner"
+  }
 }

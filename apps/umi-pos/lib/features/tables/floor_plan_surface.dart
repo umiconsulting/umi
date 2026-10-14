@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
+import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/station_document.dart';
 import '../entry/entry_controller.dart';
 import 'floor_plan_controller.dart';
 import 'table_state_controller.dart';
@@ -14,12 +17,16 @@ Future<void> showFloorPlan(
   required FloorPlanController controller,
   required EntryController entry,
   TableStateController? tableState,
+  Future<void> Function(FloorPlanElement table)? onOpenAccount,
+  VoidCallback? onShowAccounts,
 }) => Navigator.of(context).push(
-  MaterialPageRoute<void>(
+  PosPageRoute<void>(
     builder: (_) => FloorPlanSurface(
       controller: controller,
       entry: entry,
       tableState: tableState,
+      onOpenAccount: onOpenAccount,
+      onShowAccounts: onShowAccounts,
     ),
   ),
 );
@@ -30,9 +37,19 @@ class FloorPlanSurface extends StatefulWidget {
     required this.controller,
     required this.entry,
     this.tableState,
+    this.embedded = false,
+    this.onOpenAccount,
+    this.onShowAccounts,
+    this.directAccounts = false,
+    this.onSetUpTables,
   });
   final FloorPlanController controller;
   final EntryController entry;
+  final bool embedded;
+  final Future<void> Function(FloorPlanElement table)? onOpenAccount;
+  final VoidCallback? onShowAccounts;
+  final bool directAccounts;
+  final VoidCallback? onSetUpTables;
 
   /// The live room (plan section 8D steps 3 to 5). Null when this build has no
   /// client, and the surface then stays the read-only map it used to be.
@@ -47,7 +64,6 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   Timer? _ticker;
   String? _areaId;
   String? _context;
-  bool _list = false;
   bool _active = true;
   bool _returningToEntry = false;
 
@@ -68,6 +84,11 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   static const double _panelBreakpoint = 720;
 
   bool get _panelShown => MediaQuery.sizeOf(context).width >= _panelBreakpoint;
+
+  // El plano reduce las etiquetas al espacio de cada mesa. El texto al 200 %
+  // necesita una lista legible en pantallas angostas.
+  bool get _accessibleList =>
+      !_panelShown && MediaQuery.textScalerOf(context).scale(16) >= 32;
 
   /// The room read is behind, or the last read failed. The map keeps drawing
   /// what it has, and the top bar says so instead of pretending it is current.
@@ -91,6 +112,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
 
   /// A refusal the surface decided itself, before spending a request on it.
   String? _notice;
+  String? _result;
 
   /// Published geometry by table id, so capacity is known without a request.
   Map<String, FloorPlanElement> _elementsById = const {};
@@ -170,6 +192,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       _mergeMode = false;
       _moveFrom = null;
       _notice = null;
+      _result = null;
+      _selectedId = null;
       widget.tableState?.clear();
     }
     unawaited(
@@ -199,10 +223,13 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   Widget build(BuildContext context) {
     final es = Localizations.localeOf(context).languageCode == 'es';
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     if (!_hasOperatorContext) {
-      return Scaffold(
-        appBar: AppBar(title: Text(es ? 'Mesas' : 'Tables')),
+      return PosPage(
+        appBar: PosHeader(
+          automaticallyImplyLeading: !widget.embedded,
+          title: Text(es ? 'Mesas' : 'Tables'),
+        ),
         body: Center(
           child: Text(
             es
@@ -229,118 +256,149 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         .toList(growable: false);
     _elementsById = {for (final table in tables) table.id: table};
     final visuals = room == null ? null : _visuals(room, tables);
-    return Scaffold(
+    return PosPage(
       body: SafeArea(
         child: Column(
-        children: [
-          _topBar(tables, visuals, l10n, es),
-          if (controller.loading) const LinearProgressIndicator(),
-          if (controller.failed)
-            MaterialBanner(
-              content: Text(
-                es
-                    ? 'No se pudo actualizar el plano. La información puede estar desactualizada.'
-                    : 'Could not refresh the floor plan. The information may be out of date.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: _load,
-                  child: Text(es ? 'Reintentar' : 'Retry'),
+          children: [
+            _topBar(tables, visuals, l10n, es),
+            if (widget.onShowAccounts != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: PosTextButton.icon(
+                  onPressed: widget.onShowAccounts,
+                  icon: const PosIcon(PosGlyphs.receiptLong),
+                  label: Text(es ? 'Cuentas abiertas' : 'Open accounts'),
                 ),
-              ],
-            ),
-          if (room != null && room.stale)
-            MaterialBanner(
-              content: Text(
-                es
-                    ? 'No se pudo actualizar el estado de las mesas. Lo que ves puede estar desactualizado.'
-                    : 'Could not refresh table state. What you see may be out of date.',
               ),
-              actions: [
-                TextButton(
-                  onPressed: _load,
-                  child: Text(es ? 'Reintentar' : 'Retry'),
+            if (controller.loading) const PosProgress(),
+            if (controller.failed)
+              PosNoticeBanner(
+                content: Text(
+                  es
+                      ? 'No se pudo actualizar el plano. La información puede estar desactualizada.'
+                      : 'Could not refresh the floor plan. The information may be out of date.',
                 ),
-              ],
-            ),
-          if (room?.errorCode != null) _failureBanner(room!, l10n),
-          if (_notice != null)
-            MaterialBanner(
-              content: Text(_notice!),
-              actions: [
-                TextButton(
-                  onPressed: () => setState(() => _notice = null),
-                  child: Text(l10n.closeAction),
+                actions: [
+                  PosTextButton(
+                    onPressed: _load,
+                    child: Text(es ? 'Reintentar' : 'Retry'),
+                  ),
+                ],
+              ),
+            if (room != null && room.stale)
+              PosNoticeBanner(
+                content: Text(
+                  es
+                      ? 'No se pudo actualizar el estado de las mesas. Lo que ves puede estar desactualizado.'
+                      : 'Could not refresh table state. What you see may be out of date.',
                 ),
-              ],
-            ),
-          if (_mergeMode || _moveFrom != null) _gestureBar(room, l10n, es),
-          if (controller.refreshedAt != null)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                '${es ? 'Plano actualizado' : 'Map refreshed'}: ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(controller.refreshedAt!))}',
+                actions: [
+                  PosTextButton(
+                    onPressed: _load,
+                    child: Text(es ? 'Reintentar' : 'Retry'),
+                  ),
+                ],
               ),
-            ),
-          if (areas.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                UmiSpacing.md,
-                0,
-                UmiSpacing.md,
-                UmiSpacing.sm,
+            if (room?.errorCode != null) _failureBanner(room!, l10n),
+            if (_notice != null)
+              PosNoticeBanner(
+                content: Text(_notice!),
+                actions: [
+                  PosTextButton(
+                    onPressed: () => setState(() => _notice = null),
+                    child: Text(l10n.closeAction),
+                  ),
+                ],
               ),
-              child: LayoutBuilder(
-                builder: (context, constraints) => Row(
-                  children: [
-                    Expanded(
-                      child: FloorPlanAreaSelector(
-                        areas: areas,
-                        selectedAreaId: area?.id,
-                        onSelect: (value) => setState(() => _areaId = value),
-                      ),
+            if (_result != null)
+              Semantics(
+                liveRegion: true,
+                child: PosNoticeBanner(
+                  content: Text(_result!),
+                  actions: [
+                    PosTextButton(
+                      onPressed: () => setState(() => _result = null),
+                      child: Text(l10n.closeAction),
                     ),
-                    // The hint is a nicety, so it yields to the chips: the
-                    // operator needs every area on a narrow surface.
-                    if (constraints.maxWidth >= 560) ...[
-                      const SizedBox(width: UmiSpacing.md),
-                      Flexible(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 280),
-                          child: Text(
-                            es
-                                ? 'Toca una mesa para ver el detalle'
-                                : 'Tap a table to see its detail',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
+            if (_mergeMode || _moveFrom != null) _gestureBar(room, l10n, es),
+            if (!widget.directAccounts && controller.refreshedAt != null)
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  '${es ? 'Plano actualizado' : 'Map refreshed'}: ${PosLocalLabels.of(context).formatTimeOfDay(PosTime.fromDateTime(controller.refreshedAt!))}',
+                ),
+              ),
+            if (areas.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  UmiSpacing.md,
+                  0,
+                  UmiSpacing.md,
+                  UmiSpacing.sm,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => Row(
+                    children: [
+                      Expanded(
+                        child: FloorPlanAreaSelector(
+                          areas: areas,
+                          selectedAreaId: area?.id,
+                          onSelect: (value) => setState(() => _areaId = value),
+                        ),
+                      ),
+                      // The hint is a nicety, so it yields to the chips: the
+                      // operator needs every area on a narrow surface.
+                      //
+                      // It ALSO YIELDS TO AN ARMED MODE. It says what a tap on a table does — open
+                      // its detail — and with a move or a merge armed a tap does something else.
+                      // Two instructions on one screen, one of them false, is how a table gets
+                      // moved by accident; the gesture bar above already says what the next tap
+                      // will do. Measured on the iMin D3-504 on 2026-10-11: with `Moviendo Mesa 3…`
+                      // in the bar, this hint still read `Toca una mesa para ver el detalle`.
+                      if (constraints.maxWidth >= 560 &&
+                          _moveFrom == null &&
+                          !_mergeMode) ...[
+                        const SizedBox(width: UmiSpacing.md),
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 280),
+                            child: Text(
+                              es
+                                  ? 'Toca una mesa para ver el detalle'
+                                  : 'Tap a table to see its detail',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _roomView(area, visuals, l10n, es)),
+                  if (_panelShown) _detailPanel(area, l10n, es),
+                ],
+              ),
             ),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: _roomView(area, visuals, l10n, es)),
-                if (_panelShown) _detailPanel(area, l10n, es),
-              ],
-            ),
-          ),
-        ],
+            if (!_panelShown) _selectedSummary(area, l10n, es),
+          ],
         ),
       ),
     );
   }
 
-  /// The map or the list, whichever the operator asked for.
   /// The top bar: who is on shift, how the room stands, and the two controls
   /// that do not belong to the map itself.
   Widget _topBar(
@@ -349,69 +407,50 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     AppLocalizations l10n,
     bool es,
   ) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final branch = widget.entry.state.selectedBranch?.name;
     final operator = widget.entry.operatorName;
     final who = [branch, operator].whereType<String>().join(' · ');
-    final dirty = visuals?.values
+    final dirty =
+        visuals?.values
             .where((visual) => visual.state == tableStateDirty)
             .length ??
         0;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        UmiSpacing.sm,
-        UmiSpacing.sm,
-        UmiSpacing.sm,
-        UmiSpacing.sm,
+    return PosHeader(
+      toolbarHeight: widget.directAccounts ? 56 : 72,
+      actionsInline:
+          widget.directAccounts && MediaQuery.sizeOf(context).width >= 560,
+      automaticallyImplyLeading: !widget.embedded,
+      leading: widget.embedded
+          ? null
+          : PosIconButton(
+              tooltip: PosLocalLabels.of(context).backButtonTooltip,
+              onPressed: _returningToEntry
+                  ? null
+                  : () => Navigator.of(context).maybePop(),
+              icon: const PosIcon(PosGlyphs.arrowBack),
+            ),
+      title: StationHeading(
+        title: es ? 'Mesas' : 'Tables',
+        subtitle: widget.directAccounts || who.isEmpty ? null : who,
       ),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            onPressed: _returningToEntry
-                ? null
-                : () => Navigator.of(context).maybePop(),
-            icon: const Icon(Icons.arrow_back),
+      actions: [
+        if (visuals != null) ...[
+          _TopBarBadge(
+            label: es ? '${tables.length} mesas' : '${tables.length} tables',
+            color: UmiTheme.brand,
           ),
-          const SizedBox(width: UmiSpacing.xs),
-          Text(
-            es ? 'Mesas' : 'Tables',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (who.isNotEmpty) ...[
-            const SizedBox(width: UmiSpacing.sm),
-            Flexible(
-              child: Text(
-                who,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-          const Spacer(),
-          if (visuals != null) ...[
-            _TopBarBadge(
-              label: es
-                  ? '${tables.length} mesas'
-                  : '${tables.length} tables',
-              color: UmiTheme.brand,
-            ),
-            if (dirty > 0) ...[
-              const SizedBox(width: UmiSpacing.sm),
-              _TopBarBadge(
+          if (dirty > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
+              child: _TopBarBadge(
                 label: es ? '$dirty por limpiar' : '$dirty to clear',
                 color: const Color(0xFFB26A00),
               ),
-            ],
-            if (widget.tableState != null) ...[
-              const SizedBox(width: UmiSpacing.sm),
-              _TopBarBadge(
+            ),
+          if (widget.tableState != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
+              child: _TopBarBadge(
                 label: _roomOffline
                     ? (es ? 'Sin conexión' : 'Offline')
                     : (es ? '● En línea' : '● Online'),
@@ -419,38 +458,29 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                     ? const Color(0xFFB26A00)
                     : const Color(0xFF3FA76B),
               ),
-            ],
-            const SizedBox(width: UmiSpacing.sm),
-          ],
-          IconButton(
-            tooltip: es ? 'Actualizar' : 'Refresh',
-            onPressed: widget.controller.loading ? null : _load,
-            icon: const Icon(Icons.refresh),
-          ),
-          IconButton(
-            tooltip: _list
-                ? (es ? 'Ver plano' : 'Show map')
-                : (es ? 'Ver lista' : 'Show list'),
-            onPressed: () => setState(() => _list = !_list),
-            icon: Icon(_list ? Icons.map_outlined : Icons.list),
-          ),
+            ),
         ],
-      ),
+        PosIconButton(
+          tooltip: es ? 'Actualizar' : 'Refresh',
+          onPressed: widget.controller.loading ? null : _load,
+          icon: const PosIcon(PosGlyphs.refresh),
+        ),
+      ],
     );
   }
 
   List<Widget> _zoomControls(bool es) => [
-    IconButton(
+    PosIconButton(
       tooltip: es ? 'Alejar' : 'Zoom out',
       onPressed: _zoomScale <= 1 ? null : () => _zoomBy(1 / _zoomStep),
-      icon: const Icon(Icons.remove_circle_outline),
+      icon: const PosIcon(PosGlyphs.removeCircleOutline),
     ),
-    IconButton(
+    PosIconButton(
       tooltip: es ? 'Acercar' : 'Zoom in',
       onPressed: _zoomScale >= 4 ? null : () => _zoomBy(_zoomStep),
-      icon: const Icon(Icons.add_circle_outline),
+      icon: const PosIcon(PosGlyphs.addCircleOutline),
     ),
-    OutlinedButton(
+    PosOutlineButton(
       onPressed: () => setState(() => _zoom.value = Matrix4.identity()),
       child: Text(es ? 'Ajustar' : 'Fit'),
     ),
@@ -463,6 +493,32 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     bool es,
   ) {
     final controller = widget.controller;
+    if (widget.directAccounts &&
+        !controller.loading &&
+        !controller.failed &&
+        widget.onSetUpTables != null &&
+        (controller.plan?.published == null ||
+            !FloorPlanDocument.fromJson(controller.plan!.published!).areas
+                .map(FloorPlanArea.fromJson)
+                .any(
+                  (room) => room.elements.any(
+                    (element) => element['kind'] == 'table',
+                  ),
+                ))) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(es ? 'Aún no hay mesas' : 'There are no tables yet'),
+            const SizedBox(height: UmiSpacing.md),
+            PosButton(
+              onPressed: widget.onSetUpTables,
+              child: Text(es ? 'Crear mesas' : 'Create tables'),
+            ),
+          ],
+        ),
+      );
+    }
     if (area == null) {
       return Center(
         child: Padding(
@@ -480,23 +536,33 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         ),
       );
     }
-    if (_list) {
+    if (_accessibleList) {
       return ListView(
+        padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.md),
         children: area.elements
             .map(FloorPlanElement.fromJson)
             .where((element) => element.kind == 'table')
             .map(
-              (element) => ListTile(
-                leading: const Icon(Icons.table_restaurant_outlined),
+              (element) => PosListRow(
+                selected: _selectedId == element.id,
+                leading: PosIcon(
+                  tableStateGlyph(
+                    visuals?[element.id]?.state ?? tableStateOpen,
+                  ),
+                  color: _FloorPlanPalette.of(
+                    context,
+                  ).stateAccent(visuals?[element.id]?.state ?? tableStateOpen),
+                ),
                 title: Text(element.label),
                 subtitle: Text(_tableSubtitle(element, visuals, es)),
+                trailing: const PosIcon(PosGlyphs.chevronRight),
                 onTap: () => _onTableTap(element, l10n, es),
               ),
             )
             .toList(),
       );
     }
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Column(
       children: [
         Expanded(
@@ -545,7 +611,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   /// state in the till's own words, so the map's colour and glyph are never the
   /// only place a state is explained.
   Widget _mapFooter(bool es) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final palette = _FloorPlanPalette.of(context);
     return Row(
       children: [
@@ -562,7 +628,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                   tableStateAwaitingPayment,
                   tableStateDirty,
                 ]) ...[
-                  Icon(
+                  PosIcon(
                     tableStateGlyph(state),
                     size: 13,
                     color: palette.stateAccent(state),
@@ -593,7 +659,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   /// size, the turn, and the group. A server and a balance are not in it, so
   /// this panel does not invent them.
   Widget _panelRow(String label, String value) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -612,7 +678,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   }
 
   Widget _detailPanel(FloorPlanArea? area, AppLocalizations l10n, bool es) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final palette = _FloorPlanPalette.of(context);
     final room = widget.tableState;
     final selected = _selectedId == null ? null : _elementsById[_selectedId];
@@ -697,13 +763,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         if (partySize != null)
           _panelRow(l10n.tableStatePartySizeField, '$partySize'),
         if (elapsed != null)
-          _panelRow(
-            l10n.tableStateElapsedField,
-            formatTableTurn(elapsed),
-          ),
-        if (groupSize > 1)
-          _panelRow(l10n.tableStateGroupField, '$groupSize'),
-        const Divider(),
+          _panelRow(l10n.tableStateElapsedField, formatTableTurn(elapsed)),
+        if (groupSize > 1) _panelRow(l10n.tableStateGroupField, '$groupSize'),
+        const PosDivider(),
         Text(
           l10n.tableStatePanelActions,
           style: theme.textTheme.labelMedium?.copyWith(
@@ -713,18 +775,34 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         const SizedBox(height: UmiSpacing.sm),
       ]);
       if (room != null) {
+        final actions = _tableActions(selected, room, l10n, es);
         children.add(
           Wrap(
             spacing: UmiSpacing.sm,
             runSpacing: UmiSpacing.sm,
             children: [
-              for (final action in _tableActions(selected, room, l10n, es))
-                OutlinedButton.icon(
-                  onPressed: action.onTap,
-                  icon: Icon(action.icon, size: 18),
-                  label: Text(action.label),
-                ),
+              for (var index = 0; index < actions.length; index++)
+                if (index == 0 && widget.onOpenAccount != null)
+                  PosButton.icon(
+                    onPressed: actions[index].onTap,
+                    icon: PosIcon(actions[index].icon, size: 18),
+                    label: Text(actions[index].label),
+                  )
+                else
+                  PosOutlineButton.icon(
+                    onPressed: actions[index].onTap,
+                    icon: PosIcon(actions[index].icon, size: 18),
+                    label: Text(actions[index].label),
+                  ),
             ],
+          ),
+        );
+      } else if (widget.onOpenAccount != null) {
+        children.add(
+          PosButton.icon(
+            onPressed: () => unawaited(widget.onOpenAccount!(selected)),
+            icon: const PosIcon(PosGlyphs.receiptLong),
+            label: Text(es ? 'Abrir cuenta' : 'Open account'),
           ),
         );
       }
@@ -749,6 +827,64 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     );
   }
 
+  Widget _selectedSummary(FloorPlanArea? area, AppLocalizations l10n, bool es) {
+    final selected = _elementsById[_selectedId];
+    if (selected == null ||
+        area == null ||
+        !area.elements.any(
+          (value) => FloorPlanElement.fromJson(value).id == selected.id,
+        )) {
+      return const SizedBox.shrink();
+    }
+    final room = widget.tableState;
+    final facts = <String>[
+      _stateLabel(room?.stateOf(selected.id).state ?? tableStateOpen, es),
+    ];
+    final party = room?.stateOf(selected.id).partySize;
+    if (party != null) facts.add(l10n.tableStatePartySizeLabel(party));
+    return Container(
+      key: const ValueKey('selected-table-summary'),
+      padding: const EdgeInsets.all(UmiSpacing.sm),
+      decoration: BoxDecoration(
+        color: PosTheme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: PosTheme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  selected.label,
+                  style: PosTheme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  facts.join(' · '),
+                  style: PosTheme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          PosOutlineButton(
+            onPressed: () => _details(selected, es, l10n),
+            child: Text(es ? 'Detalle' : 'Details'),
+          ),
+          PosIconButton(
+            tooltip: es ? 'Quitar selección' : 'Clear selection',
+            onPressed: () => setState(() => _selectedId = null),
+            icon: const PosIcon(PosGlyphs.close),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// What the map draws for every published table, by table id.
   Map<String, FloorPlanTableVisual> _visuals(
     TableStateController room,
@@ -763,6 +899,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       for (final table in tables)
         table.id: FloorPlanTableVisual(
           state: room.stateOf(table.id).state,
+          partySize: room.stateOf(table.id).partySize,
           turn: switch (room.elapsedOf(table.id)) {
             final elapsed? => formatTableTurn(elapsed),
             _ => null,
@@ -772,7 +909,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             final groupId? => groupSize[groupId],
             _ => null,
           },
-          selected: _selection.contains(table.id),
+          selected: _selection.contains(table.id) || _selectedId == table.id,
           moving: _moveFrom == table.id,
         ),
     };
@@ -783,11 +920,20 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     Map<String, FloorPlanTableVisual>? visuals,
     bool es,
   ) {
-    final seats = '${element.capacity} ${es ? 'lugares' : 'seats'}';
+    // THE SEATS ARE NOT THE TILL'S BUSINESS. The owner asked for them gone
+    // (2026-10-12): capacity belongs to the floor plan the dashboard publishes, and
+    // on the counter it competed with the two facts an operator reads off a tile —
+    // whether the table is taken, and how long the party has been sitting there.
     final visual = visuals?[element.id];
-    if (visual == null) return seats;
-    final state = _stateLabel(visual.state, es);
-    return visual.turn == null ? '$state - $seats' : '$state - ${visual.turn}';
+    if (visual == null) return _stateLabel(tableStateOpen, es);
+    return [
+      _stateLabel(visual.state, es),
+      if (visual.partySize != null)
+        AppLocalizations.of(
+          context,
+        ).tableStatePartySizeLabel(visual.partySize!),
+      if (visual.turn != null) visual.turn!,
+    ].join(' · ');
   }
 
   String _stateLabel(String state, bool es) {
@@ -804,17 +950,19 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
 
   Widget _failureBanner(TableStateController room, AppLocalizations l10n) {
     final failure = describeTableStateFailure(room.errorCode!, l10n);
-    return MaterialBanner(
-      content: Text('${failure.title}\n${failure.message}\n${failure.recovery}'),
+    return PosNoticeBanner(
+      content: Text(
+        '${failure.title}\n${failure.message}\n${failure.recovery}',
+      ),
       actions: [
-        TextButton(
+        PosTextButton(
           onPressed: () {
             room.dismissError();
             _load();
           },
           child: Text(l10n.tableStateFailureRefresh),
         ),
-        TextButton(
+        PosTextButton(
           onPressed: room.dismissError,
           child: Text(l10n.closeAction),
         ),
@@ -827,11 +975,11 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     AppLocalizations l10n,
     bool es,
   ) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final label = _moveFrom != null
         ? l10n.tableStateMoveArmed(_elementsById[_moveFrom]?.label ?? '')
         : l10n.tableStateSelectHint;
-    return Material(
+    return PosSurface(
       color: theme.colorScheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -840,8 +988,10 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         ),
         child: Row(
           children: [
-            Icon(
-              _moveFrom != null ? Icons.arrow_forward : Icons.check_box_outlined,
+            PosIcon(
+              _moveFrom != null
+                  ? PosGlyphs.arrowForward
+                  : PosGlyphs.checkBoxOutlined,
               color: theme.colorScheme.onSecondaryContainer,
             ),
             const SizedBox(width: UmiSpacing.sm),
@@ -852,11 +1002,11 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                 style: theme.textTheme.labelLarge,
               ),
             if (_mergeMode && _selection.length > 1)
-              TextButton(
+              PosTextButton(
                 onPressed: () => _mergeSelected(l10n),
                 child: Text(l10n.tableStateMergeAction),
               ),
-            IconButton(
+            PosIconButton(
               tooltip: es ? 'Cancelar' : 'Cancel',
               onPressed: () => setState(() {
                 _mergeMode = false;
@@ -864,7 +1014,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
                 _selection.clear();
                 _notice = null;
               }),
-              icon: const Icon(Icons.close),
+              icon: const PosIcon(PosGlyphs.close),
             ),
           ],
         ),
@@ -879,8 +1029,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   ) async {
     final room = widget.tableState;
     if (room == null) {
+      setState(() => _selectedId = element.id);
       if (_panelShown) {
-        setState(() => _selectedId = element.id);
         return;
       }
       await _details(element, es);
@@ -895,10 +1045,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       _toggleSelection(element, l10n);
       return;
     }
-    if (_panelShown) {
-      setState(() => _selectedId = element.id);
-      return;
-    }
+    setState(() => _selectedId = element.id);
+    if (_panelShown) return;
     await _details(element, es, l10n);
   }
 
@@ -930,6 +1078,11 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       if (moved) {
         _moveFrom = null;
         _notice = null;
+        _selectedId = target.id;
+        final es = Localizations.localeOf(context).languageCode == 'es';
+        _result = es
+            ? 'Personas trasladadas a ${target.label}. El tiempo de atención se conserva.'
+            : 'Guests moved to ${target.label}. The service timer is preserved.';
       }
     });
   }
@@ -984,7 +1137,39 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       l10n: l10n,
     );
     if (partySize == null) return;
-    await room.seat(element.id, partySize);
+    final seated = await room.seat(element.id, partySize);
+    if (seated && mounted) await widget.onOpenAccount?.call(element);
+  }
+
+  Future<void> _splitTables(
+    FloorPlanElement element,
+    AppLocalizations l10n,
+    bool es,
+  ) async {
+    final confirmed = await showPosDialog<bool>(
+      context: context,
+      builder: (dialog) => PosAlertDialog(
+        title: Text(l10n.tableStateSplitAction),
+        content: Text(
+          es
+              ? 'Se separarán las mesas del grupo. Las personas se repartirán según la capacidad. Las mesas sin personas quedarán por limpiar. La cuenta se conserva en su mesa.'
+              : 'Separate the group tables? Guests will be distributed within each capacity. Empty tables will need cleaning. The account stays on its table.',
+        ),
+        actions: [
+          PosTextButton(
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: Text(l10n.tableStateCancelAction),
+          ),
+          PosTextButton(
+            onPressed: () => Navigator.of(dialog).pop(true),
+            child: Text(l10n.confirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await widget.tableState?.split(element.id);
+    }
   }
 
   Future<void> _clearTable(
@@ -994,9 +1179,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   ) async {
     final room = widget.tableState;
     if (room == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showPosDialog<bool>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => PosAlertDialog(
         title: Text(l10n.tableStateClearAction),
         content: Text(
           es
@@ -1004,11 +1189,11 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
               : 'Has the party left ${element.label}?',
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.of(dialog).pop(false),
             child: Text(l10n.tableStateCancelAction),
           ),
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.of(dialog).pop(true),
             child: Text(l10n.confirmAction),
           ),
@@ -1029,10 +1214,10 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   }) {
     final ceiling = maximum < 1 ? 1 : maximum;
     var value = initial.clamp(1, ceiling);
-    return showDialog<int>(
+    return showPosDialog<int>(
       context: context,
       builder: (dialog) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PosAlertDialog(
           title: Text(title),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1042,37 +1227,37 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
               const SizedBox(height: UmiSpacing.sm),
               Row(
                 children: [
-                  IconButton(
+                  PosIconButton(
                     tooltip: 'menos',
                     onPressed: value <= 1
                         ? null
                         : () => setDialogState(() => value -= 1),
-                    icon: const Icon(Icons.remove_circle_outline),
+                    icon: const PosIcon(PosGlyphs.removeCircleOutline),
                   ),
                   Expanded(
                     child: Text(
                       '$value',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      style: PosTheme.of(context).textTheme.headlineSmall,
                     ),
                   ),
-                  IconButton(
+                  PosIconButton(
                     tooltip: 'mas',
                     onPressed: value >= ceiling
                         ? null
                         : () => setDialogState(() => value += 1),
-                    icon: const Icon(Icons.add_circle_outline),
+                    icon: const PosIcon(PosGlyphs.addCircleOutline),
                   ),
                 ],
               ),
             ],
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.of(dialog).pop(),
               child: Text(l10n.tableStateCancelAction),
             ),
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.of(dialog).pop(value),
               child: Text(l10n.confirmAction),
             ),
@@ -1085,7 +1270,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   /// The actions a table offers, in the order the operator reads them. The
   /// detail panel and the modal sheet share this list, so one place owns the
   /// rule and the two surfaces cannot drift apart.
-  List<({String label, IconData icon, VoidCallback onTap})> _tableActions(
+  List<({String label, PosGlyph icon, VoidCallback onTap})> _tableActions(
     FloorPlanElement element,
     TableStateController room,
     AppLocalizations l10n,
@@ -1095,11 +1280,22 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final present = tablePartyStates.contains(entry.state);
     final groupId = entry.groupId;
     final groupSize = groupId == null ? 0 : room.group(groupId).length;
-    final actions = <({String label, IconData icon, VoidCallback onTap})>[];
+    final actions = <({String label, PosGlyph icon, VoidCallback onTap})>[];
+    if (widget.onOpenAccount != null) {
+      actions.add((
+        label: es ? 'Abrir cuenta' : 'Open account',
+        icon: PosGlyphs.receiptLong,
+        onTap: () => unawaited(widget.onOpenAccount!(element)),
+      ));
+    }
+    final permissions = OperatorPermissions(
+      widget.entry.state.operator?.permissions ?? const [],
+    );
+    if (!permissions.allows('sale.lifecycle')) return actions;
     if (present) {
       actions.add((
         label: l10n.tableStateMoveAction,
-        icon: Icons.arrow_forward,
+        icon: PosGlyphs.arrowForward,
         onTap: () => setState(() {
           _moveFrom = element.id;
           _mergeMode = false;
@@ -1110,46 +1306,46 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       if (groupSize > 1) {
         actions.add((
           label: l10n.tableStateSplitAction,
-          icon: Icons.call_split,
-          onTap: () => unawaited(room.split(element.id)),
+          icon: PosGlyphs.callSplit,
+          onTap: () => unawaited(_splitTables(element, l10n, es)),
         ));
       }
       actions.add((
         label: l10n.tableStateOrderedAction,
-        icon: Icons.receipt_long,
+        icon: PosGlyphs.receiptLong,
         onTap: () => unawaited(room.markOrdered(element.id)),
       ));
       actions.add((
         label: l10n.tableStateServedAction,
-        icon: Icons.restaurant,
+        icon: PosGlyphs.restaurant,
         onTap: () => unawaited(room.markServed(element.id)),
       ));
       actions.add((
         label: l10n.tableStateAwaitingPaymentAction,
-        icon: Icons.request_quote,
+        icon: PosGlyphs.requestQuote,
         onTap: () => unawaited(room.markAwaitingPayment(element.id)),
       ));
       actions.add((
         label: l10n.tableStateClearAction,
-        icon: Icons.cleaning_services_outlined,
+        icon: PosGlyphs.cleaningServicesOutlined,
         onTap: () => unawaited(_clearTable(element, l10n, es)),
       ));
     } else {
       actions.add((
         label: l10n.tableStateSeatAction,
-        icon: Icons.person_add_alt,
+        icon: PosGlyphs.personAddAlt,
         onTap: () => unawaited(_seat(element, l10n)),
       ));
       if (entry.state == tableStateDirty) {
         actions.add((
           label: l10n.tableStateReadyAction,
-          icon: Icons.check_circle_outline,
+          icon: PosGlyphs.checkCircleOutline,
           onTap: () => unawaited(room.markReady(element.id)),
         ));
       }
       actions.add((
         label: l10n.tableStateSelectAction,
-        icon: Icons.check_box_outlined,
+        icon: PosGlyphs.checkBoxOutlined,
         onTap: () => setState(() {
           _mergeMode = true;
           _notice = null;
@@ -1167,13 +1363,21 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   ]) async {
     final room = widget.tableState;
     if (room == null) {
-      await showDialog<void>(
+      await showPosDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => PosAlertDialog(
           title: Text(element.label),
           content: Text('${element.capacity} ${es ? 'lugares' : 'seats'}'),
           actions: [
-            TextButton(
+            if (widget.onOpenAccount != null)
+              PosButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  unawaited(widget.onOpenAccount!(element));
+                },
+                child: Text(es ? 'Abrir cuenta' : 'Open account'),
+              ),
+            PosTextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(es ? 'Cerrar' : 'Close'),
             ),
@@ -1188,9 +1392,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final groupId = entry.groupId;
     final groupSize = groupId == null ? 0 : room.group(groupId).length;
     final actions = _tableActions(element, room, l10n, es);
-    await showDialog<void>(
+    await showPosDialog<void>(
       context: context,
-      builder: (dialog) => AlertDialog(
+      builder: (dialog) => PosAlertDialog(
         title: Text(element.label),
         content: SingleChildScrollView(
           child: Column(
@@ -1199,42 +1403,38 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             children: [
               Text(
                 _stateLabel(entry.state, es),
-                style: Theme.of(dialog).textTheme.titleMedium,
+                style: PosTheme.of(dialog).textTheme.titleMedium,
               ),
               const SizedBox(height: UmiSpacing.xs),
               Text(
                 '${element.capacity} ${es ? 'lugares' : 'seats'}',
-                style: Theme.of(dialog).textTheme.bodySmall,
+                style: PosTheme.of(dialog).textTheme.bodySmall,
               ),
               if (entry.partySize != null)
                 Text(
                   l10n.tableStatePartySizeLabel(entry.partySize!),
-                  style: Theme.of(dialog).textTheme.bodySmall,
+                  style: PosTheme.of(dialog).textTheme.bodySmall,
                 ),
               if (elapsed != null)
                 Text(
                   l10n.tableStateElapsedLabel(formatTableTurn(elapsed)),
-                  style: Theme.of(dialog).textTheme.bodySmall,
+                  style: PosTheme.of(dialog).textTheme.bodySmall,
                 ),
               if (groupSize > 1)
                 Text(
                   l10n.tableStateGroupLabel(groupSize),
-                  style: Theme.of(dialog).textTheme.bodySmall,
+                  style: PosTheme.of(dialog).textTheme.bodySmall,
                 ),
-              const Divider(),
+              const PosDivider(),
               ...actions.map(
-                (action) => _action(
-                  dialog,
-                  action.label,
-                  action.icon,
-                  action.onTap,
-                ),
+                (action) =>
+                    _action(dialog, action.label, action.icon, action.onTap),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.of(dialog).pop(),
             child: Text(l10n.closeAction),
           ),
@@ -1246,10 +1446,10 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
   Widget _action(
     BuildContext dialog,
     String label,
-    IconData icon,
+    PosGlyph icon,
     VoidCallback onTap,
-  ) => ListTile(
-    leading: Icon(icon),
+  ) => PosListRow(
+    leading: PosIcon(icon),
     title: Text(label),
     contentPadding: EdgeInsets.zero,
     onTap: () {
@@ -1269,12 +1469,14 @@ final class FloorPlanTableVisual {
     this.groupSize,
     this.selected = false,
     this.moving = false,
+    this.partySize,
   });
 
   final String state;
   final String? turn;
   final String? groupId;
   final int? groupSize;
+  final int? partySize;
   final bool selected;
   final bool moving;
 
@@ -1384,10 +1586,10 @@ class FloorPlanAreaSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final spanish = Localizations.localeOf(context).languageCode == 'es';
     return SizedBox(
-      height: 44,
+      height: UmiTouchTarget.minimum,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: areas.length,
@@ -1400,7 +1602,7 @@ class FloorPlanAreaSelector extends StatelessWidget {
 
   Widget _chip(
     BuildContext context,
-    ThemeData theme,
+    PosThemeData theme,
     FloorPlanArea area,
     bool spanish,
   ) {
@@ -1410,51 +1612,50 @@ class FloorPlanAreaSelector extends StatelessWidget {
       floorPlanTableCount(area),
       spanish: spanish,
     );
-    final nameColor = selected ? Colors.white : scheme.onSurface;
+    final nameColor = selected ? PosColors.white : scheme.onSurface;
     final countColor = selected
-        ? Colors.white.withValues(alpha: .8)
+        ? PosColors.white.withValues(alpha: .8)
         : scheme.onSurfaceVariant;
-    return Semantics(
-      button: true,
+    // THE TAP REGION WRAPS THE SURFACE, NOT THE OTHER WAY AROUND. Inside it, the region is
+    // inset by the surface's 1px border, so the control the engine publishes — and the one the
+    // POS surface inventory measures — came out 42px tall inside a 44px chip. The chip looks
+    // identical; what a finger lands on is now the whole 44px box.
+    return PosTapRegion(
       selected: selected,
-      label: '${area.name}, $countLabel',
-      child: Material(
+      semanticLabel: '${area.name}, $countLabel',
+      onTap: () => onSelect(area.id),
+      child: PosSurface(
         color: selected ? UmiTheme.brand : scheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(UmiRadius.control),
           side: BorderSide(
-            color: selected ? Colors.transparent : scheme.outlineVariant,
+            color: selected ? PosColors.transparent : scheme.outlineVariant,
           ),
         ),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => onSelect(area.id),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: UmiSpacing.md,
-              vertical: UmiSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Text(
-                  area.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: nameColor,
-                    fontWeight: FontWeight.w700,
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: UmiSpacing.md,
+            vertical: UmiSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Text(
+                area.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: nameColor,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(width: UmiSpacing.sm),
-                Text(
-                  countLabel,
-                  maxLines: 1,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: countColor,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: UmiSpacing.sm),
+              Text(
+                countLabel,
+                maxLines: 1,
+                style: theme.textTheme.labelSmall?.copyWith(color: countColor),
+              ),
+            ],
           ),
         ),
       ),
@@ -1464,17 +1665,14 @@ class FloorPlanAreaSelector extends StatelessWidget {
 
 /// A small pill in the top bar: a count, or a standing of the room.
 class _TopBarBadge extends StatelessWidget {
-  const _TopBarBadge({
-    required this.label,
-    required this.color,
-  });
+  const _TopBarBadge({required this.label, required this.color});
 
   final String label;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: UmiSpacing.sm,
@@ -1522,18 +1720,60 @@ class FloorPlanMap extends StatelessWidget {
         .toList(growable: false);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final scale = math.min(
-          constraints.maxWidth / area.width,
-          constraints.maxHeight / area.height,
+        var frame = Rect.fromLTWH(
+          0,
+          0,
+          area.width.toDouble(),
+          area.height.toDouble(),
         );
+        // A short viewport frames the furniture instead of empty canvas margins.
+        if (constraints.maxHeight < 320 && elements.isNotEmpty) {
+          Rect? occupied;
+          for (final element in elements) {
+            final angle = element.rotation * math.pi / 180;
+            final width =
+                element.width * math.cos(angle).abs() +
+                element.height * math.sin(angle).abs();
+            final height =
+                element.height * math.cos(angle).abs() +
+                element.width * math.sin(angle).abs();
+            final bounds = Rect.fromCenter(
+              center: Offset(element.x.toDouble(), element.y.toDouble()),
+              width: width,
+              height: height,
+            );
+            occupied = occupied?.expandToInclude(bounds) ?? bounds;
+          }
+          frame = occupied!.inflate(24);
+        }
+        final fitScale = math.min(
+          constraints.maxWidth / frame.width,
+          constraints.maxHeight / frame.height,
+        );
+        var scale = fitScale;
+        if (constraints.maxHeight < 320) {
+          for (final element in elements.where(
+            (element) => element.kind == 'table',
+          )) {
+            final side = math.min(element.width, element.height);
+            if (side > 0) {
+              // Reserve both 3-pixel borders outside the table's touch region.
+              scale = math.max(scale, (UmiTouchTarget.minimum + 6) / side);
+            }
+          }
+        }
+        final canvasWidth = math.max(frame.width * scale, constraints.maxWidth);
+        final leftInset = (canvasWidth - frame.width * scale) / 2;
         return Center(
           child: InteractiveViewer(
+            constrained: false,
+            alignment: Alignment.center,
             transformationController: controller,
             minScale: 1,
             maxScale: 4,
             child: SizedBox(
-              width: area.width * scale,
-              height: area.height * scale,
+              width: canvasWidth,
+              height: frame.height * scale,
               child: DecoratedBox(
                 decoration: BoxDecoration(color: palette.canvas),
                 child: Stack(
@@ -1542,8 +1782,9 @@ class FloorPlanMap extends StatelessWidget {
                     // party, one bounded region.
                     for (final region in _groupRegions(elements))
                       Positioned(
-                        left: region.rect.left * scale,
-                        top: region.rect.top * scale,
+                        left:
+                            (region.rect.left - frame.left) * scale + leftInset,
+                        top: (region.rect.top - frame.top) * scale,
                         width: region.rect.width * scale,
                         height: region.rect.height * scale,
                         child: DecoratedBox(
@@ -1560,8 +1801,13 @@ class FloorPlanMap extends StatelessWidget {
                       ),
                     for (final element in elements)
                       Positioned(
-                        left: (element.x - element.width / 2) * scale,
-                        top: (element.y - element.height / 2) * scale,
+                        left:
+                            (element.x - element.width / 2 - frame.left) *
+                                scale +
+                            leftInset,
+                        top:
+                            (element.y - element.height / 2 - frame.top) *
+                            scale,
                         width: element.width * scale,
                         height: element.height * scale,
                         child: Transform.rotate(
@@ -1645,47 +1891,53 @@ class _FloorPlanElement extends StatelessWidget {
           : (accent ?? palette.borderFor(element.kind)),
       width: selected ? 3 : (accent == null ? 1 : 2),
     );
-    return Semantics(
-      label: isTable
-          ? '${element.label}, ${element.capacity}, ${_stateSemantics(visual)}'
-          : element.label,
-      button: isTable,
-      child: Material(
-        key: ValueKey('floor-plan-element-${element.id}'),
-        color: palette.fillFor(element.kind, visual?.state),
-        shape: element.shape == 'round'
-            ? CircleBorder(side: border)
-            : RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isTable ? 8 : 2),
-                side: border,
-              ),
-        clipBehavior: Clip.antiAlias,
-        elevation: isTable ? palette.tableElevation : 0,
-        shadowColor: palette.shadow,
-        surfaceTintColor: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          child: LayoutBuilder(
-            builder: (context, constraints) =>
-                _content(constraints.maxWidth, constraints.maxHeight),
-          ),
-        ),
-      ),
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    final stateLabel = _stateName(visual?.state ?? tableStateOpen, spanish);
+    final label = [
+      element.label,
+      if (isTable) '${element.capacity} ${spanish ? 'lugares' : 'seats'}',
+      if (isTable && visual != null) stateLabel,
+      if (visual?.partySize != null)
+        '${visual!.partySize} ${spanish ? 'personas' : 'guests'}',
+      if (visual?.turn != null)
+        '${spanish ? 'Tiempo' : 'Time'} ${visual!.turn}',
+    ].join(', ');
+    final content = LayoutBuilder(
+      builder: (context, constraints) =>
+          _content(constraints.maxWidth, constraints.maxHeight),
+    );
+    return PosSurface(
+      key: ValueKey('floor-plan-element-${element.id}'),
+      color: palette.fillFor(element.kind, visual?.state),
+      shape: element.shape == 'round'
+          ? CircleBorder(side: border)
+          : RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isTable ? 8 : 2),
+              side: border,
+            ),
+      clipBehavior: Clip.antiAlias,
+      elevation: isTable ? palette.tableElevation : 0,
+      shadowColor: palette.shadow,
+      surfaceTintColor: PosColors.transparent,
+      child: isTable
+          ? PosTapRegion(
+              onTap: onTap,
+              selected: visual?.selected,
+              semanticLabel: label,
+              child: content,
+            )
+          : Semantics(label: label, excludeSemantics: true, child: content),
     );
   }
 
-  String _stateSemantics(FloorPlanTableVisual? visual) {
-    if (visual == null) return '';
-    final turn = visual.turn;
-    return switch (visual.state) {
-      tableStateSeated => turn == null ? 'seated' : 'seated $turn',
-      tableStateOrdered => 'ordered',
-      tableStateServed => 'served',
-      tableStateAwaitingPayment => 'awaiting payment',
-      tableStateDirty => 'needs cleaning',
-      _ => 'open',
-    };
-  }
+  String _stateName(String state, bool spanish) => switch (state) {
+    tableStateSeated => spanish ? 'Ocupada' : 'Seated',
+    tableStateOrdered => spanish ? 'Pedido tomado' : 'Order taken',
+    tableStateServed => spanish ? 'Servido' : 'Served',
+    tableStateAwaitingPayment => spanish ? 'Por cobrar' : 'Awaiting payment',
+    tableStateDirty => spanish ? 'Por limpiar' : 'Needs cleaning',
+    _ => spanish ? 'Libre' : 'Open',
+  };
 
   Widget _content(double width, double height) {
     final isTable = element.kind == 'table';
@@ -1702,7 +1954,9 @@ class _FloorPlanElement extends StatelessWidget {
     final visual = state;
     final turn = visual?.turn;
     final label = Padding(
-      padding: EdgeInsets.symmetric(horizontal: width * 0.06),
+      padding: EdgeInsets.symmetric(
+        horizontal: width * (element.shape == 'round' ? .14 : .06),
+      ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
         child: Column(
@@ -1730,72 +1984,58 @@ class _FloorPlanElement extends StatelessWidget {
     );
     final dirty = visual?.state == tableStateDirty;
     final present = visual?.partyPresent == true;
-    final body = !detailed
-        ? Center(child: label)
-        : Column(
-            children: [
-              Expanded(child: Center(child: label)),
-              Container(
-                key: ValueKey('floor-plan-divider-${element.id}'),
-                height: 1,
-                color: palette.divider,
-              ),
-              Expanded(
-                child: dirty
-                    ? FloorPlanClearedBand(
-                        key: ValueKey('floor-plan-cleared-${element.id}'),
-                        color: palette.stateAccent(tableStateDirty),
-                      )
-                    : element.capacity > 0
-                    ? FloorPlanSeatDots(
-                        key: ValueKey('floor-plan-seats-${element.id}'),
-                        count: element.capacity,
-                        color: present
-                            ? palette.stateAccent(visual!.state)
-                            : palette.seat,
-                        filled: present,
-                      )
-                    : const SizedBox.expand(),
-              ),
-            ],
-          );
-    if (visual == null || visual.state == tableStateOpen) return body;
-    // A round table is clipped to its circle, so a badge in the square corner of
-    // that box is cut by the rim — a fragment instead of an icon, which leaves
-    // those tables carrying their state by colour alone. §8D step 3 forbids
-    // exactly that ("colour alone must not carry the state"), and half of this
-    // room is round. The inset is the distance from the corner to the rim at 45
-    // degrees, so a round table draws the glyph inside the circle and a
-    // rectangular one keeps it in the corner.
-    final badgeInset = element.shape == 'round'
-        ? math.min(width, height) * 0.15
-        : 1.0;
-    return Stack(
+    final seats = dirty
+        ? FloorPlanClearedBand(
+            key: ValueKey('floor-plan-cleared-${element.id}'),
+            color: palette.stateAccent(tableStateDirty),
+          )
+        : element.capacity > 0
+        ? FloorPlanSeatDots(
+            key: ValueKey('floor-plan-seats-${element.id}'),
+            count: element.capacity,
+            color: present ? palette.stateAccent(visual!.state) : palette.seat,
+            filled: present,
+          )
+        : const SizedBox.expand();
+    if (!detailed) return Center(child: label);
+    return Column(
       children: [
-        Positioned.fill(child: body),
-        if (math.min(width, height) >= 20)
-          Positioned(
-            top: badgeInset,
-            right: badgeInset,
-            child: Icon(
-              tableStateGlyph(visual.state),
-              size: math.min(width, height) * 0.26,
-              color: palette.stateAccent(visual.state),
-            ),
-          ),
+        Expanded(child: Center(child: label)),
+        Container(
+          key: ValueKey('floor-plan-divider-${element.id}'),
+          height: 1,
+          color: palette.divider,
+        ),
+        Expanded(
+          child: visual != null && visual.state != tableStateOpen
+              ? Padding(
+                  padding: EdgeInsets.symmetric(horizontal: width * .15),
+                  child: Row(
+                    children: [
+                      PosIcon(
+                        tableStateGlyph(visual.state),
+                        size: math.min(width, height) * .18,
+                        color: palette.stateAccent(visual.state),
+                      ),
+                      Expanded(child: seats),
+                    ],
+                  ),
+                )
+              : seats,
+        ),
       ],
     );
   }
 }
 
 /// The glyph that carries a state, so the state is never colour alone.
-IconData tableStateGlyph(String state) => switch (state) {
-  tableStateSeated => Icons.event_seat,
-  tableStateOrdered => Icons.receipt_long,
-  tableStateServed => Icons.restaurant,
-  tableStateAwaitingPayment => Icons.payments_outlined,
-  tableStateDirty => Icons.cleaning_services,
-  _ => Icons.check_circle_outline,
+PosGlyph tableStateGlyph(String state) => switch (state) {
+  tableStateSeated => PosGlyphs.eventSeat,
+  tableStateOrdered => PosGlyphs.receiptLong,
+  tableStateServed => PosGlyphs.restaurant,
+  tableStateAwaitingPayment => PosGlyphs.paymentsOutlined,
+  tableStateDirty => PosGlyphs.cleaningServices,
+  _ => PosGlyphs.checkCircleOutline,
 };
 
 /// Compact seat dots that represent a table's capacity in the lower band.
@@ -1932,13 +2172,13 @@ class _FloorPlanPalette {
   });
 
   factory _FloorPlanPalette.of(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final dark = theme.brightness == Brightness.dark;
     return _FloorPlanPalette(
       dark: dark,
       scheme: theme.colorScheme,
       canvas: dark ? const Color(0xff15161a) : const Color(0xffededf2),
-      tableFill: dark ? const Color(0xff25272e) : Colors.white,
+      tableFill: dark ? const Color(0xff25272e) : PosColors.white,
       tableBorder: dark ? const Color(0xff3b3e47) : const Color(0xffdfdfe7),
       divider: dark ? const Color(0xff3b3e47) : const Color(0xffe6e6ec),
       seat: dark ? const Color(0xffa7adb8) : const Color(0xff9ba1ab),
@@ -1969,7 +2209,7 @@ class _FloorPlanPalette {
   }
 
   final bool dark;
-  final ColorScheme scheme;
+  final PosPalette scheme;
   final Color canvas;
   final Color tableFill;
   final Color tableBorder;
@@ -1992,7 +2232,7 @@ class _FloorPlanPalette {
         'wall' => dark ? const Color(0xff5a6577) : const Color(0xff64748b),
         'counter' => dark ? const Color(0xff4a4231) : const Color(0xffe8ddc9),
         'door' => dark ? const Color(0xff2e4557) : const Color(0xffbfd7e5),
-        'label' => Colors.transparent,
+        'label' => PosColors.transparent,
         _ => scheme.surfaceContainerHighest,
       };
     }
@@ -2004,12 +2244,12 @@ class _FloorPlanPalette {
     'wall' => dark ? const Color(0xff76829a) : const Color(0xff526075),
     'counter' => dark ? const Color(0xff5e5440) : const Color(0xffcbbda2),
     'door' => dark ? const Color(0xff3d5a70) : const Color(0xff9dbece),
-    'label' => Colors.transparent,
+    'label' => PosColors.transparent,
     _ => scheme.outlineVariant,
   };
 
   Color labelFor(String kind) => switch (kind) {
-    'wall' => Colors.white,
+    'wall' => PosColors.white,
     'label' => scheme.onSurfaceVariant,
     _ => label,
   };

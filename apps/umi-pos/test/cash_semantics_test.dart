@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cash/cash_controller.dart';
 import 'package:umi_pos/features/cash/cash_surface.dart';
 
@@ -30,16 +30,15 @@ Future<void> _pumpCashCenter(
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    MaterialApp(
+    PosApp(
       locale: const Locale('es'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
+
         GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
-      home: Scaffold(
+      home: PosPage(
         body: CashCenter(
           controller: controller,
           permissions: OperatorPermissions(const [
@@ -86,11 +85,14 @@ void main() {
     await _pumpCashCenter(tester);
     final read = _read(tester);
 
-    // Two things interrupt: the drawer's state changed, or the count revealed
-    // its answer. Nothing else on this screen is worth interrupting for — and
-    // the body of the screen used to be a live region all by itself.
-    expect(read.liveRegions, hasLength(2));
-    expect(read.liveRegions.first, 'Turno abierto');
+    // Three things interrupt now, and each one earns it: the drawer is from
+    // another day and has to be closed before today's money goes in, the drawer's
+    // state changed, or the count revealed its answer. Nothing else on this screen
+    // is worth interrupting for — and the body of the screen used to be a live
+    // region all by itself, which is what this test was written against.
+    expect(read.liveRegions, hasLength(3));
+    expect(read.liveRegions.first, contains('un día anterior'));
+    expect(read.liveRegions[1], 'Turno abierto');
     expect(read.liveRegions.last, contains('Efectivo esperado'));
 
     handle.dispose();

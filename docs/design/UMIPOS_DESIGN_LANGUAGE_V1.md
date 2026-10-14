@@ -107,6 +107,17 @@ Cada estado vacío debe explicar la causa y una acción útil. Un estado vacío 
 - Usa un sheet del carrito bajo 900 píxeles.
 - No se certifica una interfaz POS para teléfono.
 
+### Galaxy Tab A11 — ajuste del 13 de octubre de 2026
+
+- Usa la densidad nativa de 213 dpi en la pantalla de 800 por 1340 píxeles físicos.
+- Admite vertical y horizontal. La ventana completa mide aproximadamente 601 por 1007 píxeles lógicos, o su inversa.
+- Reserva cada margen del sistema una sola vez. La cabecera consume el superior; la navegación inferior consume el inferior.
+- Usa una cabecera de 56 píxeles lógicos en la comanda compacta.
+- Usa tarjetas de 168 píxeles de altura en vertical. En horizontal corto, usa filas de 108 píxeles con imagen pequeña.
+- Conserva el nombre y el precio antes de abrir el producto.
+- Encuadra los elementos del plano en una vista corta. Conserva objetivos táctiles de 48 píxeles y permite desplazamiento cuando falta altura.
+- Conserva el carrito como panel desde 900 píxeles y como sheet por debajo de ese ancho.
+
 ## Movimiento
 
 - Usa movimiento Material local y corto.

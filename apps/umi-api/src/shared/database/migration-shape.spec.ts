@@ -173,9 +173,9 @@ describe('forward migrations · the shape every file must take', () => {
       });
 
       it('guards every `create policy` with a drop', () => {
-        const creates = sql.match(/create policy \w+ on/gi) ?? [];
-        const drops = sql.match(/drop policy if exists \w+ on/gi) ?? [];
-        expect(drops.length).toBe(creates.length);
+        const creates = pairs(sql, CREATE_POLICY);
+        const drops = new Set(pairs(sql, DROP_POLICY));
+        expect(creates.filter((created) => !drops.has(created))).toEqual([]);
       });
 
       it('does NOT disable an append-only trigger by hand', () => {

@@ -1,0 +1,17 @@
+ position | tender_type | amount_minor_units | tip_minor_units |      status       | business_date |               shift_id               | ledger_amount 
+----------+-------------+--------------------+-----------------+-------------------+---------------+--------------------------------------+---------------
+        0 | cash        |               4000 |               0 | confirmed_success | 2026-10-13    | f24921da-321c-48b0-bd78-96b16877a8ce |          4000
+        1 | cash        |               3000 |               0 | confirmed_success | 2026-10-13    | f24921da-321c-48b0-bd78-96b16877a8ce |          3000
+        2 | cash        |               2000 |               0 | confirmed_success | 2026-10-13    | f24921da-321c-48b0-bd78-96b16877a8ce |          2000
+(3 rows)
+
+                  id                  |               cart_id                |         receipt_snapshot_id          |         committed_at          
+--------------------------------------+--------------------------------------+--------------------------------------+-------------------------------
+ f277ee85-8617-4e3d-b89b-8473fc4ceadb | db0a4449-3bc6-4ea2-b6be-be399bc238a3 | f561cc34-46a4-452e-9d0c-044fab1ef5e7 | 2026-10-14 13:37:51.649309+00
+(1 row)
+
+ cash_entries | cash_total_minor | shifts | duplicate_close_entries 
+--------------+------------------+--------+-------------------------
+            3 |             9000 |      1 |                       0
+(1 row)
+

@@ -210,7 +210,7 @@ final class CredentialVault
   Future<String?> accessToken() => _storage.read(_access);
 
   @override
-  Future<Map<String, String>> deviceHeaders() async {
+  Future<Map<String, String>> deviceHeaders({String? path}) async {
     final identity = await deviceIdentity();
     if (!identity.isEnrolled) return {};
     return {

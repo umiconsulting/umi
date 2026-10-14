@@ -1,0 +1,10 @@
+apps/umi-dashboard                       |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+> @umi/api@0.1.0 typecheck /home/juan/Projects/umiconsulting/umi/apps/umi-api
+> tsc --noEmit
+
+src/modules/pos-hardware/pos-hardware.repository.spec.ts(70,9): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+src/modules/pos-hardware/pos-hardware.repository.spec.ts(95,7): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+/home/juan/Projects/umiconsulting/umi/apps/umi-api:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @umi/api@0.1.0 typecheck: `tsc --noEmit`
+Exit status 2

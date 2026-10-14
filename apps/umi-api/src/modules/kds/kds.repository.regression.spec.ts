@@ -15,6 +15,15 @@ describe('KDS order scope query regression', () => {
 });
 
 describe('KDS device location query regression', () => {
+  // The till's board is the one caller that gets the SAME ticket once per station —
+  // the bar's drink and the kitchen's pizza — so the row it reads has to carry the
+  // station's name, not just its id. Dropping the name from this SELECT is invisible in
+  // a single-station café and unusable in a two-station one.
+  it('names the station on the board row, so a till can tell its cards apart', () => {
+    expect(source).toContain('s.name AS station_name');
+    expect(source).toContain('JOIN merchant.station s ON s.id=v.station_id');
+  });
+
   it('uses the device registry location with a legacy session fallback', () => {
     expect(source).toContain("COALESCE(dv.location_id::text, s.metadata->>'location_id') = $2");
     expect(source).toContain(

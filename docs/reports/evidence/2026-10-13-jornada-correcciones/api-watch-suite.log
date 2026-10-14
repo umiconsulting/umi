@@ -1,0 +1,12 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/realtime/kitchen-board.events.spec.ts (4 tests) 186ms
+ ✓ src/modules/kds/kds.service.spec.ts (59 tests) 46ms
+
+ Test Files  2 passed (2)
+      Tests  63 passed (63)
+   Start at  13:20:27
+   Duration  750ms (transform 291ms, setup 0ms, collect 619ms, tests 232ms, environment 0ms, prepare 109ms)
+

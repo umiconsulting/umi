@@ -1,0 +1,179 @@
+########## PASS 2
+== 001_example_rerunnable.sql
+psql:<stdin>:15: NOTICE:  schema "merchant" already exists, skipping
+psql:<stdin>:54: NOTICE:  001_example_rerunnable: no change. This file documents the shape.
+== 002_onca_onboarding.sql
+psql:<stdin>:540: NOTICE:  002_onca_onboarding: ONCA present. 51 products (24 require preparation), 24 variants, 2 stations, 2 kitchen routes. No login and no devices were created — invite the owner from the dashboard, then enrol each tablet from the app.
+== 003_updated_at_trigger_parity.sql
+psql:<stdin>:100: NOTICE:  003_updated_at_trigger_parity: attached touch_updated_at to merchant.pos_account_counter
+psql:<stdin>:100: NOTICE:  003_updated_at_trigger_parity: attached touch_updated_at to merchant.receipt_counter
+psql:<stdin>:100: NOTICE:  003_updated_at_trigger_parity: attached 2 missing trigger(s); every base table with updated_at now carries it.
+== 004_pos_fired_order.sql
+psql:<stdin>:50: NOTICE:  column "fired_order_id" of relation "pos_cart" already exists, skipping
+psql:<stdin>:196: NOTICE:  004_pos_fired_order: order.fire held by 5 role(s); fired_order_id present. Route and checkout branch still to come.
+== 005_pos_cart_fulfillment.sql
+psql:<stdin>:33: NOTICE:  column "fulfillment_type" of relation "pos_cart" already exists, skipping
+== 006_pos_cart_second_round.sql
+psql:<stdin>:36: NOTICE:  column "fired_at" of relation "pos_cart_line" already exists, skipping
+psql:<stdin>:53: NOTICE:  constraint "pos_cart_line_cart_id_identity_key_key" of relation "pos_cart_line" does not exist, skipping
+psql:<stdin>:56: NOTICE:  relation "pos_cart_line_unfired_identity_uidx" already exists, skipping
+== 007_pos_cancellation_reason_code.sql
+psql:<stdin>:30: NOTICE:  column "cancellation_reason_code" of relation "pos_cart" already exists, skipping
+== 008_controlled_reprint_printer_id.sql
+== 009_transition_finds_its_print_job.sql
+== 010_pos_cart_column_grants.sql
+== 011_hardware_command_without_open_shift.sql
+== 012_cash_shift_adoption_custody.sql
+== 013_cash_count_while_counting.sql
+== 014_merchant_branding_logo.sql
+psql:<stdin>:44: NOTICE:  relation "merchant_branding_logo" already exists, skipping
+== 015_cash_shift_resume_custody.sql
+== 016_hardware_runtime_sees_its_own_till.sql
+psql:<stdin>:38: NOTICE:  function merchant.read_hardware_runtime(uuid,uuid,uuid,uuid) does not exist, skipping
+== 017_reprint_refreshes_the_mark.sql
+== 018_pos_table_accounts.sql
+psql:<stdin>:5: NOTICE:  column "table_id" of relation "pos_cart" already exists, skipping
+psql:<stdin>:5: NOTICE:  column "table_name" of relation "pos_cart" already exists, skipping
+psql:<stdin>:5: NOTICE:  column "table_visit_id" of relation "pos_cart" already exists, skipping
+psql:<stdin>:7: NOTICE:  column "order_item_id" of relation "pos_cart_line" already exists, skipping
+psql:<stdin>:10: NOTICE:  relation "pos_cart_open_table_uidx" already exists, skipping
+psql:<stdin>:12: NOTICE:  relation "pos_cart_line_order_item_idx" already exists, skipping
+psql:<stdin>:15: NOTICE:  column "visit_id" of relation "table_state" already exists, skipping
+== 019_cancel_sent_cart_line.sql
+== 020_waiter_role_template.sql
+== 021_pos_account_metadata.sql
+psql:<stdin>:2: NOTICE:  column "account_number" of relation "pos_cart" already exists, skipping
+psql:<stdin>:3: NOTICE:  relation "pos_cart_account_number_uidx" already exists, skipping
+psql:<stdin>:5: NOTICE:  column "source_context" of relation "customer_order" already exists, skipping
+psql:<stdin>:6: NOTICE:  column "source_context" of relation "kitchen_order" already exists, skipping
+== 022_receipt_folio.sql
+psql:<stdin>:41: NOTICE:  relation "receipt_counter" already exists, skipping
+== 023_cash_shift_close_reason.sql
+psql:<stdin>:20: NOTICE:  column "closed_reason" of relation "cash_shift" already exists, skipping
+== 024_pos_day_close_policy.sql
+psql:<stdin>:33: NOTICE:  column "pos_day_close_policy" of relation "merchant" already exists, skipping
+== 025_pilot_business_calendar.sql
+== 026_void_after_preparation.sql
+== 027_void_only_same_business_day.sql
+== 028_authorizations_admin_only.sql
+== 029_kitchen_station_alerts.sql
+== 030_void_completed_kitchen_item.sql
+== 031_kitchen_station_completion.sql
+psql:<stdin>:4: NOTICE:  column "station_completed_at" of relation "kitchen_order_item" already exists, skipping
+== 032_checkout_service_policy.sql
+psql:<stdin>:3: NOTICE:  column "allow_dine_in_without_table" of relation "pos_checkout_policy" already exists, skipping
+== 033_kitchen_unassigned_routes.sql
+== 034_pos_push_tokens.sql
+psql:<stdin>:4: NOTICE:  column "fired_by_user_id" of relation "pos_cart_line" already exists, skipping
+psql:<stdin>:8: NOTICE:  relation "pos_cart_line_fired_actor_idx" already exists, skipping
+psql:<stdin>:29: NOTICE:  relation "pos_push_token" already exists, skipping
+psql:<stdin>:33: NOTICE:  relation "pos_push_token_recipient_idx" already exists, skipping
+psql:<stdin>:36: NOTICE:  relation "pos_push_token_session_idx" already exists, skipping
+== 035_bank_transfer_checkout.sql
+psql:<stdin>:10: NOTICE:  column "bank_transfer_enabled" of relation "pos_checkout_policy" already exists, skipping
+psql:<stdin>:10: NOTICE:  column "bank_transfer_holder_name" of relation "pos_checkout_policy" already exists, skipping
+psql:<stdin>:10: NOTICE:  column "bank_transfer_bank_name" of relation "pos_checkout_policy" already exists, skipping
+psql:<stdin>:10: NOTICE:  column "bank_transfer_clabe" of relation "pos_checkout_policy" already exists, skipping
+psql:<stdin>:10: NOTICE:  column "bank_transfer_account_number" of relation "pos_checkout_policy" already exists, skipping
+== 036_checkout_partial_payments.sql
+psql:<stdin>:30: NOTICE:  relation "pos_partial_payment" already exists, skipping
+psql:<stdin>:33: NOTICE:  relation "pos_partial_payment_cart_idx" already exists, skipping
+== 037_cancel_suspended_carried_accounts.sql
+== 038_daily_pos_account_number.sql
+psql:<stdin>:17: NOTICE:  column "daily_account_number" of relation "pos_cart" already exists, skipping
+psql:<stdin>:28: NOTICE:  relation "pos_account_counter" already exists, skipping
+psql:<stdin>:35: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_account_counter" does not exist, skipping
+psql:<stdin>:36: NOTICE:  policy "location_narrowing" for relation "merchant.pos_account_counter" does not exist, skipping
+psql:<stdin>:66: NOTICE:  relation "pos_cart_daily_account_number_uidx" already exists, skipping
+== 039_onca_production_readiness.sql
+== 040_onca_checkout_policy.sql
+########## 99_verify.sql
+psql:<stdin>:1143: NOTICE:  umi base tables:     22
+psql:<stdin>:1143: NOTICE:  merchant base tables:  149
+psql:<stdin>:1143: NOTICE:  runtime base tables: 28
+psql:<stdin>:1143: NOTICE:  build-v3 verify: OK
+DO
+########## security_gate.sql
+CREATE TABLE
+CREATE VIEW
+INSERT 0 49
+
+================= STRUCTURAL GATE =================
+ status |                                label                                
+--------+---------------------------------------------------------------------
+ FAIL   | api/worker have USAGE but NOT CREATE on extensions
+ PASS   | 0 active users with an email but NULL password hash
+ PASS   | 0 break-glass grants without an expiry
+ PASS   | 0 café roles granted platform-wide
+ PASS   | 0 foreign servers / user mappings / FDWs remain
+ PASS   | api CANNOT read umi.prospect / umi.audit_log
+ PASS   | api CANNOT read umi.user.password_hash
+ PASS   | api CANNOT read umi.user.password_salt
+ PASS   | api cannot UPDATE derived columns (normalized_value, business_date)
+ PASS   | api CAN read umi.user.email (identity col)
+ PASS   | api has ZERO privilege on runtime auth tables
+ PASS   | api holds no DML on any view
+ PASS   | api is NOT superuser / NOT bypassrls
+ PASS   | at most 1 unbounded platform grant (the bootstrap)
+ PASS   | at most one shared-password group survives (AB#116)
+ PASS   | audit tables carry outcome + request_id (PCI DSS 10.2.2)
+ PASS   | bind parameters are never logged (log_parameter_max_length = 0)
+ PASS   | bind parameters are never logged on error
+ PASS   | build-v3 order views exist (order_total, order_ticket)
+ PASS   | every api-reachable runtime table with merchant_id has RLS+FORCE
+ PASS   | every break-glass grant cites a reference and a justification
+ WARN   | every live platform grant holder has a second factor
+ PASS   | every request-path login role holds a SCRAM verifier (no md5)
+ PASS   | every retained legacy hash can still heal on login
+ PASS   | every umi/merchant view is security_invoker
+ PASS   | ghost @umi.invalid account is not active
+ PASS   | legacy-sha256 hashes do not grow (<=2: admin+barista @nectarcafe)
+ PASS   | merchant audit tables carry delegate_user_id
+ PASS   | merchant: every base table RLS+FORCE
+ PASS   | no api/worker* default ACL leaks (api locked)
+ PASS   | no extension installed outside pg_catalog/extensions
+ PASS   | no historical webhook PII in runtime
+ PASS   | no network/exec-capable extension installed
+ PASS   | no role holds UPDATE/DELETE on audit_log
+ PASS   | no role-level override re-enables statement logging
+ PASS   | no shared-password group is larger than AB#116's four accounts
+ PASS   | no Slack ids in café-readable audit_log
+ PASS   | PUBLIC cannot CREATE in schema public
+ PASS   | readonly CANNOT read runtime auth tables
+ PASS   | readonly CANNOT read umi.user.password_hash
+ PASS   | request-path roles are not exposed to duration-based logging
+ PASS   | request-path roles never log statements
+ SKIP   | some strong scrypt logins survive (functional)
+ PASS   | super_admin holds every permission key
+ PASS   | trigger funcs have pinned search_path
+ PASS   | umi.access_grant sealed from the request path (no DML, no read)
+ PASS   | umi per-café tables RLS+FORCE (4)
+ PASS   | umi.user_role sealed from the request path
+ PASS   | worker IS bypassrls (machinery)
+(49 rows)
+
+
+================= BEHAVIORAL GATE (as role api) =================
+SET
+DO
+PASS: empty/missing app.current_merchant -> 0 rows, no error (fail-closed)
+              set_config              
+--------------------------------------
+ a13905a2-0319-4cc1-cacf-eee47b75e309
+(1 row)
+
+DO
+PASS: EGR scope isolated; conversation_analytics + effective_entitlement do NOT leak cross-merchant
+              set_config              
+--------------------------------------
+ 1860305f-e864-d745-29e6-fb8830926cc6
+(1 row)
+
+PASS: Kalala scope sees exactly its own rows
+RESET
+
+================= ENFORCE =================
+psql:<stdin>:655: WARNING:  ACKNOWLEDGED GAP: every live platform grant holder has a second factor
+psql:<stdin>:655: WARNING:  NOT MEASURED ON THIS TARGET: some strong scrypt logins survive (functional)
+psql:<stdin>:655: ERROR:  SECURITY GATE FAILED: 1 structural check(s) failed
+CONTEXT:  PL/pgSQL function inline_code_block line 15 at RAISE

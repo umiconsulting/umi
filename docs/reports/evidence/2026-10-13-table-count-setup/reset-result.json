@@ -1,0 +1,106 @@
+{
+  "closedAccounts": 36,
+  "removedTables": 11,
+  "planVersion": 11,
+  "historyBefore": {
+    "customer_order": {
+      "count": 19,
+      "sha256": "9ca914a2425be33218ac84aa571380eecc29f88a8ce17e48fe0fa368ea3ff033"
+    },
+    "kitchen_order": {
+      "count": 17,
+      "sha256": "ab0fde06a1397b78cd53cd3b9ab246d025325db8e2ef6f5481b3ccf50a22594c"
+    },
+    "kitchen_order_item": {
+      "count": 34,
+      "sha256": "8bb5a044788a7fd43572cced296758a9c8849b7b498fb55fa14587500dbe687f"
+    },
+    "order_discount": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "order_item_modifier": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "order_ticket": {
+      "count": 19,
+      "sha256": "a031f13ea729d7dcc10adda6b3b6cf1e61fc0cce278cc70d88c27ac5ceb86144"
+    },
+    "order_total": {
+      "count": 19,
+      "sha256": "2a0657597efec55b84d063b690b8d8264eff2637d5bd96aabda36b92a4628ea2"
+    },
+    "pos_cart_line": {
+      "count": 38,
+      "sha256": "3caaac227528bd0744a42c9184eecc39cef63cf15aa879cbbaa386d0901a8db7"
+    },
+    "pos_cart_line_modifier": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "pos_checkout_draft": {
+      "count": 9,
+      "sha256": "c0b3916930c2eded69ef26b663e55213ad5ec12dc9eccd42903ae29e4599861c"
+    },
+    "pos_payment_attempt": {
+      "count": 9,
+      "sha256": "35476d3a7c19fde1c94502a0e892bef0f7888a63f2a3506c35c3bfdb97a45091"
+    },
+    "table_order": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "historyAfter": {
+    "customer_order": {
+      "count": 19,
+      "sha256": "9ca914a2425be33218ac84aa571380eecc29f88a8ce17e48fe0fa368ea3ff033"
+    },
+    "kitchen_order": {
+      "count": 17,
+      "sha256": "ab0fde06a1397b78cd53cd3b9ab246d025325db8e2ef6f5481b3ccf50a22594c"
+    },
+    "kitchen_order_item": {
+      "count": 34,
+      "sha256": "8bb5a044788a7fd43572cced296758a9c8849b7b498fb55fa14587500dbe687f"
+    },
+    "order_discount": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "order_item_modifier": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "order_ticket": {
+      "count": 19,
+      "sha256": "a031f13ea729d7dcc10adda6b3b6cf1e61fc0cce278cc70d88c27ac5ceb86144"
+    },
+    "order_total": {
+      "count": 19,
+      "sha256": "2a0657597efec55b84d063b690b8d8264eff2637d5bd96aabda36b92a4628ea2"
+    },
+    "pos_cart_line": {
+      "count": 38,
+      "sha256": "3caaac227528bd0744a42c9184eecc39cef63cf15aa879cbbaa386d0901a8db7"
+    },
+    "pos_cart_line_modifier": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "pos_checkout_draft": {
+      "count": 9,
+      "sha256": "c0b3916930c2eded69ef26b663e55213ad5ec12dc9eccd42903ae29e4599861c"
+    },
+    "pos_payment_attempt": {
+      "count": 9,
+      "sha256": "35476d3a7c19fde1c94502a0e892bef0f7888a63f2a3506c35c3bfdb97a45091"
+    },
+    "table_order": {
+      "count": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "existingClosedAccountsPreserved": 23
+}

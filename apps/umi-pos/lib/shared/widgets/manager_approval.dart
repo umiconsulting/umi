@@ -1,8 +1,15 @@
-/// The manager's PIN, asked for over the money it authorizes.
+/// The manager's PIN, asked for over the act it authorizes.
 ///
 /// The approval used to be a second form: a wide empty box restating the
 /// operation, a PIN in a text field a thousand pixels wide, everything else
 /// blacked out, and — when the PIN was refused — nothing left on screen at all.
+///
+/// It began as the cash surface's dialog and is now the till's ONE approval
+/// surface, which is why it lives in `shared/` and why the parts that only cash
+/// has are nullable instead of filled with a stand-in: a void of an already-made
+/// dish is authorized by the same manager, with the same keypad, over the price
+/// that stops being charged. A prompt that named a register for a plate would be
+/// telling the manager about a drawer that is not part of the decision.
 ///
 /// This is built to four rules.
 ///
@@ -23,8 +30,8 @@
 /// keystrokes that are certain to be refused.
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
@@ -37,7 +44,9 @@ final class ManagerApprovalPrompt {
     required this.operation,
     required this.amount,
     required this.reason,
-    required this.registerName,
+    this.registerName,
+    this.reasonLabel,
+    this.cancelLabel,
     this.expectedInDrawer,
     this.expectedAfter,
   });
@@ -45,7 +54,17 @@ final class ManagerApprovalPrompt {
   final String operation;
   final String amount;
   final String reason;
-  final String registerName;
+
+  /// The register this act touches. Null when the act does not touch a drawer —
+  /// a product void — and the line is then left out rather than invented.
+  final String? registerName;
+
+  /// What the reason above is a reason FOR. Cash moves money and cancels plates:
+  /// the same sentence ("Motivo del movimiento") is wrong on one of them.
+  final String? reasonLabel;
+
+  /// The wording that abandons the act. Defaults to the cash sentence.
+  final String? cancelLabel;
 
   /// What the drawer is expected to hold now, and once this movement is booked.
   /// A manager authorizing money out of a drawer is entitled to see what the
@@ -80,25 +99,28 @@ ApprovalRefusal approvalRefusal(AppLocalizations l, String code) =>
       _ => ApprovalRefusal(l.cashOperationFailedMessage, retryable: true),
     };
 
-/// The manager's PIN, or `null` when the movement was abandoned.
-Future<String?> showCashApprovalDialog(
+/// The manager's PIN, or `null` when the act was abandoned.
+Future<String?> showManagerApprovalDialog(
   BuildContext context, {
   required ManagerApprovalPrompt request,
   String? failure,
   bool retryable = true,
-}) => showDialog<String>(
+}) => showPosDialog<String>(
   context: context,
   // One dim, not two. The cash screen already sits behind its own fullscreen
   // route's barrier, and a second barrier on top of that turned everything but
   // the app bar to black: the manager was authorizing money with no sight of
   // the drawer it was coming out of.
-  barrierColor: Colors.transparent,
-  builder: (_) =>
-      CashApprovalDialog(request: request, failure: failure, retryable: retryable),
+  barrierColor: PosColors.transparent,
+  builder: (_) => ManagerApprovalDialog(
+    request: request,
+    failure: failure,
+    retryable: retryable,
+  ),
 );
 
-final class CashApprovalDialog extends StatefulWidget {
-  const CashApprovalDialog({
+final class ManagerApprovalDialog extends StatefulWidget {
+  const ManagerApprovalDialog({
     required this.request,
     this.failure,
     this.retryable = true,
@@ -110,10 +132,10 @@ final class CashApprovalDialog extends StatefulWidget {
   final bool retryable;
 
   @override
-  State<CashApprovalDialog> createState() => _CashApprovalDialogState();
+  State<ManagerApprovalDialog> createState() => _ManagerApprovalDialogState();
 }
 
-final class _CashApprovalDialogState extends State<CashApprovalDialog> {
+final class _ManagerApprovalDialogState extends State<ManagerApprovalDialog> {
   final _pin = TextEditingController();
   final _focus = FocusNode();
 
@@ -173,7 +195,7 @@ final class _CashApprovalDialogState extends State<CashApprovalDialog> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final es = Localizations.localeOf(context).languageCode == 'es';
     final failure = widget.failure;
@@ -182,7 +204,7 @@ final class _CashApprovalDialogState extends State<CashApprovalDialog> {
       focusNode: _focus,
       autofocus: true,
       onKeyEvent: _onKey,
-      child: Dialog(
+      child: PosDialog(
         insetPadding: const EdgeInsets.all(UmiSpacing.lg),
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
@@ -199,49 +221,62 @@ final class _CashApprovalDialogState extends State<CashApprovalDialog> {
                 title: l.managerApprovalTitle,
                 onClose: () => Navigator.pop(context),
               ),
-              if (failure != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    UmiSpacing.lg,
-                    0,
-                    UmiSpacing.lg,
-                    UmiSpacing.lg,
-                  ),
-                  child: InlineNotice(
-                    message: failure,
-                    tone: InlineNoticeTone.error,
-                  ),
-                ),
-              // Equal heights for the two columns, so the hairline between them
-              // runs the full depth and neither side floats in its own space.
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: _ScopePane(request: widget.request)),
-                    VerticalDivider(
-                      width: 1,
-                      thickness: 1,
-                      color: scheme.outlineVariant,
-                    ),
-                    Expanded(
-                      child: _PinPane(
-                        length: _pin.text.length,
-                        hint: l.managerApprovalPinHint,
-                        label: l.managerPinLabel,
-                        es: es,
-                        enabled: widget.retryable,
-                        onDigit: _press,
-                        onBackspace: () => _press('back'),
-                        onClear: () => _press('clear'),
+              Flexible(
+                fit: FlexFit.loose,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (failure != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            UmiSpacing.lg,
+                            0,
+                            UmiSpacing.lg,
+                            UmiSpacing.lg,
+                          ),
+                          child: InlineNotice(
+                            message: failure,
+                            tone: InlineNoticeTone.error,
+                          ),
+                        ),
+                      // Equal heights for the two columns, so the hairline between them
+                      // runs the full depth and neither side floats in its own space.
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _ScopePane(request: widget.request),
+                            ),
+                            PosVerticalDivider(
+                              width: 1,
+                              thickness: 1,
+                              color: scheme.outlineVariant,
+                            ),
+                            Expanded(
+                              child: _PinPane(
+                                length: _pin.text.length,
+                                hint: l.managerApprovalPinHint,
+                                label: l.managerPinLabel,
+                                es: es,
+                                enabled: widget.retryable,
+                                onDigit: _press,
+                                onBackspace: () => _press('back'),
+                                onClear: () => _press('clear'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+              PosDivider(height: 1, thickness: 1, color: scheme.outlineVariant),
               _DecisionBar(
-                cancelLabel: l.managerApprovalCancelAction,
+                cancelLabel:
+                    widget.request.cancelLabel ?? l.managerApprovalCancelAction,
                 confirmLabel: l.managerApprovalAction,
                 onCancel: () => Navigator.pop(context),
                 onConfirm: _ready ? _submit : null,
@@ -262,7 +297,7 @@ final class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         UmiSpacing.lg,
@@ -273,10 +308,10 @@ final class _Header extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
-          IconButton(
+          PosIconButton(
             tooltip: AppLocalizations.of(context).closeAction,
             onPressed: onClose,
-            icon: const Icon(Icons.close),
+            icon: const PosIcon(PosGlyphs.close),
           ),
         ],
       ),
@@ -293,7 +328,7 @@ final class _ScopePane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final now = request.expectedInDrawer;
     final after = request.expectedAfter;
@@ -321,11 +356,16 @@ final class _ScopePane extends StatelessWidget {
             ),
           ),
           const SizedBox(height: UmiSpacing.lg),
-          Divider(height: 1, color: scheme.outlineVariant),
+          PosDivider(height: 1, color: scheme.outlineVariant),
           const SizedBox(height: UmiSpacing.lg),
-          _Fact(label: l.cashMovementReasonLabel, value: request.reason),
-          const SizedBox(height: UmiSpacing.md),
-          _Fact(label: l.registerAssignedLabel, value: request.registerName),
+          _Fact(
+            label: request.reasonLabel ?? l.cashMovementReasonLabel,
+            value: request.reason,
+          ),
+          if (request.registerName != null) ...[
+            const SizedBox(height: UmiSpacing.md),
+            _Fact(label: l.registerAssignedLabel, value: request.registerName!),
+          ],
           if (now != null && after != null) ...[
             const SizedBox(height: UmiSpacing.lg),
             _DrawerEffect(
@@ -365,7 +405,7 @@ final class _PinPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Padding(
       padding: const EdgeInsets.all(UmiSpacing.lg),
       child: Column(
@@ -414,7 +454,7 @@ final class _DecisionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = ButtonStyle(
+    final style = PosButtonStyle(
       minimumSize: WidgetStateProperty.all(
         const Size.fromHeight(UmiTouchTarget.primary + 4),
       ),
@@ -424,7 +464,7 @@ final class _DecisionBar extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: TextButton(
+            child: PosTextButton(
               onPressed: onCancel,
               style: style,
               child: Text(cancelLabel),
@@ -432,7 +472,7 @@ final class _DecisionBar extends StatelessWidget {
           ),
           const SizedBox(width: UmiSpacing.md),
           Expanded(
-            child: FilledButton(
+            child: PosButton(
               onPressed: onConfirm,
               style: style,
               child: Text(confirmLabel),
@@ -461,7 +501,7 @@ final class _DrawerEffect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -498,7 +538,7 @@ final class _EffectRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
@@ -514,13 +554,14 @@ final class _EffectRow extends StatelessWidget {
         const SizedBox(width: UmiSpacing.sm),
         Text(
           value,
-          style: (emphasized
-                  ? theme.textTheme.titleMedium
-                  : theme.textTheme.bodyLarge)
-              ?.copyWith(
-                fontWeight: emphasized ? FontWeight.w600 : FontWeight.w400,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+          style:
+              (emphasized
+                      ? theme.textTheme.titleMedium
+                      : theme.textTheme.bodyLarge)
+                  ?.copyWith(
+                    fontWeight: emphasized ? FontWeight.w600 : FontWeight.w400,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
         ),
       ],
     );
@@ -535,7 +576,7 @@ final class _Fact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -559,12 +600,180 @@ final class _Eyebrow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     return Text(
       text.toUpperCase(),
       style: theme.textTheme.labelMedium?.copyWith(
         color: theme.colorScheme.onSurfaceVariant,
         letterSpacing: 1.2,
+      ),
+    );
+  }
+}
+
+/// The operator's own PIN, asked for over the action it unlocks.
+///
+/// The manager's PIN says "this person authorizes the money"; this one says
+/// "this is the operator standing at the till". Same drawing, because it is the
+/// same idea — a secret typed on a counter tablet with no keyboard — and a
+/// second way of asking for it would be the second control this file exists to
+/// avoid.
+///
+/// Returns the PIN, or `null` when the ask was abandoned.
+Future<String?> showOperatorPinDialog(
+  BuildContext context, {
+  required String title,
+  required String confirmLabel,
+  String? failure,
+  bool retryable = true,
+}) => showPosDialog<String>(
+  context: context,
+  // Transparent for the same reason as the approval: the screen behind this
+  // dialog is the shift the PIN is about to bring back.
+  barrierColor: PosColors.transparent,
+  builder: (_) => OperatorPinDialog(
+    title: title,
+    confirmLabel: confirmLabel,
+    failure: failure,
+    retryable: retryable,
+  ),
+);
+
+final class OperatorPinDialog extends StatefulWidget {
+  const OperatorPinDialog({
+    required this.title,
+    required this.confirmLabel,
+    this.failure,
+    this.retryable = true,
+    super.key,
+  });
+
+  final String title;
+  final String confirmLabel;
+  final String? failure;
+  final bool retryable;
+
+  @override
+  State<OperatorPinDialog> createState() => _OperatorPinDialogState();
+}
+
+final class _OperatorPinDialogState extends State<OperatorPinDialog> {
+  final _pin = TextEditingController();
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  bool get _ready => widget.retryable && _pin.text.length >= 4;
+
+  void _press(String key) {
+    setState(() {
+      if (key == 'back') {
+        if (_pin.text.isNotEmpty) {
+          _pin.text = _pin.text.substring(0, _pin.text.length - 1);
+        }
+      } else if (key == 'clear') {
+        _pin.clear();
+      } else if (_pin.text.length < 8) {
+        _pin.text = _pin.text + key;
+      }
+    });
+  }
+
+  /// A physical keyboard keeps working, exactly as on the manager's dialog.
+  void _onKey(KeyEvent event) {
+    if (!widget.retryable) return;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return;
+    final character = event.character;
+    if (character != null &&
+        character.length == 1 &&
+        '0123456789'.contains(character)) {
+      _press(character);
+      return;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.backspace ||
+        event.logicalKey == LogicalKeyboardKey.delete) {
+      _press('back');
+      return;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _submit();
+    }
+  }
+
+  void _submit() {
+    if (!_ready) return;
+    Navigator.pop(context, _pin.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = PosTheme.of(context);
+    final scheme = theme.colorScheme;
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    final failure = widget.failure;
+
+    return KeyboardListener(
+      focusNode: _focus,
+      autofocus: true,
+      onKeyEvent: _onKey,
+      child: PosDialog(
+        insetPadding: const EdgeInsets.all(UmiSpacing.lg),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(UmiRadius.surface),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _Header(
+                title: widget.title,
+                onClose: () => Navigator.pop(context),
+              ),
+              if (failure != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    UmiSpacing.lg,
+                    0,
+                    UmiSpacing.lg,
+                    UmiSpacing.lg,
+                  ),
+                  child: InlineNotice(
+                    message: failure,
+                    tone: InlineNoticeTone.error,
+                  ),
+                ),
+              _PinPane(
+                length: _pin.text.length,
+                label: l.operatorPinLabel,
+                hint: l.operatorPinHint,
+                es: es,
+                enabled: widget.retryable,
+                onDigit: _press,
+                onBackspace: () => _press('back'),
+                onClear: () => _press('clear'),
+              ),
+              const SizedBox(height: UmiSpacing.md),
+              PosDivider(height: 1, thickness: 1, color: scheme.outlineVariant),
+              _DecisionBar(
+                cancelLabel: l.closeAction,
+                confirmLabel: widget.confirmLabel,
+                onCancel: () => Navigator.pop(context),
+                onConfirm: _ready ? _submit : null,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

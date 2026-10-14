@@ -52,11 +52,17 @@ final class CheckoutState {
     this.errorCode,
     this.provisionalReceipt,
     this.failureDetails,
+    this.postCommitWarning,
   });
   final CheckoutPhase phase;
   final CheckoutResult? result;
   final String? errorCode;
   final ProvisionalReceipt? provisionalReceipt;
+
+  /// A warning from the hardware that ran AFTER a completed sale — the drawer's
+  /// pulse especially. The money is recorded either way; what failed is the
+  /// signal that opens the drawer, and the cashier has no other way to hear it.
+  final String? postCommitWarning;
 
   /// The facts a typed refusal carried (`ApiError.details`), so the failure
   /// surface can offer the recovery action the code names instead of a bare
@@ -67,6 +73,30 @@ final class CheckoutState {
   /// shift: `free | held_by_this_device | held_by_active_till |
   /// held_by_orphaned_till`.
   String? get holdState => failureDetails?['holdState'] as String?;
+
+  /// The shift the refusal refused over, when it named one. The resume recovery
+  /// acts on THIS id instead of re-deriving "the current shift" from the cash
+  /// screen, which is what leaves an operator pressing a button that cannot work
+  /// after an app update moved the session on.
+  String? get holdShiftId => _detailString('shiftId');
+
+  /// One field out of a refusal, whatever shape the envelope took.
+  ///
+  /// `failureDetails` is the API's `details` map, and the platform's own client
+  /// notes that a thrown payload arrives NESTED: the filter wraps it as
+  /// `{ statusCode, error: { code, message, details } }`, so a field can sit one
+  /// level down from where the route put it. Reading only the top level is how a
+  /// recovery button ends up with a null it never reports — measured on the iMin
+  /// D3-504 on 2026-10-11: the till held the shift id in the refusal and pressed
+  /// the resume anyway with nothing to resume.
+  String? _detailString(String key) {
+    for (final bag in [failureDetails, failureDetails?['details'], failureDetails?['error']]) {
+      if (bag is! Map) continue;
+      final value = bag[key];
+      if (value is String && value.isNotEmpty) return value;
+    }
+    return null;
+  }
 }
 
 final class CheckoutController extends ChangeNotifier {
@@ -75,7 +105,7 @@ final class CheckoutController extends ChangeNotifier {
     OfflineCheckoutService? offlineCheckout,
     ConnectivityController? connectivity,
     required Telemetry telemetry,
-    Future<void> Function(CheckoutResult result)? afterCommit,
+    Future<String?> Function(CheckoutResult result)? afterCommit,
     Future<void> Function(ProvisionalReceipt receipt)? afterOfflineCommit,
   }) : _repository = repository,
        _offlineCheckout = offlineCheckout,
@@ -88,7 +118,7 @@ final class CheckoutController extends ChangeNotifier {
   final OfflineCheckoutService? _offlineCheckout;
   final ConnectivityController? _connectivity;
   final Telemetry _telemetry;
-  final Future<void> Function(CheckoutResult result)? _afterCommit;
+  final Future<String?> Function(CheckoutResult result)? _afterCommit;
   final Future<void> Function(ProvisionalReceipt receipt)? _afterOfflineCommit;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
@@ -104,6 +134,7 @@ final class CheckoutController extends ChangeNotifier {
   String? _cashShiftId;
   int? _cartVersion;
   String _paymentMethod = 'cash';
+  bool _partialLedgerFinalization = false;
   Cart? _cart;
   OfflineAuthorityContext? _authority;
   String _locationName = '';
@@ -120,6 +151,44 @@ final class CheckoutController extends ChangeNotifier {
   /// The policy describes the LOCATION, so it lives here and survives a reset.
   CheckoutPolicy? _policy;
   CheckoutPolicy? get policy => _policy;
+  bool get supportsPartialPayments => _repository is PartialPaymentRepository;
+  bool get canCollectPartialPayments => supportsPartialPayments && _worthTryingOnline;
+
+  Future<Map<String, Object?>> partialPayments({
+    required String merchantId,
+    required String cartId,
+    required String locationId,
+    required String operatorSessionId,
+  }) {
+    final repository = _repository;
+    if (repository is! PartialPaymentRepository || !_worthTryingOnline) {
+      throw StateError('PARTIAL_PAYMENTS_UNAVAILABLE');
+    }
+    return (repository as PartialPaymentRepository).partialPayments(
+      merchantId,
+      cartId,
+      CheckoutPartialPaymentQuery(
+        locationId: locationId,
+        operatorSessionId: operatorSessionId,
+      ),
+    ).then((result) => result.data);
+  }
+
+  Future<Map<String, Object?>> collectPartialPayment({
+    required String merchantId,
+    required String cartId,
+    required Map<String, Object?> command,
+  }) {
+    final repository = _repository;
+    if (repository is! PartialPaymentRepository || !_worthTryingOnline) {
+      throw StateError('PARTIAL_PAYMENTS_UNAVAILABLE');
+    }
+    return (repository as PartialPaymentRepository).collectPartialPayment(
+      merchantId,
+      cartId,
+      CheckoutPartialPaymentRequest.fromJson(command),
+    ).then((result) => result.data);
+  }
 
   /// The card-present provider this location may actually use, or null.
   ///
@@ -158,6 +227,7 @@ final class CheckoutController extends ChangeNotifier {
     String locationName = '',
     String operatorName = '',
     int? cashReceivedMinorUnits,
+    bool partialLedgerFinalization = false,
     List<Map<String, Object?>> tenderDrafts = const [],
     Map<String, Object?>? tipDraft,
     List<Map<String, Object?>> discountDrafts = const [],
@@ -174,6 +244,7 @@ final class CheckoutController extends ChangeNotifier {
     _cartId = cartId;
     _cartVersion = cartVersion;
     _paymentMethod = paymentMethod;
+    _partialLedgerFinalization = partialLedgerFinalization;
     _cashShiftId = cashShiftId;
     _cart = cart;
     _authority = authority;
@@ -226,7 +297,13 @@ final class CheckoutController extends ChangeNotifier {
     // type for comes from, and an escape here left the sheet on the spinner the
     // phase above just set. See `_unexpected`.
     try {
-      final terminalFailure = await _captureTerminalTenders();
+      // The partial-payment endpoint already persisted the operator's
+      // confirmation and reference for each external tender. A final checkout
+      // links that ledger; capturing the same terminal tender here again would
+      // create a second attempt after the money was recorded.
+      final terminalFailure = _partialLedgerFinalization
+          ? null
+          : await _captureTerminalTenders();
       if (terminalFailure != null) {
         _set(
           CheckoutState(
@@ -472,6 +549,26 @@ final class CheckoutController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The customer-value half of the checkout command, with the absent optionals LEFT OUT.
+  ///
+  /// `CustomerValueSelection.toJson()` is generated and writes every key, so the fields the sale
+  /// has no value for travel as `null`. The contract declares those fields optional, which makes an
+  /// explicit null a DIFFERENT thing from an absent one, and the ones the database reads as arrays
+  /// (`storedValueAuthorizationIds`, `fundedGiftCards`) are refused or explode when they arrive as
+  /// null: measured on the iMin D3-504 on 2026-10-11, a customer sale that had just earned its
+  /// preview was answered
+  /// `400 VALIDATION_FAILED … fieldErrors: {"customerValue.fundedGiftCards":["Expected array, received null"]}`.
+  /// Dropping the nulls is what the contract asks for: `z.array(...).optional()`, `.nullable().optional()`
+  /// and `.default(null)` all mean "absent is fine", and none of them means "null is fine".
+  static Map<String, Object?>? _customerValuePayload(
+    CustomerValueSelection? selection,
+  ) {
+    final json = selection?.toJson();
+    if (json == null) return null;
+    json.removeWhere((_, value) => value == null);
+    return json;
+  }
+
   Future<void> confirm() async {
     final fingerprint = _state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
@@ -673,6 +770,7 @@ final class CheckoutController extends ChangeNotifier {
     _cashShiftId = null;
     _cartVersion = null;
     _paymentMethod = 'cash';
+    _partialLedgerFinalization = false;
     _cart = null;
     _authority = null;
     _locationName = '';
@@ -763,7 +861,7 @@ final class CheckoutController extends ChangeNotifier {
           approvalIds: _approvalIds,
           receiptDelivery: _receiptDelivery,
           cashShiftId: _cashShiftId,
-          customerValue: _customerValueSelection?.toJson(),
+          customerValue: _customerValuePayload(_customerValueSelection),
         ),
       );
       final storedValueFingerprint =
@@ -819,9 +917,30 @@ final class CheckoutController extends ChangeNotifier {
     final callback = _afterCommit;
     if (callback == null) return;
     unawaited(
-      callback(result).catchError((Object _) {
-        _event('hardware_recovery_required');
-      }),
+      () async {
+        try {
+          final warning = await callback(result);
+          if (warning == null || _state.phase != CheckoutPhase.completed) {
+            return;
+          }
+          // The sale is done; this is a fact about the drawer the operator is
+          // standing in front of. It rides the state the receipt screen reads,
+          // so it appears where the cashier is rather than in a log.
+          final current = _state;
+          _set(
+            CheckoutState(
+              phase: current.phase,
+              result: current.result,
+              errorCode: current.errorCode,
+              provisionalReceipt: current.provisionalReceipt,
+              failureDetails: current.failureDetails,
+              postCommitWarning: warning,
+            ),
+          );
+        } catch (_) {
+          _event('hardware_recovery_required');
+        }
+      }(),
     );
   }
 

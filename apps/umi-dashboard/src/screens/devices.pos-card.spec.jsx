@@ -54,7 +54,15 @@ describe('Tarjeta de caja UmiPOS', () => {
   });
 
   it('ofrece el botón de editar de la caja', () => {
-    expect(render()).toContain('aria-label="Editar caja"');
+    expect(render()).toContain('aria-label="Editar dispositivo"');
+  });
+
+  // One binary serves both jobs, and the card must say which job the tablet has. A
+  // register defaults to the till; a device the owner switched to `kds` reads as a
+  // kitchen board so the two are never confused in the grid.
+  it('marca el modo del dispositivo y cambia con el tipo', () => {
+    expect(render()).toContain('UMIPOS');
+    expect(render({ type: 'kds' })).toContain('UMIKDS');
   });
 });
 
@@ -88,8 +96,10 @@ describe('Panel de la caja UmiPOS', () => {
       ),
     );
 
-    expect(markup).toContain('Gestionar caja');
+    expect(markup).toContain('Gestionar dispositivo');
     expect(markup).toContain('value="zaza"');
+    expect(markup).toContain('Modo');
+    expect(markup).toContain('UmiPOS · Caja');
     expect(markup).toContain('Modalidad');
     expect(markup).toContain('Móvil');
     expect(markup).toContain('Web');

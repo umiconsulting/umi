@@ -1,0 +1,34 @@
+[
+  {
+    "package": "co.umiconsulting.umi_pos",
+    "kind": "original",
+    "sha256": "31d9925c40f2cf30c1396432cc92b92e6a2b8122fa9c9c17af6677eac13d08e9",
+    "userId": "10133",
+    "versionCode": "1 minSdk=24 targetSdk=36",
+    "versionName": "0.1.0",
+    "firstInstallTime": "2026-10-05 18:48:18",
+    "lastUpdateTime": "2026-10-09 10:26:43"
+  },
+  {
+    "package": "co.umiconsulting.umi_pos.anterior",
+    "kind": "previous",
+    "sha256": "07ca1d1dcc71b9966eef9a72425bbc8c60367e0ab75c551feccd6586660eaa61",
+    "userId": "10135",
+    "versionCode": "1 minSdk=24 targetSdk=36",
+    "versionName": "0.1.0",
+    "firstInstallTime": "2026-10-09 10:54:54",
+    "lastUpdateTime": "2026-10-09 10:54:54",
+    "fatalMarkers": []
+  },
+  {
+    "package": "co.umiconsulting.umi_pos.estacion",
+    "kind": "current",
+    "sha256": "19551dd744bc0f1fff89a9249610340897dac771379fddfd98087ddadede324c",
+    "userId": "10136",
+    "versionCode": "1 minSdk=24 targetSdk=36",
+    "versionName": "0.1.0",
+    "firstInstallTime": "2026-10-09 10:56:43",
+    "lastUpdateTime": "2026-10-09 11:14:40",
+    "fatalMarkers": []
+  }
+]

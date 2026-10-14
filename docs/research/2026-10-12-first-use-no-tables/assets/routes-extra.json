@@ -1,0 +1,20 @@
+[
+  {
+    "name": "toast-setup",
+    "url": "https://support.toasttab.com/en/article/Self-Service-Guide",
+    "status": 200,
+    "imgs": []
+  },
+  {
+    "name": "toast-create",
+    "url": "https://support.toasttab.com/en/article/Creating-Service-Areas-and-Table-Setup-1493049150430?lang=en_US",
+    "status": 200,
+    "imgs": []
+  },
+  {
+    "name": "revo-create",
+    "url": "https://support.revo.works/es/articles/103",
+    "status": 200,
+    "imgs": []
+  }
+]

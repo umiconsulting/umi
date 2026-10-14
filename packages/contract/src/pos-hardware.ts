@@ -152,6 +152,10 @@ const SafeMetadata = z
     recovered: z.boolean().optional(),
     connectionState: HardwareConnectionState.optional(),
     attemptLimitReached: z.boolean().optional(),
+    pulsePath: z.enum(['service', 'sysfs']).optional(),
+    pulseNode: z.string().trim().min(1).max(160).optional(),
+    pulseValue: z.string().trim().min(1).max(32).optional(),
+    drawerSensor: z.number().int().optional(),
   })
   .strict();
 
@@ -323,7 +327,7 @@ const ReceiptItem = z
   .strict();
 const ReceiptTender = z
   .object({
-    type: z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card', 'other']),
+    type: z.enum(['cash', 'manual_terminal', 'bank_transfer', 'wallet', 'gift_card', 'other']),
     amountMinorUnits: z.number().int().nonnegative(),
     maskedReference: z.string().trim().max(80).nullable(),
   })
@@ -335,7 +339,33 @@ export const ReceiptPrintPayload = z
     locationName: z.string().trim().min(1).max(160),
     registerName: z.string().trim().max(160).nullable(),
     receiptNumber: PublicReference,
+    /**
+     * THE ORDER THIS PAPER BELONGS TO, IN THE NUMBER THE GUEST HEARS.
+     *
+     * The folio (`receiptNumber`) is the document's own consecutive number — the one
+     * the tax rule asks for and the back office counts with — and "TICKET 0001" says
+     * nothing to the person standing at the counter. The order number is the account
+     * the crew calls out, so it is the identity the customer can use, and the folio
+     * rides underneath it (owner, 2026-10-12).
+     */
+    orderNumber: z.string().trim().max(64).nullable().optional(),
+    /** The source sale's ticket, when this document is a refund or void. */
+    originalReceiptNumber: z.string().trim().max(80).nullable().optional(),
     businessDate: MerchantDate,
+    /**
+     * WHEN THIS DOCUMENT WAS ISSUED, IN THE CAFÉ'S OWN CLOCK.
+     *
+     * The paper carried the business date and nothing else, so every ticket of a day was the
+     * same ticket and two sales a minute apart could not be told apart on it. The value is the
+     * receipt's frozen instant expressed in the LOCATION's timezone — an ISO string carrying
+     * that offset — because the clock the guest and the cashier read is the café's: not the
+     * server's, and not whatever timezone a till happens to be set to.
+     *
+     * Optional, so a client built before this field still reads the payload it knows and a job
+     * frozen then still prints.
+     */
+    // Generated Dart clients include absent optional fields as explicit null.
+    issuedAt: IsoTimestamp.nullable().optional(),
     currency: CurrencyCode,
     items: z.array(ReceiptItem).max(500),
     subtotalMinorUnits: z.number().int().nonnegative(),
@@ -350,6 +380,66 @@ export const ReceiptPrintPayload = z
     exceptionMarker: z.enum(['refund', 'void', 'provisional']).nullable(),
     qrValue: z.string().trim().max(512).nullable(),
     footer: z.string().trim().max(500).nullable(),
+    /**
+     * THIS PAPER IS A DUPLICATE, AND IT SAYS SO.
+     *
+     * The head prints the word COPIA at the top. The rule the till follows is the
+     * one the market follows: the receipt printed AS PART OF THE SALE is the
+     * original, and anything printed afterwards — from Ventas, from a receipt the
+     * operator chose to print later, from a customer asking for another one — is a
+     * copy, and the person holding it has to be able to tell. Before this field the
+     * legend only appeared on a controlled reprint of an existing job, so a
+     * receipt printed for the first time from the sales history came out
+     * indistinguishable from an original (measured on the iMin D3-504,
+     * 2026-10-11).
+     *
+     * `nullable` as well as optional because the generated client bindings write
+     * an absent optional field as an explicit `null`, and a schema that refused
+     * that would refuse the till's own print (measured: 400 VALIDATION_FAILED with
+     * `copy: null` on the wire).
+     */
+    copy: z.boolean().nullable().optional(),
+    /**
+     * WHICH IMPRESSION THIS IS: 0 is the paper that came out of the sale, 1 the
+     * first copy, 2 the next, and so on.
+     *
+     * `copy` said only THAT a paper was a duplicate, so two reprints of the same sale
+     * were indistinguishable from each other on the counter and in the drawer (owner,
+     * 2026-10-12). The index is what lets the paper say COPIA and COPIA 2, and it is
+     * counted from the print jobs the receipt already has.
+     */
+    copyIndex: z.number().int().nonnegative().nullable().optional(),
+    /**
+     * EL IDIOMA DEL PAPEL.
+     *
+     * The words on the receipt are the café's, not the till's: the paper is read at
+     * the counter by a guest and filed for the tax authority, so it follows the
+     * MERCHANT's locale (`merchant.merchant.locale`) rather than whichever language
+     * the operator picked for their own screen. The till renders its labels from
+     * this value.
+     *
+     * Before it existed the paper had no language at all, so the renderer fell back
+     * to English literals and a Spanish café printed "Subtotal / Tax / TOTAL" while
+     * every screen around it said "Impuestos" (owner, 2026-10-12).
+     */
+    locale: z.string().trim().min(2).max(10).nullable().optional(),
+    /**
+     * THE IMPRESSION'S OWN UUID — the print job this paper came out of.
+     *
+     * The receipt's UUID is frozen in the barcode and belongs to the sale; this one
+     * belongs to the *impression*, which is what a staff member reading the paper, a
+     * customer asking about it and a developer looking at the job all need to point
+     * at the same row.
+     */
+    impressionId: z.string().trim().max(80).nullable().optional(),
+    /**
+     * The café's own mark, as `merchant.logo_url` held it when the sale committed
+     * (migration 014). A URL and not bytes: it is public and content-addressed, so a
+     * printer that can draw images fetches exactly the picture the customer's paper
+     * carried, and a printer that cannot ignores it. The till rasterises it for the
+     * head, because the head's geometry is the till's business.
+     */
+    logoUrl: z.string().trim().min(1).max(2048).nullable().optional(),
   })
   .strict();
 export const KitchenTicketPrintPayloadFoundation = z
@@ -477,6 +567,42 @@ export const HardwareRegistryQuery = z
     includeDisabled: z.coerce.boolean().default(false),
   })
   .strict();
+
+/**
+ * One piece of hardware, as the BACK OFFICE lists it.
+ *
+ * A different shape from `HardwareDevice` on purpose. The till's snapshot carries ids
+ * because the till joins them itself; the Dashboard exists so a person can read the
+ * inventory, and an id answers nothing to a person. So the register and the device that
+ * owns the hardware arrive as NAMES, resolved in the same query that reads the row.
+ */
+export const DashboardHardwareRow = z
+  .object({
+    id: Uuid,
+    locationId: Uuid,
+    type: HardwareDeviceType,
+    manufacturer: z.string().trim().min(1).max(120),
+    model: z.string().trim().min(1).max(120),
+    publicReference: PublicReference,
+    transport: HardwareTransport,
+    capabilities: z.array(HardwareCapability).max(32),
+    enabled: z.boolean(),
+    connectionState: HardwareConnectionState,
+    /** The register whose till it serves, by name. */
+    registerName: z.string().trim().min(1).max(120).nullable(),
+    /** The paired device it is attached to, by name. */
+    assignedDeviceName: z.string().trim().min(1).max(120).nullable(),
+    lastHeartbeatAt: IsoTimestamp.nullable(),
+    lastDiagnosticAt: IsoTimestamp.nullable(),
+    createdAt: IsoTimestamp,
+  })
+  .strict();
+export type DashboardHardwareRow = z.infer<typeof DashboardHardwareRow>;
+
+export const DashboardHardwareList = z
+  .object({ devices: z.array(DashboardHardwareRow).max(200) })
+  .strict();
+export type DashboardHardwareList = z.infer<typeof DashboardHardwareList>;
 export const RegisterHardwareRequest = z
   .object({
     locationId: Uuid,
@@ -582,6 +708,16 @@ export const HardwareCommandRequest = z
     drawer: CashDrawerCommand.nullable().default(null),
     display: CustomerDisplayState.nullable().default(null),
     printPayload: ReceiptPrintPayload.nullable().default(null),
+    /**
+     * The caller is printing a receipt the sale already finished — the reprint the
+     * sales history offers. The server owns the receipt's CONTENT (it rebuilds
+     * `printPayload` from the stored snapshot whatever the till sends, so a till
+     * cannot print a receipt nobody issued), and this flag is the one fact about
+     * the print that no content can carry: whether the paper is the original the
+     * sale printed or a duplicate made afterwards. It becomes the COPIA legend in
+     * the rebuilt payload, and it never reaches the money.
+     */
+    copy: z.boolean().nullable().optional(),
   })
   .strict();
 export const ControlledReprintRequest = z
@@ -708,4 +844,6 @@ export const posHardwareModels = {
   HardwareDiagnosticRequest,
   HardwareRecoveryQuery,
   HardwareRemoteClaimResult,
+  DashboardHardwareRow,
+  DashboardHardwareList,
 };

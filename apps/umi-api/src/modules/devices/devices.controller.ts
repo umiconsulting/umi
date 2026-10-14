@@ -33,7 +33,7 @@ import { MerchantAccessGuard } from '../auth/merchant-access.guard';
 import { EntitlementGuard } from '../auth/entitlement.guard';
 import { RequireProduct } from '../auth/require-product.decorator';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
-import { canSwitchLocations, resolveLocationAuthority } from '../auth/location-authority';
+import { locationScopeFor, resolveLocationAuthority } from '../auth/location-authority';
 import { DevicesService } from './devices.service';
 
 @UseGuards(AuthGuard)
@@ -231,7 +231,7 @@ export function deviceLocationScope(
   merchant: MerchantAccess,
   requestedLocationId?: string,
 ): string[] | null {
-  const locationId = resolveLocationAuthority(merchant, requestedLocationId);
-  if (locationId) return [locationId];
-  return canSwitchLocations(merchant) ? null : [];
+  // One implementation, in `location-authority`, where `resolveLocationAuthority` and
+  // `canSwitchLocations` already live: the hardware inventory asks the same question.
+  return locationScopeFor(merchant, requestedLocationId);
 }

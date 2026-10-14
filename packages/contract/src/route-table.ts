@@ -131,6 +131,40 @@ const posMerchantRoute = (input: {
 
 export const ROUTE_TABLE: readonly RouteDef[] = [
   posMerchantRoute({
+    id: 'pos.floorPlan.addTable',
+    method: 'POST',
+    suffix: '/floor-plan/tables',
+    dart: 'posFloorPlanAddTable',
+    request: 'AddPosTableRequest',
+    response: 'PublishedFloorPlan',
+    permission: 'cart.write',
+    errors: [
+      'PERMISSION_DENIED',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+      'FLOOR_PLAN_NOT_PUBLISHED',
+      'FLOOR_PLAN_DRAFT_PENDING',
+      'VALIDATION_ERROR',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.floorPlan.bootstrapTables',
+    method: 'POST',
+    suffix: '/floor-plan/bootstrap-tables',
+    dart: 'posFloorPlanBootstrapTables',
+    request: 'InitializePosTablesRequest',
+    response: 'PublishedFloorPlan',
+    permission: 'cart.write',
+    errors: [
+      'PERMISSION_DENIED',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+      'FLOOR_PLAN_ALREADY_CONFIGURED',
+      'FLOOR_PLAN_DRAFT_PENDING',
+      'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+    ],
+  }),
+  posMerchantRoute({
     id: 'pos.floorPlan',
     method: 'GET',
     suffix: '/floor-plan',
@@ -203,6 +237,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     response: 'TableStateChangeResult',
     permission: 'sale.lifecycle',
     errors: [
+      'TABLE_HAS_OPEN_ACCOUNT',
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
       'VALIDATION_FAILED',
@@ -238,6 +273,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     response: 'TableStateChangeResult',
     permission: 'sale.lifecycle',
     errors: [
+      'TABLE_HAS_OPEN_ACCOUNT',
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
       'VALIDATION_FAILED',
@@ -255,6 +291,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     response: 'TableStateChangeResult',
     permission: 'sale.lifecycle',
     errors: [
+      'TABLE_HAS_OPEN_ACCOUNT',
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
       'VALIDATION_FAILED',
@@ -1258,6 +1295,61 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     params: ['merchantId'],
     dart: null,
   },
+  // ── The café's own logo (migration 014) ─────────────────────────────────────
+  // The upload is the dashboard's; the asset is PUBLIC and immutable because
+  // that is what a logo is, and because the wallet pass builders fetch it over
+  // plain `fetch` with no credentials (`loadAsset` in stamp-strip.ts would get a
+  // 401 on a session route). Content-addressed, so a new upload is a new URL and
+  // no cache ever has to be busted.
+  {
+    id: 'merchants.brandingLogo',
+    method: 'PUT',
+    path: '/api/merchants/:merchantId/branding/logo',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'MerchantBrandingLogoUpload',
+      response: 'MerchantBrandingLogo',
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: false,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['VALIDATION_FAILED', 'PERMISSION_DENIED', 'MERCHANT_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'merchants.brandingLogoAsset',
+    method: 'GET',
+    path: '/logos/:asset',
+    params: ['asset'],
+    dart: null,
+  },
+  // The same URL, emptied. A café that wants its old logo gone should not have to
+  // upload a blank one; `logo_url` goes back to null with the bytes.
+  {
+    id: 'merchants.brandingLogoRemove',
+    method: 'DELETE',
+    path: '/api/merchants/:merchantId/branding/logo',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: null,
+      response: null,
+      auth: 'session',
+      permission: 'merchant.manage',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: false,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'MERCHANT_NOT_FOUND'],
+    },
+  },
   {
     id: 'merchants.locations',
     method: 'GET',
@@ -1752,6 +1844,33 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
   {
+    // The back office's hardware inventory. The till reads the same rows through
+    // `/api/v1/pos/.../hardware` with an operator session; this twin exists so a person
+    // can see what the café owns without standing at a till, which is what makes the
+    // printers count as inventory rather than as something only the till knows about.
+    id: 'hardware.list',
+    method: 'GET',
+    path: '/api/v1/merchants/:merchantId/hardware',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: null,
+      response: 'DashboardHardwareList',
+      // `device.enroll` and not `hardware.read`: this list lives on the Devices screen,
+      // whose gate is `device.enroll`. A handler stricter than the screen it answers
+      // would refuse a route the client already drew (role-surface rule 2).
+      auth: 'session',
+      permission: 'device.enroll',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'ENTITLEMENT_DISABLED'],
+    },
+  },
+  {
     id: 'devices.update',
     method: 'PATCH',
     path: '/api/v1/merchants/:merchantId/devices/:deviceId',
@@ -1936,6 +2055,8 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       pin: false,
       approval: false,
       errors: [
+        'OPERATOR_SESSION_BUSY',
+        'CART_ACTOR_BUSY',
         'PERMISSION_DENIED',
         'DEVICE_REVOKED',
         'LOCATION_SCOPE_VIOLATION',
@@ -2086,6 +2207,243 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     },
   },
 
+  {
+    id: 'pos.cartOpenAccounts',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/cart/open-accounts',
+    params: ['merchantId'],
+    dart: null,
+    contract: {
+      request: 'CartQuery',
+      response: 'OpenCartAccounts',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'CART_VERSION_CONFLICT',
+        'CART_ACCOUNT_BUSY',
+        'CART_ACTOR_BUSY',
+        'CART_PAYMENT_UNRESOLVED',
+        'KITCHEN_PREPARATION_STARTED',
+        'CART_LINE_DAY_CLOSED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_VALIDATION_FAILED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartAccountGet',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/cart/accounts/:cartId',
+    params: ['merchantId', 'cartId'],
+    dart: null,
+    contract: {
+      request: 'CartQuery',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'CART_VERSION_CONFLICT',
+        'CART_ACCOUNT_BUSY',
+        'CART_ACTOR_BUSY',
+        'CART_PAYMENT_UNRESOLVED',
+        'KITCHEN_PREPARATION_STARTED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_VALIDATION_FAILED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartTableOpen',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/table',
+    params: ['merchantId'],
+    dart: 'posCartTable',
+    contract: {
+      request: 'OpenTableAccountRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'CART_VERSION_CONFLICT',
+        'CART_ACCOUNT_BUSY',
+        'CART_ACTOR_BUSY',
+        'CART_PAYMENT_UNRESOLVED',
+        'KITCHEN_PREPARATION_STARTED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_VALIDATION_FAILED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartAccountResume',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/accounts/:cartId/resume',
+    params: ['merchantId', 'cartId'],
+    dart: 'posCartAccountResume',
+    contract: {
+      request: 'ResumeCartAccountRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'CART_VERSION_CONFLICT',
+        'CART_ACCOUNT_BUSY',
+        'CART_ACTOR_BUSY',
+        'CART_PAYMENT_UNRESOLVED',
+        'KITCHEN_PREPARATION_STARTED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_VALIDATION_FAILED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartSuspend',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/suspend',
+    params: ['merchantId'],
+    dart: 'posCartSuspend',
+    contract: {
+      request: 'SuspendCartRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'CART_VERSION_CONFLICT',
+        'CART_ACCOUNT_BUSY',
+        'CART_ACTOR_BUSY',
+        'CART_PAYMENT_UNRESOLVED',
+        'KITCHEN_PREPARATION_STARTED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_VALIDATION_FAILED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartSentLineRemove',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/lines/:lineId/cancel-sent',
+    params: ['merchantId', 'lineId'],
+    dart: 'posCartSentLineRemove',
+    contract: {
+      request: 'RemoveSentCartLineRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'RESOURCE_NOT_FOUND',
+        'CART_VERSION_CONFLICT',
+        'CART_ACCOUNT_BUSY',
+        'CART_ACTOR_BUSY',
+        'CART_PAYMENT_UNRESOLVED',
+        'KITCHEN_PREPARATION_STARTED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_VALIDATION_FAILED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartAccountDetails',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/accounts/:cartId/details',
+    params: ['merchantId', 'cartId'],
+    dart: 'posCartAccountDetails',
+    contract: {
+      request: 'SetCartAccountDetailsRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'CART_VALIDATION_FAILED',
+        'CART_VERSION_CONFLICT',
+        'CART_PAYMENT_UNRESOLVED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_TABLE_ACCOUNT_EXISTS',
+        'CART_ALREADY_ASSIGNED',
+      ],
+    },
+  } as const,
+  {
+    id: 'pos.cartAccountAssignTable',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/accounts/:cartId/table',
+    params: ['merchantId', 'cartId'],
+    dart: 'posCartAccountAssignTable',
+    contract: {
+      request: 'AssignCartTableRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: [
+        'PERMISSION_DENIED',
+        'CART_VALIDATION_FAILED',
+        'CART_VERSION_CONFLICT',
+        'CART_PAYMENT_UNRESOLVED',
+        'TABLE_NOT_IN_PLAN',
+        'CART_TABLE_ACCOUNT_EXISTS',
+        'CART_ALREADY_ASSIGNED',
+      ],
+    },
+  } as const,
   // ── POS cart ───────────────────────────────────────────────────────────────
   {
     id: 'pos.cartCreate',
@@ -2247,6 +2605,59 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT'],
     },
   },
+  {
+    id: 'pos.cartFulfillment',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/cart/fulfillment',
+    params: ['merchantId'],
+    dart: 'posCartFulfillment',
+    contract: {
+      request: 'SetCartFulfillmentRequest',
+      response: 'Cart',
+      auth: 'operator-session',
+      // The order type is data of the order, not its own primitive (plan §7 D5):
+      // the operator who may build the order may say how it leaves the counter.
+      permission: 'cart.write',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT'],
+    },
+  },
+
+  // ── The fired order ────────────────────────────────────────────────────────
+  //
+  // Sending an order to the kitchen before the money. ADR:
+  // docs/architecture/2026-10-07-pos-fired-order-adr.md.
+  //
+  // `order.fire` and NOT a kitchen permission, on purpose: this CREATES the order and
+  // its kitchen ticket, whereas every `kitchen.*` command acts on a ticket that already
+  // exists (and `fire_course` merely advances the courses of one). Naming it after the
+  // kitchen would file the one action that makes a ticket among the ones that consume it.
+  //
+  // The path is `/orders/fire` rather than `/cart/fire` because the cart is what is
+  // fired but the ORDER is what the action produces — and the order-level actions that
+  // follow (a second round, a split) belong under the same prefix.
+  posMerchantRoute({
+    id: 'pos.orderFire',
+    method: 'POST',
+    suffix: '/orders/fire',
+    dart: 'posOrderFire',
+    request: 'FireOrderRequest',
+    response: 'FireOrderResult',
+    permission: 'order.fire',
+    errors: [
+      'PERMISSION_DENIED',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+      'RESOURCE_NOT_FOUND',
+      'CART_EMPTY',
+      'VALIDATION_FAILED',
+    ],
+  }),
 
   // ── POS checkout ───────────────────────────────────────────────────────────
   {
@@ -2293,6 +2704,46 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       pin: false,
       approval: false,
       errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.checkoutPartialPayments',
+    method: 'GET',
+    path: '/api/v1/pos/merchants/:merchantId/checkout/carts/:cartId/partial-payments',
+    params: ['merchantId', 'cartId'],
+    dart: 'posCheckoutPartialPayments',
+    contract: {
+      request: 'CheckoutPartialPaymentQuery',
+      response: 'CheckoutPartialPaymentResult',
+      auth: 'operator-session',
+      permission: 'checkout.commit',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+    },
+  },
+  {
+    id: 'pos.checkoutCollectPartialPayment',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/checkout/carts/:cartId/partial-payments',
+    params: ['merchantId', 'cartId'],
+    dart: 'posCheckoutCollectPartialPayment',
+    contract: {
+      request: 'CheckoutPartialPaymentRequest',
+      response: 'CheckoutPartialPaymentResult',
+      auth: 'operator-session',
+      permission: 'checkout.commit',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'IDEMPOTENCY_CONFLICT'],
     },
   },
 
@@ -2677,6 +3128,11 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     request: 'ShiftTransitionRequest',
     response: 'CashShift',
     permission: 'cash.shift.suspend',
+    // A suspend is refused by name when the shift has moved on (a version the
+    // caller no longer holds) or when it is not in a state a pause can leave:
+    // only `open` may be suspended, and a drawer under count belongs to the
+    // count. The old answer for both was a 500.
+    errors: ['PERMISSION_DENIED', 'OPTIMISTIC_VERSION_CONFLICT', 'INVALID_SHIFT_TRANSITION'],
   }),
   posMerchantRoute({
     id: 'pos.cashResume',
@@ -2687,6 +3143,16 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     request: 'ShiftTransitionRequest',
     response: 'CashShift',
     permission: 'cash.shift.resume',
+    // The resume is the operation an app update forces: the drawer is still held
+    // by this very terminal, and only the operator session that opened it is
+    // gone. It is refused by name when the caller's version is stale, when the
+    // drawer is held by another terminal, or when the status does not admit it.
+    errors: [
+      'PERMISSION_DENIED',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'INVALID_SHIFT_TRANSITION',
+      'RESOURCE_NOT_FOUND',
+    ],
   }),
   posMerchantRoute({
     id: 'pos.cashAdopt',
@@ -3400,6 +3866,21 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     permission: 'sale.lifecycle',
   }),
   posMerchantRoute({
+    id: 'pos.carriedOverAccountsCancel',
+    method: 'POST',
+    suffix: '/sales/carried-over/cancel',
+    dart: 'posCarriedOverAccountsCancel',
+    request: 'CancelCarriedOverAccountsRequest',
+    response: 'CancelCarriedOverAccountsResult',
+    permission: 'sale.lifecycle',
+    errors: [
+      'PERMISSION_DENIED',
+      'CART_PAYMENT_UNRESOLVED',
+      'SALE_STATE_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+    ],
+  }),
+  posMerchantRoute({
     id: 'pos.saleCustomerAttach',
     method: 'POST',
     suffix: '/sales/:saleId/customer',
@@ -3500,6 +3981,48 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     permission: 'kitchen.read',
     errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
   }),
+  posMerchantRoute({
+    id: 'pos.kitchenUnassigned',
+    method: 'GET',
+    suffix: '/kitchen/unassigned',
+    dart: 'posKitchenUnassigned',
+    request: 'PosKitchenOrderQuery',
+    response: 'KitchenUnassignedResponse',
+    permission: 'kitchen.read',
+    errors: ['PERMISSION_DENIED'],
+  }),
+  posMerchantRoute({
+    id: 'pos.kitchenResolveUnassigned',
+    method: 'POST',
+    suffix: '/kitchen/unassigned/resolve-routes',
+    dart: 'posKitchenResolveUnassigned',
+    request: 'PosKitchenUnassignedCommandRequest',
+    response: 'KitchenUnassignedCommandResult',
+    permission: 'kitchen.station.manage',
+    errors: [
+      'PERMISSION_DENIED',
+      'RESOURCE_NOT_FOUND',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+      'KITCHEN_INVALID_TRANSITION',
+    ],
+  }),
+  posMerchantRoute({
+    id: 'pos.kitchenDiscardUnassigned',
+    method: 'POST',
+    suffix: '/kitchen/unassigned/discard',
+    dart: 'posKitchenDiscardUnassigned',
+    request: 'PosKitchenUnassignedCommandRequest',
+    response: 'KitchenUnassignedCommandResult',
+    permission: 'kitchen.cancel_ack',
+    errors: [
+      'PERMISSION_DENIED',
+      'RESOURCE_NOT_FOUND',
+      'OPTIMISTIC_VERSION_CONFLICT',
+      'IDEMPOTENCY_CONFLICT',
+      'KITCHEN_INVALID_TRANSITION',
+    ],
+  }),
   // The all-day count (§8H step 6). A sibling of the board rather than a field
   // on it: the board is polled every few seconds and answers "what is on the
   // rail NOW", while this is one aggregate per trading day that changes only when
@@ -3530,6 +4053,19 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     permission: 'kitchen.read',
     errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
   }),
+  // The stations of this kitchen, all of them, whether or not they have work. The
+  // board's chips read this instead of the tickets, so a station is a tab at 8 a.m. and
+  // not only when it happens to have something to cook (owner, 2026-10-13).
+  posMerchantRoute({
+    id: 'pos.kitchenStations',
+    method: 'GET',
+    suffix: '/kitchen/stations',
+    dart: 'posKitchenStations',
+    request: 'PosKitchenOrderQuery',
+    response: 'KitchenStationListResponse',
+    permission: 'kitchen.read',
+    errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
+  }),
   posMerchantRoute({
     id: 'pos.kitchenOrder',
     method: 'GET',
@@ -3538,7 +4074,8 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posKitchenOrder',
     request: 'PosKitchenOrderQuery',
     response: 'PosKitchenStatusResult',
-    permission: 'kitchen.read',
+    // Kitchen readers may inspect location tickets; order.fire readers only their own cart.
+    permission: 'order.fire',
     errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND'],
   }),
   // The write half of the same board (§8H step 3, defect D33). It shares the

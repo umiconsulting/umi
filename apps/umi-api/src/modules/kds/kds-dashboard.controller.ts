@@ -86,6 +86,12 @@ export class KdsDashboardController {
     return this.kds.listRoutes(t.merchantId, locationId ?? null);
   }
 
+  @Get('products')
+  @RequirePermission('kitchen.station.read')
+  products(@Merchant() t: MerchantAccess, @Query('search') search?: string) {
+    return this.kds.searchProducts(t.merchantId, search ?? '');
+  }
+
   @Post('routes')
   @RequirePermission('kitchen.station.manage')
   createRoute(

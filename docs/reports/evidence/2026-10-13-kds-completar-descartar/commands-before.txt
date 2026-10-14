@@ -1,0 +1,8 @@
+mark_item_ready|conflict|4|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}
+start_preparation|succeeded|3|{"status": "exception", "version": 4, "sequence": 258, "updatedAt": "2026-10-13T21:34:20.404Z", "kitchenOrderId": "50e2ef12-ba2f-4d0c-97be-41a28829257b"}
+mark_item_ready|conflict|3|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}
+mark_item_ready|conflict|3|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}
+mark_item_ready|conflict|3|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}
+mark_item_ready|conflict|3|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}
+mark_item_ready|conflict|3|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}
+mark_item_ready|conflict|3|{"code": "KITCHEN_INVALID_TRANSITION", "currentStatus": "exception"}

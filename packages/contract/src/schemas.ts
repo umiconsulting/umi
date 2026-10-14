@@ -37,6 +37,42 @@ export const SessionUser = z.object({
 });
 export type SessionUser = z.infer<typeof SessionUser>;
 
+/**
+ * `PUT /api/merchants/:merchantId/branding/logo` — the café's own logo, the one
+ * the ticket wears.
+ *
+ * It travels as base64 inside JSON rather than multipart because every other
+ * write in this contract is JSON, the dashboard already reads files with
+ * `FileReader`, and the API can therefore validate the whole request with the
+ * same pipe as everything else. `dataBase64`'s ceiling is the byte ceiling times
+ * base64's own expansion (4/3), so a body that passes the schema is under 256 KiB
+ * of image and the decode below cannot be talked into allocating more.
+ */
+export const MerchantBrandingLogoUpload = z
+  .object({
+    contentType: z.enum(['image/png', 'image/jpeg']),
+    dataBase64: z
+      .string()
+      .min(1)
+      .max(349_528)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  })
+  .strict();
+export type MerchantBrandingLogoUpload = z.infer<typeof MerchantBrandingLogoUpload>;
+
+/** What the upload answers, and what the dashboard draws its preview from. */
+export const MerchantBrandingLogo = z
+  .object({
+    /** Absolute, public and content-addressed: safe to cache forever. */
+    url: z.string().url().max(2048),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    contentType: z.enum(['image/png', 'image/jpeg']),
+    width: z.number().int().positive().max(4096),
+    height: z.number().int().positive().max(4096),
+  })
+  .strict();
+export type MerchantBrandingLogo = z.infer<typeof MerchantBrandingLogo>;
+
 /** Merchant membership as embedded in a session (login/refresh/me). Mirrors
  *  auth.repository MerchantMembershipSummary.
  *
@@ -388,6 +424,8 @@ export type GiftRedeemRequest = z.infer<typeof GiftRedeemRequest>;
 // refers to, so a route can only name a model that exists.
 
 export const httpModels = {
+  MerchantBrandingLogoUpload,
+  MerchantBrandingLogo,
   LoginRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,

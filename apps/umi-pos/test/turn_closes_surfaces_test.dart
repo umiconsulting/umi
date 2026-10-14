@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/app/umi_pos_app.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 /// Stands in for the till's session: the test decides when the turn ends.
 final class _Session extends ChangeNotifier {
@@ -28,12 +28,12 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         navigatorKey: navigator,
         home: TurnClosesSurfaces(
           session: session,
           hasTurn: () => session.ready,
-          child: const Scaffold(body: Text('El turno')),
+          child: const PosPage(body: Text('El turno')),
         ),
       ),
     );
@@ -41,8 +41,8 @@ void main() {
 
     unawaited(
       navigator.currentState!.push(
-        MaterialPageRoute<void>(
-          builder: (_) => const Scaffold(body: Text('Centro de caja')),
+        PosPageRoute<void>(
+          builder: (_) => const PosPage(body: Text('Centro de caja')),
         ),
       ),
     );
@@ -68,12 +68,12 @@ void main() {
     addTearDown(session.dispose);
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         navigatorKey: navigator,
         home: TurnClosesSurfaces(
           session: session,
           hasTurn: () => session.ready,
-          child: const Scaffold(body: Text('El turno')),
+          child: const PosPage(body: Text('El turno')),
         ),
       ),
     );
@@ -81,8 +81,8 @@ void main() {
 
     unawaited(
       navigator.currentState!.push(
-        MaterialPageRoute<void>(
-          builder: (_) => const Scaffold(body: Text('Centro de caja')),
+        PosPageRoute<void>(
+          builder: (_) => const PosPage(body: Text('Centro de caja')),
         ),
       ),
     );

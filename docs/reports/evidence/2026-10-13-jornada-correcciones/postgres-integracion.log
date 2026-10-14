@@ -1,0 +1,16 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+[Nest] 1401386  - 10/13/2026, 1:08:21 PM     LOG [PgService] D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)
+[Nest] 1401386  - 10/13/2026, 1:08:21 PM     LOG [PgService] Postgres pools ready (app + worker roles, no TLS — local/dev)
+stdout | src/modules/table-map/table-state.integration.ts > table state · the room, the turn timer, merge/split and the publish guard > the ACCEPTANCE LINE, measured: a party of eight moves table-to-table (server path)
+[acceptance] party of 8: 2 requests (seat + move), 12.9 ms wall clock
+
+ ✓ src/modules/table-map/table-state.integration.ts (41 tests) 970ms
+
+ Test Files  1 passed (1)
+      Tests  41 passed (41)
+   Start at  13:08:20
+   Duration  2.14s (transform 511ms, setup 0ms, collect 912ms, tests 970ms, environment 0ms, prepare 79ms)
+

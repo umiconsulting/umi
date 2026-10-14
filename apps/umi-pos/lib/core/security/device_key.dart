@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:umi_contract/umi_contract.dart' show UmiRoutes;
 
 import '../network/api_client.dart';
 import '../storage/storage.dart';
@@ -45,6 +46,12 @@ final class SoftwareDeviceKey implements DeviceKey {
 
   static const _seedKey = 'device.key_seed';
 
+  /// The key pair, derived once. The seed is stable for the life of the
+  /// install — nothing deletes `device.key_seed`, not even `clearDeviceTrust` —
+  /// so re-reading secure storage and re-deriving the pair on every signed
+  /// request bought nothing and cost a keystore read each time.
+  Future<SimpleKeyPair>? _keyPairCache;
+
   @override
   String get algorithm => 'ed25519';
 
@@ -57,7 +64,18 @@ final class SoftwareDeviceKey implements DeviceKey {
     return seed;
   }
 
-  Future<SimpleKeyPair> _keyPair() async =>
+  Future<SimpleKeyPair> _keyPair() {
+    final cached = _keyPairCache;
+    if (cached != null) return cached;
+    // A derivation that failed is not cached: the next signed request retries
+    // instead of replaying one failure forever.
+    return _keyPairCache = _deriveKeyPair().onError<Object>((error, stack) {
+      _keyPairCache = null;
+      throw error;
+    });
+  }
+
+  Future<SimpleKeyPair> _deriveKeyPair() async =>
       _algorithm.newKeyPairFromSeed(await _seed());
 
   @override
@@ -99,12 +117,29 @@ final class ProvingDeviceCredentials implements DeviceCredentialProvider {
   final DeviceKey _deviceKey;
   final DateTime Function() _clock;
 
+  /// Whether the server verifies a possession proof on this route.
+  ///
+  /// TWO ROUTES, and they are the whole list: the API reads
+  /// `x-umi-device-proof` in `PosAuthController.pinLogin` and `.refresh`
+  /// (`apps/umi-api/src/modules/auth/auth.controller.ts`) and nowhere else. The
+  /// names come from the contract, so a route rename cannot drift here in
+  /// silence.
+  ///
+  /// WHY IT MATTERS. Signing is two Ed25519 scalar multiplications in pure
+  /// Dart. On the pilot till every request paid them, and the poll loop makes
+  /// dozens of requests a minute: the profile showed the till spending about
+  /// half its CPU inside `Ed25519.sign`, with the UI starved. A proof the
+  /// server never reads protects nothing.
+  static bool requiresProof(String? path) =>
+      path == UmiRoutes.posPinLogin || path == UmiRoutes.posRefresh;
+
   @override
-  Future<Map<String, String>> deviceHeaders() async {
-    final base = await _inner.deviceHeaders();
+  Future<Map<String, String>> deviceHeaders({String? path}) async {
+    final base = await _inner.deviceHeaders(path: path);
     final installationId = base['x-umi-installation-id'];
     // No installation id means the device is not enrolled; nothing to prove.
     if (installationId == null) return base;
+    if (!requiresProof(path)) return base;
     final timestamp = _clock().toUtc().toIso8601String();
     final proof = await _deviceKey.sign(
       utf8.encode(deviceProofPayload(installationId, timestamp)),

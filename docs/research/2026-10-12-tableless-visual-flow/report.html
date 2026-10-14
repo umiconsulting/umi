@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Pedidos con mesa y sin mesa</title
+  ><style>
+    body {
+      margin: 0;
+      background: #f5f6f8;
+      color: #20242b;
+      font:
+        17px/1.55 system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 1120px;
+      margin: auto;
+      padding: 32px 24px;
+    }
+    a {
+      color: #175cad;
+    }
+    h1 {
+      font-size: 32px;
+      line-height: 1.2;
+    }
+    h2 {
+      margin-top: 36px;
+    }
+    nav {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      padding: 12px 0;
+      background: #f5f6f8;
+    }
+    section {
+      scroll-margin-top: 60px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+    figure {
+      margin: 0;
+      padding: 16px;
+      background: white;
+      border: 1px solid #dce1e8;
+      border-radius: 12px;
+    }
+    img {
+      display: block;
+      width: 100%;
+      height: 360px;
+      object-fit: contain;
+    }
+    figcaption {
+      margin-top: 12px;
+      font-size: 15px;
+    }
+    .note {
+      background: #e9effa;
+      padding: 18px;
+      border-radius: 8px;
+    }
+    small {
+      color: #526071;
+    }
+  </style>
+  <main>
+    <h1>Pedidos con mesa y sin mesa</h1>
+    <p>
+      Capturas oficiales para comparar apertura, productos y recuperación de cuentas. Consulta: 12
+      de octubre de 2026.
+    </p>
+    <p class="note">
+      <strong>Propuesta para Umi:</strong> una pantalla de Cuentas con vistas Mesas y Sin mesa;
+      Nueva cuenta sin mesa visible; el mismo panel de productos con nombre y ubicación en la
+      cabecera.
+    </p>
+    <nav>
+      <a href="#revo">REVO</a><a href="#toast">Toast</a><a href="#fudo">Fudo</a
+      ><a href="#square">Square</a
+      ><a href="../2026-10-12-tableless-visual-flow.md">Investigación completa</a>
+    </nav>
+    <section id="revo">
+      <h2>REVO</h2>
+      <p>
+        Virtual → nombre → comensales → productos → enviar o salir. Recuperación en Virtual / TPV.
+        <a href="https://support.revo.works/es/articles/119">Documentación oficial</a>
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="assets/revo-virtual-01.png"
+            ><img
+              loading="lazy"
+              src="assets/revo-virtual-01.png"
+              alt="1. Entrada desde el mapa y nombre de la cuenta"
+          /></a>
+          <figcaption>1. Entrada desde el mapa y nombre de la cuenta</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/revo-virtual-mode-05.png"
+            ><img
+              loading="lazy"
+              src="assets/revo-virtual-mode-05.png"
+              alt="2. Comensales en el modo de mesas virtuales"
+          /></a>
+          <figcaption>2. Comensales en el modo de mesas virtuales</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/revo-virtual-02.png"
+            ><img
+              loading="lazy"
+              src="assets/revo-virtual-02.png"
+              alt="3. Pantalla de productos de la cuenta virtual"
+          /></a>
+          <figcaption>3. Pantalla de productos de la cuenta virtual</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/revo-virtual-03.png"
+            ><img
+              loading="lazy"
+              src="assets/revo-virtual-03.png"
+              alt="4. Recuperación por tarjeta con nombre e importe"
+          /></a>
+          <figcaption>4. Recuperación por tarjeta con nombre e importe</figcaption>
+        </figure>
+      </div>
+    </section>
+    <section id="toast">
+      <h2>Toast</h2>
+      <p>
+        Con mesa: seleccionar la mesa. Sin mesa: New order. Recuperación: All checks.
+        <a href="https://support.toasttab.com/en/article/New-POS-Managing-Tables"
+          >Documentación oficial</a
+        >
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="assets/toast-tables-01.png"
+            ><img
+              loading="lazy"
+              src="assets/toast-tables-01.png"
+              alt="1. Un mapa con acceso a New order y All checks"
+          /></a>
+          <figcaption>1. Un mapa con acceso a New order y All checks</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/toast-orders-07.png"
+            ><img
+              loading="lazy"
+              src="assets/toast-orders-07.png"
+              alt="2. Productos y acciones en Quick Order"
+          /></a>
+          <figcaption>2. Productos y acciones en Quick Order</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/toast-tab-02.png"
+            ><img loading="lazy" src="assets/toast-tab-02.png" alt="3. Nombre de la cuenta"
+          /></a>
+          <figcaption>3. Nombre de la cuenta</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/toast-tab-03.png"
+            ><img
+              loading="lazy"
+              src="assets/toast-tab-03.png"
+              alt="4. Nombre visible junto al número; envío y pago separados"
+          /></a>
+          <figcaption>4. Nombre visible junto al número; envío y pago separados</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/toast-orders-10.png"
+            ><img
+              loading="lazy"
+              src="assets/toast-orders-10.png"
+              alt="5. El mismo modelo en el portátil"
+          /></a>
+          <figcaption>5. El mismo modelo en el portátil</figcaption>
+        </figure>
+      </div>
+    </section>
+    <section id="fudo">
+      <h2>Fudo</h2>
+      <p>
+        Sin mesa: Mostrador → Nuevo Pedido → datos opcionales → Crear. Con mesa: seleccionar mesa →
+        personas → Abrir mesa.
+        <a href="https://soporte.fu.do/es/articles/11730844-7-mostrador-meson"
+          >Documentación oficial</a
+        >
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="assets/fudo-counter-01.png"
+            ><img loading="lazy" src="assets/fudo-counter-01.png" alt="1. Creación sin mesa"
+          /></a>
+          <figcaption>1. Creación sin mesa</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/fudo-counter-02.png"
+            ><img
+              loading="lazy"
+              src="assets/fudo-counter-02.png"
+              alt="2. Lista de pedidos En curso y Cerrados"
+          /></a>
+          <figcaption>2. Lista de pedidos En curso y Cerrados</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/fudo-counter-03.png"
+            ><img
+              loading="lazy"
+              src="assets/fudo-counter-03.png"
+              alt="3. Productos del pedido sin mesa"
+          /></a>
+          <figcaption>3. Productos del pedido sin mesa</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/fudo-tables-01.png"
+            ><img loading="lazy" src="assets/fudo-tables-01.png" alt="4. Apertura con mesa"
+          /></a>
+          <figcaption>4. Apertura con mesa</figcaption>
+        </figure>
+      </div>
+    </section>
+    <section id="square">
+      <h2>Square</h2>
+      <p>
+        Sin mesa: Tickets → New Ticket → nombre → productos → Save ticket. El mapa mostrado procede
+        de un webinar oficial de 2024.
+        <a href="https://squareup.com/help/us/en/article/5337-use-open-tickets-with-square"
+          >Documentación oficial</a
+        >
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="assets/square-floor-plan-original.png"
+            ><img
+              loading="lazy"
+              src="assets/square-floor-plan-original.png"
+              alt="1. Referencia histórica: Floor plan y Checks"
+          /></a>
+          <figcaption>1. Referencia histórica: Floor plan y Checks</figcaption>
+        </figure>
+      </div>
+    </section>
+    <p>
+      <small
+        >Las capturas documentan las interfaces públicas. No son una prueba autenticada del
+        proveedor. Sin mesa y para llevar son decisiones distintas. Los botones y permisos varían
+        según configuración y versión.</small
+      >
+    </p>
+  </main>
+</html>

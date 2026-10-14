@@ -1,13 +1,17 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/app/umi_pos_app.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/hardware/hardware_fingerprint.dart';
 import 'package:umi_pos/features/hardware/hardware_recovery_store.dart';
 import 'package:umi_pos/features/hardware/hardware_repository.dart';
 import 'package:umi_pos/features/hardware/hardware_runtime.dart';
 import 'package:umi_pos/features/hardware/hardware_service.dart';
+import 'package:umi_pos/features/hardware/pilot_hardware_adapters.dart';
+import 'package:umi_pos/features/hardware/terminal_cashbox_transport.dart';
 
 const scope = HardwareScope(
   merchantId: '10000000-0000-4000-8000-000000000001',
@@ -80,6 +84,85 @@ void main() {
       expect(printer.artifacts, hasLength(1));
       expect(recovered.command['status'], 'succeeded');
       expect(repository.transitions, ['dispatching', 'succeeded']);
+    },
+  );
+
+  test(
+    'a receipt already printed is reprinted as a copy, not printed again',
+    () async {
+      // `Imprimir recibo` on a sale that had already printed asked for a second
+      // official receipt. The first job owns the command's idempotency key and
+      // the unique index allows one official receipt per receipt and printer, so
+      // the till answered `IDEMPOTENCY_CONFLICT` (measured on the iMin D3-504 on
+      // 2026-10-11). A copy is a controlled reprint of the original job.
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          devices: [_simulatorPrinter.toJson()],
+          printJobs: const [
+            {
+              'jobId': 'job-original',
+              'targetPrinterId': '10000000-0000-4000-8000-000000000020',
+              'type': 'official_receipt',
+              'sourceAggregateType': 'receipt',
+              'sourceAggregateId': 'receipt-1',
+              'correlationId': 'correlation-1',
+              'idempotencyKey': 'hardware-receipt-receipt-1',
+              'payloadFingerprint':
+                  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'copies': 1,
+              'status': 'printed',
+              'attempts': 1,
+              'createdAt': '2026-08-09T00:00:00.000Z',
+              'startedAt': null,
+              'completedAt': null,
+              'failure': null,
+              'originalJobId': null,
+            },
+          ],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final printer = PrinterSimulatorAdapter();
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(
+          adapters: {_simulatorPrinter.id: printer},
+          devices: [simulatedDevice(id: _simulatorPrinter.id, type: 'printer')],
+        ),
+        recovery: MemoryHardwareRecoveryStore(),
+      );
+
+      await service.printAuthoritativeReceipt(
+        scope: scope,
+        receiptId: 'receipt-1',
+        receiptSnapshot: const {
+          'merchantName': 'UmiPOS Local',
+          'locationName': 'Sucursal Local',
+          'receiptRef': 'POS-1',
+          'businessDate': '2026-08-09',
+          'currency': 'MXN',
+          'lines': [
+            {
+              'description': 'Chai latte',
+              'quantity': 1,
+              'lineTotal': {'minorUnits': 7200},
+            },
+          ],
+          'subtotal': {'minorUnits': 7200},
+          'tax': {'minorUnits': 993},
+          'total': {'minorUnits': 7200},
+          'change': {'minorUnits': 0},
+        },
+      );
+
+      expect(repository.reprintCalls, ['job-original']);
+      await service.dispose();
     },
   );
 
@@ -278,9 +361,9 @@ void main() {
     final focusNode = FocusNode();
     final router = HardwareKeyboardWedgeRouter();
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ElevatedButton(
+      PosApp(
+        home: PosPage(
+          body: PosButton(
             focusNode: focusNode,
             onPressed: () => actionCount += 1,
             child: const Text('Focused action'),
@@ -447,6 +530,58 @@ void main() {
   );
 
   test(
+    'terminal drawer test records an unverified physical connection',
+    () async {
+      final drawer = _pilotDevice(
+        'drawer-terminal-diagnostic',
+        'cash_drawer',
+        const ['drawer.open', 'drawer.status'],
+        transport: 'platform_channel_foundation',
+        assignedPosDeviceId: scope.deviceId,
+      );
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          devices: [drawer.toJson()],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final cashbox = _TerminalCashboxChannelFake();
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: MemoryHardwareRecoveryStore(),
+        adapterResolver: PilotHardwareLab(
+          terminalCashboxFactory: () => cashbox,
+        ),
+        identifiers: _SequenceIdentifierFactory([
+          '10000000-0000-4000-8000-000000000018',
+          '10000000-0000-4000-8000-000000000019',
+        ]),
+      );
+
+      final result = await service.runDiagnostic(
+        scope: scope,
+        hardwareId: drawer.id,
+        diagnostic: 'drawer_test',
+      );
+
+      expect(result.health, 'unknown');
+      expect(result.connectionState, 'unknown');
+      expect(cashbox.pulses, 1);
+      expect(repository.lastDiagnostic?.connectionState, 'unknown');
+      expect(repository.lastDiagnostic?.health, 'unknown');
+      await service.dispose();
+    },
+  );
+
+  test(
     'server pilot policy disables scanner input without disabling manual lookup',
     () async {
       final repository = _HardwareRepository()
@@ -568,6 +703,8 @@ void main() {
         operatorSessionId: '10000000-0000-4000-8000-000000000003',
         status: 'prepared',
         version: 1,
+        firedOrderId: null,
+        fulfillmentType: 'dine_in',
         items: [],
         totals: totals,
         checkoutEnabled: true,
@@ -781,8 +918,10 @@ void main() {
       );
 
       expect(scans.single.value, '7501234567890');
-      expect(saleResults, hasLength(3));
-      expect(replayResults, hasLength(3));
+      expect(saleResults.results, hasLength(3));
+      expect(saleResults.drawerAnswered, isTrue);
+      expect(replayResults.results, hasLength(3));
+      expect(replayResults.drawerAnswered, isTrue);
       expect(refundResults, hasLength(2));
       expect(
         lab.adapter<PrinterSimulatorAdapter>('printer-journey')!.artifacts,
@@ -801,6 +940,239 @@ void main() {
       );
       expect(repository.statuses, hasLength(7));
       await subscription.cancel();
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a drawer that names another terminal is not this till\'s to open',
+    () async {
+      // The counter's drawer is visible to everyone in the location, and a
+      // handheld has no socket to pulse it with. A cash sale there must not
+      // answer "el cajón no respondió" about hardware it never had.
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          policy: const {'openDrawerOnCashSale': true},
+          devices: [
+            _pilotDevice(
+              'drawer-counter',
+              'cash_drawer',
+              const ['drawer.open', 'drawer.status'],
+              assignedPosDeviceId: '10000000-0000-4000-8000-0000000000ff',
+            ).toJson(),
+          ],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final cashbox = _TerminalCashboxChannelFake();
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: MemoryHardwareRecoveryStore(),
+        adapterResolver: PilotHardwareLab(
+          terminalCashboxFactory: () => cashbox,
+        ),
+      );
+
+      await service.snapshot(scope);
+      final sale = await service.afterCheckoutCompleted(scope, cashSale);
+
+      expect(sale.results, isEmpty);
+      expect(sale.drawerAnswered, isTrue);
+      expect(cashbox.pulses, 0);
+      await service.dispose();
+    },
+  );
+
+  test(
+    'a cash sale pulses the drawer on the terminal port exactly once',
+    () async {
+      // The terminal's OWN drawer socket, end to end through the service: the
+      // registry says the drawer rides the platform channel, the sale commits,
+      // and the adapter pulses the board once. The replay of the same sale must
+      // not produce a second pulse — that rule is what keeps a retried response
+      // from opening a drawer twice.
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          policy: const {'openDrawerOnCashSale': true},
+          devices: [
+            _pilotDevice(
+              'drawer-terminal',
+              'cash_drawer',
+              const ['drawer.open', 'drawer.status'],
+              transport: 'platform_channel_foundation',
+              assignedPosDeviceId: scope.deviceId,
+            ).toJson(),
+          ],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final cashbox = _TerminalCashboxChannelFake();
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: MemoryHardwareRecoveryStore(),
+        adapterResolver: PilotHardwareLab(
+          terminalCashboxFactory: () => cashbox,
+        ),
+      );
+
+      await service.snapshot(scope);
+      final sale = await service.afterCheckoutCompleted(scope, cashSale);
+      final replay = await service.afterCheckoutCompleted(scope, cashSale);
+
+      expect(sale.drawerAnswered, isTrue);
+      expect(replay.drawerAnswered, isTrue);
+      // The replay of the same sale carries the same command identity, so the
+      // board is written once; the health poll is what asks the port the rest of
+      // the time, and it never pulses.
+      expect(cashbox.pulses, 1);
+      expect(cashbox.probes, greaterThan(0));
+      await service.dispose();
+    },
+  );
+
+  test('a slow drawer cannot delay an independent receipt printer', () async {
+    final printer = PrinterSimulatorAdapter();
+    final drawer = _HeldDrawerAdapter();
+    final repository = _HardwareRepository()
+      ..snapshotResult = HardwareRuntimeSnapshot(
+        merchantId: scope.merchantId,
+        locationId: scope.locationId,
+        registerId: null,
+        policy: const {
+          'autoPrintReceipt': true,
+          'openDrawerOnCashSale': true,
+          'receiptCopiesDefault': 1,
+        },
+        devices: [
+          _pilotDevice('printer-independent', 'printer', const [
+            'printer.receipt',
+          ]).toJson(),
+          _pilotDevice('drawer-independent', 'cash_drawer', const [
+            'drawer.open',
+          ]).toJson(),
+        ],
+        printJobs: const [],
+        recoveryStates: const [],
+        pendingJobs: 0,
+        retryableJobs: 0,
+        unknownCommands: 0,
+        capturedAt: '2026-08-09T00:00:00.000Z',
+      );
+    final service = HardwareService(
+      repository: repository,
+      coordinator: HardwareCoordinator(
+        adapters: {
+          'printer-independent': printer,
+          'drawer-independent': drawer,
+        },
+        devices: [
+          simulatedDevice(id: 'printer-independent', type: 'printer'),
+          simulatedDevice(id: 'drawer-independent', type: 'cash_drawer'),
+        ],
+      ),
+      recovery: MemoryHardwareRecoveryStore(),
+    );
+
+    final checkout = service.afterCheckoutCompleted(scope, cashSale);
+    await drawer.started.future;
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(printer.artifacts, hasLength(1));
+    drawer.release.complete();
+    final outcome = await checkout;
+    expect(outcome.drawerAnswered, isTrue);
+    await service.dispose();
+  });
+
+  test('a reading the relay takes reaches every screen that follows it', () async {
+    // The state a centre shows is the state the till measured last. A screen that
+    // keeps the reading it loaded when it opened shows the state of that moment:
+    // on the pilot till a printer was found and printed while the centre still
+    // read the state of the moment the centre opened.
+    final repository = _HardwareRepository()
+      ..snapshotResult = HardwareRuntimeSnapshot(
+        merchantId: scope.merchantId,
+        locationId: scope.locationId,
+        registerId: null,
+        devices: [_simulatorPrinter.toJson()],
+        printJobs: const [],
+        pendingJobs: 0,
+        retryableJobs: 0,
+        unknownCommands: 0,
+        capturedAt: '2026-08-09T00:00:00.000Z',
+      );
+    final service = HardwareService(
+      repository: repository,
+      coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+      recovery: MemoryHardwareRecoveryStore(),
+    );
+    final seen = <HardwareRuntimeSnapshot?>[];
+    void follow() => seen.add(service.latestRuntime.value);
+    service.latestRuntime.addListener(follow);
+
+    expect(service.latestRuntime.value, isNull);
+    await service.snapshot(scope);
+
+    expect(seen, hasLength(1));
+    expect(seen.single?.devices, hasLength(1));
+    expect(seen.single?.capturedAt, '2026-08-09T00:00:00.000Z');
+
+    service.latestRuntime.removeListener(follow);
+    await service.dispose();
+  });
+
+  test(
+    'the background read waits for its minute, and a screen at the hardware does not',
+    () async {
+      // The reading carries the queue of the whole location, and the till asked for it
+      // every ten seconds whether or not a screen showed the hardware: 8,600 reads and
+      // 8,000 claims each day for one till (measured 2026-10-12). The first read always
+      // happens, so the print path has a runtime before any sale.
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          devices: const [],
+          printJobs: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+        recovery: MemoryHardwareRecoveryStore(),
+      );
+
+      expect(service.runtimeReadDue, isTrue);
+      await service.snapshot(scope);
+      expect(service.runtimeReadDue, isFalse);
+
+      service.watchRuntime();
+      expect(service.runtimeReadDue, isTrue);
+      service.unwatchRuntime();
+      expect(service.runtimeReadDue, isFalse);
+      // A screen that closes twice must not leave the counter below zero.
+      service.unwatchRuntime();
+      expect(service.runtimeReadDue, isFalse);
+
       await service.dispose();
     },
   );
@@ -836,18 +1208,23 @@ HardwareDevice _pilotDevice(
   String type,
   List<String> capabilities, {
   bool primary = false,
+  String transport = 'simulator',
+  // Assigned to the terminal the scope belongs to, which is what the registry
+  // does when the till files its own hardware (`scope.deviceId`, spelled out
+  // because a default value cannot read it).
+  String? assignedPosDeviceId = '10000000-0000-4000-8000-000000000099',
 }) => HardwareDevice(
   id: id,
   merchantId: scope.merchantId,
   locationId: scope.locationId,
   registerId: null,
-  assignedPosDeviceId: '10000000-0000-4000-8000-000000000021',
+  assignedPosDeviceId: assignedPosDeviceId,
   primary: primary,
   type: type,
   manufacturer: 'Simulator',
   model: '$type-v1',
   publicReference: id,
-  transport: 'simulator',
+  transport: transport,
   capabilities: capabilities,
   enabled: true,
   configurationVersion: 1,
@@ -889,6 +1266,10 @@ HardwareCommandRequest _printCommand(String commandId) {
     'drawer': null,
     'display': null,
     'printPayload': receipt.toJson(),
+    // The till's fingerprint input carries the copy flag, normalised to a boolean,
+    // exactly as the API's `hardwareCommandFingerprint` does — the two are compared
+    // byte for byte before a command is accepted.
+    'copy': false,
   };
   return HardwareCommandRequest(
     locationId: scope.locationId,
@@ -916,6 +1297,9 @@ String _deterministicTestId(String source) {
 }
 
 final class _HardwareRepository implements HardwareRepository {
+  /// Every job this fake was asked to reprint, in order.
+  final List<String> reprintCalls = [];
+
   HardwareCommandResult? remoteClaim;
 
   @override
@@ -929,6 +1313,7 @@ final class _HardwareRepository implements HardwareRepository {
   }
 
   final Map<String, String> statuses = {};
+  final Map<String, HardwareCommandRequest> commands = {};
   final List<String> transitions = [];
   HardwareCommandRequest? lastCommand;
   HardwareDiagnosticRequest? lastDiagnostic;
@@ -941,6 +1326,7 @@ final class _HardwareRepository implements HardwareRepository {
     HardwareCommandRequest command,
   ) async {
     lastCommand = command;
+    commands[command.commandId] = command;
     statuses.putIfAbsent(command.commandId, () => 'pending');
     return _result(command.commandId, statuses[command.commandId]!);
   }
@@ -959,27 +1345,29 @@ final class _HardwareRepository implements HardwareRepository {
     return _result(commandId, status);
   }
 
-  HardwareCommandResult _result(String commandId, String status) =>
-      HardwareCommandResult(
-        command: {
-          ...?lastCommand?.toJson(),
-          'commandId': commandId,
-          'merchantId': scope.merchantId,
-          'originatingPosDeviceId': '10000000-0000-4000-8000-000000000099',
-          'operatorId': '10000000-0000-4000-8000-000000000098',
-          'correlationId': 'hardware-test',
-          'status': status,
-        },
-        recovered: status != 'pending',
-        failure: status == 'unknown'
-            ? const {'code': 'unknown_outcome', 'retryable': false}
-            : null,
-        dispatchPayload: {
-          'drawer': lastCommand?.drawer,
-          'display': lastCommand?.display,
-          'printPayload': lastCommand?.printPayload,
-        },
-      );
+  HardwareCommandResult _result(String commandId, String status) {
+    final command = commands[commandId] ?? lastCommand;
+    return HardwareCommandResult(
+      command: {
+        ...?command?.toJson(),
+        'commandId': commandId,
+        'merchantId': scope.merchantId,
+        'originatingPosDeviceId': '10000000-0000-4000-8000-000000000099',
+        'operatorId': '10000000-0000-4000-8000-000000000098',
+        'correlationId': 'hardware-test',
+        'status': status,
+      },
+      recovered: status != 'pending',
+      failure: status == 'unknown'
+          ? const {'code': 'unknown_outcome', 'retryable': false}
+          : null,
+      dispatchPayload: {
+        'drawer': command?.drawer,
+        'display': command?.display,
+        'printPayload': command?.printPayload,
+      },
+    );
+  }
 
   @override
   Future<HardwareRuntimeSnapshot> snapshot(
@@ -1014,7 +1402,13 @@ final class _HardwareRepository implements HardwareRepository {
     String jobId,
     ControlledReprintRequest request,
   ) async {
-    final original = lastCommand ?? _printCommand(jobId);
+    reprintCalls.add(jobId);
+    final original =
+        commands.values
+            .where((command) => command.commandType == 'print_receipt')
+            .lastOrNull ??
+        lastCommand ??
+        _printCommand(jobId);
     final input = {
       'locationId': original.locationId,
       'registerId': original.registerId,
@@ -1027,6 +1421,7 @@ final class _HardwareRepository implements HardwareRepository {
       'drawer': null,
       'display': null,
       'printPayload': original.printPayload,
+      'copy': false,
     };
     final command = HardwareCommandRequest(
       locationId: original.locationId,
@@ -1045,6 +1440,7 @@ final class _HardwareRepository implements HardwareRepository {
       printPayload: original.printPayload,
     );
     lastCommand = command;
+    commands[command.commandId] = command;
     return ControlledReprintResult(
       job: {'jobId': request.commandId, 'originalJobId': jobId},
       command: command.toJson(),
@@ -1080,4 +1476,88 @@ final class _HardwareRepository implements HardwareRepository {
     String merchantId,
     UpdateHardwarePolicyRequest request,
   ) => throw UnimplementedError();
+}
+
+/// A committed sale paid in cash: the one kind of sale that pulses a drawer.
+const cashSale = CheckoutResult(
+  status: 'completed',
+  confirmation: {},
+  payment: null,
+  payments: [
+    {
+      'type': 'cash',
+      'amount': {'minorUnits': 1500, 'currency': 'MXN'},
+    },
+  ],
+  reservation: null,
+  sale: {'id': '10000000-0000-4000-8000-000000000041'},
+  receipt: {
+    'id': '10000000-0000-4000-8000-000000000042',
+    'receiptRef': 'PILOT-DRAWER-1',
+    'businessDate': '2026-08-09',
+    'currency': 'MXN',
+    'lines': [],
+    'subtotal': {'minorUnits': 1200, 'currency': 'MXN'},
+    'taxTotal': {'minorUnits': 0, 'currency': 'MXN'},
+    'grandTotal': {'minorUnits': 1200, 'currency': 'MXN'},
+    'change': {'minorUnits': 300, 'currency': 'MXN'},
+  },
+  failure: null,
+);
+
+/// The terminal's cashbox port, faked: a service test cannot hold the board.
+final class _TerminalCashboxChannelFake implements TerminalCashboxChannel {
+  int probes = 0;
+  int pulses = 0;
+
+  static const _port = TerminalCashboxPort(
+    path: 'sysfs',
+    node: '/sys/class/neostra_gpioctl/dev/gpioctl',
+    value: '1',
+  );
+
+  @override
+  Future<TerminalCashboxAnswer> probe() async {
+    probes += 1;
+    return const TerminalCashboxAnswer(
+      outcome: TerminalCashboxOutcome.ready,
+      port: _port,
+    );
+  }
+
+  @override
+  Future<TerminalCashboxAnswer> pulse() async {
+    pulses += 1;
+    return const TerminalCashboxAnswer(
+      outcome: TerminalCashboxOutcome.ready,
+      port: _port,
+    );
+  }
+}
+
+final class _HeldDrawerAdapter implements DeviceAdapter {
+  final started = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Set<String> get capabilities => const {'drawer.open'};
+
+  @override
+  String get deviceType => 'cash_drawer';
+
+  @override
+  String get transport => 'simulator';
+
+  @override
+  Future<RuntimeCommandResult> execute(RuntimeCommand command) async {
+    started.complete();
+    await release.future;
+    return const RuntimeCommandResult(
+      status: RuntimeCommandStatus.succeeded,
+      failureCode: null,
+      retryable: false,
+      recovered: false,
+      safeMetadata: {'acknowledged': true},
+    );
+  }
 }

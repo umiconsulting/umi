@@ -76,7 +76,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -99,6 +99,12 @@ function run(bin, args, { display = process.env.UX_DISPLAY || ':0' } = {}) {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+/** Whether an external tool resolves to a file this machine actually has. */
+function hasTool(name) {
+  const resolved = tool(name);
+  return resolved.includes('/') && existsSync(resolved);
 }
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -575,24 +581,60 @@ export async function createDriver({
     // whichever run wrote it. Callers that want history keep it by passing a
     // fresh directory per run rather than by varying the file name.
     const file = join(shots, `${safe}.png`);
-    run(
-      'ffmpeg',
-      [
-        '-y',
-        '-loglevel',
-        'error',
-        '-f',
-        'x11grab',
-        '-video_size',
-        `${origin.width}x${origin.height}`,
-        '-i',
-        `${display}.0+${origin.x},${origin.y}`,
-        '-frames:v',
-        '1',
-        file,
-      ],
-      { display },
-    );
+    // THE WINDOW, NOT THE SCREEN, AND NOT THE COMPOSITED FRAME.
+    //
+    // House rule, asked for by the owner: every harness window lives on a workspace of its own so
+    // a run never interrupts what is on the screen. That rule kills two capture paths at once:
+    // `ffmpeg -f x11grab` reads the X ROOT window, which the compositor does not draw into (every
+    // POS screenshot this harness wrote was a black ~9 KB rectangle until 2026-10-10), and `grim`
+    // reads the composited OUTPUT, which is whatever workspace is visible — the operator's screen,
+    // not the till. ImageMagick's `import -window <id>` asks the X server for the window's own
+    // contents, so it works while the window is on a workspace nobody is looking at.
+    //
+    // The order matters: the window's own pixels first, grim only if import is missing, ffmpeg
+    // last. The size check below refuses to let a flat frame pass as a screenshot in silence.
+    const windowId = (() => {
+      try {
+        return (
+          run('xdotool', ['search', '--name', windowName], { display })?.trim().split('\n')[0] ||
+          null
+        );
+      } catch {
+        return null;
+      }
+    })();
+    if (windowId && hasTool('magick')) {
+      run('magick', ['import', '-window', windowId, file]);
+    } else if (hasTool('grim')) {
+      run('grim', ['-g', `${origin.x},${origin.y} ${origin.width}x${origin.height}`, file]);
+    } else {
+      run(
+        'ffmpeg',
+        [
+          '-y',
+          '-loglevel',
+          'error',
+          '-f',
+          'x11grab',
+          '-video_size',
+          `${origin.width}x${origin.height}`,
+          '-i',
+          `${display}.0+${origin.x},${origin.y}`,
+          '-frames:v',
+          '1',
+          file,
+        ],
+        { display },
+      );
+    }
+    const written = await stat(file).catch(() => null);
+    if (written && written.size < 30_000) {
+      say(
+        `  WARNING: ${file} is ${written.size} bytes for ${origin.width}x${origin.height}. ` +
+          'A frame that flat is a capture of nothing — the semantics tree is the evidence, ' +
+          'this image is not.',
+      );
+    }
     say(`  shot  ${file}`);
     return file;
   };
@@ -643,6 +685,48 @@ export async function createDriver({
           'click at its coordinates would land in another window. Bring the till forward ' +
           '(`xdotool windowactivate`, or `wmctrl -s` for its workspace) and run again.',
       );
+    }
+  };
+
+  /**
+   * WHY A CLICK CAN LAND SOMETIMES.
+   *
+   * A harness window lives on a workspace nobody is showing, and a pointer event aimed at it is
+   * delivered only when the compositor agrees — measured on 2026-10-11: four presses aimed at the
+   * PIN keypad moved the counter by two. The verdict "the click did not land" is then a fact about
+   * the desktop, not about the till, and that difference decides whether a person should go looking
+   * for a product defect. This note says which desktop is showing, so the reader can tell them
+   * apart.
+   */
+  const desktopWarning = () => {
+    // ASK THE COMPOSITOR, NOT X. `xdotool get_desktop_for_window` and `get_desktop` agree here —
+    // XWayland reports one flat desktop — so the X answer says "same desktop" about a window nobody
+    // is showing and the note never fires (measured 2026-10-11). Hyprland knows the workspaces, and
+    // its client list carries the class the launcher set.
+    try {
+      const clients = JSON.parse(
+        execFileSync('hyprctl', ['-j', 'clients'], { encoding: 'utf8', env: process.env }),
+      );
+      const mine = clients.find((client) =>
+        String(client.class ?? '')
+          .toLowerCase()
+          .includes('umi_pos'),
+      );
+      if (!mine) return '';
+      const shown = JSON.parse(
+        execFileSync('hyprctl', ['-j', 'activeworkspace'], { encoding: 'utf8', env: process.env }),
+      );
+      const here = mine.workspace?.name;
+      const visible = shown?.name;
+      if (!here || !visible || here === visible) return '';
+      return (
+        ` The till is on workspace ${here} and workspace ${visible} is showing, so the compositor` +
+        ' may drop the press: this verdict is not yet evidence about the till. Bring the till' +
+        ' forward (or run when the screen is free) before believing it.'
+      );
+    } catch {
+      // No compositor to ask (another desktop, or hyprctl absent): say nothing rather than guess.
+      return '';
     }
   };
 
@@ -1004,7 +1088,27 @@ export async function createDriver({
     return map;
   };
 
-  const checkExpectation = async (expect) => {
+  const checkExpectation = async (expect, { settledFingerprint = null } = {}) => {
+    if (expect.screenChanges) {
+      // THE WEAKEST HONEST EXPECTATION: THE PRESS DID SOMETHING.
+      //
+      // A journey knows what each tap should produce, so it names it (`appears`, `gone`,
+      // `valueChange`). An AUDIT does not: it presses a control to find out what happens, and
+      // the only thing it can assert in advance is that the screen must not stay put. That is
+      // still an assertion — a swallowed press leaves the tree identical, and this catches it —
+      // and it is compared against the state the screen had before the click, not against a
+      // guess.
+      const baseline = settledFingerprint ?? (await fingerprint());
+      const deadline = Date.now() + (expect.timeout ?? 8000);
+      for (;;) {
+        const moved = fingerprintDiff(baseline, await fingerprint());
+        if (moved.length) return `the screen changed: ${moved.slice(0, 4).join(', ')}`;
+        if (Date.now() > deadline) {
+          throw new Error('Expected the screen to change, and nothing moved.');
+        }
+        await sleep(150);
+      }
+    }
     if (expect.appears) {
       await waitFor(expect.appears, { timeout: expect.timeout ?? 10000, actionable: false });
       return `"${expect.appears}" appeared`;
@@ -1198,7 +1302,7 @@ export async function createDriver({
       clickRaw(screen.x, screen.y);
       const clicked = Date.now();
       try {
-        outcome = await checkExpectation(expect);
+        outcome = await checkExpectation(expect, { settledFingerprint: settled.fingerprint });
         phases = {
           focus: focused - before,
           click: clicked - focused,
@@ -1230,7 +1334,7 @@ export async function createDriver({
         retries.push({ attempt, reason: 'the screen is unchanged, so the press did not land' });
         say(
           `  retry ${attempt}: nothing on the screen changed, so the click did not land; ` +
-            `re-resolving "${name}" before pressing again`,
+            `re-resolving "${name}" before pressing again.${desktopWarning()}`,
         );
       }
     }
@@ -1241,7 +1345,9 @@ export async function createDriver({
       // which submits on its own - would vanish from the tap count and
       // under-report the operator's real work.
       const file = shots ? await shot(`${name}-FAILED`) : null;
-      const inert = new Error(`${lastError.message}${file ? ` (screenshot: ${file})` : ''}`);
+      const inert = new Error(
+        `${lastError.message}${file ? ` (screenshot: ${file})` : ''}${desktopWarning()}`,
+      );
       // Every attempt left the screen untouched, so the press provably did
       // nothing: a caller may safely try a different target.
       inert.clickVerdict = 'inert';
@@ -1331,7 +1437,7 @@ export async function createDriver({
       clickRaw(screen.x, screen.y);
       const clicked = Date.now();
       try {
-        outcome = await checkExpectation(expect);
+        outcome = await checkExpectation(expect, { settledFingerprint: settled.fingerprint });
         phases = {
           focus: focused - before,
           click: clicked - focused,
@@ -1380,7 +1486,16 @@ export async function createDriver({
   const typeText = async (text, { delay = 60 } = {}) => {
     const started = Date.now();
     focus();
-    run('xdotool', ['type', '--delay', String(delay), text], { display });
+    // INTO THE WINDOW, NOT INTO WHATEVER HAS THE KEYBOARD.
+    //
+    // `xdotool type` without `--window` sends to the X input focus, and a harness window does not
+    // always have it: the launcher's rule keeps the till off the operator's screen with
+    // `no_focus`, and on a shared workstation the focused window is then somebody else's. Measured
+    // on 2026-10-10: an enrollment code typed at the till landed nowhere in the till, and eight
+    // characters went to whatever window did have focus. `--window` addresses the till itself.
+    run('xdotool', ['type', '--window', facts.windowId, '--delay', String(delay), text], {
+      display,
+    });
     await sleep(settle);
     const step = record({ action: 'type', text, ms: Date.now() - started });
     say(`  type  "${text}" in ${step.ms}ms`);
@@ -1390,7 +1505,7 @@ export async function createDriver({
   const pressKey = async (key) => {
     const started = Date.now();
     focus();
-    run('xdotool', ['key', key], { display });
+    run('xdotool', ['key', '--window', facts.windowId, key], { display });
     await sleep(settle);
     const step = record({ action: 'key', key, ms: Date.now() - started });
     say(`  key   ${key}`);

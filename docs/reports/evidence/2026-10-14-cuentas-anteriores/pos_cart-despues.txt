@@ -1,0 +1,17 @@
+ account_number | business_date | lifecycle_state |  status   | table_name |                            cancellation_reason                            
+----------------+---------------+-----------------+-----------+------------+---------------------------------------------------------------------------
+            123 | 2026-10-13    | cancelled       | abandoned |            | Borrador vacio de periodo anterior sin pago; saneamiento local 2026-10-14
+            131 | 2026-10-13    | cancelled       | abandoned |            | Cierre de periodo anterior, sin pago
+            132 | 2026-10-13    | cancelled       | abandoned |            | Borrador vacio de periodo anterior sin pago; saneamiento local 2026-10-14
+            141 | 2026-10-13    | cancelled       | abandoned | Mesa 1     | Cierre de periodo anterior, sin pago
+            143 | 2026-10-13    | cancelled       | abandoned |            | Cierre de periodo anterior, sin pago
+            144 | 2026-10-13    | cancelled       | abandoned |            | Cierre de periodo anterior, sin pago
+            146 | 2026-10-13    | cancelled       | abandoned |            | Cierre de periodo anterior, sin pago
+            150 | 2026-10-13    | cancelled       | abandoned | Mesa 3     | Cierre de periodo anterior, sin pago
+            152 | 2026-10-13    | cancelled       | abandoned | Mesa 6     | Cierre de periodo anterior, sin pago
+            153 | 2026-10-13    | cancelled       | abandoned |            | Cierre de periodo anterior, sin pago
+            173 | 2026-10-13    | cancelled       | abandoned |            | Cierre de periodo anterior, sin pago
+            188 | 2026-10-14    | cancelled       | abandoned |            | Cuenta vacía: se cierra al apartarla.
+            189 | 2026-10-14    | cancelled       | abandoned |            | Cuenta vacia generada al cancelar la cuenta 141
+(13 rows)
+

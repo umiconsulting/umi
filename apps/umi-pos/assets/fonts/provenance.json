@@ -1,0 +1,56 @@
+[
+  {
+    "file": "assets/fonts/IBMPlexSans-Regular.ttf",
+    "url": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf",
+    "bytes": 200500,
+    "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5"
+  },
+  {
+    "file": "assets/fonts/IBMPlexSans-Medium.ttf",
+    "url": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Medium.ttf",
+    "bytes": 202460,
+    "sha256": "331c8639d7598b2cde62a911a71db195e30cb655cd6bdf2e324a7e984955f907"
+  },
+  {
+    "file": "assets/fonts/IBMPlexSans-SemiBold.ttf",
+    "url": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-SemiBold.ttf",
+    "bytes": 202632,
+    "sha256": "a20caf8286023a6a7a85e40b1d2a4ae9fc3e3b1f9eda8f4c542dd4986af67bb1"
+  },
+  {
+    "file": "assets/fonts/IBMPlexSans-Bold.ttf",
+    "url": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Bold.ttf",
+    "bytes": 200872,
+    "sha256": "9e6c74a889a700d707613d24548fe4ffa6bc59559a0689d2cf9e133bdcdafb2f"
+  },
+  {
+    "file": "assets/fonts/IBMPlexSans-Italic.ttf",
+    "url": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Italic.ttf",
+    "bytes": 207920,
+    "sha256": "a9c6ef9942c49e49d11e11a6dacc0b3a087978757e9b22a06b8ac22a6400fb15"
+  },
+  {
+    "file": "assets/fonts/BricolageGrotesque12pt-SemiBold.ttf",
+    "url": "https://raw.githubusercontent.com/ateliertriay/bricolage/84745e5b96261ae5f8c6c856e262fe78d1d6efdd/fonts/ttf/BricolageGrotesque12pt-SemiBold.ttf",
+    "bytes": 116708,
+    "sha256": "b3c5133bc53549fdac082b999117efd76f52c92ed6032895bc91e01aa14d93d2"
+  },
+  {
+    "file": "assets/fonts/BricolageGrotesque12pt-Bold.ttf",
+    "url": "https://raw.githubusercontent.com/ateliertriay/bricolage/84745e5b96261ae5f8c6c856e262fe78d1d6efdd/fonts/ttf/BricolageGrotesque12pt-Bold.ttf",
+    "bytes": 116444,
+    "sha256": "b832e0d13b20794dd20c6e1711eab89a96e96b89268172f3ccd863657aa6157e"
+  },
+  {
+    "file": "assets/fonts/IBM-Plex-OFL.txt",
+    "url": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/LICENSE.txt",
+    "bytes": 4456,
+    "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
+  },
+  {
+    "file": "assets/fonts/Bricolage-OFL.txt",
+    "url": "https://raw.githubusercontent.com/ateliertriay/bricolage/84745e5b96261ae5f8c6c856e262fe78d1d6efdd/OFL.txt",
+    "bytes": 4403,
+    "sha256": "4b5a7d8f37f5602621c8a8d7358a6a2e71317e6c231c661e15aef0275d3e07ba"
+  }
+]

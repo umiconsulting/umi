@@ -1,10 +1,14 @@
-import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
+import '../../core/errors/operator_error_message.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/security/operator_permissions.dart';
+import '../../shared/money.dart';
+import '../../shared/widgets/station_document.dart';
 import '../entry/entry_controller.dart';
 import 'inventory_controller.dart';
+import 'inventory_quantity.dart';
 
 Future<void> showInventoryCenter(
   BuildContext context, {
@@ -22,7 +26,7 @@ Future<void> showInventoryCenter(
     operatorSessionId: operator.id,
   );
   await Navigator.of(context).push<void>(
-    MaterialPageRoute(
+    PosPageRoute(
       builder: (_) => InventorySurface(
         controller: controller,
         scope: scope,
@@ -53,6 +57,49 @@ final class InventorySurface extends StatefulWidget {
 final class _InventorySurfaceState extends State<InventorySurface> {
   final Map<String, TextEditingController> _countInputs = {};
   final Map<String, String> _varianceReasons = {};
+  bool _countInvalid = false;
+
+  List<Map<String, Object?>> get _countItems {
+    final overview = widget.controller.state.overview;
+    final count = widget.controller.state.count?.count;
+    if (overview == null || count == null) return const [];
+    final ids = {
+      for (final balance in overview.balances)
+        if (balance['inventoryLocationId'] == count['inventoryLocationId'])
+          balance['inventoryItemId'],
+    };
+    return overview.items
+        .where((item) => item['active'] == true && ids.contains(item['id']))
+        .toList(growable: false);
+  }
+
+  int _scale(Map<String, Object?> item) =>
+      (item['scale'] as num?)?.toInt() ?? 0;
+  String _quantityHint(Map<String, Object?> item) => _scale(item) == 0
+      ? _copy('Ingresa una cantidad entera.', 'Enter a whole quantity.')
+      : _copy(
+          'Hasta ${_scale(item)} decimales. Usa el punto decimal.',
+          'Up to ${_scale(item)} decimal places. Use a decimal point.',
+        );
+
+  Future<void> _submitCount() async {
+    final quantities = <String, int>{};
+    for (final item in _countItems) {
+      final id = item['id']! as String;
+      final value = InventoryQuantityText.parse(
+        _countInputs[id]?.text ?? '',
+        _scale(item),
+      );
+      if (value == null) {
+        setState(() => _countInvalid = true);
+        return;
+      }
+      quantities[id] = value;
+    }
+    setState(() => _countInvalid = false);
+    await widget.controller.submitCount(widget.scope, quantities);
+  }
+
   // The produce dialog outlives its own future while the route pops, so the
   // State owns these and disposes them once.
   final _productionQuantity = TextEditingController();
@@ -94,16 +141,18 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     final blindCountActive =
         state.count?.count['status'] == 'counting' &&
         state.count?.count['blind'] == true;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_copy('Operaciones de inventario', 'Inventory operations')),
+    return PosPage(
+      appBar: PosHeader(
+        title: StationHeading(
+          title: _copy('Operaciones de inventario', 'Inventory operations'),
+        ),
         actions: [
-          IconButton(
+          PosIconButton(
             tooltip: _copy('Actualizar', 'Refresh'),
             onPressed: state.busy
                 ? null
                 : () => widget.controller.load(widget.scope),
-            icon: const Icon(Icons.refresh),
+            icon: const PosIcon(PosGlyphs.refresh),
           ),
         ],
       ),
@@ -111,7 +160,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
         child: overview == null
             ? Center(
                 child: state.errorCode == null
-                    ? const CircularProgressIndicator()
+                    ? const PosSpinner()
                     : _Failure(
                         message: _error(state.errorCode!),
                         retry: () => widget.controller.load(widget.scope),
@@ -120,10 +169,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             : Column(
                 children: [
                   if (state.errorCode != null)
-                    MaterialBanner(
+                    PosNoticeBanner(
                       content: Text(_error(state.errorCode!)),
                       actions: [
-                        TextButton(
+                        PosTextButton(
                           onPressed: () => widget.controller.load(widget.scope),
                           child: Text(_copy('Reintentar', 'Retry')),
                         ),
@@ -133,7 +182,6 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                     location: overview.locations.isEmpty
                         ? '—'
                         : overview.locations.first['displayName']! as String,
-                    policy: overview.policy['version']! as String,
                     offlineBlocked:
                         overview.policy['offlineMutationsAllowed'] != true,
                   ),
@@ -145,7 +193,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: overview.restockReviews
                             .map(
-                              (review) => Card(
+                              (review) => PosCard(
                                 child: Padding(
                                   padding: const EdgeInsets.all(12),
                                   child: Wrap(
@@ -160,7 +208,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                                           'Pending refund disposition',
                                         ),
                                       ),
-                                      FilledButton.tonal(
+                                      PosButton.tonal(
                                         onPressed: state.busy
                                             ? null
                                             : () => _restockDialog(review),
@@ -184,12 +232,12 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: FilledButton.icon(
+                        child: PosButton.icon(
                           onPressed: state.busy
                               ? null
                               : () =>
                                     widget.controller.startCount(widget.scope),
-                          icon: const Icon(Icons.fact_check_outlined),
+                          icon: const PosIcon(PosGlyphs.factCheckOutlined),
                           label: Text(
                             _copy('Iniciar conteo ciego', 'Start blind count'),
                           ),
@@ -203,12 +251,12 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: FilledButton.icon(
+                        child: PosButton.icon(
                           onPressed: state.busy
                               ? null
                               : () => _productionDialog(),
-                          icon: const Icon(
-                            Icons.precision_manufacturing_outlined,
+                          icon: const PosIcon(
+                            PosGlyphs.precisionManufacturingOutlined,
                           ),
                           label: Text(
                             AppLocalizations.of(
@@ -262,7 +310,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                                       'Historial inmutable',
                                       'Immutable history',
                                     ),
-                                    style: Theme.of(
+                                    style: PosTheme.of(
                                       context,
                                     ).textTheme.titleLarge,
                                   ),
@@ -274,7 +322,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                                     vertical: 12,
                                   ),
                                   child: Center(
-                                    child: OutlinedButton(
+                                    child: PosOutlineButton(
                                       onPressed: state.busy
                                           ? null
                                           : () => widget.controller
@@ -308,9 +356,9 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     final count = result.count;
     final status = count['status']! as String;
     if (status == 'counting') {
-      return Card(
+      return PosCard(
         margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: ExpansionTile(
+        child: PosDisclosure(
           initiallyExpanded: true,
           title: Text(_copy('Conteo ciego activo', 'Active blind count')),
           subtitle: Text(
@@ -320,18 +368,35 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             ),
           ),
           children: [
-            for (final item in widget.controller.state.overview!.items)
+            for (final item in _countItems)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                child: TextField(
+                child: PosField(
                   controller: _countInputs.putIfAbsent(
                     item['id']! as String,
                     () => TextEditingController(),
                   ),
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
+                  keyboardType: TextInputType.numberWithOptions(
+                    decimal: _scale(item) > 0,
+                  ),
+                  decoration: PosFieldDecoration(
                     labelText: item['displayName']! as String,
-                    suffixText: item['baseUnit']! as String,
+                    suffixText: InventoryQuantityText.unit(
+                      item['baseUnit']! as String,
+                    ),
+                    helperText: _quantityHint(item),
+                    errorText:
+                        _countInvalid &&
+                            InventoryQuantityText.parse(
+                                  _countInputs[item['id']]?.text ?? '',
+                                  _scale(item),
+                                ) ==
+                                null
+                        ? _copy(
+                            'Registra una cantidad válida, incluido cero.',
+                            'Enter a valid quantity, including zero.',
+                          )
+                        : null,
                   ),
                 ),
               ),
@@ -339,15 +404,8 @@ final class _InventorySurfaceState extends State<InventorySurface> {
               padding: const EdgeInsets.all(16),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: widget.controller.state.busy
-                      ? null
-                      : () => widget.controller.submitCount(widget.scope, {
-                          for (final entry in _countInputs.entries)
-                            if (int.tryParse(entry.value.text)
-                                case final value?)
-                              if (value >= 0) entry.key: value,
-                        }),
+                child: PosButton(
+                  onPressed: widget.controller.state.busy ? null : _submitCount,
                   child: Text(_copy('Enviar conteo', 'Submit count')),
                 ),
               ),
@@ -356,7 +414,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
         ),
       );
     }
-    return Card(
+    return PosCard(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -367,19 +425,19 @@ final class _InventorySurfaceState extends State<InventorySurface> {
               status == 'committed'
                   ? _copy('Conteo reconciliado', 'Reconciled count')
                   : _copy('Varianza del conteo', 'Count variance'),
-              style: Theme.of(context).textTheme.titleMedium,
+              style: PosTheme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             for (final variance in result.variances)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: DropdownButtonFormField<String>(
+                child: PosSelectFormField<String>(
                   initialValue:
                       _varianceReasons[variance['inventoryItemId']! as String],
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText:
                         '${_itemName(variance['inventoryItemId']! as String)} · '
-                        '${(variance['signed']! as Map<String, Object?>)['value']}',
+                        '${InventoryQuantityText.label(variance['signed']! as Map<String, Object?>)}',
                   ),
                   hint: Text(
                     _copy('Selecciona el motivo', 'Select the reason'),
@@ -397,7 +455,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             if (status != 'committed' &&
                 widget.permissions.allows('inventory.count.reconcile')) ...[
               const SizedBox(height: 12),
-              FilledButton.icon(
+              PosButton.icon(
                 onPressed:
                     widget.controller.state.busy ||
                         !_hasAllVarianceReasons(result)
@@ -413,7 +471,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                           await _approvalDialog();
                         }
                       },
-                icon: const Icon(Icons.balance_outlined),
+                icon: const PosIcon(PosGlyphs.balanceOutlined),
                 label: Text(
                   _copy('Solicitar reconciliación', 'Request reconciliation'),
                 ),
@@ -431,30 +489,30 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     final fingerprint = widget.controller.state.approvalFingerprint;
     if (entry == null || permission == null || fingerprint == null) return;
     final pin = TextEditingController();
-    final approved = await showDialog<bool>(
+    final approved = await showPosDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(
           _copy(
             'Se requiere una aprobación independiente',
             'Independent approval required',
           ),
         ),
-        content: TextField(
+        content: PosField(
           controller: pin,
           autofocus: true,
           obscureText: true,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText: _copy('PIN del aprobador', 'Approver PIN'),
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(_copy('Cancelar', 'Cancel')),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(_copy('Aprobar', 'Approve')),
           ),
@@ -499,33 +557,45 @@ final class _InventorySurfaceState extends State<InventorySurface> {
 
   Future<void> _quantityDialog(Map<String, Object?> item, String action) async {
     final input = TextEditingController(text: '1');
-    final quantity = await showDialog<int>(
+    final quantity = await showPosDialog<int>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('${_actionLabel(action)} · ${item['displayName']}'),
-        content: TextField(
-          controller: input,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: _copy('Cantidad escalada', 'Scaled quantity'),
-            helperText: _copy(
-              'La API valida la unidad y la escala.',
-              'The API validates the unit and scale.',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => PosAlertDialog(
+          title: Text('${_actionLabel(action)} · ${item['displayName']}'),
+          content: PosField(
+            controller: input,
+            autofocus: true,
+            keyboardType: TextInputType.numberWithOptions(
+              decimal: _scale(item) > 0,
             ),
+            decoration: PosFieldDecoration(
+              labelText: _copy('Cantidad', 'Quantity'),
+              suffixText: InventoryQuantityText.unit(
+                item['baseUnit']! as String,
+              ),
+              helperText: _quantityHint(item),
+            ),
+            onChanged: (_) => setDialogState(() {}),
           ),
+          actions: [
+            PosTextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(_copy('Cancelar', 'Cancel')),
+            ),
+            PosButton(
+              onPressed:
+                  (InventoryQuantityText.parse(input.text, _scale(item)) ??
+                          0) <=
+                      0
+                  ? null
+                  : () => Navigator.pop(
+                      dialogContext,
+                      InventoryQuantityText.parse(input.text, _scale(item)),
+                    ),
+              child: Text(_copy('Confirmar', 'Confirm')),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(_copy('Cancelar', 'Cancel')),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, int.tryParse(input.text)),
-            child: Text(_copy('Confirmar', 'Confirm')),
-          ),
-        ],
       ),
     );
     input.dispose();
@@ -577,10 +647,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     _productionQuantity.text = '1';
     _productionLot.clear();
     _productionExpiry.clear();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showPosDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PosAlertDialog(
           title: Text(l.inventoryProductionTitle),
           content: SizedBox(
             width: 560,
@@ -589,17 +659,17 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  DropdownButtonFormField<String>(
+                  PosSelectFormField<String>(
                     initialValue: outputItemId,
-                    decoration: InputDecoration(
+                    decoration: PosFieldDecoration(
                       labelText: l.inventoryProductionOutputLabel,
                     ),
                     items: [
                       for (final item in candidates)
-                        DropdownMenuItem(
+                        PosSelectItem(
                           value: item['id']! as String,
                           child: Text(
-                            '${item['displayName']} · ${item['baseUnit']}',
+                            '${item['displayName']} · ${InventoryQuantityText.unit(item['baseUnit']! as String)}',
                           ),
                         ),
                     ],
@@ -608,25 +678,38 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                       setDialogState(() => outputItemId = value);
                     },
                   ),
-                  TextField(
+                  PosField(
                     controller: _productionQuantity,
                     autofocus: true,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: l.inventoryProductionQuantityLabel,
-                      helperText: l.inventoryProductionQuantityHelper,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
+                    decoration: PosFieldDecoration(
+                      labelText: l.inventoryProductionQuantityLabel,
+                      suffixText: InventoryQuantityText.unit(
+                        candidates.firstWhere(
+                              (item) => item['id'] == outputItemId,
+                            )['baseUnit']!
+                            as String,
+                      ),
+                      helperText: _quantityHint(
+                        candidates.firstWhere(
+                          (item) => item['id'] == outputItemId,
+                        ),
+                      ),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
                   ),
-                  TextField(
+                  PosField(
                     controller: _productionLot,
-                    decoration: InputDecoration(
+                    decoration: PosFieldDecoration(
                       labelText: l.inventoryProductionLotLabel,
                     ),
                   ),
-                  TextField(
+                  PosField(
                     controller: _productionExpiry,
                     keyboardType: TextInputType.datetime,
-                    decoration: InputDecoration(
+                    decoration: PosFieldDecoration(
                       labelText: l.inventoryProductionExpiryLabel,
                       hintText: l.inventoryProductionExpiryHint,
                     ),
@@ -636,19 +719,34 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             ),
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               child: Text(_copy('Cancelar', 'Cancel')),
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
+            PosButton(
+              onPressed:
+                  (InventoryQuantityText.parse(
+                            _productionQuantity.text,
+                            _scale(
+                              candidates.firstWhere(
+                                (item) => item['id'] == outputItemId,
+                              ),
+                            ),
+                          ) ??
+                          0) <=
+                      0
+                  ? null
+                  : () => Navigator.pop(dialogContext, true),
               child: Text(_copy('Confirmar', 'Confirm')),
             ),
           ],
         ),
       ),
     );
-    final quantity = int.tryParse(_productionQuantity.text);
+    final quantity = InventoryQuantityText.parse(
+      _productionQuantity.text,
+      _scale(candidates.firstWhere((item) => item['id'] == outputItemId)),
+    );
     final lotCode = _productionLot.text.trim();
     final expiresOn = _productionExpiry.text.trim();
     if (confirmed != true || quantity == null || quantity <= 0) return;
@@ -670,16 +768,16 @@ final class _InventorySurfaceState extends State<InventorySurface> {
 
   Future<void> _productionResultDialog(ProductionResult result) async {
     final l = AppLocalizations.of(context);
-    await showDialog<void>(
+    await showPosDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(l.inventoryProductionResultTitle),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(child: _productionSummary(result)),
         ),
         actions: [
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(_copy('Cerrar', 'Close')),
           ),
@@ -733,10 +831,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
         const SizedBox(height: 12),
         Text(
           l.inventoryProductionConsumedTitle,
-          style: Theme.of(context).textTheme.titleSmall,
+          style: PosTheme.of(context).textTheme.titleSmall,
         ),
         for (final line in result.consumed)
-          ListTile(
+          PosListRow(
             contentPadding: EdgeInsets.zero,
             title: Text(line['displayName']! as String),
             subtitle: Text(line['publicReference']! as String),
@@ -752,11 +850,11 @@ final class _InventorySurfaceState extends State<InventorySurface> {
   }
 
   String _quantityLabel(Map<String, Object?> quantity) =>
-      '${quantity['value']} ${quantity['unit']}';
+      InventoryQuantityText.label(quantity);
 
   String _cost(int? minorUnits) => minorUnits == null
       ? AppLocalizations.of(context).inventoryProductionNoCostLabel
-      : (minorUnits / 100).toStringAsFixed(2);
+      : formatMinorUnits(minorUnits);
 
   Future<void> _restockDialog(Map<String, Object?> review) async {
     final components = (review['components']! as List<Object?>)
@@ -765,10 +863,10 @@ final class _InventorySurfaceState extends State<InventorySurface> {
       for (final component in components)
         component['inventoryItemId']! as String: 'not_restocked',
     };
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showPosDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PosAlertDialog(
           title: Text(
             _copy('Destino por componente', 'Disposition by component'),
           ),
@@ -777,7 +875,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: components.length,
-              separatorBuilder: (_, _) => const Divider(),
+              separatorBuilder: (_, _) => const PosDivider(),
               itemBuilder: (context, index) {
                 final component = components[index];
                 final itemId = component['inventoryItemId']! as String;
@@ -794,26 +892,26 @@ final class _InventorySurfaceState extends State<InventorySurface> {
                     children: [
                       Text(
                         '$displayName · $publicReference · '
-                        '${maximum['value']} ${maximum['unit']}',
+                        '${InventoryQuantityText.label(maximum)}',
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
+                      PosSelectFormField<String>(
                         initialValue: decisions[itemId],
-                        decoration: InputDecoration(
+                        decoration: PosFieldDecoration(
                           labelText: _copy('Destino', 'Disposition'),
                         ),
                         items: [
-                          DropdownMenuItem(
+                          PosSelectItem(
                             value: 'restocked',
                             child: Text(_copy('Reingresar', 'Restock')),
                           ),
-                          DropdownMenuItem(
+                          PosSelectItem(
                             value: 'not_restocked',
                             child: Text(
                               _copy('No reingresar', 'Do not restock'),
                             ),
                           ),
-                          DropdownMenuItem(
+                          PosSelectItem(
                             value: 'inspection_queued',
                             child: Text(
                               _copy(
@@ -835,11 +933,11 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             ),
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               child: Text(_copy('Cancelar', 'Cancel')),
             ),
-            FilledButton(
+            PosButton(
               onPressed: () => Navigator.pop(dialogContext, true),
               child: Text(_copy('Confirmar', 'Confirm')),
             ),
@@ -865,7 +963,7 @@ final class _InventorySurfaceState extends State<InventorySurface> {
         ),
       );
 
-  List<DropdownMenuItem<String>> _varianceReasonItems() =>
+  List<PosSelectItem<String>> _varianceReasonItems() =>
       [
             ('counting_error', _copy('Error de conteo', 'Counting error')),
             (
@@ -893,10 +991,8 @@ final class _InventorySurfaceState extends State<InventorySurface> {
             ('authorized_other', _copy('Otro autorizado', 'Authorized other')),
           ]
           .map(
-            (entry) => DropdownMenuItem<String>(
-              value: entry.$1,
-              child: Text(entry.$2),
-            ),
+            (entry) =>
+                PosSelectItem<String>(value: entry.$1, child: Text(entry.$2)),
           )
           .toList();
 
@@ -958,32 +1054,33 @@ final class _InventorySurfaceState extends State<InventorySurface> {
     'INVENTORY_SOURCE_STATE_INSUFFICIENT' => AppLocalizations.of(
       context,
     ).inventoryProductionInsufficientStockMessage,
-    _ => _copy(
-      'No fue posible completar la operación de inventario.',
-      'The inventory operation could not finish.',
-    ),
+    // A code this screen has nothing specific to say about still gets the core
+    // message. One generic sentence for every unknown refusal threw away what
+    // the server did say — `VALIDATION_FAILED` reached the operator as
+    // `No fue posible completar la operación de inventario.`, with nothing to
+    // act on — while the shared mapping already has something specific for the
+    // codes that come back most.
+    _ => operatorErrorMessage(context, code),
   };
 }
 
 final class _Header extends StatelessWidget {
-  const _Header({
-    required this.location,
-    required this.policy,
-    required this.offlineBlocked,
-  });
+  const _Header({required this.location, required this.offlineBlocked});
   final String location;
-  final String policy;
   final bool offlineBlocked;
 
   @override
   Widget build(BuildContext context) {
     final es = Localizations.localeOf(context).languageCode == 'es';
-    return ListTile(
-      leading: const Icon(Icons.inventory_2_outlined),
+    return PosListRow(
+      leading: const PosIcon(PosGlyphs.inventory2Outlined),
       title: Text(location),
       subtitle: Text(
-        '${es ? 'Política' : 'Policy'} $policy · '
-        '${offlineBlocked ? (es ? 'Solo en línea' : 'Online-only') : (es ? 'En línea' : 'Online')}',
+        offlineBlocked
+            ? (es
+                  ? 'Los movimientos requieren conexión'
+                  : 'Stock changes require a connection')
+            : (es ? 'Movimientos disponibles' : 'Stock changes available'),
       ),
     );
   }
@@ -1006,10 +1103,17 @@ final class _InventoryItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final available = balance?['available'] ?? 0;
-    final onHand = balance?['onHand'] ?? 0;
-    final reserved = balance?['reserved'] ?? 0;
-    return Card(
+    final scale = (item['scale'] as num?)?.toInt() ?? 0;
+    final available = InventoryQuantityText.format(
+      balance?['available'] ?? 0,
+      scale,
+    );
+    final onHand = InventoryQuantityText.format(balance?['onHand'] ?? 0, scale);
+    final reserved = InventoryQuantityText.format(
+      balance?['reserved'] ?? 0,
+      scale,
+    );
+    return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Wrap(
@@ -1019,51 +1123,57 @@ final class _InventoryItemCard extends StatelessWidget {
           children: [
             SizedBox(
               width: 260,
-              child: ListTile(
+              child: PosListRow(
                 contentPadding: EdgeInsets.zero,
                 title: Text(item['displayName']! as String),
                 subtitle: Text(
-                  '${item['publicReference']} · ${item['baseUnit']}',
+                  '${item['publicReference']} · ${InventoryQuantityText.unit(item['baseUnit']! as String)}',
                 ),
               ),
             ),
-            _Metric(
-              label: es ? 'Existencia física' : 'On hand',
-              value: '$onHand',
-            ),
-            _Metric(label: es ? 'Reservado' : 'Reserved', value: '$reserved'),
-            _Metric(
-              label: es ? 'Disponible' : 'Available',
-              value: '$available',
-            ),
+            _Metric(label: es ? 'Existencia física' : 'On hand', value: onHand),
+            _Metric(label: es ? 'Reservado' : 'Reserved', value: reserved),
+            _Metric(label: es ? 'Disponible' : 'Available', value: available),
             if (permissions.allows('inventory.adjust.increase'))
-              OutlinedButton(
+              PosOutlineButton.icon(
                 onPressed: busy ? null : () => onAction('increase'),
-                child: const Text('+'),
+                icon: const PosIcon(PosGlyphs.add),
+                label: Text(
+                  es ? 'Aumentar' : 'Increase',
+                  semanticsLabel: es
+                      ? 'Aumentar existencias de ${item['displayName']}'
+                      : 'Increase stock for ${item['displayName']}',
+                ),
               ),
             if (permissions.allows('inventory.adjust.decrease'))
-              OutlinedButton(
+              PosOutlineButton.icon(
                 onPressed: busy ? null : () => onAction('decrease'),
-                child: const Text('−'),
+                icon: const PosIcon(PosGlyphs.remove),
+                label: Text(
+                  es ? 'Reducir' : 'Decrease',
+                  semanticsLabel: es
+                      ? 'Reducir existencias de ${item['displayName']}'
+                      : 'Decrease stock for ${item['displayName']}',
+                ),
               ),
             if (permissions.allows('inventory.waste.create'))
-              IconButton(
+              PosIconButton(
                 tooltip: es ? 'Registrar merma' : 'Record waste',
                 onPressed: busy ? null : () => onAction('waste'),
-                icon: const Icon(Icons.delete_sweep_outlined),
+                icon: const PosIcon(PosGlyphs.deleteSweepOutlined),
               ),
             if (permissions.allows('inventory.damage.create'))
-              IconButton(
+              PosIconButton(
                 tooltip: es ? 'Registrar daño' : 'Record damage',
                 onPressed: busy ? null : () => onAction('damage'),
-                icon: const Icon(Icons.report_problem_outlined),
+                icon: const PosIcon(PosGlyphs.reportProblemOutlined),
               ),
             if (permissions.allows('inventory.quarantine.release') &&
                 (balance?['quarantine'] as num? ?? 0) > 0)
-              IconButton(
+              PosIconButton(
                 tooltip: es ? 'Liberar cuarentena' : 'Release quarantine',
                 onPressed: busy ? null : () => onAction('quarantine_release'),
-                icon: const Icon(Icons.inventory_outlined),
+                icon: const PosIcon(PosGlyphs.inventoryOutlined),
               ),
           ],
         ),
@@ -1080,11 +1190,11 @@ final class _HistoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final quantity = entry['quantity']! as Map<String, Object?>;
-    return ListTile(
-      leading: const Icon(Icons.history),
+    return PosListRow(
+      leading: const PosIcon(PosGlyphs.history),
       title: Text(label),
       subtitle: Text('${entry['businessDate']} · ${entry['correlationId']}'),
-      trailing: Text('${quantity['value']} ${quantity['unit']}'),
+      trailing: Text(InventoryQuantityText.label(quantity)),
     );
   }
 }
@@ -1096,7 +1206,7 @@ final class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     label: '$label: $value',
-    child: Chip(label: Text('$label $value')),
+    child: PosTag(label: Text('$label $value')),
   );
 }
 
@@ -1112,10 +1222,7 @@ final class _Failure extends StatelessWidget {
       children: [
         Text(message),
         const SizedBox(height: 12),
-        FilledButton(
-          onPressed: retry,
-          child: Text(es ? 'Reintentar' : 'Retry'),
-        ),
+        PosButton(onPressed: retry, child: Text(es ? 'Reintentar' : 'Retry')),
       ],
     );
   }

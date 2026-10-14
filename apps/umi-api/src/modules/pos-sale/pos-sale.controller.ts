@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@n
 import {
   AttachSaleCustomerRequest,
   CancelSaleRequest,
+  CancelCarriedOverAccountsRequest,
   PosCustomerSearchQuery,
   RenameSuspendedSaleRequest,
   ResumeSaleRequest,
@@ -79,6 +80,16 @@ export class PosSaleController {
     @Body(new ZodValidationPipe(ResumeSaleRequest)) dto: ResumeSaleRequest,
   ) {
     return this.sales.resume(user, merchantId, saleId, dto);
+  }
+
+  @Post('carried-over/cancel')
+  cancelCarriedOver(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(CancelCarriedOverAccountsRequest))
+    dto: CancelCarriedOverAccountsRequest,
+  ) {
+    return this.sales.cancelCarriedOver(user, merchantId, dto);
   }
 
   @Post(':saleId/cancel')

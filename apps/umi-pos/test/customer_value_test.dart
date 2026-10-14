@@ -1,10 +1,18 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
+import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/customer_value/customer_value_controller.dart';
 import 'package:umi_pos/features/customer_value/customer_value_repository.dart';
+import 'package:umi_pos/features/customer_value/customer_value_surface.dart';
+
+import 'support/fakes.dart';
 
 const scope = CustomerValueScope(
   merchantId: '10000000-0000-4000-8000-000000000001',
@@ -46,6 +54,10 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
   PointsAdjustmentRequest? adjustmentCommand;
   GiftCardIssuanceRequest? issuanceCommand;
 
+  /// What the customer's history answers with. The default is empty; a test that
+  /// cares about how a history row is worded seeds its own entries.
+  List<Map<String, Object?>> historyEntries = const [];
+
   @override
   Future<CustomerSearchResult> search(
     String merchantId,
@@ -70,10 +82,10 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
     String merchantId,
     String customerId,
     CustomerHistoryQuery query,
-  ) async => const CustomerHistoryPage(
+  ) async => CustomerHistoryPage(
     nextCursor: null,
-    entries: [],
-    loyaltyAccount: {
+    entries: historyEntries,
+    loyaltyAccount: const {
       'id': '10000000-0000-4000-8000-000000000030',
       'customerId': '10000000-0000-4000-8000-000000000004',
       'programReference': 'pilot',
@@ -83,7 +95,7 @@ final class FakeCustomerValueRepository implements CustomerValueRepository {
       'version': 1,
       'enrolledAt': '2026-08-05T18:00:00.000Z',
     },
-    pointsBalance: {'available': 600, 'pending': 20},
+    pointsBalance: const {'available': 600, 'pending': 20},
   );
 
   @override
@@ -463,6 +475,140 @@ void main() {
       expect(issued?.card['status'], 'inactive');
       expect(controller.selection()?.fundedGiftCards, hasLength(1));
       expect(repository.issuanceCommand?.saleLineId, isNotNull);
+    },
+  );
+
+  testWidgets(
+    'the customer centre will not offer an attach with no sale behind it',
+    (tester) async {
+      // `SaleLifecycleController.attachCustomer` returns in silence when there is
+      // no editable sale, so a button that looks ready leaves the operator
+      // tapping at nothing (`canEditSale` is the same condition the command
+      // guards on). It stands down, and says why.
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1396, 737);
+      addTearDown(tester.view.reset);
+
+      final controller = CustomerValueController(FakeCustomerValueRepository());
+      final root = testRoot();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          theme: UmiTheme.light(),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: CustomerValueSurface(
+            entry: root.entry,
+            controller: controller,
+            sales: root.sales,
+            scope: scope,
+            permissions: OperatorPermissions(const [
+              'customer.search',
+              'customer.attach',
+            ]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ana'));
+      await tester.pumpAndSettle();
+
+      expect(root.sales.canEditSale, isFalse, reason: 'no sale is open');
+      final attach = tester.widget<PosButton>(
+        find.widgetWithText(PosButton, 'Adjuntar a la venta'),
+      );
+      expect(attach.onPressed, isNull);
+      expect(
+        find.text('Empieza o reanuda una venta para adjuntar un cliente.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      root.dispose();
+    },
+  );
+
+  testWidgets(
+    'the customer center words money in pesos, never in raw minor units',
+    (tester) async {
+      // Both places this screen states an amount of money used to print the
+      // number the ledger stores (minor units) beside the currency code: a
+      // MXN 20.00 wallet hold read `2000 MXN` and the gift-card confirmation for
+      // a MXN 500.00 card read `50000 MXN`. Measured on the iMin D3-504 on
+      // 2026-10-11 against `loyalty_stored_value_ledger.amount_minor_units` and
+      // `loyalty_gift_card.amount_cents`. A hundredfold overstatement of the
+      // customer's own money is a wording bug with the shape of a money bug, so
+      // both places are pinned here.
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(1396, 737);
+      addTearDown(tester.view.reset);
+
+      final repository = FakeCustomerValueRepository()
+        ..historyEntries = [
+          {
+            'type': 'wallet',
+            'publicReference': 'WLT-1',
+            'businessDate': '2026-10-11',
+            'total': {'minorUnits': 2000, 'currency': 'MXN'},
+          },
+        ];
+      final controller = CustomerValueController(repository);
+      final root = testRoot();
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          theme: UmiTheme.light(),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          home: CustomerValueSurface(
+            entry: root.entry,
+            controller: controller,
+            sales: root.sales,
+            scope: scope,
+            permissions: OperatorPermissions(const [
+              'customer.search',
+              'gift_card.issue',
+            ]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ana'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('MXN 20.00'), findsOneWidget);
+      expect(find.textContaining('2000 MXN'), findsNothing);
+
+      await tester.tap(find.text('Emitir tarjeta'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(PosAlertDialog),
+          matching: find.byType(PosField),
+        ),
+        '50000',
+      );
+      await tester.tap(find.text('Revisar'));
+      await tester.pumpAndSettle();
+
+      // MXN 500.00 on the card, and the MXN 100,000.00 ceiling beside it —
+      // grouped thousands included, the same as everywhere else on the till.
+      expect(find.textContaining('MXN 500.00'), findsOneWidget);
+      expect(find.textContaining('MXN 100,000.00'), findsOneWidget);
+      expect(find.textContaining('50000 MXN'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+      root.dispose();
     },
   );
 }

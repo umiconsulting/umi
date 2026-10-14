@@ -1,9 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
+
+import '../../core/errors/operator_error_message.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
 import '../../shared/widgets/pin_entry.dart';
+import '../../shared/widgets/station_document.dart';
+import '../../shared/widgets/station_signature.dart';
 import '../../shared/widgets/status_card.dart';
 import 'entry_controller.dart';
 
@@ -16,9 +20,7 @@ final class EntrySurface extends StatelessWidget {
     EntryPhase.restoringSession ||
     EntryPhase.authenticating ||
     EntryPhase.pinAuthenticating ||
-    EntryPhase.startingOperator => const Center(
-      child: CircularProgressIndicator(),
-    ),
+    EntryPhase.startingOperator => _EntryLoading(phase: controller.state.phase),
     EntryPhase.enrollmentRequired => _Enrollment(controller: controller),
     EntryPhase.enrollmentPending => _EnrollmentPending(controller: controller),
     EntryPhase.pinRequired => _PinLogin(controller: controller),
@@ -60,14 +62,14 @@ final class _EnrollmentState extends State<_Enrollment> {
         children: [
           Text(
             l.enrollmentTitle,
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: PosTheme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: UmiSpacing.sm),
           Text(l.enrollmentBody, textAlign: TextAlign.center),
           const SizedBox(height: UmiSpacing.lg),
-          TextField(
+          PosField(
             controller: code,
-            decoration: InputDecoration(
+            decoration: PosFieldDecoration(
               labelText: l.enrollmentCodeLabel,
               errorText: _invalidCode
                   ? l.enrollmentCodeInvalid
@@ -87,7 +89,7 @@ final class _EnrollmentState extends State<_Enrollment> {
           const SizedBox(height: UmiSpacing.lg),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: PosButton(
               onPressed: code.text.length == 8 ? _submit : null,
               child: Text(l.continueAction),
             ),
@@ -135,11 +137,11 @@ final class _EnrollmentPending extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const CircularProgressIndicator(),
+            const PosSpinner(),
             const SizedBox(height: UmiSpacing.lg),
             Text(
               l.enrollmentPendingTitle,
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: PosTheme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: UmiSpacing.sm),
@@ -148,19 +150,19 @@ final class _EnrollmentPending extends StatelessWidget {
             Text(
               l.enrollmentPendingSecure,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: PosTheme.of(context).textTheme.bodySmall,
             ),
             if (controller.state.errorCode != null) ...[
               const SizedBox(height: UmiSpacing.md),
               Text(l.recoverableNetworkBody, textAlign: TextAlign.center),
               const SizedBox(height: UmiSpacing.sm),
-              OutlinedButton(
+              PosOutlineButton(
                 onPressed: controller.retryPairing,
                 child: Text(l.retryAction),
               ),
             ],
             const SizedBox(height: UmiSpacing.lg),
-            TextButton(
+            PosTextButton(
               onPressed: controller.cancelPairing,
               child: Text(l.cancelEnrollmentAction),
             ),
@@ -203,6 +205,11 @@ final class _PinLoginState extends State<_PinLogin> {
     final l = AppLocalizations.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
     final length = pin.text.length;
+    // The largest text the product offers doubles every line, so the space BETWEEN blocks is what
+    // gives way; the title, the hint, the dots, the keys and the action all stay.
+    final largeText = MediaQuery.textScalerOf(context).scale(16) >= 24;
+    final block = largeText ? UmiSpacing.md : UmiSpacing.lg;
+    final tight = largeText ? UmiSpacing.xs : UmiSpacing.sm;
     final error = _tooShort
         ? l.operatorPinLength
         : _pinError(l, widget.controller.state.errorCode);
@@ -210,66 +217,73 @@ final class _PinLoginState extends State<_PinLogin> {
     // field that would summon the OS keyboard on a counter tablet. The physical
     // keyboard still works through the KeyboardListener (dev, accessibility).
     return _EntryFrame(
+      showSignature: false,
       child: KeyboardListener(
         focusNode: focus,
         autofocus: true,
         onKeyEvent: _onKey,
-        child: Semantics(
-          label: l.operatorPinTitle,
-          value: es ? '$length dígitos' : '$length digits',
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.dialpad_outlined, size: 44),
-              const SizedBox(height: UmiSpacing.md),
-              Text(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              container: true,
+              header: true,
+              child: Text(
                 l.operatorPinTitle,
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: PosTheme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: UmiSpacing.sm),
-              Text(l.operatorPinBody, textAlign: TextAlign.center),
-              const SizedBox(height: UmiSpacing.lg),
-              PinDots(length: length, minLength: 4),
-              const SizedBox(height: UmiSpacing.sm),
+            ),
+            SizedBox(height: block),
+            Semantics(
+              container: true,
+              liveRegion: true,
+              label: es ? 'PIN de operador' : 'Operator PIN',
+              value: es ? '$length dígitos' : '$length digits',
+              excludeSemantics: true,
+              child: PinDots(length: length, minLength: 4),
+            ),
+            SizedBox(height: tight),
+            Text(
+              l.operatorPinHint,
+              textAlign: TextAlign.center,
+              style: PosTheme.of(context).textTheme.bodySmall,
+            ),
+            if (error != null) ...[
+              SizedBox(height: tight),
               Text(
-                l.operatorPinHint,
+                error,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              if (error != null) ...[
-                const SizedBox(height: UmiSpacing.sm),
-                Text(
-                  error,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
-                ),
-              ],
-              const SizedBox(height: UmiSpacing.lg),
-              PinPad(
-                onDigit: (digit) => _press(digit),
-                onBackspace: () => _press('back'),
-                onClear: () => _press('clear'),
-                canEdit: length > 0,
-                es: es,
-              ),
-              const SizedBox(height: UmiSpacing.lg),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: length >= 4 ? _submit : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: UmiSpacing.sm,
-                    ),
-                    child: Text(l.operatorPinAction),
-                  ),
+                style: PosTheme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: PosTheme.of(context).colorScheme.error,
                 ),
               ),
             ],
-          ),
+            SizedBox(height: block),
+            PinPad(
+              onDigit: (digit) => _press(digit),
+              onBackspace: () => _press('back'),
+              onClear: () => _press('clear'),
+              canEdit: length > 0,
+              es: es,
+              // 60 px is still a long way above the till's 48 px floor, and it is the room that
+              // keeps the action on the screen at 200 % text. The keys are the biggest thing on
+              // this screen after the type itself, so they are the honest place to take it from.
+              keyHeight: largeText ? 60 : 68,
+              rowGap: largeText ? UmiSpacing.xs : UmiSpacing.sm,
+            ),
+            SizedBox(height: block),
+            SizedBox(
+              width: double.infinity,
+              child: PosButton(
+                onPressed: length >= 4 ? _submit : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: UmiSpacing.sm),
+                  child: Text(l.operatorPinAction),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -351,28 +365,28 @@ final class _LoginState extends State<_Login> {
           children: [
             Text(
               l.loginTitle,
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: PosTheme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: UmiSpacing.lg),
-            TextField(
+            PosField(
               controller: username,
               autofillHints: const [AutofillHints.username],
               keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(labelText: l.usernameLabel),
+              decoration: PosFieldDecoration(labelText: l.usernameLabel),
             ),
             const SizedBox(height: UmiSpacing.md),
-            TextField(
+            PosField(
               controller: password,
               autofillHints: const [AutofillHints.password],
               obscureText: true,
               enableSuggestions: false,
               autocorrect: false,
-              decoration: InputDecoration(labelText: l.passwordLabel),
+              decoration: PosFieldDecoration(labelText: l.passwordLabel),
               onSubmitted: (_) =>
                   widget.controller.login(username.text, password.text),
             ),
             const SizedBox(height: UmiSpacing.lg),
-            ElevatedButton(
+            PosButton(
               onPressed: () =>
                   widget.controller.login(username.text, password.text),
               child: Text(l.signInAction),
@@ -392,7 +406,7 @@ final class _TenantSelection extends StatelessWidget {
     final l = AppLocalizations.of(context);
     if (controller.state.merchants.isEmpty) {
       return StatusCard(
-        icon: Icons.domain_disabled_outlined,
+        icon: PosGlyphs.domainDisabledOutlined,
         title: l.noTenantTitle,
         message: l.noTenantBody,
       );
@@ -403,12 +417,12 @@ final class _TenantSelection extends StatelessWidget {
         children: [
           Text(
             l.selectTenantTitle,
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: PosTheme.of(context).textTheme.headlineSmall,
           ),
           for (final tenant in controller.state.merchants)
-            ListTile(
+            PosListRow(
               title: Text(tenant.name),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const PosIcon(PosGlyphs.chevronRight),
               onTap: () => controller.selectTenant(tenant),
             ),
         ],
@@ -439,13 +453,13 @@ final class _BranchSelection extends StatelessWidget {
         children: [
           Text(
             l.selectBranchTitle,
-            style: Theme.of(context).textTheme.headlineSmall,
+            style: PosTheme.of(context).textTheme.headlineSmall,
           ),
           if (locations.isEmpty) Text(l.noBranchBody),
           for (final branch in locations)
-            ListTile(
+            PosListRow(
               title: Text(branch.name),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const PosIcon(PosGlyphs.chevronRight),
               onTap: () => controller.selectBranch(tenant!, branch),
             ),
         ],
@@ -461,12 +475,26 @@ final class _OperatorEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return StatusCard(
-      icon: Icons.badge_outlined,
+      icon: PosGlyphs.badgeOutlined,
       title: l.operatorTitle,
-      message: l.operatorBody,
-      action: ElevatedButton(
-        onPressed: controller.startOperator,
-        child: Text(l.startOperatorAction),
+      message: controller.state.errorCode == null
+          ? l.operatorBody
+          : operatorErrorMessage(context, controller.state.errorCode!),
+      action: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PosButton(
+            onPressed: controller.startOperator,
+            child: Text(l.startOperatorAction),
+          ),
+          if (controller.state.errorCode == 'OPERATOR_SESSION_BUSY') ...[
+            const SizedBox(height: UmiSpacing.md),
+            PosButton(
+              onPressed: controller.logout,
+              child: Text(l.logoutAction),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -479,19 +507,19 @@ final class _ReadyShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = controller.state;
     final l = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(
+    return PosPage(
+      appBar: PosHeader(
         title: const Text('UmiPOS'),
         actions: [
-          IconButton(
+          PosIconButton(
             tooltip: l.lockAction,
             onPressed: controller.lock,
-            icon: const Icon(Icons.lock_outline),
+            icon: const PosIcon(PosGlyphs.lockOutline),
           ),
-          IconButton(
+          PosIconButton(
             tooltip: l.logoutAction,
             onPressed: controller.logout,
-            icon: const Icon(Icons.logout),
+            icon: const PosIcon(PosGlyphs.logout),
           ),
         ],
       ),
@@ -505,16 +533,16 @@ final class _ReadyShell extends StatelessWidget {
                 spacing: UmiSpacing.md,
                 runSpacing: UmiSpacing.md,
                 children: [
-                  Chip(label: Text(state.selectedTenant?.name ?? '—')),
-                  Chip(label: Text(state.selectedBranch?.name ?? '—')),
-                  Chip(label: Text(l.deviceActiveLabel)),
-                  Chip(label: Text(l.connectivityUnknownLabel)),
+                  PosTag(label: Text(state.selectedTenant?.name ?? '—')),
+                  PosTag(label: Text(state.selectedBranch?.name ?? '—')),
+                  PosTag(label: Text(l.deviceActiveLabel)),
+                  PosTag(label: Text(l.connectivityUnknownLabel)),
                 ],
               ),
               const SizedBox(height: UmiSpacing.xl),
               Expanded(
                 child: StatusCard(
-                  icon: Icons.point_of_sale_outlined,
+                  icon: PosGlyphs.pointOfSaleOutlined,
                   title: l.shellReadyTitle,
                   message: l.catalogNotImplemented,
                 ),
@@ -533,10 +561,12 @@ final class _DeviceProblem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return StatusCard(
-      icon: Icons.phonelink_erase_outlined,
-      title: revoked ? l.deviceRevokedTitle : l.rotationRequiredTitle,
-      message: revoked ? l.deviceRevokedBody : l.rotationRequiredBody,
+    return PosPage(
+      body: StatusCard(
+        icon: PosGlyphs.phonelinkEraseOutlined,
+        title: revoked ? l.deviceRevokedTitle : l.rotationRequiredTitle,
+        message: revoked ? l.deviceRevokedBody : l.rotationRequiredBody,
+      ),
     );
   }
 }
@@ -547,38 +577,141 @@ final class _Recovery extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return StatusCard(
-      icon: Icons.cloud_off_outlined,
-      title: l.recoverableFailureTitle,
-      message: l.recoverableNetworkBody,
-      action: ElevatedButton(
-        onPressed: controller.initialize,
-        child: Text(l.retryAction),
+    return PosPage(
+      body: StatusCard(
+        icon: PosGlyphs.cloudOffOutlined,
+        title: controller.state.phase == EntryPhase.storageFailure
+            ? l.storageUnavailableTitle
+            : l.recoverableFailureTitle,
+        message: controller.state.phase == EntryPhase.storageFailure
+            ? l.storageUnavailableBody
+            : l.recoverableNetworkBody,
+        action: PosButton(
+          onPressed: controller.initialize,
+          child: Text(l.retryAction),
+        ),
       ),
     );
   }
 }
 
 final class _EntryFrame extends StatelessWidget {
-  const _EntryFrame({required this.child});
+  const _EntryFrame({
+    required this.child,
+    this.showSignature = true,
+    this.wordmarkOnly = false,
+  });
   final Widget child;
+
+  /// False on the PIN screen, where the keypad is the whole task and the
+  /// terminal's own name would only take room above it.
+  final bool showSignature;
+  final bool wordmarkOnly;
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PosPage(
     body: SafeArea(
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(UmiSpacing.lg),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(UmiSpacing.xl),
-                child: child,
+      child: LayoutBuilder(
+        builder: (context, size) {
+          // `Muy grande` is a text scale of 2, and 16 x 2 = 32. At that size the entry screens
+          // tighten their RHYTHM, never their content: the wordmark stays on loading screens
+          // (a test pins that at 200 % — `entry loading retains context at enlarged phone scale`), the keypad keeps its
+          // 68 px keys, and the spars that were decorative are what give way. The PIN screen is the
+          // one exception, and shows no signature at all: the keypad is its whole task. Measured on
+          // the iMin's 1014 px window: with the old rhythm the sign-in action sat 49 px below the
+          // fold at 200 % (apps/umi-pos/test/device_pairing_test.dart, "the sign-in action stays on
+          // screen at 200 % text").
+          final largeText = MediaQuery.textScalerOf(context).scale(16) >= 24;
+          final wide =
+              size.maxWidth >= 1000 && size.maxHeight >= 600 && !largeText;
+          final afterSignature = largeText ? UmiSpacing.md : UmiSpacing.xl;
+          final formPadding = largeText
+              ? UmiSpacing.sm
+              : (size.maxWidth < 600 ? 12.0 : UmiSpacing.lg);
+          final form = Center(
+            child: SingleChildScrollView(
+              // At the largest text the outer margin is the first thing to spend: the screens
+              // keep every word and every key, and the room comes from the space around them.
+              padding: EdgeInsets.all(
+                largeText ? UmiSpacing.sm : UmiSpacing.lg,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Padding(
+                  padding: EdgeInsets.all(formPadding),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (showSignature) ...[
+                        StationSignature(wordmarkOnly: wordmarkOnly),
+                        SizedBox(height: afterSignature),
+                      ],
+                      child,
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+          // Keep the form in one keyed row. Keyboard resize can hide the cover
+          // without replacing the editor and its focus node.
+          return Row(
+            children: [
+              if (wide)
+                const Expanded(
+                  key: ValueKey('entry-cover'),
+                  flex: 5,
+                  child: StationEntryCover(),
+                ),
+              Expanded(key: const ValueKey('entry-form'), flex: 7, child: form),
+            ],
+          );
+        },
       ),
     ),
   );
+}
+
+/// True while a loading screen belongs to the operator's PIN: the screen that
+/// verifies it and the screen that starts the session it opens.
+bool _pinLoading(EntryPhase phase) =>
+    phase == EntryPhase.pinAuthenticating ||
+    phase == EntryPhase.startingOperator;
+
+final class _EntryLoading extends StatelessWidget {
+  const _EntryLoading({required this.phase});
+  final EntryPhase phase;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final title = switch (phase) {
+      EntryPhase.checkingDevice => l.entryCheckingTerminal,
+      EntryPhase.restoringSession => l.entryRestoringSession,
+      EntryPhase.authenticating => l.entryAuthenticating,
+      EntryPhase.pinAuthenticating => l.entryVerifyingPin,
+      _ => l.entryStartingOperator,
+    };
+    return _EntryFrame(
+      // The PIN is one task from the keypad to the session it starts, and the
+      // owner asked on 2026-10-11 for the terminal's own mark to stay off that
+      // whole path: the mark, the word and the promise all read as one thing,
+      // and they came back on the screen that follows the PIN.
+      showSignature: !_pinLoading(phase),
+      wordmarkOnly: true,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PosSpinner(semanticsLabel: title),
+          const SizedBox(height: UmiSpacing.lg),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: PosTheme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: UmiSpacing.sm),
+          Text(l.entryLoadingBody, textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
 }

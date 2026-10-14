@@ -8,6 +8,11 @@ set(BINARY_NAME "umi_pos")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 set(APPLICATION_ID "co.umiconsulting.umi_pos")
+# The isolated local preview has its own GTK identity for precise window rules.
+# Standard builds retain the production identity and its preferences.
+if("$ENV{UMIPOS_ESTACION_PREVIEW}" STREQUAL "1")
+  set(APPLICATION_ID "co.umiconsulting.umi_pos.estacion")
+endif()
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.

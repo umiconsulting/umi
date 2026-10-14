@@ -37,6 +37,22 @@ final class CashState {
   final bool drawerUnanswered;
 }
 
+/// What came of asking the till to take its own paused shift back.
+///
+/// Either the shift is open again and [shiftId] names it, or the server
+/// refused and [errorCode] says why. The refusals are different facts — a PIN
+/// that matched nothing, a PIN that is locked, a rate limit — and the operator
+/// is entitled to tell them apart, so they travel as the code the API sent.
+final class ShiftResumeOutcome {
+  const ShiftResumeOutcome.resumed(this.shiftId) : errorCode = null;
+  const ShiftResumeOutcome.refused(this.errorCode) : shiftId = null;
+
+  final String? shiftId;
+  final String? errorCode;
+
+  bool get ok => shiftId != null;
+}
+
 final class CommittedCashHardwareAction {
   const CommittedCashHardwareAction({
     required this.reason,
@@ -91,6 +107,30 @@ final class CashController extends ChangeNotifier {
       return null;
     }
     return shift['id'] as String?;
+  }
+
+  /// True when this till's own shift is paused and one PIN brings it back.
+  ///
+  /// A paused shift is not the restart case: the session still matches, the
+  /// register is still held by this device, and the server offers `resume`. It
+  /// is the moment the till sat unattended, so the till asks who is taking it
+  /// back instead of resuming on its own.
+  bool get canResumePausedShift {
+    final snapshot = _state.snapshot;
+    if (snapshot == null || snapshot.recoveryState != 'shift_suspended') {
+      return false;
+    }
+    final shift = snapshot.currentShift;
+    if (shift == null || shift['status'] != 'suspended') return false;
+    if (shift['registerId'] == null) return false;
+    if (!snapshot.allowedActions.contains('resume')) return false;
+    for (final register in snapshot.registers) {
+      if (register['id'] != shift['registerId']) continue;
+      final hold = register['hold'];
+      return hold is Map<String, Object?> &&
+          hold['state'] == 'held_by_this_device';
+    }
+    return false;
   }
 
   String? get activeRegisterId {
@@ -159,7 +199,7 @@ final class CashController extends ChangeNotifier {
     if (!_hasContext || _state.busy) return;
     _set(CashState(busy: true, snapshot: _state.snapshot));
     try {
-      final recoveryCode = await _recoverPendingCommand();
+      var recoveryCode = await _recoverPendingCommand();
       var snapshot = await _center();
       // THE RESTART PATH.
       //
@@ -176,11 +216,20 @@ final class CashController extends ChangeNotifier {
         try {
           await _resumeOwnShift(snapshot.currentShift!);
           snapshot = await _center();
-        } catch (_) {
+        } on AppException catch (error) {
           // A resume that the server refuses (a role without cash.shift.resume,
           // or a shift that moved) must not take the catalog down with it. The
           // mismatch snapshot is kept, and the Caja screen still offers the
           // explicit resume action.
+          //
+          // SAY WHY, THOUGH. This catch used to swallow the refusal whole, so the
+          // one code that explains the dead button — `CASH_RECOVERY_ACTION_REQUIRED`,
+          // i.e. a cash movement of this terminal is still unresolved — never
+          // reached a screen and the operator pressed the same button again.
+          recoveryCode ??= error.code;
+        } catch (_) {
+          // Anything else is a client fault on a path that must not take the
+          // screen down either; the mismatch snapshot is still useful.
         }
       }
       final restored = _restore(snapshot);
@@ -233,6 +282,42 @@ final class CashController extends ChangeNotifier {
       await _reload();
     });
     return activeShiftId;
+  }
+
+  /// Bring this till's paused shift back, once the operator has said who they
+  /// are.
+  ///
+  /// The server authorizes a resume from the operator session, so the PIN is
+  /// not what makes the write legal — it is the till asking the person who
+  /// takes the drawer back to prove it is them, and the server checks that
+  /// against the operator enrolled on this device. A refusal throws before
+  /// anything is resumed, so a wrong PIN leaves the shift exactly as it was.
+  Future<ShiftResumeOutcome> resumePausedShiftWithPin({
+    required String pin,
+  }) async {
+    if (!_hasContext) return const ShiftResumeOutcome.refused(null);
+    final snapshot = _state.snapshot;
+    final shift = snapshot?.currentShift;
+    if (snapshot == null || shift == null || !canResumePausedShift) {
+      return ShiftResumeOutcome.refused(_state.errorCode);
+    }
+    await _repository.verifyOperatorPin(
+      VerifyOperatorPinRequest(
+        pin: pin,
+        permission: 'cash.shift.resume',
+        merchantId: _merchantId!,
+        locationId: _locationId!,
+      ),
+    );
+    await _perform(() async {
+      await _resumeOwnShift(shift, reasonCode: 'operator_resumed_break');
+      await _reload();
+    });
+    final errorCode = _state.errorCode;
+    if (errorCode != null) return ShiftResumeOutcome.refused(errorCode);
+    return activeShiftId == null
+        ? const ShiftResumeOutcome.refused('CASH_OPERATION_FAILED')
+        : ShiftResumeOutcome.resumed(activeShiftId!);
   }
 
   /// Free a register whose holding terminal is never coming back. The server
@@ -292,7 +377,76 @@ final class CashController extends ChangeNotifier {
   /// terminal (`SHIFT_ALREADY_HELD`), and only `resume` rewrites the shift's
   /// `operator_session_id` onto the live session. Same operator, same drawer,
   /// nothing about the money changes.
-  Future<void> _resumeOwnShift(Map<String, Object?> shift) async {
+  /// Take back the drawer the SERVER named, by id.
+  ///
+  /// `recoverOwnShift` decides from the cash snapshot's idea of "the current
+  /// shift", and that idea is refreshed on load — which means a till that read the
+  /// cash centre before the drawer came back to it (an app update, a reinstall, a
+  /// session that moved on) presses a resume button against a stale snapshot and
+  /// nothing happens. The refusal already carries the shift it refused over, so the
+  /// recovery names that id instead of asking the till to guess.
+  ///
+  /// Returns the shift id in force afterwards, or null when the server refused.
+  Future<String?> resumeShiftById(String shiftId) async {
+    if (!_hasContext) return null;
+    // Read first: the load path already resumes a shift this terminal holds and
+    // whose session moved on, so the common case of an app update ends here.
+    await load();
+    if (activeShiftId != null) {
+      return activeShiftId;
+    }
+    final current = _state.snapshot?.currentShift;
+    // A version is not guessed. If the server did not name this shift as the one
+    // this terminal holds, there is nothing here to resume, and sending a made-up
+    // version would be a write the operator did not authorise.
+    if (current == null || current['id'] != shiftId) {
+      debugPrint(
+        '[umipos] resume $shiftId: the cash snapshot names '
+        '${current?['id'] ?? 'no shift'} — nothing of ours to resume',
+      );
+      return null;
+    }
+    // `bigint` reaches Dart as a String through some paths (the contract types it
+    // as a number and node-postgres hands it back as text), so a String that
+    // parses is a version, not a reason to give up.
+    final rawVersion = current['version'];
+    final version = rawVersion is int
+        ? rawVersion
+        : rawVersion is String
+        ? int.tryParse(rawVersion)
+        : null;
+    if (version == null) {
+      debugPrint('[umipos] resume $shiftId: version is ${rawVersion.runtimeType}');
+      return null;
+    }
+    debugPrint('[umipos] resume $shiftId at version $version');
+    await _perform(() async {
+      final ids = await _commandIds('resume_shift');
+      await _repository.transition(
+        _merchantId!,
+        shiftId,
+        ShiftTransitionRequest(
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+          commandId: ids.commandId,
+          idempotencyKey: ids.idempotencyKey,
+          shiftId: shiftId,
+          expectedShiftVersion: version,
+          reasonCode: 'operator_session_replaced',
+        ),
+        suspend: false,
+      );
+      await _completeCommand(ids);
+      await _reload();
+    });
+    if (_state.errorCode != null) return null;
+    return activeShiftId ?? shiftId;
+  }
+
+  Future<void> _resumeOwnShift(
+    Map<String, Object?> shift, {
+    String reasonCode = 'operator_session_replaced',
+  }) async {
     final ids = await _commandIds('resume_shift');
     await _repository.transition(
       _merchantId!,
@@ -304,7 +458,7 @@ final class CashController extends ChangeNotifier {
         idempotencyKey: ids.idempotencyKey,
         shiftId: shift['id']! as String,
         expectedShiftVersion: shift['version']! as int,
-        reasonCode: 'operator_session_replaced',
+        reasonCode: reasonCode,
       ),
       suspend: false,
     );
@@ -620,23 +774,30 @@ final class CashController extends ChangeNotifier {
     });
   }
 
-  Future<String> approveVariance(String managerPin) async {
+  /// Ask the manager for the variance, and hand back null when it was REFUSED.
+  ///
+  /// A null answer is not a missing answer: the refusal is on the screen
+  /// (`state.errorCode`, which the cash centre renders as its one notice), and the caller must not
+  /// carry on to `resolveVariance` as if the money had been authorised.
+  Future<String?> approveVariance(String managerPin) async {
     final count = _state.count;
     final fingerprint = count?.approvalFingerprint;
     if (count == null || fingerprint == null) {
       throw StateError('Variance approval is not available.');
     }
-    final approval = await _repository.approve(
-      ManagerApprovalRequest(
-        operatorSessionId: _operatorSessionId!,
-        managerPin: managerPin,
-        permission: 'cash.variance.approve',
-        merchantId: _merchantId!,
-        locationId: _locationId!,
-        commandFingerprint: fingerprint,
-      ),
-    );
-    return approval.elevationId;
+    return _approve(() async {
+      final approval = await _repository.approve(
+        ManagerApprovalRequest(
+          operatorSessionId: _operatorSessionId!,
+          managerPin: managerPin,
+          permission: 'cash.variance.approve',
+          merchantId: _merchantId!,
+          locationId: _locationId!,
+          commandFingerprint: fingerprint,
+        ),
+      );
+      return approval.elevationId;
+    });
   }
 
   Future<void> resolveVariance({
@@ -704,22 +865,32 @@ final class CashController extends ChangeNotifier {
     await closeShiftWithApproval();
   }
 
-  Future<String> approveClose(String managerPin) async {
+  /// The manager's authorisation to close a shift whose count is out of tolerance.
+  ///
+  /// THIS ONE USED TO LEAVE NOTHING BEHIND WHEN IT WAS REFUSED — see `_approve`, which is the fix:
+  /// the request ran outside the controller's guard, so the API's answer reached no one. Measured on
+  /// the iMin D3-504 on 2026-10-11: the till posted `"managerPin": ""` and got
+  /// `400 VALIDATION_FAILED {"fieldErrors":{"managerPin":["Invalid"]}}`, the dialog was already
+  /// gone, the screen looked untouched, and the shift stayed in `closing` — unclosable, with the
+  /// only way out being `Reanudar turno`.
+  Future<String?> approveClose(String managerPin) async {
     final fingerprint = _state.reconciliation?.closeApprovalFingerprint;
     if (fingerprint == null) {
       throw StateError('Close approval is not available.');
     }
-    final approval = await _repository.approve(
-      ManagerApprovalRequest(
-        operatorSessionId: _operatorSessionId!,
-        managerPin: managerPin,
-        permission: 'cash.shift.close.approve',
-        merchantId: _merchantId!,
-        locationId: _locationId!,
-        commandFingerprint: fingerprint,
-      ),
-    );
-    return approval.elevationId;
+    return _approve(() async {
+      final approval = await _repository.approve(
+        ManagerApprovalRequest(
+          operatorSessionId: _operatorSessionId!,
+          managerPin: managerPin,
+          permission: 'cash.shift.close.approve',
+          merchantId: _merchantId!,
+          locationId: _locationId!,
+          commandFingerprint: fingerprint,
+        ),
+      );
+      return approval.elevationId;
+    });
   }
 
   Future<void> closeShiftWithApproval({String? approvalId}) async {
@@ -759,7 +930,9 @@ final class CashController extends ChangeNotifier {
     });
   }
 
-  Future<({String approvalId, String fingerprint})> approveNoSale({
+  /// The manager's authorisation to open the drawer without a sale, or null when it was refused
+  /// (the refusal is on the screen; see `_approve`).
+  Future<({String approvalId, String fingerprint})?> approveNoSale({
     required String managerPin,
     required String reasonCode,
   }) async {
@@ -778,17 +951,19 @@ final class CashController extends ChangeNotifier {
           ),
         )
         .toString();
-    final approval = await _repository.approve(
-      ManagerApprovalRequest(
-        operatorSessionId: _operatorSessionId!,
-        managerPin: managerPin,
-        permission: 'cash.drawer.no_sale.approve',
-        merchantId: _merchantId!,
-        locationId: _locationId!,
-        commandFingerprint: fingerprint,
-      ),
-    );
-    return (approvalId: approval.elevationId, fingerprint: fingerprint);
+    return _approve(() async {
+      final granted = await _repository.approve(
+        ManagerApprovalRequest(
+          operatorSessionId: _operatorSessionId!,
+          managerPin: managerPin,
+          permission: 'cash.drawer.no_sale.approve',
+          merchantId: _merchantId!,
+          locationId: _locationId!,
+          commandFingerprint: fingerprint,
+        ),
+      );
+      return (approvalId: granted.elevationId, fingerprint: fingerprint);
+    });
   }
 
   Future<void> requestNoSale(
@@ -895,6 +1070,34 @@ final class CashController extends ChangeNotifier {
         : ShiftReconciliation.fromJson(snapshot.reconciliation!),
   );
 
+  /// One manager approval, INSIDE the controller's guard.
+  ///
+  /// `_perform` is what turns an `AppException` into `state.errorCode`, and the cash centre renders
+  /// that one field as its notice. An approval awaited outside it — as the close, the variance and
+  /// the no-sale drawer used to be — leaves nothing behind when the API refuses it: no error, no
+  /// notice, and a caller that carries on as if the money had been authorised. Null means REFUSED,
+  /// and the caller must stop; the reason is already on the screen.
+  Future<T?> _approve<T>(Future<T> Function() request) async {
+    T? granted;
+    await _perform(() async {
+      granted = await request();
+      // AN APPROVAL HAS NOTHING TO RELOAD, and `_perform` releases the screen through the operation
+      // itself: every other operation ends in `_reload`, which is what clears `busy`. Without this
+      // the approval would leave the controller busy, and the step that FOLLOWS it — the drawer
+      // request, the variance, the close — would find `_perform` returning at its `busy` guard and
+      // quietly do nothing at all.
+      _set(
+        CashState(
+          snapshot: _state.snapshot,
+          count: _state.count,
+          resolution: _state.resolution,
+          reconciliation: _state.reconciliation,
+        ),
+      );
+    });
+    return _state.errorCode == null ? granted : null;
+  }
+
   Future<void> _perform(Future<void> Function() operation) async {
     if (_state.busy) return;
     final before = _state;
@@ -910,6 +1113,10 @@ final class CashController extends ChangeNotifier {
     try {
       await operation();
     } on AppException catch (error) {
+      debugPrint(
+        '[umipos] cash op refused: ${error.code} '
+        '(${error.runtimeType}) details=${error.details}',
+      );
       _set(
         CashState(
           snapshot: before.snapshot,
@@ -919,7 +1126,12 @@ final class CashController extends ChangeNotifier {
           errorCode: error.code,
         ),
       );
-    } catch (_) {
+    } catch (error, stack) {
+      debugPrint(
+        '[umipos] cash op blew up BEFORE the server saw it: '
+        '${error.runtimeType} $error',
+      );
+      debugPrint('$stack');
       // ANYTHING ELSE STILL HAS TO RELEASE THE SCREEN.
       //
       // Only `AppException` was caught here, so a decoding slip — a bigint the
@@ -982,14 +1194,31 @@ final class CashController extends ChangeNotifier {
           correlationId: result.correlationId,
         );
       }
-      if (pending.operation != operation) {
-        throw const AppException(
-          category: AppErrorCategory.conflict,
-          code: 'CASH_RECOVERY_ACTION_REQUIRED',
-          recoverable: true,
-        );
+      if (result.status == 'not_found') {
+        // THE SERVER NEVER SAW THIS COMMAND, AND IT NEVER WILL.
+        //
+        // A cash command runs inside one transaction: the claim row is written
+        // first and the whole thing rolls back on any refusal, so a refused
+        // command leaves no row behind. The till only keeps a pending command
+        // for an attempt that did not finish on this device, and that attempt is
+        // over by the time we ask. So "not found" means it never landed, and the
+        // pending record protects no money.
+        //
+        // Keeping it wedged the whole cash screen: a count the server refused
+        // before it recorded anything left the till asking about it on every
+        // action, and a resume was refused because that other operation was
+        // still "pending". Discard it and hand the caller fresh ids.
+        await _recoveryStore.clear(merchantId, locationId);
+      } else {
+        if (pending.operation != operation) {
+          throw const AppException(
+            category: AppErrorCategory.conflict,
+            code: 'CASH_RECOVERY_ACTION_REQUIRED',
+            recoverable: true,
+          );
+        }
+        return pending;
       }
-      return pending;
     }
     final command = PendingCashCommand(
       merchantId: merchantId,
@@ -1066,6 +1295,20 @@ final class CashController extends ChangeNotifier {
     if (result.status == 'failed' && !result.retryable) {
       await _completeCommand(pending);
       return result.failureCode ?? 'CASH_OPERATION_CONFLICT';
+    }
+    if (result.status == 'not_found') {
+      // THE SERVER NEVER HEARD OF IT, AND IT NEVER WILL.
+      //
+      // A cash command runs inside one transaction — the claim row is written
+      // first and the whole thing rolls back on any refusal — so a command the
+      // server does not have never landed, and the record protects no money. The
+      // write path (`_commandIds`) already discards it; this path used to keep it
+      // and answer `CASH_COMMAND_RETRY_REQUIRED` on every load, which is how a
+      // leftover from an attempt that never left the device came to sit in front
+      // of every later action. Measured on the iMin, 2026-10-11: five command ids
+      // the till kept asking about, none of them in `merchant.business_command`.
+      await _completeCommand(pending);
+      return null;
     }
     return 'CASH_COMMAND_RETRY_REQUIRED';
   }

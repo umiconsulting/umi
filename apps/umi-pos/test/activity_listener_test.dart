@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/app/activity_listener.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 void main() {
   testWidgets('a pointer press reports activity', (tester) async {
     var activity = 0;
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         home: ActivityListener(
           onActivity: () => activity += 1,
           child: const SizedBox.expand(child: Text('till')),
@@ -23,11 +23,11 @@ void main() {
   testWidgets('activity reporting does not swallow the tap', (tester) async {
     var taps = 0;
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         home: ActivityListener(
           onActivity: () {},
           child: Center(
-            child: ElevatedButton(
+            child: PosButton(
               onPressed: () => taps += 1,
               child: const Text('Cobrar'),
             ),

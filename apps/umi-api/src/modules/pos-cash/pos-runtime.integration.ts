@@ -126,10 +126,23 @@ describe('POS startup against the canonical database', () => {
     ]);
     expect(await create()).toBe(id);
     const after = await pg.query(
-      'SELECT business_date::text,lifecycle_state FROM merchant.pos_cart WHERE id=$1',
+      'SELECT business_date::text,lifecycle_state,operator_session_id::text AS "operatorSessionId",version FROM merchant.pos_cart WHERE id=$1',
       [id],
     );
-    expect(after.rows[0]).toMatchObject({ ...before.rows[0], lifecycle_state: 'recovered' });
+    // THE SESSION THAT HOLDS THE CART GETS IT BACK UNTOUCHED.
+    //
+    // `create()` is idempotent for its own holder: asking again returns the row
+    // it already has, with the same session and the same version, and it does not
+    // stamp 'recovered' on a cart that was never suspended — the counter release
+    // (2026-10-14) reserves 'recovered' for the OTHER path, the one where a new
+    // session claims a cart whose previous session died. Before that change this
+    // call marked a live draft as recovered on every press of "Nueva cuenta".
+    expect(after.rows[0]).toMatchObject({
+      ...before.rows[0],
+      lifecycle_state: 'building_cart',
+      operatorSessionId: operatorId,
+      version: 1,
+    });
     const permission = await pg.app.query(
       "SELECT has_column_privilege(current_user,'merchant.pos_cart','business_date','UPDATE') AS allowed",
     );

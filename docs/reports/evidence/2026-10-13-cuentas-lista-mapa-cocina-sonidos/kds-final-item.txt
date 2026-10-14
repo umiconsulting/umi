@@ -1,0 +1,5 @@
+   public_reference   | ticket_status | product_name | item_status | target_seconds | station 
+----------------------+---------------+--------------+-------------+----------------+---------
+ Cuenta 096 · Mesa 10 | completed     | Capuccino    | ready       |             30 | Cocina
+(1 row)
+

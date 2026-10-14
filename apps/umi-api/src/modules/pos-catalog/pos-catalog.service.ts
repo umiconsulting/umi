@@ -71,7 +71,7 @@ export class PosCatalogService {
     user: AuthUser,
     access: MerchantAccess,
     context: PersistedDashboardAdministrativeCommandContext,
-    operation: 'catalog.create' | 'catalog.update' | 'catalog.archive',
+    operation: 'catalog.create' | 'catalog.update' | 'catalog.archive' | 'catalog.availability',
     parameters: Record<string, unknown>,
   ) {
     const command = await this.integrity.execute(
@@ -101,12 +101,26 @@ export class PosCatalogService {
                   requiredVersion(context.targetVersion),
                   parameters,
                 )
-              : await this.repo.archiveAdministrative(
-                  transaction.client,
-                  access.merchantId,
-                  context.targetAggregateId,
-                  requiredVersion(context.targetVersion),
-                );
+              : operation === 'catalog.archive'
+                ? await this.repo.archiveAdministrative(
+                    transaction.client,
+                    access.merchantId,
+                    context.targetAggregateId,
+                    requiredVersion(context.targetVersion),
+                  )
+                : await this.repo.setAvailabilityAdministrative(
+                    transaction.client,
+                    access.merchantId,
+                    context.targetAggregateId,
+                    requiredVersion(context.targetVersion),
+                    {
+                      // The location the command is scoped to IS the location the
+                      // availability belongs to: "no hay producto EN Chapultepec".
+                      locationId: context.locationId,
+                      status: parameters.status,
+                      availableFrom: parameters.availableFrom ?? null,
+                    },
+                  );
         await transaction.appendAudit({
           eventType: `catalog_${operation.split('.')[1]}`,
           entityType: 'product',
@@ -135,9 +149,20 @@ export class PosCatalogService {
 
   private async authorize(user: AuthUser, merchantId: string, locationId: string) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    if (
-      !(await this.repo.authorize(user.id, user.sessionId, user.deviceId, merchantId, locationId))
-    ) {
+    const access = await this.repo.authorize(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      locationId,
+    );
+    // A session with no permissions is not live: sign in again. A live session without
+    // `catalog.read` is a role gap, and the till must show the gap rather than log the
+    // operator out — the difference between the two is why the repository returns both.
+    if (access.permissions.length === 0) {
+      throw new UnauthorizedException({ code: 'AUTHENTICATION_REQUIRED' });
+    }
+    if (!access.allowed) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
     }
   }

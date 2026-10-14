@@ -1,0 +1,2 @@
+60f8103f-7140-41ef-a636-1fd37d591c55|cash_drawer|platform_channel_foundation|unknown|2026-10-14 19:26:43.527425+00
+drawer_test|unknown|unknown|2026-10-14 19:26:43.527012+00

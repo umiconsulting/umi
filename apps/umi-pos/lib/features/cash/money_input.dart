@@ -12,6 +12,8 @@ library;
 
 import 'package:flutter/services.dart';
 
+export '../../shared/money.dart' show formatMinorUnits;
+
 /// One peso short of a hundred million. Past this the input is a typo or a
 /// paste, never a float somebody is counting into a till.
 const int _maxMinorUnits = 9999999999;
@@ -108,28 +110,6 @@ bool _groupsWellFormed(String whole, String separator) {
   return true;
 }
 
-/// `MXN 1,500.00`, from minor units. One division, at the edge of the system.
-///
-/// This is the only money formatter in the app. There used to be two — this one
-/// without the currency, and a second inside the drawer equation — so the same
-/// amount printed as `1458.50` in one card and `MXN 1,458.50` in the next. The
-/// currency is optional for the field helpers that format a bare amount, and the
-/// sign is the true minus (−), never the hyphen, because a figure is read beside
-/// other figures and a hyphen reads as a dash.
-String formatMinorUnits(int minorUnits, [String currency = '']) {
-  final sign = minorUnits < 0 ? '−' : '';
-  final value = minorUnits.abs();
-  final whole = (value ~/ 100).toString();
-  final cents = (value % 100).toString().padLeft(2, '0');
-  final grouped = StringBuffer();
-  for (var i = 0; i < whole.length; i++) {
-    if (i > 0 && (whole.length - i) % 3 == 0) grouped.write(',');
-    grouped.write(whole[i]);
-  }
-  final prefix = currency.isEmpty ? '' : '$currency ';
-  return '$sign$prefix$grouped.$cents';
-}
-
 /// Keeps a cash field to digits and separators, so most of the shapes
 /// [parseMinorUnits] has to refuse never get typed in the first place. It is a
 /// courtesy, not the guard: the parser is still the thing that decides.
@@ -146,6 +126,12 @@ final List<TextInputFormatter> cashAmountFormatters = [
 /// checkout then refused to complete without saying why. So a draft that does
 /// not add up to the total is replaced.
 ///
+/// A field the cashier is editing is NEVER replaced. To type a real amount the
+/// operator clears the seeded figure first, and for one frame that field is
+/// empty; seeding it there put the old amount straight back and the next digit
+/// landed on top of it. So `receivedEmpty` only seeds a field nobody has
+/// touched, and `tenderEdited` gates the whole decision.
+///
 /// [tenderEdited] must mean *the cashier typed the split*, and nothing else. The
 /// sheet's own `dirty` flag is raised by the customer-value preview before
 /// anyone touches a field, which is why it cannot answer this question.
@@ -155,5 +141,5 @@ bool tenderNeedsReseed({
   required int tenderedMinorUnits,
   required int grandTotalMinorUnits,
 }) =>
-    receivedEmpty ||
-    (!tenderEdited && tenderedMinorUnits != grandTotalMinorUnits);
+    !tenderEdited &&
+    (receivedEmpty || tenderedMinorUnits != grandTotalMinorUnits);

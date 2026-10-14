@@ -9,6 +9,19 @@ const inventoryPath = resolve(root, 'config/umipos-permission-inventory.json');
 const approvalPath = resolve(root, 'config/umipos-pilot-approval-boundaries.json');
 const sqlPath = resolve(root, 'docs/migration/build-v3/35_pos_pilot_rbac.sql');
 
+const merchantRoleSchema = readFileSync(
+  resolve(root, 'docs/migration/build-v3/49_merchant_roles.sql'),
+  'utf8',
+);
+const resolverStart = merchantRoleSchema.indexOf(
+  'create or replace function umi.resolve_staff_permissions',
+);
+const resolverEnd = merchantRoleSchema.indexOf(
+  'revoke all on function umi.resolve_staff_permissions',
+  resolverStart,
+);
+const merchantRoleResolverSql = merchantRoleSchema.slice(resolverStart, resolverEnd).trim();
+
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 const matrix = readJson(matrixPath);
 const inventory = readJson(inventoryPath);
@@ -278,6 +291,15 @@ $$;
 revoke all on function umi.resolve_staff_permissions(uuid) from public;
 grant execute on function umi.resolve_staff_permissions(uuid) to api,worker;
 
+-- Preserve the merchant role resolver when file 35 runs after file 49.
+do $preserve_roles$
+begin
+  if exists(select 1 from information_schema.columns where table_schema='merchant'
+    and table_name='staff' and column_name='merchant_role_id') then
+    execute $resolver$${merchantRoleResolverSql}$resolver$;
+  end if;
+end $preserve_roles$;
+
 create or replace function runtime.invalidate_operator_sessions_for_rbac()
 returns trigger
 language plpgsql
@@ -291,6 +313,13 @@ begin
     from merchant.staff s
     where os.staff_id=s.id
       and s.role_id=coalesce(new.role_id,old.role_id)
+      and os.state in ('active','locked');
+  elsif tg_table_schema='merchant' and tg_table_name='role_permission' then
+    update runtime.operator_session os
+    set state='ended',ended_at=coalesce(ended_at,now()),last_activity_at=now()
+    from merchant.staff s
+    where os.staff_id=s.id
+      and s.merchant_role_id=coalesce(new.role_id,old.role_id)
       and os.state in ('active','locked');
   elsif tg_table_schema='merchant' and tg_table_name='staff_permission_override' then
     update runtime.operator_session
@@ -329,6 +358,27 @@ on merchant.staff_permission_override;
 create trigger staff_override_operator_session_invalidation
 after insert or update or delete on merchant.staff_permission_override
 for each row execute function runtime.invalidate_operator_sessions_for_rbac();
+
+-- A reapply preserves the merchant role column after file 49 added it.
+do $$ begin
+  if exists(select 1 from information_schema.columns where table_schema='merchant'
+    and table_name='staff' and column_name='merchant_role_id') then
+    execute 'drop trigger if exists staff_authority_operator_session_invalidation on merchant.staff';
+    execute $trigger$create trigger staff_authority_operator_session_invalidation
+after update of role_id,merchant_role_id,location_id,status,operator_pin_hash,operator_pin_lookup
+on merchant.staff
+for each row
+when (
+  old.role_id is distinct from new.role_id
+  or old.merchant_role_id is distinct from new.merchant_role_id
+  or old.location_id is distinct from new.location_id
+  or old.status is distinct from new.status
+  or old.operator_pin_hash is distinct from new.operator_pin_hash
+  or old.operator_pin_lookup is distinct from new.operator_pin_lookup
+)
+execute function runtime.invalidate_operator_sessions_for_rbac();$trigger$;
+  end if;
+end $$;
 
 -- super_admin stays outside the café matrix. Platform grants use their own authority.
 

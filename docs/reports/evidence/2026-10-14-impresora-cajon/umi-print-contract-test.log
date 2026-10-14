@@ -1,0 +1,196 @@
+apps/umi-dashboard                       |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+> @umi/contract@0.1.0 pretest /home/juan/Projects/umiconsulting/umi/packages/contract
+> npm run build
+
+npm warn Unknown env config "npm-globalconfig". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "_jsr-registry". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+npm warn Unknown env config "recursive". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> @umi/contract@0.1.0 build
+> pnpm run generate && tsup
+
+../../apps/umi-dashboard                 |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+> @umi/contract@0.1.0 generate /home/juan/Projects/umiconsulting/umi/packages/contract
+> pnpm run build:runtime && node scripts/generate.mjs
+
+../../apps/umi-dashboard                 |  WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.21.0","pnpm":"10.29.3"})
+
+> @umi/contract@0.1.0 build:runtime /home/juan/Projects/umiconsulting/umi/packages/contract
+> tsup
+
+CLI Building entry: src/entitlements.ts, src/index.ts, src/platform.ts, src/realtime-channels.ts, src/route-table.ts, src/routes.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /home/juan/Projects/umiconsulting/umi/packages/contract/tsup.config.ts
+CLI Target: node22
+CLI Cleaning output folder
+CJS Build start
+ESM Build start
+ESM dist/route-table.js       128.15 KB
+ESM dist/platform.js          23.38 KB
+ESM dist/index.js             457.71 KB
+ESM dist/entitlements.js      360.00 B
+ESM dist/routes.js            142.02 KB
+ESM dist/realtime-channels.js 877.00 B
+ESM ⚡️ Build success in 49ms
+CJS dist/entitlements.cjs      1.47 KB
+CJS dist/platform.cjs          27.75 KB
+CJS dist/realtime-channels.cjs 2.37 KB
+CJS dist/route-table.cjs       129.27 KB
+CJS dist/routes.cjs            143.06 KB
+CJS dist/index.cjs             528.26 KB
+CJS ⚡️ Build success in 49ms
+DTS Build start
+DTS ⚡️ Build success in 7691ms
+DTS dist/index.d.cts             7.05 MB
+DTS dist/entitlements.d.cts      1.21 KB
+DTS dist/platform.d.cts          162.66 KB
+DTS dist/realtime-channels.d.cts 4.10 KB
+DTS dist/routes.d.cts            11.44 KB
+DTS dist/route-table.d.cts       3.06 KB
+DTS dist/index.d.ts              7.05 MB
+DTS dist/entitlements.d.ts       1.21 KB
+DTS dist/platform.d.ts           162.66 KB
+DTS dist/realtime-channels.d.ts  4.10 KB
+DTS dist/routes.d.ts             11.44 KB
+DTS dist/route-table.d.ts        3.06 KB
+Generated UMI contract 2.38.1 (fcdb1b6dd5010440a3225d496b52b21d6fc1bcd7d24f1aa3b65ab72752ca997c)
+CLI Building entry: src/entitlements.ts, src/index.ts, src/platform.ts, src/realtime-channels.ts, src/route-table.ts, src/routes.ts
+CLI Using tsconfig: tsconfig.json
+CLI tsup v8.5.1
+CLI Using tsup config: /home/juan/Projects/umiconsulting/umi/packages/contract/tsup.config.ts
+CLI Target: node22
+CLI Cleaning output folder
+CJS Build start
+ESM Build start
+ESM dist/entitlements.js      360.00 B
+ESM dist/platform.js          23.38 KB
+ESM dist/realtime-channels.js 877.00 B
+ESM dist/index.js             457.71 KB
+ESM dist/route-table.js       128.15 KB
+ESM dist/routes.js            142.02 KB
+ESM ⚡️ Build success in 46ms
+CJS dist/platform.cjs          27.75 KB
+CJS dist/route-table.cjs       129.27 KB
+CJS dist/routes.cjs            143.06 KB
+CJS dist/entitlements.cjs      1.47 KB
+CJS dist/realtime-channels.cjs 2.37 KB
+CJS dist/index.cjs             528.26 KB
+CJS ⚡️ Build success in 46ms
+DTS Build start
+DTS ⚡️ Build success in 7102ms
+DTS dist/index.d.cts             7.05 MB
+DTS dist/entitlements.d.cts      1.21 KB
+DTS dist/platform.d.cts          162.66 KB
+DTS dist/realtime-channels.d.cts 4.10 KB
+DTS dist/routes.d.cts            11.44 KB
+DTS dist/route-table.d.cts       3.06 KB
+DTS dist/index.d.ts              7.05 MB
+DTS dist/entitlements.d.ts       1.21 KB
+DTS dist/platform.d.ts           162.66 KB
+DTS dist/realtime-channels.d.ts  4.10 KB
+DTS dist/routes.d.ts             11.44 KB
+DTS dist/route-table.d.ts        3.06 KB
+
+> @umi/contract@0.1.0 test /home/juan/Projects/umiconsulting/umi/packages/contract
+> node --test test/*.test.mjs
+
+✔ PRODUCT_KEYS = the real gateable products (incl. pos; no observability/landing) (1.55235ms)
+✔ PRODUCT_ACTIVE_STATUSES matches server.js port (0.2433ms)
+✔ isProductStatusActive (0.2085ms)
+✔ entitlements entry is zod-free (dashboard bundle constraint) (1.25855ms)
+✔ additional tables accept identity and capacity, never a replacement layout (3.60906ms)
+✔ POS table initialization accepts only bounded unique slots and no layout edits (1.63393ms)
+✔ layout validates rotated bounds, table identity, labels, and capacity (1.893589ms)
+✔ published response rejects draft fields (0.28144ms)
+✔ a layout rejects duplicate area names, compared case-insensitively (0.53482ms)
+✔ identities are unique across the document, not just within an area (0.48454ms)
+✔ unknown keys are rejected at every level (0.40542ms)
+✔ floorElementBounds swaps the half-extents on a quarter turn (0.27432ms)
+✔ Gate 2F checkout identity and recovery actions are typed and bounded (3.00427ms)
+✔ Gate 2D cart contracts bound quantities, notes, and checkout authority (1.91465ms)
+✔ Gate 2E checkout requires explicit totals confirmation and safe ambiguity (1.1204ms)
+✔ Money uses integer minor units and explicit currency (0.20917ms)
+✔ Gate 2C catalog contracts bound location search and cursor pages (0.34326ms)
+✔ PaymentAmbiguity prevents a new retry for an unknown outcome (0.31961ms)
+✔ OfflineCommandEnvelope rejects unbounded identity and invalid fingerprints (0.31826ms)
+✔ receipt and error envelopes validate public-safe shapes (0.49008ms)
+✔ neutral artifact has required models and a valid checksum (42.068326ms)
+✔ generated Dart package metadata contains real YAML line breaks (0.86641ms)
+✔ Gate 2B device contracts are bounded and generated for Flutter (56.650844ms)
+✔ a true union survives generation — both login outcomes reach the artifact (0.89226ms)
+✔ a union of two arrays reaches Dart as one list, and its decoder agrees (1.22083ms)
+✔ Gate 3C contracts enforce cash facts and blind-count boundaries (5.933659ms)
+✔ Gate 3D contracts reject unsafe refund quantities and offline authority (5.38068ms)
+✔ Gate 3G-A device and command contracts reject vendor authority and unsafe payloads (5.11003ms)
+✔ Gate 3G-A print payload keeps authoritative totals and masked value summaries (1.15833ms)
+✔ the terminal drawer reports its port without rejecting the command transition (0.31949ms)
+✔ Gate 3G-A print job and runtime snapshot expose explicit unknown recovery (0.592539ms)
+✔ Gate 3G-A hardware routes are typed and permission scoped (0.2025ms)
+✔ Gate 3G-B network configuration and pilot policy are bounded and secret-free (0.45989ms)
+✔ Gate 3G-B operational transports require a safe endpoint and device type (1.26353ms)
+✔ unassigned commands use order identity and preview, never client-selected stations (3.64897ms)
+✔ Gate 4A kitchen projection contains preparation-safe fields only (3.983039ms)
+✔ Gate 4A commands bind identity, version, and scope-safe payload (0.55028ms)
+✔ the generated POS status route lets an order writer read their kitchen status (0.46567ms)
+✔ the POS command route carries the command plus the board read context (0.58905ms)
+✔ a cancellation names a reason from the fixed list (3.388609ms)
+✔ free text alone is not a reason (1.06233ms)
+✔ an invented code is not a reason (0.52044ms)
+✔ the note is optional; the code is not (0.34588ms)
+✔ carried-over cancellation requires selected versions and a reason (0.97094ms)
+✔ channel names are byte-exact to the gateways (1.05904ms)
+✔ the package root re-exports the same names (API surface unchanged) (0.46121ms)
+✔ realtime-channels entry is zod-free (dashboard bundle constraint) (0.2704ms)
+✔ InventoryAuthoringItemCreateRequest accepts a valid ingredient (2.86986ms)
+✔ InventoryAuthoringItemCreateRequest refuses a reference the database would refuse (0.7362ms)
+✔ a float quantity is refused — money and quantities are integers (0.83766ms)
+✔ a recipe component must be more than zero, which is what the database stores (0.73097ms)
+✔ InventoryRecipeCreateRequest accepts one target and at least one component (1.07652ms)
+✔ InventoryRecipeCreateRequest refuses a recipe with no components (0.25576ms)
+✔ InventoryRecipeCreateRequest refuses two targets at once (0.37882ms)
+✔ InventoryRecipeCreateRequest refuses a target kind that does not match its id (0.27932ms)
+✔ SupplierInvoiceUploadRequest needs a document (0.88987ms)
+✔ every declared route resolves to a live controller handler (19.583048ms)
+✔ the pending list cannot rot — a served route must leave it (9.587089ms)
+✔ no POS or device route is served outside the versioned namespace (14.888848ms)
+✔ auth route literals are byte-exact to the controllers (1.33464ms)
+✔ me + merchant-scoped route builders (0.45316ms)
+✔ merchant role routes are byte-exact (0.25871ms)
+✔ merchant id is URL-encoded (matches data.jsx _merchantPath) (0.1548ms)
+✔ dashboard device enrollment routes match the versioned controller (0.25376ms)
+✔ cash merchant-scoped routes (dashboard surface) (0.3195ms)
+✔ cash routes addressed by merchant reference (umi-cash surface) — byte-exact to controllers (0.2902ms)
+✔ routes entry is zod-free (dashboard bundle constraint) (0.89665ms)
+✔ merchant reference + gift code are URL-encoded (0.64793ms)
+✔ routes.auth.mfaVerify names the second half of the login (0.28503ms)
+✔ ScanRequest (2.13581ms)
+✔ TopupRequest — $1.00 floor (0.42618ms)
+✔ PurchaseRequest — $0.01 floor (0.16738ms)
+✔ GiftCardCreateRequest — mirrors the DTO @ValidateIf conditionals (0.76502ms)
+✔ RegisterMemberRequest — real calendar birthDate (0.72979ms)
+✔ GiftRedeemRequest — both channels optional (0.15777ms)
+✔ session schemas (auth surface) — representative parse (0.47934ms)
+✔ POS PIN login requires scoped device input and four to eight digits (0.27306ms)
+✔ staff creation accepts a personal operator PIN without exposing it in responses (0.3029ms)
+✔ RegisterMemberRequest — national digit count, not string length (0.4028ms)
+✔ MfaChallengeResponse accepts the four fields the server sends (0.119229ms)
+✔ MfaChallengeResponse rejects a session body (0.1223ms)
+✔ mfaRequired must be the LITERAL true, not a truthy value (0.12171ms)
+✔ LoginResponse accepts BOTH outcomes (0.24089ms)
+✔ LoginResponse rejects a body that is neither (0.21106ms)
+✔ mfaChallenged tells the two apart (0.10059ms)
+✔ mfaChallenged does not read a truthy mfaRequired as a challenge (0.08958ms)
+✔ VerifyMfaRequest takes exactly six digits (0.22217ms)
+✔ VerifyMfaRequest needs a challenge token (0.09819ms)
+ℹ tests 88
+ℹ suites 0
+ℹ pass 88
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 274.934972

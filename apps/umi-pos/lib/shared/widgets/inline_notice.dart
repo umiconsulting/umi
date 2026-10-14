@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/theme/umi_theme.dart';
 
@@ -26,10 +26,10 @@ final class InlineNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     final accent = tone == InlineNoticeTone.error
         ? scheme.error
-        : UmiTheme.warning;
+        : scheme.tertiary;
     return Semantics(
       liveRegion: true,
       container: true,
@@ -46,10 +46,10 @@ final class InlineNotice extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
+            PosIcon(
               tone == InlineNoticeTone.error
-                  ? Icons.error_outline
-                  : Icons.warning_amber_outlined,
+                  ? PosGlyphs.errorOutline
+                  : PosGlyphs.warningAmberOutlined,
               size: 20,
               color: accent,
             ),
@@ -57,7 +57,7 @@ final class InlineNotice extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: Theme.of(
+                style: PosTheme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
               ),

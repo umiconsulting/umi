@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   HardwareCommand,
+  HardwareCommandTransitionRequest,
   HardwareConnectionConfiguration,
   HardwareDevice,
   HardwarePilotPolicy,
@@ -104,10 +105,28 @@ test('Gate 3G-A print payload keeps authoritative totals and masked value summar
     footer: null,
   });
   assert.equal(payload.totalMinorUnits, 5500);
+  assert.equal(ReceiptPrintPayload.safeParse({ ...payload, issuedAt: null }).success, true);
   assert.equal(
     ReceiptPrintPayload.safeParse({ ...payload, customerContact: 'private@example.com' }).success,
     false,
   );
+});
+
+test('the terminal drawer reports its port without rejecting the command transition', () => {
+  const result = HardwareCommandTransitionRequest.safeParse({
+    locationId: ids.location,
+    operatorSessionId: ids.operator,
+    status: 'succeeded',
+    failureCode: null,
+    safeResultMetadata: {
+      acknowledged: true,
+      pulsePath: 'sysfs',
+      pulseNode: '/sys/class/neostra_gpioctl/dev/gpioctl',
+      pulseValue: '1',
+      drawerSensor: 0,
+    },
+  });
+  assert.equal(result.success, true);
 });
 
 test('Gate 3G-A print job and runtime snapshot expose explicit unknown recovery', () => {

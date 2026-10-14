@@ -623,7 +623,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxIncludedLabel.
   ///
   /// In es, this message translates to:
-  /// **'Impuesto configurado'**
+  /// **'El precio incluye impuestos'**
   String get taxIncludedLabel;
 
   /// No description provided for @closeAction.
@@ -632,22 +632,40 @@ abstract class AppLocalizations {
   /// **'Cerrar'**
   String get closeAction;
 
+  /// No description provided for @kitchenSoundsEnable.
+  ///
+  /// In es, this message translates to:
+  /// **'Activar sonidos'**
+  String get kitchenSoundsEnable;
+
+  /// No description provided for @kitchenSoundsMute.
+  ///
+  /// In es, this message translates to:
+  /// **'Silenciar sonidos'**
+  String get kitchenSoundsMute;
+
+  /// No description provided for @kitchenTimeOverdue.
+  ///
+  /// In es, this message translates to:
+  /// **'Tiempo vencido'**
+  String get kitchenTimeOverdue;
+
   /// No description provided for @cartTitle.
   ///
   /// In es, this message translates to:
-  /// **'Carrito actual'**
+  /// **'Comanda'**
   String get cartTitle;
 
   /// No description provided for @cartEmpty.
   ///
   /// In es, this message translates to:
-  /// **'Abre un producto para iniciar este carrito.'**
+  /// **'Elige un producto de la carta para empezar.'**
   String get cartEmpty;
 
   /// No description provided for @cartUnavailable.
   ///
   /// In es, this message translates to:
-  /// **'El carrito no está disponible temporalmente.'**
+  /// **'La comanda no está disponible temporalmente.'**
   String get cartUnavailable;
 
   /// No description provided for @cartNoteLabel.
@@ -659,31 +677,37 @@ abstract class AppLocalizations {
   /// No description provided for @cartCourseLabel.
   ///
   /// In es, this message translates to:
-  /// **'Curso'**
+  /// **'Tiempo de servicio'**
   String get cartCourseLabel;
+
+  /// Explains the course number under its label. The kitchen stages a ticket by course: course 1 fires with the rest of the order and a later course is held back until the kitchen starts it. Without this line the label reads like a duration and the number like a time that never arrives.
+  ///
+  /// In es, this message translates to:
+  /// **'1 se sirve con todo · 2 se prepara después'**
+  String get cartCourseHint;
 
   /// No description provided for @cartCoursePrevious.
   ///
   /// In es, this message translates to:
-  /// **'Curso anterior'**
+  /// **'Tiempo anterior'**
   String get cartCoursePrevious;
 
   /// No description provided for @cartCourseNext.
   ///
   /// In es, this message translates to:
-  /// **'Curso siguiente'**
+  /// **'Tiempo siguiente'**
   String get cartCourseNext;
 
   /// Names the course a cart line belongs to, for the operator and for a screen reader.
   ///
   /// In es, this message translates to:
-  /// **'Curso {course}'**
+  /// **'Tiempo {course}'**
   String cartCourseCurrent(int course);
 
   /// No description provided for @addToCartAction.
   ///
   /// In es, this message translates to:
-  /// **'Agregar al carrito'**
+  /// **'Agregar a la comanda'**
   String get addToCartAction;
 
   /// No description provided for @removeFromCartAction.
@@ -691,6 +715,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Eliminar línea'**
   String get removeFromCartAction;
+
+  /// Labels the quantity stepper on the line editor, beside the course stepper. Unlabelled, the two rows are the same shape twice and read as one control repeated.
+  ///
+  /// In es, this message translates to:
+  /// **'Cantidad'**
+  String get cartQuantityLabel;
 
   /// No description provided for @increaseQuantity.
   ///
@@ -713,7 +743,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxLabel.
   ///
   /// In es, this message translates to:
-  /// **'Impuestos'**
+  /// **'Impuestos incluidos'**
   String get taxLabel;
 
   /// No description provided for @discountLabel.
@@ -734,6 +764,12 @@ abstract class AppLocalizations {
   /// **'Fecha operativa'**
   String get businessDateLabel;
 
+  /// No description provided for @localTimeLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Hora local'**
+  String get localTimeLabel;
+
   /// No description provided for @checkoutNextGate.
   ///
   /// In es, this message translates to:
@@ -749,7 +785,7 @@ abstract class AppLocalizations {
   /// No description provided for @checkoutTitle.
   ///
   /// In es, this message translates to:
-  /// **'Cobro autorizado'**
+  /// **'Cobrar pedido'**
   String get checkoutTitle;
 
   /// No description provided for @operatorLabel.
@@ -769,6 +805,18 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Efectivo'**
   String get cashPayment;
+
+  /// No description provided for @cardPayment.
+  ///
+  /// In es, this message translates to:
+  /// **'Tarjeta'**
+  String get cardPayment;
+
+  /// No description provided for @receiptThanksMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'Gracias por su visita'**
+  String get receiptThanksMessage;
 
   /// No description provided for @externalTerminalPayment.
   ///
@@ -809,7 +857,7 @@ abstract class AppLocalizations {
   /// No description provided for @totalsConfirmedBody.
   ///
   /// In es, this message translates to:
-  /// **'UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.'**
+  /// **'UMI recalculó la comanda. Revisa cada total antes de confirmar el pago.'**
   String get totalsConfirmedBody;
 
   /// No description provided for @paymentProcessing.
@@ -851,7 +899,7 @@ abstract class AppLocalizations {
   /// No description provided for @finishSaleAction.
   ///
   /// In es, this message translates to:
-  /// **'Finalizar e iniciar otro carrito'**
+  /// **'Finalizar e iniciar otra comanda'**
   String get finishSaleAction;
 
   /// No description provided for @checkoutFailed.
@@ -962,11 +1010,113 @@ abstract class AppLocalizations {
   /// **'Terminal manual'**
   String get manualTerminalLabel;
 
+  /// No description provided for @bankTransferLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Transferencia bancaria'**
+  String get bankTransferLabel;
+
+  /// No description provided for @bankTransferPendingNote.
+  ///
+  /// In es, this message translates to:
+  /// **'Muestra los datos al cliente. La cuenta sigue abierta hasta confirmar el abono.'**
+  String get bankTransferPendingNote;
+
+  /// No description provided for @bankTransferViewDetails.
+  ///
+  /// In es, this message translates to:
+  /// **'Ver datos bancarios'**
+  String get bankTransferViewDetails;
+
+  /// No description provided for @bankTransferAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe a transferir'**
+  String get bankTransferAmountLabel;
+
+  /// No description provided for @bankTransferBankLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Banco'**
+  String get bankTransferBankLabel;
+
+  /// No description provided for @bankTransferHolderLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Titular'**
+  String get bankTransferHolderLabel;
+
+  /// No description provided for @bankTransferAccountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Número de cuenta'**
+  String get bankTransferAccountLabel;
+
+  /// No description provided for @bankTransferConceptLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Concepto sugerido'**
+  String get bankTransferConceptLabel;
+
+  /// No description provided for @bankTransferAccountWord.
+  ///
+  /// In es, this message translates to:
+  /// **'Cuenta'**
+  String get bankTransferAccountWord;
+
+  /// No description provided for @bankTransferInstructions.
+  ///
+  /// In es, this message translates to:
+  /// **'Verifica el abono en el banco o con el CEP antes de cobrar. Este POS no verifica transferencias de forma automática.'**
+  String get bankTransferInstructions;
+
+  /// No description provided for @bankTransferSelectAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Usar transferencia'**
+  String get bankTransferSelectAction;
+
+  /// No description provided for @bankTransferConfirmTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar abono recibido'**
+  String get bankTransferConfirmTitle;
+
+  /// No description provided for @bankTransferConfirmBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirma sólo si viste el abono en el banco o verificaste el CEP. Una captura del cliente no confirma el pago.'**
+  String get bankTransferConfirmBody;
+
+  /// No description provided for @bankTransferConfirmAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar abono y cobrar'**
+  String get bankTransferConfirmAction;
+
   /// No description provided for @terminalProcessingAction.
   ///
   /// In es, this message translates to:
   /// **'Procesando fuera del POS'**
   String get terminalProcessingAction;
+
+  /// No description provided for @manualTerminalConfirmTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar cobro en la terminal'**
+  String get manualTerminalConfirmTitle;
+
+  /// No description provided for @manualTerminalConfirmBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirma sólo si la terminal externa aprobó el cargo de {amount}. Si no conoces el resultado, cierra este aviso y revisa la terminal antes de intentar otro cobro.'**
+  String manualTerminalConfirmBody(String amount);
+
+  /// No description provided for @manualTerminalConfirmAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Confirmar cargo y cobrar'**
+  String get manualTerminalConfirmAction;
 
   /// No description provided for @terminalSuccessAction.
   ///
@@ -1379,7 +1529,7 @@ abstract class AppLocalizations {
   /// No description provided for @confirmCancelSaleBody.
   ///
   /// In es, this message translates to:
-  /// **'El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.'**
+  /// **'La comanda se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.'**
   String get confirmCancelSaleBody;
 
   /// No description provided for @saleRestoredMessage.
@@ -1423,6 +1573,24 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Buscar clientes'**
   String get searchCustomerHint;
+
+  /// Empty state of the customer picker. The list is fed by other channels, so a café with no customers yet sees a blank sheet and cannot tell whether the screen is broken or simply empty.
+  ///
+  /// In es, this message translates to:
+  /// **'Aquí aparecerán tus clientes'**
+  String get customerPickerEmptyTitle;
+
+  /// Says where the customers in this list come from, and what the operator can do instead.
+  ///
+  /// In es, this message translates to:
+  /// **'Los que llegan por WhatsApp, los de loyalty y los de Wallet se van sumando aquí. También puedes buscarlos por nombre, teléfono o correo, o cobrarle a un cliente anónimo.'**
+  String get customerPickerEmptyBody;
+
+  /// A search that returned nobody, which is a different fact from a café with no customers at all.
+  ///
+  /// In es, this message translates to:
+  /// **'Nadie coincide con «{query}».'**
+  String customerPickerNoMatch(String query);
 
   /// No description provided for @recentCustomersAction.
   ///
@@ -1547,7 +1715,7 @@ abstract class AppLocalizations {
   /// No description provided for @reprintReceiptAction.
   ///
   /// In es, this message translates to:
-  /// **'Ver para reimpresión'**
+  /// **'Imprimir recibo'**
   String get reprintReceiptAction;
 
   /// No description provided for @receiptAvailableMessage.
@@ -1589,13 +1757,13 @@ abstract class AppLocalizations {
   /// No description provided for @clearCartAction.
   ///
   /// In es, this message translates to:
-  /// **'Vaciar carrito'**
+  /// **'Vaciar comanda'**
   String get clearCartAction;
 
   /// No description provided for @confirmClearCartTitle.
   ///
   /// In es, this message translates to:
-  /// **'¿Vaciar este carrito?'**
+  /// **'¿Vaciar esta comanda?'**
   String get confirmClearCartTitle;
 
   /// No description provided for @confirmClearCartBody.
@@ -1784,6 +1952,12 @@ abstract class AppLocalizations {
   /// **'Iniciar conteo ciego'**
   String get blindCountAction;
 
+  /// No description provided for @countDrawerAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Contar el cajón'**
+  String get countDrawerAction;
+
   /// No description provided for @recountAction.
   ///
   /// In es, this message translates to:
@@ -1910,6 +2084,12 @@ abstract class AppLocalizations {
   /// **'Enviar conteo ciego'**
   String get submitBlindCountAction;
 
+  /// No description provided for @submitCountAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Enviar conteo'**
+  String get submitCountAction;
+
   /// No description provided for @cashOperationFailedMessage.
   ///
   /// In es, this message translates to:
@@ -1939,6 +2119,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Se requiere conciliación'**
   String get cashStatusReconciliation;
+
+  /// No description provided for @cashCarriedOverShiftNotice.
+  ///
+  /// In es, this message translates to:
+  /// **'Este turno quedó abierto de un día anterior y el cajón es suyo hasta que se cierre. Cuenta la caja y ciérralo antes de seguir con el día: así el efectivo de hoy no se mezcla con el de ayer.'**
+  String get cashCarriedOverShiftNotice;
 
   /// No description provided for @cashStatusClosed.
   ///
@@ -2023,6 +2209,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Importe restante reembolsable'**
   String get refundableAmountLabel;
+
+  /// No description provided for @refundAmountLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Importe del reembolso'**
+  String get refundAmountLabel;
 
   /// No description provided for @remainingRefundableQuantityLabel.
   ///
@@ -2429,7 +2621,7 @@ abstract class AppLocalizations {
   /// Title of the dialog that takes a party size before seating.
   ///
   /// In es, this message translates to:
-  /// **'Sentar la mesa {table}'**
+  /// **'Sentar en {table}'**
   String tableStateSeatTitle(String table);
 
   /// No description provided for @tableStatePartySizeField.
@@ -2663,8 +2855,32 @@ abstract class AppLocalizations {
   /// No description provided for @kitchenBoardTitle.
   ///
   /// In es, this message translates to:
-  /// **'Cocina'**
+  /// **'KDS'**
   String get kitchenBoardTitle;
+
+  /// No description provided for @kitchenStationAll.
+  ///
+  /// In es, this message translates to:
+  /// **'Todos'**
+  String get kitchenStationAll;
+
+  /// No description provided for @sentLineVoidApprovalOperation.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelar un platillo que cocina ya empezó'**
+  String get sentLineVoidApprovalOperation;
+
+  /// No description provided for @sentLineVoidApprovalReasonLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Motivo de la cancelación'**
+  String get sentLineVoidApprovalReasonLabel;
+
+  /// No description provided for @sentLineVoidApprovalCancelAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver'**
+  String get sentLineVoidApprovalCancelAction;
 
   /// No description provided for @kitchenBoardRefresh.
   ///
@@ -2711,7 +2927,7 @@ abstract class AppLocalizations {
   /// No description provided for @kitchenPrepEmpty.
   ///
   /// In es, this message translates to:
-  /// **'Aún no hay artículos con par. Define el par en Inventario.'**
+  /// **'No hay niveles objetivo de preparación. Configúralos en Inventario del panel administrativo.'**
   String get kitchenPrepEmpty;
 
   /// The window the forecast usage covers. It comes from the response.
@@ -2735,7 +2951,7 @@ abstract class AppLocalizations {
   /// No description provided for @kitchenPrepParColumn.
   ///
   /// In es, this message translates to:
-  /// **'Par'**
+  /// **'Objetivo'**
   String get kitchenPrepParColumn;
 
   /// No description provided for @kitchenPrepOnHandColumn.
@@ -2792,6 +3008,24 @@ abstract class AppLocalizations {
   /// **'Excepción'**
   String get kitchenStatusException;
 
+  /// No description provided for @kitchenStatusCancelled.
+  ///
+  /// In es, this message translates to:
+  /// **'Cancelado'**
+  String get kitchenStatusCancelled;
+
+  /// No description provided for @kitchenTicketDiscardAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Descartar'**
+  String get kitchenTicketDiscardAction;
+
+  /// No description provided for @kitchenItemRouteMissing.
+  ///
+  /// In es, this message translates to:
+  /// **'Sin estación asignada'**
+  String get kitchenItemRouteMissing;
+
   /// No description provided for @kitchenPriorityUrgent.
   ///
   /// In es, this message translates to:
@@ -2843,7 +3077,7 @@ abstract class AppLocalizations {
   /// The heading that names one course on a kitchen ticket. A ticket groups its lines by course so a dessert is not started with the starters.
   ///
   /// In es, this message translates to:
-  /// **'Curso {course}'**
+  /// **'Tiempo {course}'**
   String kitchenCourseGroup(int course);
 
   /// The label on a course the kitchen has not been told to start. The count is how many lines it holds.
@@ -3197,19 +3431,19 @@ abstract class AppLocalizations {
   /// Asked before `Nueva venta` abandons a sale that is still in progress.
   ///
   /// In es, this message translates to:
-  /// **'Este carrito tiene {count} línea(s) sin cobrar. Se abandona y empieza una venta vacía; no se cobra nada por él.'**
+  /// **'Esta comanda tiene {count} línea(s) sin cobrar. Se abandona y empieza una venta vacía; no se cobra nada por ella.'**
   String newSaleConfirmBody(int count);
 
   /// No description provided for @keepCartAction.
   ///
   /// In es, this message translates to:
-  /// **'Seguir con este carrito'**
+  /// **'Seguir con esta comanda'**
   String get keepCartAction;
 
   /// No description provided for @tenderConflictTitle.
   ///
   /// In es, this message translates to:
-  /// **'Este carrito no se puede cobrar así'**
+  /// **'Esta comanda no se puede cobrar así'**
   String get tenderConflictTitle;
 
   /// No description provided for @tenderConflictBody.
@@ -3692,6 +3926,12 @@ abstract class AppLocalizations {
   /// **'Conteo ciego: el esperado se revela cuando envías tu conteo.'**
   String get countDialogBlindHint;
 
+  /// No description provided for @countDialogVisibleHint.
+  ///
+  /// In es, this message translates to:
+  /// **'El efectivo esperado está a la vista. Envía lo que contaste.'**
+  String get countDialogVisibleHint;
+
   /// Shown in the blind-count dialog when this count replaces an earlier one.
   ///
   /// In es, this message translates to:
@@ -3881,7 +4121,7 @@ abstract class AppLocalizations {
   /// Heading of the persistent table detail panel. Combines the word for table with the published table label.
   ///
   /// In es, this message translates to:
-  /// **'Mesa {table}'**
+  /// **'{table}'**
   String tableStatePanelTitle(String table);
 
   /// Shown in the persistent detail panel before any table is selected.
@@ -3907,6 +4147,408 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Grupo'**
   String get tableStateGroupField;
+
+  /// Home title for an operator whose role does not hold the order surface.
+  ///
+  /// In es, this message translates to:
+  /// **'Tu rol no abre una caja de venta'**
+  String get noSaleSurfaceTitle;
+
+  /// Home body for an operator whose role does not hold the order surface.
+  ///
+  /// In es, this message translates to:
+  /// **'Usa las pestañas para abrir las herramientas de tu rol.'**
+  String get noSaleSurfaceBody;
+
+  /// Sends the cart to the kitchen before the money (the fired order).
+  ///
+  /// In es, this message translates to:
+  /// **'Enviar a cocina'**
+  String get fireOrderAction;
+
+  /// Marks a cart that already has a kitchen ticket; its lines are frozen.
+  ///
+  /// In es, this message translates to:
+  /// **'Enviada a cocina'**
+  String get firedOrderMarker;
+
+  /// Marks a single cart line the kitchen already has, beside its quantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Enviada'**
+  String get firedLineMarker;
+
+  /// A typed cancellation reason.
+  ///
+  /// In es, this message translates to:
+  /// **'El cliente cambió de opinión'**
+  String get cancelReasonCustomerChanged;
+
+  /// A typed cancellation reason.
+  ///
+  /// In es, this message translates to:
+  /// **'Error del operador'**
+  String get cancelReasonOperatorMistake;
+
+  /// A typed cancellation reason.
+  ///
+  /// In es, this message translates to:
+  /// **'Comanda duplicada'**
+  String get cancelReasonDuplicate;
+
+  /// A typed cancellation reason; it carries no claim by itself.
+  ///
+  /// In es, this message translates to:
+  /// **'Otro motivo'**
+  String get cancelReasonOther;
+
+  /// The operator's optional comment on a cancellation, never the reason.
+  ///
+  /// In es, this message translates to:
+  /// **'Nota (opcional)'**
+  String get cancelSaleNoteLabel;
+
+  /// Required explanation when the operator selects Other for a cancellation, refund, or void.
+  ///
+  /// In es, this message translates to:
+  /// **'Describe el motivo'**
+  String get otherReasonDetailLabel;
+
+  /// Confirmation when the kitchen ticket was sent, with no reference.
+  ///
+  /// In es, this message translates to:
+  /// **'Comanda enviada a cocina.'**
+  String get firedOrderSent;
+
+  /// Confirmation that names the ticket reference the operator reads to a cook.
+  ///
+  /// In es, this message translates to:
+  /// **'Comanda {reference} enviada a cocina.'**
+  String firedOrderSentReference(String reference);
+
+  /// No description provided for @entryCheckingTerminal.
+  ///
+  /// In es, this message translates to:
+  /// **'Comprobando tu terminal'**
+  String get entryCheckingTerminal;
+
+  /// No description provided for @entryRestoringSession.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperando tu sesión'**
+  String get entryRestoringSession;
+
+  /// No description provided for @entryAuthenticating.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificando tu acceso'**
+  String get entryAuthenticating;
+
+  /// No description provided for @entryVerifyingPin.
+  ///
+  /// In es, this message translates to:
+  /// **'Verificando tu PIN'**
+  String get entryVerifyingPin;
+
+  /// No description provided for @entryStartingOperator.
+  ///
+  /// In es, this message translates to:
+  /// **'Preparando tu sesión'**
+  String get entryStartingOperator;
+
+  /// No description provided for @entryLoadingBody.
+  ///
+  /// In es, this message translates to:
+  /// **'Estamos preparando el acceso a tu punto de venta.'**
+  String get entryLoadingBody;
+
+  /// No description provided for @productVariantRequiredHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige una variante para agregar el producto.'**
+  String get productVariantRequiredHint;
+
+  /// No description provided for @productOptionsRequiredHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Completa las opciones obligatorias para continuar.'**
+  String get productOptionsRequiredHint;
+
+  /// No description provided for @countedTotalLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Total contado'**
+  String get countedTotalLabel;
+
+  /// No description provided for @openCashAndContinueAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Abrir caja y continuar'**
+  String get openCashAndContinueAction;
+
+  /// No description provided for @openCashAndContinueHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Abre el turno, vuelve al cobro y continuaremos con este pedido.'**
+  String get openCashAndContinueHint;
+
+  /// No description provided for @productInformationLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Información del producto'**
+  String get productInformationLabel;
+
+  /// No description provided for @productBarcodeLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Código de barras'**
+  String get productBarcodeLabel;
+
+  /// No description provided for @returnAndChargeAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Volver y cobrar'**
+  String get returnAndChargeAction;
+
+  /// No description provided for @previousShiftSummaryLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Arqueo del turno anterior'**
+  String get previousShiftSummaryLabel;
+
+  /// No description provided for @resumeCurrentOrderHint.
+  ///
+  /// In es, this message translates to:
+  /// **'Para reanudar otro pedido, suspende o termina el pedido actual.'**
+  String get resumeCurrentOrderHint;
+
+  /// No description provided for @displaySettingsTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Ajustes'**
+  String get displaySettingsTitle;
+
+  /// No description provided for @displaySettingsScope.
+  ///
+  /// In es, this message translates to:
+  /// **'Estas preferencias se guardan en esta terminal y se aplican a todos sus operadores.'**
+  String get displaySettingsScope;
+
+  /// No description provided for @appearanceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Apariencia'**
+  String get appearanceLabel;
+
+  /// No description provided for @followSystemLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Seguir al sistema'**
+  String get followSystemLabel;
+
+  /// No description provided for @lightAppearanceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Clara'**
+  String get lightAppearanceLabel;
+
+  /// No description provided for @darkAppearanceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Oscura'**
+  String get darkAppearanceLabel;
+
+  /// No description provided for @midnightAppearanceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Medianoche'**
+  String get midnightAppearanceLabel;
+
+  /// No description provided for @languageLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Idioma'**
+  String get languageLabel;
+
+  /// No description provided for @motionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Movimiento'**
+  String get motionLabel;
+
+  /// No description provided for @reducedMotionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Reducido'**
+  String get reducedMotionLabel;
+
+  /// No description provided for @reducedMotionDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Reduce las transiciones. Siempre se respeta la preferencia de movimiento reducido del sistema.'**
+  String get reducedMotionDescription;
+
+  /// No description provided for @operatorSessionLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Sesión del operador'**
+  String get operatorSessionLabel;
+
+  /// No description provided for @savingDisplayPreferences.
+  ///
+  /// In es, this message translates to:
+  /// **'Guardando preferencias…'**
+  String get savingDisplayPreferences;
+
+  /// No description provided for @displayPreferencesReadError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudieron leer las preferencias. Se usa la apariencia del sistema; puedes guardar una nueva elección.'**
+  String get displayPreferencesReadError;
+
+  /// No description provided for @displayPreferencesWriteError.
+  ///
+  /// In es, this message translates to:
+  /// **'No se guardó el cambio. Se conserva la elección anterior. Vuelve a elegir para reintentar.'**
+  String get displayPreferencesWriteError;
+
+  /// No description provided for @incomingOrdersLoading.
+  ///
+  /// In es, this message translates to:
+  /// **'Consultando pedidos entrantes…'**
+  String get incomingOrdersLoading;
+
+  /// No description provided for @incomingOrdersEmptyDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Los pedidos de web, WhatsApp y otros canales aparecerán aquí cuando estén disponibles para esta sucursal.'**
+  String get incomingOrdersEmptyDescription;
+
+  /// No description provided for @incomingOrdersErrorDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Comprueba la conexión y vuelve a consultar. El pedido actual se conserva.'**
+  String get incomingOrdersErrorDescription;
+
+  /// No description provided for @refreshAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Actualizar'**
+  String get refreshAction;
+
+  /// No description provided for @receiptReferenceAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Referencia del recibo'**
+  String get receiptReferenceAction;
+
+  /// No description provided for @closeOrderAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Cerrar comanda'**
+  String get closeOrderAction;
+
+  /// No description provided for @decreaseDenominationQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Disminuir cantidad de {denomination}'**
+  String decreaseDenominationQuantity(String denomination);
+
+  /// No description provided for @increaseDenominationQuantity.
+  ///
+  /// In es, this message translates to:
+  /// **'Aumentar cantidad de {denomination}'**
+  String increaseDenominationQuantity(String denomination);
+
+  /// No description provided for @openingFloatExceedsMaximum.
+  ///
+  /// In es, this message translates to:
+  /// **'Máximo {amount}. Reduce el conteo.'**
+  String openingFloatExceedsMaximum(String amount);
+
+  /// No description provided for @allSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Todas las ventas'**
+  String get allSalesLabel;
+
+  /// No description provided for @recentSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Recientes'**
+  String get recentSalesLabel;
+
+  /// No description provided for @oldestSalesLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Antiguas'**
+  String get oldestSalesLabel;
+
+  /// No description provided for @saleHistoryLoading.
+  ///
+  /// In es, this message translates to:
+  /// **'Buscando ventas…'**
+  String get saleHistoryLoading;
+
+  /// No description provided for @saleHistoryNoMatches.
+  ///
+  /// In es, this message translates to:
+  /// **'No hay ventas que coincidan con esta búsqueda.'**
+  String get saleHistoryNoMatches;
+
+  /// No description provided for @saleHistoryLoadFailed.
+  ///
+  /// In es, this message translates to:
+  /// **'No se pudo cargar el historial.'**
+  String get saleHistoryLoadFailed;
+
+  /// No description provided for @textSizeLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Tamaño del texto'**
+  String get textSizeLabel;
+
+  /// No description provided for @textSizeDescription.
+  ///
+  /// In es, this message translates to:
+  /// **'Elige un tamaño cómodo para leer.'**
+  String get textSizeDescription;
+
+  /// No description provided for @largeTextLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Grande'**
+  String get largeTextLabel;
+
+  /// No description provided for @extraLargeTextLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Muy grande'**
+  String get extraLargeTextLabel;
+
+  /// No description provided for @receiptTicketLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Ticket'**
+  String get receiptTicketLabel;
+
+  /// No description provided for @receiptDocumentTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Recibo'**
+  String get receiptDocumentTitle;
+
+  /// No description provided for @receiptTaxLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Impuestos'**
+  String get receiptTaxLabel;
+
+  /// Daily ordered quantity, distinct from the quantity on this ticket.
+  ///
+  /// In es, this message translates to:
+  /// **'Hoy: {ordered}'**
+  String kitchenAllDayCount(int ordered);
 }
 
 class _AppLocalizationsDelegate

@@ -69,6 +69,10 @@ before you select a different one.
 A GNOME desktop (Pop!_OS, Ubuntu desktop) already runs GNOME Keyring, and PAM unlocks it
 at login. A minimal or compositor-only session does neither. Install it and unlock it:
 
+On a compositor-only session that also has KWallet installed, read
+[the 2026-10-08 unlock note](../architecture/2026-10-08-linux-keyring-unlock.md) first. The
+one-shot command below does not survive the next login by itself.
+
 ```sh
 sudo pacman -S --needed gnome-keyring libsecret        # Arch
 sudo apt-get install -y gnome-keyring libsecret-tools  # Debian, Ubuntu, PoP!_OS

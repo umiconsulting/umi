@@ -1,17 +1,26 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/bootstrap/composition_root.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
+import 'package:umi_pos/core/security/credential_vault.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_surface.dart';
+import 'package:umi_pos/features/customer_value/customer_value_controller.dart';
+import 'package:umi_pos/features/customer_value/customer_value_repository.dart';
+import 'package:umi_pos/features/entry/entry_controller.dart';
+import 'package:umi_pos/features/entry/entry_gateway.dart';
+import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
+import 'package:umi_pos/features/sale/sale_repository.dart';
 
 import 'support/fakes.dart';
 
@@ -42,6 +51,9 @@ const _confirmation = {
 const _policy = {
   'version': 'test-1',
   'manualTerminalEnabled': true,
+  'bankTransferEnabled': false,
+  'bankTransferDetails': null,
+  'merchantLogoUrl': null,
   'mixedTenderEnabled': true,
   'maximumTenderLines': 8,
   'manualTerminalApprovalThreshold': {'minorUnits': 50000, 'currency': 'MXN'},
@@ -78,7 +90,29 @@ final class _CheckoutRepository implements CheckoutRepository {
   final bool loseCommitResponseOnce;
   final CheckoutRecoverySnapshot? recoverySnapshot;
   final String paymentStatusValue;
+
+  /// When set, the confirmation this fake publishes NAMES the value the command carried — the way
+  /// `checkout-calculator.ts` hashes `customerValue` into the fingerprint — so a test can see which
+  /// confirmation a commit quoted.
+  bool valueAwareFingerprint = false;
+
+  /// When set, the confirmation's fingerprint MOVES with the command's tenders the way the real
+  /// calculator's does (it hashes them). A test that corrects a tender after a preview needs the
+  /// server to answer a different fingerprint for the corrected command.
+  bool fingerprintFollowsTheCommand = false;
+  static const valuedFingerprint =
+      'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+  static const valuedStoredValueFingerprint =
+      'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+  static const correctedTenderFingerprint =
+      'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+
+  /// When set, the repriced confirmation comes back with this grand total — how a test reaches the
+  /// confirmation screen instead of the one-tap charge.
+  int? repricedGrandTotalMinorUnits;
   bool responseLost = false;
+  bool requireCashShift = false;
+  String cashHoldState = 'free';
   final commands = <CheckoutCommand>[];
   final cancellations = <CheckoutCancellationRequest>[];
 
@@ -202,6 +236,39 @@ final class _CheckoutRepository implements CheckoutRepository {
     });
   }
 
+  /// The confirmation the server would publish for this command. With
+  /// [valueAwareFingerprint] the value the command carries is in the fingerprint and in
+  /// `storedValueFingerprint`, which is how the real calculator behaves.
+  Map<String, Object?> _confirmationFor(CheckoutCommand command) {
+    final confirmation = <String, Object?>{..._confirmation};
+    final repriced = repricedGrandTotalMinorUnits;
+    if (repriced != null) {
+      confirmation['totals'] = {
+        ...(_confirmation['totals']! as Map<String, Object?>),
+        'grandTotal': {'minorUnits': repriced, 'currency': 'MXN'},
+      };
+    }
+    if (fingerprintFollowsTheCommand) {
+      // The calculator hashes the tender drafts into the fingerprint, so a corrected tender is a
+      // different confirmation. Modelled two-way: the cart's own total, and anything else.
+      final cash = (command.tenderDrafts ?? const <Map<String, Object?>>[])
+          .where((tender) => tender['type'] == 'cash')
+          .firstOrNull;
+      final received =
+          (cash?['amountReceived'] as Map<String, Object?>?)?['minorUnits']
+              as num?;
+      if (received != null && received.toInt() != 11600) {
+        confirmation['fingerprint'] = correctedTenderFingerprint;
+      }
+    }
+    if (!valueAwareFingerprint || command.customerValue == null) {
+      return confirmation;
+    }
+    confirmation['fingerprint'] = valuedFingerprint;
+    confirmation['storedValueFingerprint'] = valuedStoredValueFingerprint;
+    return confirmation;
+  }
+
   @override
   Future<CheckoutResult> checkout(
     String merchantId,
@@ -212,9 +279,9 @@ final class _CheckoutRepository implements CheckoutRepository {
       throw StateError('the response was not a checkout result at all');
     }
     if (command.totalsFingerprint == null) {
-      return const CheckoutResult(
+      return CheckoutResult(
         status: 'confirmation_required',
-        confirmation: _confirmation,
+        confirmation: _confirmationFor(command),
         payment: null,
         reservation: null,
         sale: null,
@@ -226,6 +293,14 @@ final class _CheckoutRepository implements CheckoutRepository {
           'correlationId': 'checkout-test',
         },
         policy: _policy,
+      );
+    }
+    if (requireCashShift && command.cashShiftId == null) {
+      throw AppException(
+        category: AppErrorCategory.unknown,
+        code: 'CASH_SHIFT_REQUIRED',
+        recoverable: false,
+        details: {'holdState': cashHoldState},
       );
     }
     if (loseCommitResponseOnce && !responseLost) {
@@ -380,8 +455,11 @@ final class _CartRepository implements CartRepository {
     merchantId: '00000000-0000-4000-8000-000000000001',
     locationId: '00000000-0000-4000-8000-000000000002',
     operatorSessionId: '00000000-0000-4000-8000-000000000003',
+    accountFolio: 'Cuenta 182',
     status: 'prepared',
     version: 3,
+    firedOrderId: null,
+    fulfillmentType: 'dine_in',
     items: [],
     totals: _confirmation['totals']! as Map<String, Object?>,
     checkoutEnabled: false,
@@ -424,11 +502,23 @@ final class _CartRepository implements CartRepository {
     String merchantId,
     BindCartOriginRequest input,
   ) async => throw UnimplementedError();
+
+  @override
+  Future<FireOrderResult> fire(
+    String merchantId,
+    FireOrderRequest request,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<Cart> setFulfillment(
+    String merchantId,
+    SetCartFulfillmentRequest input,
+  ) async => throw UnimplementedError();
 }
 
 CheckoutController _controller(
   _CheckoutRepository repository, {
-  Future<void> Function(CheckoutResult result)? afterCommit,
+  Future<String?> Function(CheckoutResult result)? afterCommit,
 }) => CheckoutController(
   repository: repository,
   afterCommit: afterCommit,
@@ -468,6 +558,7 @@ Future<_TenderSheet> _openTenderSheet(
   WidgetTester tester,
   _CheckoutRepository repository, {
   required CheckoutPolicy policy,
+  Future<String?> Function()? onOpenCashShift,
 }) async {
   tester.view.devicePixelRatio = 1;
   // Tall enough that the whole tender surface lays out at once, so every
@@ -501,18 +592,17 @@ Future<_TenderSheet> _openTenderSheet(
     currency: 'MXN',
   );
   await tester.pumpWidget(
-    MaterialApp(
+    PosApp(
       locale: const Locale('en'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
+
         GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
       home: Builder(
-        builder: (context) => Scaffold(
-          body: FilledButton(
+        builder: (context) => PosPage(
+          body: PosButton(
             onPressed: () => showCheckoutSheet(
               context,
               checkout: checkout,
@@ -520,6 +610,7 @@ Future<_TenderSheet> _openTenderSheet(
               cart: cart,
               entry: root.entry,
               sales: root.sales,
+              onOpenCashShift: onOpenCashShift,
             ),
             child: const Text('open'),
           ),
@@ -530,6 +621,332 @@ Future<_TenderSheet> _openTenderSheet(
   await tester.tap(find.text('open'));
   await tester.pumpAndSettle();
   return _TenderSheet(tester, root, cart, checkout);
+}
+
+/// The fingerprint the held preview answers with. Asserted on the command, so the
+/// test proves the commit carries the preview it was shown and not just any value.
+const _previewFingerprint =
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+/// What a SECOND preview answers with, so a test can tell which one the commit named.
+const _rekeyedPreviewFingerprint =
+    'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+/// A customer-value repository whose preview is HELD OPEN until the test answers it.
+///
+/// The defect this covers was a race, and a race cannot be observed from the
+/// outside unless one leg can be stopped: with the future parked, the only way the
+/// commit can travel is if the sheet never waited for it.
+final class _HeldPreview implements CustomerValueRepository {
+  final requests = <CustomerValuePreviewRequest>[];
+  final held = <Completer<CustomerValuePreview>>[];
+
+  @override
+  Future<CustomerValuePreview> preview(
+    String merchantId,
+    CustomerValuePreviewRequest command,
+  ) {
+    requests.add(command);
+    final completer = Completer<CustomerValuePreview>();
+    held.add(completer);
+    return completer.future;
+  }
+
+  /// Answer every preview asked for so far, the way the server does.
+  void answer() {
+    for (final (index, completer) in held.indexed) {
+      if (!completer.isCompleted) {
+        completer.complete(
+          CustomerValuePreview(
+            // The shape the demo API answers for a pilot customer: points, the earn preview, a
+            // reward the customer cannot afford yet, and a wallet the cashier may apply. The panel
+            // grows with every one of them, which is what the money screen has to survive.
+            summary: <String, Object?>{
+              'customer': {'displayName': 'Cliente Piloto'},
+              'points': {'available': 0, 'pending': 0},
+              'wallet': {
+                'accountId': '00000000-0000-4000-8000-000000000070',
+                'currency': 'MXN',
+                'available': 50000,
+              },
+              'giftCards': <Object?>[],
+            },
+            earn: {'expectedPoints': 45, 'status': 'pending'},
+            rewards: <Map<String, Object?>>[
+              {
+                'reward': {
+                  'id': '00000000-0000-4000-8000-000000000071',
+                  'displayName': 'Reward piloto',
+                },
+                'eligible': false,
+                'state': 'ineligible',
+                'pointsCost': 100,
+              },
+            ],
+            selectedReward: null,
+            storedValueAuthorizations: <Map<String, Object?>>[],
+            remainingBalance: {'minorUnits': 0, 'currency': 'MXN'},
+            policyVersions: {'loyalty': 'pilot'},
+            // A re-asked preview carries a different fingerprint, because the basis it is computed
+            // against is part of it — which is how a test sees WHICH preview the commit named.
+            fingerprint: index == 0
+                ? _previewFingerprint
+                : _rekeyedPreviewFingerprint,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+/// The sale the sheet finds open: a cart with a customer already attached, which
+/// is the only state in which the sheet previews loyalty at all.
+final class _CustomerSale implements SaleRepository {
+  _CustomerSale(this.cart, this.customer);
+  final Cart cart;
+  final Map<String, Object?> customer;
+
+  SaleSnapshot _snapshot({String? id, Map<String, Object?>? customer}) =>
+      SaleSnapshot(
+        id: id ?? cart.id,
+        state: 'building_cart',
+        cart: cart.toJson(),
+        label: null,
+        customer: customer,
+        originalOperatorSessionId: cart.operatorSessionId,
+        currentOperatorSessionId: cart.operatorSessionId,
+        suspendedAt: null,
+        cancelledAt: null,
+        cancellationReasonCode: null,
+        cancellationReason: null,
+        committedSaleId: null,
+        sourceOrderId: null,
+        receiptId: null,
+        receiptRef: null,
+        updatedAt: '2026-07-28T19:00:00.000Z',
+      );
+
+  @override
+  Future<SaleSnapshot> current(
+    String merchantId,
+    SaleHistoryQuery query,
+  ) async => _snapshot(customer: customer);
+
+  /// The next sale the till opens by itself once this one is paid: same cart
+  /// fixture, and no customer — the loyalty pairing belongs to the paid sale.
+  @override
+  Future<SaleSnapshot> start(
+    String merchantId,
+    SaleContextRequest request,
+  ) async => _snapshot(id: '00000000-0000-4000-8000-000000000060');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+/// A device already signed in. The customer-value preview names the operator
+/// session, so the sheet cannot ask for one without this.
+final class _SignedInTrustedSessionGateway implements EntryGateway {
+  @override
+  Future<OperatorSessionView> startOperator(
+    String merchantId,
+    String locationId,
+  ) async => OperatorSessionView(
+    id: '00000000-0000-4000-8000-000000000003',
+    userId: '00000000-0000-4000-8000-000000000040',
+    staffId: 'staff',
+    merchantId: merchantId,
+    locationId: locationId,
+    deviceId: 'device',
+    state: 'active',
+    // What a cashier needs to see the panel in full: the reward and the wallet rows carry their own
+    // actions, and each one is behind its own permission.
+    permissions: const [
+      'cart.write',
+      'loyalty.read',
+      'loyalty.reward.authorize',
+      'wallet.authorize',
+    ],
+    entitlements: const [],
+    startedAt: '2026-07-28T18:00:00.000Z',
+    lastActivityAt: '2026-07-28T19:00:00.000Z',
+    expiresAt: '2026-07-28T23:00:00.000Z',
+  );
+
+  @override
+  Future<void> lockOperator(String id) async {}
+
+  @override
+  Future<void> logout() async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+Future<EntryController> _signedInEntry() async {
+  final entry = EntryController(
+    gateway: _SignedInTrustedSessionGateway(),
+    vault: CredentialVault(MemorySecureStorage()),
+    telemetry: const SafeTelemetry(
+      enabled: false,
+      context: TelemetryContext(
+        appVersion: 'test',
+        environment: 'test',
+        platform: 'test',
+      ),
+      exporter: NoopTelemetryExporter(),
+    ),
+    idleTimeout: const Duration(seconds: 30),
+  );
+  // One branch on the tenant, so the pick starts the operator session and the
+  // entry lands on `ready` the way the app's own auto-path does.
+  await entry.selectTenant(
+    EntryMerchant.fromJson({
+      'id': '00000000-0000-4000-8000-000000000001',
+      'name': 'Test café',
+      'roles': <Object?>[],
+      'permissions': <Object?>[],
+      'entitlements': <Object?>[],
+      'locations': [
+        {
+          'id': '00000000-0000-4000-8000-000000000002',
+          'merchantId': '00000000-0000-4000-8000-000000000001',
+          'name': 'Test location',
+          'status': 'active',
+          'deviceAllowed': true,
+          'operatorAllowed': true,
+        },
+      ],
+    }),
+  );
+  return entry;
+}
+
+/// The pieces a customer-value charge needs, disposed together by the test.
+final class _ValueSheet {
+  _ValueSheet(
+    this.tester,
+    this.repository,
+    this.value,
+    this.cart,
+    this.sales,
+    this.entry,
+    this.customerValue,
+    this.checkout,
+  );
+  final WidgetTester tester;
+  final _CheckoutRepository repository;
+  final _HeldPreview value;
+  final CartController cart;
+  final SaleLifecycleController sales;
+  final EntryController entry;
+  final CustomerValueController customerValue;
+  final CheckoutController checkout;
+
+  Future<void> dispose() async {
+    await tester.pumpWidget(const SizedBox());
+    entry.dispose();
+    sales.dispose();
+    cart.dispose();
+    customerValue.dispose();
+    checkout.dispose();
+  }
+}
+
+/// A tender sheet whose sale already has a customer, whose loyalty preview is HELD until the test
+/// answers it, and whose canvas is the till's unless the test says otherwise.
+Future<_ValueSheet> _openValueSheet(
+  WidgetTester tester, {
+  Size canvas = const Size(1396, 737),
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = canvas;
+  addTearDown(tester.view.reset);
+  final repository = _CheckoutRepository()
+    ..policyValue = CheckoutPolicy.fromJson(_policy)
+    ..valueAwareFingerprint = true;
+  final carts = _CartRepository();
+  final telemetry = const SafeTelemetry(
+    enabled: false,
+    context: TelemetryContext(
+      appVersion: 'test',
+      environment: 'test',
+      platform: 'test',
+    ),
+    exporter: NoopTelemetryExporter(),
+  );
+  final cart = CartController(repository: carts, telemetry: telemetry);
+  await cart.open(
+    carts.cart.merchantId,
+    carts.cart.locationId,
+    carts.cart.operatorSessionId,
+  );
+  final sales = SaleLifecycleController(
+    repository: _CustomerSale(carts.cart, const {
+      'id': '00000000-0000-4000-8000-000000000050',
+      'displayName': 'Cliente Piloto',
+      'contactHint': null,
+    }),
+    cart: cart,
+    telemetry: telemetry,
+  );
+  await sales.open(
+    carts.cart.merchantId,
+    carts.cart.locationId,
+    carts.cart.operatorSessionId,
+  );
+  final entry = await _signedInEntry();
+  final value = _HeldPreview();
+  final customerValue = CustomerValueController(value);
+  final checkout = _controller(repository);
+  await checkout.loadPolicy(
+    merchantId: carts.cart.merchantId,
+    locationId: carts.cart.locationId,
+    operatorSessionId: carts.cart.operatorSessionId,
+    currency: 'MXN',
+  );
+  await tester.pumpWidget(
+    PosApp(
+      locale: const Locale('en'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      home: Builder(
+        builder: (context) => PosPage(
+          body: PosButton(
+            onPressed: () => showCheckoutSheet(
+              context,
+              checkout: checkout,
+              cashShiftId: null,
+              cart: cart,
+              entry: entry,
+              sales: sales,
+              customerValue: customerValue,
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('open'));
+  await tester.pumpAndSettle();
+  return _ValueSheet(
+    tester,
+    repository,
+    value,
+    cart,
+    sales,
+    entry,
+    customerValue,
+    checkout,
+  );
 }
 
 void main() {
@@ -563,7 +980,10 @@ void main() {
     CheckoutResult? hardwareResult;
     final controller = _controller(
       repository,
-      afterCommit: (result) async => hardwareResult = result,
+      afterCommit: (result) async {
+        hardwareResult = result;
+        return null;
+      },
     );
     await controller.preview(
       merchantId: '00000000-0000-4000-8000-000000000001',
@@ -576,6 +996,29 @@ void main() {
     await controller.confirm();
     await Future<void>.delayed(Duration.zero);
     expect(hardwareResult?.status, 'completed');
+  });
+
+  test('a drawer that did not answer becomes a warning on the receipt', () async {
+    final repository = _CheckoutRepository();
+    final controller = _controller(
+      repository,
+      // The hardware ran, the money is recorded, and the drawer's pulse did not
+      // answer. The till has to say so where the cashier is (plan §8.2 F5).
+      afterCommit: (result) async => 'DRAWER_UNANSWERED',
+    );
+    await controller.preview(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      cartId: '00000000-0000-4000-8000-000000000004',
+      cartVersion: 3,
+      paymentMethod: 'cash',
+    );
+    await controller.confirm();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.phase, CheckoutPhase.completed);
+    expect(controller.state.postCommitWarning, 'DRAWER_UNANSWERED');
   });
 
   test(
@@ -610,6 +1053,35 @@ void main() {
       );
     },
   );
+
+  test('the value selection the command carries has no null fields', () async {
+    // The generated `toJson()` writes every key, so the fields this sale has no
+    // value for would travel as `null`. The contract declares them optional, and
+    // for the ones the database reads as arrays (`fundedGiftCards`) an explicit
+    // null is a 400, not an omission: measured at the till on 2026-10-11,
+    // `customerValue.fundedGiftCards` came back ["Expected array, received null"].
+    final repository = _CheckoutRepository();
+    final controller = _controller(repository);
+    controller.applyCustomerValue(
+      const CustomerValueSelection(
+        previewFingerprint: _previewFingerprint,
+        storedValueAuthorizationIds: <String>[],
+      ),
+    );
+    await controller.preview(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      cartId: '00000000-0000-4000-8000-000000000004',
+      cartVersion: 3,
+      paymentMethod: 'cash',
+    );
+    await controller.confirm();
+    final selection = repository.commands.last.customerValue!;
+    expect(selection.entries.where((entry) => entry.value == null), isEmpty);
+    expect(selection.containsKey('fundedGiftCards'), isFalse);
+    expect(selection['previewFingerprint'], _previewFingerprint);
+  });
 
   test('unknown external-terminal payment remains query-only', () async {
     final repository = _CheckoutRepository(unknown: true);
@@ -1023,6 +1495,158 @@ void main() {
     expect(repository.commands, isEmpty);
   });
 
+  testWidgets('a tender corrected after the preview re-keys the pair before the charge', (
+    tester,
+  ) async {
+    // The pair the closeout asserts is keyed on the command WITHOUT its customer value — the
+    // basis. Correct a tender after the preview was taken (the customer hands over a 500 note) and
+    // the basis moves with it, so the row on file names a command that no longer exists and the
+    // commit is refused as stale: measured on the iMin D3-504 on 2026-10-11 at 13:37:44, with the
+    // till saying only "No fue posible completar el cobro de forma segura." The sheet asks for the
+    // new basis and re-keys the row before it charges.
+    final sheet = await _openValueSheet(tester);
+    final repository = sheet.repository
+      // A repriced total takes the sheet to its confirmation screen, which is where a real
+      // operator corrects the tender.
+      ..repricedGrandTotalMinorUnits = 39900
+      // …and the corrected tender is a different command, so the server answers a different
+      // fingerprint for it, exactly as the calculator's hash of the tender drafts does.
+      ..fingerprintFollowsTheCommand = true;
+    final value = sheet.value;
+    await tester.tap(find.widgetWithText(PosButton, 'Checkout · MXN 116.00'));
+    await tester.pumpAndSettle();
+    expect(value.requests, hasLength(1));
+    final firstBasis = value.requests.first.checkoutFingerprint;
+
+    // The correction: the cash the customer handed over, after the preview.
+    await tester.tap(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
+    // The sheet is showing the repriced total, and the edit turns the confirm back into a charge.
+    await tester.tap(find.widgetWithText(PosButton, 'Checkout · MXN 399.00'));
+    await tester.pumpAndSettle();
+    expect(
+      value.requests,
+      hasLength(2),
+      reason: 'the basis moved, so the row has to be written again',
+    );
+    expect(value.requests.last.checkoutFingerprint, isNot(firstBasis));
+
+    // The server answers the re-keyed preview, and only then can the charge name it.
+    value.answer();
+    await tester.pumpAndSettle();
+    expect(
+      repository.commands.last.customerValue?['previewFingerprint'],
+      _rekeyedPreviewFingerprint,
+      reason: 'the commit names the preview the corrected command was keyed on',
+    );
+    expect(tester.takeException(), isNull);
+    await sheet.dispose();
+  });
+
+  testWidgets(
+    'cash shortage disables charge until the received amount covers the bill',
+    (tester) async {
+      final repository = _CheckoutRepository()
+        ..policyValue = CheckoutPolicy.fromJson(_policy);
+      final sheet = await _openTenderSheet(
+        tester,
+        repository,
+        policy: CheckoutPolicy.fromJson(_policy),
+      );
+      await tester.tap(find.text('MXN 100.00'));
+      await tester.pumpAndSettle();
+      final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      expect(tester.widget<PosButton>(charge).onPressed, isNull);
+      expect(repository.commands, isEmpty);
+      await tester.tap(find.text('MXN 200.00'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<PosButton>(charge).onPressed, isNotNull);
+      await sheet.dispose();
+    },
+  );
+
+  testWidgets('a tip is collected: the tender covers the amount due it creates', (
+    tester,
+  ) async {
+    // The server adds the tip to the amount due (`amountDue = discountedSubtotal + tipAmount`) and
+    // then checks the tenders cover it. The applied legs used to be balanced against the BILL alone,
+    // so a 10 % tip on this MXN 116.00 sale left the till reading `Falta por cobrar MXN 11.60` with
+    // nothing able to raise the applied amount and a charge refused as a remaining balance —
+    // measured on the iMin D3-504 on 2026-10-11.
+    final repository = _CheckoutRepository()
+      ..policyValue = CheckoutPolicy.fromJson(_policy);
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    await tester.tap(find.text('10%'));
+    await tester.pumpAndSettle();
+    // 10 % of 116.00 is 11.60, so the cash the till applies and receives is 127.60.
+    expect(find.text('127.60'), findsWidgets);
+
+    final charge = find.byType(PosButton).last;
+    await tester.ensureVisible(charge);
+    await tester.tap(charge);
+    await tester.pumpAndSettle();
+
+    final command = repository.commands.last;
+    expect(command.tipDraft?['basisPoints'], 1000);
+    final cash = (command.tenderDrafts as List<Object?>)
+        .cast<Map<String, Object?>>()
+        .firstWhere((tender) => tender['type'] == 'cash');
+    expect(
+      (cash['amount']! as Map<String, Object?>)['minorUnits'],
+      12760,
+      reason:
+          'the tender has to cover the bill and the tip the server will ask for',
+    );
+    await sheet.dispose();
+  });
+
+  testWidgets('a tip does not overwrite what the customer handed over', (
+    tester,
+  ) async {
+    // The customer puts MXN 500.00 on a MXN 116.00 bill and the operator THEN adds a tip.
+    // The change is what is left of the 500 once the bill and the tip are paid (500 − 127.60
+    // = 372.40), and the 500 stays on screen. The till used to rewrite the received amount
+    // with the new total on every draft change, so the change read zero and the money on
+    // the counter disappeared from the screen (owner, 2026-10-13).
+    final repository = _CheckoutRepository()
+      ..policyValue = CheckoutPolicy.fromJson(_policy);
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+
+    final cashReceivedField = find.ancestor(
+      of: find.text('Cash received'),
+      matching: find.byType(PosField),
+    );
+    await tester.tap(cashReceivedField);
+    await tester.pump();
+    for (final key in ['5', '0', '0']) {
+      await tester.tap(find.text(key).first);
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('10%'));
+    await tester.pumpAndSettle();
+
+    // Lo que el cliente puso en el mostrador sigue ahí: el campo no se reescribe con el
+    // total. (Se teclea 500 y el campo muestra 500 — el formateo a dos decimales es de los
+    // botones de efectivo rápido, no de cada tecla.)
+    expect(
+      find.text('500'),
+      findsWidgets,
+      reason: 'el efectivo recibido no se reescribe',
+    );
+    expect(find.text('MXN 372.40'), findsOneWidget);
+    await sheet.dispose();
+  });
+
   testWidgets('checkout sheet renders authoritative totals and payment methods', (
     tester,
   ) async {
@@ -1053,18 +1677,17 @@ void main() {
     final root = testRoot();
     final checkout = _controller(_CheckoutRepository());
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('en'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         home: Builder(
-          builder: (context) => Scaffold(
-            body: FilledButton(
+          builder: (context) => PosPage(
+            body: PosButton(
               onPressed: () => showCheckoutSheet(
                 context,
                 checkout: checkout,
@@ -1081,10 +1704,10 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(find.text('Authoritative checkout'), findsOneWidget);
+    expect(find.text('Checkout'), findsOneWidget);
     // The redesigned SOTA tender screen: a hero total, the payment-method tile,
     // the cash-received flow with quick-cash notes and an on-screen keypad, the
-    // colour-coded change block, and the receipt options.
+    // colour-coded change block. Receipt delivery uses the default display path.
     expect(find.text('TOTAL'), findsOneWidget);
     expect(find.text('Payment selection'), findsOneWidget);
     expect(find.text('Cash'), findsWidgets);
@@ -1093,18 +1716,28 @@ void main() {
     expect(find.text('MXN 500.00'), findsOneWidget); // a quick-cash note
     expect(find.text('7'), findsWidgets); // a keypad key
     expect(find.text('Change due'), findsOneWidget);
-    expect(find.text('Receipt destination'), findsOneWidget);
+    expect(find.text('Receipt destination'), findsNothing);
     expect(find.text('MXN 116.00'), findsWidgets);
     // One-tap checkout: the charge button reviews the total server-side and, when
     // it matches what the cashier saw, commits in the same action. It is the last
-    // FilledButton (after the harness's own "open" button).
-    final charge = find.byType(FilledButton).last;
+    // PosButton (after the harness's own "open" button).
+    final charge = find.byType(PosButton).last;
     await tester.ensureVisible(charge);
     await tester.tap(charge);
     await tester.pumpAndSettle();
     // The completed screen is the PoloTab-style change/paid summary.
     expect(find.text('Paid'), findsOneWidget);
     expect(find.text('New order'), findsOneWidget);
+    // AND NO FIELD IS STILL WAITING FOR TYPING. The tender's amount field kept focus through the
+    // commit, so Android left the soft keyboard open over this screen — measured on the iMin
+    // D3-504 on 2026-10-10, where it covered the lower half of the till. A Linux window has a
+    // hardware keyboard, so this assertion is the only place the desktop can hold the line.
+    expect(
+      tester
+          .widgetList<EditableText>(find.byType(EditableText))
+          .where((field) => field.focusNode.hasFocus),
+      isEmpty,
+    );
     await tester.pumpWidget(const SizedBox());
     root.dispose();
     cart.dispose();
@@ -1156,18 +1789,17 @@ void main() {
         currency: 'MXN',
       );
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           locale: const Locale('en'),
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [
             AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
+
             GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
           ],
           home: Builder(
-            builder: (context) => Scaffold(
-              body: FilledButton(
+            builder: (context) => PosPage(
+              body: PosButton(
                 onPressed: () => showCheckoutSheet(
                   context,
                   checkout: checkout,
@@ -1318,18 +1950,17 @@ void main() {
       currency: 'MXN',
     );
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('en'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         home: Builder(
-          builder: (context) => Scaffold(
-            body: FilledButton(
+          builder: (context) => PosPage(
+            body: PosButton(
               onPressed: () => showCheckoutSheet(
                 context,
                 checkout: checkout,
@@ -1358,12 +1989,12 @@ void main() {
     await tester.pumpAndSettle();
 
     // The contradiction is named, once, in the operator's own terms...
-    expect(find.text('This cart cannot be paid like this'), findsOneWidget);
+    expect(find.text('This order cannot be paid like this'), findsOneWidget);
     expect(find.text('Cash received'), findsOneWidget);
     // ...the unpayable half is NOT adopted (the terminal's own field is absent)...
     expect(find.text('Amount applied'), findsNothing);
     // ...and the charge is refused rather than offered.
-    final charge = tester.widget<FilledButton>(find.byType(FilledButton).last);
+    final charge = tester.widget<PosButton>(find.byType(PosButton).last);
     expect(charge.onPressed, isNull);
 
     await tester.pumpWidget(const SizedBox());
@@ -1407,18 +2038,17 @@ void main() {
       currency: 'MXN',
     );
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('en'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         home: Builder(
-          builder: (context) => Scaffold(
-            body: FilledButton(
+          builder: (context) => PosPage(
+            body: PosButton(
               onPressed: () => showCheckoutSheet(
                 context,
                 checkout: checkout,
@@ -1509,18 +2139,17 @@ void main() {
       currency: 'MXN',
     );
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('en'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         home: Builder(
-          builder: (context) => Scaffold(
-            body: FilledButton(
+          builder: (context) => PosPage(
+            body: PosButton(
               onPressed: () => showCheckoutSheet(
                 context,
                 checkout: checkout,
@@ -1546,13 +2175,21 @@ void main() {
 
     final cashReceivedField = find.ancestor(
       of: find.text('Cash received'),
-      matching: find.byType(TextField),
+      matching: find.byType(PosField),
     );
     // The customer hands over MXN 100.00 for a MXN 58.00 cash leg. The change is
     // MXN 42.00 — measured against the cash leg. Before this was fixed the sheet
     // compared the drawer against the whole MXN 116.00 bill and said the customer
     // still owed MXN 16.00, with the money already on the counter.
-    await tester.enterText(cashReceivedField, '100.00');
+    // The keypad is the only input the cash field takes now (a POS often has no keyboard
+    // and the real one covered the number being read), so the test drives the keys the
+    // operator would: tap the field to point the keypad at it, then type.
+    await tester.tap(cashReceivedField);
+    await tester.pump();
+    for (final key in ['1', '0', '0', '.', '0', '0']) {
+      await tester.tap(find.text(key).first);
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
     expect(find.text('Change due'), findsOneWidget);
     expect(find.text('MXN 42.00'), findsOneWidget);
@@ -1560,7 +2197,12 @@ void main() {
 
     // And the other direction still names what is missing: MXN 20.00 on the
     // counter leaves MXN 38.00 of the cash leg unpaid.
-    await tester.enterText(cashReceivedField, '20.00');
+    await tester.tap(cashReceivedField);
+    await tester.pump();
+    for (final key in ['2', '0', '.', '0', '0']) {
+      await tester.tap(find.text(key).first);
+      await tester.pump();
+    }
     await tester.pumpAndSettle();
     expect(find.text('Amount due'), findsOneWidget);
     expect(find.text('MXN 38.00'), findsOneWidget);
@@ -1604,6 +2246,163 @@ void main() {
     await sheet.dispose();
   });
 
+  testWidgets('bank instructions never charge; only a confirmed deposit does', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson({
+        ..._policy,
+        'bankTransferEnabled': true,
+        'bankTransferDetails': {
+          'holderName': 'ONCA DEMO',
+          'bankName': 'Banco de prueba',
+          'clabe': '012345678901234567',
+          'accountNumber': null,
+        },
+      }),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('method-bank-transfer')));
+    await tester.pumpAndSettle();
+    expect(find.text('ONCA DEMO'), findsOneWidget);
+    expect(find.text('ONCA Cuenta 182'), findsOneWidget);
+    expect(find.byKey(const ValueKey('bank-transfer-clabe')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('bank-transfer-modal-amount')),
+      findsOneWidget,
+    );
+    expect(repository.commands, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('bank-transfer-close')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('bank-transfer-amount')), findsNothing);
+    expect(repository.commands, isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('method-bank-transfer')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('bank-transfer-select')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('bank-transfer-amount')), findsOneWidget);
+    expect(find.byKey(const ValueKey('tender-bank-transfer')), findsOneWidget);
+    final bankIcon = find.descendant(
+      of: find.byKey(const ValueKey('tender-bank-transfer')),
+      matching: find.byType(PosIcon),
+    );
+    expect(tester.getSize(bankIcon.first).width, lessThanOrEqualTo(64));
+    expect(find.text('Terminal charge'), findsNothing);
+    expect(repository.commands, isEmpty);
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm deposit received'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('bank-transfer-confirm-close')));
+    await tester.pumpAndSettle();
+    expect(repository.commands, isEmpty);
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('bank-transfer-confirm')));
+    await tester.pumpAndSettle();
+    expect(repository.commands, isNotEmpty);
+    expect(repository.commands.first.paymentMethod, 'bank_transfer');
+    final tender = repository.commands.first.tenderDrafts!.singleWhere(
+      (draft) => draft['type'] == 'bank_transfer',
+    );
+    expect(tender['status'], 'confirmed_success');
+    expect(tender['amount'], {'minorUnits': 11600, 'currency': 'MXN'});
+    await sheet.dispose();
+  });
+
+  testWidgets('manual card payment uses the tap icon and needs confirmation', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    final face = find.byKey(const ValueKey('tender-terminal'));
+    final icon = find.descendant(of: face, matching: find.byType(SvgPicture));
+    expect(icon, findsOneWidget);
+    expect(tester.getSize(icon), const Size(104, 78));
+    expect(find.text('Processing externally'), findsOneWidget);
+    expect(find.text('Charging outside the POS'), findsOneWidget);
+    expect(find.text('Payment failed'), findsNothing);
+    expect(find.text('Receipt destination'), findsNothing);
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+    expect(find.text('Confirm the terminal charge'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('manual-terminal-confirm-close')),
+    );
+    await tester.pumpAndSettle();
+    expect(repository.commands, isEmpty);
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('manual-terminal-confirm')));
+    await tester.pumpAndSettle();
+    expect(repository.commands, isNotEmpty);
+    final tender = repository.commands.first.tenderDrafts!.singleWhere(
+      (draft) => draft['type'] == 'manual_terminal',
+    );
+    expect(tender['status'], 'confirmed_success');
+    expect(tender['amount'], {'minorUnits': 11600, 'currency': 'MXN'});
+    await sheet.dispose();
+  });
+
+  testWidgets('bank transfer is absent until the location enables it', (
+    tester,
+  ) async {
+    final sheet = await _openTenderSheet(
+      tester,
+      _CheckoutRepository(),
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    expect(find.byKey(const ValueKey('method-bank-transfer')), findsNothing);
+    await sheet.dispose();
+  });
+
+  testWidgets('bank instructions show only the bank leg of a split', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson({
+        ..._policy,
+        'maximumTenderLines': 2,
+        'bankTransferEnabled': true,
+        'bankTransferDetails': {
+          'holderName': 'ONCA DEMO',
+          'bankName': 'Banco de prueba',
+          'clabe': '000000000000000000',
+        },
+      }),
+    );
+    await tester.tap(find.byKey(const ValueKey('tender-split-arm')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('method-bank-transfer')));
+    await tester.pumpAndSettle();
+    expect(find.text('MXN 58.00'), findsWidgets);
+    await tester.tap(find.byKey(const ValueKey('bank-transfer-select')));
+    await tester.pumpAndSettle();
+    final field = tester.widget<PosField>(
+      find.byKey(const ValueKey('bank-transfer-amount')),
+    );
+    expect(field.controller?.text, '58.00');
+    expect(repository.commands, isEmpty);
+    await sheet.dispose();
+  });
+
   testWidgets('an armed split keeps cash and adds the terminal leg', (
     tester,
   ) async {
@@ -1644,7 +2443,7 @@ void main() {
     await sheet.dispose();
   });
 
-  testWidgets('a split that does not cover the bill says by how much', (
+  testWidgets('an unequal split allocates the remaining amount', (
     tester,
   ) async {
     final repository = _CheckoutRepository();
@@ -1659,28 +2458,125 @@ void main() {
     await tester.tap(find.text('Manual terminal'));
     await tester.pumpAndSettle();
 
-    // The operator puts only MXN 20.00 of the bill on cash: 20.00 + 58.00 is
-    // MXN 38.00 short of the MXN 116.00 bill.
     final cashAppliedField = find.byWidgetPredicate(
       (widget) =>
-          widget is TextField && widget.decoration?.labelText == 'Cash applied',
+          widget is PosField && widget.decoration?.labelText == 'Cash applied',
     );
     await tester.enterText(cashAppliedField, '20.00');
     await tester.pumpAndSettle();
-
-    expect(find.textContaining('Short by MXN 38.00'), findsOneWidget);
-    expect(find.textContaining('Over by'), findsNothing);
-    // The reading names the gap, so the button does not offer the charge.
-    final charge = tester.widget<FilledButton>(find.byType(FilledButton).last);
-    expect(charge.onPressed, isNull);
-
-    // Covering the bill again makes the charge live once more.
-    await tester.enterText(cashAppliedField, '58.00');
-    await tester.pumpAndSettle();
+    expect(
+      find.text('1. Cash: MXN 20.00   2. Manual terminal: MXN 96.00'),
+      findsOneWidget,
+    );
     expect(find.textContaining('Short by'), findsNothing);
-    final live = tester.widget<FilledButton>(find.byType(FilledButton).last);
-    expect(live.onPressed, isNotNull);
+    expect(find.textContaining('Over by'), findsNothing);
+    final charge = tester.widget<PosButton>(find.byType(PosButton).last);
+    expect(charge.onPressed, isNotNull);
 
+    await tester.tap(find.text('10%'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('1. Cash: MXN 20.00   2. Manual terminal: MXN 107.60'),
+      findsOneWidget,
+      reason: 'la propina conserva el importe que el cajero asignó a efectivo',
+    );
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is PosField &&
+          widget.decoration?.labelText == 'Amount applied' &&
+          widget.controller?.text == '107.60',
+    );
+    await tester.enterText(terminalField, '40.00');
+    await tester.pumpAndSettle();
+    expect(
+      find.text('1. Cash: MXN 87.60   2. Manual terminal: MXN 40.00'),
+      findsOneWidget,
+      reason: 'editar el importe de tarjeta calcula el resto en efectivo',
+    );
+    expect(
+      tester.widget<PosButton>(find.byType(PosButton).last).onPressed,
+      isNotNull,
+    );
+
+    await sheet.dispose();
+  });
+
+  testWidgets('card tip opens the on-screen keypad and hides receipt choices', (
+    tester,
+  ) async {
+    final sheet = await _openTenderSheet(
+      tester,
+      _CheckoutRepository(),
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tender-tip-keypad')), findsNothing);
+    expect(find.text('Receipt destination'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('custom-tip-percentage')));
+    await tester.pumpAndSettle();
+    final keypad = find.byKey(const ValueKey('tender-tip-keypad'));
+    expect(keypad, findsOneWidget);
+    tester.view.physicalSize = const Size(1920, 1080);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(tester.getRect(keypad).bottom, lessThan(820));
+    for (final digit in ['1', '2', '.', '5']) {
+      await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
+      await tester.pump();
+    }
+    final percent = tester.widget<PosField>(
+      find.byKey(const ValueKey('custom-tip-percentage')),
+    );
+    expect(percent.controller?.text, '12.5');
+    final terminal = tester.widget<PosField>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is PosField &&
+            widget.decoration?.labelText == 'Amount applied',
+      ),
+    );
+    expect(terminal.controller?.text, '130.50');
+    expect(find.text('MXN 130.50'), findsWidgets);
+    expect(find.text('Checkout · MXN 130.50'), findsOneWidget);
+    await tester.tap(
+      find.descendant(of: keypad, matching: find.text('Confirm')),
+    );
+    await tester.pumpAndSettle();
+    expect(keypad, findsNothing);
+    expect(find.byKey(const ValueKey('tender-terminal')), findsOneWidget);
+    await sheet.dispose();
+  });
+
+  testWidgets('fixed tip also uses the keypad with a card', (tester) async {
+    final sheet = await _openTenderSheet(
+      tester,
+      _CheckoutRepository(),
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('custom-tip-fixed')));
+    await tester.pumpAndSettle();
+    final keypad = find.byKey(const ValueKey('tender-tip-keypad'));
+    expect(keypad, findsOneWidget);
+    for (final digit in ['5', '.', '0', '0']) {
+      await tester.tap(find.descendant(of: keypad, matching: find.text(digit)));
+      await tester.pump();
+    }
+    final fixed = tester.widget<PosField>(
+      find.byKey(const ValueKey('custom-tip-fixed')),
+    );
+    expect(fixed.controller?.text, '5.00');
+    final terminal = tester.widget<PosField>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is PosField &&
+            widget.decoration?.labelText == 'Amount applied',
+      ),
+    );
+    expect(terminal.controller?.text, '121.00');
     await sheet.dispose();
   });
 
@@ -1707,4 +2603,170 @@ void main() {
 
     await sheet.dispose();
   });
+  for (final hold in ['free', 'held_by_active_till']) {
+    testWidgets(
+      'cash refusal offers opening only for an available drawer: $hold',
+      (tester) async {
+        final repository = _CheckoutRepository()
+          ..requireCashShift = true
+          ..cashHoldState = hold;
+        var opens = 0;
+        final pending = Completer<String?>();
+        final sheet = await _openTenderSheet(
+          tester,
+          repository,
+          policy: CheckoutPolicy.fromJson(_policy),
+          onOpenCashShift: () {
+            opens++;
+            return pending.future;
+          },
+        );
+        await sheet.checkout.preview(
+          merchantId: '00000000-0000-4000-8000-000000000001',
+          locationId: '00000000-0000-4000-8000-000000000002',
+          operatorSessionId: '00000000-0000-4000-8000-000000000003',
+          cartId: '00000000-0000-4000-8000-000000000004',
+          cartVersion: 3,
+          paymentMethod: 'cash',
+          cashReceivedMinorUnits: 11600,
+        );
+        await sheet.checkout.confirm();
+        await tester.pumpAndSettle();
+        expect(sheet.checkout.state.errorCode, 'CASH_SHIFT_REQUIRED');
+        final action = find.widgetWithText(
+          PosButton,
+          'Open cash shift and continue',
+        );
+        if (hold == 'held_by_active_till') {
+          expect(action, findsNothing);
+          expect(opens, 0);
+        } else {
+          await tester.tap(action);
+          await tester.pump();
+          expect(opens, 1);
+          expect(tester.widget<PosButton>(action).onPressed, isNull);
+          pending.complete('00000000-0000-4000-8000-000000000009');
+          await tester.pumpAndSettle();
+          expect(sheet.checkout.state.phase, CheckoutPhase.completed);
+          expect(
+            repository.commands.last.cashShiftId,
+            '00000000-0000-4000-8000-000000000009',
+          );
+          final commits = repository.commands
+              .where((c) => c.totalsFingerprint != null)
+              .toList();
+          expect(commits.length, 2);
+          expect(commits.first.commandId, commits.last.commandId);
+          expect(commits.first.idempotencyKey, commits.last.idempotencyKey);
+          expect(commits.first.cartId, commits.last.cartId);
+        }
+        expect(tester.takeException(), isNull);
+        await sheet.dispose();
+      },
+    );
+  }
+
+  testWidgets(
+    'the one-tap charge waits for the loyalty preview the command has to carry',
+    (tester) async {
+      // A sale with a customer attached cannot be charged unless the command
+      // carries the loyalty preview's fingerprint: the database asserts it and
+      // refuses the commit with `LOYALTY_PREVIEW_STALE` when the half is missing
+      // (`merchant.assert_loyalty_earn_preview`). The sheet charges in one action —
+      // review, then commit — so the preview it showed and the commit it sends race.
+      // This test parks the preview and proves the commit WAITS for it.
+      final sheet = await _openValueSheet(tester);
+      final repository = sheet.repository;
+      final value = sheet.value;
+      final checkout = sheet.checkout;
+      final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      await tester.ensureVisible(charge);
+      await tester.tap(charge);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      // The review has gone out and asked for the preview. While that answer is
+      // parked, only the repricing command may exist: a commit here is the defect.
+      expect(value.requests, hasLength(1));
+      expect(repository.commands, hasLength(1));
+      value.answer();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      // THREE commands, in the order the contract needs: the review that found the total, the
+      // review that carries the value, and the commit.
+      expect(repository.commands, hasLength(3));
+      final reviews = repository.commands
+          .where((command) => command.totalsFingerprint == null)
+          .toList();
+      final commits = repository.commands
+          .where((command) => command.totalsFingerprint != null)
+          .toList();
+      expect(reviews, hasLength(2));
+      expect(reviews.first.customerValue, isNull);
+      expect(
+        reviews.last.customerValue?['previewFingerprint'],
+        _previewFingerprint,
+      );
+      // The commit names the confirmation that carries the value, and both halves of the pair.
+      expect(commits, hasLength(1));
+      expect(
+        commits.single.totalsFingerprint,
+        _CheckoutRepository.valuedFingerprint,
+      );
+      expect(
+        commits.single.customerValue?['previewFingerprint'],
+        _previewFingerprint,
+      );
+      expect(
+        commits.single.customerValue?['storedValueFingerprint'],
+        _CheckoutRepository.valuedStoredValueFingerprint,
+      );
+      expect(
+        commits.single.customerValue!.entries.where(
+          (entry) => entry.value == null,
+        ),
+        isEmpty,
+      );
+      // ONE preview per checkout version — the server can only hold one.
+      expect(value.requests, hasLength(1));
+      expect(checkout.state.phase, CheckoutPhase.completed);
+      expect(tester.takeException(), isNull);
+      await sheet.dispose();
+    },
+  );
+
+  testWidgets(
+    'the money screen keeps its methods and its charge action on the till canvas',
+    (tester) async {
+      // The playbook's own check: "money screens fit one screen". The loyalty panel grows when it
+      // has something to say (points, a wallet with its own buttons, a reward row), and the method
+      // tiles sit BELOW it — so the panel is what can push `Efectivo` and the charge action off the
+      // till's canvas. Measured at the iMin's own logical size, 1396x737.
+      final sheet = await _openValueSheet(tester);
+      // A repriced total that differs from the one on screen is how the operator reaches the
+      // confirmation screen, where the panel HAS its answer and the charge is still ahead.
+      sheet.repository.repricedGrandTotalMinorUnits = 99900;
+      final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      await tester.ensureVisible(charge);
+      await tester.tap(charge);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      sheet.value.answer();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      final canvas = Offset.zero & tester.view.physicalSize;
+      for (final finder in [
+        find.text('Cash'),
+        find.widgetWithText(PosButton, 'Confirm and pay'),
+      ]) {
+        final rect = tester.getRect(finder.first);
+        expect(
+          rect.top >= canvas.top && rect.bottom <= canvas.bottom,
+          isTrue,
+          reason:
+              '$finder sits at $rect, outside the $canvas the till draws on',
+        );
+      }
+      await sheet.dispose();
+    },
+  );
 }

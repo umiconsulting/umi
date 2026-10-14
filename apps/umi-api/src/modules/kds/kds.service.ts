@@ -10,9 +10,14 @@ import type {
   PosKitchenAllDayQuery,
   PosKitchenCommandRequest,
   PosKitchenOrderQuery,
+  PosKitchenUnassignedCommandRequest,
 } from '@umi/contract';
+import { KitchenAlertSettings, KitchenUnassignedCommandResult } from '@umi/contract';
+import { IntegrityService } from '../integrity/integrity.service';
+import type { UnassignedAction } from './kitchen-unassigned';
 import type { AuthUser } from '../auth/auth.types';
 import { RateLimitService } from '../../shared/ratelimit/rate-limit.service';
+import { RESOURCE_LIMITS } from '../../shared/operations/resource-limits';
 import { DashboardRealtimeEvents } from '../realtime/dashboard-realtime.events';
 import { KitchenBoardEvents } from '../realtime/kitchen-board.events';
 import {
@@ -51,15 +56,11 @@ const PAIR_RATE_WINDOW_MS = 60_000;
 /**
  * How long a board watch is held before it answers `changed: false`.
  *
- * The number is bounded from above by a fact in the client: the till's `ApiClient.requestTimeout` is
- * **15 seconds** (`lib/core/network/api_client.dart`), and a hold that outlives the client's own
- * timeout would turn every idle watch into an error the till then retries. Twelve leaves three
- * seconds of margin for a slow link. A nudge releases the hold immediately, so twelve seconds is
- * the worst case a cook sees rather than the usual one — and it is still less traffic than the
- * eight-second poll this replaces, with a change arriving in milliseconds instead of up to eight
- * seconds later.
+ * Fastify closes an inactive socket after `httpConnectionMs`, before the POS's 15-second timeout.
+ * Reserve two seconds below the smaller server limit. NOTIFY still releases a changed board immediately.
  */
-const BOARD_WATCH_HOLD_MS = 12_000;
+const BOARD_WATCH_HOLD_MS =
+  Math.min(RESOURCE_LIMITS.httpConnectionMs, RESOURCE_LIMITS.httpRequestMs) - 2_000;
 
 /** Serve the iPad KDS contract and the dashboard operations. */
 @Injectable()
@@ -69,7 +70,59 @@ export class KdsService {
     private readonly rateLimit: RateLimitService,
     private readonly realtime: DashboardRealtimeEvents,
     private readonly kitchenBoard: KitchenBoardEvents,
+    private readonly integrity: IntegrityService,
   ) {}
+
+  async unassignedForPos(user: AuthUser, merchantId: string, query: PosKitchenOrderQuery) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    return { ok: true as const, data: await this.repo.unassignedBoard(user, merchantId, query) };
+  }
+
+  async changeUnassignedForPos(
+    user: AuthUser,
+    merchantId: string,
+    dto: PosKitchenUnassignedCommandRequest,
+    action: UnassignedAction,
+  ) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    await this.repo.authorizeUnassigned(user, merchantId, dto, action);
+    const result = await this.integrity.execute<KitchenUnassignedCommandResult>(
+      {
+        merchantId,
+        locationId: dto.locationId,
+        commandId: dto.idempotencyKey,
+        idempotencyKey: dto.idempotencyKey,
+        commandType: `kitchen.unassigned.${action}`,
+        expectedVersion: dto.expectedVersion,
+        payload: dto,
+      },
+      async (context) => {
+        const value = await this.repo.changeUnassigned(
+          context.client,
+          user,
+          merchantId,
+          dto,
+          action,
+        );
+        await context.appendAudit({
+          eventType: `kitchen.unassigned.${action}`,
+          entityType: 'kitchen_order',
+          entityId: dto.kitchenOrderId,
+          outcome: 'success',
+          publicData: {
+            version: value.version,
+            resolvedItems: value.resolvedItems,
+            remainingItems: value.remainingItems,
+            discardedItems: value.discardedItems,
+          },
+        });
+        return { ok: true, value };
+      },
+    );
+    if (result.status !== 'succeeded' || !result.result)
+      throw new ConflictException({ code: result.failureCode ?? 'KITCHEN_COMMAND_CONFLICT' });
+    return KitchenUnassignedCommandResult.parse(result.result);
+  }
 
   // ════════════════════════════ Device auth ════════════════════════════════
 
@@ -529,7 +582,7 @@ export class KdsService {
     query: PosKitchenOrderQuery,
   ) {
     if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
-    const { allowed } = await this.repo.authorizePos(
+    const { allowed, permissions } = await this.repo.authorizePos(
       user.id,
       user.sessionId,
       user.deviceId,
@@ -537,7 +590,18 @@ export class KdsService {
       query.locationId,
       query.operatorSessionId,
     );
-    if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    if (
+      !allowed &&
+      (!permissions.includes('order.fire') ||
+        !(await this.repo.ownsPosOrder(
+          merchantId,
+          query.locationId,
+          sourceOrderId,
+          query.operatorSessionId,
+        )))
+    ) {
+      throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    }
     const result = await this.repo.posKitchenStatus(merchantId, query.locationId, sourceOrderId);
     if (!result) throw new NotFoundException({ code: 'KITCHEN_ORDER_NOT_FOUND' });
     return result;
@@ -563,6 +627,40 @@ export class KdsService {
     if (stationIds.length === 0) return { ok: true as const, data: [] };
     const rows = await this.repo.boardSnapshot(merchantId, query.locationId, stationIds);
     return { ok: true as const, data: rows.map(toSnapshotRow) };
+  }
+
+  /**
+   * The stations of this kitchen, all of them, with the same authorisation pair the board
+   * uses — the till has no station, so the PERSON at it is authorised by `locationId` +
+   * `operatorSessionId`.
+   *
+   * A read of CONFIGURATION, not of work: the board's chips come from here so that a
+   * station is a tab at eight in the morning and not only when it happens to have a
+   * ticket, and so that a bar screen can be fixed to Barra before the rush instead of
+   * hoping two stations have work at the same time.
+   */
+  async stationsForPos(user: AuthUser, merchantId: string, query: PosKitchenOrderQuery) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    const { allowed } = await this.repo.authorizePos(
+      user.id,
+      user.sessionId,
+      user.deviceId,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+    );
+    if (!allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    const stations = await this.repo.listStations(merchantId, query.locationId);
+    return {
+      ok: true as const,
+      data: stations.map((station) => ({
+        id: station.id,
+        key: station.station_key,
+        name: station.name,
+        sortOrder: station.sort_order,
+        ...station.alert_settings,
+      })),
+    };
   }
 
   /**
@@ -854,6 +952,8 @@ export class KdsService {
       merchantId,
       stationId: id,
       name,
+      alertSettings:
+        body.alertSettings === undefined ? undefined : parseAlertSettings(body.alertSettings),
     });
     if (!station) throw new NotFoundException({ error: 'station_not_found' });
     return { station };
@@ -872,6 +972,10 @@ export class KdsService {
     const location = asUuid(locationId);
     if (!location) throw new BadRequestException({ error: 'location_required' });
     return { routes: await this.repo.listRoutes(merchantId, location) };
+  }
+
+  async searchProducts(merchantId: string, search: string) {
+    return { products: await this.repo.searchProducts(merchantId, search.slice(0, 120)) };
   }
 
   async createRoute(merchantId: string, locationId: string | null, body: Record<string, unknown>) {
@@ -1370,6 +1474,7 @@ function remapItems(items: unknown): unknown[] {
 
 function toSnapshotRow(t: TicketRow) {
   return {
+    ...t.alert_settings,
     id: t.ticket_id,
     sourceOrderId: t.source_transaction_id,
     publicReference: t.public_reference ?? t.source_transaction_id,
@@ -1379,6 +1484,10 @@ function toSnapshotRow(t: TicketRow) {
     status: t.status,
     priority: (t as TicketRow & { priority?: string }).priority ?? 'normal',
     stationId: t.station_id,
+    // The station's name, for the one reader that cannot infer it: a POS device has no
+    // station, so its board carries the same ticket once per station (bar and kitchen)
+    // and two cards that say only "Cuenta 019" are indistinguishable.
+    stationName: t.station_name ?? undefined,
     businessDate: (t as TicketRow & { business_date?: string }).business_date,
     // The strict projection types these as ISO instants. JSON.stringify would render a
     // Date correctly on the wire, but the object in hand would not be an instance of what
@@ -1398,6 +1507,12 @@ function toSnapshotRow(t: TicketRow) {
     ),
     items: remapItems(t.items),
   };
+}
+
+export function parseAlertSettings(value: unknown) {
+  const parsed = KitchenAlertSettings.safeParse(value);
+  if (!parsed.success) throw new BadRequestException({ error: 'invalid_kitchen_alert_settings' });
+  return parsed.data;
 }
 
 /** A timestamptz as the contract's ISO instant: pg hands it back as a Date, not a string. */

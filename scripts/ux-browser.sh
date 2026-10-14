@@ -62,9 +62,35 @@ setsid nohup "$CHROME" \
   --remote-debugging-port="${PORT}" --user-data-dir="$PROFILE" \
   --noerrdialogs --no-first-run --use-angle=swiftshader-webgl \
   about:blank >/tmp/ux/chrome.log 2>&1 < /dev/null &
+chrome_pid=$!
 
 for _ in $(seq 1 30); do
   if curl -sf -m 2 "http://127.0.0.1:${PORT}/json/version" >/dev/null; then
+    # A WORKSPACE OF ITS OWN, AND WITHOUT TAKING THE SCREEN.
+    #
+    # House rule, asked for by the owner: a window under test never shares a workspace with
+    # anything else, so a run cannot interrupt what the person in front of the machine is doing.
+    #
+    # BY PID, and it never follows the window. The first patched launch of this script used the
+    # name-based `window-workspace.sh`, that script acted on the ACTIVE window on this compositor,
+    # and the harness window therefore opened on top of a running game on workspace 2. The
+    # pid-based mover cannot pick the wrong window, and `follow = false` keeps the operator's
+    # screen where they left it. The same rule is why the POS driver captures with
+    # `magick import -window <id>` rather than a screen grab: the window is rarely the visible one.
+    if [ "${UX_HEADLESS:-0}" != "1" ]; then
+      mover="$(dirname "${BASH_SOURCE[0]}")/../tools/ux-sweep/window-empty-workspace.sh"
+      workspace=""
+      for _ in $(seq 1 20); do
+        workspace="$(bash "$mover" "$chrome_pid" 2>/dev/null || true)"
+        [ -n "$workspace" ] && break
+        sleep 0.5
+      done
+      if [ -n "$workspace" ]; then
+        echo "ux-browser: window placed on workspace ${workspace} (your screen was not switched)"
+      else
+        echo "ux-browser: could not place the window on a workspace of its own; it is on your screen" >&2
+      fi
+    fi
     echo "ux-browser: CDP ready at http://127.0.0.1:${PORT}"
     exit 0
   fi

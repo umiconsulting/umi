@@ -1,0 +1,4 @@
+185|ac7131c2-c39c-4e61-95e6-5636e656be5a|2026-10-14|draft|suspended|4||
+186|40b1eb46-553d-4b4c-b97e-da8cbe3ae4f4|2026-10-14|draft|suspended|3||
+190|dbdc7839-a1c8-4134-949b-72e775881ca1|2026-10-13|abandoned|cancelled|6|other|Anulada desde Días anteriores
+191|80f741a1-aecd-421b-be84-7a82bf77f353|2026-10-13|abandoned|cancelled|3|other|Anulada desde Días anteriores

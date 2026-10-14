@@ -2,6 +2,8 @@ import { useState, useId } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { apiUrl, withCreds, errMessage } from '@/lib/config.js';
+import { LocaleSelect } from '@/shell.jsx';
+import { I } from '@/icons.jsx';
 import '@/styles.css';
 
 export default function ResetPasswordScreen() {
@@ -16,6 +18,8 @@ export default function ResetPasswordScreen() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const ready = !!localToken;
 
   const handleSubmit = async (e) => {
@@ -71,6 +75,9 @@ export default function ResetPasswordScreen() {
             boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
           }}
         >
+          <div className="login-locale">
+            <LocaleSelect />
+          </div>
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
             <Trans>Contraseña actualizada</Trans>
           </h2>
@@ -109,6 +116,9 @@ export default function ResetPasswordScreen() {
           boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
         }}
       >
+        <div className="login-locale">
+          <LocaleSelect />
+        </div>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 6, letterSpacing: '-0.02em' }}>
           <Trans>Nueva contraseña</Trans>
         </h2>
@@ -129,30 +139,54 @@ export default function ResetPasswordScreen() {
               <label htmlFor={`${uid}-nueva-contrasena`}>
                 <Trans>Nueva contraseña</Trans>
               </label>
-              <input
-                id={`${uid}-nueva-contrasena`}
-                className="input tall"
-                type="password"
-                placeholder={t`Mínimo 8 caracteres`}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoFocus
-              />
+              <div className="login-pw">
+                <input
+                  id={`${uid}-nueva-contrasena`}
+                  className="input tall"
+                  type={showPw ? 'text' : 'password'}
+                  placeholder={t`Mínimo 8 caracteres`}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="login-reveal"
+                  onClick={() => setShowPw((s) => !s)}
+                  aria-label={showPw ? t`Ocultar contraseña` : t`Mostrar contraseña`}
+                >
+                  {showPw ? <I.EyeOff size={19} stroke={1.8} /> : <I.Eye size={19} stroke={1.8} />}
+                </button>
+              </div>
             </div>
             <div className="field">
               <label htmlFor={`${uid}-confirmar-contrasena`}>
                 <Trans>Confirmar contraseña</Trans>
               </label>
-              <input
-                id={`${uid}-confirmar-contrasena`}
-                className="input tall"
-                type="password"
-                placeholder={t`Repite la contraseña`}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                required
-              />
+              <div className="login-pw">
+                <input
+                  id={`${uid}-confirmar-contrasena`}
+                  className="input tall"
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder={t`Repite la contraseña`}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  className="login-reveal"
+                  onClick={() => setShowConfirm((s) => !s)}
+                  aria-label={showConfirm ? t`Ocultar contraseña` : t`Mostrar contraseña`}
+                >
+                  {showConfirm ? (
+                    <I.EyeOff size={19} stroke={1.8} />
+                  ) : (
+                    <I.Eye size={19} stroke={1.8} />
+                  )}
+                </button>
+              </div>
             </div>
             {error && (
               <div

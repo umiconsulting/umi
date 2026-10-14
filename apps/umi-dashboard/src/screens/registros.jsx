@@ -63,7 +63,12 @@ function StatusPill({ status }) {
           : inUse
             ? 'color-mix(in srgb, var(--merchant-brand) 14%, transparent)'
             : 'var(--surface-2)',
-        color: attn ? 'var(--danger)' : inUse ? 'var(--merchant-brand)' : 'var(--ink-3)',
+        // Text on a tint of its own colour: the accent's ink, not the accent.
+        color: attn
+          ? 'var(--danger)'
+          : inUse
+            ? 'var(--accent-ink, var(--merchant-brand))'
+            : 'var(--ink-3)',
         fontWeight: 600,
         whiteSpace: 'nowrap',
       }}

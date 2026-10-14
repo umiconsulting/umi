@@ -48,9 +48,41 @@ export default defineConfig(({ mode }) => {
           target: apiProxyTarget,
           changeOrigin: true,
         },
+        // The café's uploaded logo, served by the API at `/logos/{name}` and not
+        // under `/api`. Without this the branding card's preview — and the Wallet
+        // pass the settings screen draws next to it — would fetch the Vite dev
+        // server and get the SPA's index.html back.
+        '/logos': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
         // Socket.IO realtime. The dashboard connects to `/rt/dashboard`, but the
         // engine.io transport lands on `/socket.io` (the default path); the
         // namespace rides in the handshake payload.
+        '/socket.io': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+          ws: true,
+        },
+      },
+    },
+    // `vite preview` serves the BUILT app, and the load-time question ("every
+    // screen loads in less than a second", plan §4) is only answerable against a
+    // bundle: the dev server ships ~100 unbundled modules, so a throttled run
+    // against it measures the development setup, not the product. The same proxy
+    // is required here — without it the built app's same-origin `/api` calls hit
+    // the static server and 404.
+    preview: {
+      port: 4173,
+      proxy: {
+        '/api': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
+        '/logos': {
+          target: apiProxyTarget,
+          changeOrigin: true,
+        },
         '/socket.io': {
           target: apiProxyTarget,
           changeOrigin: true,

@@ -320,8 +320,10 @@ declare r record;
   -- re-apply gate will fail the next time it runs.
   post_90 constant text[] := array[
     'device_point_terminal', 'fiscal_document', 'floor_plan', 'inventory_allergen',
-    'inventory_item_allergen', 'mp_point_credential', 'purchase_order',
+    'inventory_item_allergen', 'mp_point_credential', 'pos_account_counter',
+    'pos_partial_payment', 'purchase_order',
     'purchase_order_line', 'purchase_order_receipt', 'purchase_order_receipt_line',
+    'receipt_counter',
     'stock_lot', 'supplier', 'supplier_invoice', 'supplier_invoice_line',
     'table_order', 'table_order_credential', 'table_reservation', 'table_state'
   ]::text[];
@@ -537,8 +539,10 @@ declare
   skip constant text[] := array[
     'staff', 'loyalty_visit',
     'device_point_terminal', 'fiscal_document', 'floor_plan', 'inventory_allergen',
-    'inventory_item_allergen', 'mp_point_credential', 'purchase_order',
+    'inventory_item_allergen', 'mp_point_credential', 'pos_account_counter',
+    'pos_partial_payment', 'purchase_order',
     'purchase_order_line', 'purchase_order_receipt', 'purchase_order_receipt_line',
+    'receipt_counter',
     'stock_lot', 'supplier', 'supplier_invoice', 'supplier_invoice_line',
     'table_order', 'table_order_credential', 'table_reservation', 'table_state'
   ];

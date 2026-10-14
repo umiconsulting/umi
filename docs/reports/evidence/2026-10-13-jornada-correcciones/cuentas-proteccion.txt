@@ -1,0 +1,9 @@
+ account_number | lifecycle_state |    name    |           device           | version 
+----------------+-----------------+------------+----------------------------+---------
+            146 | suspended       | Admin ONCA | Caja ONCA                  |       8
+            150 | recovered       | Admin ONCA | Caja ONCA                  |       4
+            152 | suspended       | Admin ONCA | Caja ONCA                  |       5
+            153 | recovered       | Mesero 2   | Samsung portátil QA nativa |       6
+            154 | cancelled       | Mesero 2   | Samsung portátil QA nativa |       2
+(5 rows)
+
