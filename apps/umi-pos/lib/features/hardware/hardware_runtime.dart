@@ -101,6 +101,29 @@ abstract interface class SerialFoundationTransport
 abstract interface class PlatformChannelFoundationTransport
     implements HardwareTransportAdapter {}
 
+/// The answer to "is this link there?" from a pilot transport that carries no
+/// bytes, so there is no socket and no interface to ask.
+///
+/// A TCP or USB link is asked through its `HardwareByteTransport`. A terminal's
+/// own port is not a byte link, so its adapter answers for itself, and the health
+/// poll asks the adapter.
+final class AdapterHealth {
+  const AdapterHealth({
+    required this.state,
+    this.failureCode,
+    this.safeDetail = const {},
+  });
+
+  /// `connected`, `disconnected` or `failed`.
+  final String state;
+  final String? failureCode;
+  final Map<String, Object?> safeDetail;
+}
+
+abstract interface class AdapterHealthProbe {
+  Future<AdapterHealth> probe();
+}
+
 abstract interface class DeviceAdapter implements HardwareTransportAdapter {
   String get deviceType;
   Set<String> get capabilities;

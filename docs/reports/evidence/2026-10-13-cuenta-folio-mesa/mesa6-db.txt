@@ -1,0 +1,6 @@
+ account_number | table_name |  status   | lifecycle_state | version 
+----------------+------------+-----------+-----------------+---------
+            152 | Mesa 6     | draft     | recovered       |       6
+             59 | Mesa 6     | committed | committed       |       2
+(2 rows)
+

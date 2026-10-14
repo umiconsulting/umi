@@ -36,6 +36,7 @@ import { DevicesModule } from './modules/devices/devices.module';
 import { RealtimeEventsModule } from './modules/realtime/realtime-events.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PosEntryModule } from './modules/pos-entry/pos-entry.module';
+import { PosPushModule } from './modules/pos-push/pos-push.module';
 import { PosCatalogModule } from './modules/pos-catalog/pos-catalog.module';
 import { PosCartModule } from './modules/pos-cart/pos-cart.module';
 import { PosCheckoutModule } from './modules/pos-checkout/pos-checkout.module';
@@ -58,6 +59,7 @@ import { AdministrativeCommandModule } from './modules/administrative-commands/a
 import { ReleaseModule } from './shared/release/release.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { TableOrderModule } from './modules/table-order/table-order.module';
+import { MerchantBrandingLogoModule } from './modules/merchant-branding/merchant-branding.module';
 
 /**
  * Root module for the WEB process. Imports shared infrastructure + domain
@@ -101,6 +103,7 @@ import { TableOrderModule } from './modules/table-order/table-order.module';
     RealtimeEventsModule,
     RealtimeModule,
     PosEntryModule,
+    PosPushModule,
     PosCatalogModule,
     PosCartModule,
     PosCheckoutModule,
@@ -131,6 +134,10 @@ import { TableOrderModule } from './modules/table-order/table-order.module';
     DashboardCatalogModule,
     AdministrativeCommandModule,
     OrdersModule,
+    // The café's own logo (migration 014). The upload is the dashboard's; the asset
+    // is public and content-addressed, because the wallet pass builders fetch it
+    // with a plain unauthenticated `fetch` and the till draws it on the receipt.
+    MerchantBrandingLogoModule,
     // §8I step 2, ADR 2026-09-13 §9: table-order INTAKE. A seated guest orders from a QR
     // at the table; the order goes through the one writer with the channel identity `web`
     // and lands in the till's incoming-orders list and on the kitchen board. Payment

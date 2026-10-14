@@ -96,6 +96,23 @@ export const FloorPlanDocument = z
 
 export const FloorPlanQuery = z.object({ locationId: Id }).strict();
 export const PosFloorPlanQuery = FloorPlanQuery.extend({ operatorSessionId: Id }).strict();
+export const AddPosTableRequest = PosFloorPlanQuery.extend({
+  expectedPublishedVersion: z.number().int().nonnegative(),
+  idempotencyKey: Id,
+  areaId: Id,
+  label: Label,
+  capacity: z.number().int().min(1).max(100),
+}).strict();
+export const InitializePosTablesRequest = PosFloorPlanQuery.extend({
+  expectedPublishedVersion: z.number().int().nonnegative(),
+  idempotencyKey: Id,
+  slots: z.array(z.number().int().min(0).max(49)).min(1).max(50),
+})
+  .strict()
+  .refine((request) => new Set(request.slots).size === request.slots.length, {
+    path: ['slots'],
+    message: 'Duplicate table slot',
+  });
 export const SaveFloorPlanRequest = z
   .object({
     locationId: Id,
@@ -121,15 +138,20 @@ export type FloorPlanElement = z.infer<typeof FloorPlanElement>;
 export type FloorPlanArea = z.infer<typeof FloorPlanArea>;
 export type FloorPlanDocument = z.infer<typeof FloorPlanDocument>;
 export type FloorPlanState = z.infer<typeof FloorPlanState>;
+export type PublishedFloorPlan = z.infer<typeof PublishedFloorPlan>;
 export type SaveFloorPlanRequest = z.infer<typeof SaveFloorPlanRequest>;
 export type PublishFloorPlanRequest = z.infer<typeof PublishFloorPlanRequest>;
 export type PosFloorPlanQuery = z.infer<typeof PosFloorPlanQuery>;
+export type InitializePosTablesRequest = z.infer<typeof InitializePosTablesRequest>;
+export type AddPosTableRequest = z.infer<typeof AddPosTableRequest>;
 export const floorPlanModels = {
   FloorPlanElement,
   FloorPlanArea,
   FloorPlanDocument,
   FloorPlanQuery,
   PosFloorPlanQuery,
+  InitializePosTablesRequest,
+  AddPosTableRequest,
   SaveFloorPlanRequest,
   PublishFloorPlanRequest,
   FloorPlanState,

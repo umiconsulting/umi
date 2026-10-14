@@ -47,7 +47,15 @@ abstract interface class SaleRepository {
   );
 }
 
-final class ApiSaleRepository implements SaleRepository {
+abstract interface class CarriedOverSaleRepository {
+  Future<CancelCarriedOverAccountsResult> cancelCarriedOver(
+    String merchantId,
+    CancelCarriedOverAccountsRequest request,
+  );
+}
+
+final class ApiSaleRepository
+    implements SaleRepository, CarriedOverSaleRepository {
   ApiSaleRepository(this._api);
   final ApiClient _api;
 
@@ -137,6 +145,19 @@ final class ApiSaleRepository implements SaleRepository {
     await _api.request(
       method: ApiMethod.post,
       path: UmiRoutes.posSaleCancel(merchantId, saleId),
+      body: request.toJson(),
+      idempotent: true,
+    ),
+  );
+
+  @override
+  Future<CancelCarriedOverAccountsResult> cancelCarriedOver(
+    String merchantId,
+    CancelCarriedOverAccountsRequest request,
+  ) async => CancelCarriedOverAccountsResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posCarriedOverAccountsCancel(merchantId),
       body: request.toJson(),
       idempotent: true,
     ),

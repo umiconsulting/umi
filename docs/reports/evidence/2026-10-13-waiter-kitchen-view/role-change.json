@@ -1,0 +1,45 @@
+{
+  "status": 200,
+  "request": {
+    "name": "Mesero",
+    "description": "Rol de ONCA · Mesero",
+    "permissionKeys": [
+      "cart.write",
+      "catalog.read",
+      "customer.attach",
+      "customer.read",
+      "customer.search",
+      "loyalty.read",
+      "offline.replay",
+      "order.fire",
+      "kitchen.read"
+    ],
+    "expectedRevision": 2
+  },
+  "result": {
+    "role": {
+      "id": "6f515dfc-aa56-45d4-869a-32c9cd5cf23c",
+      "key": "custom-mesero-a7ec3f",
+      "name": "Mesero",
+      "description": "Rol de ONCA · Mesero",
+      "status": "active",
+      "revision": 3,
+      "isSystem": false,
+      "sourceTemplateKey": null,
+      "sourceTemplateVersion": null,
+      "permissionKeys": [
+        "cart.write",
+        "catalog.read",
+        "customer.attach",
+        "customer.read",
+        "customer.search",
+        "kitchen.read",
+        "loyalty.read",
+        "offline.replay",
+        "order.fire"
+      ],
+      "assignedCount": 1,
+      "updatedAt": "2026-10-13T16:30:09.737Z"
+    }
+  }
+}

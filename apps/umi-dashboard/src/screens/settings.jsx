@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useId } from 'react';
+import React, { useState, useEffect, useCallback, useId, useRef } from 'react';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
 import { I } from '@/icons.jsx';
@@ -7,6 +7,8 @@ import { Segmented } from '@/components/segmented.jsx';
 import {
   useMerchantData,
   saveMerchantSettings,
+  saveMerchantLogo,
+  removeMerchantLogo,
   saveRewardConfig,
   useVoiceConfig,
   saveMerchantVoice,
@@ -275,6 +277,7 @@ const SettingsScreen = () => {
       cardPrefix: merchant.cardPrefix,
       subscription: merchant.subscriptionStatus,
       businessDayStart: merchant.businessDayStart || '00:00',
+      posDayClosePolicy: merchant.posDayClosePolicy || 'manual',
     };
     // Effective cutoffs come merged from the API; show spend in pesos.
     const st = merchant.segmentThresholds || {};
@@ -379,6 +382,7 @@ const SettingsScreen = () => {
         name: biz.name,
         city: biz.city,
         businessDayStart: biz.businessDayStart,
+        posDayClosePolicy: biz.posDayClosePolicy,
         ...(seg
           ? {
               segmentThresholds: {
@@ -535,6 +539,32 @@ const SettingsScreen = () => {
                 </Trans>
               </div>
             </div>
+            <div className="field">
+              <label htmlFor={`${uid}-pos-day-close`}>
+                <Trans>Cierre del día y cuentas abiertas</Trans>
+              </label>
+              <select
+                id={`${uid}-pos-day-close`}
+                className="input tall"
+                value={biz.posDayClosePolicy || 'manual'}
+                onChange={(e) => setBiz((b) => ({ ...b, posDayClosePolicy: e.target.value }))}
+              >
+                <option value="manual">
+                  <Trans>Resolver a mano (recomendado)</Trans>
+                </option>
+                <option value="auto_void">
+                  <Trans>Anular las cuentas sin cobrar al corte</Trans>
+                </option>
+              </select>
+              <div style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 4 }}>
+                <Trans>
+                  Qué pasa con una cuenta que sigue abierta cuando termina el día operativo. A mano,
+                  alguien la cobra o la anula. Al anular automáticamente, el sistema cierra las
+                  cuentas sin cobrar de días anteriores y las marca en rojo en el historial; las
+                  cuentas guardadas y las ya cobradas no se tocan. Empieza a mano.
+                </Trans>
+              </div>
+            </div>
             {seg && (
               <div className="field" style={{ gridColumn: '1 / -1' }}>
                 <span className="field-label">
@@ -672,6 +702,13 @@ const SettingsScreen = () => {
             onSave={() => handleSave('biz')}
           />
         </div>
+
+        {/* The café's logo — one upload, live as soon as it lands. */}
+        <BusinessLogoCard
+          logoUrl={brand.logoUrl}
+          merchantName={biz.name}
+          onChanged={(url) => setBrand((b) => ({ ...b, logoUrl: url || '' }))}
+        />
 
         {/* Voice & tone — WhatsApp assistant (ConversaFlow) */}
         {conversaflowActive && voice && (
@@ -1201,6 +1238,182 @@ const SettingsScreen = () => {
     </div>
   );
 };
+
+/**
+ * The café's logo: the one picture the whole product already reads.
+ *
+ * It is NOT part of the page's save. The other sections edit a form that one
+ * PATCH commits, but a file is not a field — the bytes leave the moment the owner
+ * picks them, and the URL that comes back is what the till prints from that
+ * second. So this card owns its own pending/error/saved state and shows the live
+ * result rather than a "sin guardar" that no control could commit.
+ *
+ * Where it shows: the ticket the customer is handed (the POS draws it at the head
+ * of the receipt) and the Apple/Google Wallet pass. Both read `merchant.logo_url`,
+ * which is what the upload writes.
+ */
+function BusinessLogoCard({ logoUrl, merchantName, onChanged }) {
+  const { t } = useLingui();
+  const fileRef = useRef(null);
+  const [state, setState] = useState({ pending: false, error: null, saved: false });
+  /**
+   * THE FILE THE OWNER JUST PICKED, on screen before a single byte travels.
+   *
+   * The upload is immediate — there is no "save" for a file — so the card used to
+   * say `Subiendo…` and show the OLD mark, or an empty frame, until the request
+   * came back. An owner who picked the wrong picture, or a 4 MB photo that takes a
+   * second to shrink, had nothing on screen that answered "is this the one I
+   * meant?". A blob URL is local: it costs no request, it works with the network
+   * down, and it is the same picture the API is about to store.
+   */
+  const [preview, setPreview] = useState(null);
+  /**
+   * The stored URL answered with something that is not an image. A pointer that
+   * does not resolve used to leave a blank frame and no words — hiding the broken
+   * <img> was the whole recovery. Measured 2026-10-11 after the local environment
+   * moved: the URL in `merchant.logo_url` named a port that no longer answered, and
+   * the card showed an empty box while `Sin logo` was never reached.
+   */
+  const [broken, setBroken] = useState(false);
+  const url = normalizeAssetUrl(logoUrl);
+  const shown = preview || (broken ? '' : url);
+
+  function dropPreview() {
+    setPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  }
+
+  async function pick(event) {
+    const file = event.target.files && event.target.files[0];
+    // The same file must be uploadable twice, so the input forgets the choice.
+    event.target.value = '';
+    if (!file) return;
+    dropPreview();
+    setBroken(false);
+    setPreview(URL.createObjectURL(file));
+    setState({ pending: true, error: null, saved: false });
+    try {
+      const saved = await saveMerchantLogo(file);
+      // The stored asset is the same picture, content-addressed, so the local copy
+      // has done its job and its object URL is released.
+      dropPreview();
+      onChanged(saved.url);
+      setState({ pending: false, error: null, saved: true });
+    } catch (error) {
+      // A refusal keeps the preview: the owner is looking at the file that failed,
+      // which is the only thing that makes the message actionable.
+      setState({ pending: false, error, saved: false });
+    }
+  }
+
+  async function remove() {
+    dropPreview();
+    setBroken(false);
+    setState({ pending: true, error: null, saved: false });
+    try {
+      await removeMerchantLogo();
+      onChanged('');
+      setState({ pending: false, error: null, saved: true });
+    } catch (error) {
+      setState({ pending: false, error, saved: false });
+    }
+  }
+
+  return (
+    <div style={{ padding: 24, borderTop: '1px solid var(--line-soft)' }}>
+      <SettingsSection
+        title={<Trans>Logo del negocio</Trans>}
+        note={<Trans>Aparece en el ticket que recibe el cliente y en su tarjeta de Wallet.</Trans>}
+      />
+      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            width: 132,
+            height: 96,
+            borderRadius: 12,
+            border: '1px dashed var(--line-soft)',
+            background: 'var(--surface-2, #faf7f2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            padding: 8,
+          }}
+        >
+          {shown ? (
+            <img
+              src={shown}
+              alt={merchantName}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              onError={() => setBroken(true)}
+            />
+          ) : (
+            <span className="muted" style={{ fontSize: 12.5 }}>
+              <Trans>Sin logo</Trans>
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gap: 8, minWidth: 220 }}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            style={{ display: 'none' }}
+            onChange={pick}
+          />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary btn-sm focusable"
+              type="button"
+              onClick={() => fileRef.current && fileRef.current.click()}
+              disabled={state.pending}
+            >
+              {url ? <Trans>Cambiar logo</Trans> : <Trans>Subir logo</Trans>}
+            </button>
+            {url ? (
+              <button
+                className="btn btn-ghost btn-sm focusable"
+                type="button"
+                onClick={remove}
+                disabled={state.pending}
+              >
+                <Trans>Quitar logo</Trans>
+              </button>
+            ) : null}
+          </div>
+          <span className="muted" style={{ fontSize: 11.5 }}>
+            <Trans>PNG o JPG. Lo reducimos a 768 px antes de guardarlo.</Trans>
+          </span>
+          {state.pending ? (
+            <span className="muted" style={{ fontSize: 12.5 }}>
+              <Trans>Subiendo…</Trans>
+            </span>
+          ) : null}
+          {state.error ? (
+            <span role="alert" style={{ color: 'var(--danger)', fontSize: 12.5 }}>
+              {state.error.message || t`No pudimos guardar el logo.`}
+            </span>
+          ) : null}
+          {broken && url && !preview ? (
+            <span role="alert" style={{ color: 'var(--danger)', fontSize: 12.5 }}>
+              <Trans>Guardamos una imagen que ya no se puede cargar. Vuelve a subirla.</Trans>
+            </span>
+          ) : null}
+          {state.saved ? (
+            <span
+              role="status"
+              style={{ color: 'var(--success)', fontSize: 12.5, display: 'inline-flex', gap: 4 }}
+            >
+              <I.Check size={14} /> <Trans>Logo actualizado</Trans>
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Live wallet pass component ─────────────────────────────────────────────────
 const WalletPass = ({ brand, biz, stamps, loyalty, birthday, topupEnabled }) => {

@@ -1,9 +1,43 @@
-import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/security/operator_permissions.dart';
+import '../../shared/widgets/station_document.dart';
 import '../entry/entry_controller.dart';
 import 'hardware_service.dart';
+import 'terminal_cashbox_transport.dart';
+import 'usb_printer_transport.dart';
+
+/// Folds a newer reading into the runtime a screen shows.
+///
+/// The device rows of [shown] stay, because a reading may carry only the devices
+/// that are active. The newer measured state of each device replaces the older one,
+/// and the print queue becomes the newer queue. Everything else stays as the screen
+/// loaded it.
+HardwareRuntimeSnapshot adoptHardwareReading({
+  required HardwareRuntimeSnapshot shown,
+  required HardwareRuntimeSnapshot reading,
+}) {
+  final measured = <String, Object?>{};
+  for (final device in reading.devices) {
+    final id = device['id'];
+    if (id is String) measured[id] = device['connectionState'];
+  }
+  return HardwareRuntimeSnapshot.fromJson({
+    ...shown.toJson(),
+    'devices': shown.devices.map((device) {
+      final id = device['id'];
+      final state = id is String ? measured[id] : null;
+      if (state is! String) return device;
+      return {...device, 'connectionState': state};
+    }).toList(),
+    'printJobs': reading.printJobs ?? shown.printJobs,
+    'pendingJobs': reading.pendingJobs,
+    'retryableJobs': reading.retryableJobs,
+    'unknownCommands': reading.unknownCommands,
+    'capturedAt': reading.capturedAt,
+  });
+}
 
 Future<void> showHardwareCenter(
   BuildContext context, {
@@ -11,7 +45,7 @@ Future<void> showHardwareCenter(
   required HardwareService service,
   required OperatorPermissions permissions,
   required String? registerId,
-}) => showModalBottomSheet<void>(
+}) => showPosSheet<void>(
   context: context,
   isScrollControlled: true,
   builder: (_) => FractionallySizedBox(
@@ -77,7 +111,38 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
   @override
   void initState() {
     super.initState();
+    widget.service.latestRuntime.addListener(_adoptReading);
+    // The operator is looking at the hardware, so the relay keeps the fast cadence
+    // while this screen is on.
+    widget.service.watchRuntime();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    widget.service.latestRuntime.removeListener(_adoptReading);
+    widget.service.unwatchRuntime();
+    super.dispose();
+  }
+
+  /// Shows a reading the till made while this screen was open.
+  ///
+  /// The relay reads the hardware runtime every ten seconds while an operator
+  /// session is open, so this screen stays current without one request of its own.
+  /// A reading for another register is not this screen's business and is ignored.
+  void _adoptReading() {
+    final reading = widget.service.latestRuntime.value;
+    final shown = _snapshot;
+    final scope = _scope;
+    if (!mounted || reading == null || shown == null || scope == null) return;
+    if (reading.merchantId != scope.merchantId ||
+        reading.locationId != scope.locationId ||
+        reading.registerId != scope.registerId) {
+      return;
+    }
+    setState(
+      () => _snapshot = adoptHardwareReading(shown: shown, reading: reading),
+    );
   }
 
   Future<void> _load() async {
@@ -103,25 +168,27 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
   @override
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(text('Hardware center', 'Centro de hardware')),
+    return PosPage(
+      appBar: PosHeader(
+        title: StationHeading(
+          title: text('Hardware center', 'Centro de hardware'),
+        ),
         actions: [
-          IconButton(
+          PosIconButton(
             tooltip: text('Refresh hardware', 'Actualizar hardware'),
             onPressed: _busy ? null : _load,
-            icon: const Icon(Icons.refresh),
+            icon: const PosIcon(PosGlyphs.refresh),
           ),
-          IconButton(
+          PosIconButton(
             tooltip: text('Close', 'Cerrar'),
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close),
+            icon: const PosIcon(PosGlyphs.close),
           ),
         ],
       ),
       body: SafeArea(
         child: _busy && snapshot == null
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: PosSpinner())
             : _error != null
             ? Center(
                 child: Semantics(
@@ -153,24 +220,36 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
           header: true,
           child: Text(
             text('Assigned devices', 'Dispositivos asignados'),
-            style: Theme.of(context).textTheme.titleLarge,
+            style: PosTheme.of(context).textTheme.titleLarge,
           ),
         ),
         if (widget.permissions.allows('hardware.manage'))
           Wrap(
             spacing: 8,
             children: [
-              FilledButton.icon(
-                onPressed: _busy ? null : _register,
-                icon: const Icon(Icons.add),
-                label: Text(text('Register device', 'Registrar dispositivo')),
+              // One tap: look on the till's own USB host port, then add whatever
+              // printer answers. The cable is the configuration, so the operator
+              // never picks a host, a port, or a transport.
+              PosButton.icon(
+                onPressed: _busy ? null : _addUsbPrinter,
+                icon: const PosIcon(PosGlyphs.usb),
+                label: Text(text('Find USB printer', 'Buscar impresora USB')),
               ),
-              OutlinedButton.icon(
-                onPressed: _busy || snapshot == null
-                    ? null
-                    : () => _configurePolicy(snapshot),
-                icon: const Icon(Icons.policy_outlined),
-                label: Text(text('Pilot policy', 'Política piloto')),
+              // The drawer's other cable, in one tap: the terminal is asked
+              // whether it has its own cashbox port, and a record is filed only
+              // when it answers. A tablet gets a sentence instead of a device
+              // row that could never open anything.
+              PosButton.icon(
+                onPressed: _busy ? null : _addTerminalDrawer,
+                icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
+                label: Text(
+                  text('Find terminal drawer', 'Buscar cajón de la terminal'),
+                ),
+              ),
+              PosButton.icon(
+                onPressed: _busy ? null : _register,
+                icon: const PosIcon(PosGlyphs.add),
+                label: Text(text('Register device', 'Registrar dispositivo')),
               ),
             ],
           ),
@@ -183,12 +262,17 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
           header: true,
           child: Text(
             text('Printer queue', 'Cola de impresión'),
-            style: Theme.of(context).textTheme.titleLarge,
+            style: PosTheme.of(context).textTheme.titleLarge,
           ),
         ),
         if (jobs.isEmpty)
           Text(text('The queue is empty.', 'La cola está vacía.')),
-        ...jobs.map(_jobTile),
+        // NEWEST FIRST. The API reads the queue in creation order, which is right for a
+        // dispatcher and wrong for the person who just pressed "Run test": the page they
+        // asked for landed at the bottom of a scrolling list, off screen, so a working
+        // button looked like a broken one. On the pilot till this was the second half of
+        // "Ejecutar prueba no funciona" — the first was the command being refused.
+        ...jobs.reversed.map(_jobTile),
         if ((snapshot?.unknownCommands ?? 0) > 0)
           Semantics(
             liveRegion: true,
@@ -202,7 +286,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
         if ((snapshot?.recoveryStates ?? const []).contains('drawer_unknown') &&
             widget.permissions.allows('hardware.drawer.test') &&
             devices.where((device) => device.type == 'cash_drawer').isNotEmpty)
-          FilledButton.tonalIcon(
+          PosButton.tonalIcon(
             onPressed: _busy
                 ? null
                 : () => _diagnostic(
@@ -210,7 +294,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
                       (device) => device.type == 'cash_drawer',
                     ),
                   ),
-            icon: const Icon(Icons.point_of_sale_outlined),
+            icon: const PosIcon(PosGlyphs.pointOfSaleOutlined),
             label: Text(
               text(
                 'Issue authorized second open',
@@ -222,7 +306,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     );
   }
 
-  Widget _deviceCard(HardwareDevice device) => Card(
+  Widget _deviceCard(HardwareDevice device) => PosCard(
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -233,55 +317,75 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
               Expanded(
                 child: Text(
                   '${_deviceType(device.type)} · ${device.publicReference}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: PosTheme.of(context).textTheme.titleMedium,
                 ),
               ),
               Semantics(
                 label: device.enabled
-                    ? text('Device enabled', 'Dispositivo activo')
+                    ? _unverifiedTerminalDrawer(device)
+                          ? text(
+                              'Terminal port available; physical drawer unverified',
+                              'Puerto de la terminal disponible; cajón físico sin verificar',
+                            )
+                          : text('Device enabled', 'Dispositivo activo')
                     : text('Device disabled', 'Dispositivo inactivo'),
-                child: Icon(
-                  device.enabled ? Icons.check_circle : Icons.block,
-                  color: device.enabled ? Colors.green : Colors.grey,
+                child: PosIcon(
+                  !device.enabled
+                      ? PosGlyphs.block
+                      : _unverifiedTerminalDrawer(device)
+                      ? PosGlyphs.helpOutline
+                      : PosGlyphs.checkCircle,
+                  color: device.enabled && !_unverifiedTerminalDrawer(device)
+                      ? PosColors.green
+                      : PosColors.grey,
                 ),
               ),
             ],
           ),
           Text('${device.manufacturer} ${device.model}'),
-          Text(
-            '${text('Connection', 'Conexión')}: ${_connection(device.connectionState)}',
-          ),
-          Text(
-            '${text('Capabilities', 'Capacidades')}: '
-            '${device.capabilities.map(_capability).join(', ')}',
-          ),
-          Text(
-            '${text('Register', 'Caja')}: '
-            '${device.registerId == null ? text('Not assigned', 'Sin asignar') : text('Assigned', 'Asignada')}',
-          ),
+          Text('${text('Connection', 'Conexión')}: ${_connection(device)}'),
           Wrap(
             spacing: 8,
             children: [
               if (_canTest(device))
-                OutlinedButton.icon(
+                PosOutlineButton.icon(
                   onPressed: _busy ? null : () => _diagnostic(device),
-                  icon: const Icon(Icons.health_and_safety_outlined),
+                  icon: const PosIcon(PosGlyphs.healthAndSafetyOutlined),
                   label: Text(text('Run test', 'Ejecutar prueba')),
                 ),
               if (widget.permissions.allows('hardware.manage'))
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _configure(device),
-                  icon: const Icon(Icons.settings_outlined),
-                  label: Text(text('Configure', 'Configurar')),
+                PosOutlineButton.icon(
+                  onPressed: _busy
+                      ? null
+                      : device.type == 'printer'
+                      ? () => _configurePrinter()
+                      : () => _configureConnection(device),
+                  icon: const PosIcon(PosGlyphs.settingsOutlined),
+                  label: Text(
+                    device.type == 'printer'
+                        ? text('Printer settings', 'Ajustes de impresora')
+                        : text('Configure', 'Configurar'),
+                  ),
+                ),
+              if (device.type == 'printer' &&
+                  {
+                    'network_tcp',
+                    'printer_attached',
+                  }.contains(device.transport) &&
+                  widget.permissions.allows('hardware.manage'))
+                PosOutlineButton.icon(
+                  onPressed: _busy ? null : () => _configureConnection(device),
+                  icon: const PosIcon(PosGlyphs.tuneOutlined),
+                  label: Text(text('Connection', 'Conexión')),
                 ),
               if (widget.permissions.allows('hardware.assign') &&
                   (device.registerId != widget.registerId ||
                       device.assignedPosDeviceId !=
                           widget.entry.state.device?.id ||
                       (device.type == 'printer' && device.primary != true)))
-                OutlinedButton.icon(
+                PosOutlineButton.icon(
                   onPressed: _busy ? null : () => _assignHere(device),
-                  icon: const Icon(Icons.assignment_turned_in_outlined),
+                  icon: const PosIcon(PosGlyphs.assignmentTurnedInOutlined),
                   label: Text(
                     device.type == 'printer'
                         ? text('Use as primary', 'Usar como principal')
@@ -289,9 +393,11 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
                   ),
                 ),
               if (widget.permissions.allows('hardware.manage'))
-                OutlinedButton.icon(
+                PosOutlineButton.icon(
                   onPressed: _busy ? null : () => _toggle(device),
-                  icon: Icon(device.enabled ? Icons.pause : Icons.play_arrow),
+                  icon: PosIcon(
+                    device.enabled ? PosGlyphs.pause : PosGlyphs.playArrow,
+                  ),
                   label: Text(
                     device.enabled
                         ? text('Disable', 'Desactivar')
@@ -305,24 +411,27 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     ),
   );
 
-  Widget _jobTile(PrintJob job) => ListTile(
-    leading: const Icon(Icons.print_outlined),
+  Widget _jobTile(PrintJob job) => PosListRow(
+    leading: const PosIcon(PosGlyphs.printOutlined),
     title: Text('${_jobType(job.type)} · ${job.sourceAggregateId}'),
     subtitle: Text(_jobStatus(job.status)),
     trailing:
         job.status == 'retryable_failure' &&
             widget.permissions.allows('hardware.printer.print')
-        ? TextButton(
+        ? PosTextButton(
             onPressed: _busy ? null : () => _retry(job),
             child: Text(text('Retry', 'Reintentar')),
           )
-        : widget.permissions.allows('hardware.printer.reprint') &&
+        // A test page is re-run from "Run test", not copied: a copy carries a
+        // sale's identity, and a test page has none.
+        : job.type != 'test_page' &&
+              widget.permissions.allows('hardware.printer.reprint') &&
               {
                 'printed',
                 'terminal_failure',
                 'unknown_outcome',
               }.contains(job.status)
-        ? TextButton(
+        ? PosTextButton(
             onPressed: _busy ? null : () => _reprint(job),
             child: Text(text('Controlled reprint', 'Reimpresión controlada')),
           )
@@ -343,7 +452,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     if (scope == null) return;
     setState(() => _busy = true);
     try {
-      await widget.service.runDiagnostic(
+      final result = await widget.service.runDiagnostic(
         scope: scope,
         hardwareId: device.id,
         diagnostic: switch (device.type) {
@@ -355,17 +464,237 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
         },
       );
       await _load();
+      // SAY WHAT HAPPENED. The test page leaves the queue at the bottom and the paper
+      // leaves the printer silently; without this line the operator has nothing to read
+      // and concludes the button did nothing. The device is named because a till may hold
+      // several, and the health is named because "sent" is not "printed".
+      _snack(
+        device.type == 'cash_drawer' &&
+                device.transport == 'platform_channel_foundation' &&
+                result.health == 'unknown' &&
+                result.failure == null
+            ? text(
+                'The terminal accepted the pulse. Check that the drawer opened.',
+                'La terminal aceptó el pulso. Verifica que el cajón haya abierto.',
+              )
+            : '${text('Test sent to', 'Prueba enviada a')} ${device.manufacturer} ${device.model}: '
+                  '${_diagnosticHealth(result.health)}.',
+      );
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_diagnostic_failed');
+      _failed(
+        'The test did not reach the device.',
+        'La prueba no llegó al dispositivo.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  /// The one-button path for a receipt printer on the till's USB host port.
+  ///
+  /// It discovers the printer instead of asking the operator to describe it:
+  /// the printer that answers is the printer, so the link, the host, and the
+  /// port are not questions. An Epson (Seiko) device wins when several
+  /// printer-class devices are present, because that is the pilot's printer.
+  Future<void> _addUsbPrinter() async {
+    final scope = _scope;
+    if (scope == null) return;
+    setState(() => _busy = true);
+    try {
+      List<UsbPrinterInfo> printers;
+      try {
+        printers = await MethodChannelUsbPrinter().attached();
+      } catch (_) {
+        // No channel (desktop/test) or a platform fault: nothing was found.
+        printers = const <UsbPrinterInfo>[];
+      }
+      if (printers.isEmpty) {
+        _snack(
+          text(
+            'No USB printer found. Check the cable and try again.',
+            'No se encontró una impresora USB. Revisa el cable e inténtalo de nuevo.',
+          ),
+        );
+        return;
+      }
+      final found = printers.firstWhere(
+        (printer) => printer.isEpson,
+        orElse: () => printers.first,
+      );
+      final reference = _usbReference(found);
+      final model = (found.productName?.trim().isNotEmpty ?? false)
+          ? found.productName!.trim()
+          : text('USB receipt printer', 'Impresora de recibos USB');
+      // Adding the same printer twice is not an error: fall back to the record
+      // already filed under this reference and just point it at this till.
+      final device =
+          _registeredWithReference(reference) ??
+          await widget.service.registerDevice(
+            scope: scope,
+            assignedPosDeviceId: widget.entry.state.device?.id,
+            type: 'printer',
+            manufacturer: found.isEpson ? 'Epson' : 'Generic',
+            model: model,
+            publicReference: reference,
+            transport: 'usb_foundation',
+            capabilities: const [
+              'printer.receipt',
+              // THE HEAD CAN DRAW A PICTURE, AND THE TILL BELIEVES IT.
+              //
+              // This list is what the till registers a receipt printer with, and
+              // `printer.image` gates the café's mark: without it the renderer is
+              // never even asked to fetch the logo, so every ticket came out with
+              // the name and no picture while the SAME receipt showed the mark on
+              // screen (iMin D3-504, 2026-10-11). A receipt printer this product
+              // talks to is an ESC/POS head, and the mark is a `GS v 0` raster —
+              // the one command in the family that every one of them implements.
+              'printer.image',
+              'printer.qr',
+              'printer.cut',
+              'printer.test_page',
+            ],
+            connectionConfiguration: const {
+              'connectTimeoutMs': 2000,
+              'commandTimeoutMs': 5000,
+              'characterEncoding': 'cp850',
+              // The pilot printer is 80 mm: 48 columns at the printer's own
+              // default font. The form default (42) is for 58 mm paper.
+              'receiptWidthColumns': 48,
+              'drawerPulsePin': 0,
+              'drawerPulseOnMs': 50,
+              'scannerTerminator': 'enter',
+              'scannerBurstWindowMs': 80,
+            },
+          );
+      await widget.service.assignDevice(
+        scope: scope,
+        hardwareId: device.id,
+        assignedPosDeviceId: widget.entry.state.device?.id,
+        primary: true,
+        expectedVersion: device.optimisticVersion,
+      );
+      await _load();
+      _snack(text('USB printer added.', 'Impresora USB agregada.'));
+    } catch (_) {
+      _snack(
+        text(
+          'The USB printer could not be added.',
+          'No se pudo agregar la impresora USB.',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// A stable, schema-legal public reference for a discovered USB device.
+  String _usbReference(UsbPrinterInfo info) =>
+      'usb-${info.vendorId.toRadixString(16).padLeft(4, '0')}'
+      '-${info.productId.toRadixString(16).padLeft(4, '0')}';
+
+  /// The one-button path for a drawer on the terminal's own RJ12 port.
+  ///
+  /// The terminal is asked whether it has the port before anything is filed: an
+  /// iMin answers with the node it pulses and the drawer-detect reading, and a
+  /// tablet answers nothing, so the operator reads a sentence instead of
+  /// collecting a device row that could never open anything.
+  Future<void> _addTerminalDrawer() async {
+    final scope = _scope;
+    if (scope == null) return;
+    setState(() => _busy = true);
+    try {
+      TerminalCashboxAnswer answer;
+      try {
+        answer = await MethodChannelTerminalCashbox().probe();
+      } catch (_) {
+        answer = const TerminalCashboxAnswer(
+          outcome: TerminalCashboxOutcome.absent,
+          failureCode: 'transport_unavailable',
+        );
+      }
+      final port = answer.port;
+      if (answer.outcome != TerminalCashboxOutcome.ready || port == null) {
+        _snack(
+          text(
+            'This terminal has no cash drawer port the app can reach.',
+            'Esta terminal no tiene un puerto de cajón que la app pueda usar.',
+          ),
+        );
+        return;
+      }
+      final reference = 'imin-cashbox:${port.node.split('/').last}';
+      final device =
+          _registeredWithReference(reference) ??
+          await widget.service.registerDevice(
+            scope: scope,
+            assignedPosDeviceId: widget.entry.state.device?.id,
+            type: 'cash_drawer',
+            manufacturer: 'iMin',
+            model: 'Terminal cash drawer port',
+            publicReference: reference,
+            transport: 'platform_channel_foundation',
+            capabilities: const ['drawer.open', 'drawer.status'],
+            connectionConfiguration: const {
+              'connectTimeoutMs': 2000,
+              'commandTimeoutMs': 5000,
+              'characterEncoding': 'cp850',
+              'receiptWidthColumns': 42,
+              // The pin is the board's only cashbox line. The pulse WIDTH is the
+              // board's too — the node takes a level, not a timing — so this is
+              // kept as the registry's record and is not what the till sends.
+              'drawerPulsePin': 0,
+              'drawerPulseOnMs': 50,
+              'scannerTerminator': 'enter',
+              'scannerBurstWindowMs': 80,
+            },
+          );
+      await widget.service.assignDevice(
+        scope: scope,
+        hardwareId: device.id,
+        assignedPosDeviceId: widget.entry.state.device?.id,
+        primary: true,
+        expectedVersion: device.optimisticVersion,
+      );
+      await _load();
+      _snack(
+        text(
+          'Terminal drawer port registered. Connect the drawer and verify that it opens.',
+          'Puerto del cajón registrado. Conecta el cajón y verifica que abra.',
+        ),
+      );
+    } catch (_) {
+      _failed(
+        'The cash drawer could not be added.',
+        'No se pudo agregar el cajón.',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  HardwareDevice? _registeredWithReference(String reference) {
+    for (final raw in _snapshot?.devices ?? const <Object>[]) {
+      final device = HardwareDevice.fromJson(raw as Map<String, Object?>);
+      if (device.publicReference == reference) return device;
+    }
+    return null;
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    showPosFeedback(context, message);
+  }
+
+  /// An action that failed says so in place. Swapping the whole surface for
+  /// "hardware data is unavailable" threw away the list the operator was
+  /// reading, so a refused reprint looked like an empty tab.
+  void _failed(String english, String spanish) =>
+      _snack(text(english, spanish));
+
   Future<void> _register() async {
     final scope = _scope;
     if (scope == null) return;
-    final result = await showDialog<_HardwareDraft>(
+    final result = await showPosDialog<_HardwareDraft>(
       context: context,
       builder: (_) => _HardwareRegistrationDialog(spanish: _spanish),
     );
@@ -392,18 +721,21 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       );
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_register_failed');
+      _failed(
+        'The device was not registered.',
+        'No se registró el dispositivo.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _configure(HardwareDevice device) async {
+  Future<void> _configureConnection(HardwareDevice device) async {
     if (!{'network_tcp', 'printer_attached'}.contains(device.transport)) return;
     final scope = _scope;
     if (scope == null) return;
     final current = device.connectionConfiguration ?? const {};
-    final result = await showDialog<_NetworkDraft>(
+    final result = await showPosDialog<_NetworkDraft>(
       context: context,
       builder: (_) => _NetworkConfigurationDialog(
         spanish: _spanish,
@@ -427,18 +759,23 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       );
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_configuration_failed');
+      _failed(
+        'The configuration was not saved.',
+        'No se guardó la configuración.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _configurePolicy(HardwareRuntimeSnapshot snapshot) async {
+  Future<void> _configurePrinter() async {
+    final snapshot = _snapshot;
+    if (snapshot == null) return;
     final scope = _scope;
     if (scope == null) return;
-    final result = await showDialog<Map<String, Object?>>(
+    final result = await showPosDialog<Map<String, Object?>>(
       context: context,
-      builder: (_) => _HardwarePolicyDialog(
+      builder: (_) => PrinterSettingsDialog(
         spanish: _spanish,
         initial: snapshot.policy ?? const {},
       ),
@@ -453,7 +790,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       );
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_policy_failed');
+      _failed('The policy was not saved.', 'No se guardó la política.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -472,7 +809,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       );
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_update_failed');
+      _failed('The change was not saved.', 'No se guardó el cambio.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -492,7 +829,10 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       );
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_assignment_failed');
+      _failed(
+        'The device was not assigned to this till.',
+        'No se asignó el dispositivo a esta caja.',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -510,7 +850,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       );
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_reprint_failed');
+      _failed('The copy did not print.', 'La copia no se imprimió.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -524,7 +864,7 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
       await widget.service.retryKnownSafePrint(scope: scope, jobId: job.jobId);
       await _load();
     } catch (_) {
-      if (mounted) setState(() => _error = 'hardware_print_retry_failed');
+      _failed('The retry did not print.', 'El reintento no se imprimió.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -543,35 +883,50 @@ final class _HardwareSurfaceState extends State<HardwareSurface> {
     _ => text('Hardware device', 'Dispositivo de hardware'),
   };
 
-  String _connection(String value) => switch (value) {
-    'connected' => text('Connected', 'Conectado'),
-    'disconnected' => text('Disconnected', 'Desconectado'),
-    'connecting' => text('Connecting', 'Conectando'),
-    'busy' => text('Busy', 'Ocupado'),
-    'error' => text('Error', 'Error'),
-    _ => text('Unknown', 'Desconocido'),
+  String _connection(HardwareDevice device) {
+    if (_unverifiedTerminalDrawer(device)) {
+      return text(
+        'Terminal port available; physical drawer unverified',
+        'Puerto de la terminal disponible; cajón físico sin verificar',
+      );
+    }
+    return switch (device.connectionState) {
+      'connected' => text('Connected', 'Conectado'),
+      'disconnected' => text('Disconnected', 'Desconectado'),
+      'connecting' => text('Connecting', 'Conectando'),
+      'busy' => text('Busy', 'Ocupado'),
+      'error' => text('Error', 'Error'),
+      _ => text('Unknown', 'Desconocido'),
+    };
+  }
+
+  bool _unverifiedTerminalDrawer(HardwareDevice device) =>
+      device.type == 'cash_drawer' &&
+      device.transport == 'platform_channel_foundation' &&
+      device.connectionState == 'unknown';
+
+  /// The queue names the document, so a test page is not mistaken for a sale.
+  String _jobType(String value) => switch (value) {
+    'receipt_copy' => text('Receipt copy', 'Copia de recibo'),
+    'test_page' => text('Test page', 'Página de prueba'),
+    _ => text('Receipt', 'Recibo'),
   };
 
-  String _capability(String value) => switch (value) {
-    'printer.receipt' => text('Receipt print', 'Impresión de recibo'),
-    'printer.image' => text('Image print', 'Impresión de imagen'),
-    'printer.qr' => text('QR print', 'Impresión de QR'),
-    'printer.cut' => text('Paper cut', 'Corte de papel'),
-    'printer.test_page' => text('Test page', 'Página de prueba'),
-    'drawer.open' => text('Drawer open', 'Apertura del cajón'),
-    'drawer.status' => text('Drawer status', 'Estado del cajón'),
-    'scanner.barcode' => text('Barcode scan', 'Lectura de código'),
-    'scanner.qr' => text('QR scan', 'Lectura de QR'),
-    'scanner.continuous' => text('Continuous scan', 'Lectura continua'),
-    'scanner.single' => text('Single scan', 'Lectura única'),
-    'customer_display.text' => text('Display text', 'Texto en pantalla'),
-    'customer_display.totals' => text('Display totals', 'Totales en pantalla'),
-    'customer_display.qr' => text('Display QR', 'QR en pantalla'),
-    _ => text('Foundation capability', 'Capacidad base'),
+  /// What a finished diagnostic says about the device. "Sent" is not "printed": the
+  /// command can come back healthy while the paper never moves, and the operator has to
+  /// be able to tell those apart.
+  String _diagnosticHealth(String value) => switch (value) {
+    'healthy' => text('the device answered', 'el dispositivo respondió'),
+    'degraded' => text(
+      'the device answered slowly',
+      'el dispositivo respondió con lentitud',
+    ),
+    'unavailable' => text(
+      'the device did not answer',
+      'el dispositivo no respondió',
+    ),
+    _ => text('no result from the device', 'sin resultado del dispositivo'),
   };
-  String _jobType(String value) => value == 'receipt_copy'
-      ? text('Receipt copy', 'Copia de recibo')
-      : text('Receipt', 'Recibo');
   String _jobStatus(String value) => switch (value) {
     'queued' => text('Queued', 'En cola'),
     'printing' => text('Printing', 'Imprimiendo'),
@@ -625,6 +980,9 @@ final class _HardwareRegistrationDialogState
   final _port = TextEditingController(text: '9100');
   String type = 'printer';
   bool simulator = false;
+  // How the till reaches a printer or the drawer that hangs off it: over the
+  // network, or on the till's own USB host port.
+  String link = 'network';
 
   String t(String english, String spanish) =>
       widget.spanish ? spanish : english;
@@ -642,60 +1000,99 @@ final class _HardwareRegistrationDialogState
   @override
   Widget build(BuildContext context) {
     final needsNetwork =
-        !simulator && {'printer', 'cash_drawer'}.contains(type);
-    return AlertDialog(
-      title: Text(t('Register pilot hardware', 'Registrar hardware piloto')),
+        !simulator &&
+        link == 'network' &&
+        {'printer', 'cash_drawer'}.contains(type);
+    final needsLink = !simulator && {'printer', 'cash_drawer'}.contains(type);
+    return PosAlertDialog(
+      title: Text(t('Register device', 'Registrar dispositivo')),
       content: Form(
         key: _form,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
+              PosSelectFormField<String>(
                 initialValue: type,
-                decoration: InputDecoration(
+                decoration: PosFieldDecoration(
                   labelText: t('Device type', 'Tipo de dispositivo'),
                 ),
                 items: [
-                  DropdownMenuItem(
+                  PosSelectItem(
                     value: 'printer',
                     child: Text(t('Printer', 'Impresora')),
                   ),
-                  DropdownMenuItem(
+                  PosSelectItem(
                     value: 'cash_drawer',
                     child: Text(t('Cash drawer', 'Cajón de efectivo')),
                   ),
-                  DropdownMenuItem(
+                  PosSelectItem(
                     value: 'barcode_scanner',
                     child: Text(t('Barcode scanner', 'Escáner de códigos')),
                   ),
-                  DropdownMenuItem(
+                  PosSelectItem(
                     value: 'customer_display',
                     child: Text(t('Customer display', 'Pantalla del cliente')),
                   ),
                 ],
-                onChanged: (value) => setState(() => type = value ?? type),
+                onChanged: (value) => setState(() {
+                  type = value ?? type;
+                  // "Terminal port" is a drawer's answer only: a printer has no
+                  // such socket, so a stale choice falls back to the network.
+                  if (type == 'printer' && link == 'terminal') link = 'network';
+                }),
               ),
-              SwitchListTile(
+              PosSwitchRow(
                 value: simulator,
                 onChanged: (value) => setState(() => simulator = value),
                 title: Text(t('Use simulator', 'Usar simulador')),
               ),
-              TextFormField(
+              if (needsLink)
+                PosSelectFormField<String>(
+                  initialValue: link,
+                  decoration: PosFieldDecoration(
+                    labelText: t('Connection', 'Conexión'),
+                  ),
+                  items: [
+                    PosSelectItem(
+                      value: 'network',
+                      child: Text(t('Network', 'Red')),
+                    ),
+                    PosSelectItem(
+                      value: 'usb',
+                      child: Text(t('USB (till port)', 'USB (puerto del POS)')),
+                    ),
+                    // The drawer's OTHER cable: the RJ11 socket on the terminal
+                    // itself. An iMin carries that port, and the pulse is not a
+                    // printer's ESC/POS byte, so it is a different transport.
+                    if (type == 'cash_drawer')
+                      PosSelectItem(
+                        value: 'terminal',
+                        child: Text(
+                          t(
+                            'Terminal port (iMin RJ11)',
+                            'Puerto de la terminal (RJ11 iMin)',
+                          ),
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => setState(() => link = value ?? link),
+                ),
+              PosFormField(
                 controller: _manufacturer,
-                decoration: InputDecoration(
+                decoration: PosFieldDecoration(
                   labelText: t('Manufacturer', 'Fabricante'),
                 ),
                 validator: _required,
               ),
-              TextFormField(
+              PosFormField(
                 controller: _model,
-                decoration: InputDecoration(labelText: t('Model', 'Modelo')),
+                decoration: PosFieldDecoration(labelText: t('Model', 'Modelo')),
                 validator: _required,
               ),
-              TextFormField(
+              PosFormField(
                 controller: _reference,
-                decoration: InputDecoration(
+                decoration: PosFieldDecoration(
                   labelText: t('Public reference', 'Referencia pública'),
                 ),
                 validator: (value) =>
@@ -707,9 +1104,9 @@ final class _HardwareRegistrationDialogState
                       ),
               ),
               if (needsNetwork) ...[
-                TextFormField(
+                PosFormField(
                   controller: _host,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: t('Network host', 'Host de red'),
                   ),
                   validator: (value) =>
@@ -717,10 +1114,10 @@ final class _HardwareRegistrationDialogState
                       ? null
                       : t('Enter a valid host.', 'Escribe un host válido.'),
                 ),
-                TextFormField(
+                PosFormField(
                   controller: _port,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: t('Network port', 'Puerto de red'),
                   ),
                   validator: (value) {
@@ -736,14 +1133,11 @@ final class _HardwareRegistrationDialogState
         ),
       ),
       actions: [
-        TextButton(
+        PosTextButton(
           onPressed: () => Navigator.pop(context),
           child: Text(t('Cancel', 'Cancelar')),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: Text(t('Register', 'Registrar')),
-        ),
+        PosButton(onPressed: _submit, child: Text(t('Register', 'Registrar'))),
       ],
     );
   }
@@ -757,14 +1151,22 @@ final class _HardwareRegistrationDialogState
     final transport = simulator
         ? 'simulator'
         : switch (type) {
-            'printer' => 'network_tcp',
-            'cash_drawer' => 'printer_attached',
+            'printer' => link == 'usb' ? 'usb_foundation' : 'network_tcp',
+            'cash_drawer' => switch (link) {
+              'usb' => 'usb_foundation',
+              'terminal' => 'platform_channel_foundation',
+              _ => 'printer_attached',
+            },
             'barcode_scanner' => 'keyboard_wedge',
             _ => 'simulator',
           };
     final capabilities = switch (type) {
       'printer' => [
         'printer.receipt',
+        // See the note on the USB quick-register list above: `printer.image` is
+        // what lets the receipt draw the café's mark at all, and a receipt printer
+        // registered without it prints the name and nothing above it.
+        'printer.image',
         'printer.qr',
         'printer.cut',
         'printer.test_page',
@@ -851,32 +1253,32 @@ final class _NetworkConfigurationDialogState
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => PosAlertDialog(
     title: Text(
       widget.spanish ? 'Configurar conexión' : 'Configure connection',
     ),
     content: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        TextField(
+        PosField(
           controller: host,
-          decoration: const InputDecoration(labelText: 'Host'),
+          decoration: const PosFieldDecoration(labelText: 'Host'),
         ),
-        TextField(
+        PosField(
           controller: port,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText: widget.spanish ? 'Puerto' : 'Port',
           ),
         ),
       ],
     ),
     actions: [
-      TextButton(
+      PosTextButton(
         onPressed: () => Navigator.pop(context),
         child: Text(widget.spanish ? 'Cancelar' : 'Cancel'),
       ),
-      FilledButton(
+      PosButton(
         onPressed: () {
           final parsed = int.tryParse(port.text);
           if (host.text.trim().isEmpty ||
@@ -893,17 +1295,26 @@ final class _NetworkConfigurationDialogState
   );
 }
 
-final class _HardwarePolicyDialog extends StatefulWidget {
-  const _HardwarePolicyDialog({required this.spanish, required this.initial});
+final class PrinterSettingsDialog extends StatefulWidget {
+  const PrinterSettingsDialog({
+    required this.spanish,
+    required this.initial,
+    super.key,
+  });
   final bool spanish;
   final Map<String, Object?> initial;
 
   @override
-  State<_HardwarePolicyDialog> createState() => _HardwarePolicyDialogState();
+  State<PrinterSettingsDialog> createState() => _PrinterSettingsDialogState();
 }
 
-final class _HardwarePolicyDialogState extends State<_HardwarePolicyDialog> {
+final class _PrinterSettingsDialogState extends State<PrinterSettingsDialog> {
   late bool autoPrint = widget.initial['autoPrintReceipt'] as bool? ?? true;
+  // Drawer, no-sale, scanner and customer-display settings are read here only
+  // so that saving keeps them as they were. None of them changes what this
+  // till does today — the drawer and the scanner have no registered device,
+  // the site has no customer display, and nothing reads allowNoSale — so they
+  // are not shown. Bring the switch back when its device is registered.
   late bool cashSale = widget.initial['openDrawerOnCashSale'] as bool? ?? true;
   late bool cashRefund =
       widget.initial['openDrawerOnCashRefund'] as bool? ?? true;
@@ -912,118 +1323,77 @@ final class _HardwarePolicyDialogState extends State<_HardwarePolicyDialog> {
   late bool display =
       widget.initial['customerDisplayEnabled'] as bool? ?? false;
   late int copies = widget.initial['receiptCopiesDefault'] as int? ?? 1;
-  late int retries = widget.initial['hardwareRetryLimit'] as int? ?? 2;
-  late int health =
+
+  // Keep hidden policy fields intact when changing only receipt preferences.
+  late int retryLimit = widget.initial['hardwareRetryLimit'] as int? ?? 2;
+  late int healthIntervalSeconds =
       widget.initial['hardwareHealthIntervalSeconds'] as int? ?? 30;
 
   String t(String english, String spanish) =>
       widget.spanish ? spanish : english;
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(t('Pilot hardware policy', 'Política de hardware piloto')),
+  Widget build(BuildContext context) => PosAlertDialog(
+    title: Text(t('Printer settings', 'Ajustes de impresora')),
     content: SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _toggle(
-            t('Auto-print receipts', 'Imprimir recibos automáticamente'),
-            autoPrint,
-            (value) => autoPrint = value,
-          ),
-          _toggle(
-            t(
-              'Open drawer for cash sales',
-              'Abrir el cajón en ventas en efectivo',
+          SizedBox(
+            height: 72,
+            child: PosSwitchRow(
+              title: Text(
+                t('Print receipt on checkout', 'Imprimir el recibo al cobrar'),
+              ),
+              value: autoPrint,
+              trailingWidth: 96,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              onChanged: (next) => setState(() => autoPrint = next),
             ),
-            cashSale,
-            (value) => cashSale = value,
           ),
-          _toggle(
-            t(
-              'Open drawer for cash refunds',
-              'Abrir el cajón en reembolsos en efectivo',
+          SizedBox(
+            height: 72,
+            child: PosListRow(
+              title: Text(t('Copies per receipt', 'Copias por recibo')),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              trailing: SizedBox(
+                width: 96,
+                child: PosSelect<int>(
+                  value: copies,
+                  items: const [
+                    PosSelectItem(value: 1, child: Text('1')),
+                    PosSelectItem(value: 2, child: Text('2')),
+                    PosSelectItem(value: 3, child: Text('3')),
+                  ],
+                  onChanged: (next) {
+                    if (next != null) setState(() => copies = next);
+                  },
+                ),
+              ),
             ),
-            cashRefund,
-            (value) => cashRefund = value,
-          ),
-          _toggle(
-            t('Allow approved No Sale', 'Permitir Sin venta aprobado'),
-            allowNoSale,
-            (value) => allowNoSale = value,
-          ),
-          _toggle(
-            t('Enable scanner', 'Activar el escáner'),
-            scanner,
-            (value) => scanner = value,
-          ),
-          _toggle(
-            t('Enable customer display', 'Activar la pantalla del cliente'),
-            display,
-            (value) => display = value,
-          ),
-          _choice(t('Receipt copies', 'Copias del recibo'), copies, const [
-            1,
-            2,
-            3,
-          ], (value) => copies = value),
-          _choice(
-            t('Retry limit', 'Límite de reintentos'),
-            retries,
-            const [1, 2, 3],
-            (value) => retries = value,
-          ),
-          _choice(
-            t('Health interval in seconds', 'Intervalo de estado en segundos'),
-            health,
-            const [15, 30, 60, 120, 300],
-            (value) => health = value,
           ),
         ],
       ),
     ),
     actions: [
-      TextButton(
+      PosTextButton(
         onPressed: () => Navigator.pop(context),
         child: Text(t('Cancel', 'Cancelar')),
       ),
-      FilledButton(
+      PosButton(
         onPressed: () => Navigator.pop(context, {
           'autoPrintReceipt': autoPrint,
           'openDrawerOnCashSale': cashSale,
           'openDrawerOnCashRefund': cashRefund,
           'allowNoSale': allowNoSale,
           'receiptCopiesDefault': copies,
-          'hardwareRetryLimit': retries,
-          'hardwareHealthIntervalSeconds': health,
+          'hardwareRetryLimit': retryLimit,
+          'hardwareHealthIntervalSeconds': healthIntervalSeconds,
           'scannerEnabled': scanner,
           'customerDisplayEnabled': display,
         }),
         child: Text(t('Save', 'Guardar')),
       ),
     ],
-  );
-
-  Widget _toggle(String label, bool value, ValueChanged<bool> update) =>
-      SwitchListTile(
-        title: Text(label),
-        value: value,
-        onChanged: (next) => setState(() => update(next)),
-      );
-
-  Widget _choice(
-    String label,
-    int value,
-    List<int> values,
-    ValueChanged<int> update,
-  ) => DropdownButtonFormField<int>(
-    initialValue: value,
-    decoration: InputDecoration(labelText: label),
-    items: values
-        .map((item) => DropdownMenuItem(value: item, child: Text('$item')))
-        .toList(),
-    onChanged: (next) {
-      if (next != null) setState(() => update(next));
-    },
   );
 }

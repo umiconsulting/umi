@@ -8,6 +8,7 @@ import {
 import { TableStateEntry, type PosTableStateQuery, type TableStateValue } from '@umi/contract';
 import type { PoolClient } from 'pg';
 import { PgService } from '../../shared/database/pg.service';
+import { syncCartOrderContext } from '../../shared/orders/cart-order-context';
 import { planTables, type PlanTable } from '../../shared/floor-plan/plan-tables';
 import type { AuthUser } from '../auth/auth.types';
 
@@ -21,6 +22,9 @@ type StateRow = {
   seated_at: Date | null;
   party_size: number | null;
   group_id: string | null;
+  open_account_id?: string | null;
+  open_account_folio?: string | null;
+  open_account_table_id?: string | null;
 };
 
 const STATE_COLUMNS =
@@ -34,6 +38,13 @@ export function tableStateEntry(row: StateRow): TableStateEntry {
     seatedAt: row.seated_at?.toISOString() ?? null,
     partySize: row.party_size,
     groupId: row.group_id,
+    ...(row.open_account_id === undefined
+      ? {}
+      : {
+          openAccountId: row.open_account_id,
+          openAccountFolio: row.open_account_folio ?? null,
+          openAccountTableId: row.open_account_table_id ?? null,
+        }),
   });
 }
 
@@ -75,6 +86,7 @@ export class TableMapRepository {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
+    readOnly = false,
   ) {
     const authorization = await client.query(
       `SELECT 1 FROM runtime.operator_session os
@@ -82,7 +94,8 @@ export class TableMapRepository {
        WHERE os.id=$1::uuid AND os.user_id=$2::uuid AND os.durable_session_id=$3::uuid
          AND os.device_id=$4::uuid AND os.merchant_id=$5::uuid AND os.location_id=$6::uuid
          AND os.state='active' AND os.expires_at>now() AND d.status='active'
-         AND ($7::text=ANY(os.permissions) OR '*'=ANY(os.permissions))
+         AND ($7::text=ANY(os.permissions) OR '*'=ANY(os.permissions)
+           OR ($8::boolean AND 'cart.write'=ANY(os.permissions)))
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos' AND coalesce((e->>'enabled')::boolean,false))`,
       [
@@ -93,6 +106,7 @@ export class TableMapRepository {
         merchantId,
         locationId,
         POS_PERMISSION,
+        readOnly,
       ],
     );
     if (!authorization.rowCount) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
@@ -113,7 +127,7 @@ export class TableMapRepository {
     await this.assertLocation(client, merchantId, locationId);
     const result = await client.query<{ plan: unknown }>(
       `SELECT coalesce(published, draft) AS plan FROM merchant.floor_plan
-       WHERE merchant_id=$1::uuid AND location_id=$2::uuid`,
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid FOR SHARE`,
       [merchantId, locationId],
     );
     const plan = result.rows[0]?.plan ?? null;
@@ -158,8 +172,25 @@ export class TableMapRepository {
     states: TableStateEntry[];
   }> {
     const rows = await client.query<StateRow>(
-      `SELECT ${STATE_COLUMNS} FROM merchant.table_state
-       WHERE merchant_id=$1::uuid AND location_id=$2::uuid ORDER BY table_id`,
+      `SELECT t.table_id::text,t.state,t.seated_at,t.party_size,t.group_id::text,
+         account.id::text AS open_account_id,
+         account.table_id::text AS open_account_table_id,
+         CASE WHEN account.id IS NOT NULL THEN
+           'Cuenta '||lpad(COALESCE(account.daily_account_number,account.account_number)::text,
+             greatest(3,length(COALESCE(account.daily_account_number,account.account_number)::text)),'0')
+         END AS open_account_folio
+       FROM merchant.table_state t
+       LEFT JOIN LATERAL (
+         SELECT c.id,c.account_number,c.daily_account_number,c.table_id FROM merchant.pos_cart c
+         WHERE c.merchant_id=t.merchant_id AND c.location_id=t.location_id
+           AND c.status IN ('draft','prepared')
+           AND (c.table_id=t.table_id OR (t.group_id IS NOT NULL AND EXISTS (
+             SELECT 1 FROM merchant.table_state member
+             WHERE member.merchant_id=t.merchant_id AND member.location_id=t.location_id
+               AND member.group_id=t.group_id AND member.table_id=c.table_id)))
+         ORDER BY (c.table_id=t.table_id) DESC,c.created_at,c.id LIMIT 1
+       ) account ON true
+       WHERE t.merchant_id=$1::uuid AND t.location_id=$2::uuid ORDER BY t.table_id`,
       [merchantId, locationId],
     );
     const clock = await client.query<{ now: Date }>('SELECT now() AS now');
@@ -181,6 +212,7 @@ export class TableMapRepository {
           merchantId,
           query.locationId,
           query.operatorSessionId,
+          true,
         );
         await this.assertLocation(client, merchantId, query.locationId);
         return this.readInTransaction(client, merchantId, query.locationId);
@@ -288,6 +320,34 @@ export class TableMapRepository {
         fieldErrors: { toTableId: [input.toTableId] },
       });
 
+    const accounts = await client.query<{ id: string; fired_order_id: string | null }>(
+      `SELECT c.id::text,c.fired_order_id::text FROM merchant.pos_cart c
+       WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
+         AND c.status IN ('draft','prepared') AND c.table_id IN (
+           SELECT table_id FROM merchant.table_state
+           WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+             AND (table_id=$3::uuid OR group_id=$4::uuid))
+       ORDER BY c.id FOR UPDATE OF c`,
+      [merchantId, locationId, input.fromTableId, source.group_id],
+    );
+    if (accounts.rows.length > 1)
+      throw new ConflictException({ code: 'CART_TABLE_ACCOUNT_EXISTS' });
+    for (const account of accounts.rows) {
+      const payment = await client.query(
+        `SELECT 1 FROM merchant.pos_payment_attempt WHERE merchant_id=$1::uuid AND cart_id=$2::uuid
+           AND status NOT IN ('declined','cancelled')
+         UNION ALL SELECT 1 FROM merchant.pos_checkout_draft WHERE merchant_id=$1::uuid AND cart_id=$2::uuid
+           AND state IN ('payment_accepted','payment_unknown','receipt_available','completed')
+         UNION ALL SELECT 1 FROM merchant.pos_partial_payment WHERE merchant_id=$1::uuid AND cart_id=$2::uuid
+           AND status IN ('confirmed_success','outcome_unknown')
+         UNION ALL SELECT 1 FROM merchant.pos_tender_fact WHERE merchant_id=$1::uuid AND cart_id=$2::uuid
+           AND status IN ('operator_processing_externally','awaiting_operator_confirmation',
+             'confirmed_success','outcome_unknown','committed')`,
+        [merchantId, account.id],
+      );
+      if (payment.rowCount) throw new ConflictException({ code: 'CART_PAYMENT_UNRESOLVED' });
+    }
+
     const moved = await client.query<StateRow>(
       `INSERT INTO merchant.table_state
          (merchant_id,location_id,table_id,state,seated_at,party_size,group_id)
@@ -299,6 +359,20 @@ export class TableMapRepository {
       [merchantId, locationId, input.toTableId, source.state, source.seated_at, partySize],
     );
     if (!moved.rows[0]) TableMapRepository.occupied(input.toTableId, 'toTableId');
+
+    // Se mueve la cuenta antes de liberar su mesa. El guard protege las cuentas abiertas.
+    for (const account of accounts.rows) {
+      await client.query(
+        `UPDATE merchant.pos_cart SET table_id=$3::uuid,table_name=$4,
+           table_visit_id=(SELECT visit_id FROM merchant.table_state
+             WHERE merchant_id=$1::uuid AND location_id=$5::uuid AND table_id=$3::uuid),
+           version=version+1,updated_at=now()
+         WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+        [merchantId, account.id, input.toTableId, target.label, locationId],
+      );
+      if (account.fired_order_id)
+        await syncCartOrderContext(client, merchantId, account.id, account.fired_order_id);
+    }
 
     // The source and, when the party was merged, every other member of the group
     // go to `dirty`: they need wiping, and they no longer hold a party.
@@ -422,21 +496,32 @@ export class TableMapRepository {
         message: 'That table is not part of a merged group.',
         fieldErrors: { tableId: [input.tableId] },
       });
-    const released = await client.query<StateRow>(
-      `UPDATE merchant.table_state
-         SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
-       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND group_id=$3::uuid
-         AND table_id<>$4::uuid
-       RETURNING ${STATE_COLUMNS}`,
-      [merchantId, locationId, source.group_id, input.tableId],
+    let remaining = source.party_size ?? 0;
+    const changed: StateRow[] = [];
+    const ordered = [...members.rows].sort((a, b) =>
+      a.table_id === input.tableId
+        ? -1
+        : b.table_id === input.tableId
+          ? 1
+          : a.table_id.localeCompare(b.table_id),
     );
-    const survivor = await client.query<StateRow>(
-      `UPDATE merchant.table_state SET group_id=NULL,updated_at=now()
-       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid
-       RETURNING ${STATE_COLUMNS}`,
-      [merchantId, locationId, input.tableId],
-    );
-    return byTableId([survivor.rows[0], ...released.rows]);
+    for (const member of ordered) {
+      const count = Math.min(remaining, TableMapRepository.table(tables, member.table_id).capacity);
+      remaining -= count;
+      const result = await client.query<StateRow>(
+        `UPDATE merchant.table_state SET
+           state=CASE WHEN $4=0 THEN 'dirty' ELSE state END,
+           seated_at=CASE WHEN $4=0 THEN NULL ELSE seated_at END,
+           party_size=CASE WHEN $4=0 THEN NULL ELSE $4 END,
+           group_id=NULL,updated_at=now()
+         WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid
+         RETURNING ${STATE_COLUMNS}`,
+        [merchantId, locationId, member.table_id, count],
+      );
+      changed.push(result.rows[0]);
+    }
+    if (remaining > 0) throw new ConflictException({ code: 'TABLE_CAPACITY_EXCEEDED' });
+    return byTableId(changed);
   }
 
   /**

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
@@ -9,10 +8,17 @@ import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
+import 'package:umi_pos/core/storage/storage.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
+import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/entry/entry_surface.dart';
+import 'package:umi_pos/shared/widgets/station_signature.dart';
 
+// The product's own fonts: without them the test lays out with the engine's box font and the
+// geometry would not be the geometry the till draws.
+import 'receipt_document_test.dart' show fonts;
 import 'support/fakes.dart';
 
 const _installationId = '00000000-0000-4000-8000-000000000001';
@@ -24,6 +30,97 @@ const _locationId = '00000000-0000-4000-8000-000000000006';
 const _secret = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
 
 void main() {
+  testWidgets(
+    'a stalled credential read offers recovery instead of a spinner',
+    (tester) async {
+      final storage = _StalledReadStorage();
+      final controller = _controller(
+        _PairingGateway(),
+        CredentialVault(storage),
+      );
+      addTearDown(controller.dispose);
+
+      unawaited(controller.initialize());
+      await tester.pump();
+      expect(controller.state.phase, EntryPhase.checkingDevice);
+
+      await tester.pump(const Duration(seconds: 11));
+      expect(controller.state.phase, EntryPhase.storageFailure);
+      expect(controller.state.errorCode, 'ENTRY_STORAGE_TIMEOUT');
+
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          theme: UmiTheme.light(),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: EntrySurface(controller: controller),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Almacenamiento seguro no disponible'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'another POS session explains the conflict and permits another PIN',
+    (tester) async {
+      final storage = MemorySecureStorage();
+      storage.values['device.installation_id'] = _installationId;
+      final vault = CredentialVault(storage);
+      await vault.saveDevice(
+        id: _deviceId,
+        publicId: _publicId,
+        credential: _secret,
+        credentialVersion: 1,
+        state: 'active',
+        merchantId: _merchantId,
+        locationId: _locationId,
+      );
+      final gateway = _PairingGateway()..failOperatorBusy = true;
+      final controller = _controller(gateway, vault);
+      addTearDown(controller.dispose);
+      addTearDown(gateway.dispose);
+      await controller.initialize();
+      await controller.loginWithPin('2468');
+      expect(controller.state.phase, EntryPhase.operatorRequired);
+      await tester.pumpWidget(
+        PosApp(
+          locale: const Locale('es'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ListenableBuilder(
+            listenable: controller,
+            builder: (_, _) => EntrySurface(controller: controller),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Este usuario ya tiene una sesión abierta en otro POS. Cierra la sesión allí o entra con otro usuario.',
+        ),
+        findsOneWidget,
+      );
+      final logout = AppLocalizations.of(
+        tester.element(find.byType(EntrySurface)),
+      ).logoutAction;
+      await tester.tap(find.text(logout));
+      await tester.pumpAndSettle();
+      expect(controller.state.phase, EntryPhase.pinRequired);
+      expect(gateway.logouts, 1);
+      expect(controller.state.errorCode, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test(
     'pairing credentials persist in secure storage and clear safely',
     () async {
@@ -67,6 +164,119 @@ void main() {
       expect(await vault.pairingIdentity(), isNull);
     },
   );
+
+  // THE ENTRY ACTION HAS TO BE ON THE SCREEN, AT EVERY TEXT SIZE THE PRODUCT OFFERS.
+  //
+  // Ajustes offers `Muy grande`, which is a text scale of 2. On the iMin (1920x1080, a 1014 px
+  // window) the sign-in screen collapsed to one column and `Continuar` left both the visible area
+  // and the accessibility tree — the operator had to scroll a full-screen keypad to sign in, and
+  // the people who choose the largest text are the least able to do that. Measured on the physical
+  // till on 2026-10-11 (docs/reports/2026-10-11-imin-device-retest.md, defect 2).
+  //
+  // The assertion is the one a person makes: the action is inside the window and it is tappable
+  // where it stands, with no scrolling.
+  for (final phase in ['sign-in', 'enrollment']) {
+    for (final scale in [1.0, 1.5, 2.0]) {
+      testWidgets('the $phase action stays on screen at ${(scale * 100).round()}% text', (
+        tester,
+      ) async {
+        await fonts();
+        // THE iMin'S OWN SCREEN, ITS OWN DENSITY. 1920x1080 device pixels at 220 dpi is a
+        // device pixel ratio of 1.375, and the navigation bar leaves the app a 1014-pixel-tall
+        // window: 1396 x 737 LOGICAL pixels. A test at 1920x1014 logical is a canvas half again
+        // as tall as the till's, and it reported this screen as fitting when the device shows it
+        // clipped (measured 2026-10-11).
+        tester.view.physicalSize = const Size(1920, 1014);
+        tester.view.devicePixelRatio = 1.375;
+        addTearDown(tester.view.reset);
+        final windowHeight =
+            tester.view.physicalSize.height / tester.view.devicePixelRatio;
+        final storage = MemorySecureStorage();
+        storage.values['device.installation_id'] = _installationId;
+        final vault = CredentialVault(storage);
+        final controller = _controller(_PairingGateway(), vault);
+        // The pairing channel is waited on, and this is a widget test: the clock is fake until
+        // something pumps it, so the real-async escape hatch is what lets it finish. Enrollment is
+        // the phase a terminal starts in; the sign-in screen is the phase every shift after that
+        // starts in.
+        await tester.runAsync(() async {
+          if (phase == 'sign-in') {
+            await controller.enroll('ABCDEFGH');
+          } else {
+            await controller.initialize();
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        });
+        expect(
+          controller.state.phase,
+          phase == 'sign-in'
+              ? EntryPhase.pinRequired
+              : EntryPhase.enrollmentRequired,
+        );
+
+        await tester.pumpWidget(
+          PosApp(
+            locale: const Locale('es'),
+            theme: UmiTheme.light(),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(scale)),
+              child: child!,
+            ),
+            home: EntrySurface(controller: controller),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+
+        final action = find.text('Continuar');
+        expect(action, findsOneWidget, reason: 'the $phase action is missing');
+        final rect = tester.getRect(action);
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(windowHeight),
+          reason:
+              'the $phase action sits below the window at ${(scale * 100).round()}% text',
+        );
+        expect(
+          action.hitTestable(),
+          findsOneWidget,
+          reason:
+              'the $phase action is not tappable where it stands at '
+              '${(scale * 100).round()}% text, so it needs a scroll to reach',
+        );
+        if (phase == 'sign-in') {
+          // The keypad is the whole screen. The owner asked on 2026-10-11 for the
+          // terminal's own mark and its promise to leave this side of it, so the
+          // screen holds the task and nothing above it. The cover keeps its own
+          // mark on a window wide enough to show it, so the assertions name the
+          // form column rather than the whole window.
+          final form = find.byKey(const ValueKey('entry-form'));
+          expect(find.byType(StationSignature), findsNothing);
+          expect(
+            find.descendant(of: form, matching: find.text('umi')),
+            findsNothing,
+          );
+          expect(
+            find.descendant(of: form, matching: find.text('Estación')),
+            findsNothing,
+          );
+          expect(
+            find.text('Tu PIN te identifica y carga tus permisos actuales.'),
+            findsNothing,
+          );
+          expect(find.text('Ingresa tu PIN de operador'), findsOneWidget);
+        }
+        controller.dispose();
+      });
+    }
+  }
 
   test('bootstrap resumes a persisted pairing session after restart', () async {
     final storage = MemorySecureStorage();
@@ -219,19 +429,18 @@ void main() {
     await controller.initialize();
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
         home: EntrySurface(controller: controller),
       ),
     );
 
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(PosField), findsOneWidget);
     expect(find.text('Challenge ID'), findsNothing);
     expect(find.text('Enrollment code'), findsOneWidget);
   });
@@ -247,19 +456,18 @@ void main() {
     await controller.initialize();
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
         home: EntrySurface(controller: controller),
       ),
     );
 
-    await tester.enterText(find.byType(TextField), '2468');
+    await tester.enterText(find.byType(PosField), '2468');
     await tester.tap(find.text('Continue'));
     await tester.pump();
 
@@ -278,13 +486,12 @@ void main() {
     await controller.initialize();
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
         home: ListenableBuilder(
@@ -294,7 +501,7 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.byType(TextField), 'BADCODE1');
+    await tester.enterText(find.byType(PosField), 'BADCODE1');
     await tester.pump();
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
@@ -306,7 +513,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    final field = tester.widget<TextField>(find.byType(TextField));
+    final field = tester.widget<PosField>(find.byType(PosField));
     expect(field.decoration?.errorText, isNotNull);
   });
 
@@ -321,13 +528,12 @@ void main() {
     await controller.initialize();
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
         home: ListenableBuilder(
@@ -337,7 +543,7 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.byType(TextField), 'ABCDEFGH');
+    await tester.enterText(find.byType(PosField), 'ABCDEFGH');
     await tester.pump();
     await tester.tap(find.text('Continuar'));
     await tester.pumpAndSettle();
@@ -349,9 +555,77 @@ void main() {
       ),
       findsOneWidget,
     );
-    final field = tester.widget<TextField>(find.byType(TextField));
+    final field = tester.widget<PosField>(find.byType(PosField));
     expect(field.decoration?.errorText, isNotNull);
   });
+
+  testWidgets(
+    'PIN semantics announce the count without duplicating the title',
+    (tester) async {
+      final storage = MemorySecureStorage();
+      storage.values['device.installation_id'] = _installationId;
+      final vault = CredentialVault(storage);
+      await vault.saveDevice(
+        id: _deviceId,
+        publicId: _publicId,
+        credential: _secret,
+        credentialVersion: 1,
+        state: 'active',
+        merchantId: _merchantId,
+        locationId: _locationId,
+      );
+      final controller = _controller(_PairingGateway(), vault);
+      await controller.initialize();
+      final semantics = tester.ensureSemantics();
+      try {
+        await tester.pumpWidget(
+          PosApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: EntrySurface(controller: controller),
+          ),
+        );
+        final title = find.bySemanticsLabel(
+          RegExp(r'^Enter your operator PIN$'),
+        );
+        expect(title, findsOneWidget);
+        expect(
+          tester.getSemantics(title),
+          isSemantics(label: 'Enter your operator PIN', isHeader: true),
+        );
+        final count = find.bySemanticsLabel(RegExp(r'^Operator PIN$'));
+        expect(count, findsOneWidget);
+        expect(
+          tester.getSemantics(count),
+          isSemantics(
+            label: 'Operator PIN',
+            value: '0 digits',
+            isLiveRegion: true,
+          ),
+        );
+        for (final digit in const ['2', '4']) {
+          await tester.tap(find.text(digit));
+          await tester.pump();
+        }
+        expect(title, findsOneWidget);
+        expect(
+          tester.getSemantics(count),
+          isSemantics(
+            label: 'Operator PIN',
+            value: '2 digits',
+            isLiveRegion: true,
+          ),
+        );
+      } finally {
+        semantics.dispose();
+        await tester.pumpWidget(const SizedBox.shrink());
+        controller.dispose();
+      }
+    },
+  );
 
   testWidgets('trusted device uses the personal PIN and loads cashier access', (
     tester,
@@ -373,12 +647,11 @@ void main() {
     await controller.initialize();
 
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
         home: EntrySurface(controller: controller),
@@ -402,6 +675,60 @@ void main() {
     expect(gateway.authenticatedPin, '2468');
     expect(controller.state.phase, EntryPhase.ready);
     expect(controller.state.operator?.permissions, contains('catalog.read'));
+  });
+
+  testWidgets('the screen that verifies the PIN carries no station mark', (
+    tester,
+  ) async {
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    await vault.saveDevice(
+      id: _deviceId,
+      publicId: _publicId,
+      credential: _secret,
+      credentialVersion: 1,
+      state: 'active',
+      merchantId: _merchantId,
+      locationId: _locationId,
+    );
+    final gateway = _PairingGateway()..pinHold = Completer<void>();
+    final controller = _controller(gateway, vault);
+    await controller.initialize();
+
+    await tester.pumpWidget(
+      PosApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ListenableBuilder(
+          listenable: controller,
+          builder: (context, _) => EntrySurface(controller: controller),
+        ),
+      ),
+    );
+    for (final digit in const ['2', '4', '6', '8']) {
+      await tester.tap(find.text(digit));
+      await tester.pump();
+    }
+    await tester.ensureVisible(find.text('Continue'));
+    await tester.tap(find.text('Continue'));
+    // One frame, not a settle: the answer is held, so the screen under review
+    // is the one the operator watches while the till verifies the PIN.
+    await tester.pump();
+    expect(controller.state.phase, EntryPhase.pinAuthenticating);
+    expect(find.text('Verifying your PIN'), findsOneWidget);
+    // The keypad is the PIN screen, and this loading belongs to it.
+    expect(find.byType(StationSignature), findsNothing);
+    expect(find.text('Station'), findsNothing);
+    expect(find.text('Enter your operator PIN'), findsNothing);
+
+    gateway.pinHold!.complete();
+    await tester.pumpAndSettle();
+    expect(controller.state.phase, EntryPhase.ready);
+    controller.dispose();
   });
 
   test(
@@ -643,6 +970,27 @@ EntryController _controller(EntryGateway gateway, CredentialVault vault) {
   );
 }
 
+final class _StalledReadStorage implements SecureKeyValueStorage {
+  final _delegate = MemorySecureStorage();
+  final _blocked = Completer<String?>();
+
+  @override
+  Future<StorageHealth> healthCheck() => _delegate.healthCheck();
+
+  @override
+  Future<String?> read(String key) =>
+      key == 'device.installation_id' ? _blocked.future : _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) => _delegate.write(key, value);
+
+  @override
+  Future<void> delete(String key) => _delegate.delete(key);
+
+  @override
+  Future<void> deleteAll() => _delegate.deleteAll();
+}
+
 final class _PairingGateway implements EntryGateway {
   String? claimedCode;
   int polls = 0;
@@ -650,7 +998,12 @@ final class _PairingGateway implements EntryGateway {
   int logouts = 0;
   int refreshes = 0;
   bool failRefresh = false;
+  bool failOperatorBusy = false;
   String? authenticatedPin;
+
+  /// Pending work a test can hold the PIN answer behind, so the screen that
+  /// shows while the till verifies the PIN can be read.
+  Completer<void>? pinHold;
   bool failLock = false;
   bool failClaim = false;
   String? claimFailureCode;
@@ -763,6 +1116,7 @@ final class _PairingGateway implements EntryGateway {
     required String locationId,
   }) async {
     authenticatedPin = pin;
+    await pinHold?.future;
     return const PosSessionResponse(
       session: {'id': 'session'},
       tokens: {'accessToken': 'access', 'refreshToken': 'refresh'},
@@ -821,24 +1175,36 @@ final class _PairingGateway implements EntryGateway {
   Future<OperatorSessionView> startOperator(
     String merchantId,
     String locationId,
-  ) => Future.value(
-    OperatorSessionView(
-      id: _sessionId,
-      userId: '00000000-0000-4000-8000-000000000007',
-      staffId: '00000000-0000-4000-8000-000000000008',
-      merchantId: merchantId,
-      locationId: locationId,
-      deviceId: _deviceId,
-      state: 'active',
-      permissions: const ['catalog.read', 'cart.write', 'checkout.commit'],
-      entitlements: const [
-        {'key': 'pos', 'enabled': true},
-      ],
-      startedAt: '2026-07-28T00:00:00.000Z',
-      lastActivityAt: '2026-07-28T00:00:00.000Z',
-      expiresAt: '2026-07-28T08:00:00.000Z',
-    ),
-  );
+  ) => failOperatorBusy
+      ? Future.error(
+          const AppException(
+            category: AppErrorCategory.conflict,
+            code: 'OPERATOR_SESSION_BUSY',
+            recoverable: true,
+          ),
+        )
+      : Future.value(
+          OperatorSessionView(
+            id: _sessionId,
+            userId: '00000000-0000-4000-8000-000000000007',
+            staffId: '00000000-0000-4000-8000-000000000008',
+            merchantId: merchantId,
+            locationId: locationId,
+            deviceId: _deviceId,
+            state: 'active',
+            permissions: const [
+              'catalog.read',
+              'cart.write',
+              'checkout.commit',
+            ],
+            entitlements: const [
+              {'key': 'pos', 'enabled': true},
+            ],
+            startedAt: '2026-07-28T00:00:00.000Z',
+            lastActivityAt: '2026-07-28T00:00:00.000Z',
+            expiresAt: '2026-07-28T08:00:00.000Z',
+          ),
+        );
   @override
   Future<void> lockOperator(String id) async {
     if (failLock) {

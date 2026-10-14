@@ -191,6 +191,22 @@ msgid "hace {0} h"
 msgstr "hace {0} h"
 
 #: src/data.jsx
+msgid "No pudimos preparar la imagen."
+msgstr "No pudimos preparar la imagen."
+
+#: src/data.jsx
+msgid "No pudimos leer el archivo."
+msgstr "No pudimos leer el archivo."
+
+#: src/data.jsx
+msgid "Elige una imagen PNG o JPG."
+msgstr "Elige una imagen PNG o JPG."
+
+#: src/data.jsx
+msgid "La imagen es demasiado pesada. Prueba con una más simple."
+msgstr "La imagen es demasiado pesada. Prueba con una más simple."
+
+#: src/data.jsx
 msgid "No se pudo leer el costo"
 msgstr "No se pudo leer el costo"
 
@@ -387,6 +403,7 @@ msgid "Lealtad y valor"
 msgstr "Lealtad y valor"
 
 #: src/lib/module-registry.js
+#: src/screens/devices.jsx
 #: src/screens/overview.jsx
 #: src/screens/staff.jsx
 #: src/shell.jsx
@@ -566,6 +583,22 @@ msgstr "por id"
 #~ msgstr "Peor día: {0}, el {1}"
 
 #: src/screens/caja-turnos.jsx
+#~ msgid "Custodia de efectivo"
+#~ msgstr "Custodia de efectivo"
+
+#: src/screens/caja-turnos.jsx
+#~ msgid "{daysCovered} días comerciales en la ventana de turnos cargada."
+#~ msgstr "{daysCovered} días comerciales en la ventana de turnos cargada."
+
+#: src/screens/caja-turnos.jsx
+#~ msgid "La ventana de turnos cargada cubre un día comercial."
+#~ msgstr "La ventana de turnos cargada cubre un día comercial."
+
+#: src/screens/caja-turnos.jsx
+#~ msgid "Conteo ciego"
+#~ msgstr "Conteo ciego"
+
+#: src/screens/caja-turnos.jsx
 msgid "Abriendo"
 msgstr "Abriendo"
 
@@ -646,6 +679,119 @@ msgid "Arqueo"
 msgstr "Arqueo"
 
 #: src/screens/caja-turnos.jsx
+msgid "No se pudo leer la configuración de cobro."
+msgstr "No se pudo leer la configuración de cobro."
+
+#: src/screens/caja-turnos.jsx
+msgid "No se guardó el cambio. Se conserva la configuración anterior."
+msgstr "No se guardó el cambio. Se conserva la configuración anterior."
+
+#: src/screens/caja-turnos.jsx
+msgid "Escribe el titular y el banco."
+msgstr "Escribe el titular y el banco."
+
+#: src/screens/caja-turnos.jsx
+msgid "El titular y el banco admiten hasta 120 caracteres."
+msgstr "El titular y el banco admiten hasta 120 caracteres."
+
+#: src/screens/caja-turnos.jsx
+msgid "Escribe una CLABE o un número de cuenta."
+msgstr "Escribe una CLABE o un número de cuenta."
+
+#: src/screens/caja-turnos.jsx
+msgid "La CLABE debe tener 18 dígitos."
+msgstr "La CLABE debe tener 18 dígitos."
+
+#: src/screens/caja-turnos.jsx
+msgid "El número de cuenta debe tener entre 1 y 24 dígitos."
+msgstr "El número de cuenta debe tener entre 1 y 24 dígitos."
+
+#: src/screens/caja-turnos.jsx
+msgid "No se guardaron los datos bancarios. Revisa los campos e inténtalo otra vez."
+msgstr "No se guardaron los datos bancarios. Revisa los campos e inténtalo otra vez."
+
+#: src/screens/caja-turnos.jsx
+msgid "Reglas del cobro"
+msgstr "Reglas del cobro"
+
+#: src/screens/caja-turnos.jsx
+msgid "Permitir tarjeta en terminal manual"
+msgstr "Permitir tarjeta en terminal manual"
+
+#: src/screens/caja-turnos.jsx
+msgid "El cajero declara el resultado de la terminal externa. No activa ni sustituye una terminal integrada."
+msgstr "El cajero declara el resultado de la terminal externa. No activa ni sustituye una terminal integrada."
+
+#: src/screens/caja-turnos.jsx
+msgid "Permitir pagos mixtos"
+msgstr "Permitir pagos mixtos"
+
+#: src/screens/caja-turnos.jsx
+msgid "Una cuenta puede combinar efectivo y tarjeta según los métodos habilitados."
+msgstr "Una cuenta puede combinar efectivo y tarjeta según los métodos habilitados."
+
+#: src/screens/caja-turnos.jsx
+msgid "Permitir Comer aquí sin mesa"
+msgstr "Permitir Comer aquí sin mesa"
+
+#: src/screens/caja-turnos.jsx
+msgid "La cuenta conserva Comer aquí sin asignar una mesa ficticia."
+msgstr "La cuenta conserva Comer aquí sin asignar una mesa ficticia."
+
+#: src/screens/caja-turnos.jsx
+msgid "Transferencia bancaria"
+msgstr "Transferencia bancaria"
+
+#: src/screens/caja-turnos.jsx
+msgid "Estos datos se mostrarán al cajero durante el cobro. Activa el método cuando los datos estén listos."
+msgstr "Estos datos se mostrarán al cajero durante el cobro. Activa el método cuando los datos estén listos."
+
+#: src/screens/caja-turnos.jsx
+msgid "Permitir transferencia bancaria"
+msgstr "Permitir transferencia bancaria"
+
+#: src/screens/caja-turnos.jsx
+msgid "Titular de la cuenta"
+msgstr "Titular de la cuenta"
+
+#: src/screens/caja-turnos.jsx
+msgid "Banco"
+msgstr "Banco"
+
+#: src/screens/caja-turnos.jsx
+msgid "CLABE (18 dígitos)"
+msgstr "CLABE (18 dígitos)"
+
+#: src/screens/caja-turnos.jsx
+msgid "Número de cuenta (opcional si hay CLABE)"
+msgstr "Número de cuenta (opcional si hay CLABE)"
+
+#: src/screens/caja-turnos.jsx
+msgid "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
+msgstr "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
+
+#: src/screens/caja-turnos.jsx
+msgid "Guardar transferencia"
+msgstr "Guardar transferencia"
+
+#: src/screens/caja-turnos.jsx
+#: src/screens/devices.jsx
+#: src/screens/hours.jsx
+#: src/screens/reset-password.jsx
+#: src/screens/settings.jsx
+#: src/screens/staff.jsx
+msgid "Guardando…"
+msgstr "Guardando…"
+
+#: src/screens/caja-turnos.jsx
+msgid "Transferencia guardada para esta sucursal."
+msgstr "Transferencia guardada para esta sucursal."
+
+#: src/screens/caja-turnos.jsx
+msgid "No hay política de cobro para esta sucursal."
+msgstr "No hay política de cobro para esta sucursal."
+
+#: src/screens/caja-turnos.jsx
 msgid "Sin turnos cerrados todavía. La tendencia aparece con el primer cierre."
 msgstr "Sin turnos cerrados todavía. La tendencia aparece con el primer cierre."
 
@@ -700,6 +846,7 @@ msgstr "Caja"
 #: src/screens/caja-turnos.jsx
 #: src/screens/recibos.jsx
 #: src/screens/reembolsos.jsx
+#: src/screens/ventas-report.jsx
 msgid "Operador"
 msgstr "Operador"
 
@@ -831,16 +978,12 @@ msgid "Trazabilidad del turno"
 msgstr "Trazabilidad del turno"
 
 #: src/screens/caja-turnos.jsx
-msgid "Custodia de efectivo"
-msgstr "Custodia de efectivo"
+msgid "No se guardó el conteo. Intenta de nuevo."
+msgstr "No se guardó el conteo. Intenta de nuevo."
 
 #: src/screens/caja-turnos.jsx
-msgid "{daysCovered} días comerciales en la ventana de turnos cargada."
-msgstr "{daysCovered} días comerciales en la ventana de turnos cargada."
-
-#: src/screens/caja-turnos.jsx
-msgid "La ventana de turnos cargada cubre un día comercial."
-msgstr "La ventana de turnos cargada cubre un día comercial."
+msgid "Turno actual"
+msgstr "Turno actual"
 
 #: src/screens/caja-turnos.jsx
 msgid "Cajas abiertas"
@@ -872,6 +1015,30 @@ msgid "sin cierres en la ventana"
 msgstr "sin cierres en la ventana"
 
 #: src/screens/caja-turnos.jsx
+msgid "Regla del conteo"
+msgstr "Regla del conteo"
+
+#: src/screens/caja-turnos.jsx
+msgid "Activar conteo ciego"
+msgstr "Activar conteo ciego"
+
+#: src/screens/caja-turnos.jsx
+msgid "Ciego: la caja cuenta por denominación sin ver el esperado. Visible: la caja solo pide el total."
+msgstr "Ciego: la caja cuenta por denominación sin ver el esperado. Visible: la caja solo pide el total."
+
+#: src/screens/caja-turnos.jsx
+msgid "Ciego"
+msgstr "Ciego"
+
+#: src/screens/caja-turnos.jsx
+msgid "Visible · total"
+msgstr "Visible · total"
+
+#: src/screens/caja-turnos.jsx
+msgid "Sin política"
+msgstr "Sin política"
+
+#: src/screens/caja-turnos.jsx
 msgid "Diferencia neta por día comercial"
 msgstr "Diferencia neta por día comercial"
 
@@ -888,6 +1055,7 @@ msgstr "No hay turnos de caja en esta vista."
 #~ msgstr "Facturas"
 
 #: src/screens/categories-workspace.jsx
+#: src/screens/cocina.jsx
 msgid "No se pudo guardar"
 msgstr "No se pudo guardar"
 
@@ -932,6 +1100,7 @@ msgid "Nueva categoría"
 msgstr "Nueva categoría"
 
 #: src/screens/categories-workspace.jsx
+#: src/screens/cocina.jsx
 #: src/screens/floor-plan.jsx
 #: src/screens/inventory-item-editor.jsx
 #: src/screens/members.jsx
@@ -953,6 +1122,193 @@ msgstr "Cada categoría empieza con un color al azar; cámbialo cuando quieras. 
 #: src/screens/categories-workspace.jsx
 msgid "Aún no hay categorías. Crea la primera arriba."
 msgstr "Aún no hay categorías. Crea la primera arriba."
+
+#: src/screens/cocina.jsx
+msgid "Llegada · agudo breve"
+msgstr "Llegada · agudo breve"
+
+#: src/screens/cocina.jsx
+msgid "Vencimiento · grave largo"
+msgstr "Vencimiento · grave largo"
+
+#: src/screens/cocina.jsx
+msgid "Listo · agudo alto"
+msgstr "Listo · agudo alto"
+
+#. placeholder {0}: station.name
+#: src/screens/cocina.jsx
+msgid "Nombre {0}"
+msgstr "Nombre {0}"
+
+#: src/screens/cocina.jsx
+msgid "Vencido a los (minutos)"
+msgstr "Vencido a los (minutos)"
+
+#. placeholder {0}: station.name
+#: src/screens/cocina.jsx
+msgid "Umbral {0}"
+msgstr "Umbral {0}"
+
+#: src/screens/cocina.jsx
+msgid "Sonidos activados"
+msgstr "Sonidos activados"
+
+#: src/screens/cocina.jsx
+msgid "Al llegar"
+msgstr "Al llegar"
+
+#: src/screens/cocina.jsx
+msgid "Al vencer"
+msgstr "Al vencer"
+
+#: src/screens/cocina.jsx
+msgid "Ítem listo para el mesero"
+msgstr "Ítem listo para el mesero"
+
+#: src/screens/cocina.jsx
+msgid "Guardar estación"
+msgstr "Guardar estación"
+
+#: src/screens/cocina.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Estación"
+msgstr "Estación"
+
+#: src/screens/cocina.jsx
+msgid "Sin ruta propia"
+msgstr "Sin ruta propia"
+
+#: src/screens/cocina.jsx
+msgid "Prioridad (menor gana)"
+msgstr "Prioridad (menor gana)"
+
+#: src/screens/cocina.jsx
+msgid "Prioridad {label}"
+msgstr "Prioridad {label}"
+
+#: src/screens/cocina.jsx
+msgid "Objetivo (segundos)"
+msgstr "Objetivo (segundos)"
+
+#: src/screens/cocina.jsx
+msgid "Objetivo {label}"
+msgstr "Objetivo {label}"
+
+#: src/screens/cocina.jsx
+msgid "Umbral de estación"
+msgstr "Umbral de estación"
+
+#: src/screens/cocina.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Guardar ruta"
+msgstr "Guardar ruta"
+
+#: src/screens/cocina.jsx
+msgid "Desactivar ruta"
+msgstr "Desactivar ruta"
+
+#: src/screens/cocina.jsx
+msgid "Configuración guardada"
+msgstr "Configuración guardada"
+
+#: src/screens/cocina.jsx
+msgid "Selecciona una sucursal para configurar la cocina."
+msgstr "Selecciona una sucursal para configurar la cocina."
+
+#: src/screens/cocina.jsx
+msgid "Cocina: estaciones, rutas y avisos"
+msgstr "Cocina: estaciones, rutas y avisos"
+
+#: src/screens/cocina.jsx
+msgid "La excepción por producto gana a la categoría, y la categoría a la predeterminada. Sin ninguna ruta, el platillo queda como excepción y no llega a una estación."
+msgstr "La excepción por producto gana a la categoría, y la categoría a la predeterminada. Sin ninguna ruta, el platillo queda como excepción y no llega a una estación."
+
+#: src/screens/cocina.jsx
+msgid "El objetivo de la ruta reemplaza el umbral de la estación para ese platillo. Los avisos suenan una sola vez; cada terminal puede silenciarlos."
+msgstr "El objetivo de la ruta reemplaza el umbral de la estación para ese platillo. Los avisos suenan una sola vez; cada terminal puede silenciarlos."
+
+#: src/screens/cocina.jsx
+msgid "Estaciones y sonidos"
+msgstr "Estaciones y sonidos"
+
+#: src/screens/cocina.jsx
+#: src/screens/devices.jsx
+msgid "Nueva estación"
+msgstr "Nueva estación"
+
+#: src/screens/cocina.jsx
+msgid "Crear estación"
+msgstr "Crear estación"
+
+#: src/screens/cocina.jsx
+msgid "Ruteo por categoría"
+msgstr "Ruteo por categoría"
+
+#: src/screens/cocina.jsx
+msgid "Predeterminada (todo lo demás)"
+msgstr "Predeterminada (todo lo demás)"
+
+#: src/screens/cocina.jsx
+msgid "Recibe lo que ninguna categoría reclame."
+msgstr "Recibe lo que ninguna categoría reclame."
+
+#: src/screens/cocina.jsx
+msgid "Sin predeterminada: un platillo sin ruta no llega a ninguna estación."
+msgstr "Sin predeterminada: un platillo sin ruta no llega a ninguna estación."
+
+#: src/screens/cocina.jsx
+msgid "Hereda la predeterminada"
+msgstr "Hereda la predeterminada"
+
+#: src/screens/cocina.jsx
+msgid "Sin destino"
+msgstr "Sin destino"
+
+#: src/screens/cocina.jsx
+msgid "Excepción por producto · ¿dónde cae este platillo?"
+msgstr "Excepción por producto · ¿dónde cae este platillo?"
+
+#: src/screens/cocina.jsx
+msgid "Buscar producto"
+msgstr "Buscar producto"
+
+#: src/screens/cocina.jsx
+msgid "Producto a configurar"
+msgstr "Producto a configurar"
+
+#: src/screens/cocina.jsx
+msgid "Elige un producto (hasta 50 resultados)"
+msgstr "Elige un producto (hasta 50 resultados)"
+
+#. placeholder {0}: resolved.productId ? t`Excepción por producto` : resolved.categoryId ? t`Categoría` : t`Predeterminada`
+#. placeholder {1}: resolved.routePriority
+#. placeholder {2}: resolved.targetSeconds ?? destination?.alertSettings?.overdueSeconds ?? 900
+#: src/screens/cocina.jsx
+msgid "{0} · Prioridad {1} · Objetivo {2} s"
+msgstr "{0} · Prioridad {1} · Objetivo {2} s"
+
+#: src/screens/cocina.jsx
+msgid "Excepción por producto"
+msgstr "Excepción por producto"
+
+#: src/screens/cocina.jsx
+#: src/screens/operations-workspace.jsx
+#: src/screens/ventas-report.jsx
+msgid "Categoría"
+msgstr "Categoría"
+
+#: src/screens/cocina.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Predeterminada"
+msgstr "Predeterminada"
+
+#: src/screens/cocina.jsx
+msgid "Agrega una ruta para que llegue a cocina."
+msgstr "Agrega una ruta para que llegue a cocina."
+
+#: src/screens/cocina.jsx
+msgid "Dejar sin ruta propia restaura la categoría o la predeterminada."
+msgstr "Dejar sin ruta propia restaura la categoría o la predeterminada."
 
 #: src/screens/conversations.jsx
 msgid "{total, plural, one {# cliente espera respuesta.} other {# clientes esperan respuesta.}}"
@@ -1736,9 +2092,19 @@ msgstr "Móvil"
 msgid "Estático"
 msgstr "Estático"
 
+#: src/screens/device-utils.js
+msgid "UmiKDS"
+msgstr "UmiKDS"
+
+#: src/screens/device-utils.js
+msgid "UmiPOS"
+msgstr "UmiPOS"
+
 #. placeholder {0}: Math.floor(ms / 86400000)
 #. placeholder {0}: Math.floor(ms / LAST_SEEN_DAY)
+#. placeholder {0}: Math.round(hours / 24)
 #: src/screens/device-utils.js
+#: src/screens/devices.jsx
 #: src/screens/members.jsx
 msgid "hace {0} d"
 msgstr "hace {0} d"
@@ -1781,6 +2147,84 @@ msgstr "No se pudo crear la tienda. Intenta de nuevo."
 #~ msgstr "Desconectar"
 
 #: src/screens/devices.jsx
+#~ msgid "Editar caja"
+#~ msgstr "Editar caja"
+
+#: src/screens/devices.jsx
+#~ msgid "UmiPOS · Dispositivo"
+#~ msgstr "UmiPOS · Dispositivo"
+
+#: src/screens/devices.jsx
+#~ msgid "Gestionar caja"
+#~ msgstr "Gestionar caja"
+
+#: src/screens/devices.jsx
+#~ msgid "{liveCount} KDS en vivo"
+#~ msgstr "{liveCount} KDS en vivo"
+
+#. placeholder {0}: posCards.length
+#: src/screens/devices.jsx
+#~ msgid "{0, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
+#~ msgstr "{0, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
+
+#: src/screens/devices.jsx
+#~ msgid "p. ej. Cocina Caliente 2"
+#~ msgstr "p. ej. Cocina Caliente 2"
+
+#: src/screens/devices.jsx
+#~ msgid "No hay estaciones todavía. Crea una para asignar este dispositivo."
+#~ msgstr "No hay estaciones todavía. Crea una para asignar este dispositivo."
+
+#: src/screens/devices.jsx
+#~ msgid "Nombre de la estación"
+#~ msgstr "Nombre de la estación"
+
+#: src/screens/devices.jsx
+#~ msgid "PIN de primer pareo"
+#~ msgstr "PIN de primer pareo"
+
+#: src/screens/devices.jsx
+#~ msgid "Esperando solicitud del iPad"
+#~ msgstr "Esperando solicitud del iPad"
+
+#: src/screens/devices.jsx
+#~ msgid "estación"
+#~ msgstr "estación"
+
+#. placeholder {0}: formatTime(pairing.expires_at)
+#: src/screens/devices.jsx
+#~ msgid "Expira {0}"
+#~ msgstr "Expira {0}"
+
+#: src/screens/devices.jsx
+#~ msgid "Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes pendientes, apruébalo desde esta pantalla."
+#~ msgstr "Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes pendientes, apruébalo desde esta pantalla."
+
+#: src/screens/devices.jsx
+#~ msgid "Solicitudes activas"
+#~ msgstr "Solicitudes activas"
+
+#: src/screens/devices.jsx
+#~ msgid "Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla."
+#~ msgstr "Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla."
+
+#: src/screens/devices.jsx
+#~ msgid "Generando…"
+#~ msgstr "Generando…"
+
+#: src/screens/devices.jsx
+#~ msgid "PIN generado"
+#~ msgstr "PIN generado"
+
+#: src/screens/devices.jsx
+#~ msgid "Generar PIN"
+#~ msgstr "Generar PIN"
+
+#: src/screens/devices.jsx
+#~ msgid "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
+#~ msgstr "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
+
+#: src/screens/devices.jsx
 #: src/screens/overview.jsx
 msgid "En vivo"
 msgstr "En vivo"
@@ -1794,13 +2238,12 @@ msgid "Sondeo 10 s"
 msgstr "Sondeo 10 s"
 
 #: src/screens/devices.jsx
-msgid "{liveCount} KDS en vivo"
-msgstr "{liveCount} KDS en vivo"
+msgid "{kdsModeCount} KDS"
+msgstr "{kdsModeCount} KDS"
 
-#. placeholder {0}: posCards.length
 #: src/screens/devices.jsx
-msgid "{0, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
-msgstr "{0, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
+msgid "{tillCount, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
+msgstr "{tillCount, plural, one {# caja UmiPOS} other {# cajas UmiPOS}}"
 
 #: src/screens/devices.jsx
 msgid "{liveCount} en vivo ahora mismo."
@@ -1886,8 +2329,136 @@ msgid "Rotación pendiente"
 msgstr "Rotación pendiente"
 
 #: src/screens/devices.jsx
-msgid "Editar caja"
-msgstr "Editar caja"
+msgid "Impresora"
+msgstr "Impresora"
+
+#: src/screens/devices.jsx
+msgid "Cajón de dinero"
+msgstr "Cajón de dinero"
+
+#: src/screens/devices.jsx
+msgid "Lector de códigos"
+msgstr "Lector de códigos"
+
+#: src/screens/devices.jsx
+msgid "Pantalla de cliente"
+msgstr "Pantalla de cliente"
+
+#: src/screens/devices.jsx
+msgid "Terminal de pago"
+msgstr "Terminal de pago"
+
+#: src/screens/devices.jsx
+msgid "Báscula"
+msgstr "Báscula"
+
+#: src/screens/devices.jsx
+msgid "Simulador"
+msgstr "Simulador"
+
+#: src/screens/devices.jsx
+msgid "Red"
+msgstr "Red"
+
+#: src/screens/devices.jsx
+msgid "Conectado a la impresora"
+msgstr "Conectado a la impresora"
+
+#: src/screens/devices.jsx
+msgid "Teclado"
+msgstr "Teclado"
+
+#: src/screens/devices.jsx
+msgid "USB"
+msgstr "USB"
+
+#: src/screens/devices.jsx
+msgid "Bluetooth"
+msgstr "Bluetooth"
+
+#: src/screens/devices.jsx
+msgid "Puerto serie"
+msgstr "Puerto serie"
+
+#: src/screens/devices.jsx
+msgid "Canal del sistema"
+msgstr "Canal del sistema"
+
+#: src/screens/devices.jsx
+msgid "Conectado"
+msgstr "Conectado"
+
+#: src/screens/devices.jsx
+msgid "Desconectado"
+msgstr "Desconectado"
+
+#: src/screens/devices.jsx
+#: src/shell.jsx
+msgid "Conectando"
+msgstr "Conectando"
+
+#: src/screens/devices.jsx
+msgid "Ocupado"
+msgstr "Ocupado"
+
+#: src/screens/devices.jsx
+msgid "Recuperando"
+msgstr "Recuperando"
+
+#: src/screens/devices.jsx
+#: src/screens/operations-workspace.jsx
+msgid "Falló"
+msgstr "Falló"
+
+#: src/screens/devices.jsx
+msgid "Deshabilitado"
+msgstr "Deshabilitado"
+
+#: src/screens/devices.jsx
+msgid "Error"
+msgstr "Error"
+
+#: src/screens/devices.jsx
+#: src/screens/members.jsx
+msgid "Sin dato"
+msgstr "Sin dato"
+
+#: src/screens/devices.jsx
+msgid "hace {minutes} min"
+msgstr "hace {minutes} min"
+
+#: src/screens/devices.jsx
+msgid "hace {hours} h"
+msgstr "hace {hours} h"
+
+#: src/screens/devices.jsx
+msgid "Equipo"
+msgstr "Equipo"
+
+#: src/screens/devices.jsx
+msgid "Hardware registrado"
+msgstr "Hardware registrado"
+
+#: src/screens/devices.jsx
+msgid "No hay impresoras ni periféricos registrados en esta sucursal."
+msgstr "No hay impresoras ni periféricos registrados en esta sucursal."
+
+#. placeholder {0}: relativeAge(i18n, probedAt, now)
+#: src/screens/devices.jsx
+msgid "Sin verificar · visto {0}"
+msgstr "Sin verificar · visto {0}"
+
+#: src/screens/devices.jsx
+msgid "Sin verificar"
+msgstr "Sin verificar"
+
+#: src/screens/devices.jsx
+msgid "SIRVE A"
+msgstr "SIRVE A"
+
+#: src/screens/devices.jsx
+msgid "Sin asignar"
+msgstr "Sin asignar"
 
 #: src/screens/devices.jsx
 msgid "No se pudieron guardar los cambios. Intenta de nuevo."
@@ -1898,12 +2469,12 @@ msgid "No se pudo revocar la caja. Intenta de nuevo."
 msgstr "No se pudo revocar la caja. Intenta de nuevo."
 
 #: src/screens/devices.jsx
-msgid "UmiPOS · Dispositivo"
-msgstr "UmiPOS · Dispositivo"
+msgid "Dispositivo"
+msgstr "Dispositivo"
 
 #: src/screens/devices.jsx
-msgid "Gestionar caja"
-msgstr "Gestionar caja"
+msgid "Gestionar dispositivo"
+msgstr "Gestionar dispositivo"
 
 #: src/screens/devices.jsx
 msgid "CREDENCIAL"
@@ -1916,6 +2487,26 @@ msgstr "Nombre del dispositivo"
 #: src/screens/devices.jsx
 msgid "Caja principal"
 msgstr "Caja principal"
+
+#: src/screens/devices.jsx
+msgid "Modo"
+msgstr "Modo"
+
+#: src/screens/devices.jsx
+msgid "UmiPOS · Caja"
+msgstr "UmiPOS · Caja"
+
+#: src/screens/devices.jsx
+msgid "UmiKDS · Cocina"
+msgstr "UmiKDS · Cocina"
+
+#: src/screens/devices.jsx
+msgid "UmiKDS muestra los pedidos en la cocina. Al guardar, reinicia la tablet para que tome el nuevo modo."
+msgstr "UmiKDS muestra los pedidos en la cocina. Al guardar, reinicia la tablet para que tome el nuevo modo."
+
+#: src/screens/devices.jsx
+msgid "UmiPOS es la caja: cobra y toma pedidos. Al guardar, reinicia la tablet para que tome el nuevo modo."
+msgstr "UmiPOS es la caja: cobra y toma pedidos. Al guardar, reinicia la tablet para que tome el nuevo modo."
 
 #: src/screens/devices.jsx
 msgid "Modalidad"
@@ -1952,14 +2543,6 @@ msgstr "Revocando…"
 #: src/screens/devices.jsx
 msgid "Revocar caja"
 msgstr "Revocar caja"
-
-#: src/screens/devices.jsx
-#: src/screens/hours.jsx
-#: src/screens/reset-password.jsx
-#: src/screens/settings.jsx
-#: src/screens/staff.jsx
-msgid "Guardando…"
-msgstr "Guardando…"
 
 #: src/screens/devices.jsx
 msgid "Guardar cambios"
@@ -2039,10 +2622,6 @@ msgid "KDS · Dispositivo"
 msgstr "KDS · Dispositivo"
 
 #: src/screens/devices.jsx
-msgid "Gestionar dispositivo"
-msgstr "Gestionar dispositivo"
-
-#: src/screens/devices.jsx
 msgid "ÓRDENES ABIERTAS"
 msgstr "ÓRDENES ABIERTAS"
 
@@ -2053,10 +2632,6 @@ msgstr "p. ej. Cocina Caliente 1"
 #: src/screens/devices.jsx
 msgid "Estación asignada"
 msgstr "Estación asignada"
-
-#: src/screens/devices.jsx
-msgid "Sin asignar"
-msgstr "Sin asignar"
 
 #: src/screens/devices.jsx
 msgid "ID de sesión"
@@ -2104,10 +2679,6 @@ msgid "Aún no hay estaciones. Crea la primera abajo."
 msgstr "Aún no hay estaciones. Crea la primera abajo."
 
 #: src/screens/devices.jsx
-msgid "Nueva estación"
-msgstr "Nueva estación"
-
-#: src/screens/devices.jsx
 msgid "p. ej. Cocina Caliente"
 msgstr "p. ej. Cocina Caliente"
 
@@ -2124,8 +2695,8 @@ msgid "Selecciona una sucursal"
 msgstr "Selecciona una sucursal"
 
 #: src/screens/devices.jsx
-msgid "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
-msgstr "El dispositivo y sus estaciones quedarán vinculados a esta sucursal."
+msgid "El dispositivo quedará vinculado a esta sucursal."
+msgstr "El dispositivo quedará vinculado a esta sucursal."
 
 #: src/screens/devices.jsx
 msgid "Producto del dispositivo"
@@ -2160,47 +2731,6 @@ msgid "¿Por qué?"
 msgstr "¿Por qué?"
 
 #: src/screens/devices.jsx
-msgid "p. ej. Cocina Caliente 2"
-msgstr "p. ej. Cocina Caliente 2"
-
-#: src/screens/devices.jsx
-msgid "No hay estaciones todavía. Crea una para asignar este dispositivo."
-msgstr "No hay estaciones todavía. Crea una para asignar este dispositivo."
-
-#: src/screens/devices.jsx
-msgid "Nombre de la estación"
-msgstr "Nombre de la estación"
-
-#: src/screens/devices.jsx
-msgid "Crear estación"
-msgstr "Crear estación"
-
-#: src/screens/devices.jsx
-msgid "PIN de primer pareo"
-msgstr "PIN de primer pareo"
-
-#: src/screens/devices.jsx
-msgid "Esperando solicitud del iPad"
-msgstr "Esperando solicitud del iPad"
-
-#: src/screens/devices.jsx
-msgid "estación"
-msgstr "estación"
-
-#. placeholder {0}: formatTime(pairing.expires_at)
-#: src/screens/devices.jsx
-msgid "Expira {0}"
-msgstr "Expira {0}"
-
-#: src/screens/devices.jsx
-msgid "Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes pendientes, apruébalo desde esta pantalla."
-msgstr "Escribe este PIN en el iPad del KDS. Cuando aparezca en las solicitudes pendientes, apruébalo desde esta pantalla."
-
-#: src/screens/devices.jsx
-msgid "Solicitudes activas"
-msgstr "Solicitudes activas"
-
-#: src/screens/devices.jsx
 msgid "La solicitud queda vinculada al negocio y a la sucursal seleccionada."
 msgstr "La solicitud queda vinculada al negocio y a la sucursal seleccionada."
 
@@ -2208,31 +2738,19 @@ msgstr "La solicitud queda vinculada al negocio y a la sucursal seleccionada."
 msgid "Código de configuración"
 msgstr "Código de configuración"
 
-#. placeholder {0}: posCreated.setupCode
+#. placeholder {0}: created.setupCode
 #: src/screens/devices.jsx
 msgid "Código {0}"
 msgstr "Código {0}"
 
 #: src/screens/devices.jsx
-msgid "Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla."
-msgstr "Escribe este código en UmiPOS. Después, aprueba la solicitud en esta pantalla."
+msgid "Escribe este código en la tablet. Después, aprueba la solicitud en esta pantalla."
+msgstr "Escribe este código en la tablet. Después, aprueba la solicitud en esta pantalla."
 
-#. placeholder {0}: formatTime(posCreated.expiresAt)
+#. placeholder {0}: formatTime(created.expiresAt)
 #: src/screens/devices.jsx
 msgid "Expira a las {0}."
 msgstr "Expira a las {0}."
-
-#: src/screens/devices.jsx
-msgid "Generando…"
-msgstr "Generando…"
-
-#: src/screens/devices.jsx
-msgid "PIN generado"
-msgstr "PIN generado"
-
-#: src/screens/devices.jsx
-msgid "Generar PIN"
-msgstr "Generar PIN"
 
 #: src/screens/devices.jsx
 msgid "Crear código"
@@ -2374,10 +2892,6 @@ msgid "Sin registro"
 msgstr "Sin registro"
 
 #: src/screens/devices.jsx
-msgid "Modo"
-msgstr "Modo"
-
-#: src/screens/devices.jsx
 msgid "Modo de operación del terminal"
 msgstr "Modo de operación del terminal"
 
@@ -2507,10 +3021,6 @@ msgstr "Conectar cuenta"
 #: src/screens/devices.jsx
 msgid "Conectado, con avisos"
 msgstr "Conectado, con avisos"
-
-#: src/screens/devices.jsx
-msgid "Conectado"
-msgstr "Conectado"
 
 #: src/screens/devices.jsx
 msgid "Cuenta de Mercado Pago"
@@ -3253,6 +3763,7 @@ msgid "Motivo"
 msgstr "Motivo"
 
 #: src/screens/inventory-adjust.jsx
+#: src/screens/recibos.jsx
 msgid "Nota"
 msgstr "Nota"
 
@@ -4964,10 +5475,12 @@ msgid "Tu contraseña"
 msgstr "Tu contraseña"
 
 #: src/screens/login.jsx
+#: src/screens/reset-password.jsx
 msgid "Ocultar contraseña"
 msgstr "Ocultar contraseña"
 
 #: src/screens/login.jsx
+#: src/screens/reset-password.jsx
 msgid "Mostrar contraseña"
 msgstr "Mostrar contraseña"
 
@@ -5154,10 +5667,6 @@ msgstr "total"
 #: src/screens/members.jsx
 msgid "{0} ciclo"
 msgstr "{0} ciclo"
-
-#: src/screens/members.jsx
-msgid "Sin dato"
-msgstr "Sin dato"
 
 #: src/screens/members.jsx
 msgid "Nunca"
@@ -5404,10 +5913,6 @@ msgstr "Reembolsar"
 #: src/screens/profile.jsx
 msgid "Activo"
 msgstr "Activo"
-
-#: src/screens/operations-workspace.jsx
-msgid "Falló"
-msgstr "Falló"
 
 #: src/screens/operations-workspace.jsx
 #: src/screens/registros.jsx
@@ -5658,11 +6163,6 @@ msgid "Código de barras"
 msgstr "Código de barras"
 
 #: src/screens/operations-workspace.jsx
-#: src/screens/ventas-report.jsx
-msgid "Categoría"
-msgstr "Categoría"
-
-#: src/screens/operations-workspace.jsx
 msgid "UUID opcional"
 msgstr "UUID opcional"
 
@@ -5673,6 +6173,30 @@ msgstr "Requiere preparación"
 #: src/screens/operations-workspace.jsx
 msgid "Artículo de inventario"
 msgstr "Artículo de inventario"
+
+#: src/screens/operations-workspace.jsx
+msgid "Disponibilidad"
+msgstr "Disponibilidad"
+
+#: src/screens/operations-workspace.jsx
+msgid "Marca «No disponible» cuando no haya producto en esa sucursal. La caja opaca la tarjeta, avisa «No disponible» y no deja agregarla a la cuenta."
+msgstr "Marca «No disponible» cuando no haya producto en esa sucursal. La caja opaca la tarjeta, avisa «No disponible» y no deja agregarla a la cuenta."
+
+#: src/screens/operations-workspace.jsx
+msgid "No disponible"
+msgstr "No disponible"
+
+#: src/screens/operations-workspace.jsx
+msgid "Fuera de surtido"
+msgstr "Fuera de surtido"
+
+#: src/screens/operations-workspace.jsx
+msgid "Descontinuado"
+msgstr "Descontinuado"
+
+#: src/screens/operations-workspace.jsx
+msgid "Programado"
+msgstr "Programado"
 
 #: src/screens/operations-workspace.jsx
 msgid "Configurar registro"
@@ -5707,16 +6231,8 @@ msgid "Configurar ruta de cocina"
 msgstr "Configurar ruta de cocina"
 
 #: src/screens/operations-workspace.jsx
-msgid "Estación"
-msgstr "Estación"
-
-#: src/screens/operations-workspace.jsx
 msgid "UUID de estación"
 msgstr "UUID de estación"
-
-#: src/screens/operations-workspace.jsx
-msgid "Predeterminada"
-msgstr "Predeterminada"
 
 #: src/screens/operations-workspace.jsx
 #: src/screens/recipe-workspace.jsx
@@ -5730,10 +6246,6 @@ msgstr "UUID del objetivo"
 #: src/screens/operations-workspace.jsx
 msgid "Prioridad"
 msgstr "Prioridad"
-
-#: src/screens/operations-workspace.jsx
-msgid "Guardar ruta"
-msgstr "Guardar ruta"
 
 #: src/screens/operations-workspace.jsx
 msgid "Comando original"
@@ -6427,6 +6939,590 @@ msgstr "movimientos"
 msgid "Canjes"
 msgstr "Canjes"
 
+#: src/screens/permission-labels.js
+msgid "Ver el historial de auditoría"
+msgstr "Ver el historial de auditoría"
+
+#: src/screens/permission-labels.js
+msgid "Preparar y editar cuentas"
+msgstr "Preparar y editar cuentas"
+
+#: src/screens/permission-labels.js
+msgid "Solicitar otro conteo de caja"
+msgstr "Solicitar otro conteo de caja"
+
+#: src/screens/permission-labels.js
+msgid "Enviar el conteo de caja"
+msgstr "Enviar el conteo de caja"
+
+#: src/screens/permission-labels.js
+msgid "Abrir el cajón sin venta"
+msgstr "Abrir el cajón sin venta"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar la apertura del cajón sin venta"
+msgstr "Autorizar la apertura del cajón sin venta"
+
+#: src/screens/permission-labels.js
+msgid "Registrar ingresos a caja"
+msgstr "Registrar ingresos a caja"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar ingresos a caja sobre el límite"
+msgstr "Autorizar ingresos a caja sobre el límite"
+
+#: src/screens/permission-labels.js
+msgid "Registrar retiros de caja"
+msgstr "Registrar retiros de caja"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar retiros de caja sobre el límite"
+msgstr "Autorizar retiros de caja sobre el límite"
+
+#: src/screens/permission-labels.js
+msgid "Registrar retiros a caja fuerte"
+msgstr "Registrar retiros a caja fuerte"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar retiros a caja fuerte sobre el límite"
+msgstr "Autorizar retiros a caja fuerte sobre el límite"
+
+#: src/screens/permission-labels.js
+msgid "Conciliar un turno de caja"
+msgstr "Conciliar un turno de caja"
+
+#: src/screens/permission-labels.js
+msgid "Usar una caja registradora asignada"
+msgstr "Usar una caja registradora asignada"
+
+#: src/screens/permission-labels.js
+msgid "Cerrar un turno conciliado"
+msgstr "Cerrar un turno conciliado"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar cierres sobre el límite"
+msgstr "Autorizar cierres sobre el límite"
+
+#: src/screens/permission-labels.js
+msgid "Traspasar la responsabilidad del turno"
+msgstr "Traspasar la responsabilidad del turno"
+
+#: src/screens/permission-labels.js
+msgid "Abrir un turno de caja"
+msgstr "Abrir un turno de caja"
+
+#: src/screens/permission-labels.js
+msgid "Consultar turnos de caja autorizados"
+msgstr "Consultar turnos de caja autorizados"
+
+#: src/screens/permission-labels.js
+msgid "Reanudar un turno de caja"
+msgstr "Reanudar un turno de caja"
+
+#: src/screens/permission-labels.js
+msgid "Pausar un turno de caja"
+msgstr "Pausar un turno de caja"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar diferencias de caja"
+msgstr "Autorizar diferencias de caja"
+
+#: src/screens/permission-labels.js
+msgid "Administrar el catálogo"
+msgstr "Administrar el catálogo"
+
+#: src/screens/permission-labels.js
+msgid "Consultar el catálogo de la sucursal"
+msgstr "Consultar el catálogo de la sucursal"
+
+#: src/screens/permission-labels.js
+msgid "Cobrar una venta"
+msgstr "Cobrar una venta"
+
+#: src/screens/permission-labels.js
+msgid "Aplicar descuentos dentro del límite"
+msgstr "Aplicar descuentos dentro del límite"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar descuentos especiales"
+msgstr "Autorizar descuentos especiales"
+
+#: src/screens/permission-labels.js
+msgid "Recuperar el cobro de otro operador"
+msgstr "Recuperar el cobro de otro operador"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar un resultado de terminal manual"
+msgstr "Autorizar un resultado de terminal manual"
+
+#: src/screens/permission-labels.js
+msgid "Confirmar un resultado de terminal manual"
+msgstr "Confirmar un resultado de terminal manual"
+
+#: src/screens/permission-labels.js
+msgid "Asignar un cliente a la cuenta"
+msgstr "Asignar un cliente a la cuenta"
+
+#: src/screens/permission-labels.js
+msgid "Ver datos de contacto del cliente"
+msgstr "Ver datos de contacto del cliente"
+
+#: src/screens/permission-labels.js
+msgid "Registrar clientes"
+msgstr "Registrar clientes"
+
+#: src/screens/permission-labels.js
+msgid "Quitar el cliente de la cuenta"
+msgstr "Quitar el cliente de la cuenta"
+
+#: src/screens/permission-labels.js
+msgid "Ver el historial administrativo del cliente"
+msgstr "Ver el historial administrativo del cliente"
+
+#: src/screens/permission-labels.js
+msgid "Ver el historial del cliente en otras sucursales"
+msgstr "Ver el historial del cliente en otras sucursales"
+
+#: src/screens/permission-labels.js
+msgid "Ver el historial del cliente"
+msgstr "Ver el historial del cliente"
+
+#: src/screens/permission-labels.js
+msgid "Unir registros de clientes"
+msgstr "Unir registros de clientes"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar la unión de clientes"
+msgstr "Autorizar la unión de clientes"
+
+#: src/screens/permission-labels.js
+msgid "Consultar clientes"
+msgstr "Consultar clientes"
+
+#: src/screens/permission-labels.js
+msgid "Buscar clientes"
+msgstr "Buscar clientes"
+
+#: src/screens/permission-labels.js
+msgid "Registrar terminales de venta o cocina"
+msgstr "Registrar terminales de venta o cocina"
+
+#: src/screens/permission-labels.js
+msgid "Activar tarjetas de regalo"
+msgstr "Activar tarjetas de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar la activación de tarjetas de regalo"
+msgstr "Autorizar la activación de tarjetas de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar el uso de una tarjeta de regalo"
+msgstr "Autorizar el uso de una tarjeta de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Emitir tarjetas de regalo"
+msgstr "Emitir tarjetas de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar la emisión de tarjetas de regalo"
+msgstr "Autorizar la emisión de tarjetas de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Buscar tarjetas de regalo"
+msgstr "Buscar tarjetas de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Consultar tarjetas de regalo"
+msgstr "Consultar tarjetas de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Cobrar con una tarjeta de regalo"
+msgstr "Cobrar con una tarjeta de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Devolver saldo a una tarjeta de regalo"
+msgstr "Devolver saldo a una tarjeta de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Liberar una reserva de tarjeta de regalo"
+msgstr "Liberar una reserva de tarjeta de regalo"
+
+#: src/screens/permission-labels.js
+msgid "Asignar periféricos"
+msgstr "Asignar periféricos"
+
+#: src/screens/permission-labels.js
+msgid "Ejecutar acciones de periféricos"
+msgstr "Ejecutar acciones de periféricos"
+
+#: src/screens/permission-labels.js
+msgid "Probar la pantalla del cliente"
+msgstr "Probar la pantalla del cliente"
+
+#: src/screens/permission-labels.js
+msgid "Usar la pantalla del cliente"
+msgstr "Usar la pantalla del cliente"
+
+#: src/screens/permission-labels.js
+msgid "Consultar el diagnóstico de periféricos"
+msgstr "Consultar el diagnóstico de periféricos"
+
+#: src/screens/permission-labels.js
+msgid "Abrir el cajón de dinero"
+msgstr "Abrir el cajón de dinero"
+
+#: src/screens/permission-labels.js
+msgid "Probar el cajón de dinero"
+msgstr "Probar el cajón de dinero"
+
+#: src/screens/permission-labels.js
+msgid "Configurar periféricos"
+msgstr "Configurar periféricos"
+
+#: src/screens/permission-labels.js
+msgid "Imprimir recibos"
+msgstr "Imprimir recibos"
+
+#: src/screens/permission-labels.js
+msgid "Reimprimir recibos"
+msgstr "Reimprimir recibos"
+
+#: src/screens/permission-labels.js
+msgid "Probar la impresora"
+msgstr "Probar la impresora"
+
+#: src/screens/permission-labels.js
+msgid "Consultar periféricos"
+msgstr "Consultar periféricos"
+
+#: src/screens/permission-labels.js
+msgid "Probar el lector de códigos"
+msgstr "Probar el lector de códigos"
+
+#: src/screens/permission-labels.js
+msgid "Usar el lector de códigos"
+msgstr "Usar el lector de códigos"
+
+#: src/screens/permission-labels.js
+msgid "Consultar reportes del negocio"
+msgstr "Consultar reportes del negocio"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar ajustes de inventario"
+msgstr "Autorizar ajustes de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Reducir existencias por ajuste"
+msgstr "Reducir existencias por ajuste"
+
+#: src/screens/permission-labels.js
+msgid "Aumentar existencias por ajuste"
+msgstr "Aumentar existencias por ajuste"
+
+#: src/screens/permission-labels.js
+msgid "Configurar conversiones de unidades"
+msgstr "Configurar conversiones de unidades"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar conteos de inventario"
+msgstr "Autorizar conteos de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Crear conteos de inventario"
+msgstr "Crear conteos de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Conciliar conteos de inventario"
+msgstr "Conciliar conteos de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Enviar conteos de inventario"
+msgstr "Enviar conteos de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar registros de daño"
+msgstr "Autorizar registros de daño"
+
+#: src/screens/permission-labels.js
+msgid "Registrar productos dañados"
+msgstr "Registrar productos dañados"
+
+#: src/screens/permission-labels.js
+msgid "Consultar movimientos de inventario"
+msgstr "Consultar movimientos de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar facturas de proveedor y sus costos"
+msgstr "Autorizar facturas de proveedor y sus costos"
+
+#: src/screens/permission-labels.js
+msgid "Capturar facturas de proveedor"
+msgstr "Capturar facturas de proveedor"
+
+#: src/screens/permission-labels.js
+msgid "Administrar artículos de inventario"
+msgstr "Administrar artículos de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar existencias negativas"
+msgstr "Autorizar existencias negativas"
+
+#: src/screens/permission-labels.js
+msgid "Configurar reglas de inventario"
+msgstr "Configurar reglas de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Consultar reglas de inventario"
+msgstr "Consultar reglas de inventario"
+
+#: src/screens/permission-labels.js
+msgid "Registrar producción con una receta vigente"
+msgstr "Registrar producción con una receta vigente"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar cuarentena de productos"
+msgstr "Autorizar cuarentena de productos"
+
+#: src/screens/permission-labels.js
+msgid "Poner productos en cuarentena"
+msgstr "Poner productos en cuarentena"
+
+#: src/screens/permission-labels.js
+msgid "Liberar productos de cuarentena"
+msgstr "Liberar productos de cuarentena"
+
+#: src/screens/permission-labels.js
+msgid "Consultar existencias"
+msgstr "Consultar existencias"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar recetas que cambian el costo"
+msgstr "Autorizar recetas que cambian el costo"
+
+#: src/screens/permission-labels.js
+msgid "Administrar recetas y alérgenos"
+msgstr "Administrar recetas y alérgenos"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar reposiciones"
+msgstr "Autorizar reposiciones"
+
+#: src/screens/permission-labels.js
+msgid "Resolver reposiciones"
+msgstr "Resolver reposiciones"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar mermas"
+msgstr "Autorizar mermas"
+
+#: src/screens/permission-labels.js
+msgid "Registrar mermas"
+msgstr "Registrar mermas"
+
+#: src/screens/permission-labels.js
+msgid "Confirmar la recepción de una cancelación en cocina"
+msgstr "Confirmar la recepción de una cancelación en cocina"
+
+#: src/screens/permission-labels.js
+msgid "Terminar tickets de la estación"
+msgstr "Terminar tickets de la estación"
+
+#: src/screens/permission-labels.js
+msgid "Consultar el diagnóstico de cocina"
+msgstr "Consultar el diagnóstico de cocina"
+
+#: src/screens/permission-labels.js
+msgid "Consultar la cocina del negocio"
+msgstr "Consultar la cocina del negocio"
+
+#: src/screens/permission-labels.js
+msgid "Iniciar la preparación de productos"
+msgstr "Iniciar la preparación de productos"
+
+#: src/screens/permission-labels.js
+msgid "Cambiar la prioridad de un ticket"
+msgstr "Cambiar la prioridad de un ticket"
+
+#: src/screens/permission-labels.js
+msgid "Consultar el tablero de cocina"
+msgstr "Consultar el tablero de cocina"
+
+#: src/screens/permission-labels.js
+msgid "Marcar productos listos"
+msgstr "Marcar productos listos"
+
+#: src/screens/permission-labels.js
+msgid "Devolver productos a preparación"
+msgstr "Devolver productos a preparación"
+
+#: src/screens/permission-labels.js
+msgid "Configurar estaciones y rutas de cocina"
+msgstr "Configurar estaciones y rutas de cocina"
+
+#: src/screens/permission-labels.js
+msgid "Consultar estaciones y rutas de cocina"
+msgstr "Consultar estaciones y rutas de cocina"
+
+#: src/screens/permission-labels.js
+msgid "Cambiar de sucursal en el dashboard"
+msgstr "Cambiar de sucursal en el dashboard"
+
+#: src/screens/permission-labels.js
+msgid "Ajustar puntos de lealtad"
+msgstr "Ajustar puntos de lealtad"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar ajustes de puntos"
+msgstr "Autorizar ajustes de puntos"
+
+#: src/screens/permission-labels.js
+msgid "Operar el programa de lealtad"
+msgstr "Operar el programa de lealtad"
+
+#: src/screens/permission-labels.js
+msgid "Configurar el programa de lealtad"
+msgstr "Configurar el programa de lealtad"
+
+#: src/screens/permission-labels.js
+msgid "Consultar puntos de lealtad"
+msgstr "Consultar puntos de lealtad"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar una recompensa revisada"
+msgstr "Autorizar una recompensa revisada"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar el uso de una recompensa"
+msgstr "Autorizar el uso de una recompensa"
+
+#: src/screens/permission-labels.js
+msgid "Canjear recompensas"
+msgstr "Canjear recompensas"
+
+#: src/screens/permission-labels.js
+msgid "Liberar una reserva de recompensa"
+msgstr "Liberar una reserva de recompensa"
+
+#: src/screens/permission-labels.js
+msgid "Configurar el negocio"
+msgstr "Configurar el negocio"
+
+#: src/screens/permission-labels.js
+msgid "Registrar ventas provisionales en efectivo sin conexión"
+msgstr "Registrar ventas provisionales en efectivo sin conexión"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar la recuperación de una operación sin conexión"
+msgstr "Autorizar la recuperación de una operación sin conexión"
+
+#: src/screens/permission-labels.js
+msgid "Sincronizar y conciliar operaciones sin conexión"
+msgstr "Sincronizar y conciliar operaciones sin conexión"
+
+#: src/screens/permission-labels.js
+msgid "Enviar productos a cocina antes de cobrar"
+msgstr "Enviar productos a cocina antes de cobrar"
+
+#: src/screens/permission-labels.js
+msgid "Operar pedidos y el tablero de cocina"
+msgstr "Operar pedidos y el tablero de cocina"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar cancelaciones después de iniciar la preparación"
+msgstr "Autorizar cancelaciones después de iniciar la preparación"
+
+#: src/screens/permission-labels.js
+msgid "Configurar cajas registradoras"
+msgstr "Configurar cajas registradoras"
+
+#: src/screens/permission-labels.js
+msgid "Consultar el historial de devoluciones y anulaciones"
+msgstr "Consultar el historial de devoluciones y anulaciones"
+
+#: src/screens/permission-labels.js
+msgid "Consultar devoluciones y anulaciones disponibles"
+msgstr "Consultar devoluciones y anulaciones disponibles"
+
+#: src/screens/permission-labels.js
+msgid "Gestionar cuentas y mesas"
+msgstr "Gestionar cuentas y mesas"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar devoluciones especiales"
+msgstr "Autorizar devoluciones especiales"
+
+#: src/screens/permission-labels.js
+msgid "Devolver efectivo"
+msgstr "Devolver efectivo"
+
+#: src/screens/permission-labels.js
+msgid "Devolver una venta completa"
+msgstr "Devolver una venta completa"
+
+#: src/screens/permission-labels.js
+msgid "Registrar devoluciones con terminal manual"
+msgstr "Registrar devoluciones con terminal manual"
+
+#: src/screens/permission-labels.js
+msgid "Devolver ventas de otra sucursal"
+msgstr "Devolver ventas de otra sucursal"
+
+#: src/screens/permission-labels.js
+msgid "Devolver ventas de otro operador"
+msgstr "Devolver ventas de otro operador"
+
+#: src/screens/permission-labels.js
+msgid "Devolver parte de una venta"
+msgstr "Devolver parte de una venta"
+
+#: src/screens/permission-labels.js
+msgid "Conciliar devoluciones con resultado desconocido"
+msgstr "Conciliar devoluciones con resultado desconocido"
+
+#: src/screens/permission-labels.js
+msgid "Reanudar cuentas de otro operador"
+msgstr "Reanudar cuentas de otro operador"
+
+#: src/screens/permission-labels.js
+msgid "Anular ventas elegibles"
+msgstr "Anular ventas elegibles"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar operaciones de saldo"
+msgstr "Autorizar operaciones de saldo"
+
+#: src/screens/permission-labels.js
+msgid "Conciliar operaciones de saldo"
+msgstr "Conciliar operaciones de saldo"
+
+#: src/screens/permission-labels.js
+msgid "Emitir y revocar códigos de pedido por mesa"
+msgstr "Emitir y revocar códigos de pedido por mesa"
+
+#: src/screens/permission-labels.js
+msgid "Administrar el negocio, el personal y las sucursales"
+msgstr "Administrar el negocio, el personal y las sucursales"
+
+#: src/screens/permission-labels.js
+msgid "Autorizar el uso del monedero"
+msgstr "Autorizar el uso del monedero"
+
+#: src/screens/permission-labels.js
+msgid "Consultar el monedero"
+msgstr "Consultar el monedero"
+
+#: src/screens/permission-labels.js
+msgid "Cobrar con el monedero"
+msgstr "Cobrar con el monedero"
+
+#: src/screens/permission-labels.js
+msgid "Devolver saldo al monedero"
+msgstr "Devolver saldo al monedero"
+
+#: src/screens/permission-labels.js
+msgid "Liberar una reserva del monedero"
+msgstr "Liberar una reserva del monedero"
+
 #: src/screens/prep-list.jsx
 msgid "No puedes administrar la preparación."
 msgstr "No puedes administrar la preparación."
@@ -6554,6 +7650,7 @@ msgid "Encargado"
 msgstr "Encargado"
 
 #: src/screens/profile.jsx
+#: src/screens/staff.jsx
 msgid "Personal"
 msgstr "Personal"
 
@@ -7201,6 +8298,22 @@ msgid "Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café
 msgstr "Hora en que empieza el día de ventas. 00:00 = medianoche local. Un café nocturno usa p. ej. 04:00 para que una venta de la 1 a.m. cuente en la noche que la abrió. No cambia días ya cerrados."
 
 #: src/screens/settings.jsx
+msgid "Cierre del día y cuentas abiertas"
+msgstr "Cierre del día y cuentas abiertas"
+
+#: src/screens/settings.jsx
+msgid "Resolver a mano (recomendado)"
+msgstr "Resolver a mano (recomendado)"
+
+#: src/screens/settings.jsx
+msgid "Anular las cuentas sin cobrar al corte"
+msgstr "Anular las cuentas sin cobrar al corte"
+
+#: src/screens/settings.jsx
+msgid "Qué pasa con una cuenta que sigue abierta cuando termina el día operativo. A mano, alguien la cobra o la anula. Al anular automáticamente, el sistema cierra las cuentas sin cobrar de días anteriores y las marca en rojo en el historial; las cuentas guardadas y las ya cobradas no se tocan. Empieza a mano."
+msgstr "Qué pasa con una cuenta que sigue abierta cuando termina el día operativo. A mano, alguien la cobra o la anula. Al anular automáticamente, el sistema cierra las cuentas sin cobrar de días anteriores y las marca en rojo en el historial; las cuentas guardadas y las ya cobradas no se tocan. Empieza a mano."
+
+#: src/screens/settings.jsx
 msgid "Segmentos de clientes"
 msgstr "Segmentos de clientes"
 
@@ -7402,6 +8515,50 @@ msgid "El cliente entra al programa de lealtad escaneando un código QR en la me
 msgstr "El cliente entra al programa de lealtad escaneando un código QR en la mesa, sin ayuda del personal."
 
 #: src/screens/settings.jsx
+msgid "Logo del negocio"
+msgstr "Logo del negocio"
+
+#: src/screens/settings.jsx
+msgid "Aparece en el ticket que recibe el cliente y en su tarjeta de Wallet."
+msgstr "Aparece en el ticket que recibe el cliente y en su tarjeta de Wallet."
+
+#: src/screens/settings.jsx
+msgid "Sin logo"
+msgstr "Sin logo"
+
+#: src/screens/settings.jsx
+msgid "Cambiar logo"
+msgstr "Cambiar logo"
+
+#: src/screens/settings.jsx
+msgid "Subir logo"
+msgstr "Subir logo"
+
+#: src/screens/settings.jsx
+msgid "Quitar logo"
+msgstr "Quitar logo"
+
+#: src/screens/settings.jsx
+msgid "PNG o JPG. Lo reducimos a 768 px antes de guardarlo."
+msgstr "PNG o JPG. Lo reducimos a 768 px antes de guardarlo."
+
+#: src/screens/settings.jsx
+msgid "Subiendo…"
+msgstr "Subiendo…"
+
+#: src/screens/settings.jsx
+msgid "No pudimos guardar el logo."
+msgstr "No pudimos guardar el logo."
+
+#: src/screens/settings.jsx
+msgid "Guardamos una imagen que ya no se puede cargar. Vuelve a subirla."
+msgstr "Guardamos una imagen que ya no se puede cargar. Vuelve a subirla."
+
+#: src/screens/settings.jsx
+msgid "Logo actualizado"
+msgstr "Logo actualizado"
+
+#: src/screens/settings.jsx
 msgid "Vista previa del pase de Wallet"
 msgstr "Vista previa del pase de Wallet"
 
@@ -7587,13 +8744,13 @@ msgstr "p. ej. la del centro, junto al parque"
 #~ msgstr "No se borra nada: el historial de sus turnos y ventas se conserva, y puedes devolverle el acceso desde esta misma pantalla cuando quieras."
 
 #: src/screens/staff.jsx
-msgid "Admin"
-msgstr "Admin"
+#: src/screens/ventas-report.jsx
+#~ msgid "Barista"
+#~ msgstr "Barista"
 
 #: src/screens/staff.jsx
-#: src/screens/ventas-report.jsx
-msgid "Barista"
-msgstr "Barista"
+msgid "Admin"
+msgstr "Admin"
 
 #: src/screens/staff.jsx
 msgid "Carrito"
@@ -7779,6 +8936,18 @@ msgstr "El rol Owner está protegido."
 #: src/screens/staff.jsx
 msgid "Filtrar permisos por producto"
 msgstr "Filtrar permisos por producto"
+
+#: src/screens/staff.jsx
+msgid "Este rol del sistema no se puede modificar."
+msgstr "Este rol del sistema no se puede modificar."
+
+#: src/screens/staff.jsx
+msgid "Necesitas permiso para administrar roles."
+msgstr "Necesitas permiso para administrar roles."
+
+#: src/screens/staff.jsx
+msgid "Este permiso está reservado y no se puede asignar a un rol personalizado."
+msgstr "Este permiso está reservado y no se puede asignar a un rol personalizado."
 
 #: src/screens/staff.jsx
 msgid "Reasigna al equipo antes de archivar."
@@ -8153,10 +9322,6 @@ msgid "En línea"
 msgstr "En línea"
 
 #: src/shell.jsx
-msgid "Conectando"
-msgstr "Conectando"
-
-#: src/shell.jsx
 msgid "Menú"
 msgstr "Menú"
 
@@ -8171,3 +9336,19 @@ msgstr "reintentar"
 #: src/shell.jsx
 msgid "Secciones"
 msgstr "Secciones"
+
+#: src/screens/staff.jsx
+msgid "Correo para entrar al POS"
+msgstr "Correo para entrar al POS"
+
+#: src/screens/staff.jsx
+msgid "Obligatorio si esta persona usará un PIN en el POS."
+msgstr "Obligatorio si esta persona usará un PIN en el POS."
+
+#: src/screens/staff.jsx
+msgid "Escribe un correo válido."
+msgstr "Escribe un correo válido."
+
+#: src/screens/staff.jsx
+msgid "Escribe un correo para usar el PIN en el POS."
+msgstr "Escribe un correo para usar el PIN en el POS."

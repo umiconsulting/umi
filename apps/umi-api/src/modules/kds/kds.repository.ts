@@ -8,6 +8,15 @@ import {
 } from './kitchen-domain';
 import { PgService } from '../../shared/database/pg.service';
 import { getRequestContext } from '../../shared/database/request-context';
+import { commercialCancellationSql } from './kitchen-commercial-state';
+import {
+  authorizeUnassigned,
+  changeUnassigned,
+  readUnassigned,
+  type UnassignedAction,
+} from './kitchen-unassigned';
+import type { PosKitchenOrderQuery, PosKitchenUnassignedCommandRequest } from '@umi/contract';
+import type { AuthUser } from '../auth/auth.types';
 import {
   type KdsDeviceSession,
   type KitchenStatus,
@@ -148,6 +157,7 @@ export interface SessionRow {
 export interface OrderScopeRow {
   id: string;
   merchant_id: string;
+  source_order_id?: string;
   location_id: string | null;
   station_id: string | null;
   station_ids?: string[];
@@ -161,6 +171,7 @@ export interface OrderScopeRow {
 
 /** A preparation-safe kitchen row for the iPad and dashboard adapters. */
 export interface TicketRow {
+  alert_settings?: Record<string, unknown>;
   ticket_id: string;
   source_transaction_id: string | null;
   public_reference?: string;
@@ -225,7 +236,52 @@ export interface DeviceListRow {
 
 @Injectable()
 export class KdsRepository {
+  async searchProducts(merchantId: string, search: string) {
+    const result = await this.pg.query<{ id: string; name: string; categoryId: string | null }>(
+      `SELECT id::text, name, category_id::text AS "categoryId"
+         FROM merchant.product WHERE merchant_id=$1::uuid AND active=true
+          AND name ILIKE '%' || $2 || '%' ORDER BY name,id LIMIT 50`,
+      [merchantId, search],
+    );
+    return result.rows;
+  }
   constructor(private readonly pg: PgService) {}
+
+  unassignedBoard(user: AuthUser, merchantId: string, query: PosKitchenOrderQuery) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      user.id,
+      async (client) => {
+        await authorizeUnassigned(client, user, merchantId, query);
+        return readUnassigned(client, merchantId, query.locationId);
+      },
+      query.locationId,
+    );
+  }
+
+  authorizeUnassigned(
+    user: AuthUser,
+    merchantId: string,
+    query: PosKitchenOrderQuery,
+    action: UnassignedAction,
+  ) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      user.id,
+      (client) => authorizeUnassigned(client, user, merchantId, query, action),
+      query.locationId,
+    );
+  }
+
+  changeUnassigned(
+    client: PoolClient,
+    user: AuthUser,
+    merchantId: string,
+    dto: PosKitchenUnassignedCommandRequest,
+    action: UnassignedAction,
+  ) {
+    return changeUnassigned(client, user, merchantId, dto, action);
+  }
 
   async dashboardLocationAllowed(userId: string, merchantId: string, locationId: string) {
     const { rowCount } = await this.pg.query(
@@ -336,15 +392,25 @@ export class KdsRepository {
       version: string;
       station_ids: string[];
       updated_at: string;
+      items: Array<{ sourceOrderItemId: string; status: string }>;
+      ready_items: Array<{ id: string; sound: string | null }>;
     }>(
       `SELECT ko.id::text AS kitchen_order_id,ko.source_order_id::text,
               ko.public_reference,ko.status,ko.priority,ko.version::text,
               array_agg(DISTINCT i.station_id::text) FILTER (WHERE i.station_id IS NOT NULL)
                 AS station_ids,
-              ko.updated_at
+              ko.updated_at,
+              coalesce(jsonb_agg(jsonb_build_object(
+                'sourceOrderItemId',i.source_order_item_id::text,
+                'status',i.status) order by i.display_order,i.id),'[]'::jsonb) as items,
+              coalesce(jsonb_agg(jsonb_build_object(
+                'id',i.id::text,'sound',case when (s.alert_settings->>'soundsEnabled')::boolean
+                  then s.alert_settings->>'readySound' else null end))
+                filter (where i.status='ready'),'[]'::jsonb) as ready_items
          FROM merchant.kitchen_order ko
          JOIN merchant.kitchen_order_item i
            ON i.merchant_id=ko.merchant_id AND i.kitchen_order_id=ko.id
+         LEFT JOIN merchant.station s ON s.id=i.station_id AND s.merchant_id=ko.merchant_id
         WHERE ko.merchant_id=$1::uuid AND ko.location_id=$2::uuid
           AND ko.source_order_id=$3::uuid
         GROUP BY ko.id`,
@@ -360,8 +426,24 @@ export class KdsRepository {
       priority: row.priority,
       version: Number(row.version),
       stationIds: row.station_ids ?? [],
+      items: row.items ?? [],
+      readyItems: row.ready_items ?? [],
       updatedAt: row.updated_at,
     };
+  }
+
+  async ownsPosOrder(
+    merchantId: string,
+    locationId: string,
+    sourceOrderId: string,
+    operatorSessionId: string,
+  ) {
+    const result = await this.pg.query(
+      `SELECT 1 FROM merchant.pos_cart WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+         AND fired_order_id=$3::uuid AND operator_session_id=$4::uuid`,
+      [merchantId, locationId, sourceOrderId, operatorSessionId],
+    );
+    return result.rows.length > 0;
   }
 
   // ── Stations (merchant.station; location_id -> location_id) ─────────────────────
@@ -398,12 +480,13 @@ export class KdsRepository {
       status: string;
       sort_order: number;
       location_id: string | null;
+      alert_settings: Record<string, unknown>;
     }>
   > {
     const locClause = locationId ? 'AND location_id = $2' : '';
     const params = locationId ? [merchantId, locationId] : [merchantId];
     const { rows } = await this.pg.query(
-      `SELECT id, key AS station_key, name, status, sort_order, location_id AS location_id
+      `SELECT id, key AS station_key, name, status, sort_order, location_id AS location_id, alert_settings
          FROM merchant.station
         WHERE merchant_id = $1 AND status = 'active' ${locClause}
         ORDER BY sort_order ASC, name ASC`,
@@ -416,6 +499,7 @@ export class KdsRepository {
       status: string;
       sort_order: number;
       location_id: string | null;
+      alert_settings: Record<string, unknown>;
     }>;
   }
 
@@ -459,8 +543,9 @@ export class KdsRepository {
   }> {
     return this.pg.workerTx(async (client) => {
       const { rows } = await client.query(
-        `INSERT INTO merchant.station (merchant_id, location_id, key, name)
-           VALUES ($1, $2, $3, $4)
+        `INSERT INTO merchant.station (merchant_id, location_id, key, name, alert_settings)
+           VALUES ($1, $2, $3, $4, jsonb_build_object('overdueSeconds',case when $3='barra' then 300 else 900 end,
+             'soundsEnabled',true,'arrivalSound','arrival','overdueSound','overdue','readySound','ready'))
          RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
         [input.merchantId, input.locationId, input.stationKey, input.name],
       );
@@ -485,7 +570,12 @@ export class KdsRepository {
   }
 
   /** Rename an active/disabled station. Returns null if not found. */
-  async updateStation(input: { merchantId: string; stationId: string; name: string }): Promise<{
+  async updateStation(input: {
+    merchantId: string;
+    stationId: string;
+    name: string;
+    alertSettings?: Record<string, unknown>;
+  }): Promise<{
     id: string;
     station_key: string;
     name: string;
@@ -496,10 +586,15 @@ export class KdsRepository {
     return this.pg.workerTx(async (client) => {
       const { rows } = await client.query(
         `UPDATE merchant.station
-          SET name = $3, updated_at = now()
+          SET name = $3, alert_settings = coalesce($4::jsonb, alert_settings), updated_at = now()
         WHERE id = $1 AND merchant_id = $2 AND status <> 'archived'
-      RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id`,
-        [input.stationId, input.merchantId, input.name],
+      RETURNING id, key AS station_key, name, status, sort_order, location_id AS location_id, alert_settings`,
+        [
+          input.stationId,
+          input.merchantId,
+          input.name,
+          input.alertSettings ? JSON.stringify(input.alertSettings) : null,
+        ],
       );
       const station =
         (rows[0] as {
@@ -1119,10 +1214,12 @@ export class KdsRepository {
     const { rows } = await this.pg.query<TicketRow>(
       `SELECT v.id::text AS ticket_id,v.source_order_id::text AS source_transaction_id,
               v.public_reference,
-              v.merchant_id::text AS merchant_id,v.source AS source_channel,v.status,
+              v.merchant_id::text AS merchant_id,v.source AS source_channel,
+              CASE WHEN cancellation.cancelled THEN 'cancelled' ELSE v.status END AS status,
               v.location_id::text,v.priority,v.business_date::text,
               v.preparation_started_at,v.version,
               v.station_id::text AS station_id,s.name AS station_name,
+              s.alert_settings,
               v.queued_at AS created_at,
               v.updated_at AS updated_at,v.last_event_sequence,
               -- §8.5 and D8, the SECOND place a ticket projection is built. The view is
@@ -1132,7 +1229,9 @@ export class KdsRepository {
               -- because kds.station_order does not carry it, and the list is derived
               -- from the recipe on every read rather than stored on the line.
               coalesce((
-                select jsonb_agg(item || jsonb_build_object('allergens',
+                select jsonb_agg(item
+                       || CASE WHEN cancellation.cancelled THEN '{"status":"cancelled"}'::jsonb ELSE '{}'::jsonb END
+                       || jsonb_build_object('allergens',
                          case when i.product_id is null then '[]'::jsonb else coalesce((
                            select jsonb_agg(jsonb_build_object('code',a.code,'label',a.label)
                                             order by a.code)
@@ -1147,9 +1246,15 @@ export class KdsRepository {
               v.fired_through_course
          FROM kds.station_order v
          JOIN merchant.station s ON s.id=v.station_id AND s.merchant_id=v.merchant_id
+         CROSS JOIN LATERAL (SELECT ${commercialCancellationSql('v')} OR v.status='cancelled' AS cancelled) cancellation
         WHERE v.merchant_id=$1::uuid AND v.location_id=$2::uuid
           AND v.station_id=ANY($3::uuid[])
-          AND v.status IN ('queued','in_preparation','partially_ready','ready','exception')
+          AND v.status IN ('queued','in_preparation','partially_ready','ready','exception','cancelled')
+          AND EXISTS (SELECT 1 FROM merchant.kitchen_order_item pending
+            WHERE pending.merchant_id=v.merchant_id AND pending.kitchen_order_id=v.id
+              AND pending.station_id=v.station_id
+              AND (cancellation.cancelled OR pending.status<>'cancelled')
+              AND pending.station_completed_at IS NULL)
         ORDER BY CASE v.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
                  v.queued_at,v.id`,
       [merchantId, locationId, stationIds],
@@ -1205,10 +1310,12 @@ export class KdsRepository {
       `SELECT i.product_name AS "productName",
               i.variant_name AS "variantName",
               coalesce(sum(i.quantity) FILTER (
-                WHERE ko.status <> 'cancelled' AND i.status <> 'cancelled'), 0)::int
+                WHERE ko.status <> 'cancelled' AND NOT ${commercialCancellationSql('ko')}
+                  AND i.status <> 'cancelled'), 0)::int
                 AS "ordered",
               coalesce(sum(i.quantity) FILTER (
-                WHERE ko.status <> 'cancelled' AND i.status NOT IN ('ready','cancelled')), 0)::int
+                WHERE ko.status <> 'cancelled' AND NOT ${commercialCancellationSql('ko')}
+                  AND i.status NOT IN ('ready','cancelled')), 0)::int
                 AS "outstanding"
          FROM merchant.kitchen_order ko
          JOIN merchant.kitchen_order_item i ON i.kitchen_order_id = ko.id
@@ -1349,7 +1456,7 @@ export class KdsRepository {
     const { rows } = await this.pg.query<
       OrderScopeRow & { status: KitchenOrderStatus; station_ids: string[]; version: string }
     >(
-      `SELECT ko.id,ko.merchant_id,ko.location_id,
+      `SELECT ko.id,ko.merchant_id,ko.location_id,ko.source_order_id::text,
               min(i.station_id::text) AS station_id,
               array_agg(DISTINCT i.station_id::text) FILTER (WHERE i.station_id IS NOT NULL)
                 AS station_ids,
@@ -1450,12 +1557,14 @@ export class KdsRepository {
         location_id: string;
         fired_through_course: number | string;
         updated_at: Date | string;
+        commercially_cancelled: boolean;
       }>(
-        `SELECT id::text,status,version::text,location_id::text,
-                fired_through_course,updated_at
-           FROM merchant.kitchen_order
-          WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-          FOR UPDATE`,
+        `SELECT ko.id::text,ko.status,ko.version::text,ko.location_id::text,
+                ko.fired_through_course,ko.updated_at,
+                ${commercialCancellationSql('ko')} AS commercially_cancelled
+           FROM merchant.kitchen_order ko
+          WHERE ko.id=$1::uuid AND ko.merchant_id=$2::uuid AND ko.location_id=$3::uuid
+          FOR UPDATE OF ko`,
         [input.order.id, input.order.merchant_id, input.session.locationId],
       );
       const current = locked.rows[0];
@@ -1541,6 +1650,12 @@ export class KdsRepository {
       // out of it: nothing was written, so a stale `expectedVersion` is not a conflict.
       const requestedCourse =
         input.commandType === 'fire_course' ? (input.courseNumber ?? null) : null;
+      const cancelled = current.commercially_cancelled || current.status === 'cancelled';
+      if (cancelled && input.commandType !== 'cancel_ack') {
+        const result = { code: 'KITCHEN_INVALID_TRANSITION', currentStatus: 'cancelled' };
+        await finishKitchenCommand(client, input.commandId, 'conflict', result);
+        return { status: 'conflict', result };
+      }
       const currentFiredThroughCourse = Number(current.fired_through_course ?? 1);
       // The service refuses a course outside 1..20 with a 400 before it gets here. This is
       // the last line of defence, not a second copy of that check: a `fire_course` that
@@ -1588,6 +1703,18 @@ export class KdsRepository {
       const requestedStatus = commandTarget(input.commandType, current.status);
       if (
         requestedStatus &&
+        !(cancelled && input.commandType === 'cancel_ack') &&
+        !(
+          input.commandType === 'complete' &&
+          input.itemIds.length > 0 &&
+          ['queued', 'in_preparation', 'partially_ready', 'ready', 'exception'].includes(
+            current.status,
+          )
+        ) &&
+        !(
+          current.status === 'exception' &&
+          ['mark_item_ready', 'mark_order_ready'].includes(input.commandType)
+        ) &&
         !(
           requestedStatus === current.status &&
           ['start_preparation', 'mark_item_ready', 'mark_order_ready'].includes(input.commandType)
@@ -1600,15 +1727,39 @@ export class KdsRepository {
       }
 
       let effectCount = 1;
-      if (input.commandType === 'start_preparation' || input.commandType === 'recall') {
+      let newlyReadyItemIds: string[] = [];
+      if (input.commandType === 'cancel_ack' && cancelled) {
+        // Descartar confirma el aviso sólo para los ítems de esta estación.
+        const effect = await client.query(
+          `UPDATE merchant.kitchen_order_item SET status='cancelled',version=version+1,
+                  cancelled_at=coalesce(cancelled_at,clock_timestamp()),
+                  station_completed_at=clock_timestamp(),updated_at=clock_timestamp()
+            WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
+              AND station_id=ANY($3::uuid[])
+              AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))
+              AND station_completed_at IS NULL`,
+          [input.order.merchant_id, input.order.id, stationScope, input.itemIds],
+        );
+        effectCount = effect.rowCount ?? 0;
+      } else if (input.commandType === 'start_preparation' || input.commandType === 'recall') {
         const effect = await client.query(
           `UPDATE merchant.kitchen_order_item SET status='preparing',version=version+1,
+                  station_completed_at=NULL,
                   preparation_started_at=coalesce(preparation_started_at,clock_timestamp()),
                   updated_at=clock_timestamp()
             WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
               AND station_id=ANY($3::uuid[])
-              AND status IN ('queued','ready')`,
-          [input.order.merchant_id, input.order.id, stationScope],
+              AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))
+              AND course_number <= $6
+              AND (status='queued' OR ($5='recall' AND status='ready'))`,
+          [
+            input.order.merchant_id,
+            input.order.id,
+            stationScope,
+            input.itemIds,
+            input.commandType,
+            currentFiredThroughCourse,
+          ],
         );
         effectCount = effect.rowCount ?? 0;
       } else if (input.commandType === 'mark_item_ready') {
@@ -1619,33 +1770,73 @@ export class KdsRepository {
             `SELECT count(*)::text AS count FROM merchant.kitchen_order_item
               WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
                 AND station_id=ANY($3::uuid[])
-                AND id=ANY($4::uuid[]) AND status IN ('queued','preparing')`,
-            [input.order.merchant_id, input.order.id, stationScope, input.itemIds],
+                AND id=ANY($4::uuid[]) AND status IN ('queued','preparing')
+                AND course_number <= $5`,
+            [
+              input.order.merchant_id,
+              input.order.id,
+              stationScope,
+              input.itemIds,
+              currentFiredThroughCourse,
+            ],
           );
           if (Number(eligible.rows[0]?.count ?? 0) !== input.itemIds.length) {
             effectCount = 0;
           } else {
-            const effect = await client.query(
+            const effect = await client.query<{ id: string }>(
               `UPDATE merchant.kitchen_order_item SET status='ready',version=version+1,
                   ready_at=clock_timestamp(),updated_at=clock_timestamp()
                 WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
                   AND station_id=ANY($3::uuid[])
-                  AND id=ANY($4::uuid[]) AND status IN ('queued','preparing')`,
-              [input.order.merchant_id, input.order.id, stationScope, input.itemIds],
+                  AND id=ANY($4::uuid[]) AND status IN ('queued','preparing')
+                  AND course_number <= $5
+                RETURNING id::text`,
+              [
+                input.order.merchant_id,
+                input.order.id,
+                stationScope,
+                input.itemIds,
+                currentFiredThroughCourse,
+              ],
             );
             effectCount = effect.rowCount ?? 0;
+            newlyReadyItemIds = effect.rows.map((row) => row.id);
           }
         }
+      } else if (input.commandType === 'complete') {
+        const eligible = await client.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM merchant.kitchen_order_item
+           WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
+             AND station_id=ANY($3::uuid[]) AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))
+             AND status='ready' AND station_completed_at IS NULL`,
+          [input.order.merchant_id, input.order.id, stationScope, input.itemIds],
+        );
+        const count = Number(eligible.rows[0]?.count ?? 0);
+        if (count === 0 || (input.itemIds.length > 0 && count !== input.itemIds.length)) {
+          effectCount = 0;
+        } else {
+          const effect = await client.query(
+            `UPDATE merchant.kitchen_order_item SET station_completed_at=clock_timestamp(),
+               version=version+1,updated_at=clock_timestamp()
+             WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
+               AND station_id=ANY($3::uuid[]) AND (cardinality($4::uuid[])=0 OR id=ANY($4::uuid[]))
+               AND status='ready' AND station_completed_at IS NULL`,
+            [input.order.merchant_id, input.order.id, stationScope, input.itemIds],
+          );
+          effectCount = effect.rowCount ?? 0;
+        }
       } else if (input.commandType === 'mark_order_ready') {
-        const effect = await client.query(
+        const effect = await client.query<{ id: string }>(
           `UPDATE merchant.kitchen_order_item SET status='ready',version=version+1,
                   ready_at=clock_timestamp(),updated_at=clock_timestamp()
             WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid
               AND station_id=ANY($3::uuid[])
-              AND status IN ('queued','preparing')`,
-          [input.order.merchant_id, input.order.id, stationScope],
+              AND status IN ('queued','preparing') AND course_number <= $4
+            RETURNING id::text`,
+          [input.order.merchant_id, input.order.id, stationScope, currentFiredThroughCourse],
         );
         effectCount = effect.rowCount ?? 0;
+        newlyReadyItemIds = effect.rows.map((row) => row.id);
       } else if (input.commandType === 'cancel_ack') {
         const eligible =
           input.itemIds.length === 0
@@ -1678,13 +1869,24 @@ export class KdsRepository {
         return { status: 'conflict', result };
       }
 
-      const itemRows = await client.query<{ status: KitchenItemStatus }>(
-        `SELECT status FROM merchant.kitchen_order_item
+      const itemRows = await client.query<{
+        status: KitchenItemStatus;
+        station_completed_at: Date | null;
+      }>(
+        `SELECT status,station_completed_at FROM merchant.kitchen_order_item
           WHERE merchant_id=$1::uuid AND kitchen_order_id=$2::uuid`,
         [input.order.merchant_id, input.order.id],
       );
       let nextStatus: KitchenOrderStatus;
-      if (input.commandType === 'complete') nextStatus = 'completed';
+      if (cancelled) nextStatus = 'cancelled';
+      else if (input.commandType === 'complete')
+        nextStatus = itemRows.rows.every(
+          (row) =>
+            row.status === 'cancelled' ||
+            (row.status === 'ready' && row.station_completed_at !== null),
+        )
+          ? 'completed'
+          : deriveKitchenOrderStatus(itemRows.rows.map((row) => row.status));
       // `fire_course` fires a course, it does not move the ticket: the status passes
       // through exactly as `change_priority` passes it, rather than being recomputed
       // from the item rows, which a course never touches.
@@ -1718,7 +1920,7 @@ export class KdsRepository {
         ],
       );
       const kind = kitchenEventKind(input.commandType);
-      const event = await client.query<{ sequence: string }>(
+      const event = await client.query<{ event_id: string; sequence: string }>(
         `INSERT INTO merchant.kitchen_event
            (event_id,merchant_id,location_id,kitchen_order_id,kitchen_order_item_id,
             station_id,kind,aggregate_version,status,safe_payload,correlation_id)
@@ -1726,7 +1928,7 @@ export class KdsRepository {
                  jsonb_build_object('reasonCode',$9::text)
                    || CASE WHEN $11::smallint IS NULL THEN '{}'::jsonb
                            ELSE jsonb_build_object('firedThroughCourse',$11::smallint) END,$10)
-         RETURNING sequence::text`,
+         RETURNING event_id::text,sequence::text`,
         [
           input.order.merchant_id,
           input.session.locationId,
@@ -1741,6 +1943,42 @@ export class KdsRepository {
           requestedCourse,
         ],
       );
+      const fcmProjectId = process.env.FCM_PROJECT_ID;
+      const environment = process.env.UMI_ENVIRONMENT;
+      if (
+        fcmProjectId &&
+        environment &&
+        input.order.source_order_id &&
+        newlyReadyItemIds.length > 0
+      ) {
+        const orderReady = nextStatus === 'ready';
+        const itemIdsToNotify = orderReady ? newlyReadyItemIds.slice(0, 1) : newlyReadyItemIds;
+        const pushType = orderReady ? 'kitchen_order_ready' : 'kitchen_item_ready';
+        for (const itemId of itemIdsToNotify) {
+          await client.query(
+            `INSERT INTO runtime.outbox_event
+               (merchant_id,topic,aggregate_id,idempotency_key,payload)
+             VALUES ($1::uuid,$5,$2::uuid,$3,$4::jsonb)
+             ON CONFLICT (merchant_id,idempotency_key) DO NOTHING`,
+            [
+              input.order.merchant_id,
+              input.order.id,
+              `pos.${pushType}:${event.rows[0].event_id}:${itemId}`,
+              JSON.stringify({
+                type: pushType,
+                merchantId: input.order.merchant_id,
+                kitchenOrderId: input.order.id,
+                sourceOrderId: input.order.source_order_id,
+                itemId,
+                eventId: event.rows[0].event_id,
+                environment,
+                projectId: fcmProjectId,
+              }),
+              `pos.${pushType}`,
+            ],
+          );
+        }
+      }
       await client.query(
         `INSERT INTO merchant.audit_event
            (merchant_id,location_id,actor_user_id,command_id,event_type,entity_type,entity_id,outcome,

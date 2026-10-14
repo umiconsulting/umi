@@ -1,0 +1,92 @@
+{
+  "generatedAt": "2026-10-11T08:29:59.028Z",
+  "base": "http://127.0.0.1:4000",
+  "email": "prueba-reset@umiconsulting.co",
+  "requestEmail": "nadie@ejemplo.invalid",
+  "steps": [
+    {
+      "name": "sign-in screen",
+      "ok": true,
+      "detail": "the link to the request view is on the sign-in screen",
+      "ms": 1181,
+      "shot": "/tmp/ux/forgot-shots/01-sign-in screen.png"
+    },
+    {
+      "name": "request view",
+      "ok": true,
+      "detail": "heading \"¿Olvidaste tu contraseña?\", the email field is present",
+      "ms": 414,
+      "shot": "/tmp/ux/forgot-shots/02-request view.png"
+    },
+    {
+      "name": "request sent",
+      "ok": true,
+      "detail": "the confirmation view answers and names the 15-minute expiry",
+      "ms": 457,
+      "shot": "/tmp/ux/forgot-shots/03-request sent.png"
+    },
+    {
+      "name": "message and link",
+      "ok": true,
+      "detail": "the message arrived · subject \"Reestablecer contraseña · Umi Dashboard\" · link on 127.0.0.1:4000",
+      "ms": 404,
+      "shot": "/tmp/ux/forgot-shots/04-message and link.png"
+    },
+    {
+      "name": "new-password view",
+      "ok": true,
+      "detail": "heading \"Nueva contraseña\", two hidden fields, the language control is present",
+      "ms": 711,
+      "shot": "/tmp/ux/forgot-shots/05-new-password view.png"
+    },
+    {
+      "name": "reveal toggle",
+      "ok": true,
+      "detail": "the password can be shown and hidden, and the control says which it will do",
+      "ms": 132,
+      "shot": "/tmp/ux/forgot-shots/06-reveal toggle.png"
+    },
+    {
+      "name": "language on the form",
+      "ok": true,
+      "detail": "\"Nueva contraseña\" → \"New password\" → \"Nueva contraseña\"",
+      "ms": 972,
+      "shot": "/tmp/ux/forgot-shots/07-language on the form.png"
+    },
+    {
+      "name": "refuses a short password",
+      "ok": true,
+      "detail": "the form refuses it in its own words, before the API is asked",
+      "ms": 119,
+      "shot": "/tmp/ux/forgot-shots/08-refuses a short password.png"
+    },
+    {
+      "name": "refuses a mismatch",
+      "ok": true,
+      "detail": "the form refuses two different passwords",
+      "ms": 98,
+      "shot": "/tmp/ux/forgot-shots/09-refuses a mismatch.png"
+    },
+    {
+      "name": "sets the password",
+      "ok": true,
+      "detail": "the API accepted the token and the view confirms the change",
+      "ms": 160,
+      "shot": "/tmp/ux/forgot-shots/10-sets the password.png"
+    },
+    {
+      "name": "signs in with it",
+      "ok": true,
+      "detail": "the browser left the sign-in screen for /",
+      "ms": 1054,
+      "shot": "/tmp/ux/forgot-shots/11-signs in with it.png"
+    }
+  ],
+  "message": {
+    "to": "prueba-reset@umiconsulting.co",
+    "subject": "Reestablecer contraseña · Umi Dashboard",
+    "greeting": "Prueba Reset",
+    "linkHost": "127.0.0.1:4000"
+  },
+  "passed": true
+}

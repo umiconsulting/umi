@@ -1,0 +1,98 @@
+[
+  {
+    "name": "toast-send",
+    "url": "https://support.toasttab.com/en/article/Differences-Between-the-Send-Stay-and-Hold-Buttons?lang=en_US",
+    "status": 200,
+    "title": "Use the Send, Stay and Hold Buttons on Your POS",
+    "images": 4,
+    "challenge": false
+  },
+  {
+    "name": "toast-handheld",
+    "url": "https://support.toasttab.com/en/article/Setting-Up-Your-Toast-Go-2-and-Accepting-Payments",
+    "status": 200,
+    "title": "Set Up Your Toast Go® 2 Handheld",
+    "images": 1,
+    "challenge": false
+  },
+  {
+    "name": "square-handheld",
+    "url": "https://squareup.com/help/us/en/article/8499-accept-payments-with-square-handheld",
+    "status": 200,
+    "title": "Accept payments with Square Handheld | Square Support Center - United States",
+    "images": 1,
+    "challenge": false
+  },
+  {
+    "name": "square-send",
+    "url": "https://squareup.com/help/us/en/article/8612-set-up-send-stay-for-your-restaurant",
+    "status": 200,
+    "title": "Set up Send & Stay for your restaurant | Square Support Center - United States",
+    "images": 0,
+    "challenge": false
+  },
+  {
+    "name": "lightspeed-send",
+    "url": "https://k-series-support.lightspeedhq.com/hc/en-us/articles/360050308894-Placing-basic-orders",
+    "status": 200,
+    "title": "Placing basic orders – Lightspeed Restaurant (K-Series)",
+    "images": 4,
+    "challenge": false
+  },
+  {
+    "name": "lightspeed-handheld",
+    "url": "https://k-series-support.lightspeedhq.com/hc/en-us/articles/5012416749211-Using-Pay-at-Table-with-Lightspeed-Payments",
+    "status": 200,
+    "title": "Using Pay at Table with Lightspeed Payments – Lightspeed Restaurant (K-Series)",
+    "images": 27,
+    "challenge": false
+  },
+  {
+    "name": "softrestaurant-mobile",
+    "url": "https://softrestaurant.com/addons/movil",
+    "status": 200,
+    "title": "Soft Restaurant® - Comandero Móvil",
+    "images": 5,
+    "challenge": false
+  },
+  {
+    "name": "fudo-mobile",
+    "url": "https://soporte.fu.do/es/articles/11732083-aplicacion-movil-que-es-y-como-funciona",
+    "status": 200,
+    "title": "Aplicación Móvil - Qué es y cómo funciona | Fudo | Centro de Ayuda",
+    "images": 13,
+    "challenge": false
+  },
+  {
+    "name": "softrestaurant-payments",
+    "url": "https://softrestaurant.com/terminal-punto-venta-soft-restaurant-payments",
+    "status": 200,
+    "title": "Soft Restaurant® - Nuevo Soft Restaurant® Payments | Terminal Punto de Venta",
+    "images": 2,
+    "challenge": false
+  },
+  {
+    "name": "fudo-terminal-mx",
+    "url": "https://soporte.fu.do/es/articles/14489380-terminal-de-fudo-mx-que-es-y-como-funciona",
+    "status": 200,
+    "title": "Terminal de Fudo MX: ¿Qué es y cómo funciona? | Fudo | Centro de Ayuda",
+    "images": 2,
+    "challenge": false
+  },
+  {
+    "name": "parrot-send",
+    "url": "https://soporte.parrotsoftware.com.mx/es_MX/tipo-de-orden-pos/comandar-orden-de-mesa-",
+    "status": 200,
+    "title": "Comandar orden de mesa - Parrot",
+    "images": 4,
+    "challenge": false
+  },
+  {
+    "name": "softrestaurant-cloud",
+    "url": "https://softrestaurant.zohodesk.com/portal/es/kb/articles/manual-src-m%C3%B3vil",
+    "status": 200,
+    "title": "Manual de usuario - Dispositivos Móviles SRC",
+    "images": 49,
+    "challenge": false
+  }
+]

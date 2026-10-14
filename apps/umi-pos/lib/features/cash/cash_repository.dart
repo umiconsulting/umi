@@ -1,6 +1,7 @@
 import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/network/api_client.dart';
+import '../../shared/approvals/manager_approval_repository.dart';
 
 abstract interface class CashRepository {
   Future<CashCenterSnapshot> center(String merchantId, CashCenterQuery query);
@@ -74,11 +75,19 @@ abstract interface class CashRepository {
     NoSaleDrawerRequest request,
   );
   Future<ElevationGrantView> approve(ManagerApprovalRequest request);
+  Future<ElevationGrantView> verifyOperatorPin(
+    VerifyOperatorPinRequest request,
+  );
 }
 
 final class ApiCashRepository implements CashRepository {
   ApiCashRepository(this._api);
   final ApiClient _api;
+
+  /// One implementation of the manager elevation call for the whole till: the cash
+  /// surfaces keep asking through this repository, and the cart's void-after-preparation
+  /// approval asks through the same object rather than a second copy of the route.
+  late final ManagerApprovalRepository _approvals = ApiManagerApprovalRepository(_api);
 
   @override
   Future<CashCenterSnapshot> center(
@@ -301,12 +310,22 @@ final class ApiCashRepository implements CashRepository {
   );
 
   @override
-  Future<ElevationGrantView> approve(ManagerApprovalRequest request) async =>
-      ElevationGrantView.fromJson(
-        await _api.request(
-          method: ApiMethod.post,
-          path: UmiRoutes.managerApproval,
-          body: request.toJson(),
-        ),
-      );
+  Future<ElevationGrantView> approve(ManagerApprovalRequest request) =>
+      _approvals.approve(request);
+
+  /// The operator's own PIN, checked by the server under the live session.
+  ///
+  /// The elevation the server returns is what names the permission this PIN
+  /// proved, so a till cannot use it to unlock something the operator does not
+  /// hold. A refusal arrives as an `AppException` the caller must show.
+  @override
+  Future<ElevationGrantView> verifyOperatorPin(
+    VerifyOperatorPinRequest request,
+  ) async => ElevationGrantView.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.operatorPin,
+      body: request.toJson(),
+    ),
+  );
 }

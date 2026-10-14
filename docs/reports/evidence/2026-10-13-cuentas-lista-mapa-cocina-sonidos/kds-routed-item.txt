@@ -1,0 +1,5 @@
+   public_reference   | station | product_name | target_seconds |   route_reason   |  status   |           queued_at           
+----------------------+---------+--------------+----------------+------------------+-----------+-------------------------------
+ Cuenta 096 · Mesa 10 | Cocina  | Capuccino    |             30 | configured_route | preparing | 2026-10-13 11:33:20.356005+00
+(1 row)
+

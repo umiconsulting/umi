@@ -1,0 +1,13 @@
+192.168.1.10:5555 install -r: Success
+versionCode=89 minSdk=24 targetSdk=36
+versionName=0.1.0
+
+192.168.1.14:35559 install -r: Success
+versionCode=89 minSdk=24 targetSdk=36
+versionName=0.1.0
+
+192.168.1.13:38333 install -r: Success
+versionCode=89 minSdk=24 targetSdk=36
+versionName=0.1.0
+
+1d3b62b8ffe9a91d0e6b54b66d44df08173706fe277ba6bfe339ebe57a0f8112  apps/umi-pos/build/app/outputs/flutter-apk/app-profile.apk

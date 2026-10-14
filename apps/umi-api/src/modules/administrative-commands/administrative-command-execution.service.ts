@@ -98,6 +98,7 @@ export class AdministrativeCommandExecutionService {
           case 'catalog.create':
           case 'catalog.update':
           case 'catalog.archive':
+          case 'catalog.availability':
             return this.catalog.executeAdministrative(
               user,
               access,

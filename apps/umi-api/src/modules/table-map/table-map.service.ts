@@ -213,7 +213,17 @@ export class TableMapService {
           dto.locationId,
           dto.operatorSessionId,
         );
-        const changed = await run(context);
+        let changed: TableStateEntry[];
+        try {
+          changed = await run(context);
+        } catch (error) {
+          if (
+            (error as { code?: string; message?: string }).code === '23514' &&
+            (error as Error).message.includes('TABLE_HAS_OPEN_ACCOUNT')
+          )
+            throw new ConflictException({ code: 'TABLE_HAS_OPEN_ACCOUNT' });
+          throw error;
+        }
         await context.appendAudit({
           eventType: `${commandType}.applied`,
           entityType: 'table_state',

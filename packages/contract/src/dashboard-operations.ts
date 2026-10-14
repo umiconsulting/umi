@@ -131,6 +131,9 @@ export const DashboardAdministrativeOperation = z.enum([
   'catalog.detail',
   'catalog.update',
   'catalog.archive',
+  // "No hay producto" for one product at one location (the 86 state). The dashboard is
+  // where the owner says it; the till reads it to dim the card and refuse the line.
+  'catalog.availability',
   // Recipes and inventory authoring (recipes module plan §11, phase 1). The console
   // AUTHORS items, their unit conversions and their allergen labels; the till
   // operates. Every one of these is an administrative command, never a write route,

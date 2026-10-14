@@ -1,0 +1,20 @@
+{
+  "status": "degraded",
+  "state": "Unready",
+  "db": true,
+  "redis": true,
+  "release": {
+    "application": "umi-api",
+    "version": "0.1.0",
+    "gitCommit": "76555ab3d767ab05b5cd3ef7521f86f258657cd5",
+    "buildTimestamp": "2026-10-07T04:05:00Z",
+    "environment": "development",
+    "contractVersion": "2.34.0",
+    "expectedSchemaVersion": "build-v3-79",
+    "configurationSchemaVersion": "1",
+    "minimumPosVersion": "0.1.0",
+    "minimumDashboardVersion": "0.2.0"
+  },
+  "schema": { "current": null, "expected": "build-v3-79", "compatible": false },
+  "ts": "2026-10-13T22:18:33.125Z"
+}

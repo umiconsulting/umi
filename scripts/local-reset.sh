@@ -164,6 +164,25 @@ echo "== applying the build-v3 chain =="
 PGHOST="$host" PGPORT="$port" PGUSER=postgres PGPASSWORD="$pg_password" \
   bash "$ROOT/docs/migration/build-v3/00_run.sh" "$database"
 
+# THE CHAIN IS NOT THE WHOLE SCHEMA ANY MORE, and assuming it was is how a local
+# database ends up a version nobody ships. After the cutover a schema change arrives as a
+# file in `docs/migration/build-v3/migrations/`: `80_pos_table_accounts.sql` \ir-includes
+# some of them (004–022) because they are the base the accounts feature needs, and the
+# rest — 001, 002, 003, 008, 009, 011–017, 023, 024 and everything after — reach
+# production, staging and CI only through this loop. CI already does exactly this
+# (`umi-api-ci.yml`, "Apply the forward migrations"); a reset that skipped it built a
+# database missing `cash_shift.closed_reason` or `merchant.pos_day_close_policy`, and the
+# first symptom was a column that does not exist at the moment the feature ran.
+#
+# Re-runnable by contract: every file is guarded, and CI applies the whole directory
+# three times to prove it.
+echo "== applying the forward migrations =="
+for f in "$ROOT"/docs/migration/build-v3/migrations/*.sql; do
+  [ -e "$f" ] || break
+  echo "   $(basename "$f")"
+  psql_in -d "$database" -q -f "$f"
+done
+
 if [[ "$seed" == true ]]; then
   # Demo data FIRST, access second: the access seed writes roles, PINs and a
   # subscription for the merchant, and the merchant comes from the demo seed.

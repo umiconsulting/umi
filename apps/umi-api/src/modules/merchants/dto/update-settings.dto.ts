@@ -1,5 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Matches, Max, Min, ValidateNested } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 /**
  * Owner-tuned customer-segment cutoffs. Every field is optional: the API merges
@@ -61,6 +70,17 @@ export class UpdateSettingsDto {
     message: 'businessDayStart must be HH:MM in 24-hour time (00:00–23:59)',
   })
   businessDayStart?: string;
+
+  // Owner-tunable customer-segment cutoffs (merchant.segment_thresholds).
+  // Qué hace el cierre del día con las cuentas que siguen abiertas al corte del día de
+  // negocio (merchant.pos_day_close_policy). `manual` —lo de fábrica, igual que Toast—
+  // deja la resolución a una persona; `auto_void` anula, al corte, las cuentas sin
+  // cobrar de días anteriores. Nunca toca una venta cobrada.
+  @IsOptional()
+  @IsIn(['manual', 'auto_void'], {
+    message: 'posDayClosePolicy must be manual or auto_void',
+  })
+  posDayClosePolicy?: 'manual' | 'auto_void';
 
   // Owner-tunable customer-segment cutoffs (merchant.segment_thresholds).
   @IsOptional()

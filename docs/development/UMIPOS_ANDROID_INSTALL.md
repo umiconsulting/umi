@@ -36,7 +36,7 @@ cd apps/umi-pos
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 export ANDROID_HOME="$HOME/Android/Sdk"
 
-flutter build apk --debug --target-platform android-arm64 \
+flutter build apk --debug --flavor development --target-platform android-arm64 \
   --dart-define=UMIPOS_ENVIRONMENT=development \
   --dart-define=UMIPOS_API_BASE_URL=http://192.168.1.9:4001 \
   --dart-define=UMIPOS_DEVICE_KEY=keystore \
@@ -46,6 +46,10 @@ flutter build apk --debug --target-platform android-arm64 \
 ```
 
 Arm64-only release build: 21.8 MB. The icon font is tree-shaken from 1.6 MB to 21 KB.
+
+The development APK now uses the `app-development-debug.apk` filename. The
+[Android release procedure](UMIPOS_ANDROID_RELEASE.md) documents the environment
+flavors and production signing.
 
 Every define matters:
 

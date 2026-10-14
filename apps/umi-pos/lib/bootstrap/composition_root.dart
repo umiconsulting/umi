@@ -16,7 +16,9 @@ import '../core/security/device_key.dart';
 import '../core/security/keystore_device_key.dart';
 import '../core/security/tpm_backend.dart';
 import '../core/security/tpm_device_key.dart';
+import '../core/storage/sealing_backend.dart';
 import '../core/storage/storage.dart';
+import '../core/storage/tpm_sealed_storage.dart';
 import '../core/update/desktop_updater.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_repository.dart';
@@ -56,6 +58,7 @@ import '../features/sale/sale_repository.dart';
 import '../features/tables/floor_plan_controller.dart';
 import '../features/tables/table_state_controller.dart';
 import '../features/tables/table_state_repository.dart';
+import '../shared/approvals/manager_approval_repository.dart';
 import 'bootstrap_controller.dart';
 
 final class AppCompositionRoot {
@@ -109,7 +112,12 @@ final class AppCompositionRoot {
       context: TelemetryContext.current(config),
       exporter: const NoopTelemetryExporter(),
     );
-    const secureStorage = FlutterSecureKeyValueStorage();
+    // The vault backend. Default is the platform credential service. The
+    // opt-in `UMIPOS_SECURE_STORAGE=tpm` build seals the vault to the TPM 2.0,
+    // so a counter terminal never shows a keyring prompter.
+    final SecureKeyValueStorage secureStorage = config.useTpmSealedStorage
+        ? TpmSealedStorage(createSealingBackend())
+        : const FlutterSecureKeyValueStorage();
     final credentials = CredentialVault(secureStorage);
     // One device key for the whole app. Default is the software Ed25519 key that
     // runs everywhere. Opt-in hardware builds: UMIPOS_DEVICE_KEY=tpm (desktop
@@ -146,6 +154,11 @@ final class AppCompositionRoot {
     final connectivity = ConnectivityController();
     final hardwareLab = PilotHardwareLab(
       allowSimulator: config.hardwareSimulatorEnabled,
+      // The café's mark lives on the API, and a receipt freezes its URL with the
+      // address that was current when the sale committed. Handing the lab the base
+      // the till is configured with is what repairs a frozen loopback address at
+      // print time instead of leaving the ticket without its mark.
+      apiBaseUri: config.apiBaseUri,
     );
     final hardware = HardwareService(
       repository: ApiHardwareRepository(apiClient),
@@ -249,6 +262,10 @@ final class AppCompositionRoot {
     final cartRepository = ApiCartRepository(apiClient);
     final cart = CartController(
       repository: cartRepository,
+      // The manager's PIN, asked for when the cart must void a line the kitchen already
+      // started. It is the same elevation route the cash surfaces use — one call, one
+      // place — and only the permission and the fingerprint differ.
+      approvals: ApiManagerApprovalRepository(apiClient),
       telemetry: telemetry,
     );
     final incomingOrders = IncomingOrdersController(
@@ -342,9 +359,9 @@ final class AppCompositionRoot {
               location == null ||
               operator == null ||
               posDevice == null) {
-            return;
+            return null;
           }
-          await hardware.afterCheckoutCompleted(
+          final outcome = await hardware.afterCheckoutCompleted(
             HardwareScope(
               merchantId: merchant.id,
               locationId: location.id,
@@ -356,6 +373,10 @@ final class AppCompositionRoot {
             ),
             result,
           );
+          // The drawer's pulse is the one result the cashier cannot get any
+          // other way. When it does not
+          // answer, the receipt screen says so (plan §8.2 F5).
+          return outcome.drawerAnswered ? null : 'DRAWER_UNANSWERED';
         },
         afterOfflineCommit: (receipt) async {
           final state = entry.state;
@@ -534,7 +555,15 @@ final class AppCompositionRoot {
       registerId: cash.activeRegisterId,
     );
     try {
-      await service.snapshot(scope);
+      // THE READING IS THE EXPENSIVE PART OF THE RELAY, AND THE CLAIM IS NOT.
+      //
+      // One read carries the queue of the whole location, and the till asked for it
+      // every ten seconds whether or not a screen showed the hardware (measured
+      // 2026-10-12: 8,600 reads and 8,000 claims each day for one till). The read now
+      // waits for the cadence the service states, and a screen at the hardware keeps
+      // the fast one. The claim is the delivery path for a remote command: it stays at
+      // ten seconds.
+      if (service.runtimeReadDue) await service.snapshot(scope);
       for (var index = 0; index < 4; index++) {
         if (await service.executeNextRemoteCommand(scope) == null) break;
       }

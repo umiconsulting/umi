@@ -30,6 +30,22 @@ abstract interface class TerminalTenderRepository {
   );
 }
 
+/// The server-owned ledger for consecutive payments on one open account.
+/// Kept separate from CheckoutRepository so cash-only test repositories remain valid.
+abstract interface class PartialPaymentRepository {
+  Future<CheckoutPartialPaymentResult> partialPayments(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentQuery query,
+  );
+
+  Future<CheckoutPartialPaymentResult> collectPartialPayment(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentRequest command,
+  );
+}
+
 abstract interface class CheckoutRepository {
   /// What the tender screen may offer, read before anything is charged (§8G).
   Future<CheckoutPolicy> policy(
@@ -69,9 +85,41 @@ abstract interface class CheckoutRepository {
 }
 
 final class ApiCheckoutRepository
-    implements CheckoutRepository, TerminalTenderRepository {
+    implements CheckoutRepository, TerminalTenderRepository, PartialPaymentRepository {
   ApiCheckoutRepository(this._api);
   final ApiClient _api;
+
+  @override
+  Future<CheckoutPartialPaymentResult> partialPayments(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentQuery query,
+  ) async => CheckoutPartialPaymentResult.fromJson(
+    await _api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posCheckoutPartialPayments(merchantId, cartId),
+        queryParameters: {
+          'locationId': query.locationId,
+          'operatorSessionId': query.operatorSessionId,
+        },
+      ).toString(),
+    ),
+  );
+
+  @override
+  Future<CheckoutPartialPaymentResult> collectPartialPayment(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentRequest command,
+  ) async => CheckoutPartialPaymentResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posCheckoutCollectPartialPayment(merchantId, cartId),
+      body: command.toJson(),
+      idempotent: true,
+    ),
+  );
 
   @override
   Future<CheckoutPolicy> policy(

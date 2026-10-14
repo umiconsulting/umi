@@ -3021,7 +3021,7 @@ La tabla muestra grants predeterminados. Un override puede negar o conceder un p
 | UC-AUTH-001 | Acceso      | Abrir sesión por PIN         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
 | UC-AUTH-002 | Acceso      | PIN incorrecto y rate limit  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
 | UC-AUTH-003 | Acceso      | Cambiar, bloquear o cerrar   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ✅     | Sí          | ⚠️    | Sí       | No         | IMPLEMENTADO                  |
-| UC-AUTH-004 | Acceso      | Aprobación sensible          | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO                  |
+| UC-AUTH-004 | Acceso      | Aprobación sensible          | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO                  |
 | UC-CAT-001  | Catálogo    | Ver categorías y productos   | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
 | UC-CAT-002  | Catálogo    | Buscar producto              | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | Sí       | No         | IMPLEMENTADO                  |
 | UC-CAT-003  | Catálogo    | Ver detalle y opciones       | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | 👁️     | Sí          | No    | ⚠️       | No         | IMPLEMENTADO                  |
@@ -3045,12 +3045,12 @@ La tabla muestra grants predeterminados. Un override puede negar o conceder un p
 | UC-CASH-001 | Caja        | Abrir turno                  | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-002 | Caja        | Movimientos                  | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-003 | Caja        | Suspender o reanudar         | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
-| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
+| UC-CASH-004 | Caja        | No-sale drawer               | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-005 | Caja        | Handoff                      | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-006 | Caja        | Blind count y recuento       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-CASH-007 | Caja        | Reconciliar y cerrar         | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | Sí    | Sí       | ⚠️         | IMPLEMENTADO                  |
 | UC-REF-001  | Refund      | Elegibilidad                 | ✅    | ✅    | ✅      | ✅         | ✅      | ✅    | ❌     | Sí          | No    | Sí       | No         | IMPLEMENTADO CON LIMITACIONES |
-| UC-REF-002  | Refund      | Void                         | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
+| UC-REF-002  | Refund      | Void                         | ❌    | ✅    | ❌      | ❌         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
 | UC-REF-003  | Refund      | Refund total                 | ✅    | ✅    | ✅      | ✅         | ❌      | ❌    | ❌     | Sí          | ⚠️    | Sí       | Sí         | IMPLEMENTADO CON LIMITACIONES |
 | UC-REF-004  | Refund      | Refund parcial               | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
 | UC-REF-005  | Refund      | Consecuencia de tender       | ✅    | ✅    | ✅      | ✅         | ⚠️      | ⚠️    | ❌     | Sí          | ⚠️    | Sí       | ⚠️         | IMPLEMENTADO CON LIMITACIONES |
@@ -3376,10 +3376,10 @@ Este conteo incluye acceso directo y acceso condicionado. Excluye las celdas ❌
 
 | Rol        | Casos con acceso directo o condicionado |
 | ---------- | --------------------------------------: |
-| Owner      |                                      63 |
+| Owner      |                                      62 |
 | Admin      |                                      63 |
-| Manager    |                                      59 |
-| Supervisor |                                      56 |
+| Manager    |                                      58 |
+| Supervisor |                                      55 |
 | Cashier    |                                      48 |
 | Staff      |                                      48 |
 | Viewer     |                                       8 |

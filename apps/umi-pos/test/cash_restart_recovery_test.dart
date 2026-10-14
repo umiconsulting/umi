@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/features/cash/cash_controller.dart';
 import 'package:umi_pos/features/cash/cash_repository.dart';
 
@@ -225,6 +226,140 @@ final class _RestartFakeRepository implements CashRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// A shift this till paused on purpose: same operator session, same device, the
+/// drawer still on hold here, and the server offering `resume`.
+CashCenterSnapshot _pausedSnapshot({
+  required String shiftId,
+  required String registerId,
+  required String operatorSessionId,
+}) {
+  final held = _resumedSnapshot(
+    shiftId: shiftId,
+    registerId: registerId,
+    operatorSessionId: operatorSessionId,
+  );
+  return CashCenterSnapshot(
+    businessDate: held.businessDate,
+    policy: held.policy,
+    registers: [
+      {
+        ...held.registers.first,
+        'status': 'suspended',
+        'hold': {
+          ...(held.registers.first['hold']! as Map<String, Object?>),
+          'shiftStatus': 'suspended',
+        },
+      },
+    ],
+    ledger: const [],
+    adoptableShift: null,
+    currentShift: {
+      ...held.currentShift!,
+      'status': 'suspended',
+      'version': 6,
+    },
+    expectedCash: null,
+    latestCount: null,
+    varianceResolution: null,
+    reconciliation: null,
+    recoveryState: 'shift_suspended',
+    allowedActions: const ['resume', 'count'],
+    summary: null,
+  );
+}
+
+final class _PausedShiftFakeRepository implements CashRepository {
+  _PausedShiftFakeRepository({this.refusePin = false});
+
+  /// True when the PIN the operator typed is not the one this device holds.
+  final bool refusePin;
+  int centerCalls = 0;
+  int resumeCalls = 0;
+  VerifyOperatorPinRequest? pinRequest;
+
+  static const shiftId = '00000000-0000-4000-8000-0000000000a2';
+  static const registerId = '00000000-0000-4000-8000-0000000000b2';
+  static const liveSession = '00000000-0000-4000-8000-0000000000f2';
+
+  @override
+  Future<CashCenterSnapshot> center(
+    String merchantId,
+    CashCenterQuery query,
+  ) async {
+    centerCalls += 1;
+    if (centerCalls == 1) {
+      return _pausedSnapshot(
+        shiftId: shiftId,
+        registerId: registerId,
+        operatorSessionId: liveSession,
+      );
+    }
+    return _resumedSnapshot(
+      shiftId: shiftId,
+      registerId: registerId,
+      operatorSessionId: liveSession,
+    );
+  }
+
+  @override
+  Future<ElevationGrantView> verifyOperatorPin(
+    VerifyOperatorPinRequest request,
+  ) async {
+    pinRequest = request;
+    if (refusePin) {
+      throw const AppException(
+        category: AppErrorCategory.permission,
+        code: 'PERMISSION_DENIED',
+        recoverable: true,
+      );
+    }
+    return ElevationGrantView.fromJson({
+      'elevationId': '00000000-0000-4000-8000-0000000000e2',
+      'permission': request.permission,
+      'merchantId': request.merchantId,
+      'locationId': request.locationId,
+      'method': 'operator_pin',
+      'expiresAt': '2026-10-08T20:00:00.000Z',
+      'commandFingerprint': null,
+    });
+  }
+
+  @override
+  Future<CashShift> transition(
+    String merchantId,
+    String shiftId,
+    ShiftTransitionRequest request, {
+    required bool suspend,
+  }) async {
+    resumeCalls += 1;
+    return CashShift.fromJson({
+      'id': shiftId,
+      'merchantId': merchantId,
+      'locationId': request.locationId,
+      'registerId': registerId,
+      'deviceId': '00000000-0000-4000-8000-0000000000d1',
+      'deviceCredentialVersion': 1,
+      'holdingDeviceId': '00000000-0000-4000-8000-0000000000d1',
+      'holdingDeviceCredentialVersion': 1,
+      'openingOperatorId': '00000000-0000-4000-8000-0000000000c1',
+      'responsibleOperatorId': '00000000-0000-4000-8000-0000000000c1',
+      'operatorSessionId': request.operatorSessionId,
+      'currency': 'MXN',
+      'businessDate': '2026-09-16',
+      'status': 'open',
+      'openingCommandId': request.commandId,
+      'openedAt': '2026-09-16T20:52:56.649669+00:00',
+      'suspendedAt': null,
+      'closedAt': null,
+      'ledgerSequence': 0,
+      'version': request.expectedShiftVersion + 1,
+    });
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   test(
     'a restart resumes the till own shift on load, so it is chargeable again',
@@ -299,4 +434,70 @@ void main() {
       expect(repository.reclaimRequest!.expectedRegisterVersion, 3);
     },
   );
+
+  test(
+    'a paused shift comes back with the operator PIN, not by itself',
+    () async {
+      final repository = _PausedShiftFakeRepository();
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: _PausedShiftFakeRepository.liveSession,
+      );
+
+      await controller.load();
+
+      expect(
+        repository.resumeCalls,
+        0,
+        reason: 'loading the cash screen must not spend the drawer back open',
+      );
+      expect(controller.canResumePausedShift, isTrue);
+      expect(controller.activeShiftId, isNull);
+
+      final outcome = await controller.resumePausedShiftWithPin(pin: '4321');
+
+      expect(outcome.ok, isTrue);
+      expect(outcome.shiftId, _PausedShiftFakeRepository.shiftId);
+      expect(
+        repository.pinRequest?.permission,
+        'cash.shift.resume',
+        reason: 'the PIN proves exactly the permission the resume needs',
+      );
+      expect(repository.resumeCalls, 1);
+      expect(controller.activeShiftId, _PausedShiftFakeRepository.shiftId);
+      expect(controller.canResumePausedShift, isFalse);
+    },
+  );
+
+  test('a refused PIN leaves the paused shift exactly as it was', () async {
+    final repository = _PausedShiftFakeRepository(refusePin: true);
+    final controller = CashController(repository: repository);
+    controller.setContext(
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
+      operatorSessionId: _PausedShiftFakeRepository.liveSession,
+    );
+    await controller.load();
+
+    await expectLater(
+      controller.resumePausedShiftWithPin(pin: '0000'),
+      throwsA(
+        isA<AppException>().having(
+          (error) => error.code,
+          'code',
+          'PERMISSION_DENIED',
+        ),
+      ),
+    );
+
+    expect(
+      repository.resumeCalls,
+      0,
+      reason: 'nothing is resumed behind a PIN the server refused',
+    );
+    expect(controller.activeShiftId, isNull);
+    expect(controller.canResumePausedShift, isTrue);
+  });
 }

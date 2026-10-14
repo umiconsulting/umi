@@ -1,0 +1,12 @@
+BEGIN
+           kitchen_order_id           | public_reference | business_date |  order_status  | version | category |  product  | item_status | station 
+--------------------------------------+------------------+---------------+----------------+---------+----------+-----------+-------------+---------
+ bebec681-abed-47ca-8c6d-f4214aad5f90 | Cuenta 173       | 2026-10-13    | in_preparation |       3 | Pizzas   | Margarita | preparing   | Cocina
+(1 row)
+
+               route_id               | category | station | route_priority | target_seconds | active 
+--------------------------------------+----------+---------+----------------+----------------+--------
+ 6e271683-4af9-44d8-9e30-1bcdf367b7c8 | Pizzas   | Cocina  |            100 |                | t
+(1 row)
+
+COMMIT

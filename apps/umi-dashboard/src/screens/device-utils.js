@@ -43,6 +43,42 @@ export function mobilityLabel(mobility) {
 }
 
 /**
+ * WHAT THE TABLET RUNS. One binary serves both jobs and reads its own kind from the
+ * server, so this label is the whole difference on the card: `UmiPOS` is the till,
+ * `UmiKDS` is the kitchen board for the whole branch.
+ */
+export function deviceModeLabel(type) {
+  return type === 'kds' ? t`UmiKDS` : t`UmiPOS`;
+}
+
+/**
+ * THE ONE ENROLMENT BODY, FOR EITHER JOB.
+ *
+ * The product the person picks decides the `type` the server stores as the device's
+ * `kind`, and nothing else: the till and the kitchen board enrol through the same
+ * request, and the device's own record is what later tells the app which one to draw.
+ * `pos` and any unknown value fall back to the till, so a blank product cannot
+ * silently mint a kitchen device.
+ */
+export function deviceEnrollmentRequest({
+  product,
+  name,
+  platform,
+  mobility,
+  locationId,
+  idempotencyKey,
+}) {
+  return {
+    locationId: locationId || null,
+    displayName: String(name || '').trim(),
+    type: product === 'kds' ? 'kds' : 'pos_terminal',
+    platform,
+    mobility,
+    idempotencyKey,
+  };
+}
+
+/**
  * A POS terminal has no heartbeat. A KDS iPad reports every five seconds, so live /
  * slow / offline is a real measurement there; a register only touches the server when
  * it boots or authenticates, and reading those same thresholds against `lastSeenAt`
@@ -78,6 +114,8 @@ export function posDeviceCard(device, locations, now = Date.now()) {
     product: 'pos',
     id: device.id,
     name: device.displayName,
+    mode: device.type === 'kds' ? 'kds' : 'pos_terminal',
+    modeLabel: deviceModeLabel(device.type),
     platform: device.platform,
     platformLabel: platformLabel(device.platform),
     mobility: device.mobility,

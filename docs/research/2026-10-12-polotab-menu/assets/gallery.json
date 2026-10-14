@@ -1,0 +1,98 @@
+[
+  [
+    "pos-device.png",
+    "POS · Categorías y productos",
+    "Imagen comercial oficial",
+    "La comanda está a la izquierda; las categorías, en el centro; los productos, a la derecha. Nombre y precio en tarjetas oscuras con franja de color. Sin + visible en estas tarjetas.",
+    "https://www.polotab.com/",
+    "https://www.polotab.com/producto/posHandPrint-1400.avif"
+  ],
+  [
+    "promo-17s.png",
+    "POS en uso · Catálogo de Fríos",
+    "Tutorial oficial · 00:17",
+    "La columna de categorías permanece visible. El catálogo usa tarjetas compactas de texto y precio. La categoría seleccionada tiene borde y encabezado.",
+    "https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos",
+    "https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+  ],
+  [
+    "promo-22s.png",
+    "POS en uso · Catálogo y comanda",
+    "Tutorial oficial · 00:22",
+    "Los productos añadidos aparecen en la comanda de la izquierda. El total y Cobrar permanecen en su pie.",
+    "https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos",
+    "https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+  ],
+  [
+    "pos-home.png",
+    "POS · Grupos de modificadores",
+    "Imagen comercial oficial",
+    "El detalle reemplaza el catálogo de productos. La comanda y las categorías permanecen visibles. Los grupos indican requisitos y límites; cantidad y Agregar quedan abajo.",
+    "https://www.polotab.com/",
+    "https://www.polotab.com/producto/puntoDeVentaNewFeat.avif"
+  ],
+  [
+    "promo-05s.png",
+    "POS en uso · Tamaño, extras y leche",
+    "Tutorial oficial · 00:05",
+    "Las opciones muestran precio adicional. Requerido aparece junto a los grupos. La selección usa un borde y una marca; Agregar es la acción final.",
+    "https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos",
+    "https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+  ],
+  [
+    "promo-08s.png",
+    "POS en uso · Acción secundaria",
+    "Tutorial oficial · 00:08",
+    "El tutorial abre promociones desde el menú de tres puntos. La documentación confirma que esa acción está disponible para un producto o una cuenta.",
+    "https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos",
+    "https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view"
+  ],
+  [
+    "polomini-menu.png",
+    "PoloMini · Categorías en dos columnas",
+    "Imagen comercial oficial",
+    "Bebidas, Todo tu menú y Alimentos arriba; categorías grandes; resumen de productos y total abajo. Algunas categorías usan fotos atenuadas.",
+    "https://www.polotab.com/polomini",
+    "https://www.polotab.com/producto/handHeldPosP.avif"
+  ],
+  [
+    "mobile-comanda.png",
+    "PoloMini · Referencia adicional",
+    "Imagen comercial oficial",
+    "Otra vista comercial de la pantalla portátil. Sirve para comparar distribución; no prueba la secuencia de interacción.",
+    "https://www.polotab.com/tipo-negocio/restaurante",
+    "https://www.polotab.com/featureCardsBank/comMob.avif"
+  ],
+  [
+    "polomini-trio.png",
+    "PoloMini · Operador y cliente",
+    "Imagen comercial oficial",
+    "El dispositivo central muestra categorías del operador. Las pantallas laterales son de propina y pago para el cliente; no son menús de productos.",
+    "https://www.polotab.com/polomini",
+    "https://www.polotab.com/producto/trioHandHeld.avif"
+  ],
+  [
+    "comandero-060s.png",
+    "PoloMini en uso · Categorías y resumen",
+    "Tutorial oficial · 01:00",
+    "Categorías en dos columnas, nombre del servicio arriba y productos, total, Cobrar y menú de opciones abajo.",
+    "https://www.polotab.com/soporte/conoce-tu-polomini",
+    "https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+  ],
+  [
+    "comandero-050s.png",
+    "PoloMini en uso · Productos de Café",
+    "Tutorial oficial · 00:50",
+    "Los productos muestran nombre y precio, sin + dentro de cada tarjeta visible. Asiento aparece como selector encima del catálogo.",
+    "https://www.polotab.com/soporte/conoce-tu-polomini",
+    "https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+  ],
+  [
+    "comandero-070s.png",
+    "PoloMini en uso · Cuenta enviada",
+    "Tutorial oficial · 01:10",
+    "La confirmación indica que la comanda se envió a cocina. Muestra M1, Nueva orden y un resumen con Cobrar.",
+    "https://www.polotab.com/soporte/conoce-tu-polomini",
+    "https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view"
+  ]
+]

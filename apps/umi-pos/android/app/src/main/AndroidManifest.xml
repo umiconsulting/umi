@@ -5,10 +5,19 @@
          healthy. The debug and profile manifests declared it; the release one
          did not. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- The till drives its receipt printer on its own USB host port, so the
+         money path (the receipt and the drawer pulse that leaves through the
+         printer) does not depend on the LAN. Not required: the app also runs on
+         targets without a USB host port (desktop, web). -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
     <application
         android:label="UmiPOS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="orders_ready_v2" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

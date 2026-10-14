@@ -1,0 +1,25 @@
+{
+  "flutter": "3.47.5",
+  "dart": "3.13.4",
+  "adb": "37.0.0-android-tools / protocol 1.0.41",
+  "androidBuildTools": "36.0.0",
+  "apksigner": "0.9",
+  "tests": {
+    "command": "flutter test --no-pub --reporter expanded",
+    "exitCode": 0,
+    "passed": 672
+  },
+  "analyze": {
+    "command": "flutter analyze --no-pub",
+    "exitCode": 0
+  },
+  "physicalChecks": [
+    "Both apps enrolled and authenticated on iMin D3 Android 11",
+    "Both apps opened catalog and sales with the same test merchant",
+    "Both catalog screenshots show two Croissants and MXN 96.00",
+    "The Android keyboard retains input focus on Estación",
+    "The launcher exposes separate A and E icons",
+    "The pre-existing POS APK and UID remain unchanged"
+  ],
+  "completedAt": "2026-10-09T18:22:07.640518+00:00"
+}

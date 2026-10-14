@@ -46,12 +46,89 @@ abstract interface class KitchenBoardRepository {
   /// location as the board. The till repeats no forecast math: the server
   /// subtracts the on-hand and the forecast usage from the par (plan D13).
   Future<PrepList> prepList(String merchantId, PosPrepListQuery query);
+
+  /// LAS ESTACIONES DE ESTA COCINA, TODAS — con trabajo o sin él.
+  ///
+  /// The board's tabs come from here and not from the tickets on the rail: a station is a
+  /// tab at eight in the morning, before its first order, and a merchant with two stations
+  /// sees both. It is also what lets a screen be fixed to its station before service.
+  Future<List<KitchenStation>> stations(
+    String merchantId,
+    PosKitchenOrderQuery query,
+  );
 }
 
-final class ApiKitchenBoardRepository implements KitchenBoardRepository {
+abstract interface class KitchenUnassignedRepository {
+  Future<List<KitchenUnassignedOrderProjection>> unassigned(
+    String merchantId,
+    PosKitchenOrderQuery query,
+  );
+  Future<KitchenUnassignedCommandResult> resolveUnassigned(
+    String merchantId,
+    PosKitchenUnassignedCommandRequest request,
+  );
+  Future<KitchenUnassignedCommandResult> discardUnassigned(
+    String merchantId,
+    PosKitchenUnassignedCommandRequest request,
+  );
+}
+
+final class ApiKitchenBoardRepository
+    implements KitchenBoardRepository, KitchenUnassignedRepository {
   const ApiKitchenBoardRepository(this._api);
 
   final ApiClient _api;
+
+  @override
+  Future<List<KitchenUnassignedOrderProjection>> unassigned(
+    String merchantId,
+    PosKitchenOrderQuery query,
+  ) async {
+    final response = KitchenUnassignedResponse.fromJson(
+      await _api.request(
+        method: ApiMethod.get,
+        path: Uri(
+          path: UmiRoutes.posKitchenUnassigned(merchantId),
+          queryParameters: query.toJson().map(
+            (key, value) => MapEntry(key, '$value'),
+          ),
+        ).toString(),
+      ),
+    );
+    return response.data
+        .map(KitchenUnassignedOrderProjection.fromJson)
+        .toList();
+  }
+
+  @override
+  Future<KitchenUnassignedCommandResult> resolveUnassigned(
+    String merchantId,
+    PosKitchenUnassignedCommandRequest request,
+  ) async => KitchenUnassignedCommandResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posKitchenResolveUnassigned(merchantId),
+      body: {
+        for (final entry in request.toJson().entries)
+          if (entry.value != null) entry.key: entry.value,
+      },
+    ),
+  );
+
+  @override
+  Future<KitchenUnassignedCommandResult> discardUnassigned(
+    String merchantId,
+    PosKitchenUnassignedCommandRequest request,
+  ) async => KitchenUnassignedCommandResult.fromJson(
+    await _api.request(
+      method: ApiMethod.post,
+      path: UmiRoutes.posKitchenDiscardUnassigned(merchantId),
+      body: {
+        for (final entry in request.toJson().entries)
+          if (entry.value != null) entry.key: entry.value,
+      },
+    ),
+  );
 
   @override
   Future<List<KitchenOrderProjection>> snapshot(
@@ -108,6 +185,24 @@ final class ApiKitchenBoardRepository implements KitchenBoardRepository {
   }
 
   @override
+  Future<List<KitchenStation>> stations(
+    String merchantId,
+    PosKitchenOrderQuery query,
+  ) async {
+    final response = await _api.request(
+      method: ApiMethod.get,
+      path: Uri(
+        path: UmiRoutes.posKitchenStations(merchantId),
+        queryParameters: query.toJson().map(
+          (key, value) => MapEntry(key, value.toString()),
+        ),
+      ).toString(),
+    );
+    final parsed = KitchenStationListResponse.fromJson(response);
+    return parsed.data.map(KitchenStation.fromJson).toList(growable: false);
+  }
+
+  @override
   Future<bool> watch(String merchantId, PosKitchenOrderQuery query) async {
     final response = await _api.request(
       method: ApiMethod.get,
@@ -134,12 +229,19 @@ final class KitchenBoardState {
     this.phase = KitchenBoardPhase.idle,
     this.orders = const [],
     this.allDay = const {},
+    this.stations = const [],
+    this.businessDate,
     this.errorCode,
     this.errorReference,
     this.busyTarget,
   });
   final KitchenBoardPhase phase;
   final List<KitchenOrderProjection> orders;
+
+  /// Every station of this kitchen, in the merchant's own order. The board's tabs come
+  /// from here, so they do not appear and disappear with the work.
+  final List<KitchenStation> stations;
+  final String? businessDate;
 
   /// Today's counts, keyed by the same pair a ticket line carries.
   ///
@@ -298,8 +400,19 @@ final class KitchenBoardController extends ChangeNotifier {
   static const _watchRetryDelay = Duration(seconds: 2);
 
   int _generation = 0;
+  int _watchGeneration = 0;
   String? _merchantId;
   PosKitchenOrderQuery? _query;
+  List<KitchenUnassignedOrderProjection> unassignedOrders = const [];
+  bool unassignedLoaded = false;
+  bool unassignedLoading = false;
+  String? unassignedErrorCode;
+  String? unassignedBusyTarget;
+  KitchenUnassignedCommandResult? lastUnassignedResult;
+  String? _unassignedScope;
+  int _unassignedCommandEpoch = 0;
+  PosKitchenUnassignedCommandRequest? _unassignedRequest;
+  bool? _unassignedRequestDiscard;
 
   /// Pass on what the board's own traffic just learned about the network.
   ///
@@ -329,6 +442,18 @@ final class KitchenBoardController extends ChangeNotifier {
   }
 
   Future<void> load(String merchantId, PosKitchenOrderQuery query) async {
+    final scope = '$merchantId:${query.locationId}:${query.operatorSessionId}';
+    if (_unassignedScope != scope) {
+      _unassignedScope = scope;
+      _unassignedCommandEpoch++;
+      unassignedOrders = const [];
+      unassignedLoaded = false;
+      unassignedLoading = false;
+      unassignedErrorCode = null;
+      unassignedBusyTarget = null;
+      lastUnassignedResult = null;
+      _unassignedRequest = null;
+    }
     _merchantId = merchantId;
     _query = query;
     final generation = ++_generation;
@@ -336,6 +461,8 @@ final class KitchenBoardController extends ChangeNotifier {
       phase: KitchenBoardPhase.loading,
       orders: _state.orders,
       allDay: _state.allDay,
+      stations: _state.stations,
+      businessDate: _state.businessDate,
       // A refusal from a command outlives the read that follows it: the
       // conflict message is only useful next to the refreshed board.
       errorCode: _state.errorCode,
@@ -351,6 +478,8 @@ final class KitchenBoardController extends ChangeNotifier {
         phase: KitchenBoardPhase.ready,
         orders: orders,
         allDay: _state.allDay,
+        stations: _state.stations,
+        businessDate: _state.businessDate,
         errorCode: _state.errorCode,
         errorReference: _state.errorReference,
         busyTarget: _state.busyTarget,
@@ -360,6 +489,11 @@ final class KitchenBoardController extends ChangeNotifier {
       // the count is a reading aid, so a slow or refusing count route must not
       // hold up the tickets a cook is working from.
       await _refreshAllDay(merchantId, query, generation);
+      // The station list rides along with the board the same way the counts do: it is
+      // configuration, it changes almost never, and a refusal here must not take the
+      // tickets down with it.
+      await _refreshStations(merchantId, query, generation);
+      await _refreshUnassigned(merchantId, query, generation);
       return;
     } catch (error) {
       if (_disposed || generation != _generation) return;
@@ -368,6 +502,8 @@ final class KitchenBoardController extends ChangeNotifier {
         phase: KitchenBoardPhase.failure,
         orders: _state.orders,
         allDay: _state.allDay,
+        stations: _state.stations,
+        businessDate: _state.businessDate,
         errorCode: _codeOf(error),
         errorReference: _state.errorReference,
         busyTarget: _state.busyTarget,
@@ -390,15 +526,19 @@ final class KitchenBoardController extends ChangeNotifier {
   Future<void> startWatching() async {
     if (_watching) return;
     _watching = true;
-    while (_watching && !_disposed) {
+    final generation = ++_watchGeneration;
+    bool current() => _watching && !_disposed && generation == _watchGeneration;
+    while (current()) {
       final merchantId = _merchantId;
       final query = _query;
       if (merchantId == null || query == null) break;
       bool changed;
       try {
         changed = await _repository.watch(merchantId, query);
+        if (!current()) return;
         _reportReachability();
       } catch (error) {
+        if (!current()) return;
         // The watch is a request like any other, so a refused one is evidence
         // about the wire in its own right: a held request that cannot connect is
         // the earliest sign of a drop this till gets, twelve seconds before the
@@ -407,14 +547,17 @@ final class KitchenBoardController extends ChangeNotifier {
         await Future<void>.delayed(_watchRetryDelay);
         continue;
       }
-      if (!_watching || _disposed) break;
+      if (!current()) break;
       if (changed) await load(merchantId, query);
     }
   }
 
-  /// Stop following the wake-up. Safe to call from `dispose`.
+  /// Stop the surface's watch and pending reads. A closed board cannot publish
+  /// stale connection results after another surface has recovered.
   void stopWatching() {
     _watching = false;
+    _watchGeneration++;
+    _generation++;
   }
 
   /// Today's counts, fetched after the board and kept quiet.
@@ -444,6 +587,8 @@ final class KitchenBoardController extends ChangeNotifier {
           for (final item in counts.items)
             (item.productName, item.variantName): item,
         },
+        stations: _state.stations,
+        businessDate: counts.businessDate,
         errorCode: _state.errorCode,
         errorReference: _state.errorReference,
         busyTarget: _state.busyTarget,
@@ -451,6 +596,33 @@ final class KitchenBoardController extends ChangeNotifier {
       notifyListeners();
     } catch (_) {
       // See above: the count is advisory and the board keeps working without it.
+    }
+  }
+
+  /// The kitchen's stations, read with the board and never in its way: configuration,
+  /// not work. A refusal leaves the previous list — or an empty one, which the surface
+  /// reads as "the tickets are the only thing that says which stations exist".
+  Future<void> _refreshStations(
+    String merchantId,
+    PosKitchenOrderQuery query,
+    int generation,
+  ) async {
+    try {
+      final stations = await _repository.stations(merchantId, query);
+      if (_disposed || generation != _generation) return;
+      _state = KitchenBoardState(
+        phase: _state.phase,
+        orders: _state.orders,
+        allDay: _state.allDay,
+        stations: stations,
+        businessDate: _state.businessDate,
+        errorCode: _state.errorCode,
+        errorReference: _state.errorReference,
+        busyTarget: _state.busyTarget,
+      );
+      notifyListeners();
+    } catch (_) {
+      // As above: the rail is the job.
     }
   }
 
@@ -464,12 +636,39 @@ final class KitchenBoardController extends ChangeNotifier {
       );
 
   /// The first move of a ticket: the station has begun it.
-  Future<bool> startPreparation(KitchenOrderProjection order) =>
-      _command(order, commandType: 'start_preparation', target: order.id);
+  Future<bool> startPreparation(KitchenOrderProjection order) => _command(
+    order,
+    commandType: 'start_preparation',
+    target: order.id,
+    itemIds: order.items
+        .map(KitchenOrderItem.fromJson)
+        .where((item) => item.fired && item.status == 'queued')
+        .map((item) => item.id)
+        .toList(),
+  );
 
   /// The ticket is done and leaves the board.
-  Future<bool> complete(KitchenOrderProjection order) =>
-      _command(order, commandType: 'complete', target: order.id);
+  Future<bool> complete(KitchenOrderProjection order) => _command(
+    order,
+    commandType: 'complete',
+    target: order.id,
+    itemIds: order.items
+        .map(KitchenOrderItem.fromJson)
+        .where((item) => item.status != 'cancelled')
+        .map((item) => item.id)
+        .toList(),
+  );
+
+  /// Confirma la cancelación sólo para los productos visibles de esta estación.
+  Future<bool> discard(KitchenOrderProjection order) => _command(
+    order,
+    commandType: 'cancel_ack',
+    target: order.id,
+    itemIds: order.items
+        .map(KitchenOrderItem.fromJson)
+        .map((item) => item.id)
+        .toList(),
+  );
 
   /// Put a finished ticket back on the board. The server refuses a recall with
   /// no reason on it, so a reason code is required here rather than optional.
@@ -481,6 +680,11 @@ final class KitchenBoardController extends ChangeNotifier {
     order,
     commandType: 'recall',
     target: order.id,
+    itemIds: order.items
+        .map(KitchenOrderItem.fromJson)
+        .where((item) => item.fired && item.status == 'ready')
+        .map((item) => item.id)
+        .toList(),
     reasonCode: reasonCode,
     reasonNote: reasonNote,
   );
@@ -517,6 +721,9 @@ final class KitchenBoardController extends ChangeNotifier {
     _state = KitchenBoardState(
       phase: _state.phase,
       orders: _state.orders,
+      allDay: _state.allDay,
+      stations: _state.stations,
+      businessDate: _state.businessDate,
       busyTarget: _state.busyTarget,
     );
     notifyListeners();
@@ -528,6 +735,110 @@ final class KitchenBoardController extends ChangeNotifier {
     final query = _query;
     if (merchantId == null || query == null) return;
     await load(merchantId, query);
+  }
+
+  Future<void> _refreshUnassigned(
+    String merchantId,
+    PosKitchenOrderQuery query,
+    int generation,
+  ) async {
+    final repository = _repository;
+    if (repository is! KitchenUnassignedRepository) return;
+    final unassigned = repository as KitchenUnassignedRepository;
+    if (_disposed || generation != _generation) return;
+    unassignedLoading = true;
+    notifyListeners();
+    try {
+      final orders = await unassigned.unassigned(merchantId, query);
+      if (_disposed || generation != _generation) return;
+      unassignedOrders = orders;
+      unassignedLoaded = true;
+      if (unassignedErrorCode == 'KITCHEN_UNASSIGNED_UNAVAILABLE') {
+        unassignedErrorCode = null;
+      }
+    } catch (_) {
+      if (!_disposed && generation == _generation) {
+        unassignedErrorCode = 'KITCHEN_UNASSIGNED_UNAVAILABLE';
+      }
+    } finally {
+      if (!_disposed && generation == _generation) {
+        unassignedLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> resolveUnassigned(KitchenUnassignedOrderProjection order) =>
+      _commandUnassigned(order, discard: false);
+
+  Future<bool> discardUnassigned(KitchenUnassignedOrderProjection order) =>
+      _commandUnassigned(order, discard: true);
+
+  Future<bool> _commandUnassigned(
+    KitchenUnassignedOrderProjection order, {
+    required bool discard,
+  }) async {
+    final repository = _repository;
+    final merchantId = _merchantId;
+    final query = _query;
+    if (_disposed ||
+        repository is! KitchenUnassignedRepository ||
+        merchantId == null ||
+        query == null ||
+        unassignedBusyTarget != null ||
+        (discard ? order.status != 'cancelled' : order.status == 'cancelled')) {
+      return false;
+    }
+    final unassigned = repository as KitchenUnassignedRepository;
+    final epoch = ++_unassignedCommandEpoch;
+    final previous = _unassignedRequest;
+    if (previous == null ||
+        previous.kitchenOrderId != order.id ||
+        previous.expectedVersion != order.version ||
+        (!discard && previous.routingFingerprint != order.routingFingerprint) ||
+        _unassignedRequestDiscard != discard) {
+      _unassignedRequest = PosKitchenUnassignedCommandRequest(
+        locationId: query.locationId,
+        operatorSessionId: query.operatorSessionId,
+        kitchenOrderId: order.id,
+        expectedVersion: order.version,
+        idempotencyKey: _uuid(),
+        routingFingerprint: discard ? null : order.routingFingerprint,
+      );
+      _unassignedRequestDiscard = discard;
+    }
+    unassignedBusyTarget = order.id;
+    unassignedErrorCode = null;
+    lastUnassignedResult = null;
+    notifyListeners();
+    try {
+      final result = await (discard
+          ? unassigned.discardUnassigned(merchantId, _unassignedRequest!)
+          : unassigned.resolveUnassigned(merchantId, _unassignedRequest!));
+      if (_disposed || epoch != _unassignedCommandEpoch) return false;
+      lastUnassignedResult = result;
+      _unassignedRequest = null;
+      unassignedBusyTarget = null;
+      await refresh();
+      return true;
+    } catch (error) {
+      if (_disposed || epoch != _unassignedCommandEpoch) return false;
+      unassignedErrorCode = error is AppException
+          ? error.code
+          : 'KITCHEN_COMMAND_FAILED';
+      unassignedBusyTarget = null;
+      if (error is AppException &&
+          error.category == AppErrorCategory.conflict) {
+        _unassignedRequest = null;
+        await refresh();
+      }
+      return false;
+    } finally {
+      if (!_disposed && epoch == _unassignedCommandEpoch) {
+        unassignedBusyTarget = null;
+        notifyListeners();
+      }
+    }
   }
 
   Future<bool> _command(
@@ -547,6 +858,9 @@ final class KitchenBoardController extends ChangeNotifier {
       phase: _state.phase,
       orders: _state.orders,
       busyTarget: target,
+      allDay: _state.allDay,
+      stations: _state.stations,
+      businessDate: _state.businessDate,
     );
     notifyListeners();
     try {
@@ -608,6 +922,9 @@ final class KitchenBoardController extends ChangeNotifier {
     _state = KitchenBoardState(
       phase: _state.phase,
       orders: _state.orders,
+      allDay: _state.allDay,
+      stations: _state.stations,
+      businessDate: _state.businessDate,
       errorCode: _state.errorCode,
       errorReference: _state.errorReference,
     );
@@ -617,6 +934,9 @@ final class KitchenBoardController extends ChangeNotifier {
     _state = KitchenBoardState(
       phase: _state.phase,
       orders: _state.orders,
+      allDay: _state.allDay,
+      stations: _state.stations,
+      businessDate: _state.businessDate,
       errorCode: code,
       errorReference: reference,
     );

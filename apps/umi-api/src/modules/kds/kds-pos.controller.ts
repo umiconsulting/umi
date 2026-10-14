@@ -3,6 +3,7 @@ import {
   PosKitchenAllDayQuery,
   PosKitchenCommandRequest,
   PosKitchenOrderQuery,
+  PosKitchenUnassignedCommandRequest,
 } from '@umi/contract';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
@@ -18,6 +19,35 @@ import { KdsService } from './kds.service';
 @Controller('api/v1/pos/merchants/:merchantId/kitchen')
 export class KdsPosController {
   constructor(private readonly kds: KdsService) {}
+
+  @Get('unassigned')
+  unassigned(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(PosKitchenOrderQuery)) query: PosKitchenOrderQuery,
+  ) {
+    return this.kds.unassignedForPos(user, merchantId, query);
+  }
+
+  @Post('unassigned/resolve-routes')
+  resolveUnassigned(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(PosKitchenUnassignedCommandRequest))
+    dto: PosKitchenUnassignedCommandRequest,
+  ) {
+    return this.kds.changeUnassignedForPos(user, merchantId, dto, 'resolve_routes');
+  }
+
+  @Post('unassigned/discard')
+  discardUnassigned(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(PosKitchenUnassignedCommandRequest))
+    dto: PosKitchenUnassignedCommandRequest,
+  ) {
+    return this.kds.changeUnassignedForPos(user, merchantId, dto, 'discard');
+  }
 
   @Get('orders/:sourceOrderId')
   order(
@@ -48,6 +78,18 @@ export class KdsPosController {
     @Query(new ZodValidationPipe(PosKitchenOrderQuery)) query: PosKitchenOrderQuery,
   ) {
     return this.kds.watchBoardForPos(user, merchantId, query);
+  }
+
+  // The station list. The board's chips are built from this and not from the tickets on
+  // the rail, so every station is a tab whether or not it has work — and a screen can be
+  // fixed to its station before service (owner, 2026-10-13).
+  @Get('stations')
+  stations(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(PosKitchenOrderQuery)) query: PosKitchenOrderQuery,
+  ) {
+    return this.kds.stationsForPos(user, merchantId, query);
   }
 
   // The all-day count: how many of each item the kitchen has been asked for

@@ -126,6 +126,7 @@ begin
   ('loyalty.reward.authorize','UmiPOS Gate 3F permission loyalty.reward.authorize'),
   ('loyalty.reward.redeem','UmiPOS Gate 3F permission loyalty.reward.redeem'),
   ('loyalty.reward.release','UmiPOS Gate 3F permission loyalty.reward.release'),
+  ('order.void_after_preparation.approve','UmiPOS permission order.void_after_preparation.approve'),
   ('stored_value.approve','UmiPOS Gate 3F permission stored_value.approve'),
   ('stored_value.reconcile','UmiPOS Gate 3F permission stored_value.reconcile'),
   ('wallet.authorize','UmiPOS Gate 3F permission wallet.authorize'),
@@ -224,6 +225,7 @@ begin
   ('loyalty.reward.authorize','UmiPOS Gate 3F permission loyalty.reward.authorize'),
   ('loyalty.reward.redeem','UmiPOS Gate 3F permission loyalty.reward.redeem'),
   ('loyalty.reward.release','UmiPOS Gate 3F permission loyalty.reward.release'),
+  ('order.void_after_preparation.approve','UmiPOS permission order.void_after_preparation.approve'),
   ('stored_value.approve','UmiPOS Gate 3F permission stored_value.approve'),
   ('stored_value.reconcile','UmiPOS Gate 3F permission stored_value.reconcile'),
   ('wallet.authorize','UmiPOS Gate 3F permission wallet.authorize'),
@@ -256,7 +258,7 @@ using umi.role r, umi.permission p
 where rp.role_id=r.id
   and rp.permission_id=p.id
   and r.key in ('admin','cashier','manager','owner','staff','supervisor','viewer')
-  and p.key in ('audit.read','cart.write','cash.count.recount','cash.count.submit','cash.drawer.no_sale','cash.drawer.no_sale.approve','cash.movement.paid_in','cash.movement.paid_in.approve','cash.movement.paid_out','cash.movement.paid_out.approve','cash.movement.safe_drop','cash.movement.safe_drop.approve','cash.reconcile','cash.register.use','cash.shift.close','cash.shift.close.approve','cash.shift.handoff','cash.shift.open','cash.shift.read','cash.shift.resume','cash.shift.suspend','cash.variance.approve','catalog.read','checkout.commit','checkout.discount.apply','checkout.discount.approve','checkout.recover.any','checkout.terminal.approve','checkout.terminal.confirm','customer.attach','customer.contact.read','customer.create','customer.detach','customer.history.admin','customer.history.global','customer.history.read','customer.merge','customer.merge.approve','customer.read','customer.search','device.enroll','gift_card.activate','gift_card.activate.approve','gift_card.authorize','gift_card.issue','gift_card.issue.approve','gift_card.lookup','gift_card.read','gift_card.redeem','gift_card.refund','gift_card.release','hardware.assign','hardware.command.execute','hardware.customer_display.test','hardware.customer_display.use','hardware.diagnostics','hardware.drawer.open','hardware.drawer.test','hardware.manage','hardware.printer.print','hardware.printer.reprint','hardware.printer.test','hardware.read','hardware.scanner.test','hardware.scanner.use','insights.read','inventory.adjust.approve','inventory.adjust.decrease','inventory.adjust.increase','inventory.count.approve','inventory.count.create','inventory.count.reconcile','inventory.count.submit','inventory.damage.approve','inventory.damage.create','inventory.history.read','inventory.negative_stock.override','inventory.policy.manage','inventory.policy.read','inventory.quarantine.approve','inventory.quarantine.enter','inventory.quarantine.release','inventory.read','inventory.restock.approve','inventory.restock.resolve','inventory.waste.approve','inventory.waste.create','kitchen.cancel_ack','kitchen.complete','kitchen.diagnostics','kitchen.merchant.read','kitchen.prepare','kitchen.priority','kitchen.read','kitchen.ready','kitchen.recall','kitchen.station.manage','kitchen.station.read','location.switch','loyalty.adjust','loyalty.adjust.approve','loyalty.policy.manage','loyalty.read','loyalty.reward.approve','loyalty.reward.authorize','loyalty.reward.redeem','loyalty.reward.release','merchant.manage','offline.cash.checkout','offline.recovery.review','offline.replay','sale.exception.history','sale.exception.read','sale.lifecycle','sale.refund.approve','sale.refund.cash','sale.refund.full','sale.refund.manual_terminal','sale.refund.other_location','sale.refund.other_operator','sale.refund.partial','sale.refund.reconcile','sale.resume.any','sale.void.create','stored_value.approve','stored_value.reconcile','wallet.authorize','wallet.read','wallet.redeem','wallet.refund','wallet.release');
+  and p.key in ('audit.read','cart.write','cash.count.recount','cash.count.submit','cash.drawer.no_sale','cash.drawer.no_sale.approve','cash.movement.paid_in','cash.movement.paid_in.approve','cash.movement.paid_out','cash.movement.paid_out.approve','cash.movement.safe_drop','cash.movement.safe_drop.approve','cash.reconcile','cash.register.use','cash.shift.close','cash.shift.close.approve','cash.shift.handoff','cash.shift.open','cash.shift.read','cash.shift.resume','cash.shift.suspend','cash.variance.approve','catalog.read','checkout.commit','checkout.discount.apply','checkout.discount.approve','checkout.recover.any','checkout.terminal.approve','checkout.terminal.confirm','customer.attach','customer.contact.read','customer.create','customer.detach','customer.history.admin','customer.history.global','customer.history.read','customer.merge','customer.merge.approve','customer.read','customer.search','device.enroll','gift_card.activate','gift_card.activate.approve','gift_card.authorize','gift_card.issue','gift_card.issue.approve','gift_card.lookup','gift_card.read','gift_card.redeem','gift_card.refund','gift_card.release','hardware.assign','hardware.command.execute','hardware.customer_display.test','hardware.customer_display.use','hardware.diagnostics','hardware.drawer.open','hardware.drawer.test','hardware.manage','hardware.printer.print','hardware.printer.reprint','hardware.printer.test','hardware.read','hardware.scanner.test','hardware.scanner.use','insights.read','inventory.adjust.approve','inventory.adjust.decrease','inventory.adjust.increase','inventory.count.approve','inventory.count.create','inventory.count.reconcile','inventory.count.submit','inventory.damage.approve','inventory.damage.create','inventory.history.read','inventory.negative_stock.override','inventory.policy.manage','inventory.policy.read','inventory.quarantine.approve','inventory.quarantine.enter','inventory.quarantine.release','inventory.read','inventory.restock.approve','inventory.restock.resolve','inventory.waste.approve','inventory.waste.create','kitchen.cancel_ack','kitchen.complete','kitchen.diagnostics','kitchen.merchant.read','kitchen.prepare','kitchen.priority','kitchen.read','kitchen.ready','kitchen.recall','kitchen.station.manage','kitchen.station.read','location.switch','loyalty.adjust','loyalty.adjust.approve','loyalty.policy.manage','loyalty.read','loyalty.reward.approve','loyalty.reward.authorize','loyalty.reward.redeem','loyalty.reward.release','merchant.manage','offline.cash.checkout','offline.recovery.review','offline.replay','order.void_after_preparation.approve','sale.exception.history','sale.exception.read','sale.lifecycle','sale.refund.approve','sale.refund.cash','sale.refund.full','sale.refund.manual_terminal','sale.refund.other_location','sale.refund.other_operator','sale.refund.partial','sale.refund.reconcile','sale.resume.any','sale.void.create','stored_value.approve','stored_value.reconcile','wallet.authorize','wallet.read','wallet.redeem','wallet.refund','wallet.release');
 
 with grants(role_key,permission_key) as (
   values
@@ -371,6 +373,7 @@ with grants(role_key,permission_key) as (
   ('admin','offline.cash.checkout'),
   ('admin','offline.recovery.review'),
   ('admin','offline.replay'),
+  ('admin','order.void_after_preparation.approve'),
   ('admin','sale.exception.history'),
   ('admin','sale.exception.read'),
   ('admin','sale.lifecycle'),
@@ -392,6 +395,7 @@ with grants(role_key,permission_key) as (
   ('admin','wallet.release'),
   ('cashier','cart.write'),
   ('cashier','cash.count.submit'),
+  ('cashier','cash.drawer.no_sale'),
   ('cashier','cash.movement.paid_in'),
   ('cashier','cash.movement.paid_out'),
   ('cashier','cash.movement.safe_drop'),
@@ -442,29 +446,21 @@ with grants(role_key,permission_key) as (
   ('manager','cash.count.recount'),
   ('manager','cash.count.submit'),
   ('manager','cash.drawer.no_sale'),
-  ('manager','cash.drawer.no_sale.approve'),
   ('manager','cash.movement.paid_in'),
-  ('manager','cash.movement.paid_in.approve'),
   ('manager','cash.movement.paid_out'),
-  ('manager','cash.movement.paid_out.approve'),
   ('manager','cash.movement.safe_drop'),
-  ('manager','cash.movement.safe_drop.approve'),
   ('manager','cash.reconcile'),
   ('manager','cash.register.use'),
   ('manager','cash.shift.close'),
-  ('manager','cash.shift.close.approve'),
   ('manager','cash.shift.handoff'),
   ('manager','cash.shift.open'),
   ('manager','cash.shift.read'),
   ('manager','cash.shift.resume'),
   ('manager','cash.shift.suspend'),
-  ('manager','cash.variance.approve'),
   ('manager','catalog.read'),
   ('manager','checkout.commit'),
   ('manager','checkout.discount.apply'),
-  ('manager','checkout.discount.approve'),
   ('manager','checkout.recover.any'),
-  ('manager','checkout.terminal.approve'),
   ('manager','checkout.terminal.confirm'),
   ('manager','customer.attach'),
   ('manager','customer.contact.read'),
@@ -473,14 +469,11 @@ with grants(role_key,permission_key) as (
   ('manager','customer.history.global'),
   ('manager','customer.history.read'),
   ('manager','customer.merge'),
-  ('manager','customer.merge.approve'),
   ('manager','customer.read'),
   ('manager','customer.search'),
   ('manager','gift_card.activate'),
-  ('manager','gift_card.activate.approve'),
   ('manager','gift_card.authorize'),
   ('manager','gift_card.issue'),
-  ('manager','gift_card.issue.approve'),
   ('manager','gift_card.lookup'),
   ('manager','gift_card.read'),
   ('manager','gift_card.redeem'),
@@ -498,25 +491,19 @@ with grants(role_key,permission_key) as (
   ('manager','hardware.read'),
   ('manager','hardware.scanner.test'),
   ('manager','hardware.scanner.use'),
-  ('manager','inventory.adjust.approve'),
   ('manager','inventory.adjust.decrease'),
   ('manager','inventory.adjust.increase'),
-  ('manager','inventory.count.approve'),
   ('manager','inventory.count.create'),
   ('manager','inventory.count.reconcile'),
   ('manager','inventory.count.submit'),
-  ('manager','inventory.damage.approve'),
   ('manager','inventory.damage.create'),
   ('manager','inventory.history.read'),
   ('manager','inventory.negative_stock.override'),
   ('manager','inventory.policy.read'),
-  ('manager','inventory.quarantine.approve'),
   ('manager','inventory.quarantine.enter'),
   ('manager','inventory.quarantine.release'),
   ('manager','inventory.read'),
-  ('manager','inventory.restock.approve'),
   ('manager','inventory.restock.resolve'),
-  ('manager','inventory.waste.approve'),
   ('manager','inventory.waste.create'),
   ('manager','kitchen.cancel_ack'),
   ('manager','kitchen.complete'),
@@ -529,20 +516,16 @@ with grants(role_key,permission_key) as (
   ('manager','kitchen.station.manage'),
   ('manager','kitchen.station.read'),
   ('manager','loyalty.adjust'),
-  ('manager','loyalty.adjust.approve'),
   ('manager','loyalty.policy.manage'),
   ('manager','loyalty.read'),
-  ('manager','loyalty.reward.approve'),
   ('manager','loyalty.reward.authorize'),
   ('manager','loyalty.reward.redeem'),
   ('manager','loyalty.reward.release'),
   ('manager','offline.cash.checkout'),
-  ('manager','offline.recovery.review'),
   ('manager','offline.replay'),
   ('manager','sale.exception.history'),
   ('manager','sale.exception.read'),
   ('manager','sale.lifecycle'),
-  ('manager','sale.refund.approve'),
   ('manager','sale.refund.cash'),
   ('manager','sale.refund.full'),
   ('manager','sale.refund.manual_terminal'),
@@ -550,9 +533,6 @@ with grants(role_key,permission_key) as (
   ('manager','sale.refund.partial'),
   ('manager','sale.refund.reconcile'),
   ('manager','sale.resume.any'),
-  ('manager','sale.void.create'),
-  ('manager','stored_value.approve'),
-  ('manager','stored_value.reconcile'),
   ('manager','wallet.authorize'),
   ('manager','wallet.read'),
   ('manager','wallet.redeem'),
@@ -563,29 +543,21 @@ with grants(role_key,permission_key) as (
   ('owner','cash.count.recount'),
   ('owner','cash.count.submit'),
   ('owner','cash.drawer.no_sale'),
-  ('owner','cash.drawer.no_sale.approve'),
   ('owner','cash.movement.paid_in'),
-  ('owner','cash.movement.paid_in.approve'),
   ('owner','cash.movement.paid_out'),
-  ('owner','cash.movement.paid_out.approve'),
   ('owner','cash.movement.safe_drop'),
-  ('owner','cash.movement.safe_drop.approve'),
   ('owner','cash.reconcile'),
   ('owner','cash.register.use'),
   ('owner','cash.shift.close'),
-  ('owner','cash.shift.close.approve'),
   ('owner','cash.shift.handoff'),
   ('owner','cash.shift.open'),
   ('owner','cash.shift.read'),
   ('owner','cash.shift.resume'),
   ('owner','cash.shift.suspend'),
-  ('owner','cash.variance.approve'),
   ('owner','catalog.read'),
   ('owner','checkout.commit'),
   ('owner','checkout.discount.apply'),
-  ('owner','checkout.discount.approve'),
   ('owner','checkout.recover.any'),
-  ('owner','checkout.terminal.approve'),
   ('owner','checkout.terminal.confirm'),
   ('owner','customer.attach'),
   ('owner','customer.contact.read'),
@@ -595,15 +567,12 @@ with grants(role_key,permission_key) as (
   ('owner','customer.history.global'),
   ('owner','customer.history.read'),
   ('owner','customer.merge'),
-  ('owner','customer.merge.approve'),
   ('owner','customer.read'),
   ('owner','customer.search'),
   ('owner','device.enroll'),
   ('owner','gift_card.activate'),
-  ('owner','gift_card.activate.approve'),
   ('owner','gift_card.authorize'),
   ('owner','gift_card.issue'),
-  ('owner','gift_card.issue.approve'),
   ('owner','gift_card.lookup'),
   ('owner','gift_card.read'),
   ('owner','gift_card.redeem'),
@@ -624,26 +593,20 @@ with grants(role_key,permission_key) as (
   ('owner','hardware.scanner.test'),
   ('owner','hardware.scanner.use'),
   ('owner','insights.read'),
-  ('owner','inventory.adjust.approve'),
   ('owner','inventory.adjust.decrease'),
   ('owner','inventory.adjust.increase'),
-  ('owner','inventory.count.approve'),
   ('owner','inventory.count.create'),
   ('owner','inventory.count.reconcile'),
   ('owner','inventory.count.submit'),
-  ('owner','inventory.damage.approve'),
   ('owner','inventory.damage.create'),
   ('owner','inventory.history.read'),
   ('owner','inventory.negative_stock.override'),
   ('owner','inventory.policy.manage'),
   ('owner','inventory.policy.read'),
-  ('owner','inventory.quarantine.approve'),
   ('owner','inventory.quarantine.enter'),
   ('owner','inventory.quarantine.release'),
   ('owner','inventory.read'),
-  ('owner','inventory.restock.approve'),
   ('owner','inventory.restock.resolve'),
-  ('owner','inventory.waste.approve'),
   ('owner','inventory.waste.create'),
   ('owner','kitchen.cancel_ack'),
   ('owner','kitchen.complete'),
@@ -658,21 +621,17 @@ with grants(role_key,permission_key) as (
   ('owner','kitchen.station.read'),
   ('owner','location.switch'),
   ('owner','loyalty.adjust'),
-  ('owner','loyalty.adjust.approve'),
   ('owner','loyalty.policy.manage'),
   ('owner','loyalty.read'),
-  ('owner','loyalty.reward.approve'),
   ('owner','loyalty.reward.authorize'),
   ('owner','loyalty.reward.redeem'),
   ('owner','loyalty.reward.release'),
   ('owner','merchant.manage'),
   ('owner','offline.cash.checkout'),
-  ('owner','offline.recovery.review'),
   ('owner','offline.replay'),
   ('owner','sale.exception.history'),
   ('owner','sale.exception.read'),
   ('owner','sale.lifecycle'),
-  ('owner','sale.refund.approve'),
   ('owner','sale.refund.cash'),
   ('owner','sale.refund.full'),
   ('owner','sale.refund.manual_terminal'),
@@ -681,9 +640,6 @@ with grants(role_key,permission_key) as (
   ('owner','sale.refund.partial'),
   ('owner','sale.refund.reconcile'),
   ('owner','sale.resume.any'),
-  ('owner','sale.void.create'),
-  ('owner','stored_value.approve'),
-  ('owner','stored_value.reconcile'),
   ('owner','wallet.authorize'),
   ('owner','wallet.read'),
   ('owner','wallet.redeem'),
@@ -691,6 +647,7 @@ with grants(role_key,permission_key) as (
   ('owner','wallet.release'),
   ('staff','cart.write'),
   ('staff','cash.count.submit'),
+  ('staff','cash.drawer.no_sale'),
   ('staff','cash.movement.paid_in'),
   ('staff','cash.movement.paid_out'),
   ('staff','cash.movement.safe_drop'),
@@ -755,9 +712,7 @@ with grants(role_key,permission_key) as (
   ('supervisor','catalog.read'),
   ('supervisor','checkout.commit'),
   ('supervisor','checkout.discount.apply'),
-  ('supervisor','checkout.discount.approve'),
   ('supervisor','checkout.recover.any'),
-  ('supervisor','checkout.terminal.approve'),
   ('supervisor','checkout.terminal.confirm'),
   ('supervisor','customer.attach'),
   ('supervisor','customer.contact.read'),
@@ -816,7 +771,6 @@ with grants(role_key,permission_key) as (
   ('supervisor','sale.refund.partial'),
   ('supervisor','sale.refund.reconcile'),
   ('supervisor','sale.resume.any'),
-  ('supervisor','sale.void.create'),
   ('supervisor','wallet.authorize'),
   ('supervisor','wallet.read'),
   ('supervisor','wallet.redeem'),
@@ -878,6 +832,56 @@ $$;
 revoke all on function umi.resolve_staff_permissions(uuid) from public;
 grant execute on function umi.resolve_staff_permissions(uuid) to api,worker;
 
+-- Preserve the merchant role resolver when file 35 runs after file 49.
+do $preserve_roles$
+begin
+  if exists(select 1 from information_schema.columns where table_schema='merchant'
+    and table_name='staff' and column_name='merchant_role_id') then
+    execute $resolver$create or replace function umi.resolve_staff_permissions(p_staff_id uuid)
+returns text[]
+language sql
+stable
+security definer
+set search_path=umi,merchant,pg_temp
+as $$
+  select coalesce(array_agg(effective.key order by effective.key),'{}'::text[])
+  from (
+    select p.key
+    from merchant.staff s
+    join umi.permission p on p.status='active'
+    left join merchant.role_permission mrp
+      on s.merchant_role_id is not null
+     and mrp.role_id=s.merchant_role_id
+     and mrp.permission_id=p.id
+    left join umi.role_permission rp
+      on s.merchant_role_id is null
+     and rp.role_id=s.role_id
+     and rp.permission_id=p.id
+    where s.id=p_staff_id and s.status='active'
+      and (mrp.permission_id is not null or rp.permission_id is not null)
+      and not exists (
+        select 1 from merchant.staff_permission_override denied
+        where denied.staff_id=s.id and denied.permission_id=p.id and denied.effect='deny'
+          and (denied.expires_at is null or denied.expires_at>now())
+      )
+    union
+    select p.key
+    from merchant.staff_permission_override allowed
+    join merchant.staff s on s.id=allowed.staff_id and s.status='active'
+    join umi.permission p on p.id=allowed.permission_id and p.status='active'
+    where allowed.staff_id=p_staff_id and allowed.effect='allow'
+      and (allowed.expires_at is null or allowed.expires_at>now())
+      and not exists (
+        select 1 from merchant.staff_permission_override denied
+        where denied.staff_id=allowed.staff_id
+          and denied.permission_id=allowed.permission_id and denied.effect='deny'
+          and (denied.expires_at is null or denied.expires_at>now())
+      )
+  ) effective;
+$$;$resolver$;
+  end if;
+end $preserve_roles$;
+
 create or replace function runtime.invalidate_operator_sessions_for_rbac()
 returns trigger
 language plpgsql
@@ -891,6 +895,13 @@ begin
     from merchant.staff s
     where os.staff_id=s.id
       and s.role_id=coalesce(new.role_id,old.role_id)
+      and os.state in ('active','locked');
+  elsif tg_table_schema='merchant' and tg_table_name='role_permission' then
+    update runtime.operator_session os
+    set state='ended',ended_at=coalesce(ended_at,now()),last_activity_at=now()
+    from merchant.staff s
+    where os.staff_id=s.id
+      and s.merchant_role_id=coalesce(new.role_id,old.role_id)
       and os.state in ('active','locked');
   elsif tg_table_schema='merchant' and tg_table_name='staff_permission_override' then
     update runtime.operator_session
@@ -929,6 +940,27 @@ on merchant.staff_permission_override;
 create trigger staff_override_operator_session_invalidation
 after insert or update or delete on merchant.staff_permission_override
 for each row execute function runtime.invalidate_operator_sessions_for_rbac();
+
+-- A reapply preserves the merchant role column after file 49 added it.
+do $$ begin
+  if exists(select 1 from information_schema.columns where table_schema='merchant'
+    and table_name='staff' and column_name='merchant_role_id') then
+    execute 'drop trigger if exists staff_authority_operator_session_invalidation on merchant.staff';
+    execute $trigger$create trigger staff_authority_operator_session_invalidation
+after update of role_id,merchant_role_id,location_id,status,operator_pin_hash,operator_pin_lookup
+on merchant.staff
+for each row
+when (
+  old.role_id is distinct from new.role_id
+  or old.merchant_role_id is distinct from new.merchant_role_id
+  or old.location_id is distinct from new.location_id
+  or old.status is distinct from new.status
+  or old.operator_pin_hash is distinct from new.operator_pin_hash
+  or old.operator_pin_lookup is distinct from new.operator_pin_lookup
+)
+execute function runtime.invalidate_operator_sessions_for_rbac();$trigger$;
+  end if;
+end $$;
 
 -- super_admin stays outside the café matrix. Platform grants use their own authority.
 
@@ -1048,6 +1080,7 @@ begin
   ('admin','offline.cash.checkout'),
   ('admin','offline.recovery.review'),
   ('admin','offline.replay'),
+  ('admin','order.void_after_preparation.approve'),
   ('admin','sale.exception.history'),
   ('admin','sale.exception.read'),
   ('admin','sale.lifecycle'),
@@ -1069,6 +1102,7 @@ begin
   ('admin','wallet.release'),
   ('cashier','cart.write'),
   ('cashier','cash.count.submit'),
+  ('cashier','cash.drawer.no_sale'),
   ('cashier','cash.movement.paid_in'),
   ('cashier','cash.movement.paid_out'),
   ('cashier','cash.movement.safe_drop'),
@@ -1119,29 +1153,21 @@ begin
   ('manager','cash.count.recount'),
   ('manager','cash.count.submit'),
   ('manager','cash.drawer.no_sale'),
-  ('manager','cash.drawer.no_sale.approve'),
   ('manager','cash.movement.paid_in'),
-  ('manager','cash.movement.paid_in.approve'),
   ('manager','cash.movement.paid_out'),
-  ('manager','cash.movement.paid_out.approve'),
   ('manager','cash.movement.safe_drop'),
-  ('manager','cash.movement.safe_drop.approve'),
   ('manager','cash.reconcile'),
   ('manager','cash.register.use'),
   ('manager','cash.shift.close'),
-  ('manager','cash.shift.close.approve'),
   ('manager','cash.shift.handoff'),
   ('manager','cash.shift.open'),
   ('manager','cash.shift.read'),
   ('manager','cash.shift.resume'),
   ('manager','cash.shift.suspend'),
-  ('manager','cash.variance.approve'),
   ('manager','catalog.read'),
   ('manager','checkout.commit'),
   ('manager','checkout.discount.apply'),
-  ('manager','checkout.discount.approve'),
   ('manager','checkout.recover.any'),
-  ('manager','checkout.terminal.approve'),
   ('manager','checkout.terminal.confirm'),
   ('manager','customer.attach'),
   ('manager','customer.contact.read'),
@@ -1150,14 +1176,11 @@ begin
   ('manager','customer.history.global'),
   ('manager','customer.history.read'),
   ('manager','customer.merge'),
-  ('manager','customer.merge.approve'),
   ('manager','customer.read'),
   ('manager','customer.search'),
   ('manager','gift_card.activate'),
-  ('manager','gift_card.activate.approve'),
   ('manager','gift_card.authorize'),
   ('manager','gift_card.issue'),
-  ('manager','gift_card.issue.approve'),
   ('manager','gift_card.lookup'),
   ('manager','gift_card.read'),
   ('manager','gift_card.redeem'),
@@ -1175,25 +1198,19 @@ begin
   ('manager','hardware.read'),
   ('manager','hardware.scanner.test'),
   ('manager','hardware.scanner.use'),
-  ('manager','inventory.adjust.approve'),
   ('manager','inventory.adjust.decrease'),
   ('manager','inventory.adjust.increase'),
-  ('manager','inventory.count.approve'),
   ('manager','inventory.count.create'),
   ('manager','inventory.count.reconcile'),
   ('manager','inventory.count.submit'),
-  ('manager','inventory.damage.approve'),
   ('manager','inventory.damage.create'),
   ('manager','inventory.history.read'),
   ('manager','inventory.negative_stock.override'),
   ('manager','inventory.policy.read'),
-  ('manager','inventory.quarantine.approve'),
   ('manager','inventory.quarantine.enter'),
   ('manager','inventory.quarantine.release'),
   ('manager','inventory.read'),
-  ('manager','inventory.restock.approve'),
   ('manager','inventory.restock.resolve'),
-  ('manager','inventory.waste.approve'),
   ('manager','inventory.waste.create'),
   ('manager','kitchen.cancel_ack'),
   ('manager','kitchen.complete'),
@@ -1206,20 +1223,16 @@ begin
   ('manager','kitchen.station.manage'),
   ('manager','kitchen.station.read'),
   ('manager','loyalty.adjust'),
-  ('manager','loyalty.adjust.approve'),
   ('manager','loyalty.policy.manage'),
   ('manager','loyalty.read'),
-  ('manager','loyalty.reward.approve'),
   ('manager','loyalty.reward.authorize'),
   ('manager','loyalty.reward.redeem'),
   ('manager','loyalty.reward.release'),
   ('manager','offline.cash.checkout'),
-  ('manager','offline.recovery.review'),
   ('manager','offline.replay'),
   ('manager','sale.exception.history'),
   ('manager','sale.exception.read'),
   ('manager','sale.lifecycle'),
-  ('manager','sale.refund.approve'),
   ('manager','sale.refund.cash'),
   ('manager','sale.refund.full'),
   ('manager','sale.refund.manual_terminal'),
@@ -1227,9 +1240,6 @@ begin
   ('manager','sale.refund.partial'),
   ('manager','sale.refund.reconcile'),
   ('manager','sale.resume.any'),
-  ('manager','sale.void.create'),
-  ('manager','stored_value.approve'),
-  ('manager','stored_value.reconcile'),
   ('manager','wallet.authorize'),
   ('manager','wallet.read'),
   ('manager','wallet.redeem'),
@@ -1240,29 +1250,21 @@ begin
   ('owner','cash.count.recount'),
   ('owner','cash.count.submit'),
   ('owner','cash.drawer.no_sale'),
-  ('owner','cash.drawer.no_sale.approve'),
   ('owner','cash.movement.paid_in'),
-  ('owner','cash.movement.paid_in.approve'),
   ('owner','cash.movement.paid_out'),
-  ('owner','cash.movement.paid_out.approve'),
   ('owner','cash.movement.safe_drop'),
-  ('owner','cash.movement.safe_drop.approve'),
   ('owner','cash.reconcile'),
   ('owner','cash.register.use'),
   ('owner','cash.shift.close'),
-  ('owner','cash.shift.close.approve'),
   ('owner','cash.shift.handoff'),
   ('owner','cash.shift.open'),
   ('owner','cash.shift.read'),
   ('owner','cash.shift.resume'),
   ('owner','cash.shift.suspend'),
-  ('owner','cash.variance.approve'),
   ('owner','catalog.read'),
   ('owner','checkout.commit'),
   ('owner','checkout.discount.apply'),
-  ('owner','checkout.discount.approve'),
   ('owner','checkout.recover.any'),
-  ('owner','checkout.terminal.approve'),
   ('owner','checkout.terminal.confirm'),
   ('owner','customer.attach'),
   ('owner','customer.contact.read'),
@@ -1272,15 +1274,12 @@ begin
   ('owner','customer.history.global'),
   ('owner','customer.history.read'),
   ('owner','customer.merge'),
-  ('owner','customer.merge.approve'),
   ('owner','customer.read'),
   ('owner','customer.search'),
   ('owner','device.enroll'),
   ('owner','gift_card.activate'),
-  ('owner','gift_card.activate.approve'),
   ('owner','gift_card.authorize'),
   ('owner','gift_card.issue'),
-  ('owner','gift_card.issue.approve'),
   ('owner','gift_card.lookup'),
   ('owner','gift_card.read'),
   ('owner','gift_card.redeem'),
@@ -1301,26 +1300,20 @@ begin
   ('owner','hardware.scanner.test'),
   ('owner','hardware.scanner.use'),
   ('owner','insights.read'),
-  ('owner','inventory.adjust.approve'),
   ('owner','inventory.adjust.decrease'),
   ('owner','inventory.adjust.increase'),
-  ('owner','inventory.count.approve'),
   ('owner','inventory.count.create'),
   ('owner','inventory.count.reconcile'),
   ('owner','inventory.count.submit'),
-  ('owner','inventory.damage.approve'),
   ('owner','inventory.damage.create'),
   ('owner','inventory.history.read'),
   ('owner','inventory.negative_stock.override'),
   ('owner','inventory.policy.manage'),
   ('owner','inventory.policy.read'),
-  ('owner','inventory.quarantine.approve'),
   ('owner','inventory.quarantine.enter'),
   ('owner','inventory.quarantine.release'),
   ('owner','inventory.read'),
-  ('owner','inventory.restock.approve'),
   ('owner','inventory.restock.resolve'),
-  ('owner','inventory.waste.approve'),
   ('owner','inventory.waste.create'),
   ('owner','kitchen.cancel_ack'),
   ('owner','kitchen.complete'),
@@ -1335,21 +1328,17 @@ begin
   ('owner','kitchen.station.read'),
   ('owner','location.switch'),
   ('owner','loyalty.adjust'),
-  ('owner','loyalty.adjust.approve'),
   ('owner','loyalty.policy.manage'),
   ('owner','loyalty.read'),
-  ('owner','loyalty.reward.approve'),
   ('owner','loyalty.reward.authorize'),
   ('owner','loyalty.reward.redeem'),
   ('owner','loyalty.reward.release'),
   ('owner','merchant.manage'),
   ('owner','offline.cash.checkout'),
-  ('owner','offline.recovery.review'),
   ('owner','offline.replay'),
   ('owner','sale.exception.history'),
   ('owner','sale.exception.read'),
   ('owner','sale.lifecycle'),
-  ('owner','sale.refund.approve'),
   ('owner','sale.refund.cash'),
   ('owner','sale.refund.full'),
   ('owner','sale.refund.manual_terminal'),
@@ -1358,9 +1347,6 @@ begin
   ('owner','sale.refund.partial'),
   ('owner','sale.refund.reconcile'),
   ('owner','sale.resume.any'),
-  ('owner','sale.void.create'),
-  ('owner','stored_value.approve'),
-  ('owner','stored_value.reconcile'),
   ('owner','wallet.authorize'),
   ('owner','wallet.read'),
   ('owner','wallet.redeem'),
@@ -1368,6 +1354,7 @@ begin
   ('owner','wallet.release'),
   ('staff','cart.write'),
   ('staff','cash.count.submit'),
+  ('staff','cash.drawer.no_sale'),
   ('staff','cash.movement.paid_in'),
   ('staff','cash.movement.paid_out'),
   ('staff','cash.movement.safe_drop'),
@@ -1432,9 +1419,7 @@ begin
   ('supervisor','catalog.read'),
   ('supervisor','checkout.commit'),
   ('supervisor','checkout.discount.apply'),
-  ('supervisor','checkout.discount.approve'),
   ('supervisor','checkout.recover.any'),
-  ('supervisor','checkout.terminal.approve'),
   ('supervisor','checkout.terminal.confirm'),
   ('supervisor','customer.attach'),
   ('supervisor','customer.contact.read'),
@@ -1493,7 +1478,6 @@ begin
   ('supervisor','sale.refund.partial'),
   ('supervisor','sale.refund.reconcile'),
   ('supervisor','sale.resume.any'),
-  ('supervisor','sale.void.create'),
   ('supervisor','wallet.authorize'),
   ('supervisor','wallet.read'),
   ('supervisor','wallet.redeem'),

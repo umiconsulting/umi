@@ -396,15 +396,14 @@ export class AuthService {
     // would kill every such register a TTL after it paired. `suspended` closes
     // both lists, and that is the point of having two.
     //
-    // ⚠️ KNOWN GAP IN THE READ, NOT IN THIS GATE. `findUserById` still demands
-    // `password_hash IS NOT NULL`, so a PIN-only invited operator — email and PIN
-    // but no password, which is exactly what the dashboard creates — is refused
-    // there as a MISSING user, before this line is reached. The till then opens
-    // for them and fails to renew one access TTL later. Not changed here: the same
-    // predicate decides what `/me` and the dashboard's refresh resolve, and the
-    // till cannot be driven end to end from a unit test (needs a paired device and
-    // a signed proof). Reported with the SQL evidence; see the hand-off notes.
-    const summary = await this.repo.findUserById(claims.sub);
+    // `findPosOperatorById` and NOT `findUserById`. The dashboard creates its operators
+    // with a name, an email and a till PIN — no password — so the password door's read
+    // found nobody and every register died one access TTL after the PIN that opened it.
+    // This path has already proved more than a password would: a verified refresh JWT, a
+    // device-bound session matched by installation and credential hash, and a signed
+    // device proof. The list below is the PIN door's own, so a suspended operator is
+    // still refused.
+    const summary = await this.repo.findPosOperatorById(claims.sub);
     if (!summary) throw new UnauthorizedException('invalid_token');
     if (!POS_PIN_LOGIN_STATUSES.includes(summary.status)) {
       throw new UnauthorizedException('invalid_token');
@@ -545,8 +544,15 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
     await this.repo.insertResetToken(credential.userId, tokenHash, expiresAt);
 
-    const appUrl = this.config.get('APP_URL', { infer: true }) ?? 'http://localhost:4010';
-    const resetLink = `${appUrl}/reset-password?token=${token}`;
+    // Where the emailed link points. `APP_URL` is the explicit override. A
+    // deployed environment already requires PUBLIC_DASHBOARD_URL, so the link
+    // still resolves when only that is set. The last fallback is the local
+    // Vite port; the old `http://localhost:4010` named no running server.
+    const appUrl =
+      this.config.get('APP_URL', { infer: true }) ??
+      this.config.get('PUBLIC_DASHBOARD_URL', { infer: true }) ??
+      'http://localhost:4000';
+    const resetLink = `${appUrl.replace(/\/+$/, '')}/reset-password?token=${token}`;
     const name = credential.displayName || credential.email;
 
     const sent = await this.email.send({
@@ -567,6 +573,13 @@ export class AuthService {
       // The token is already persisted; surface the delivery failure for ops
       // without leaking it to the caller (still returns 200).
       this.logger.error(`reset_email_send_failed user=${credential.userId}`);
+      // A local development machine may have no mail credentials. Put the link
+      // in the log so the reset can still be completed. A deployed environment
+      // never runs this branch.
+      const environment = this.config.get('UMI_ENVIRONMENT', { infer: true });
+      if (environment === 'development' || environment === 'test') {
+        this.logger.warn(`reset_link_dev user=${credential.userId} link=${resetLink}`);
+      }
     }
   }
 

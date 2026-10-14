@@ -1,0 +1,18 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/kds/kds.repository.regression.spec.ts (4 tests) 3ms
+ ✓ src/modules/kds/dto/kds-status-map.spec.ts (7 tests) 6ms
+ ✓ src/modules/kds/kitchen-projector.spec.ts (5 tests) 7ms
+ ✓ src/modules/kds/kitchen-domain.spec.ts (7 tests) 15ms
+ ✓ src/modules/kds/kds-contract.spec.ts (14 tests) 11ms
+ ✓ src/modules/kds/kds-location.guard.spec.ts (21 tests) 12ms
+ ✓ src/modules/kds/kds.service.spec.ts (59 tests) 46ms
+ ↓ src/modules/kds/kds.repository.integration.spec.ts (29 tests | 29 skipped)
+
+ Test Files  7 passed | 1 skipped (8)
+      Tests  117 passed | 29 skipped (146)
+   Start at  14:44:50
+   Duration  726ms (transform 530ms, setup 0ms, collect 1.65s, tests 101ms, environment 2ms, prepare 469ms)
+

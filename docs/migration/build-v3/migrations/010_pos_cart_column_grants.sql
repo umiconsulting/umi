@@ -1,0 +1,33 @@
+-- ============================================================================
+-- 010 · The columns added after 90_rls get their UPDATE grant back
+--
+-- WHY. `90_rls.sql` does not grant `api` table-level UPDATE on
+-- `merchant.pos_cart`. It revokes it and grants the privilege back COLUMN BY
+-- COLUMN, because `business_date` decides which trading day a sale lands in and
+-- the till must not be able to move it. `63_channel_attribution.sql` records the
+-- same trap in its own comment: a column that does not exist yet cannot be in
+-- that list.
+--
+-- Three columns arrived after the list was written and never restored their
+-- grant:
+--
+--   fired_order_id            set when the till fires the cart to the kitchen
+--   fulfillment_type          set when the operator switches dine-in / takeaway
+--   cancellation_reason_code  added by 007, set when the till cancels the sale
+--
+-- So every one of those writes died with `permission denied for table pos_cart`
+-- — a 500, not a refusal the operator could read. ON THE PILOT TILL, 2026-10-07:
+-- "Enviar a cocina" answered with the app's generic "no se completó la
+-- operación", and the cart line the operator had just added looked like it had
+-- never landed.
+--
+-- WHAT IT DOES. Grants UPDATE on exactly those three columns to `api`. The
+-- protected `business_date` stays unwritable, which is the point of the
+-- arrangement.
+--
+-- RE-RUNNABLE. `grant` is idempotent. No `begin;` — the caller owns the
+-- transaction.
+-- ============================================================================
+
+grant update (fired_order_id, fulfillment_type, cancellation_reason_code)
+  on merchant.pos_cart to api;

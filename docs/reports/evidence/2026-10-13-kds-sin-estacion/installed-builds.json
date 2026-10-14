@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-13T22:23:46.308948+00:00",
+  "version": "0.1.0+94",
+  "localSha256": "d9ef49320ea8be3621fd74829c0296580ec557fab3c544143d33f5bcd7280763",
+  "devices": [
+    {
+      "name": "iMin",
+      "serial": "192.168.1.10:5555",
+      "versionCode": "94",
+      "versionName": "0.1.0",
+      "sha256": "d9ef49320ea8be3621fd74829c0296580ec557fab3c544143d33f5bcd7280763"
+    },
+    {
+      "name": "A9 KDS",
+      "serial": "192.168.1.14:35559",
+      "versionCode": "94",
+      "versionName": "0.1.0",
+      "sha256": "d9ef49320ea8be3621fd74829c0296580ec557fab3c544143d33f5bcd7280763"
+    },
+    {
+      "name": "A11 móvil",
+      "serial": "192.168.1.13:38333",
+      "versionCode": "94",
+      "versionName": "0.1.0",
+      "sha256": "d9ef49320ea8be3621fd74829c0296580ec557fab3c544143d33f5bcd7280763"
+    }
+  ]
+}

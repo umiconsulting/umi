@@ -1,11 +1,17 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemChannels;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
+import '../../core/config/api_assets.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/localization/app_localizations.dart';
+import '../../core/security/operator_permissions.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/widgets/inline_notice.dart';
+import '../../shared/widgets/receipt_print_action.dart';
 import '../cart/cart_controller.dart';
 import '../cash/money_input.dart';
 import '../customer_value/customer_value_controller.dart';
@@ -14,6 +20,7 @@ import '../entry/entry_controller.dart';
 import '../offline/offline_policy.dart';
 import '../sale/sale_lifecycle_controller.dart';
 import 'checkout_controller.dart';
+import 'partial_checkout_surface.dart';
 import 'tender_identity.dart';
 
 Future<void> showCheckoutSheet(
@@ -24,7 +31,13 @@ Future<void> showCheckoutSheet(
   required EntryController entry,
   required SaleLifecycleController sales,
   CustomerValueController? customerValue,
+  // The same call Ventas uses for a reprint, so the customer who asks for their
+  // ticket at the counter gets it from the screen they are already standing at.
+  // Null on a till with no hardware service, which is what makes the dialog offer
+  // no print button rather than a button that cannot work.
+  ReceiptPrintRequest? onPrint,
   Future<String?> Function(String holdState)? onRecoverCashShift,
+  Future<String?> Function()? onOpenCashShift,
   // The till's wake-up from the API: the server resolves a card attempt about a
   // second after the terminal answers, and this is what tells the waiting screen
   // so instead of the terminal's own ten- and forty-second windows.
@@ -42,29 +55,34 @@ Future<void> showCheckoutSheet(
   // The wall clock the card wait reads. Injectable so a test can reach the
   // bound without spending a minute of real time; the till passes the real one.
   DateTime Function() now = DateTime.now,
-}) => Navigator.of(context).push(
-  // PoloTab pays on a full screen, not a sheet — a focused, low-light surface.
-  MaterialPageRoute<void>(
-    fullscreenDialog: true,
-    builder: (_) => Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: _CheckoutSheet(
-        checkout: checkout,
-        cashShiftId: cashShiftId,
-        cart: cart,
-        entry: entry,
-        sales: sales,
-        customerValue: customerValue,
-        onRecoverCashShift: onRecoverCashShift,
-        deviceChannel: deviceChannel,
-        cardTerminalPollStart: cardTerminalPollStart,
-        cardTerminalPollCap: cardTerminalPollCap,
-        cardTerminalWaitBound: cardTerminalWaitBound,
-        now: now,
+}) async {
+  await Navigator.of(context).push(
+    // PoloTab pays on a full screen, not a sheet — a focused, low-light surface.
+    PosPageRoute<void>(
+      fullscreenDialog: true,
+      builder: (_) => PosPage(
+        backgroundColor: PosTheme.of(context).scaffoldBackgroundColor,
+        body: _CheckoutSheet(
+          checkout: checkout,
+          cashShiftId: cashShiftId,
+          cart: cart,
+          entry: entry,
+          sales: sales,
+          customerValue: customerValue,
+          onPrint: onPrint,
+          onRecoverCashShift: onRecoverCashShift,
+          onOpenCashShift: onOpenCashShift,
+          deviceChannel: deviceChannel,
+          cardTerminalPollStart: cardTerminalPollStart,
+          cardTerminalPollCap: cardTerminalPollCap,
+          cardTerminalWaitBound: cardTerminalWaitBound,
+          now: now,
+        ),
       ),
     ),
-  ),
-);
+  );
+  sales.finishCheckoutPresentation();
+}
 
 final class _CheckoutSheet extends StatefulWidget {
   const _CheckoutSheet({
@@ -74,7 +92,9 @@ final class _CheckoutSheet extends StatefulWidget {
     required this.entry,
     required this.sales,
     required this.customerValue,
+    this.onPrint,
     required this.onRecoverCashShift,
+    required this.onOpenCashShift,
     required this.deviceChannel,
     required this.cardTerminalPollStart,
     required this.cardTerminalPollCap,
@@ -88,10 +108,15 @@ final class _CheckoutSheet extends StatefulWidget {
   final SaleLifecycleController sales;
   final CustomerValueController? customerValue;
 
+  /// Print this sale's receipt — the completion screen's own way in, and the same
+  /// request Ventas makes. See `receiptPrintAction` for why the paper is a copy.
+  final ReceiptPrintRequest? onPrint;
+
   /// Recover the till's cash shift after a `CASH_SHIFT_REQUIRED` refusal and
   /// return the shift id now in force, or null when the recovery freed the
   /// drawer but left no shift to charge against.
   final Future<String?> Function(String holdState)? onRecoverCashShift;
+  final Future<String?> Function()? onOpenCashShift;
   final DeviceChannelSocketClient? deviceChannel;
   final Duration cardTerminalPollStart;
   final Duration cardTerminalPollCap;
@@ -108,8 +133,10 @@ final class _CheckoutSheet extends StatefulWidget {
 final class _CheckoutSheetState extends State<_CheckoutSheet> {
   String method = 'cash';
   bool cashEnabled = true;
+  bool cashRecoveryBusy = false;
   bool terminalEnabled = false;
   String terminalStatus = 'not_started';
+  int? _confirmedManualTerminalMinorUnits;
 
   /// The CARD terminal's own tender state, kept PARALLEL to the manual one
   /// rather than overloaded onto it.
@@ -121,10 +148,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// (`terminal` vs `card_terminal`), so they can never collide on
   /// `pos_tender_fact.id`.
   bool cardEnabled = false;
+  bool bankEnabled = false;
+  bool bankConfirmed = false;
 
   /// The operator asked to divide this check across more than one method.
   /// Default false: one method per sale unless the operator says otherwise.
   bool splitArmed = false;
+  bool _partialInProgress = false;
+  bool _partialRouteOpen = false;
 
   /// The recovered draft holds a tender combination this location cannot take.
   ///
@@ -174,9 +205,19 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// The totals the sheet is showing, so the card flow can re-balance the tender
   /// fields from a poll that runs while the operator is looking elsewhere.
   TotalsPreview? shownTotals;
-  String receiptDestination = 'display';
   String tipKind = 'none';
   int tipBasisPoints = 0;
+
+  /// WHICH NUMBER THE ON-SCREEN KEYPAD IS EDITING.
+  ///
+  /// The till has one numeric keypad and two numbers that want it — what the customer put
+  /// down, and the tip percentage — and neither field opens the system keyboard any more.
+  /// A POS often has no keyboard at all, and the one it may have is the wrong tool: the
+  /// operator tapped the field, the sheet scrolled, the keyboard came up over the amount
+  /// they were reading, and getting a caret into the box took several tries (owner,
+  /// 2026-10-13). Tapping a field says which number the keypad is on; the keypad is the
+  /// only thing that writes.
+  String _padTarget = 'cash';
   String discountType = 'order_percentage';
   bool dirty = false;
 
@@ -186,11 +227,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// before anyone touches the sheet — so `dirty` cannot tell an edited amount
   /// from an untouched one, and a stale draft stayed on screen because of it.
   bool tenderEdited = false;
+  bool cashReceivedEdited = false;
+  String? _splitEditedLeg;
   bool recoveredDraftLoaded = false;
   final cashApplied = TextEditingController();
   final cashReceived = TextEditingController();
   final terminalAmount = TextEditingController();
   final cardAmount = TextEditingController();
+  final bankAmount = TextEditingController();
   final customTipPercent = TextEditingController();
   final customTipFixed = TextEditingController();
   final discountPercent = TextEditingController();
@@ -199,6 +243,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   bool fundedGiftCardRevealed = false;
   bool fundedGiftCardRevealInFlight = false;
   String? customerValuePreviewKey;
+  Future<void>? customerValuePreviewInFlight;
   List<Map<String, Object?>> storedValueTenders = const [];
 
   @override
@@ -226,15 +271,123 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           ),
         );
       }
-      unawaited(
-        widget.checkout.recover(
+      unawaited(_anchorCheckout());
+    }
+  }
+
+  /// Open the checkout against the cart's CURRENT version.
+  ///
+  /// The version is the commit's optimistic guard, and the till's copy can be a
+  /// write behind — a cancelled checkout bumps the cart server-side and the till
+  /// never sees the answer. Anchoring on the copy in hand made the commit refuse
+  /// with OPTIMISTIC_VERSION_CONFLICT, and the retry re-sent the same stale
+  /// number, so the sale was unpayable and the only way out was to back off the
+  /// screen. One read here is the difference between a recoverable refusal and a
+  /// dead end.
+  Future<void> _anchorCheckout() async {
+    if (widget.cart.state.cart == null || widget.entry.state.operator == null) {
+      return;
+    }
+    await widget.cart.refresh();
+    if (!mounted) return;
+    final cart = widget.cart.state.cart;
+    final operator = widget.entry.state.operator;
+    if (cart == null || operator == null) return;
+    await widget.checkout.recover(
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+      operatorSessionId: operator.id,
+      cartId: cart.id,
+      cartVersion: cart.version,
+    );
+    if (!mounted ||
+        !widget.checkout.supportsPartialPayments ||
+        widget.checkout.state.phase == CheckoutPhase.completed) {
+      return;
+    }
+    if (widget.checkout.policy == null) {
+      final currency = cart.totals['grandTotal'] is Map
+          ? (cart.totals['grandTotal'] as Map)['currency'] as String?
+          : null;
+      if (currency != null) {
+        await widget.checkout.loadPolicy(
           merchantId: cart.merchantId,
           locationId: cart.locationId,
           operatorSessionId: operator.id,
-          cartId: cart.id,
-          cartVersion: cart.version,
-        ),
+          currency: currency,
+        );
+      }
+    }
+    await _syncPartialLedger(openWhenFound: true);
+  }
+
+  Future<void> _syncPartialLedger({bool openWhenFound = false}) async {
+    final cart = widget.cart.state.cart;
+    final operator = widget.entry.state.operator;
+    if (cart == null ||
+        operator == null ||
+        !widget.checkout.canCollectPartialPayments) {
+      return;
+    }
+    try {
+      final snapshot = await widget.checkout.partialPayments(
+        merchantId: cart.merchantId,
+        cartId: cart.id,
+        locationId: cart.locationId,
+        operatorSessionId: operator.id,
       );
+      if (!mounted) return;
+      final found = (snapshot['tenderDrafts'] as List? ?? const []).isNotEmpty;
+      setState(() => _partialInProgress = found);
+      if (found && openWhenFound && !_partialRouteOpen) {
+        await _presentPartialCheckout();
+      }
+    } on AppException catch (failure) {
+      if (failure.code == 'RESOURCE_NOT_FOUND' && mounted) {
+        setState(() => _partialInProgress = false);
+      }
+    }
+  }
+
+  Future<void> _presentPartialCheckout() async {
+    if (_partialRouteOpen || !mounted) return;
+    _partialRouteOpen = true;
+    try {
+      await showPartialCheckout(
+        context,
+        checkout: widget.checkout,
+        cart: widget.cart,
+        operatorSessionId:
+            widget.entry.state.operator?.id ??
+            widget.cart.state.cart!.operatorSessionId,
+        canConfirmManualTerminal:
+            widget.entry.state.operator?.permissions.contains(
+              'checkout.terminal.confirm',
+            ) ==
+            true,
+        cashShiftId: widget.cashShiftId,
+        onShowBankTransferDetails: (amountMinor, selected) {
+          final policy = widget.checkout.policy;
+          if (policy?.bankTransferDetails == null) {
+            return Future<bool?>.value(false);
+          }
+          final total = widget.cart.state.cart?.totals['grandTotal'];
+          final currency = total is Map
+              ? total['currency'] as String? ?? 'MXN'
+              : 'MXN';
+          return _showBankDetails(
+            policy!,
+            amountMinor: amountMinor,
+            currency: currency,
+            selected: selected,
+          );
+        },
+      );
+    } finally {
+      _partialRouteOpen = false;
+      if (mounted && widget.checkout.state.phase != CheckoutPhase.completed) {
+        await _syncPartialLedger();
+      }
     }
   }
 
@@ -255,6 +408,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     cashApplied.dispose();
     terminalAmount.dispose();
     cardAmount.dispose();
+    bankAmount.dispose();
     customTipPercent.dispose();
     customTipFixed.dispose();
     discountPercent.dispose();
@@ -279,6 +433,23 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   }
 
   void _loadCustomerValuePreview() {
+    final pending = _requestCustomerValuePreview();
+    if (pending != null) unawaited(pending);
+  }
+
+  /// Ask for the loyalty and stored-value preview this checkout is owed, and hand
+  /// back the answer WHILE IT IS STILL IN FLIGHT.
+  ///
+  /// The panel only wants the preview to render, so it drops the future. The commit
+  /// cannot: the command has to carry the preview's own fingerprint, and the
+  /// database refuses a command whose half of the pair is missing
+  /// (`merchant.assert_loyalty_earn_preview` → `LOYALTY_PREVIEW_STALE`). Returning
+  /// the same request the panel is showing is what lets the commit WAIT for the
+  /// answer instead of racing it — and it asks the server once, not twice.
+  ///
+  /// Null means this sale has nothing to preview: no customer attached, or no
+  /// checkout fingerprint yet.
+  Future<void>? _requestCustomerValuePreview() {
     final controller = widget.customerValue;
     final confirmation = widget.checkout.state.result?.confirmation;
     final fingerprint = confirmation?['fingerprint'] as String?;
@@ -292,24 +463,41 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         customerId == null) {
       // No customer attached: an anonymous sale has no loyalty or stored value
       // to preview, so do not start the lookup.
-      return;
+      return null;
     }
+    // ASK ONLY WHILE THE COMMAND CARRIES NO VALUE, AND KEY THE ROW ON THE BASIS.
+    //
+    // The closeout pairs the preview with the command's fingerprint computed WITHOUT its
+    // `customerValue` ("the basis", `customerValueBasisFingerprint` → `merchant.assert_loyalty_earn_preview`).
+    // So the request that writes the row has to carry the basis, and the only fingerprint that IS
+    // the basis belongs to a command with no value in it. Once a value is applied, the fingerprint
+    // in hand is the value-carrying one, and asking with it writes a row the commit can never name
+    // — which is how a second review used to poison the pair.
+    if (widget.checkout.customerValueSelection != null) return null;
+    // A basis that changed — the operator corrected a tender or chose a tip after the preview was
+    // taken — needs a NEW row, and the server replaces the one this checkout version has
+    // (`merchant.replace_loyalty_earn_preview`). One row per version, always the one the next
+    // command will name.
     final key = '$customerId:${cart.version}:$fingerprint';
-    if (customerValuePreviewKey == key) return;
+    if (customerValuePreviewKey == key) return customerValuePreviewInFlight;
     customerValuePreviewKey = key;
-    unawaited(
-      controller.loadPreview(
-        CustomerValueScope(
-          merchantId: cart.merchantId,
-          locationId: cart.locationId,
-          operatorSessionId: operator.id,
-        ),
-        saleId: cart.id,
-        saleVersion: cart.version,
-        customerId: customerId,
-        checkoutFingerprint: fingerprint,
+    final pending = controller.loadPreview(
+      CustomerValueScope(
+        merchantId: cart.merchantId,
+        locationId: cart.locationId,
+        operatorSessionId: operator.id,
       ),
+      saleId: cart.id,
+      saleVersion: cart.version,
+      customerId: customerId,
+      checkoutFingerprint: fingerprint,
     );
+    customerValuePreviewInFlight = pending;
+    return pending.whenComplete(() {
+      if (identical(customerValuePreviewInFlight, pending)) {
+        customerValuePreviewInFlight = null;
+      }
+    });
   }
 
   void _restoreDraft(List<Map<String, Object?>> drafts) {
@@ -319,7 +507,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // succeed. The draft is NOT erased and the claim stays where it is; what does
     // not happen is the till pretending the combination is payable.
     final methods = drafts
-        .map((draft) => draft['type'] == 'cash' ? 'cash' : 'card')
+        .map((draft) => draft['type'] as String?)
+        .whereType<String>()
         .toSet();
     if (methods.length > 1 && !_mixedTenderAllowed) {
       recoveredTenderConflict = true;
@@ -329,6 +518,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // session. The mode has to match what is about to appear on screen, or the
     // first tap on a tile would quietly collapse the recovered split.
     if (methods.length > 1) splitArmed = true;
+    cashEnabled = false;
+    terminalEnabled = false;
+    cardEnabled = false;
+    bankEnabled = false;
     for (final draft in drafts) {
       final amount = draft['amount']! as Map<String, Object?>;
       final value = ((amount['minorUnits']! as num).toInt() / 100)
@@ -341,6 +534,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             ? value
             : (((received['minorUnits']! as num).toInt()) / 100)
                   .toStringAsFixed(2);
+        cashReceivedEdited =
+            received != null && received['minorUnits'] != amount['minorUnits'];
       } else if (draft['id'] ==
           tenderId(widget.cart.state.cart!.id, 'card_terminal')) {
         // A card tender restored after a restart is the SAME tender: its identity
@@ -349,12 +544,18 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         cardEnabled = true;
         cardAmount.text = value;
         cardStatus = draft['status']! as String;
+      } else if (draft['type'] == 'bank_transfer') {
+        bankEnabled = true;
+        bankAmount.text = value;
+        bankConfirmed = false;
       } else {
         terminalEnabled = true;
         terminalAmount.text = value;
         terminalStatus = draft['status']! as String;
       }
     }
+    if (splitArmed && cashEnabled) _splitEditedLeg = 'cash';
+    method = _selectedPaymentMethod;
     final tip = widget.checkout.tipDraft;
     if (tip?['kind'] == 'percentage') {
       tipKind = 'percentage';
@@ -380,14 +581,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       }
       discountReason.text = discounts.first['reason']! as String;
     }
-    receiptDestination =
-        widget.checkout.receiptDelivery['destination']! as String;
   }
 
   String _money(Map<String, Object?> value) {
     final currency = value['currency'] as String? ?? '';
     final minor = (value['minorUnits'] as num?)?.toInt() ?? 0;
-    return '$currency ${(minor / 100).toStringAsFixed(2)}';
+    return formatMinorUnits(minor, currency);
   }
 
   @override
@@ -411,10 +610,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // not be done safely. A draft that no longer covers the total is stale, so
     // it is replaced. `dirty` means the cashier typed the split themselves, and
     // their numbers are never overwritten.
-    final grandTotal = (totals.grandTotal['minorUnits']! as num).toInt();
-    final tendered =
-        (cashEnabled ? _minorUnits(cashApplied.text) : 0) +
-        (terminalEnabled ? _minorUnits(terminalAmount.text) : 0);
+    // The bill PLUS the tip and minus the discount: the amount due, which is what the tenders have
+    // to cover (see `_dueMinorUnits`).
+    final grandTotal = _dueMinorUnits(totals);
+    final tendered = _tenderedLegsMinorUnits;
     if (tenderNeedsReseed(
       receivedEmpty: cashReceived.text.isEmpty,
       tenderEdited: tenderEdited,
@@ -438,7 +637,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: switch (state.phase) {
-          CheckoutPhase.completed => _receipt(context, state.result!),
+          CheckoutPhase.completed => _receipt(
+            context,
+            state.result!,
+            state.postCommitWarning,
+          ),
           CheckoutPhase.provisional => _provisional(
             context,
             state.provisionalReceipt!,
@@ -448,10 +651,46 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             child: Semantics(
               liveRegion: true,
               label: l.paymentProcessing,
-              child: const CircularProgressIndicator(),
+              child: const PosSpinner(),
             ),
           ),
           CheckoutPhase.failure => _checkoutError(context, state.errorCode),
+          _ when _partialInProgress => Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    Localizations.localeOf(context).languageCode == 'es'
+                        ? 'Cobro dividido en curso'
+                        : 'Split payment in progress',
+                    style: PosTheme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: UmiSpacing.md),
+                  Text(
+                    Localizations.localeOf(context).languageCode == 'es'
+                        ? 'Consulta el saldo y continúa los pagos de esta cuenta.'
+                        : 'Check the balance and continue this account’s payments.',
+                  ),
+                  const SizedBox(height: UmiSpacing.lg),
+                  PosButton(
+                    key: const ValueKey('partial-checkout-resume'),
+                    onPressed: _presentPartialCheckout,
+                    child: Text(
+                      Localizations.localeOf(context).languageCode == 'es'
+                          ? 'Continuar cobro dividido'
+                          : 'Continue split payment',
+                    ),
+                  ),
+                  PosTextButton(
+                    onPressed: () => _closeCheckout(context),
+                    child: Text(l.closeAction),
+                  ),
+                ],
+              ),
+            ),
+          ),
           // The bill on the left, the money the customer put down on the right.
           //
           // This was one scrolling column, and the screen the cashier stands in
@@ -479,13 +718,15 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           Expanded(
                             child: Text(
                               l.checkoutTitle,
-                              style: Theme.of(context).textTheme.headlineSmall,
+                              style: PosTheme.of(
+                                context,
+                              ).textTheme.headlineSmall,
                             ),
                           ),
-                          IconButton(
+                          PosIconButton(
                             tooltip: l.closeAction,
                             onPressed: () => _closeCheckout(context),
-                            icon: const Icon(Icons.close),
+                            icon: const PosIcon(PosGlyphs.close),
                           ),
                         ],
                       ),
@@ -498,16 +739,22 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                             .whereType<String>()
                             .where((v) => v.isNotEmpty)
                             .join(' · '),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                        style: PosTheme.of(context).textTheme.bodySmall
+                            ?.copyWith(
+                              color: PosTheme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                       ),
                       const SizedBox(height: UmiSpacing.lg),
                       // The amount due, extra-large — the number the cashier verifies at a
                       // glance and the star of the tender screen (SOTA POS convention).
                       _TotalHero(
                         label: l.totalLabel,
-                        amount: _money(totals.grandTotal),
+                        amount: _money({
+                          'currency': totals.grandTotal['currency'],
+                          'minorUnits': grandTotal,
+                        }),
                       ),
                       const SizedBox(height: UmiSpacing.md),
                       _AmountRow(
@@ -531,9 +778,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ],
                       Text(
                         '${l.businessDateLabel}: ${totals.businessDate}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                        style: PosTheme.of(context).textTheme.bodySmall
+                            ?.copyWith(
+                              color: PosTheme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
                       ),
                       // Loyalty and stored value only apply when a customer is
                       // attached. An anonymous sale showed a permanent "Consulta en
@@ -559,11 +809,19 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           Expanded(
                             child: Text(
                               l.tenderSelectionTitle,
-                              style: Theme.of(context).textTheme.titleMedium,
+                              style: PosTheme.of(context).textTheme.titleMedium,
                             ),
                           ),
-                          if (_splitControlOffered(policy))
-                            TextButton.icon(
+                          if (_partialControlOffered(policy))
+                            PosTextButton.icon(
+                              key: const ValueKey('partial-checkout-open'),
+                              onPressed: _openPartialCheckout,
+                              icon: const PosIcon(PosGlyphs.callSplit),
+                              label: Text(l.splitTenderAction),
+                            )
+                          else if (!widget.checkout.supportsPartialPayments &&
+                              _splitControlOffered(policy))
+                            PosTextButton.icon(
                               key: ValueKey(
                                 splitArmed
                                     ? 'tender-split-disarm'
@@ -571,10 +829,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                               ),
                               onPressed: () =>
                                   _toggleSplit(!splitArmed, totals),
-                              icon: Icon(
+                              icon: PosIcon(
                                 splitArmed
-                                    ? Icons.merge_type
-                                    : Icons.call_split,
+                                    ? PosGlyphs.mergeType
+                                    : PosGlyphs.callSplit,
                               ),
                               label: Text(
                                 splitArmed
@@ -586,46 +844,64 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ),
                       const SizedBox(height: UmiSpacing.sm),
                       _tenderReading(context, totals),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MethodTile(
-                              icon: Icons.payments_outlined,
-                              label: l.cashPayment,
-                              selected: cashEnabled,
-                              onTap: () => _setCash(!cashEnabled, totals),
-                            ),
-                          ),
-                          if (policy?.manualTerminalEnabled ?? false) ...[
-                            const SizedBox(width: UmiSpacing.md),
-                            Expanded(
-                              child: _MethodTile(
-                                icon: Icons.credit_card_outlined,
-                                label: l.manualTerminalLabel,
-                                selected: terminalEnabled,
-                                onTap: () =>
-                                    _setTerminal(!terminalEnabled, totals),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final columns = constraints.maxWidth < 760 ? 2 : 4;
+                          final width =
+                              (constraints.maxWidth -
+                                  UmiSpacing.md * (columns - 1)) /
+                              columns;
+                          return Wrap(
+                            spacing: UmiSpacing.md,
+                            runSpacing: UmiSpacing.md,
+                            children: [
+                              SizedBox(
+                                width: width,
+                                child: _MethodTile(
+                                  icon: PosGlyphs.paymentsOutlined,
+                                  label: l.cashPayment,
+                                  selected: cashEnabled,
+                                  onTap: () => _setCash(!cashEnabled, totals),
+                                ),
                               ),
-                            ),
-                          ],
-                          // Offered ONLY when the server says a card-present
-                          // provider is available at this location. A tile that
-                          // fails after the customer decided is worse than no
-                          // tile, so the read decides the tile, not the tap.
-                          if (widget.checkout.cardTerminalProviderId !=
-                              null) ...[
-                            const SizedBox(width: UmiSpacing.md),
-                            Expanded(
-                              child: _MethodTile(
-                                key: const ValueKey('method-card-terminal'),
-                                icon: Icons.contactless_outlined,
-                                label: l.cardTerminalLabel,
-                                selected: cardEnabled,
-                                onTap: () => _setCard(!cardEnabled, totals),
-                              ),
-                            ),
-                          ],
-                        ],
+                              if (policy?.manualTerminalEnabled ?? false)
+                                SizedBox(
+                                  width: width,
+                                  child: _MethodTile(
+                                    icon: PosGlyphs.creditCardOutlined,
+                                    label: l.manualTerminalLabel,
+                                    selected: terminalEnabled,
+                                    onTap: () =>
+                                        _setTerminal(!terminalEnabled, totals),
+                                  ),
+                                ),
+                              if (widget.checkout.cardTerminalProviderId !=
+                                  null)
+                                SizedBox(
+                                  width: width,
+                                  child: _MethodTile(
+                                    key: const ValueKey('method-card-terminal'),
+                                    icon: PosGlyphs.contactlessOutlined,
+                                    label: l.cardTerminalLabel,
+                                    selected: cardEnabled,
+                                    onTap: () => _setCard(!cardEnabled, totals),
+                                  ),
+                                ),
+                              if (_bankAvailable(policy))
+                                SizedBox(
+                                  width: width,
+                                  child: _MethodTile(
+                                    key: const ValueKey('method-bank-transfer'),
+                                    icon:
+                                        PosGlyphs.accountBalanceWalletOutlined,
+                                    label: l.bankTransferLabel,
+                                    selected: bankEnabled,
+                                    onTap: () => _chooseBank(policy!, totals),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       ),
                       // One method per sale here, and more than one way to pay:
                       // say so under the tiles rather than let a tap on a second
@@ -635,9 +911,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         const SizedBox(height: UmiSpacing.xs),
                         Text(
                           l.singleMethodOnlyNote,
-                          style: Theme.of(context).textTheme.bodySmall
+                          style: PosTheme.of(context).textTheme.bodySmall
                               ?.copyWith(
-                                color: Theme.of(
+                                color: PosTheme.of(
                                   context,
                                 ).colorScheme.onSurfaceVariant,
                               ),
@@ -649,48 +925,61 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         // is charged to the card, whichever card tile is on). A
                         // single-method cash sale collects the whole total, so this field
                         // is hidden and the total stands.
-                        if (terminalEnabled || cardEnabled) ...[
-                          TextField(
+                        if (terminalEnabled || cardEnabled || bankEnabled) ...[
+                          PosField(
                             controller: cashApplied,
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
                             inputFormatters: cashAmountFormatters,
-                            decoration: InputDecoration(
+                            decoration: PosFieldDecoration(
                               labelText: l.cashTenderTitle,
                               errorText:
                                   parseMinorUnits(cashApplied.text) == null
                                   ? l.invalidAmountMessage
                                   : null,
                             ),
-                            onChanged: (_) => setState(() {
-                              dirty = true;
-                              tenderEdited = true;
-                            }),
+                            onChanged: (_) => _editSplitAmount('cash'),
                           ),
                           const SizedBox(height: UmiSpacing.md),
                         ],
                         // Cash received: a big right-aligned amount the keypad and the
                         // quick-cash notes both drive, so a barista never hunts for the
                         // decimal key on a busy till.
-                        TextField(
+                        PosField(
                           controller: cashReceived,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
+                          // No system keyboard: the keypad below is the input, and it is
+                          // the one the till has. `readOnly` also keeps the caret out of a
+                          // field the operator only reads.
+                          readOnly: true,
+                          showCursor: false,
                           inputFormatters: cashAmountFormatters,
                           textAlign: TextAlign.right,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                          decoration: InputDecoration(
+                          style: PosTheme.of(context).textTheme.headlineSmall,
+                          decoration: PosFieldDecoration(
                             labelText: l.cashReceivedLabel,
                             errorText:
                                 parseMinorUnits(cashReceived.text) == null
                                 ? l.invalidAmountMessage
                                 : null,
                           ),
+                          // A tap points the keypad here and selects the seeded figure, so
+                          // the first digit the operator types REPLACES it. Without the
+                          // selection the amount they hand over is appended to the total
+                          // (55.00 → 55.00500) and the checkout refuses it.
+                          onTap: () {
+                            setState(() {
+                              _padTarget = 'cash';
+                              cashReceived.selection = TextSelection(
+                                baseOffset: 0,
+                                extentOffset: cashReceived.text.length,
+                              );
+                            });
+                          },
                           onChanged: (_) => setState(() {
                             dirty = true;
                             tenderEdited = true;
+                            cashReceivedEdited = true;
                           }),
                         ),
                         const SizedBox(height: UmiSpacing.sm),
@@ -729,33 +1018,30 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         const SizedBox(height: UmiSpacing.lg),
                         Text(
                           l.manualTerminalLabel,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: PosTheme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: UmiSpacing.sm),
-                        TextField(
+                        PosField(
                           controller: terminalAmount,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           inputFormatters: cashAmountFormatters,
-                          decoration: InputDecoration(
+                          decoration: PosFieldDecoration(
                             labelText: l.tenderAmountLabel,
                             errorText:
                                 parseMinorUnits(terminalAmount.text) == null
                                 ? l.invalidAmountMessage
                                 : null,
                           ),
-                          onChanged: (_) => setState(() {
-                            dirty = true;
-                            tenderEdited = true;
-                          }),
+                          onChanged: (_) => _editSplitAmount('terminal'),
                         ),
                         const SizedBox(height: UmiSpacing.sm),
                         Wrap(
                           spacing: UmiSpacing.sm,
                           runSpacing: UmiSpacing.sm,
                           children: [
-                            ChoiceChip(
+                            PosChoice(
                               label: Text(l.terminalProcessingAction),
                               selected:
                                   terminalStatus ==
@@ -763,25 +1049,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                               onSelected: (_) => _terminalOutcome(
                                 'operator_processing_externally',
                               ),
-                            ),
-                            ChoiceChip(
-                              label: Text(l.terminalSuccessAction),
-                              selected: terminalStatus == 'confirmed_success',
-                              onSelected: (_) =>
-                                  _terminalOutcome('confirmed_success'),
-                            ),
-                            ChoiceChip(
-                              label: Text(l.terminalFailureAction),
-                              selected:
-                                  terminalStatus == 'operator_reported_failure',
-                              onSelected: (_) =>
-                                  _terminalOutcome('operator_reported_failure'),
-                            ),
-                            ChoiceChip(
-                              label: Text(l.terminalUnknownAction),
-                              selected: terminalStatus == 'outcome_unknown',
-                              onSelected: (_) =>
-                                  _terminalOutcome('outcome_unknown'),
                             ),
                           ],
                         ),
@@ -793,25 +1060,22 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         const SizedBox(height: UmiSpacing.lg),
                         Text(
                           l.cardTerminalLabel,
-                          style: Theme.of(context).textTheme.titleSmall,
+                          style: PosTheme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: UmiSpacing.sm),
-                        TextField(
+                        PosField(
                           controller: cardAmount,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           inputFormatters: cashAmountFormatters,
-                          decoration: InputDecoration(
+                          decoration: PosFieldDecoration(
                             labelText: l.tenderAmountLabel,
                             errorText: parseMinorUnits(cardAmount.text) == null
                                 ? l.invalidAmountMessage
                                 : null,
                           ),
-                          onChanged: (_) => setState(() {
-                            dirty = true;
-                            tenderEdited = true;
-                          }),
+                          onChanged: (_) => _editSplitAmount('card'),
                         ),
                         const SizedBox(height: UmiSpacing.sm),
                         _cardTerminalProgress(context),
@@ -820,22 +1084,48 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         // the cash keypad keeps the right column.
                         if (cardWaiting && cashEnabled) ...[
                           const SizedBox(height: UmiSpacing.sm),
-                          TextButton(
+                          PosTextButton(
                             onPressed: _stopWaitingForCardTerminal,
                             child: Text(l.terminalStopWaitingAction),
                           ),
                         ],
                       ],
+                      if (bankEnabled) ...[
+                        const SizedBox(height: UmiSpacing.lg),
+                        Text(
+                          l.bankTransferLabel,
+                          style: PosTheme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: UmiSpacing.sm),
+                        PosField(
+                          key: const ValueKey('bank-transfer-amount'),
+                          controller: bankAmount,
+                          readOnly: true,
+                          decoration: PosFieldDecoration(
+                            labelText: l.tenderAmountLabel,
+                          ),
+                        ),
+                        const SizedBox(height: UmiSpacing.xs),
+                        Text(
+                          l.bankTransferPendingNote,
+                          style: PosTheme.of(context).textTheme.bodySmall,
+                        ),
+                        PosTextButton(
+                          onPressed: () =>
+                              _showBankInstructions(policy!, totals),
+                          child: Text(l.bankTransferViewDetails),
+                        ),
+                      ],
                       if (policy?.tip['enabled'] == true) ...[
                         const SizedBox(height: UmiSpacing.lg),
                         Text(
                           l.tipLabel,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: PosTheme.of(context).textTheme.titleMedium,
                         ),
                         Wrap(
                           spacing: UmiSpacing.sm,
                           children: [
-                            ChoiceChip(
+                            PosChoice(
                               label: Text(l.noTipAction),
                               selected: tipKind == 'none',
                               onSelected: (_) => _clearTip(),
@@ -843,7 +1133,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                             for (final raw
                                 in policy!.tip['presetBasisPoints']!
                                     as List<Object?>)
-                              ChoiceChip(
+                              PosChoice(
                                 label: Text('${(raw as num).toInt() ~/ 100}%'),
                                 selected:
                                     tipKind == 'percentage' &&
@@ -858,16 +1148,31 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           children: [
                             if (policy.tip['customPercentageEnabled'] == true)
                               Expanded(
-                                child: TextField(
+                                child: PosField(
+                                  key: const ValueKey('custom-tip-percentage'),
                                   controller: customTipPercent,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  decoration: InputDecoration(
+                                  // Same rule as the cash received: the keypad writes, the
+                                  // field shows. Tapping it is what moves the keypad here.
+                                  readOnly: true,
+                                  showCursor: false,
+                                  decoration: PosFieldDecoration(
                                     labelText: l.customTipPercentLabel,
                                   ),
-                                  onChanged: _setCustomTipPercentage,
+                                  // Tapping the field is how the operator says "I am typing
+                                  // this number now": it takes the keypad and starts a fresh
+                                  // percentage, so a preset they had chosen is not appended
+                                  // to (15 + 5 is not 155 %).
+                                  onTap: () {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                    setState(() {
+                                      _padTarget = 'tip_percent';
+                                      customTipPercent.text = '';
+                                      tipKind = 'percentage';
+                                      tipBasisPoints = 0;
+                                      dirty = true;
+                                    });
+                                  },
                                 ),
                               ),
                             if (policy.tip['customPercentageEnabled'] == true &&
@@ -875,16 +1180,24 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                               const SizedBox(width: UmiSpacing.md),
                             if (policy.tip['customFixedEnabled'] == true)
                               Expanded(
-                                child: TextField(
+                                child: PosField(
+                                  key: const ValueKey('custom-tip-fixed'),
                                   controller: customTipFixed,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  decoration: InputDecoration(
+                                  readOnly: true,
+                                  showCursor: false,
+                                  decoration: PosFieldDecoration(
                                     labelText: l.customTipFixedLabel,
                                   ),
-                                  onChanged: _setCustomTipFixed,
+                                  onTap: () {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                    setState(() {
+                                      _padTarget = 'tip_fixed';
+                                      customTipFixed.clear();
+                                      tipKind = 'fixed';
+                                      dirty = true;
+                                    });
+                                  },
                                 ),
                               ),
                           ],
@@ -894,18 +1207,18 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         const SizedBox(height: UmiSpacing.lg),
                         Text(
                           l.discountLabel,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: PosTheme.of(context).textTheme.titleMedium,
                         ),
                         Wrap(
                           spacing: UmiSpacing.sm,
                           children: [
-                            ChoiceChip(
+                            PosChoice(
                               label: Text(l.percentageDiscountAction),
                               selected: discountType == 'order_percentage',
                               onSelected: (_) =>
                                   _setDiscountType('order_percentage'),
                             ),
-                            ChoiceChip(
+                            PosChoice(
                               label: Text(l.fixedDiscountAction),
                               selected: discountType == 'order_fixed',
                               onSelected: (_) =>
@@ -917,61 +1230,43 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         Row(
                           children: [
                             Expanded(
-                              child: TextField(
+                              child: PosField(
                                 controller: discountPercent,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                       decimal: false,
                                     ),
-                                decoration: InputDecoration(
+                                decoration: PosFieldDecoration(
                                   labelText: discountType == 'order_fixed'
                                       ? l.discountAmountLabel
                                       : l.discountPercentLabel,
                                 ),
-                                onChanged: (_) => setState(() => dirty = true),
+                                // A discount moves the amount due (and the base the tip is
+                                // computed on), so the tenders are re-seeded with it.
+                                onChanged: (_) {
+                                  setState(() => dirty = true);
+                                  _rebalanceForDraftChange();
+                                },
                               ),
                             ),
                             const SizedBox(width: UmiSpacing.md),
                             Expanded(
-                              child: TextField(
+                              child: PosField(
                                 controller: discountReason,
-                                decoration: InputDecoration(
+                                decoration: PosFieldDecoration(
                                   labelText: l.discountReasonLabel,
                                 ),
-                                onChanged: (_) => setState(() => dirty = true),
+                                // The reason is what makes the discount travel (`_discountDrafts`
+                                // drops one without it), so it can turn the discount on and off.
+                                onChanged: (_) {
+                                  setState(() => dirty = true);
+                                  _rebalanceForDraftChange();
+                                },
                               ),
                             ),
                           ],
                         ),
                       ],
-                      const SizedBox(height: UmiSpacing.lg),
-                      Text(
-                        l.receiptDestinationLabel,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      Wrap(
-                        spacing: UmiSpacing.sm,
-                        runSpacing: UmiSpacing.sm,
-                        children: [
-                          ChoiceChip(
-                            label: Text(l.displayReceiptAction),
-                            selected: receiptDestination == 'display',
-                            onSelected: (_) =>
-                                _setReceiptDestination('display'),
-                          ),
-                          ChoiceChip(
-                            label: Text(l.printLaterAction),
-                            selected: receiptDestination == 'print_later',
-                            onSelected: (_) =>
-                                _setReceiptDestination('print_later'),
-                          ),
-                          ChoiceChip(
-                            label: Text(l.noReceiptAction),
-                            selected: receiptDestination == 'none',
-                            onSelected: (_) => _setReceiptDestination('none'),
-                          ),
-                        ],
-                      ),
                       // One message at a time. A recovered conflict already says
                       // what happened and what to do; the draft's own stale error
                       // underneath it is the second, contradictory sentence the
@@ -984,7 +1279,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           child: Text(
                             _recoveryMessage(l, state.errorCode!),
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                              color: PosTheme.of(context).colorScheme.error,
                             ),
                           ),
                         ),
@@ -1047,8 +1342,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                                     child: child,
                                   ),
                                 ),
-                            child: cardEnabled
+                            child: _padTarget.startsWith('tip_')
+                                ? _tipKeypadFace(context)
+                                : cardEnabled
                                 ? _cardTerminalFace(context, totals)
+                                : bankEnabled
+                                ? _bankTransferFace(context, totals, policy)
                                 : _terminalTenderFace(context, totals),
                           ),
                         ),
@@ -1080,12 +1379,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     // so the spacer belongs to the keypad, which keeps its own
                     // height and must not drift away from the charge button.
                     if (cashEnabled) const Spacer(),
-                    FilledButton(
+                    PosButton(
                       // An unreadable amount never leaves the terminal. Sending it
                       // meant tendering a number the cashier did not type.
-                      style: FilledButton.styleFrom(
+                      style: PosButton.styleFrom(
                         minimumSize: const Size.fromHeight(64),
-                        textStyle: Theme.of(context).textTheme.titleLarge,
+                        textStyle: PosTheme.of(context).textTheme.titleLarge,
                       ),
                       // While a charge is at the terminal the button is inert:
                       // pressing it again must never ask for a second charge.
@@ -1093,6 +1392,13 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       // live again, because those are decisions.
                       onPressed:
                           !_amountsReadable ||
+                              (cashEnabled &&
+                                  _minorUnits(cashReceived.text) <
+                                      ((terminalEnabled ||
+                                              cardEnabled ||
+                                              bankEnabled)
+                                          ? _minorUnits(cashApplied.text)
+                                          : grandTotal)) ||
                               // A recovered combination this location cannot take
                               // cannot be charged either, and offering a live
                               // button for it is the contradiction itself.
@@ -1110,7 +1416,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           ? () => _requestApproval(context)
                           : state.phase == CheckoutPhase.confirmationRequired &&
                                 !dirty
-                          ? () => _confirm()
+                          ? () => _confirm(totals)
                           : () => _review(totals),
                       child: Text(
                         state.phase == CheckoutPhase.awaitingApproval
@@ -1121,11 +1427,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                             ? l.confirmAndPayAction
                             // The total rides on the button, so the cashier confirms
                             // the amount at the moment of the tap (SOTA convention).
-                            : '${l.checkoutAction} · ${_money(totals.grandTotal)}',
+                            : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
                       ),
                     ),
                     const SizedBox(height: UmiSpacing.sm),
-                    TextButton(
+                    PosTextButton(
                       onPressed: () => _closeCheckout(context),
                       child: Text(l.closeAction),
                     ),
@@ -1150,12 +1456,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// in the middle of those two is what made the tiles read as a contradiction.
   Widget _tenderReading(BuildContext context, TotalsPreview totals) {
     final l = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     if (recoveredTenderConflict) {
       return _TenderNotice(
         tone: scheme.errorContainer,
         ink: scheme.onErrorContainer,
-        icon: Icons.report_problem_outlined,
+        icon: PosGlyphs.reportProblemOutlined,
         title: l.tenderConflictTitle,
         body: l.tenderConflictBody,
       );
@@ -1172,6 +1478,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (cashEnabled) '${l.cashPayment}: ${money(cashApplied)}',
       if (cardEnabled) '${l.cardTerminalLabel}: ${money(cardAmount)}',
       if (terminalEnabled) '${l.manualTerminalLabel}: ${money(terminalAmount)}',
+      if (bankEnabled) '${l.bankTransferLabel}: ${money(bankAmount)}',
     ];
     if (legs.length < 2) {
       // An armed split with one leg is half a decision: name the next step
@@ -1180,17 +1487,17 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       return _TenderNotice(
         tone: scheme.surfaceContainerHighest,
         ink: scheme.onSurface,
-        icon: Icons.call_split,
+        icon: PosGlyphs.callSplit,
         title: l.splitTenderTitle,
         body: l.splitTenderPickSecond,
       );
     }
-    final grandTotal = (totals.grandTotal['minorUnits']! as num).toInt();
+    final grandTotal = _dueMinorUnits(totals);
     final difference = _tenderedLegsMinorUnits - grandTotal;
     return _TenderNotice(
       tone: scheme.surfaceContainerHighest,
       ink: scheme.onSurface,
-      icon: Icons.call_split,
+      icon: PosGlyphs.callSplit,
       title: l.splitTenderTitle,
       body: [
         for (var index = 0; index < legs.length; index++)
@@ -1232,12 +1539,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           // measured against the cash leg on both kinds of split — a cash +
           // card-terminal split used to compare the drawer against the whole
           // bill and read "Falta por cobrar" on money that was fully covered.
-          final cashLeg = (terminalEnabled || cardEnabled)
+          final cashLeg = (terminalEnabled || cardEnabled || bankEnabled)
               ? _minorUnits(cashApplied.text)
               : grandTotal;
           final change = received - cashLeg;
           final owes = change < 0;
-          final scheme = Theme.of(context).colorScheme;
+          final scheme = PosTheme.of(context).colorScheme;
           final tone = owes ? scheme.errorContainer : scheme.primaryContainer;
           final ink = owes
               ? scheme.onErrorContainer
@@ -1258,7 +1565,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   owes
                       ? (es ? 'Falta por cobrar' : 'Amount due')
                       : (es ? 'Cambio' : 'Change due'),
-                  style: Theme.of(
+                  style: PosTheme.of(
                     context,
                   ).textTheme.titleMedium?.copyWith(color: ink),
                 ),
@@ -1267,10 +1574,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     'currency': totals.grandTotal['currency'] as String? ?? '',
                     'minorUnits': change.abs(),
                   }),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: ink,
-                  ),
+                  style: PosTheme.of(context).textTheme.headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.bold, color: ink),
                 ),
               ],
             ),
@@ -1280,13 +1585,117 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     ],
   );
 
+  Widget _tipKeypadFace(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final fixed = _padTarget == 'tip_fixed';
+    return Column(
+      key: const ValueKey('tender-tip-keypad'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                fixed ? l.customTipFixedLabel : l.customTipPercentLabel,
+                style: PosTheme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            PosTextButton(
+              onPressed: () => setState(() => _padTarget = 'cash'),
+              child: Text(l.confirmAction),
+            ),
+          ],
+        ),
+        const SizedBox(height: UmiSpacing.sm),
+        _Numpad(onKey: _pushDigit),
+      ],
+    );
+  }
+
+  Widget _bankTransferFace(
+    BuildContext context,
+    TotalsPreview totals,
+    CheckoutPolicy? policy,
+  ) {
+    final l = AppLocalizations.of(context);
+    final theme = PosTheme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      key: const ValueKey('tender-bank-transfer'),
+      padding: const EdgeInsets.all(UmiSpacing.xl),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(UmiRadius.surface),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: PosIcon(
+              PosGlyphs.accountBalanceWalletOutlined,
+              size: 56,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(height: UmiSpacing.md),
+          Text(
+            l.bankTransferLabel,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: UmiSpacing.sm),
+          Text(
+            _money({
+              'currency': totals.grandTotal['currency'],
+              'minorUnits': _minorUnits(bankAmount.text),
+            }),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: UmiSpacing.sm),
+          Text(
+            l.bankTransferPendingNote,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          if (_bankAvailable(policy)) ...[
+            const SizedBox(height: UmiSpacing.lg),
+            PosButton.tonal(
+              onPressed: () => _showBankInstructions(policy!, totals),
+              child: Text(l.bankTransferViewDetails),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _tapToPayIcon(Color color) => SvgPicture.asset(
+    'assets/icons/tap_to_pay.svg',
+    width: 104,
+    height: 78,
+    fit: BoxFit.contain,
+    colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+    excludeFromSemantics: true,
+  );
+
   /// The card-terminal face: the operator declares the outcome here because the
   /// POS never reads it.
   Widget _terminalTenderFace(BuildContext context, TotalsPreview totals) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
-    final amount = _money(totals.grandTotal);
+    final amount = _money({
+      'currency': totals.grandTotal['currency'],
+      'minorUnits': _minorUnits(terminalAmount.text),
+    });
     final statusInk = switch (terminalStatus) {
       'operator_reported_failure' => scheme.error,
       'confirmed_success' => scheme.primary,
@@ -1306,7 +1715,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.contactless_outlined, size: 56, color: scheme.primary),
+          Center(child: _tapToPayIcon(scheme.primary)),
           const SizedBox(height: UmiSpacing.md),
           Text(
             l.terminalChargeTitle,
@@ -1382,7 +1791,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// notice above the tiles, so a refusal stays readable after the tile is gone.
   Widget _cardTerminalFace(BuildContext context, TotalsPreview totals) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final amount = _money({
       'currency': totals.grandTotal['currency'] as String? ?? '',
@@ -1405,10 +1814,20 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            approved ? Icons.check_circle_outline : Icons.contactless_outlined,
-            size: 56,
-            color: unresolved ? scheme.error : scheme.primary,
+          Center(
+            child: approved
+                ? SizedBox(
+                    width: 104,
+                    height: 78,
+                    child: Center(
+                      child: PosIcon(
+                        PosGlyphs.checkCircleOutline,
+                        size: 56,
+                        color: scheme.primary,
+                      ),
+                    ),
+                  )
+                : _tapToPayIcon(unresolved ? scheme.error : scheme.primary),
           ),
           const SizedBox(height: UmiSpacing.md),
           Text(
@@ -1434,7 +1853,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           _cardTerminalProgress(context),
           if (cardWaiting) ...[
             const SizedBox(height: UmiSpacing.lg),
-            OutlinedButton(
+            PosOutlineButton(
               onPressed: _stopWaitingForCardTerminal,
               child: Text(l.terminalStopWaitingAction),
             ),
@@ -1447,7 +1866,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// The terminal's own progress, exactly as the provider states it.
   Widget _cardTerminalProgress(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final status = cardProviderStatus;
     return Container(
@@ -1482,7 +1901,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   /// What the terminal said, or what the till knows about it instead.
   Widget _cardTerminalNotice(BuildContext context, String message) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final scheme = theme.colorScheme;
     final tone = switch (cardStatus) {
       'confirmed_success' => scheme.primaryContainer,
@@ -1517,8 +1936,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final preview = state.preview;
     final es = Localizations.localeOf(context).languageCode == 'es';
     if (preview == null) {
-      return ListTile(
-        leading: const Icon(Icons.loyalty_outlined),
+      return PosListRow(
+        leading: const PosIcon(PosGlyphs.loyaltyOutlined),
         title: Text(es ? 'Valor del cliente' : 'Customer value'),
         subtitle: Text(es ? 'Consulta en curso.' : 'Loading value summary.'),
       );
@@ -1529,7 +1948,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final giftCards = (summary['giftCards'] as List<Object?>? ?? const [])
         .cast<Map<String, Object?>>();
     final permissions = widget.entry.state.operator?.permissions ?? const [];
-    return Card(
+    return PosCard(
       margin: const EdgeInsets.only(top: UmiSpacing.lg),
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.md),
@@ -1538,7 +1957,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           children: [
             Text(
               es ? 'Lealtad y saldo' : 'Loyalty and balance',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: PosTheme.of(context).textTheme.titleMedium,
             ),
             if (points != null)
               Text(
@@ -1553,9 +1972,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     : 'Expected points: ${preview.earn!['expectedPoints']}',
               ),
             for (final reward in preview.rewards)
-              ListTile(
+              PosListRow(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.redeem_outlined),
+                leading: const PosIcon(PosGlyphs.redeemOutlined),
                 title: Text(
                   (reward['reward']! as Map<String, Object?>)['displayName']!
                       as String,
@@ -1572,8 +1991,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 trailing:
                     state.rewardAuthorization?.rewardId ==
                         (reward['reward']! as Map<String, Object?>)['id']
-                    ? const Icon(Icons.check_circle_outline)
-                    : TextButton(
+                    ? const PosIcon(PosGlyphs.checkCircleOutline)
+                    : PosTextButton(
                         onPressed:
                             (reward['eligible'] == true ||
                                     reward['state'] == 'approval_required' ||
@@ -1586,9 +2005,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       ),
               ),
             if (wallet != null && permissions.contains('wallet.authorize'))
-              ListTile(
+              PosListRow(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.account_balance_wallet_outlined),
+                leading: const PosIcon(PosGlyphs.accountBalanceWalletOutlined),
                 title: Text(es ? 'Cartera' : 'Wallet'),
                 subtitle: Text(
                   _money({
@@ -1596,7 +2015,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     'currency': wallet['currency'],
                   }),
                 ),
-                trailing: TextButton(
+                trailing: PosTextButton(
                   onPressed: () => _authorizeStoredValue(
                     totals,
                     accountType: 'wallet',
@@ -1607,9 +2026,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               ),
             for (final card in giftCards)
               if (permissions.contains('gift_card.authorize'))
-                ListTile(
+                PosListRow(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.card_giftcard_outlined),
+                  leading: const PosIcon(PosGlyphs.cardGiftcardOutlined),
                   title: Text(card['maskedCode']! as String),
                   subtitle: Text(
                     _money({
@@ -1619,7 +2038,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       'currency': card['currency'],
                     }),
                   ),
-                  trailing: TextButton(
+                  trailing: PosTextButton(
                     onPressed: () => _authorizeStoredValue(
                       totals,
                       accountType: 'gift_card',
@@ -1637,15 +2056,15 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   ),
                 ),
             if (permissions.contains('gift_card.lookup'))
-              TextButton.icon(
+              PosTextButton.icon(
                 onPressed: () => _lookupGiftCard(totals),
-                icon: const Icon(Icons.qr_code_scanner_outlined),
+                icon: const PosIcon(PosGlyphs.qrCodeScannerOutlined),
                 label: Text(es ? 'Buscar tarjeta regalo' : 'Look up gift card'),
               ),
             if (permissions.contains('gift_card.issue'))
-              TextButton.icon(
+              PosTextButton.icon(
                 onPressed: () => _issueSaleFundedGiftCard(totals),
-                icon: const Icon(Icons.add_card_outlined),
+                icon: const PosIcon(PosGlyphs.addCardOutlined),
                 label: Text(
                   es ? 'Vender tarjeta de regalo' : 'Sell a gift card',
                 ),
@@ -1679,9 +2098,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     );
     final current = widget.customerValue!.state.rewardAuthorization;
     if (current != null && current.rewardId != reward['id']) {
-      final replace = await showDialog<bool>(
+      final replace = await showPosDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (context) => PosAlertDialog(
           title: Text(
             Localizations.localeOf(context).languageCode == 'es'
                 ? 'Reemplazar reward'
@@ -1693,7 +2112,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 : 'The system will release the current reward before it authorizes the new reward.',
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(context, false),
               child: Text(
                 Localizations.localeOf(context).languageCode == 'es'
@@ -1701,7 +2120,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     : 'Keep current',
               ),
             ),
-            FilledButton(
+            PosButton(
               onPressed: () => Navigator.pop(context, true),
               child: Text(
                 Localizations.localeOf(context).languageCode == 'es'
@@ -1810,22 +2229,22 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   Future<void> _lookupGiftCard(TotalsPreview totals) async {
     final code = TextEditingController();
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(es ? 'Buscar tarjeta regalo' : 'Look up gift card'),
-        content: TextField(
+        content: PosField(
           controller: code,
           autofocus: true,
           obscureText: true,
-          decoration: InputDecoration(labelText: es ? 'Código' : 'Code'),
+          decoration: PosFieldDecoration(labelText: es ? 'Código' : 'Code'),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(es ? 'Cancelar' : 'Cancel'),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(es ? 'Buscar' : 'Look up'),
           ),
@@ -1863,25 +2282,26 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   Future<int?> _requestValueAmount(int available, String currency) async {
     final amount = TextEditingController();
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(es ? 'Importe autorizado' : 'Authorized amount'),
-        content: TextField(
+        content: PosField(
           controller: amount,
           autofocus: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText:
-                '$currency · ${es ? 'máximo' : 'maximum'} ${(available / 100).toStringAsFixed(2)}',
+                '$currency · ${es ? 'máximo' : 'maximum'} '
+                '${formatMinorUnits(available)}',
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(es ? 'Cancelar' : 'Cancel'),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(es ? 'Autorizar' : 'Authorize'),
           ),
@@ -1905,22 +2325,22 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     }
     final es = Localizations.localeOf(context).languageCode == 'es';
     String? selectedLineId;
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PosAlertDialog(
           title: Text(
             es ? 'Tarjeta financiada por venta' : 'Sale-funded gift card',
           ),
-          content: DropdownButtonFormField<String>(
+          content: PosSelectFormField<String>(
             initialValue: selectedLineId,
-            decoration: InputDecoration(
+            decoration: PosFieldDecoration(
               labelText: es ? 'Línea de tarjeta' : 'Gift-card line',
             ),
             items: cart.items
                 .where((item) => item['saleAction'] == 'gift_card')
                 .map(
-                  (item) => DropdownMenuItem<String>(
+                  (item) => PosSelectItem<String>(
                     value: item['id']! as String,
                     child: Text(item['productName']! as String),
                   ),
@@ -1931,11 +2351,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             }),
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               child: Text(es ? 'Cancelar' : 'Cancel'),
             ),
-            FilledButton(
+            PosButton(
               onPressed: () {
                 Navigator.pop(dialogContext, selectedLineId != null);
               },
@@ -2010,9 +2430,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       // not simply dropped: it moves into the same dialog the successful reveal
       // uses, where the retry is an ordinary button instead of a bar that
       // disappears while the operator is reaching for it.
-      await showDialog<void>(
+      await showPosDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
+        builder: (dialogContext) => PosAlertDialog(
           title: Text(es ? 'Código no recibido' : 'Code not received'),
           content: Text(
             es
@@ -2020,11 +2440,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                 : 'The code response was lost. Recover the original result.',
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(es ? 'Cerrar' : 'Close'),
             ),
-            FilledButton(
+            PosButton(
               onPressed: () {
                 Navigator.pop(dialogContext);
                 unawaited(_revealFundedGiftCardAfterCommit());
@@ -2039,14 +2459,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (!mounted) return;
     fundedGiftCardRevealed = true;
     final es = Localizations.localeOf(context).languageCode == 'es';
-    await showDialog<void>(
+    await showPosDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(es ? 'Código de entrega única' : 'One-time delivery code'),
-        content: SelectableText('${secret.maskedReference}\n${secret.code}'),
+        content: PosSelectableText('${secret.maskedReference}\n${secret.code}'),
         actions: [
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context),
             child: Text(es ? 'Código entregado' : 'Code delivered'),
           ),
@@ -2091,25 +2511,25 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   }) async {
     final pin = TextEditingController();
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(title ?? (es ? 'Aprobar reward' : 'Approve reward')),
-        content: TextField(
+        content: PosField(
           controller: pin,
           obscureText: true,
           keyboardType: TextInputType.number,
           autofocus: true,
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText: es ? 'PIN del responsable' : 'Manager PIN',
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(es ? 'Cancelar' : 'Cancel'),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(es ? 'Aprobar' : 'Approve'),
           ),
@@ -2145,8 +2565,17 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (cashEnabled) cashReceived,
       if (terminalEnabled) terminalAmount,
       if (cardEnabled) cardAmount,
+      if (bankEnabled) bankAmount,
     ]) {
       if (parseMinorUnits(field.text) == null) return false;
+    }
+    if (_splitMode &&
+        _tenderLegCount >= 2 &&
+        ((cashEnabled && _minorUnits(cashApplied.text) == 0) ||
+            (terminalEnabled && _minorUnits(terminalAmount.text) == 0) ||
+            (cardEnabled && _minorUnits(cardAmount.text) == 0) ||
+            (bankEnabled && _minorUnits(bankAmount.text) == 0))) {
+      return false;
     }
     return true;
   }
@@ -2171,8 +2600,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (selected && !_splitMode) {
         terminalEnabled = false;
         cardEnabled = false;
+        bankEnabled = false;
       }
-      method = terminalEnabled || cardEnabled ? 'external_terminal' : 'cash';
+      method = _selectedPaymentMethod;
       dirty = true;
       _balanceTenderFields(totals);
     });
@@ -2192,25 +2622,209 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   /// How many methods are on the sale right now.
   int get _tenderLegCount =>
-      (cashEnabled ? 1 : 0) + (terminalEnabled ? 1 : 0) + (cardEnabled ? 1 : 0);
+      (cashEnabled ? 1 : 0) +
+      (terminalEnabled ? 1 : 0) +
+      (cardEnabled ? 1 : 0) +
+      (bankEnabled ? 1 : 0);
 
   /// What the legs on screen add up to, in minor units.
   int get _tenderedLegsMinorUnits =>
       (cashEnabled ? _minorUnits(cashApplied.text) : 0) +
       (terminalEnabled ? _minorUnits(terminalAmount.text) : 0) +
-      (cardEnabled ? _minorUnits(cardAmount.text) : 0);
+      (cardEnabled ? _minorUnits(cardAmount.text) : 0) +
+      (bankEnabled ? _minorUnits(bankAmount.text) : 0);
+
+  String get _selectedPaymentMethod => bankEnabled
+      ? 'bank_transfer'
+      : (terminalEnabled || cardEnabled ? 'external_terminal' : 'cash');
+
+  bool _bankAvailable(CheckoutPolicy? policy) =>
+      policy?.bankTransferEnabled == true &&
+      policy?.bankTransferDetails != null;
 
   /// How many method tiles this location offers: cash always, plus the manual
   /// terminal and the card terminal when they exist here.
   int _methodsOffered(CheckoutPolicy? policy) =>
       1 +
       ((policy?.manualTerminalEnabled ?? false) ? 1 : 0) +
-      (widget.checkout.cardTerminalProviderId != null ? 1 : 0);
+      (widget.checkout.cardTerminalProviderId != null ? 1 : 0) +
+      (_bankAvailable(policy) ? 1 : 0);
 
   /// The arm/disarm control exists only where a split is possible AND there is
   /// more than one way to pay for one.
   bool _splitControlOffered(CheckoutPolicy? policy) =>
       _mixedTenderAllowed && _maxTenderLines > 1 && _methodsOffered(policy) > 1;
+
+  bool _partialControlOffered(CheckoutPolicy? policy) =>
+      widget.checkout.canCollectPartialPayments &&
+      (widget.cashShiftId != null ||
+          (policy?.manualTerminalEnabled == true &&
+              widget.entry.state.operator?.permissions.contains(
+                    'checkout.terminal.confirm',
+                  ) ==
+                  true) ||
+          policy?.bankTransferEnabled == true);
+
+  Future<void> _openPartialCheckout() async {
+    final l = AppLocalizations.of(context);
+    final currency = shownTotals?.grandTotal['currency'] as String? ?? 'MXN';
+    if (_discountDrafts(currency).isNotEmpty ||
+        widget.checkout.customerValueSelection != null) {
+      await showPosDialog<void>(
+        context: context,
+        builder: (dialogContext) => PosAlertDialog(
+          title: Text(l.splitTenderTitle),
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'es'
+                ? 'Este cobro dividido todavía no admite descuentos ni saldo de cliente. Quita esos ajustes antes de dividir.'
+                : 'Split payment does not yet support discounts or customer value. Remove those adjustments before splitting.',
+          ),
+          actions: [
+            PosButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l.closeAction),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    await _presentPartialCheckout();
+  }
+
+  Future<void> _chooseBank(CheckoutPolicy policy, TotalsPreview totals) async {
+    if (!_bankAvailable(policy)) return;
+    if (bankEnabled) {
+      if (_tenderLegCount > 1) {
+        setState(() {
+          bankEnabled = false;
+          bankConfirmed = false;
+          method = _selectedPaymentMethod;
+          dirty = true;
+          _balanceTenderFields(totals);
+        });
+        return;
+      }
+      await _showBankInstructions(policy, totals);
+      return;
+    }
+    if (cardEnabled && _cardTenderLocked) return;
+    if (_splitMode &&
+        _tenderLegCount >= _maxTenderLines &&
+        !terminalEnabled &&
+        !cardEnabled) {
+      return;
+    }
+    final accepted = await _showBankInstructions(policy, totals);
+    if (accepted != true || !mounted) return;
+    setState(() {
+      bankEnabled = true;
+      bankConfirmed = false;
+      terminalEnabled = false;
+      cardEnabled = false;
+      if (!_splitMode) cashEnabled = false;
+      method = _selectedPaymentMethod;
+      dirty = true;
+      _balanceTenderFields(totals);
+    });
+  }
+
+  Future<bool?> _showBankInstructions(
+    CheckoutPolicy policy,
+    TotalsPreview totals,
+  ) => _showBankDetails(
+    policy,
+    currency: totals.grandTotal['currency'] as String? ?? 'MXN',
+    amountMinor: bankEnabled
+        ? _minorUnits(bankAmount.text)
+        : _splitMode && cashEnabled
+        ? _dueMinorUnits(totals) - _dueMinorUnits(totals) ~/ 2
+        : _dueMinorUnits(totals),
+    selected: bankEnabled,
+  );
+
+  Future<bool?> _showBankDetails(
+    CheckoutPolicy policy, {
+    required int amountMinor,
+    required String currency,
+    required bool selected,
+  }) => showPosDialog<bool>(
+    context: context,
+    builder: (dialogContext) => BankTransferDialog(
+      details: policy.bankTransferDetails!,
+      merchantName: widget.entry.state.selectedTenant?.name ?? 'ONCA',
+      logoUrl: policy.merchantLogoUrl,
+      amount: _money({'currency': currency, 'minorUnits': amountMinor}),
+      accountFolio: widget.cart.state.cart?.accountFolio,
+      selected: selected,
+    ),
+  );
+
+  Future<bool> _confirmBankReceived() async {
+    final confirmed = await showPosDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final l = AppLocalizations.of(dialogContext);
+        return PosAlertDialog(
+          title: Text(l.bankTransferConfirmTitle),
+          content: Text(l.bankTransferConfirmBody),
+          actions: [
+            PosTextButton(
+              key: const ValueKey('bank-transfer-confirm-close'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l.closeAction),
+            ),
+            PosButton(
+              key: const ValueKey('bank-transfer-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l.bankTransferConfirmAction),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return false;
+    setState(() => bankConfirmed = true);
+    return true;
+  }
+
+  Future<bool> _confirmManualTerminalCharge() async {
+    final confirmed = await showPosDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final l = AppLocalizations.of(dialogContext);
+        final amount = _money({
+          'currency': shownTotals?.grandTotal['currency'] ?? 'MXN',
+          'minorUnits': _minorUnits(terminalAmount.text),
+        });
+        return PosAlertDialog(
+          title: Text(l.manualTerminalConfirmTitle),
+          content: Text(l.manualTerminalConfirmBody(amount)),
+          actions: [
+            PosTextButton(
+              key: const ValueKey('manual-terminal-confirm-close'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l.closeAction),
+            ),
+            PosButton(
+              key: const ValueKey('manual-terminal-confirm'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l.manualTerminalConfirmAction),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return false;
+    setState(() {
+      terminalStatus = 'confirmed_success';
+      _confirmedManualTerminalMinorUnits = _minorUnits(terminalAmount.text);
+    });
+    return true;
+  }
 
   void _setTerminal(bool selected, TotalsPreview totals) {
     if (!selected && _tenderLegCount <= 1) return;
@@ -2219,7 +2833,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // The two terminals are the same wire type, so selecting this one retires
     // the card tile rather than adding a leg; the retired leg is not counted
     // against the location's line cap.
-    final replacing = cardEnabled;
+    final replacing = cardEnabled || bankEnabled;
     if (selected &&
         _splitMode &&
         _tenderLegCount - (replacing ? 1 : 0) >= _maxTenderLines) {
@@ -2231,12 +2845,15 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       // sale carries one of them at a time.
       if (selected) {
         cardEnabled = false;
+        bankEnabled = false;
+        bankConfirmed = false;
         if (!_splitMode) cashEnabled = false;
       }
-      method = selected ? 'external_terminal' : 'cash';
+      method = _selectedPaymentMethod;
       terminalStatus = selected
-          ? 'not_started'
+          ? 'operator_processing_externally'
           : 'cancelled_before_confirmation';
+      _confirmedManualTerminalMinorUnits = null;
       dirty = true;
       _balanceTenderFields(totals);
     });
@@ -2257,7 +2874,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (!selected && _cardTenderLocked) return;
     // The manual terminal is the same wire type as this one, so selecting the
     // card tile retires it rather than adding a leg.
-    final replacing = terminalEnabled;
+    final replacing = terminalEnabled || bankEnabled;
     if (selected &&
         _splitMode &&
         _tenderLegCount - (replacing ? 1 : 0) >= _maxTenderLines) {
@@ -2267,6 +2884,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       cardEnabled = selected;
       if (selected) {
         terminalEnabled = false;
+        bankEnabled = false;
+        bankConfirmed = false;
         terminalStatus = 'cancelled_before_confirmation';
         if (!_splitMode) cashEnabled = false;
       }
@@ -2278,7 +2897,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         cardStatus = 'not_started';
         cardMessage = null;
       }
-      method = cardEnabled || terminalEnabled ? 'external_terminal' : 'cash';
+      method = _selectedPaymentMethod;
       dirty = true;
       _balanceTenderFields(totals);
     });
@@ -2300,6 +2919,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (armed) {
       setState(() {
         splitArmed = true;
+        _splitEditedLeg = null;
         dirty = true;
         _balanceTenderFields(totals);
       });
@@ -2307,78 +2927,220 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     }
     setState(() {
       splitArmed = false;
+      _splitEditedLeg = null;
       // Exactly one method survives, in the order the operator would keep them:
       // the cash in the drawer, else the card the terminal holds, else the
       // manual one.
       if (cashEnabled) {
         terminalEnabled = false;
         cardEnabled = false;
+        bankEnabled = false;
       } else if (cardEnabled) {
         terminalEnabled = false;
+        bankEnabled = false;
+      } else if (bankEnabled) {
+        terminalEnabled = false;
       }
-      method = terminalEnabled || cardEnabled ? 'external_terminal' : 'cash';
+      method = _selectedPaymentMethod;
       dirty = true;
       _balanceTenderFields(totals);
     });
   }
 
+  /// What the tenders have to cover, in minor units: the amount due the server will ask for.
+  ///
+  /// THE SERVER ADDS THE TIP TO THE AMOUNT DUE — `checkout-calculator.ts`:
+  /// `amountDue = discountedSubtotal + tipAmount` — and then checks that the tenders cover it. The
+  /// applied legs were balanced against the BILL alone, so a tip the cashier had just chosen left
+  /// the sheet reading `Falta por cobrar MXN 32.60`, with nothing on the sheet able to raise the
+  /// applied amount and a charge the server refused as a remaining balance. Measured on the iMin
+  /// D3-504 on 2026-10-11: a 10 % tip on MXN 326.00, and the 358.60 could never be collected.
+  ///
+  /// Once a review has come back, the server's own `grandTotal` IS the amount due, so it is used as
+  /// it is; before the first review it is computed here with the same arithmetic the calculator
+  /// uses, so the tender the cashier sees already covers the tip they just chose.
+  int _dueMinorUnits(TotalsPreview totals) {
+    final confirmed = widget.checkout.state.result?.confirmation['totals'];
+    final confirmedGrand = confirmed is Map<String, Object?>
+        ? confirmed['grandTotal'] as Map<String, Object?>?
+        : null;
+    final confirmedMinor = confirmedGrand?['minorUnits'] as num?;
+    if (confirmedMinor != null) return confirmedMinor.toInt();
+    final bill = (totals.grandTotal['minorUnits']! as num).toInt();
+    final discounted = bill - _discountMinorUnits(bill);
+    return discounted + _tipMinorUnits(discounted);
+  }
+
+  /// The order-level discount this sheet is about to send, in minor units — the calculator's own
+  /// rounding (`round(base * basisPoints / 10 000)`), so the tip is computed on the base the server
+  /// will use for it. A discount without a reason is not sent, so it does not count here either.
+  int _discountMinorUnits(int billMinorUnits) {
+    final raw = _minorUnits(discountPercent.text);
+    if (raw <= 0 || discountReason.text.trim().isEmpty) return 0;
+    if (discountType == 'order_fixed') return raw;
+    if (discountType != 'order_percentage') return 0;
+    return ((billMinorUnits * raw) / 10000).round();
+  }
+
+  /// The tip this sheet is about to send, in minor units, on the discounted subtotal — the same
+  /// arithmetic the calculator applies to `tipDraft`.
+  int _tipMinorUnits(int discountedSubtotalMinorUnits) => switch (tipKind) {
+    'percentage' when tipBasisPoints > 0 =>
+      ((discountedSubtotalMinorUnits * tipBasisPoints) / 10000).round(),
+    'fixed' => _minorUnits(customTipFixed.text),
+    _ => 0,
+  };
+
+  /// Re-seed the tenders after something that changes what the server will ask for — a tip or a
+  /// discount. The split the cashier typed is theirs; it was simply balanced against a different
+  /// amount due, and leaving it there is what `Falta por cobrar` means.
+  void _rebalanceForDraftChange() {
+    final totals = shownTotals;
+    if (totals == null) return;
+    _balanceTenderFields(totals);
+  }
+
+  void _editSplitAmount(String leg) {
+    setState(() {
+      dirty = true;
+      tenderEdited = true;
+      if (terminalEnabled) _confirmedManualTerminalMinorUnits = null;
+      if (_splitMode && _tenderLegCount >= 2) {
+        _splitEditedLeg = leg;
+        _rebalanceForDraftChange();
+      }
+    });
+  }
+
   void _balanceTenderFields(TotalsPreview totals) {
-    final total = (totals.grandTotal['minorUnits']! as num).toInt();
+    final total = _dueMinorUnits(totals);
     final cardLeg = cardEnabled;
-    if (cashEnabled && (terminalEnabled || cardLeg)) {
-      final cash = total ~/ 2;
+    final bankLeg = bankEnabled;
+    // WHAT THE CUSTOMER HANDED OVER IS NOT OURS TO REWRITE.
+    //
+    // This runs on every draft change — a tip, a discount — and it used to overwrite the
+    // cash-received field with the new total. A customer who puts 500 on a 100 bill and
+    // then gets a 20 % tip added has handed over 500 for 120: the change is 380, and the
+    // till was rewriting the 500 to 120.00 so the change read zero and the money on the
+    // counter disappeared from the screen (owner, 2026-10-13). The field is seeded on the
+    // first balance and left alone once the operator has said otherwise — `tenderEdited`
+    // is the operator's own statement about what is on the counter.
+    if (cashEnabled && (terminalEnabled || cardLeg || bankLeg)) {
+      final other = cardLeg
+          ? cardAmount
+          : bankLeg
+          ? bankAmount
+          : terminalAmount;
+      final cash = switch (_splitEditedLeg) {
+        'cash' => _minorUnits(cashApplied.text),
+        'card' ||
+        'terminal' ||
+        'bank' => (total - _minorUnits(other.text)).clamp(0, total),
+        _ => total ~/ 2,
+      };
       cashApplied.text = (cash / 100).toStringAsFixed(2);
-      cashReceived.text = cashApplied.text;
-      if (cardLeg) {
-        cardAmount.text = ((total - cash) / 100).toStringAsFixed(2);
+      if (!cashReceivedEdited) cashReceived.text = cashApplied.text;
+      final remaining = (total - cash).clamp(0, total);
+      if (bankLeg) {
+        bankAmount.text = (remaining / 100).toStringAsFixed(2);
+      } else if (cardLeg) {
+        cardAmount.text = (remaining / 100).toStringAsFixed(2);
       } else {
-        terminalAmount.text = ((total - cash) / 100).toStringAsFixed(2);
+        terminalAmount.text = (remaining / 100).toStringAsFixed(2);
       }
     } else if (cashEnabled) {
+      _splitEditedLeg = null;
       cashApplied.text = (total / 100).toStringAsFixed(2);
-      cashReceived.text = cashApplied.text;
+      if (!cashReceivedEdited) cashReceived.text = cashApplied.text;
       terminalAmount.clear();
       cardAmount.clear();
+      bankAmount.clear();
     } else if (cardLeg) {
+      _splitEditedLeg = null;
       cardAmount.text = (total / 100).toStringAsFixed(2);
       terminalAmount.clear();
+      bankAmount.clear();
+      cashApplied.clear();
+      cashReceived.clear();
+    } else if (bankLeg) {
+      _splitEditedLeg = null;
+      bankAmount.text = (total / 100).toStringAsFixed(2);
+      terminalAmount.clear();
+      cardAmount.clear();
       cashApplied.clear();
       cashReceived.clear();
     } else {
+      _splitEditedLeg = null;
       terminalAmount.text = (total / 100).toStringAsFixed(2);
       cardAmount.clear();
+      bankAmount.clear();
       cashApplied.clear();
       cashReceived.clear();
     }
+    bankConfirmed = false;
   }
 
   void _setCashReceived(int minorUnits) => setState(() {
     cashReceived.text = (minorUnits / 100).toStringAsFixed(2);
     dirty = true;
     tenderEdited = true;
+    cashReceivedEdited = true;
   });
 
-  /// The on-screen keypad edits the cash-received field: a POS often has no
-  /// keyboard, so digits, one decimal point (capped at two places) and a
-  /// backspace go straight into the amount the change is figured from.
+  /// The on-screen keypad, and the ONLY writer of either number: a POS often has no
+  /// keyboard, so digits, one decimal point (capped at two places) and a backspace go
+  /// straight into whichever field the operator tapped — the cash received, or the
+  /// custom tip percentage. The fields themselves are read-only displays; tapping one is
+  /// what tells the keypad which number it is on.
   void _pushDigit(String key) {
-    var text = cashReceived.text;
+    final tipPercentTarget = _padTarget == 'tip_percent';
+    final tipFixedTarget = _padTarget == 'tip_fixed';
+    final tipTarget = tipPercentTarget || tipFixedTarget;
+    final controller = tipPercentTarget
+        ? customTipPercent
+        : tipFixedTarget
+        ? customTipFixed
+        : cashReceived;
+    var text = controller.text;
+    // A SEEDED FIGURE IS REPLACED, NOT ADDED TO. The cash field starts on the bill's own
+    // amount (and the quick-cash buttons seed it again), so an operator who taps the field
+    // and types what the customer handed over means "this instead of that": 55.00500 was
+    // the bug when the first digit appended to the total.
+    final wholeSelection =
+        controller.selection.isValid &&
+        controller.selection.baseOffset == 0 &&
+        controller.selection.extentOffset == text.length &&
+        text.isNotEmpty;
     if (key == 'back') {
       if (text.isEmpty) return;
       text = text.substring(0, text.length - 1);
     } else if (key == '.') {
       if (text.contains('.')) return;
-      text = text.isEmpty ? '0.' : '$text.';
+      text = text.isEmpty || wholeSelection ? '0.' : '$text.';
     } else {
+      if (wholeSelection) text = '';
       final dot = text.indexOf('.');
       if (dot >= 0 && text.length - dot > 2) return;
       text = text == '0' ? key : '$text$key';
     }
     setState(() {
-      cashReceived.text = text;
+      controller.text = text;
+      controller.selection = TextSelection.collapsed(offset: text.length);
       dirty = true;
-      tenderEdited = true;
+      if (tipPercentTarget) {
+        tipKind = 'percentage';
+        tipBasisPoints = _minorUnits(text);
+        customTipFixed.clear();
+      } else if (tipFixedTarget) {
+        tipKind = 'fixed';
+        tipBasisPoints = 0;
+        customTipPercent.clear();
+      } else {
+        tenderEdited = true;
+        cashReceivedEdited = true;
+      }
     });
+    if (tipTarget) _rebalanceForDraftChange();
   }
 
   void _terminalOutcome(String value) => setState(() {
@@ -2386,46 +3148,44 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     dirty = true;
   });
 
-  void _clearTip() => setState(() {
-    tipKind = 'none';
-    tipBasisPoints = 0;
-    customTipPercent.clear();
-    customTipFixed.clear();
-    dirty = true;
-  });
+  void _clearTip() {
+    setState(() {
+      _padTarget = 'cash';
+      tipKind = 'none';
+      tipBasisPoints = 0;
+      customTipPercent.clear();
+      customTipFixed.clear();
+      dirty = true;
+    });
+    _rebalanceForDraftChange();
+  }
 
-  void _setTipPercentage(int value) => setState(() {
-    tipKind = 'percentage';
-    tipBasisPoints = value;
-    customTipPercent.text = (value / 100).toStringAsFixed(2);
-    customTipFixed.clear();
-    dirty = true;
-  });
+  void _setTipPercentage(int value) {
+    setState(() {
+      _padTarget = 'cash';
+      tipKind = 'percentage';
+      tipBasisPoints = value;
+      customTipPercent.text = (value / 100).toStringAsFixed(2);
+      customTipFixed.clear();
+      dirty = true;
+    });
+    _rebalanceForDraftChange();
+  }
 
-  void _setCustomTipPercentage(String value) => setState(() {
-    tipKind = 'percentage';
-    tipBasisPoints = (_minorUnits(value));
-    customTipFixed.clear();
-    dirty = true;
-  });
+  // The two handlers that used to sit here read the SYSTEM KEYBOARD's own field. Both
+  // fields are read-only displays now and the keypad is the only writer, so the
+  // percentage path lives in `_pushDigit` — one place that decides what a typed
+  // percentage means. A fixed-amount tip (a policy this café does not enable) would need
+  // its own target here when it is turned on.
 
-  void _setCustomTipFixed(String _) => setState(() {
-    tipKind = 'fixed';
-    tipBasisPoints = 0;
-    customTipPercent.clear();
-    dirty = true;
-  });
-
-  void _setDiscountType(String value) => setState(() {
-    discountType = value;
-    discountPercent.clear();
-    dirty = true;
-  });
-
-  void _setReceiptDestination(String value) => setState(() {
-    receiptDestination = value;
-    dirty = true;
-  });
+  void _setDiscountType(String value) {
+    setState(() {
+      discountType = value;
+      discountPercent.clear();
+      dirty = true;
+    });
+    _rebalanceForDraftChange();
+  }
 
   List<Map<String, Object?>> _tenders(String currency) {
     final result = <Map<String, Object?>>[];
@@ -2482,6 +3242,19 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         'correlationId': 'card-terminal-${widget.cart.state.cart!.id}',
       });
     }
+    if (bankEnabled) {
+      result.add({
+        'id': _stableId('bank_transfer'),
+        'type': 'bank_transfer',
+        'amount': {
+          'minorUnits': _minorUnits(bankAmount.text),
+          'currency': currency,
+        },
+        'amountReceived': null,
+        'status': bankConfirmed ? 'confirmed_success' : 'not_started',
+        'correlationId': null,
+      });
+    }
     result.addAll(storedValueTenders);
     return result;
   }
@@ -2523,8 +3296,19 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   String _stableId(String kind) => tenderId(widget.cart.state.cart!.id, kind);
 
   Future<void> _review(TotalsPreview totals) async {
-    final cart = widget.cart.state.cart!;
-    final entry = widget.entry.state;
+    final shownDue = _dueMinorUnits(totals);
+    // Nothing is left to type once the operator commits, so the field lets go of the focus here.
+    //
+    // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
+    // otherwise: measured on 2026-10-11, `dumpsys input_method` still reports `mInputShown=true`
+    // three to ten seconds after `Pagado`, Gboard's log shows the numeric IME being attached
+    // (`inputType=8001`) at the moment of the charge, and no editable is focused in the semantics
+    // tree. `unfocus` here, `unfocus` plus `TextInput.hide` on the result screen, and
+    // `TextInput.hide` here as well were each measured — none of them closed it, and `BACK` does.
+    // The defect and the evidence are in `docs/reports/2026-10-11-imin-keyboard-stays-open.md`; the
+    // next step is to trace the text-input channel during a charge rather than guess again.
+    FocusManager.instance.primaryFocus?.unfocus();
+    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
     // A card tender is charged on a real terminal BEFORE the checkout runs, and
     // the checkout waits for the terminal's answer. Every other path (cash, the
     // manual terminal, an already-answered card) falls through to the ordinary
@@ -2534,6 +3318,48 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (!mounted) return;
       return;
     }
+    if (terminalEnabled &&
+        (terminalStatus != 'confirmed_success' ||
+            _confirmedManualTerminalMinorUnits !=
+                _minorUnits(terminalAmount.text)) &&
+        !await _confirmManualTerminalCharge()) {
+      return;
+    }
+    if (bankEnabled && !await _confirmBankReceived()) return;
+    dirty = false;
+    widget.sales.checkoutStarted();
+    await _sendReview(totals);
+    if (!mounted) return;
+    // One-tap checkout: the cashier saw and verified this total before tapping
+    // Cobrar. The preview is a server recompute for integrity — if it matches
+    // what they saw, commit now in the same action. If UMI recomputed a
+    // DIFFERENT total, fall through to the confirmation screen so the cashier
+    // sees the new number (an inaccurate charge is the costly error to prevent).
+    final reviewed = widget.checkout.state;
+    if (reviewed.phase == CheckoutPhase.confirmationRequired && !dirty) {
+      final repriced =
+          reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
+      final newTotal = repriced == null
+          ? null
+          : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits'] as num?)
+                ?.toInt();
+      if (newTotal != null && newTotal == shownDue) {
+        await _makeValuePairWhole(totals);
+        if (!mounted) return;
+        await widget.checkout.confirm();
+      }
+    }
+  }
+
+  /// Post the review for [totals] with what the sheet holds right now.
+  ///
+  /// Extracted because a charge with a customer's value reviews TWICE: once with no value, which is
+  /// the basis the preview is asked against, and once carrying the selection, which is the
+  /// confirmation the commit has to name. Both reviews must be identical apart from the value, so
+  /// they come from one place.
+  Future<void> _sendReview(TotalsPreview totals) async {
+    final cart = widget.cart.state.cart!;
+    final entry = widget.entry.state;
     final tenant = entry.selectedTenant;
     final device = entry.device;
     final operator = entry.operator;
@@ -2555,8 +3381,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             currency: currency,
             deviceTrusted: device.state == 'active',
           );
-    dirty = false;
-    widget.sales.checkoutStarted();
     await widget.checkout.preview(
       merchantId: cart.merchantId,
       locationId: cart.locationId,
@@ -2576,30 +3400,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       tipDraft: _tipDraft(currency),
       discountDrafts: _discountDrafts(currency),
       receiptDelivery: {
-        'destination': receiptDestination,
+        'destination': 'display',
         'channel': null,
         'customerContactId': null,
       },
     );
-    if (!mounted) return;
-    // One-tap checkout: the cashier saw and verified this total before tapping
-    // Cobrar. The preview is a server recompute for integrity — if it matches
-    // what they saw, commit now in the same action. If UMI recomputed a
-    // DIFFERENT total, fall through to the confirmation screen so the cashier
-    // sees the new number (an inaccurate charge is the costly error to prevent).
-    final reviewed = widget.checkout.state;
-    if (reviewed.phase == CheckoutPhase.confirmationRequired && !dirty) {
-      final repriced =
-          reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
-      final newTotal = repriced == null
-          ? null
-          : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits'] as num?)
-                ?.toInt();
-      final shownTotal = (totals.grandTotal['minorUnits']! as num).toInt();
-      if (newTotal != null && newTotal == shownTotal) {
-        await widget.checkout.confirm();
-      }
-    }
   }
 
   /// Charge the card on the terminal this location offers, then LEARN the answer.
@@ -2931,23 +3736,23 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final fingerprint =
         widget.checkout.state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
-    final approved = await showDialog<bool>(
+    final approved = await showPosDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(l.managerApprovalTitle),
-        content: TextField(
+        content: PosField(
           controller: pin,
           obscureText: true,
           keyboardType: TextInputType.number,
           autofocus: true,
-          decoration: InputDecoration(labelText: l.managerPinLabel),
+          decoration: PosFieldDecoration(labelText: l.managerPinLabel),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(l.closeAction),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(l.approveAction),
           ),
@@ -2969,13 +3774,13 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     pin.dispose();
     if (grant == null) {
       if (context.mounted) {
-        await showDialog<void>(
+        await showPosDialog<void>(
           context: context,
-          builder: (dialogContext) => AlertDialog(
+          builder: (dialogContext) => PosAlertDialog(
             title: Text(l.managerApprovalTitle),
             content: Text(l.managerApprovalDeniedMessage),
             actions: [
-              TextButton(
+              PosTextButton(
                 onPressed: () => Navigator.pop(dialogContext),
                 child: Text(l.closeAction),
               ),
@@ -3085,21 +3890,21 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.cloud_off_outlined, size: 64),
+          const PosIcon(PosGlyphs.cloudOffOutlined, size: 64),
           Text(
             l.provisionalSalePendingTitle,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium,
+            style: PosTheme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: UmiSpacing.md),
           Text(l.provisionalSalePendingBody, textAlign: TextAlign.center),
-          SelectableText(
+          PosSelectableText(
             receipt.provisionalSaleId,
             textAlign: TextAlign.center,
           ),
           Text(receipt.locationName, textAlign: TextAlign.center),
           Text(receipt.operatorName, textAlign: TextAlign.center),
-          const Divider(),
+          const PosDivider(),
           Expanded(
             child: ListView(
               children: [
@@ -3107,7 +3912,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                   Builder(
                     builder: (context) {
                       final line = CartItem.fromJson(raw);
-                      return ListTile(
+                      return PosListRow(
                         title: Text(line.productName),
                         subtitle: Text(
                           [
@@ -3147,7 +3952,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           ),
           Text('${l.businessDateLabel}: ${snapshot.businessDate}'),
           const Spacer(),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context),
             child: Text(l.returnToCatalogAction),
           ),
@@ -3156,11 +3961,151 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     );
   }
 
-  Future<void> _confirm() async {
+  Future<void> _confirm(TotalsPreview totals) async {
+    if (terminalEnabled &&
+        (terminalStatus != 'confirmed_success' ||
+            _confirmedManualTerminalMinorUnits !=
+                _minorUnits(terminalAmount.text))) {
+      if (!await _confirmManualTerminalCharge()) return;
+      if (!mounted) return;
+      await _sendReview(totals);
+      if (!mounted) return;
+    }
+    if (bankEnabled && !bankConfirmed) {
+      if (!await _confirmBankReceived()) return;
+      if (!mounted) return;
+      await _sendReview(totals);
+      if (!mounted) return;
+    }
     // The confirmationRequired screen already shows the recomputed totals and
     // the "Confirmar y cobrar" button, so a second modal asking the same thing
-    // was pure friction — commit directly.
+    // was pure friction — commit directly. A customer's value still owes its
+    // half of the pair, so the charge goes through the same three steps the
+    // one-tap path uses.
+    await _makeValuePairWhole(totals);
+    if (!mounted) return;
     await widget.checkout.confirm();
+  }
+
+  /// Wait for the customer-value preview the commit has to carry, then push it to the checkout.
+  ///
+  /// THE CUSTOMER'S PREVIEW MUST LAND BEFORE THE COMMIT, NOT ALONGSIDE IT. What the database asserts
+  /// is the loyalty earn preview for the cart and customer, looked up **by the fingerprint on the
+  /// checkout command** (`merchant.assert_loyalty_earn_preview`,
+  /// `38_pos_customer_value_closeout.sql`), so a command without it is refused with
+  /// `LOYALTY_PREVIEW_STALE`. The panel's own load (`_loadCustomerValuePreview`) is fire-and-forget,
+  /// and this sheet charges in one action — review, then confirm without an operator step in
+  /// between — so the confirm used to leave **seven milliseconds** after the preview was asked for
+  /// and before its answer: measured on the iMin on 2026-10-11 (preview `11:49:20.860`, confirm
+  /// `.867`), with `"customerValue": null` in both bodies and the till answering "No fue posible
+  /// completar el cobro de forma segura." twice while the panel on the same screen showed the points
+  /// the sale had just earned. A customer-attached sale could not be paid at all.
+  ///
+  /// Both charging paths go through here: the one-tap charge at the end of `_review`, and the
+  /// `Confirmar y cobrar` tap on the confirmation screen (`_confirm`).
+  ///
+  /// Nothing else moves here: the tenders, the payment method and the sheet's `dirty` flag belong to
+  /// the operator's own actions.
+  /// Returns whether a selection was pushed, so the caller knows a second review is owed.
+  Future<bool> _applyCustomerValueForCommit() async {
+    final pending = _requestCustomerValuePreview();
+    if (pending != null) {
+      try {
+        await pending;
+      } on Object {
+        // A preview that could not be read is not a reason to hold the money: the
+        // panel already named the refusal, and the command travels without the
+        // preview so the server refuses it by name instead of the till going quiet.
+      }
+    }
+    if (!mounted) return false;
+    final controller = widget.customerValue;
+    if (controller == null) return false;
+    final selection = controller.selection();
+    // Only ever PUSH a selection. A null one means this checkout has no preview to
+    // pair the command with, and clearing what an earlier authorization left behind
+    // belongs to the flow that released it, not here.
+    if (selection == null) return false;
+    widget.checkout.applyCustomerValue(selection);
+    return true;
+  }
+
+  /// Put the customer's value pair together BEFORE the money moves: the preview, the
+  /// confirmation the commit names, and both fingerprint halves.
+  ///
+  /// THE ORDER IS THE CONTRACT, and it is why a customer-attached sale used to be un-chargeable.
+  /// The confirmation the commit has to quote is hashed over the command INCLUDING its
+  /// `customerValue` (`checkout-calculator.ts`: source fingerprint, discounts, `customerValue`,
+  /// reward, tip, tenders, receipt, policy, amountDue), while the database pairs the preview with
+  /// the command's fingerprint computed WITHOUT any value and without wallet/gift-card tenders
+  /// (`customerValueBasisFingerprint` → `merchant.assert_loyalty_earn_preview`). So the sheet has
+  /// to do three things in this order:
+  ///
+  ///   1. the review that carries no value — its fingerprint is the basis the PREVIEW is asked
+  ///      against, and the row that preview creates is the one the database asserts at commit;
+  ///   2. the preview itself, AWAITED — the panel's own load is fire-and-forget, and the one-tap
+  ///      charge used to commit seven milliseconds after asking for it, with `"customerValue": null`,
+  ///      which the database refuses as `LOYALTY_PREVIEW_STALE`;
+  ///   3. one more review, now carrying the selection — the fingerprint it publishes is the one the
+  ///      commit must name, and its `storedValueFingerprint` is the other half the API insists on
+  ///      (`storedValueSelectionInvalid` in `pos-checkout.service.ts`).
+  ///
+  /// Measured on the iMin D3-504, 2026-10-11: a commit sent straight after step 2 was answered
+  /// `CHECKOUT_CART_CHANGED` on identical totals (`edf9273d…` at review, `26f3e80b…` at commit),
+  /// because the value it carried was not in the confirmation it quoted.
+  Future<void> _makeValuePairWhole(TotalsPreview totals) async {
+    // THE BASIS FIRST, WHENEVER IT CAN STILL MOVE.
+    //
+    // The pair is keyed on the command WITHOUT its value, and taking the value out of a command that
+    // already carries a reward or a stored-value authorization would drop the authorization itself —
+    // so this runs for the plain loyalty-earn sale, which is what a café takes all day. It reviews
+    // once with the value removed: that confirmation's fingerprint IS the basis, and the preview the
+    // commit will name is asked against it. A tender or a tip corrected after the previous preview
+    // (the customer hands over a different note, `Falta por cobrar` is topped up) changes that
+    // fingerprint, and the row is replaced rather than left naming a command that no longer exists.
+    //
+    // A STORED VALUE OR A REWARD KEEPS THE OLD ORDER, and the walk that showed why is written up in
+    // `2026-10-11-loyalty-preview-lifecycle.md`: the authorization is bound to the preview it was
+    // asked against, so standing the value aside to re-key the earn row re-issued it — twice, over a
+    // sale that still would not close. Their pair needs its own pass, not a rider on this one.
+    final controller = widget.customerValue;
+    if (controller != null &&
+        widget.checkout.customerValueSelection != null &&
+        controller.state.rewardAuthorization == null &&
+        controller.state.storedValueAuthorizations.isEmpty) {
+      widget.checkout.applyCustomerValue(null);
+      await _sendReview(totals);
+      if (!mounted) return;
+    }
+    final valued = await _applyCustomerValueForCommit();
+    if (!mounted || !valued) return;
+    await _sendReview(totals);
+    if (!mounted) return;
+    _adoptStoredValueFingerprint();
+  }
+
+  /// Carry the `storedValueFingerprint` the fresh confirmation published on the selection.
+  ///
+  /// The API refuses a commit that holds a `customerValue` whose `storedValueFingerprint` does not
+  /// match the one it recomputes (`storedValueSelectionInvalid`), and the confirmation it hands back
+  /// is where that half is published. Without it the checkout falls back to `collecting_payment`
+  /// and the sale never closes.
+  void _adoptStoredValueFingerprint() {
+    final selection = widget.checkout.customerValueSelection;
+    final stored =
+        widget.checkout.state.result?.confirmation['storedValueFingerprint']
+            as String?;
+    if (selection == null || stored == null) return;
+    widget.checkout.applyCustomerValue(
+      CustomerValueSelection(
+        previewFingerprint: selection.previewFingerprint,
+        storedValueFingerprint: stored,
+        rewardAuthorizationId: selection.rewardAuthorizationId,
+        rewardApprovalId: selection.rewardApprovalId,
+        storedValueAuthorizationIds: selection.storedValueAuthorizationIds,
+        fundedGiftCards: selection.fundedGiftCards,
+      ),
+    );
   }
 
   /// THE UNKNOWN SCREEN, MADE SPECIFIC.
@@ -3177,7 +4122,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   /// `queryUnknownPayment`).
   Widget _unknown(BuildContext context, CheckoutResult result) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final failure = result.failure;
     final payment = result.payment;
     // The API nests the money (`amount: {minorUnits, currency}`) on a payment
@@ -3185,7 +4130,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // arrived rather than guessing.
     final amount = payment?['amount'];
     final currency =
-        (amount is Map<String, Object?> ? amount['currency'] as String? : null) ??
+        (amount is Map<String, Object?>
+            ? amount['currency'] as String?
+            : null) ??
         payment?['currency'] as String?;
     final amountMinor =
         (amount is Map<String, Object?> ? (amount['minorUnits'] as num?) : null)
@@ -3199,7 +4146,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.help_outline, size: 64),
+            const PosIcon(PosGlyphs.helpOutline, size: 64),
             const SizedBox(height: UmiSpacing.sm),
             Text(
               l.paymentUnknownTitle,
@@ -3225,18 +4172,18 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             ],
             if (failure != null) ...[
               const SizedBox(height: UmiSpacing.sm),
-              SelectableText(
+              PosSelectableText(
                 '${l.correlationLabel}: ${failure['correlationId']}',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall,
               ),
             ],
             const SizedBox(height: UmiSpacing.lg),
-            FilledButton(
+            PosButton(
               onPressed: widget.checkout.queryUnknownPayment,
               child: Text(l.queryPaymentAction),
             ),
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(l.closeAction),
             ),
@@ -3246,7 +4193,21 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     );
   }
 
-  Widget _receipt(BuildContext context, CheckoutResult result) {
+  Widget _receipt(
+    BuildContext context,
+    CheckoutResult result,
+    String? postCommitWarning,
+  ) {
+    // THE COMPLETION SCREEN ASKS FOR NOTHING TO BE TYPED, so it drops the focus and asks the
+    // platform to put its keyboard away. Both calls are belt and braces: they do NOT close the
+    // keyboard on the iMin (measured 2026-10-11 — see the note in `_review` and
+    // `docs/reports/2026-10-11-imin-keyboard-stays-open.md`), and they are kept because the intent
+    // is right and other platforms do honour them.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FocusManager.instance.primaryFocus?.unfocus();
+      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
+    });
     final l = AppLocalizations.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
     final receipt = ReceiptSnapshot.fromJson(result.receipt!);
@@ -3266,10 +4227,21 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     // PoloTab's completion screen: the change to hand back in huge blue, the amount
     // paid in huge white, a one-line receipt summary, and two actions.
     const brandBlue = Color(0xFF2E7DFF);
-    final display = Theme.of(context).textTheme.displayLarge;
+    final display = PosTheme.of(context).textTheme.displayLarge;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (postCommitWarning != null) ...[
+          // The sale is recorded and the money is right; what failed is the
+          // pulse that opens the drawer, which shares the printer's port. The
+          // cashier is standing here, so this is where it is said — a log line
+          // is a failure nobody at the till can act on (plan §8.2 F5).
+          InlineNotice(
+            message: l.cashDrawerUnansweredMessage,
+            tone: InlineNoticeTone.warning,
+          ),
+          const SizedBox(height: UmiSpacing.md),
+        ],
         const Spacer(),
         // CHANGE IS A FACT ONLY WHEN CASH WAS GIVEN. This screen led with
         // "Cambio a dar MXN 0.00" in the largest type on the till — for a card
@@ -3281,8 +4253,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           Text(
             es ? 'Cambio a dar' : 'Change due',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
+              color: PosTheme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: UmiSpacing.xs),
@@ -3301,8 +4273,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         Text(
           es ? 'Pagado' : 'Paid',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
+            color: PosTheme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: UmiSpacing.xs),
@@ -3318,24 +4290,31 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           '${es ? 'Recibiste' : 'Received'}: ${_money(money(receivedMinor))}   ·   '
           '${es ? 'Consumo' : 'Total'}: ${_money(receipt.grandTotal)}',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+            color: PosTheme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const Spacer(),
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _showReceiptDetail(context, l, receipt),
-                icon: const Icon(Icons.receipt_long_outlined),
+              child: PosOutlineButton.icon(
+                onPressed: () => _showReceiptDetail(
+                  context,
+                  receipt,
+                  // The receipt's own id is what the server files the print job
+                  // against, and it comes from the committed sale.
+                  receiptId: result.sale?['receiptId'] as String?,
+                  snapshot: result.receipt,
+                ),
+                icon: const PosIcon(PosGlyphs.receiptLongOutlined),
                 label: Text(es ? 'Ver comprobante' : 'View receipt'),
               ),
             ),
             const SizedBox(width: UmiSpacing.md),
             Expanded(
-              child: FilledButton(
-                style: FilledButton.styleFrom(
+              child: PosButton(
+                style: PosButton.styleFrom(
                   minimumSize: const Size.fromHeight(56),
                 ),
                 onPressed: () async {
@@ -3356,58 +4335,35 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   Future<void> _showReceiptDetail(
     BuildContext context,
-    AppLocalizations l,
-    ReceiptSnapshot receipt,
-  ) => showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: SelectableText(receipt.receiptRef),
-      content: SizedBox(
-        width: 360,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final raw in receipt.lines)
-              Builder(
-                builder: (_) {
-                  final line = ReceiptLineSnapshot.fromJson(raw);
-                  return ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(line.description),
-                    subtitle: Text(
-                      '${line.quantity} × ${_money(line.unitPrice)}',
-                    ),
-                    trailing: Text(_money(line.lineTotal)),
-                  );
-                },
-              ),
-            const Divider(),
-            _AmountRow(
-              label: l.totalLabel,
-              value: _money(receipt.grandTotal),
-              emphasized: true,
-            ),
-            Text('${l.businessDateLabel}: ${receipt.businessDate}'),
-          ],
-        ),
+    ReceiptSnapshot receipt, {
+    String? receiptId,
+    Map<String, Object?>? snapshot,
+  }) {
+    final permissions = OperatorPermissions(
+      widget.entry.state.operator?.permissions ?? const [],
+    );
+    return showReceiptDocument(
+      context,
+      receipt,
+      // THE CUSTOMER ASKING FOR THEIR TICKET, from the screen the operator is
+      // already on. Same dialog and same request as Ventas, so there is one
+      // behaviour to reason about; the paper says COPIA because the sale's own
+      // print is the original.
+      printAction: receiptPrintAction(
+        canPrint: permissions.allows('hardware.printer.print'),
+        receiptId: receiptId,
+        snapshot: snapshot,
+        onPrint: widget.onPrint,
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: Text(l.closeAction),
-        ),
-      ],
-    ),
-  );
+    );
+  }
 
   Widget _checkoutError(BuildContext context, String? code) {
     final l = AppLocalizations.of(context);
     final state = widget.checkout.state;
     final hold = state.holdState;
     var body = l.checkoutFailed;
-    Widget action = FilledButton.tonal(
+    Widget action = PosButton.tonal(
       onPressed: widget.checkout.reset,
       child: Text(l.retryAction),
     );
@@ -3422,8 +4378,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (recover != null &&
           (hold == 'held_by_this_device' || hold == 'held_by_orphaned_till')) {
         final resume = hold == 'held_by_this_device';
-        action = FilledButton(
-          onPressed: () => _recoverCashShift(recover, hold),
+        action = PosButton(
+          onPressed: cashRecoveryBusy
+              ? null
+              : () => _recoverCashShift(recover, hold),
           child: Text(
             resume
                 ? l.resumeShiftAndRetryAction
@@ -3432,15 +4390,22 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         );
       } else if (hold == 'held_by_active_till') {
         body = '${l.cashShiftRequiredMessage} ${l.cashHeldByActiveTillMessage}';
-      } else {
-        body = l.cashShiftRequiredMessage;
+      } else if (widget.onOpenCashShift != null) {
+        body = '${l.cashShiftRequiredMessage} ${l.openCashAndContinueHint}';
+        action = PosButton(
+          onPressed: cashRecoveryBusy
+              ? null
+              : () =>
+                    _recoverCashShift((_) => widget.onOpenCashShift!(), 'free'),
+          child: Text(l.openCashAndContinueAction),
+        );
       }
     }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.error_outline, size: 64),
+          const PosIcon(PosGlyphs.errorOutline, size: 64),
           Text(body, textAlign: TextAlign.center),
           const SizedBox(height: UmiSpacing.md),
           action,
@@ -3455,7 +4420,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           // way: this surface trapped the sweep mid-run, and the only node it
           // published was the retry button.
           const SizedBox(height: UmiSpacing.sm),
-          TextButton(
+          PosTextButton(
             onPressed: () => _closeCheckout(context),
             child: Text(l.closeAction),
           ),
@@ -3468,7 +4433,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     Future<String?> Function(String holdState) recover,
     String? hold,
   ) async {
-    final shiftId = await recover(hold ?? 'free');
+    if (cashRecoveryBusy) return;
+    setState(() => cashRecoveryBusy = true);
+    String? shiftId;
+    try {
+      shiftId = await recover(hold ?? 'free');
+    } finally {
+      if (mounted) setState(() => cashRecoveryBusy = false);
+    }
     if (!mounted) return;
     // A recovered shift lets the charge go through as it stands. A reclaim frees
     // the drawer but leaves no shift to book the money against, so the till
@@ -3477,7 +4449,12 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       await widget.checkout.retryWithCashShift(shiftId);
       return;
     }
-    if (mounted) Navigator.of(context).pop();
+    // A resume the operator walked away from — a cancelled PIN, a pad closed —
+    // leaves the refusal and the cart where they were: the sale is not lost,
+    // and pressing the button again asks for the PIN again. Only the other
+    // holds send the till back to the catalog, because a drawer this device
+    // cannot speak for leaves nothing here to charge against.
+    if (mounted && hold != 'held_by_this_device') Navigator.of(context).pop();
   }
 }
 
@@ -3491,7 +4468,7 @@ final class _TotalHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -3507,7 +4484,7 @@ final class _TotalHero extends StatelessWidget {
         children: [
           Text(
             label.toUpperCase(),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            style: PosTheme.of(context).textTheme.labelMedium?.copyWith(
               color: scheme.onSurfaceVariant,
               letterSpacing: 1,
             ),
@@ -3518,7 +4495,7 @@ final class _TotalHero extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               amount,
-              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+              style: PosTheme.of(context).textTheme.displaySmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: scheme.onSurface,
               ),
@@ -3548,7 +4525,7 @@ final class _TenderNotice extends StatelessWidget {
   });
   final Color tone;
   final Color ink;
-  final IconData icon;
+  final PosGlyph icon;
   final String title;
   final String body;
 
@@ -3565,7 +4542,7 @@ final class _TenderNotice extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: ink, size: 20),
+            PosIcon(icon, color: ink, size: 20),
             const SizedBox(width: UmiSpacing.sm),
             Expanded(
               child: Column(
@@ -3573,14 +4550,14 @@ final class _TenderNotice extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: Theme.of(
+                    style: PosTheme.of(
                       context,
                     ).textTheme.titleSmall?.copyWith(color: ink),
                   ),
                   const SizedBox(height: UmiSpacing.xs),
                   Text(
                     body,
-                    style: Theme.of(
+                    style: PosTheme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: ink),
                   ),
@@ -3594,6 +4571,207 @@ final class _TenderNotice extends StatelessWidget {
   }
 }
 
+final class BankTransferDialog extends StatelessWidget {
+  const BankTransferDialog({
+    super.key,
+    required this.details,
+    required this.merchantName,
+    required this.logoUrl,
+    required this.amount,
+    required this.accountFolio,
+    required this.selected,
+  });
+
+  final Map<String, Object?> details;
+  final String merchantName;
+  final String? logoUrl;
+  final String amount;
+  final String? accountFolio;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final theme = PosTheme.of(context);
+    final clabe = (details['clabe'] as String?)?.trim();
+    final account = (details['accountNumber'] as String?)?.trim();
+    final name = merchantName.trim().isEmpty ? 'ONCA' : merchantName;
+    final logo = logoUrl?.trim();
+    final dark = theme.brightness == Brightness.dark;
+    final headerInk = dark
+        ? theme.colorScheme.onSurface
+        : const Color(0xFF151515);
+    final headerMuted = dark
+        ? theme.colorScheme.onSurfaceVariant
+        : const Color(0xFF626262);
+    final folio = accountFolio?.trim();
+    final concept = folio == null || folio.isEmpty
+        ? null
+        : RegExp(r'^(cuenta|account)\b', caseSensitive: false).hasMatch(folio)
+        ? '$name $folio'
+        : '$name ${l.bankTransferAccountWord} $folio';
+    return PosAlertDialog(
+      constraints: const BoxConstraints(maxWidth: 560),
+      contentPadding: const EdgeInsets.all(UmiSpacing.lg),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFFFF),
+                  border: Border.all(
+                    color: dark
+                        ? theme.colorScheme.outlineVariant
+                        : const Color(0xFFD8D8D8),
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: logo == null || logo.isEmpty
+                    ? Center(
+                        child: Text(
+                          name.substring(0, 1).toUpperCase(),
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: const Color(0xFF151515),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      )
+                    : Image.network(
+                        resolveApiAssetUrl(logo),
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => Center(
+                          child: Text(
+                            name.substring(0, 1).toUpperCase(),
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              color: const Color(0xFF151515),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+              const SizedBox(width: UmiSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: headerInk,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      l.bankTransferLabel,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: headerMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: UmiSpacing.md),
+          Container(
+            height: 1,
+            color: dark
+                ? theme.colorScheme.outlineVariant
+                : const Color(0xFFE6E6E6),
+          ),
+          const SizedBox(height: UmiSpacing.lg),
+          Text(l.bankTransferAmountLabel, style: theme.textTheme.labelLarge),
+          Text(
+            amount,
+            key: const ValueKey('bank-transfer-modal-amount'),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: UmiSpacing.md),
+          _BankDetailRow(
+            label: l.bankTransferBankLabel,
+            value: details['bankName'] as String? ?? '',
+          ),
+          _BankDetailRow(
+            label: l.bankTransferHolderLabel,
+            value: details['holderName'] as String? ?? '',
+          ),
+          if (clabe != null && clabe.isNotEmpty)
+            _BankDetailRow(
+              label: 'CLABE',
+              value: clabe,
+              key: const ValueKey('bank-transfer-clabe'),
+            ),
+          if (account != null && account.isNotEmpty)
+            _BankDetailRow(label: l.bankTransferAccountLabel, value: account),
+          if (concept != null)
+            _BankDetailRow(label: l.bankTransferConceptLabel, value: concept),
+          const SizedBox(height: UmiSpacing.md),
+          Text(
+            l.bankTransferInstructions,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        PosTextButton(
+          key: const ValueKey('bank-transfer-close'),
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(l.closeAction),
+        ),
+        if (!selected)
+          PosButton(
+            key: const ValueKey('bank-transfer-select'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l.bankTransferSelectAction),
+          ),
+      ],
+    );
+  }
+}
+
+final class _BankDetailRow extends StatelessWidget {
+  const _BankDetailRow({super.key, required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = PosTheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: UmiSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 final class _MethodTile extends StatelessWidget {
   const _MethodTile({
     super.key,
@@ -3602,20 +4780,20 @@ final class _MethodTile extends StatelessWidget {
     required this.selected,
     required this.onTap,
   });
-  final IconData icon;
+  final PosGlyph icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
+    final scheme = PosTheme.of(context).colorScheme;
+    return PosSurface(
       color: selected
           ? scheme.primaryContainer
           : scheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(14),
-      child: InkWell(
+      child: PosTapRegion(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
         child: Container(
@@ -3630,7 +4808,7 @@ final class _MethodTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(
+              PosIcon(
                 icon,
                 color: selected
                     ? scheme.onPrimaryContainer
@@ -3640,7 +4818,7 @@ final class _MethodTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  style: PosTheme.of(context).textTheme.titleMedium?.copyWith(
                     color: selected
                         ? scheme.onPrimaryContainer
                         : scheme.onSurface,
@@ -3649,7 +4827,7 @@ final class _MethodTile extends StatelessWidget {
                 ),
               ),
               if (selected)
-                Icon(Icons.check_circle, color: scheme.primary, size: 20),
+                PosIcon(PosGlyphs.checkCircle, color: scheme.primary, size: 20),
             ],
           ),
         ),
@@ -3666,9 +4844,9 @@ final class _QuickCashButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => OutlinedButton(
+  Widget build(BuildContext context) => PosOutlineButton(
     onPressed: onTap,
-    style: OutlinedButton.styleFrom(
+    style: PosOutlineButton.styleFrom(
       minimumSize: const Size.fromHeight(48),
       padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
     ),
@@ -3711,17 +4889,20 @@ final class _KeyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
+    final scheme = PosTheme.of(context).colorScheme;
+    return PosSurface(
       color: scheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
+      child: PosTapRegion(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Center(
           child: label == 'back'
-              ? const Icon(Icons.backspace_outlined)
-              : Text(label, style: Theme.of(context).textTheme.headlineSmall),
+              ? const PosIcon(PosGlyphs.backspaceOutlined)
+              : Text(
+                  label,
+                  style: PosTheme.of(context).textTheme.headlineSmall,
+                ),
         ),
       ),
     );
@@ -3744,10 +4925,18 @@ final class _AmountRow extends StatelessWidget {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label),
-        Text(
-          value,
-          style: emphasized ? Theme.of(context).textTheme.headlineSmall : null,
+        Expanded(child: Text(label)),
+        const SizedBox(width: UmiSpacing.sm),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: emphasized
+                ? const UmiOperatorTokens()
+                      .money(PosTheme.of(context).textTheme)
+                      .copyWith(fontSize: 24)
+                : null,
+          ),
         ),
       ],
     ),

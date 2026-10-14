@@ -8,12 +8,16 @@ environment:
   flutter: '>=3.44.0'
 
 dependencies:
+  audioplayers: 6.8.1
+  firebase_core: 4.15.0
+  firebase_messaging: 16.7.0
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
   connectivity_plus: 7.3.1
   flutter_secure_storage: 9.2.4
+  flutter_svg: 2.3.0
   cryptography: 2.7.0
   crypto: 3.0.7
   http: 1.5.0
@@ -22,6 +26,11 @@ dependencies:
     path: ../../packages/contract/generated/dart
   socket_io_client: 3.1.6
 
+  # `flutter_localizations` pins intl for the SDK that builds the app: 0.20.3 on
+  # the 3.47 line this project develops on, 0.20.2 on the 3.44 image CI uses for
+  # the iOS target. An exact pin breaks one of the two; the range is what lets
+  # both resolve.
+  intl: ^0.20.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -33,5 +42,31 @@ dev_dependencies:
   flutter_lints: 6.0.0
 
 flutter:
-  uses-material-design: true
+  uses-material-design: false
   generate: true
+  assets:
+    - assets/audio/
+    - assets/icons/tap_to_pay.svg
+    - assets/fonts/IBM-Plex-OFL.txt
+    - assets/fonts/Bricolage-OFL.txt
+    - assets/fonts/provenance.json
+  fonts:
+    - family: IBM Plex Sans
+      fonts:
+        - asset: assets/fonts/IBMPlexSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/IBMPlexSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/IBMPlexSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexSans-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/IBMPlexSans-Italic.ttf
+          style: italic
+          weight: 400
+    - family: Bricolage Grotesque
+      fonts:
+        - asset: assets/fonts/BricolageGrotesque12pt-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/BricolageGrotesque12pt-Bold.ttf
+          weight: 700

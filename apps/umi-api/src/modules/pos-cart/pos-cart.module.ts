@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { IntegrityModule } from '../integrity/integrity.module';
 import { PosCartController } from './pos-cart.controller';
+import { PosOrderController } from './pos-order.controller';
 import { PosCartRepository } from './pos-cart.repository';
 import { PosCartService } from './pos-cart.service';
 
 @Module({
   imports: [AuthModule, IntegrityModule],
-  controllers: [PosCartController],
+  controllers: [PosCartController, PosOrderController],
   providers: [PosCartRepository, PosCartService],
   exports: [PosCartRepository],
 })

@@ -134,6 +134,7 @@ export class DevicesService {
       deviceId,
       displayName: dto.displayName,
       mobility: dto.mobility,
+      ...(dto.type ? { kind: dto.type } : {}),
       allowedBranchIds: locationIds,
     });
     if (!device) throw new NotFoundException({ code: 'DEVICE_NOT_ALLOWED' });

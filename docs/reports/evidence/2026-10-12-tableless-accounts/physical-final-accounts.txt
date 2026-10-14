@@ -1,0 +1,8 @@
+ account_number | display_label | lifecycle_state | version |  table_name  |  creator   | cart_lines | sent_lines 
+----------------+---------------+-----------------+---------+--------------+------------+------------+------------
+            100 |               | suspended       |      16 |              | Admin ONCA |          4 |          4
+            108 |               | suspended       |       4 | Mesa prueba  | Mesero 1   |          1 |          1
+            109 | Ana terraza   | suspended       |      16 | Mesa vínculo | Admin ONCA |          1 |          1
+            111 | Portatil QA   | suspended       |       3 |              | Mesero 1   |          1 |          0
+(4 rows)
+

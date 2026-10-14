@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type { CatalogCategory, CatalogProductDetail, CatalogProductSummary } from '@umi/contract';
+import {
+  availabilityStateSql,
+  isCatalogAvailabilityStatus,
+} from '../../shared/catalog/availability';
 import { PgService } from '../../shared/database/pg.service';
 
 type ProductRow = Omit<CatalogProductSummary, 'price' | 'category' | 'primaryMedia'> & {
@@ -20,13 +24,18 @@ export class PosCatalogRepository {
     deviceId: string,
     merchantId: string,
     locationId: string,
-  ): Promise<boolean> {
+  ): Promise<{ allowed: boolean; permissions: string[] }> {
     return this.pg.runWithMerchant(
       merchantId,
       userId,
       async (client) => {
-        const { rowCount } = await client.query(
-          `SELECT 1
+        // The permissions come back WITH the verdict so the caller can tell a dead session
+        // from a role that simply cannot read the catalog — the same distinction, and the
+        // same reason, as `PosCartRepository.authorize`. An empty array means no live
+        // session; a non-empty one without `catalog.read` is a role gap the operator
+        // cannot fix by signing in again.
+        const result = await client.query<{ permissions: string[] }>(
+          `SELECT os.permissions
        FROM runtime.operator_session os
        JOIN merchant.device d ON d.id = os.device_id
        JOIN merchant.location b ON b.id = os.location_id AND b.merchant_id = os.merchant_id
@@ -34,7 +43,6 @@ export class PosCatalogRepository {
          AND os.device_id = $3::uuid AND os.merchant_id = $4::uuid
          AND os.location_id = $5::uuid AND os.state = 'active' AND os.expires_at > now()
          AND d.status = 'active' AND b.status = 'active'
-         AND ('catalog.read' = ANY(os.permissions) OR '*' = ANY(os.permissions))
          AND EXISTS (
            SELECT 1 FROM jsonb_array_elements(os.entitlements) entitlement
            WHERE entitlement->>'featureKey' = 'pos'
@@ -42,7 +50,13 @@ export class PosCatalogRepository {
          )`,
           [userId, sessionId, deviceId, merchantId, locationId],
         );
-        return (rowCount ?? 0) > 0;
+        const row = result.rows[0];
+        if (!row) return { allowed: false, permissions: [] as string[] };
+        const permissions = Array.isArray(row.permissions) ? row.permissions : [];
+        return {
+          allowed: permissions.includes('catalog.read') || permissions.includes('*'),
+          permissions,
+        };
       },
       locationId,
     );
@@ -86,9 +100,7 @@ export class PosCatalogRepository {
               p.tax_rate_basis_points AS "taxRateBasisPoints",
               p.sale_action AS "saleAction",
               CASE
-                WHEN a.status NOT IN ('enabled','future_availability') THEN a.status
-                WHEN a.status = 'future_availability' AND a.available_from > now()
-                  THEN 'future_availability'
+                WHEN ${availabilityStateSql('a')} <> 'enabled' THEN ${availabilityStateSql('a')}
                 WHEN im.mapping_type='direct'
                   AND coalesce(ib.available,0)*im.conversion_denominator<im.conversion_numerator
                   THEN 'temporarily_unavailable'
@@ -189,7 +201,110 @@ export class PosCatalogRepository {
         WHERE p.merchant_id=$1::uuid AND p.id=$2::uuid`,
       [merchantId, productId],
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    if (!row) return null;
+    // The availability of this product at every live location, resolved by the SAME
+    // rule the till reads (`availabilityStateSql`), so the owner sees the state the
+    // barista's menu actually takes. An absent row is the table's default: available.
+    const availability = await this.pg.tquery(
+      merchantId,
+      `SELECT l.id::text AS "locationId", l.name,
+              ${availabilityStateSql('a')} AS status,
+              a.available_from::text AS "availableFrom"
+         FROM merchant.location l
+         LEFT JOIN merchant.product_location_availability a
+           ON a.location_id = l.id AND a.product_id = $2::uuid
+        WHERE l.merchant_id = $1::uuid AND l.status = 'active'
+        ORDER BY lower(l.name), l.id`,
+      [merchantId, productId],
+    );
+    return { ...row, availability: availability.rows };
+  }
+
+  /**
+   * Set ONE product's availability at ONE location — the owner's "no hay producto".
+   *
+   * The column had two readers and no writer: the demo seed and a test fixture were the
+   * only things that ever wrote `merchant.product_location_availability`, so the only way
+   * a café could 86 a product was `psql` (bug hunt §106, 2026-10-08). This is the writer.
+   *
+   * `enabled` DELETES the row instead of storing it. The table's own comment says an
+   * absent row means available, and a second representation of "nothing is wrong here"
+   * is a second thing that can disagree with the first. Every other status is stored, and
+   * `available_from` travels only with `future_availability` — the table's CHECK enforces
+   * the pairing, and this validates it first so the caller gets a named error.
+   */
+  async setAvailabilityAdministrative(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    expectedVersion: number,
+    input: { locationId: unknown; status: unknown; availableFrom: unknown },
+  ) {
+    await client.query(
+      `INSERT INTO merchant.aggregate_version(merchant_id,aggregate_type,aggregate_id,version)
+       SELECT $1::uuid,'catalog_product',$2::uuid,1
+        WHERE EXISTS (SELECT 1 FROM merchant.product WHERE merchant_id=$1::uuid AND id=$2::uuid)
+       ON CONFLICT DO NOTHING`,
+      [merchantId, productId],
+    );
+    const version = await client.query<{ version: string }>(
+      `SELECT version::text FROM merchant.aggregate_version
+        WHERE merchant_id=$1::uuid AND aggregate_type='catalog_product' AND aggregate_id=$2::uuid
+        FOR UPDATE`,
+      [merchantId, productId],
+    );
+    if (!version.rows[0]) throw new Error('CATALOG_PRODUCT_NOT_FOUND');
+    if (Number(version.rows[0].version) !== expectedVersion) {
+      throw new Error('CATALOG_VERSION_STALE');
+    }
+
+    const locationId = requiredUuid(input.locationId, 'LOCATION_ID');
+    const location = await client.query(
+      `SELECT 1 FROM merchant.location WHERE merchant_id=$1::uuid AND id=$2::uuid`,
+      [merchantId, locationId],
+    );
+    if (!location.rows[0]) throw new Error('CATALOG_LOCATION_SCOPE');
+
+    if (!isCatalogAvailabilityStatus(input.status)) {
+      throw new Error('CATALOG_AVAILABILITY_STATUS_INVALID');
+    }
+    const status = input.status;
+    const availableFrom =
+      status === 'future_availability'
+        ? requiredTimestamp(input.availableFrom, 'AVAILABLE_FROM')
+        : null;
+
+    if (status === 'enabled') {
+      await client.query(
+        `DELETE FROM merchant.product_location_availability
+          WHERE product_id=$1::uuid AND location_id=$2::uuid`,
+        [productId, locationId],
+      );
+    } else {
+      await client.query(
+        `INSERT INTO merchant.product_location_availability
+           (product_id,location_id,status,available_from,updated_at)
+         VALUES($1::uuid,$2::uuid,$3,$4::timestamptz,clock_timestamp())
+         ON CONFLICT (product_id,location_id) DO UPDATE
+           SET status=excluded.status,available_from=excluded.available_from,
+               updated_at=clock_timestamp()`,
+        [productId, locationId, status, availableFrom],
+      );
+    }
+    const next = await client.query<{ version: string }>(
+      `UPDATE merchant.aggregate_version SET version=version+1,updated_at=clock_timestamp()
+        WHERE merchant_id=$1::uuid AND aggregate_type='catalog_product' AND aggregate_id=$2::uuid
+        RETURNING version::text`,
+      [merchantId, productId],
+    );
+    return {
+      productId,
+      locationId,
+      status,
+      availableFrom,
+      version: Number(next.rows[0].version),
+    };
   }
 
   private async withDetails(
@@ -501,6 +616,20 @@ function nullableUuid(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value))
     throw new Error('CATALOG_UUID_INVALID');
+  return value;
+}
+
+function requiredUuid(value: unknown, field: string): string {
+  const parsed = nullableUuid(value);
+  if (!parsed) throw new Error(`CATALOG_${field}_INVALID`);
+  return parsed;
+}
+
+/** An ISO timestamp as the driver's `timestamptz` cast reads it. */
+function requiredTimestamp(value: unknown, field: string): string {
+  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
+    throw new Error(`CATALOG_${field}_INVALID`);
+  }
   return value;
 }
 

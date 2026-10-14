@@ -63,6 +63,10 @@ final class EntryController extends ChangeNotifier {
   final CredentialVault _vault;
   final Telemetry _telemetry;
 
+  /// Retira el destino de avisos antes de cerrar una sesión de forma explícita.
+  /// Un fallo de red no impide el cierre; el servidor también revoca la sesión.
+  Future<void> Function()? beforeLogout;
+
   /// How long an operator may stay idle at a ready till before the POS locks
   /// itself and asks for the PIN again. Null disables the auto-lock, which is
   /// the default in tests; the composition root sets a real value in the app.
@@ -74,6 +78,7 @@ final class EntryController extends ChangeNotifier {
   /// refresh). Past it, or with no saved session, the POS falls back to the
   /// personal PIN. An explicit [lock] always requires the PIN regardless.
   static const _restoreWindow = Duration(minutes: 5);
+  static const _localEntryTimeout = Duration(seconds: 10);
 
   int _pairingGeneration = 0;
 
@@ -117,32 +122,38 @@ final class EntryController extends ChangeNotifier {
 
   Future<void> initialize() async {
     _set(const EntryState(EntryPhase.checkingDevice));
-    final identity = await _vault.deviceIdentity();
-    if (!identity.isEnrolled) {
-      final pairing = await _vault.pairingIdentity();
-      if (pairing != null && pairing.expiresAt.isAfter(DateTime.now())) {
-        _set(const EntryState(EntryPhase.enrollmentPending));
-        _beginPairingWait(pairing);
+    try {
+      final identity = await _vault.deviceIdentity().timeout(
+        _localEntryTimeout,
+      );
+      if (!identity.isEnrolled) {
+        final pairing = await _vault.pairingIdentity().timeout(
+          _localEntryTimeout,
+        );
+        if (pairing != null && pairing.expiresAt.isAfter(DateTime.now())) {
+          _set(const EntryState(EntryPhase.enrollmentPending));
+          _beginPairingWait(pairing);
+          return;
+        }
+        if (pairing != null) await _vault.clearPairing();
+        _set(const EntryState(EntryPhase.enrollmentRequired));
         return;
       }
-      if (pairing != null) await _vault.clearPairing();
-      _set(const EntryState(EntryPhase.enrollmentRequired));
-      return;
-    }
-    final pendingAcknowledgement = await _vault.pairingIdentity();
-    if (pendingAcknowledgement != null && identity.credential != null) {
-      try {
-        await _gateway.acknowledgePairing(
-          pendingAcknowledgement,
-          identity.credential!,
-        );
-        await _vault.clearPairing();
-      } catch (_) {
-        // Device authentication remains safe. The next bootstrap retries this
-        // acknowledgement with the same persisted pairing session.
+      final pendingAcknowledgement = await _vault.pairingIdentity().timeout(
+        _localEntryTimeout,
+      );
+      if (pendingAcknowledgement != null && identity.credential != null) {
+        try {
+          await _gateway.acknowledgePairing(
+            pendingAcknowledgement,
+            identity.credential!,
+          );
+          await _vault.clearPairing();
+        } catch (_) {
+          // Device authentication remains safe. The next bootstrap retries this
+          // acknowledgement with the same persisted pairing session.
+        }
       }
-    }
-    try {
       final device = await _gateway.deviceStatus();
       if (device.state == 'revoked' || device.state == 'replaced') {
         await _vault.clearDeviceTrust();
@@ -177,6 +188,15 @@ final class EntryController extends ChangeNotifier {
       }
       _set(EntryState(EntryPhase.pinRequired, device: device));
       await _vault.clearSession();
+    } on TimeoutException {
+      // A stalled secure-storage read must not leave the terminal on a spinner.
+      debugPrint('umi_pos.entry timeout=local_credential_read');
+      _set(
+        const EntryState(
+          EntryPhase.storageFailure,
+          errorCode: 'ENTRY_STORAGE_TIMEOUT',
+        ),
+      );
     } on AppException catch (error) {
       if (error.code == 'DEVICE_REVOKED' ||
           error.code == 'DEVICE_CREDENTIAL_INVALID') {
@@ -185,6 +205,13 @@ final class EntryController extends ChangeNotifier {
       } else {
         _set(EntryState(EntryPhase.recoverableFailure, errorCode: error.code));
       }
+    } catch (_) {
+      _set(
+        const EntryState(
+          EntryPhase.storageFailure,
+          errorCode: 'ENTRY_STORAGE_FAILURE',
+        ),
+      );
     }
   }
 
@@ -624,6 +651,7 @@ final class EntryController extends ChangeNotifier {
   }
 
   Future<void> reselectBranch() async {
+    await _notifyBeforeLogout();
     final operator = _state.operator;
     if (operator != null) await _gateway.endOperator(operator.id);
     final tenant = _state.selectedTenant;
@@ -692,6 +720,7 @@ final class EntryController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _notifyBeforeLogout();
     final operator = _state.operator;
     // Best-effort server teardown. The session may already be ended server-side
     // (a role/permission change ends active operator sessions), so these calls
@@ -712,11 +741,20 @@ final class EntryController extends ChangeNotifier {
   }
 
   Future<void> globalLogout() async {
+    await _notifyBeforeLogout();
     await _gateway.globalLogout();
     await _vault.clearSession();
     _operatorName = null;
     _event('session.global_logout');
     _set(EntryState(EntryPhase.pinRequired, device: _state.device));
+  }
+
+  Future<void> _notifyBeforeLogout() async {
+    try {
+      await beforeLogout?.call();
+    } catch (_) {
+      _event('push.unregister_failed');
+    }
   }
 
   Future<void> _saveSession(PosSessionResponse response) async {

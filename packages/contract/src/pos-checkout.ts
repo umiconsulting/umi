@@ -12,7 +12,13 @@ import {
 import { CartItem, DiscountPreview, TotalsPreview } from './pos-cart';
 import { CustomerValueCommitResult, CustomerValueSelection } from './pos-customer-value';
 
-export const PaymentMethod = z.enum(['cash', 'external_terminal', 'stored_value', 'gift_card']);
+export const PaymentMethod = z.enum([
+  'cash',
+  'external_terminal',
+  'bank_transfer',
+  'stored_value',
+  'gift_card',
+]);
 export const CheckoutState = z.enum([
   'ready',
   'selecting_tender',
@@ -25,7 +31,13 @@ export const CheckoutState = z.enum([
   'completed',
   'recovered',
 ]);
-export const TenderType = z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']);
+export const TenderType = z.enum([
+  'cash',
+  'manual_terminal',
+  'bank_transfer',
+  'wallet',
+  'gift_card',
+]);
 export const TenderStatus = z.enum([
   'draft',
   'operator_processing_externally',
@@ -57,6 +69,8 @@ export const TenderDraft = z
     type: TenderType,
     amount: Money.refine((value) => value.minorUnits > 0, 'Tender amount must be positive.'),
     amountReceived: Money.nullable().default(null),
+    /** Included in amount; the rest of amount pays for the order. */
+    tipAmount: Money.optional(),
     status: TenderStatus.default('draft'),
     correlationId: CorrelationId.nullable().default(null),
     authorizationId: Uuid.nullable().optional(),
@@ -66,10 +80,21 @@ export const TenderDraft = z
     if (value.amountReceived && value.amountReceived.currency !== value.amount.currency) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Tender currencies must match.' });
     }
-    if (value.type === 'manual_terminal' && value.amountReceived !== null) {
+    if (
+      value.tipAmount &&
+      (value.tipAmount.currency !== value.amount.currency ||
+        value.tipAmount.minorUnits < 0 ||
+        value.tipAmount.minorUnits >= value.amount.minorUnits)
+    ) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid tender tip.' });
+    }
+    if (
+      (value.type === 'manual_terminal' || value.type === 'bank_transfer') &&
+      value.amountReceived !== null
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'A manual terminal tender cannot include cash received.',
+        message: 'A non-cash external tender cannot include cash received.',
       });
     }
     const storedValue = value.type === 'wallet' || value.type === 'gift_card';
@@ -93,6 +118,7 @@ export const TenderAllocation = z
     applied: Money,
     received: Money.nullable(),
     change: Money,
+    tipAmount: Money.optional(),
     status: TenderStatus,
     authorizationId: Uuid.nullable().optional(),
   })
@@ -188,14 +214,47 @@ export const CheckoutPolicy = z
   .object({
     version: z.string().min(1).max(64),
     manualTerminalEnabled: z.boolean(),
+    bankTransferEnabled: z.boolean(),
+    bankTransferDetails: z
+      .object({
+        holderName: z.string().trim().min(1).max(120),
+        bankName: z.string().trim().min(1).max(120),
+        clabe: z
+          .string()
+          .regex(/^\d{18}$/)
+          .nullable()
+          .optional(),
+        accountNumber: z
+          .string()
+          .regex(/^\d{1,24}$/)
+          .nullable()
+          .optional(),
+      })
+      .strict()
+      .nullable(),
+    merchantLogoUrl: z.string().min(1).max(2048).nullable().optional(),
     mixedTenderEnabled: z.boolean(),
+    allowDineInWithoutTable: z.boolean().optional(),
     maximumTenderLines: z.number().int().min(1).max(8),
     manualTerminalApprovalThreshold: Money,
     manualTerminalApprovalPermission: z.string().min(1).max(100),
     tip: TipPolicy,
     discount: DiscountPolicy,
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (
+      value.bankTransferEnabled &&
+      (!value.bankTransferDetails ||
+        (!value.bankTransferDetails.clabe && !value.bankTransferDetails.accountNumber))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['bankTransferDetails'],
+        message: 'An enabled bank transfer requires a CLABE or account number.',
+      });
+    }
+  });
 export const ReceiptDestination = z.enum(['display', 'print_later', 'digital', 'none']);
 /**
  * The till's read of the effective checkout policy for a location.
@@ -334,7 +393,7 @@ export const PaymentSummary = z
   .object({
     checkoutId: Uuid,
     state: CheckoutState,
-    tenders: z.array(TenderAllocation).max(8),
+    tenders: z.array(TenderAllocation).max(32),
     amountDue: Money,
     appliedAmount: Money,
     remainingBalance: Money,
@@ -359,6 +418,43 @@ export const CheckoutRecoveryQuery = z
     operatorSessionId: Uuid,
   })
   .strict();
+/** One durable collection against an open cart. Tender amount includes its tip. */
+export const CheckoutPartialPaymentRequest = z
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    expectedCartVersion: z.number().int().positive(),
+    cashShiftId: Uuid.nullable().default(null),
+    approvalIds: z.array(Uuid).max(1).default([]),
+    idempotencyKey: Uuid,
+    tender: TenderDraft,
+    confirmationReference: z.string().trim().min(1).max(160).nullable().default(null),
+  })
+  .strict();
+export const CheckoutPartialPaymentQuery = CheckoutRecoveryQuery;
+export const CheckoutPartialPaymentResult = z
+  .object({
+    ok: z.literal(true),
+    data: z
+      .object({
+        cartId: Uuid,
+        cartVersion: z.number().int().positive(),
+        amountDue: Money,
+        appliedAmount: Money,
+        remainingBalance: Money,
+        tipAmount: Money,
+        tenderDrafts: z.array(TenderDraft).max(32),
+        unresolvedTender: TenderDraft.nullable(),
+        confirmationReferences: z.record(Uuid, z.string()),
+        blockedByUnknown: z.boolean(),
+        canFinalize: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+export type CheckoutPartialPaymentRequest = z.infer<typeof CheckoutPartialPaymentRequest>;
+export type CheckoutPartialPaymentQuery = z.infer<typeof CheckoutPartialPaymentQuery>;
+export type CheckoutPartialPaymentResult = z.infer<typeof CheckoutPartialPaymentResult>;
 export const CheckoutCancellationRequest = z
   .object({
     locationId: Uuid,
@@ -478,7 +574,7 @@ export const CheckoutCommand = z
       .nullable()
       .default(null),
     idempotencyKey: Uuid,
-    tenderDrafts: z.array(TenderDraft).max(8).default([]),
+    tenderDrafts: z.array(TenderDraft).max(32).default([]),
     tipDraft: TipDraft.nullable().default(null),
     discountDrafts: z.array(DiscountDraft).max(20).default([]),
     approvalIds: z.array(Uuid).max(10).default([]),
@@ -544,7 +640,7 @@ export const CheckoutResult = z
     status: z.enum(['confirmation_required', 'payment_pending', 'payment_unknown', 'completed']),
     confirmation: TotalsConfirmation,
     payment: PaymentOutcome.nullable(),
-    payments: z.array(PaymentOutcome).max(8).default([]),
+    payments: z.array(PaymentOutcome).max(32).default([]),
     reservation: InventoryReservation.nullable(),
     sale: CommittedSale.nullable(),
     receipt: ReceiptSnapshot.nullable(),
@@ -566,7 +662,7 @@ export const CheckoutRecoverySnapshot = z
     cartId: Uuid,
     checkoutVersion: z.number().int().positive(),
     state: CheckoutState,
-    tenderDrafts: z.array(TenderDraft).max(8),
+    tenderDrafts: z.array(TenderDraft).max(32),
     tipDraft: TipDraft.nullable(),
     discountDrafts: z.array(DiscountDraft).max(20),
     receiptDelivery: ReceiptDeliveryIntent,
@@ -652,6 +748,9 @@ export const posCheckoutModels = {
   PaymentConflict,
   PaymentCommitResult,
   CheckoutRecoveryQuery,
+  CheckoutPartialPaymentRequest,
+  CheckoutPartialPaymentQuery,
+  CheckoutPartialPaymentResult,
   CheckoutRecoverySnapshot,
   CheckoutCancellationRequest,
   CheckoutCancellationResult,

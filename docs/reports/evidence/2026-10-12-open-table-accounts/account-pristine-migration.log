@@ -1,0 +1,1909 @@
+== 00_foundation ==
+DO
+CREATE SCHEMA
+CREATE SCHEMA
+CREATE SCHEMA
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE SCHEMA
+CREATE EXTENSION
+CREATE EXTENSION
+CREATE EXTENSION
+CREATE EXTENSION
+GRANT
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+== 10_umi ==
+psql:/tmp/umi_account_pristine_schema/10_umi.sql:18: NOTICE:  schema "umi" already exists, skipping
+CREATE SCHEMA
+CREATE TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+CREATE VIEW
+COMMENT
+INSERT 0 9
+INSERT 0 3
+INSERT 0 8
+INSERT 0 5
+INSERT 0 3
+INSERT 0 7
+INSERT 0 1
+== 20_merchant ==
+psql:/tmp/umi_account_pristine_schema/20_merchant.sql:9: NOTICE:  schema "merchant" already exists, skipping
+CREATE SCHEMA
+CREATE FUNCTION
+CREATE FUNCTION
+COMMENT
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE FUNCTION
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+COMMENT
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE INDEX
+COMMENT
+ALTER TABLE
+ALTER TABLE
+CREATE VIEW
+CREATE VIEW
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE VIEW
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+DO
+== 30_runtime ==
+psql:/tmp/umi_account_pristine_schema/30_runtime.sql:12: NOTICE:  schema "runtime" already exists, skipping
+CREATE SCHEMA
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+COMMENT
+CREATE TABLE
+== 30_device_pairing ==
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+REVOKE
+GRANT
+COMMENT
+COMMENT
+== 31_pos_sale ==
+INSERT 0 2
+INSERT 0 0
+INSERT 0 0
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+DROP INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+COMMENT
+COMMENT
+COMMENT
+== 32_pos_checkout ==
+INSERT 0 5
+INSERT 0 0
+INSERT 0 0
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+COMMENT
+COMMENT
+COMMENT
+== 33_pos_cash ==
+INSERT 0 15
+INSERT 0 0
+INSERT 0 0
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+DO
+GRANT
+GRANT
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+== 34_pos_exception ==
+INSERT 0 11
+INSERT 0 0
+INSERT 0 0
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+DO
+DO
+GRANT
+GRANT
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+== 35_pos_pilot_rbac ==
+BEGIN
+DO
+INSERT 0 8
+DELETE 0
+INSERT 0 571
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+CREATE FUNCTION
+psql:/tmp/umi_account_pristine_schema/35_pos_pilot_rbac.sql:966: NOTICE:  trigger "role_permission_operator_session_invalidation" for relation "umi.role_permission" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/35_pos_pilot_rbac.sql:971: NOTICE:  trigger "staff_authority_operator_session_invalidation" for relation "merchant.staff" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/35_pos_pilot_rbac.sql:985: NOTICE:  trigger "staff_override_operator_session_invalidation" for relation "merchant.staff_permission_override" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+DO
+DO
+COMMIT
+== 36_pos_inventory ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+DO
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+== 37_pos_customer_value ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE INDEX
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TABLE
+CREATE TABLE
+COMMENT
+ALTER TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+COMMENT
+CREATE TABLE
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE TRIGGER
+ALTER TABLE
+CREATE INDEX
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TABLE
+INSERT 0 0
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+INSERT 0 0
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+REVOKE
+GRANT
+GRANT
+GRANT
+REVOKE
+DO
+CREATE POLICY
+COMMENT
+COMMENT
+COMMIT
+== 38_pos_customer_value_closeout ==
+SET
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE TRIGGER
+CREATE FUNCTION
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE VIEW
+COMMENT
+CREATE FUNCTION
+GRANT
+GRANT
+REVOKE
+REVOKE
+GRANT
+GRANT
+REVOKE
+REVOKE
+DO
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+== 39_pos_customer_value_final_closeout ==
+SET
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE VIEW
+COMMENT
+REVOKE
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 3
+GRANT
+GRANT
+REVOKE
+REVOKE
+REVOKE
+DO
+CREATE POLICY
+CREATE POLICY
+== 40_pos_hardware_runtime ==
+BEGIN
+SET
+INSERT 0 14
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+DO
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+REVOKE
+GRANT
+GRANT
+REVOKE
+COMMIT
+== 41_pos_hardware_pilot ==
+BEGIN
+SET
+ALTER TABLE
+ALTER TABLE
+DROP INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE POLICY
+CREATE POLICY
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMIT
+== 42_pos_kitchen ==
+INSERT 0 11
+INSERT 0 0
+CREATE SCHEMA
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE VIEW
+CREATE VIEW
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+== 43_dashboard_administrative_commands ==
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+CREATE POLICY
+REVOKE
+GRANT
+GRANT
+REVOKE
+== 44_dashboard_operational_wiring ==
+INSERT 0 2
+INSERT 0 6
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+== 45_pilot_runtime ==
+CREATE TABLE
+REVOKE
+GRANT
+INSERT 0 1
+== 46_platform_bootstrap ==
+BEGIN
+CREATE TABLE
+REVOKE
+GRANT
+INSERT 0 0
+INSERT 0 1
+INSERT 0 3
+INSERT 0 133
+INSERT 0 1
+COMMIT
+== 50_cross_schema_fk ==
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+== 60_triggers ==
+DO
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+== 61_customer_activity ==
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+UPDATE 0
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+== 90_rls ==
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+REVOKE
+DO
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+REVOKE
+GRANT
+GRANT
+GRANT
+DO
+DO
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+GRANT
+GRANT
+DO
+REVOKE
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:294: NOTICE:  policy "merchant_isolation" for relation "merchant.merchant" does not exist, skipping
+CREATE POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.location" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_fact" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_redemption" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.audit_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.financial_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.product_media" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.gift_card_funding_assignment" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_checkout_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_shift_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_count_attempt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_variance_resolution" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_shift_handoff" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_movement" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_shift_custody_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_exception_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_exception_preview" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_cash_compensation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_exception_receipt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_device" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_command_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_assignment" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_reservation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_restock_intent" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_print_job" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_print_job_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_diagnostic" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_restock_outcome" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_location" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_item" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_unit_conversion" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_recipe" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_recipe_component" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.hardware_pilot_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_catalog_mapping" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.kitchen_order" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_stored_value_ledger" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_gift_card_ledger" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.stock_balance" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_reservation_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.kitchen_order_item" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_program" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.order_item_modifier" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.device" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_points_account" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_consent_history" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_consent_current" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_merge_mapping" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_tender_compensation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_shift" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.gift_card_secret_delivery" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.gift_card_lookup_attempt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_sale_policy_snapshot" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_sale_exception" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_sale_exception_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_value_authorization" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.physical_register" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_ledger_entry" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_visit" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.staff_permission_override" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_count" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_count_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.inventory_command_result" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.station" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_card" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_reward" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.integration" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.staff" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_birthday_grant" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.product_category" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.product" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.conversation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.knowledge_document" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_gift_card" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.administrative_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.order_discount" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.business_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.contact" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.stock_ledger_entry" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_order" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.audit_log" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.aggregate_version" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.product_variant" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_cart_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.customer_value_tender_allocation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_cart_line_modifier" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_committed_sale" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_offline_cash_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_payment_attempt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.device_replay_cursor" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_offline_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.offline_replay_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.offline_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.receipt_snapshot" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.offline_replay_conflict" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.offline_provisional_mapping" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_tender_fact" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_checkout_draft" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.cash_shift_close" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.no_sale_drawer_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_points_balance" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_stored_value_balance" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_gift_card_balance" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_earn_preview" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_cart" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.kitchen_route" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.kitchen_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.kitchen_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.kitchen_device_station" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:345: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_points_ledger" does not exist, skipping
+DO
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.loyalty_wallet_pass" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.product_option_group" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.product_location_availability" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.message" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.knowledge_chunk" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.order_item" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.order_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:379: NOTICE:  policy "merchant_isolation" for relation "merchant.payment" does not exist, skipping
+DO
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:384: NOTICE:  policy "merchant_isolation" for relation "merchant.product_modifier" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:398: NOTICE:  policy "merchant_isolation" for relation "merchant.refund" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:414: NOTICE:  policy "merchant_isolation" for relation "umi.subscription" does not exist, skipping
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:421: NOTICE:  policy "merchant_isolation" for relation "umi.invoice" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:441: NOTICE:  policy "merchant_isolation" for relation "umi.subscription_item" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:450: NOTICE:  policy "merchant_isolation" for relation "umi.entitlement_override" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:462: NOTICE:  policy "merchant_isolation" for relation "runtime.reminder_sent" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:469: NOTICE:  policy "merchant_isolation" for relation "runtime.conversation_cart" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:482: NOTICE:  policy "merchant_isolation" for relation "runtime.idempotency_key" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:489: NOTICE:  policy "merchant_isolation" for relation "runtime.conversation_turn" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.administrative_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.audit_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.business_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_count_attempt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_ledger_entry" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_movement" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_shift" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_shift_close" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_shift_custody_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_shift_handoff" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_shift_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.cash_variance_resolution" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.customer_order" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.customer_value_authorization" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.customer_value_tender_allocation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.device" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.device_replay_cursor" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.financial_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.gift_card_funding_assignment" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.gift_card_lookup_attempt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.gift_card_secret_delivery" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.hardware_assignment" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.hardware_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.hardware_device" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.hardware_diagnostic" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.hardware_pilot_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.hardware_print_job" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_command_result" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_count" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_location" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_reservation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_reservation_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.inventory_restock_outcome" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.kitchen_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.kitchen_device_station" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.kitchen_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.kitchen_order" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.kitchen_order_item" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.kitchen_route" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.loyalty_earn_preview" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.loyalty_gift_card" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.loyalty_sale_policy_snapshot" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.no_sale_drawer_event" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.offline_provisional_mapping" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.offline_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.offline_replay_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.offline_replay_conflict" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.physical_register" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_cart" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_cash_compensation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_checkout_draft" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_checkout_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_committed_sale" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_exception_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_exception_preview" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_exception_receipt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_offline_cash_policy" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_payment_attempt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_restock_intent" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_sale_exception" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_sale_exception_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_tender_compensation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.pos_tender_fact" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.product_location_availability" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.receipt_snapshot" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.station" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.stock_balance" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:564: NOTICE:  policy "location_narrowing" for relation "merchant.stock_ledger_entry" does not exist, skipping
+DO
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.device_replay_cursor" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.offline_replay_command" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.offline_reconciliation" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.offline_replay_conflict" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.offline_provisional_mapping" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.pos_checkout_draft" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.pos_exception_preview" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.pos_sale_exception" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:614: NOTICE:  policy "device_scoping" for relation "merchant.inventory_count" does not exist, skipping
+DO
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:689: NOTICE:  policy "device_scoping" for relation "merchant.cash_shift" does not exist, skipping
+DO
+DROP POLICY
+CREATE POLICY
+DO
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:780: NOTICE:  policy "merchant_isolation" for relation "runtime.operator_session" does not exist, skipping
+CREATE POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:784: NOTICE:  policy "location_narrowing" for relation "runtime.operator_session" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:791: NOTICE:  policy "merchant_isolation" for relation "runtime.device_enrollment_challenge" does not exist, skipping
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:798: NOTICE:  policy "merchant_isolation" for relation "runtime.elevation_grant" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:810: NOTICE:  policy "merchant_isolation" for relation "runtime.security_audit_event" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/90_rls.sql:817: NOTICE:  policy "merchant_isolation" for relation "runtime.audit_event_internal" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+DO
+GRANT
+DO
+REVOKE
+REVOKE
+== 47_checkout_kitchen_projection ==
+BEGIN
+GRANT
+GRANT
+INSERT 0 1
+COMMIT
+== 48_customer_value_worker_scope ==
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+GRANT
+GRANT
+INSERT 0 1
+COMMIT
+== 49_merchant_roles ==
+INSERT 0 3
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+UPDATE 136
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DO
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 7
+INSERT 0 7
+INSERT 0 577
+CREATE TABLE
+CREATE TABLE
+INSERT 0 0
+INSERT 0 0
+ALTER TABLE
+UPDATE 0
+DO
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/49_merchant_roles.sql:209: NOTICE:  policy "merchant_isolation" for relation "merchant.role" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/49_merchant_roles.sql:216: NOTICE:  policy "merchant_isolation" for relation "merchant.role_permission" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+GRANT
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+psql:/tmp/umi_account_pristine_schema/49_merchant_roles.sql:306: NOTICE:  trigger "merchant_role_permission_operator_session_invalidation" for relation "merchant.role_permission" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/49_merchant_roles.sql:329: NOTICE:  49_merchant_roles: templates, merchant roles, grants, RLS, and staff backfill are ready.
+DO
+== 51_manager_card_credential ==
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+DO
+ALTER TABLE
+ALTER TABLE
+== 52_platform_elevation ==
+CREATE TABLE
+CREATE INDEX
+== 53_location_switch_grants ==
+INSERT 0 1
+INSERT 0 0
+INSERT 0 0
+INSERT 0 0
+== 62_floor_plan ==
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE POLICY
+GRANT
+GRANT
+COMMENT
+INSERT 0 1
+== 63_channel_attribution ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+UPDATE 0
+ with_append_only_writable 
+---------------------------
+ 
+(1 row)
+
+ with_append_only_writable 
+---------------------------
+ 
+(1 row)
+
+GRANT
+INSERT 0 1
+COMMIT
+== 64_pos_cart_recovery ==
+BEGIN
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 1
+COMMIT
+== 65_table_reservation ==
+BEGIN
+CREATE EXTENSION
+CREATE TABLE
+COMMENT
+COMMENT
+psql:/tmp/umi_account_pristine_schema/65_table_reservation.sql:107: NOTICE:  trigger "touch_updated_at" for relation "merchant.table_reservation" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/65_table_reservation.sql:113: NOTICE:  policy "table_reservation_scope" for relation "merchant.table_reservation" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+GRANT
+GRANT
+INSERT 0 1
+COMMIT
+== 66_pos_cart_recovery_rollback ==
+BEGIN
+CREATE FUNCTION
+DROP FUNCTION
+INSERT 0 1
+COMMIT
+== 67_table_state ==
+BEGIN
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE FUNCTION
+psql:/tmp/umi_account_pristine_schema/67_table_state.sql:141: NOTICE:  trigger "table_state_turn_timer_immutable" for relation "merchant.table_state" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/67_table_state.sql:148: NOTICE:  trigger "touch_updated_at" for relation "merchant.table_state" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/67_table_state.sql:154: NOTICE:  policy "table_state_scope" for relation "merchant.table_state" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+GRANT
+GRANT
+INSERT 0 1
+COMMIT
+== 68_cash_shift_orphan_reclaim ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+DROP POLICY
+CREATE POLICY
+GRANT
+INSERT 0 1
+COMMIT
+== 69_procurement ==
+BEGIN
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE TABLE
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE TABLE
+COMMENT
+DO
+CREATE FUNCTION
+DROP TRIGGER
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:587: NOTICE:  trigger "touch_updated_at" for relation "merchant.supplier" does not exist, skipping
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:591: NOTICE:  trigger "touch_updated_at" for relation "merchant.purchase_order" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:595: NOTICE:  trigger "purchase_order_receipt_business_date" for relation "merchant.purchase_order_receipt" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:603: NOTICE:  trigger "purchase_order_business_date" for relation "merchant.purchase_order" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:610: NOTICE:  trigger "purchase_order_receipt_append_only" for relation "merchant.purchase_order_receipt" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:616: NOTICE:  trigger "purchase_order_receipt_line_append_only" for relation "merchant.purchase_order_receipt_line" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+GRANT
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:674: NOTICE:  policy "supplier_scope" for relation "merchant.supplier" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:674: NOTICE:  policy "purchase_order_scope" for relation "merchant.purchase_order" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:674: NOTICE:  policy "purchase_order_line_scope" for relation "merchant.purchase_order_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:674: NOTICE:  policy "purchase_order_receipt_scope" for relation "merchant.purchase_order_receipt" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/69_procurement.sql:674: NOTICE:  policy "purchase_order_receipt_line_scope" for relation "merchant.purchase_order_receipt_line" does not exist, skipping
+DO
+COMMENT
+INSERT 0 1
+COMMIT
+== 70_tender ==
+BEGIN
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+UPDATE 0
+DO
+DO
+DO
+DO
+DO
+DO
+CREATE INDEX
+COMMENT
+CREATE INDEX
+COMMENT
+CREATE TABLE
+DO
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE INDEX
+psql:/tmp/umi_account_pristine_schema/70_tender.sql:527: NOTICE:  trigger "touch_updated_at" for relation "merchant.fiscal_document" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+GRANT
+GRANT
+psql:/tmp/umi_account_pristine_schema/70_tender.sql:576: NOTICE:  policy "fiscal_document_scope" for relation "merchant.fiscal_document" does not exist, skipping
+DO
+INSERT 0 1
+COMMIT
+== 71_immutable_delete_fix ==
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+COMMENT
+COMMENT
+INSERT 0 1
+COMMIT
+== 72_mp_point ==
+BEGIN
+ALTER TABLE
+COMMENT
+DO
+CREATE INDEX
+COMMENT
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+COMMENT
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+psql:/tmp/umi_account_pristine_schema/72_mp_point.sql:377: NOTICE:  trigger "touch_updated_at" for relation "merchant.mp_point_credential" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/72_mp_point.sql:381: NOTICE:  trigger "touch_updated_at" for relation "merchant.device_point_terminal" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+COMMENT
+psql:/tmp/umi_account_pristine_schema/72_mp_point.sql:433: NOTICE:  trigger "payment_attempt_notify_resolution" for relation "merchant.pos_payment_attempt" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+GRANT
+GRANT
+GRANT
+REVOKE
+GRANT
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/72_mp_point.sql:475: NOTICE:  policy "mp_point_credential_scope" for relation "merchant.mp_point_credential" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/72_mp_point.sql:482: NOTICE:  policy "device_point_terminal_scope" for relation "merchant.device_point_terminal" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+INSERT 0 1
+COMMIT
+== 73_mp_refund ==
+BEGIN
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+DO
+CREATE INDEX
+COMMENT
+DO
+DO
+DO
+INSERT 0 1
+COMMIT
+== 74_kitchen_courses ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+DO
+DO
+DO
+DO
+psql:/tmp/umi_account_pristine_schema/74_kitchen_courses.sql:217: NOTICE:  kitchen_command_command_type_check widened with fire_course
+DO
+CREATE VIEW
+COMMENT
+INSERT 0 1
+COMMIT
+== 75_table_order_credential ==
+BEGIN
+CREATE TABLE
+COMMENT
+COMMENT
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+COMMENT
+COMMENT
+psql:/tmp/umi_account_pristine_schema/75_table_order_credential.sql:190: NOTICE:  trigger "touch_updated_at" for relation "merchant.table_order_credential" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+GRANT
+GRANT
+GRANT
+GRANT
+psql:/tmp/umi_account_pristine_schema/75_table_order_credential.sql:233: NOTICE:  policy "table_order_credential_scope" for relation "merchant.table_order_credential" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/75_table_order_credential.sql:233: NOTICE:  policy "table_order_scope" for relation "merchant.table_order" does not exist, skipping
+DO
+INSERT 0 1
+INSERT 0 4
+INSERT 0 0
+INSERT 0 3
+INSERT 0 1
+COMMIT
+== 76_recipes_inventory ==
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DO
+COMMENT
+DROP INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+CREATE FUNCTION
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:242: NOTICE:  trigger "inventory_recipe_component_acyclic" for relation "merchant.inventory_recipe_component" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+COMMENT
+CREATE TABLE
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:436: NOTICE:  function merchant.explode_inventory_recipe(uuid,uuid,pg_catalog.int4) does not exist, skipping
+DROP FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+COMMENT
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:558: NOTICE:  column "artifact_bytes" of relation "supplier_invoice" already exists, skipping
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:558: NOTICE:  column "artifact_content_type" of relation "supplier_invoice" already exists, skipping
+ALTER TABLE
+DO
+CREATE INDEX
+DO
+CREATE INDEX
+CREATE TABLE
+COMMENT
+ALTER TABLE
+DO
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+DO
+CREATE INDEX
+COMMENT
+DO
+DROP FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:980: NOTICE:  trigger "touch_updated_at" for relation "merchant.inventory_allergen" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:984: NOTICE:  trigger "touch_updated_at" for relation "merchant.supplier_invoice" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:988: NOTICE:  trigger "touch_updated_at" for relation "merchant.supplier_invoice_line" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:993: NOTICE:  trigger "stock_lot_append_only" for relation "merchant.stock_lot" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+INSERT 0 7
+INSERT 0 27
+INSERT 0 0
+INSERT 0 20
+GRANT
+GRANT
+REVOKE
+GRANT
+GRANT
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:1186: NOTICE:  policy "inventory_allergen_scope" for relation "merchant.inventory_allergen" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:1186: NOTICE:  policy "inventory_item_allergen_scope" for relation "merchant.inventory_item_allergen" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:1186: NOTICE:  policy "supplier_invoice_scope" for relation "merchant.supplier_invoice" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:1186: NOTICE:  policy "supplier_invoice_line_scope" for relation "merchant.supplier_invoice_line" does not exist, skipping
+psql:/tmp/umi_account_pristine_schema/76_recipes_inventory.sql:1186: NOTICE:  policy "stock_lot_scope" for relation "merchant.stock_lot" does not exist, skipping
+DO
+INSERT 0 1
+COMMIT
+== 77_ai_usage ==
+BEGIN
+CREATE TABLE
+DO
+COMMENT
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+psql:/tmp/umi_account_pristine_schema/77_ai_usage.sql:156: NOTICE:  policy "merchant_isolation" for relation "umi.ai_usage" does not exist, skipping
+CREATE POLICY
+GRANT
+GRANT
+INSERT 0 1
+COMMIT
+== 78_customer_pass_metadata ==
+BEGIN
+ALTER TABLE
+COMMENT
+COMMENT
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/78_customer_pass_metadata.sql:62: NOTICE:  constraint "loyalty_card_pending_tier1_non_negative" of relation "loyalty_card" does not exist, skipping
+ALTER TABLE
+COMMENT
+DO
+INSERT 0 1
+COMMIT
+== 79_cycle_anchor ==
+BEGIN
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/79_cycle_anchor.sql:72: NOTICE:  constraint "loyalty_card_cycle_anchor_non_negative" of relation "loyalty_card" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:/tmp/umi_account_pristine_schema/79_cycle_anchor.sql:76: NOTICE:  constraint "loyalty_card_rewards_earned_non_negative" of relation "loyalty_card" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMENT
+ALTER TABLE
+COMMENT
+DO
+INSERT 0 1
+COMMIT
+== 80_pos_table_accounts ==
+ALTER TABLE
+COMMENT
+INSERT 0 1
+INSERT 0 5
+psql:/tmp/umi_account_pristine_schema/migrations/004_pos_fired_order.sql:169: NOTICE:  004_pos_fired_order: template admin published v2 (140 permissions carried + order.fire)
+psql:/tmp/umi_account_pristine_schema/migrations/004_pos_fired_order.sql:169: NOTICE:  004_pos_fired_order: template manager published v2 (128 permissions carried + order.fire)
+psql:/tmp/umi_account_pristine_schema/migrations/004_pos_fired_order.sql:169: NOTICE:  004_pos_fired_order: template owner published v2 (141 permissions carried + order.fire)
+psql:/tmp/umi_account_pristine_schema/migrations/004_pos_fired_order.sql:169: NOTICE:  004_pos_fired_order: template supervisor published v2 (86 permissions carried + order.fire)
+DO
+psql:/tmp/umi_account_pristine_schema/migrations/004_pos_fired_order.sql:196: NOTICE:  004_pos_fired_order: order.fire held by 5 role(s); fired_order_id present. Route and checkout branch still to come.
+DO
+ALTER TABLE
+COMMENT
+ALTER TABLE
+COMMENT
+UPDATE 0
+ALTER TABLE
+CREATE INDEX
+ALTER TABLE
+COMMENT
+GRANT
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+GRANT
+GRANT
+ALTER TABLE
+UPDATE 0
+CREATE FUNCTION
+psql:/tmp/umi_account_pristine_schema/migrations/018_pos_table_accounts.sql:31: NOTICE:  trigger "table_state_visit_guard" for relation "merchant.table_state" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+ALTER FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 0
+INSERT 0 0
+ALTER TABLE
+CREATE INDEX
+GRANT
+ALTER TABLE
+ALTER TABLE
+GRANT
+GRANT
+== 99_verify ==
+psql:/tmp/umi_account_pristine_schema/99_verify.sql:1113: NOTICE:  umi base tables:     22
+psql:/tmp/umi_account_pristine_schema/99_verify.sql:1113: NOTICE:  merchant base tables:  145
+psql:/tmp/umi_account_pristine_schema/99_verify.sql:1113: NOTICE:  runtime base tables: 27
+psql:/tmp/umi_account_pristine_schema/99_verify.sql:1113: NOTICE:  build-v3 verify: OK
+DO
+build-v3 applied to umi_account_pristine_verify_20261012

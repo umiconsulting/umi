@@ -89,7 +89,11 @@ describe('CASH_SHIFT_REQUIRED refusal', () => {
     );
 
   it('is a typed 409 that carries the register and the hold', async () => {
-    const client = { query: vi.fn().mockResolvedValue({ rows: [row()] }) };
+    const client = {
+      query: vi.fn(async (sql: string) =>
+        sql.includes('FROM merchant.pos_partial_payment p') ? { rows: [] } : { rows: [row()] },
+      ),
+    };
     const repository = new PosCheckoutRepository({} as never);
     await expect(commitWith(repository, client)).rejects.toMatchObject({
       code: 'CASH_SHIFT_REQUIRED',

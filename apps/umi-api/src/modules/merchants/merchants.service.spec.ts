@@ -129,6 +129,31 @@ describe('MerchantsService.buildSettings', () => {
     expect(settings.primaryColor).toBe('#123456');
     expect(settings.secondaryColor).toBe('#abcdef');
   });
+
+  it('publishes the café logo the readers already use, or null when it has none', async () => {
+    const h = make();
+    h.repo.loadLocations.mockResolvedValue([]);
+    h.repo.loadProducts.mockResolvedValue({
+      dashboard: { status: 'active', locationId: null, config: {} },
+    });
+    h.repo.loadBranding.mockResolvedValue({
+      brandColor: null,
+      secondaryColor: null,
+      logoUrl: 'https://api.example.test/logos/kala-0123456789abcdef.png',
+    });
+    const caps = await h.svc.buildCapabilities(ACCESS, null);
+    expect(h.svc.buildSettings(caps).logoUrl).toBe(
+      'https://api.example.test/logos/kala-0123456789abcdef.png',
+    );
+
+    h.repo.loadBranding.mockResolvedValue({
+      brandColor: null,
+      secondaryColor: null,
+      logoUrl: null,
+    });
+    const none = await h.svc.buildCapabilities(ACCESS, null);
+    expect(h.svc.buildSettings(none).logoUrl).toBeNull();
+  });
 });
 
 describe('MerchantsService.updateLocation', () => {

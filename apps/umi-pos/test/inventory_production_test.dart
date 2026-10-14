@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/inventory/inventory_controller.dart';
 import 'package:umi_pos/features/inventory/inventory_repository.dart';
 import 'package:umi_pos/features/inventory/inventory_surface.dart';
@@ -19,12 +19,12 @@ const outputItemId = '00000000-0000-4000-8000-000000000005';
 const inventoryLocationId = '00000000-0000-4000-8000-000000000004';
 final policyFingerprint = List.filled(64, 'a').join();
 
-Map<String, Object?> outputItem() => {
+Map<String, Object?> outputItem([int scale = 0]) => {
   'id': outputItemId,
   'displayName': 'Salsa de la casa',
   'publicReference': 'SALSA-01',
   'baseUnit': 'gram',
-  'scale': 0,
+  'scale': scale,
   'trackingPolicy': 'tracked',
   'version': 1,
 };
@@ -32,9 +32,13 @@ Map<String, Object?> outputItem() => {
 /// A recipe-less but tracked item. The server refuses it with
 /// INVENTORY_RECIPE_REQUIRED, which the till must state in operator words.
 class _ProductionFake implements InventoryRepository {
-  _ProductionFake({this.refuseWithRecipeRequired = false});
+  _ProductionFake({
+    this.refuseWithRecipeRequired = false,
+    this.quantityScale = 0,
+  });
 
   final bool refuseWithRecipeRequired;
+  final int quantityScale;
   ProductionRecord? command;
 
   @override
@@ -50,7 +54,7 @@ class _ProductionFake implements InventoryRepository {
     locations: [
       {'id': inventoryLocationId, 'displayName': 'Cocina', 'version': 1},
     ],
-    items: [outputItem()],
+    items: [outputItem(quantityScale)],
     balances: [
       {
         'inventoryItemId': outputItemId,
@@ -175,14 +179,13 @@ class _ProductionFake implements InventoryRepository {
 Widget _app(
   Iterable<String> permissions, {
   required InventoryController controller,
-}) => MaterialApp(
+}) => PosApp(
   locale: const Locale('es'),
   supportedLocales: const [Locale('es'), Locale('en')],
   localizationsDelegates: const [
     AppLocalizations.delegate,
-    GlobalMaterialLocalizations.delegate,
+
     GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
   ],
   home: InventorySurface(
     controller: controller,
@@ -192,6 +195,30 @@ Widget _app(
 );
 
 void main() {
+  testWidgets('production uses visible decimals at the selected item scale', (
+    tester,
+  ) async {
+    final fake = _ProductionFake(quantityScale: 3);
+    final controller = InventoryController(fake);
+    await tester.pumpWidget(
+      _app(const [
+        'inventory.read',
+        'inventory.production.produce',
+      ], controller: controller),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Producir'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(PosField).first, '1.25');
+    await tester.pump();
+    await tester.tap(find.text('Confirmar'));
+    await tester.pumpAndSettle();
+    expect(fake.command!.quantity, {'value': 1250, 'scale': 3, 'unit': 'gram'});
+    expect(find.text('Producido 1.25 g'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+  });
   test(
     'Production carries the same command context as the other actions',
     () async {
@@ -249,8 +276,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Producir preparación'), findsOneWidget);
 
-      await tester.enterText(find.byType(TextField).first, '90');
-      await tester.enterText(find.byType(TextField).at(2), '2026-09-25');
+      await tester.enterText(find.byType(PosField).first, '90');
+      await tester.enterText(find.byType(PosField).at(2), '2026-09-25');
       await tester.tap(find.text('Confirmar'));
       await tester.pumpAndSettle();
 
@@ -260,7 +287,7 @@ void main() {
       expect(find.text('Insumos consumidos'), findsOneWidget);
       expect(find.text('Tomate'), findsOneWidget);
       expect(find.text('Cebolla'), findsOneWidget);
-      expect(find.textContaining('500 gram'), findsOneWidget);
+      expect(find.textContaining('500 g'), findsOneWidget);
       expect(find.textContaining('25.00'), findsOneWidget);
       expect(find.textContaining('22.50'), findsOneWidget);
     },

@@ -247,11 +247,15 @@ void main() {
           copy: true,
         );
 
-        expect(document.plainText, contains('COPY'));
+        expect(document.plainText, contains('COPIA'));
         expect(document.plainText, contains('Café Umi'));
         expect(document.plainText, contains('Té frío'));
         expect(document.plainText, contains('TOTAL'));
-        expect(document.commands.whereType<ThermalQrCommand>(), hasLength(1));
+        // THE PAPER CARRIES NO QR (owner, 2026-10-13). The expression had no reader: the
+        // till drew it and nothing resolved it, so the guest saw a code that promised
+        // something the product does not do. It stays in the payload, not on the paper.
+        expect(document.commands.whereType<ThermalQrCommand>(), hasLength(0));
+        expect(document.plainText, contains('Gracias por su visita'));
         expect(document.commands.last, isA<ThermalCutCommand>());
       },
     );

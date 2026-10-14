@@ -1,0 +1,65 @@
+== 001_example_rerunnable.sql
+psql:<stdin>:15: NOTICE:  schema "merchant" already exists, skipping
+psql:<stdin>:54: NOTICE:  001_example_rerunnable: no change. This file documents the shape.
+== 002_onca_onboarding.sql
+psql:<stdin>:540: NOTICE:  002_onca_onboarding: ONCA present. 51 products (24 require preparation), 24 variants, 2 stations, 2 kitchen routes. No login and no devices were created — invite the owner from the dashboard, then enrol each tablet from the app.
+== 003_updated_at_trigger_parity.sql
+psql:<stdin>:100: NOTICE:  003_updated_at_trigger_parity: nothing to do — every base table with updated_at already carries the trigger.
+== 004_pos_fired_order.sql
+psql:<stdin>:169: NOTICE:  004_pos_fired_order: template admin published v2 (143 permissions carried + order.fire)
+psql:<stdin>:169: NOTICE:  004_pos_fired_order: template manager published v2 (128 permissions carried + order.fire)
+psql:<stdin>:169: NOTICE:  004_pos_fired_order: template owner published v2 (144 permissions carried + order.fire)
+psql:<stdin>:169: NOTICE:  004_pos_fired_order: template supervisor published v2 (86 permissions carried + order.fire)
+psql:<stdin>:196: NOTICE:  004_pos_fired_order: order.fire held by 5 role(s); fired_order_id present. Route and checkout branch still to come.
+== 005_pos_cart_fulfillment.sql
+== 006_pos_cart_second_round.sql
+== 007_pos_cancellation_reason_code.sql
+== 008_controlled_reprint_printer_id.sql
+== 009_transition_finds_its_print_job.sql
+== 010_pos_cart_column_grants.sql
+== 011_hardware_command_without_open_shift.sql
+== 012_cash_shift_adoption_custody.sql
+== 013_cash_count_while_counting.sql
+== 014_merchant_branding_logo.sql
+psql:<stdin>:52: NOTICE:  trigger "touch_updated_at" for relation "merchant.merchant_branding_logo" does not exist, skipping
+psql:<stdin>:58: NOTICE:  policy "merchant_isolation" for relation "merchant.merchant_branding_logo" does not exist, skipping
+== 015_cash_shift_resume_custody.sql
+== 016_hardware_runtime_sees_its_own_till.sql
+psql:<stdin>:39: NOTICE:  function merchant.read_hardware_runtime(uuid,uuid,uuid,uuid,uuid) does not exist, skipping
+== 017_reprint_refreshes_the_mark.sql
+== 018_pos_table_accounts.sql
+psql:<stdin>:31: NOTICE:  trigger "table_state_visit_guard" for relation "merchant.table_state" does not exist, skipping
+== 019_cancel_sent_cart_line.sql
+== 020_waiter_role_template.sql
+== 021_pos_account_metadata.sql
+== 022_receipt_folio.sql
+psql:<stdin>:49: NOTICE:  policy "receipt_counter_scope" for relation "merchant.receipt_counter" does not exist, skipping
+psql:<stdin>:120: NOTICE:  dropped receipt_snapshot_merchant_id_receipt_number_key on merchant.receipt_snapshot
+psql:<stdin>:120: NOTICE:  added receipt_snapshot_number_scope_uq on merchant.receipt_snapshot
+psql:<stdin>:120: NOTICE:  dropped pos_exception_receipt_merchant_id_receipt_number_key on merchant.pos_exception_receipt
+psql:<stdin>:120: NOTICE:  added pos_exception_receipt_number_scope_uq on merchant.pos_exception_receipt
+== 023_cash_shift_close_reason.sql
+== 024_pos_day_close_policy.sql
+== 025_pilot_business_calendar.sql
+== 026_void_after_preparation.sql
+== 027_void_only_same_business_day.sql
+== 028_authorizations_admin_only.sql
+== 029_kitchen_station_alerts.sql
+== 030_void_completed_kitchen_item.sql
+== 031_kitchen_station_completion.sql
+== 032_checkout_service_policy.sql
+== 033_kitchen_unassigned_routes.sql
+== 034_pos_push_tokens.sql
+== 035_bank_transfer_checkout.sql
+== 036_checkout_partial_payments.sql
+psql:<stdin>:37: NOTICE:  policy "merchant_location_isolation" for relation "merchant.pos_partial_payment" does not exist, skipping
+psql:<stdin>:75: NOTICE:  trigger "pos_partial_payment_immutable" for relation "merchant.pos_partial_payment" does not exist, skipping
+== 037_cancel_suspended_carried_accounts.sql
+== 038_daily_pos_account_number.sql
+psql:<stdin>:35: NOTICE:  policy "merchant_isolation" for relation "merchant.pos_account_counter" does not exist, skipping
+psql:<stdin>:36: NOTICE:  policy "location_narrowing" for relation "merchant.pos_account_counter" does not exist, skipping
+psql:<stdin>:37: NOTICE:  policy "pos_account_counter_scope" for relation "merchant.pos_account_counter" does not exist, skipping
+psql:<stdin>:87: NOTICE:  trigger "zz_pos_cart_daily_account_number" for relation "merchant.pos_cart" does not exist, skipping
+== 039_onca_production_readiness.sql
+== 040_onca_checkout_policy.sql
+MIGRATIONS_OK

@@ -1,13 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type {
   PosCustomerSearchQuery,
+  CancelCarriedOverAccountsRequest,
   SaleHistoryQuery,
   SaleReceiptResult,
   SaleSnapshot,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
 import { PosCartRepository } from '../pos-cart/pos-cart.repository';
+import { receiptTimeInZone } from '../../shared/receipts/receipt-time';
 
 const ACTIVE_STATES = "('building_cart','ready_for_checkout','recovered')";
 
@@ -106,7 +108,7 @@ export class PosSaleRepository {
     const { rowCount } = await client.query(
       `UPDATE merchant.pos_cart
        SET lifecycle_state='suspended',
-           display_label=$4,
+           display_label=COALESCE($4,display_label),
            suspended_at=now(),
            version=version+1,
            updated_at=now()
@@ -211,14 +213,16 @@ export class PosSaleRepository {
     merchantId: string,
     saleId: string,
     expectedVersion: number,
-    reason: string,
+    reasonCode: string,
+    reason: string | null,
     operatorSessionId: string,
   ): Promise<SaleSnapshot | null> {
     const { rowCount } = await client.query(
       `UPDATE merchant.pos_cart
        SET status='abandoned',
            lifecycle_state='cancelled',
-           cancellation_reason=$4,
+           cancellation_reason_code=$4,
+           cancellation_reason=$6,
            cancelled_at=now(),
            version=version+1,
            updated_at=now()
@@ -228,9 +232,128 @@ export class PosSaleRepository {
          AND operator_session_id=$5::uuid
          AND lifecycle_state IN ${ACTIVE_STATES}
          AND status IN ('draft','prepared')`,
-      [merchantId, saleId, expectedVersion, reason, operatorSessionId],
+      [merchantId, saleId, expectedVersion, reasonCode, operatorSessionId, reason],
     );
     return (rowCount ?? 0) > 0 ? this.snapshotWithClient(client, merchantId, saleId) : null;
+  }
+
+  async cancelCarriedOver(
+    client: PoolClient,
+    merchantId: string,
+    actorUserId: string,
+    mayCancelOtherOperator: boolean,
+    dto: CancelCarriedOverAccountsRequest,
+  ): Promise<SaleSnapshot[]> {
+    const selected = [...dto.accounts].sort((a, b) => a.cartId.localeCompare(b.cartId));
+    const ids = selected.map((account) => account.cartId);
+    const preflight = await client.query<{ tableId: string | null }>(
+      `SELECT table_id::text AS "tableId" FROM merchant.pos_cart
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=ANY($3::uuid[])`,
+      [merchantId, dto.locationId, ids],
+    );
+    // Table assignment takes this advisory lock before it locks a cart.
+    const tableIds = [
+      ...new Set(preflight.rows.map((row) => row.tableId).filter((id): id is string => !!id)),
+    ].sort();
+    for (const tableId of tableIds) {
+      await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, [
+        `${merchantId}:${dto.locationId}:${tableId}`,
+      ]);
+    }
+    const { rows } = await client.query<{
+      id: string;
+      version: number;
+      status: string;
+      state: string;
+      businessDate: string;
+      today: string;
+      ownerId: string;
+      tableId: string | null;
+      committed: boolean;
+    }>(
+      `SELECT c.id::text,c.version,c.status,c.lifecycle_state AS state,
+              c.business_date::text AS "businessDate",
+              (((now() AT TIME ZONE m.timezone)-m.business_day_start::interval))::date::text AS today,
+              c.original_operator_user_id::text AS "ownerId",
+              c.table_id::text AS "tableId",
+              EXISTS (SELECT 1 FROM merchant.pos_committed_sale s
+                WHERE s.merchant_id=c.merchant_id AND s.cart_id=c.id) AS committed
+       FROM merchant.pos_cart c
+       JOIN merchant.merchant m ON m.id=c.merchant_id
+       WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid AND c.id=ANY($3::uuid[])
+       ORDER BY c.id FOR UPDATE OF c`,
+      [merchantId, dto.locationId, ids],
+    );
+    if (rows.length !== ids.length) throw new ConflictException({ code: 'SALE_STATE_CONFLICT' });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    for (const selectedAccount of selected) {
+      const row = byId.get(selectedAccount.cartId);
+      if (
+        !row ||
+        row.version !== selectedAccount.expectedVersion ||
+        row.businessDate >= row.today ||
+        row.committed ||
+        !['draft', 'prepared'].includes(row.status) ||
+        !['building_cart', 'ready_for_checkout', 'recovered', 'suspended'].includes(row.state)
+      ) {
+        throw new ConflictException({
+          code: 'SALE_STATE_CONFLICT',
+          accountId: selectedAccount.cartId,
+        });
+      }
+      if (row.ownerId !== actorUserId && !mayCancelOtherOperator) {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+      }
+      await this.carts.assertFinanciallyMutable(client, merchantId, row.id);
+    }
+    const cancelled: SaleSnapshot[] = [];
+    for (const account of selected) {
+      const changed = await client.query(
+        `UPDATE merchant.pos_cart SET status='abandoned',lifecycle_state='cancelled',
+           cancellation_reason_code=$4,cancellation_reason=$5,cancelled_at=now(),
+           version=version+1,updated_at=now()
+         WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid
+           AND version=$6 AND status IN ('draft','prepared')
+           AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered','suspended')`,
+        [
+          merchantId,
+          dto.locationId,
+          account.cartId,
+          dto.reasonCode,
+          dto.reason,
+          account.expectedVersion,
+        ],
+      );
+      if (changed.rowCount !== 1) {
+        throw new ConflictException({ code: 'SALE_STATE_CONFLICT', accountId: account.cartId });
+      }
+      const snapshot = await this.snapshotWithClient(client, merchantId, account.cartId);
+      if (!snapshot)
+        throw new ConflictException({ code: 'SALE_STATE_CONFLICT', accountId: account.cartId });
+      cancelled.push(snapshot);
+    }
+    if (tableIds.length) {
+      await client.query(
+        `UPDATE merchant.table_state state
+         SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
+         WHERE state.merchant_id=$1::uuid AND state.location_id=$2::uuid
+           AND state.table_id=ANY($3::uuid[])
+           AND NOT EXISTS (SELECT 1 FROM merchant.pos_cart active
+             WHERE active.merchant_id=state.merchant_id
+               AND active.location_id=state.location_id
+               AND active.table_id=state.table_id
+               AND active.status IN ('draft','prepared'))`,
+        [merchantId, dto.locationId, tableIds],
+      );
+    }
+    if (rows.some((row) => !!row.tableId) || cancelled.some((sale) => !!sale.cart.firedOrderId)) {
+      await client.query(
+        `SELECT pg_notify('umi_kitchen_board',jsonb_build_object(
+          'merchant_id',$1::uuid,'location_id',$2::uuid,'kitchen_order_id',NULL)::text)`,
+        [merchantId, dto.locationId],
+      );
+    }
+    return cancelled;
   }
 
   async attachCustomer(
@@ -288,11 +411,22 @@ export class PosSaleRepository {
            WHERE c.merchant_id=$1::uuid
              AND c.location_id=$2::uuid
              AND c.lifecycle_state=ANY($3::text[])
+             AND NOT (c.lifecycle_state='cancelled'
+               AND c.cancellation_reason IS NOT DISTINCT FROM 'Cuenta vacía: se cierra al apartarla.'
+               AND c.table_id IS NULL AND c.display_label IS NULL AND c.fired_order_id IS NULL
+               AND committed.id IS NULL
+               AND NOT EXISTS (SELECT 1 FROM merchant.pos_cart_line content
+                 WHERE content.merchant_id=c.merchant_id AND content.cart_id=c.id))
              AND (
                $4=''
                OR COALESCE(c.display_label,'') ILIKE '%' || $4 || '%'
                OR COALESCE(customer.name,'') ILIKE '%' || $4 || '%'
                OR COALESCE(receipt.receipt_number,'') ILIKE '%' || $4 || '%'
+               OR EXISTS (
+                 SELECT 1 FROM merchant.pos_cart_line line
+                 WHERE line.merchant_id=c.merchant_id AND line.cart_id=c.id
+                   AND line.product_name ILIKE '%' || $4 || '%'
+               )
              )
              AND (
                $6::timestamptz IS NULL
@@ -406,10 +540,12 @@ export class PosSaleRepository {
       null,
       async (client) => {
         const { rows } = await client.query<{
-          receipt: SaleReceiptResult['receipt'];
+          receipt: NonNullable<SaleReceiptResult['receipt']>;
+          timezone: string;
         }>(
-          `SELECT receipt.snapshot AS receipt
+          `SELECT receipt.snapshot AS receipt, business.timezone
            FROM merchant.pos_cart cart
+           JOIN merchant.merchant business ON business.id=cart.merchant_id
            JOIN merchant.pos_committed_sale sale ON sale.cart_id=cart.id
            JOIN merchant.receipt_snapshot receipt ON receipt.id=sale.receipt_snapshot_id
            WHERE cart.merchant_id=$1::uuid
@@ -422,7 +558,12 @@ export class PosSaleRepository {
               saleId,
               kind: 'official',
               provisionalReference: null,
-              receipt: rows[0].receipt,
+              receipt: {
+                ...rows[0].receipt,
+                issuedAt: rows[0].receipt.issuedAt.endsWith('Z')
+                  ? receiptTimeInZone(rows[0].receipt.issuedAt, rows[0].timezone ?? 'UTC')
+                  : rows[0].receipt.issuedAt,
+              },
             }
           : null;
       },
@@ -446,6 +587,7 @@ export class PosSaleRepository {
       currentOperatorSessionId: string | null;
       suspendedAt: string | null;
       cancelledAt: string | null;
+      cancellationReasonCode: SaleSnapshot['cancellationReasonCode'];
       cancellationReason: string | null;
       committedSaleId: string | null;
       sourceOrderId: string | null;
@@ -466,6 +608,7 @@ export class PosSaleRepository {
               cart.operator_session_id::text AS "currentOperatorSessionId",
               cart.suspended_at::text AS "suspendedAt",
               cart.cancelled_at::text AS "cancelledAt",
+              cart.cancellation_reason_code AS "cancellationReasonCode",
               cart.cancellation_reason AS "cancellationReason",
               committed.id::text AS "committedSaleId",
               committed.order_id::text AS "sourceOrderId",
@@ -507,6 +650,7 @@ export class PosSaleRepository {
       currentOperatorSessionId: row.currentOperatorSessionId,
       suspendedAt: row.suspendedAt,
       cancelledAt: row.cancelledAt,
+      cancellationReasonCode: row.cancellationReasonCode,
       cancellationReason: row.cancellationReason,
       committedSaleId: row.committedSaleId,
       sourceOrderId: row.sourceOrderId,

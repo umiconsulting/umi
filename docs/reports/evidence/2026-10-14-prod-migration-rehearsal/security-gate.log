@@ -1,0 +1,83 @@
+CREATE TABLE
+CREATE VIEW
+INSERT 0 49
+
+================= STRUCTURAL GATE =================
+ status |                                label                                
+--------+---------------------------------------------------------------------
+ PASS   | 0 active users with an email but NULL password hash
+ PASS   | 0 break-glass grants without an expiry
+ PASS   | 0 café roles granted platform-wide
+ PASS   | 0 foreign servers / user mappings / FDWs remain
+ PASS   | api CANNOT read umi.prospect / umi.audit_log
+ PASS   | api CANNOT read umi.user.password_hash
+ PASS   | api CANNOT read umi.user.password_salt
+ PASS   | api cannot UPDATE derived columns (normalized_value, business_date)
+ PASS   | api CAN read umi.user.email (identity col)
+ PASS   | api has ZERO privilege on runtime auth tables
+ PASS   | api holds no DML on any view
+ PASS   | api is NOT superuser / NOT bypassrls
+ PASS   | api/worker have USAGE but NOT CREATE on extensions
+ PASS   | at most 1 unbounded platform grant (the bootstrap)
+ PASS   | at most one shared-password group survives (AB#116)
+ PASS   | audit tables carry outcome + request_id (PCI DSS 10.2.2)
+ PASS   | bind parameters are never logged (log_parameter_max_length = 0)
+ PASS   | bind parameters are never logged on error
+ PASS   | build-v3 order views exist (order_total, order_ticket)
+ PASS   | every api-reachable runtime table with merchant_id has RLS+FORCE
+ PASS   | every break-glass grant cites a reference and a justification
+ WARN   | every live platform grant holder has a second factor
+ PASS   | every request-path login role holds a SCRAM verifier (no md5)
+ PASS   | every retained legacy hash can still heal on login
+ PASS   | every umi/merchant view is security_invoker
+ PASS   | ghost @umi.invalid account is not active
+ PASS   | legacy-sha256 hashes do not grow (<=2: admin+barista @nectarcafe)
+ PASS   | merchant audit tables carry delegate_user_id
+ PASS   | merchant: every base table RLS+FORCE
+ PASS   | no api/worker* default ACL leaks (api locked)
+ PASS   | no extension installed outside pg_catalog/extensions
+ PASS   | no historical webhook PII in runtime
+ PASS   | no network/exec-capable extension installed
+ PASS   | no role holds UPDATE/DELETE on audit_log
+ PASS   | no role-level override re-enables statement logging
+ PASS   | no shared-password group is larger than AB#116's four accounts
+ PASS   | no Slack ids in café-readable audit_log
+ PASS   | PUBLIC cannot CREATE in schema public
+ PASS   | readonly CANNOT read runtime auth tables
+ PASS   | readonly CANNOT read umi.user.password_hash
+ PASS   | request-path roles are not exposed to duration-based logging
+ PASS   | request-path roles never log statements
+ SKIP   | some strong scrypt logins survive (functional)
+ PASS   | super_admin holds every permission key
+ PASS   | trigger funcs have pinned search_path
+ PASS   | umi.access_grant sealed from the request path (no DML, no read)
+ PASS   | umi per-café tables RLS+FORCE (4)
+ PASS   | umi.user_role sealed from the request path
+ PASS   | worker IS bypassrls (machinery)
+(49 rows)
+
+
+================= BEHAVIORAL GATE (as role api) =================
+SET
+DO
+PASS: empty/missing app.current_merchant -> 0 rows, no error (fail-closed)
+              set_config              
+--------------------------------------
+ a13905a2-0319-4cc1-cacf-eee47b75e309
+(1 row)
+
+DO
+PASS: EGR scope isolated; conversation_analytics + effective_entitlement do NOT leak cross-merchant
+              set_config              
+--------------------------------------
+ 1860305f-e864-d745-29e6-fb8830926cc6
+(1 row)
+
+PASS: Kalala scope sees exactly its own rows
+RESET
+
+================= ENFORCE =================
+psql:<stdin>:655: WARNING:  ACKNOWLEDGED GAP: every live platform grant holder has a second factor
+psql:<stdin>:655: WARNING:  NOT MEASURED ON THIS TARGET: some strong scrypt logins survive (functional)
+psql:<stdin>:655: NOTICE:  SECURITY GATE PASSED: 47 structural check(s) green, 1 acknowledged gap(s), 1 not measured
+DO

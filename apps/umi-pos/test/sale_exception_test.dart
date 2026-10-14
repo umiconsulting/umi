@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/exception/exception_controller.dart';
 import 'package:umi_pos/features/exception/exception_recovery_store.dart';
 import 'package:umi_pos/features/exception/exception_repository.dart';
@@ -188,6 +188,7 @@ final class TestExceptionRepository implements SaleExceptionRepository {
   RefundApprovalRequest? approvalRequest;
   SaleExceptionCommand? commitRequest;
   bool failCommit = false;
+  AppException? approvalFailure;
   int terminalFailuresRemaining = 0;
   final List<ManualTerminalRefundOutcomeRequest> terminalRequests = [];
 
@@ -222,6 +223,7 @@ final class TestExceptionRepository implements SaleExceptionRepository {
     RefundApprovalRequest request,
   ) async {
     approvalRequest = request;
+    if (approvalFailure case final error?) throw error;
     return RefundApprovalResult(
       approvalId: '00000000-0000-4000-8000-000000000010',
       approvingOperatorReference: 'Manager',
@@ -394,6 +396,82 @@ void main() {
     },
   );
 
+  test(
+    'refused manager PIN preserves the refund preview for another approval',
+    () async {
+      final repository = TestExceptionRepository()
+        ..nextPreview = testPreview(approval: true)
+        ..approvalFailure = const AppException(
+          category: AppErrorCategory.permission,
+          code: 'PERMISSION_DENIED',
+          recoverable: true,
+        );
+      final value = controller(repository);
+      await setContext(value);
+      await value.load(sale);
+      await value.createPreview(
+        exceptionType: 'partial_refund',
+        reason: 'product_defect',
+        lines: [
+          {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+        ],
+      );
+      final preview = value.state.preview;
+      await value.approve('3333');
+      expect(value.state.phase, SaleExceptionPhase.approvalRequired);
+      expect(value.state.preview, same(preview));
+      expect(value.state.errorCode, 'PERMISSION_DENIED');
+      repository.approvalFailure = null;
+      await value.approve('1111');
+      expect(value.state.phase, SaleExceptionPhase.previewReady);
+      expect(value.state.preview, same(preview));
+      expect(value.state.errorCode, isNull);
+    },
+  );
+
+  test(
+    'expired review keeps the selection and requires refresh before PIN',
+    () async {
+      final repository = TestExceptionRepository()
+        ..nextPreview = testPreview(approval: true)
+        ..approvalFailure = const AppException(
+          category: AppErrorCategory.conflict,
+          code: 'OPTIMISTIC_VERSION_CONFLICT',
+          details: {'reason': 'refund_preview_expired'},
+          recoverable: true,
+        );
+      final value = controller(repository);
+      await setContext(value);
+      await value.load(sale);
+      final lines = [
+        {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+      ];
+      await value.createPreview(
+        exceptionType: 'partial_refund',
+        reason: 'product_defect',
+        note: 'Producto incompleto',
+        lines: lines,
+      );
+      await value.approve('1111');
+      final previousApproval = repository.approvalRequest;
+      expect(value.state.errorCode, 'REFUND_PREVIEW_EXPIRED');
+      repository.approvalFailure = null;
+      await value.approve('1111');
+      expect(repository.approvalRequest, same(previousApproval));
+      await value.refreshPreview();
+      expect(repository.previewRequest?.lines, lines);
+      expect(repository.previewRequest?.reason, 'product_defect');
+      expect(repository.previewRequest?.note, 'Producto incompleto');
+      await value.approve('1111');
+      expect(
+        repository.approvalRequest?.commandId,
+        isNot(previousApproval?.commandId),
+      );
+      expect(value.state.phase, SaleExceptionPhase.previewReady);
+      expect(value.state.errorCode, isNull);
+    },
+  );
+
   test('a person-operated terminal still requires its declaration', () async {
     final repository = TestExceptionRepository()
       ..nextPreview = testPreview(terminal: true);
@@ -556,6 +634,29 @@ void main() {
     expect(recovery.value, isNull);
   });
 
+  test('the commit names a fiscal motive, because the contract refuses null', () async {
+    // `SaleExceptionCommand.fiscalMotive` is `z.enum(['01','02','03','04']).default('02')` on the
+    // API side: Zod applies that default when the key is ABSENT and refuses `null`. The Dart model
+    // serialises the key either way, so an unset motive went out as `"fiscalMotive": null` and
+    // every commit was refused with "The request does not match the public contract" —
+    // `fieldErrors: {"fiscalMotive": ["Expected '01' | '02' | '03' | '04', received null"]}`,
+    // captured in front of the API on the iMin on 2026-10-11. This pins the field, not the refund.
+    final repository = TestExceptionRepository();
+    final value = controller(repository);
+    await setContext(value);
+    await value.load(sale);
+    await value.createPreview(
+      exceptionType: 'partial_refund',
+      reason: 'product_defect',
+      lines: [
+        {'saleLineId': line, 'quantity': 1, 'restockDecision': 'restock'},
+      ],
+    );
+    await value.commit();
+    expect(repository.commitRequest?.fiscalMotive, '02');
+    expect(repository.commitRequest?.toJson()['fiscalMotive'], isNotNull);
+  });
+
   test(
     'committed refund requests hardware after the financial result',
     () async {
@@ -613,18 +714,17 @@ void main() {
     final value = controller(TestExceptionRepository());
     await setContext(value);
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         home: Builder(
-          builder: (context) => Scaffold(
-            body: FilledButton(
+          builder: (context) => PosPage(
+            body: PosButton(
               onPressed: () => showSaleExceptionDialog(
                 context,
                 controller: value,
@@ -645,6 +745,191 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('refund accepts a written reason only for Other', (tester) async {
+    final repository = TestExceptionRepository();
+    final value = controller(repository);
+    await setContext(value);
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showSaleExceptionDialog(
+                context,
+                controller: value,
+                saleId: sale,
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+    expect(find.text('Describe el motivo'), findsNothing);
+
+    await tester.tap(find.byType(PosSelectFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Otro motivo aprobado').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Otro motivo aprobado').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<PosSelect<String>>(find.byType(PosSelect<String>)).value,
+      'other_approved_reason',
+    );
+    expect(find.text('Describe el motivo'), findsOneWidget);
+    final preview = find.widgetWithText(PosButton, 'Revisar reembolso');
+    expect(tester.widget<PosButton>(preview).onPressed, isNull);
+    await tester.enterText(find.byType(PosField), '  Acuerdo con cliente  ');
+    await tester.pumpAndSettle();
+    expect(tester.widget<PosButton>(preview).onPressed, isNotNull);
+    await tester.ensureVisible(preview);
+    await tester.pumpAndSettle();
+    await tester.tap(preview);
+    await tester.pumpAndSettle();
+    expect(repository.previewRequest?.reason, 'other_approved_reason');
+    expect(repository.previewRequest?.note, 'Acuerdo con cliente');
+  });
+
+  testWidgets('void clears the written reason after a fixed choice', (
+    tester,
+  ) async {
+    final repository = TestExceptionRepository();
+    final value = controller(repository);
+    await setContext(value);
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showSaleExceptionDialog(
+                context,
+                controller: value,
+                saleId: sale,
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Anular venta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PosSelectFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Otro motivo aprobado').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Otro motivo aprobado').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(PosField), 'No corresponde');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(PosSelectFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Error del operador').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Describe el motivo'), findsNothing);
+    final preview = find.widgetWithText(PosButton, 'Revisar reembolso');
+    await tester.ensureVisible(preview);
+    await tester.pumpAndSettle();
+    await tester.tap(preview);
+    await tester.pumpAndSettle();
+    expect(repository.previewRequest?.exceptionType, 'void');
+    expect(repository.previewRequest?.reason, 'operator_error');
+    expect(repository.previewRequest?.note, isNull);
+  });
+
+  testWidgets('the approval action is disabled until the manager PIN is a PIN', (
+    tester,
+  ) async {
+    // The contract wants `managerPin` to match `^\d{4,8}$`. Pressing the action with an empty field
+    // used to send `managerPin: ""` and come back as a generic validation failure — measured on the
+    // iMin on 2026-10-11. A control that cannot succeed is disabled, the way the sign-in keypad
+    // disables `Continuar` until four digits have landed.
+    //
+    // The dialog reloads the sale as it opens, so the preview is built the way an operator builds
+    // it: pick the type, pick a line, ask for the preview.
+    final repository = TestExceptionRepository()
+      ..nextPreview = testPreview(approval: true);
+    final value = controller(repository);
+    await setContext(value);
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showSaleExceptionDialog(
+                context,
+                controller: value,
+                saleId: sale,
+              ),
+              child: const Text('abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reembolso parcial'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Aumentar cantidad del reembolso').first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Revisar reembolso'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Revisar reembolso'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Un gerente debe aprobar este cobro.'), findsOneWidget);
+    // The preview names its own amount: the label that means "what is left to refund" belongs to
+    // the eligibility row on the first screen, not to the money being handed back.
+    expect(find.text('Importe del reembolso'), findsOneWidget);
+    expect(find.text('Importe restante reembolsable'), findsNothing);
+    final approval = find.ancestor(
+      of: find.text('Un gerente debe aprobar este cobro.'),
+      matching: find.byWidgetPredicate((widget) => widget is PosButton),
+    );
+    expect(approval, findsOneWidget);
+    expect(tester.widget<PosButton>(approval).enabled, isFalse);
+
+    final pin = find.byWidgetPredicate(
+      (widget) => widget is PosField && widget.obscureText,
+    );
+    expect(pin, findsOneWidget);
+    await tester.enterText(pin, '12');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<PosButton>(approval).enabled,
+      isFalse,
+      reason: 'two digits is not a PIN the contract accepts',
+    );
+
+    await tester.enterText(pin, '3333');
+    await tester.pumpAndSettle();
+    expect(tester.widget<PosButton>(approval).enabled, isTrue);
+  });
+
   testWidgets('a provider-backed terminal needs no declaration in the dialog', (
     tester,
   ) async {
@@ -657,18 +942,17 @@ void main() {
     final value = controller(repository);
     await setContext(value);
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: const [
           AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
+
           GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
         ],
         home: Builder(
-          builder: (context) => Scaffold(
-            body: FilledButton(
+          builder: (context) => PosPage(
+            body: PosButton(
               onPressed: () => showSaleExceptionDialog(
                 context,
                 controller: value,

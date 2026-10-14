@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
@@ -57,7 +57,7 @@ List<int> denominationsFromPolicy(Map<String, Object?>? policy) {
 ///
 /// The quantity is also a field. An operator with a keyboard — a back-office
 /// drawer, a supervisor recounting by hand — types `12` instead of pressing `+`
-/// twelve times, and `Tab` walks down the denominations the way the drawer is
+/// twelve times, and `PosTab` walks down the denominations the way the drawer is
 /// counted. The buttons stay for the counter terminal, where there is no
 /// keyboard and the finger is already on the glass.
 class DenominationCounter extends StatefulWidget {
@@ -65,12 +65,14 @@ class DenominationCounter extends StatefulWidget {
     required this.currency,
     required this.denominations,
     required this.onChanged,
+    this.showTotal = true,
     super.key,
   });
 
   final String currency;
   final List<int> denominations;
   final ValueChanged<DenominationTally> onChanged;
+  final bool showTotal;
 
   @override
   State<DenominationCounter> createState() => _DenominationCounterState();
@@ -80,6 +82,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
   final Map<int, int> _counts = <int, int>{};
   final Map<int, TextEditingController> _fields =
       <int, TextEditingController>{};
+  final Map<int, GlobalKey> _fieldKeys = {};
 
   @override
   void initState() {
@@ -111,10 +114,12 @@ class _DenominationCounterState extends State<DenominationCounter> {
     for (final denomination in _fields.keys.toList()) {
       if (!widget.denominations.contains(denomination)) {
         _fields.remove(denomination)?.dispose();
+        _fieldKeys.remove(denomination);
       }
     }
     for (final denomination in widget.denominations) {
       _fields.putIfAbsent(denomination, TextEditingController.new);
+      _fieldKeys.putIfAbsent(denomination, GlobalKey.new);
     }
   }
 
@@ -174,7 +179,7 @@ class _DenominationCounterState extends State<DenominationCounter> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     // Every denomination in the drawer, laid out in two columns whenever there
     // is room for them.
     //
@@ -192,10 +197,10 @@ class _DenominationCounterState extends State<DenominationCounter> {
         // At 200 % the old fixed maths kept two columns and a 170 px name cell,
         // and "MXN 1,000.00" came out as "MXN 1,0…" — with "MXN 50…" and "MXN 50…"
         // in the same dialog, the operator could not tell the rows apart.
-        final scale = MediaQuery.textScalerOf(context).scale(1);
+        final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
         final field = 64.0 * scale;
         final minRow = 88.0 * scale + UmiSpacing.xs + 48 + field + 48;
-        final columns = constraints.maxWidth >= minRow * 2 ? 2 : 1;
+        final columns = constraints.maxWidth >= minRow * 2 + gap ? 2 : 1;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         // The name cell is capped rather than stretched: on a wide card the row
         // otherwise leaves a hand's width of nothing between "MXN 1,000.00" and
@@ -222,39 +227,42 @@ class _DenominationCounterState extends State<DenominationCounter> {
                       theme,
                       denomination,
                       labelWidth,
+                      stacked: width < minRow,
                     ),
                   ),
               ],
             ),
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: UmiSpacing.xs),
-              child: Row(
-                children: [
-                  // The label gives way, the figure does not. A counted total is
-                  // money: it is the one thing on this row that must never be
-                  // shortened, and a font or a locale with wider glyphs should
-                  // cost the label a few characters, not the number its digits.
-                  Expanded(
-                    child: Text(
-                      Localizations.localeOf(context).languageCode == 'es'
-                          ? 'Total contado'
-                          : 'Counted total',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium,
+            if (widget.showTotal) ...[
+              const PosDivider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: UmiSpacing.xs),
+                child: Row(
+                  children: [
+                    // The label gives way, the figure does not. A counted total is
+                    // money: it is the one thing on this row that must never be
+                    // shortened, and a font or a locale with wider glyphs should
+                    // cost the label a few characters, not the number its digits.
+                    Expanded(
+                      child: Text(
+                        Localizations.localeOf(context).languageCode == 'es'
+                            ? 'Total contado'
+                            : 'Counted total',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: UmiSpacing.sm),
-                  Text(
-                    _money(_total),
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: UmiSpacing.sm),
+                    Text(
+                      _money(_total),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         );
       },
@@ -264,73 +272,80 @@ class _DenominationCounterState extends State<DenominationCounter> {
   Widget _denominationRow(
     BuildContext context,
     AppLocalizations l,
-    ThemeData theme,
+    PosThemeData theme,
     int denomination,
-    double labelWidth,
-  ) {
+    double labelWidth, {
+    required bool stacked,
+  }) {
     final quantity = _counts[denomination] ?? 0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: labelWidth,
-            // What the denomination is, and — once it is counted — what the
-            // count is worth. The line total used to sit at the far right of a
-            // row that no longer had room for it: with the quantity field in
-            // place, "MXN 12,000.00" broke over four lines in a 32 px column.
-            // Under the name it reads like a ledger line: 1,000, counted 12
-            // times, is 12,000.
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _money(denomination),
-                  style: theme.textTheme.bodyLarge,
-                  // A name may wrap when there is genuinely nowhere to put it: a
-                  // wrapped "MXN 1,000.00" is still an amount, and an ellipsis is
-                  // not.
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (quantity > 0)
-                  Text(
-                    '= ${_money(denomination * quantity)}',
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-              ],
+    final label = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _money(denomination),
+          style: theme.textTheme.bodyLarge,
+          maxLines: stacked ? null : 2,
+          overflow: stacked ? null : TextOverflow.ellipsis,
+        ),
+        if (quantity > 0)
+          Text(
+            '= ${_money(denomination * quantity)}',
+            maxLines: stacked ? null : 1,
+            softWrap: stacked,
+            overflow: stacked ? null : TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(width: UmiSpacing.xs),
-          IconButton(
-            tooltip: l.decreaseQuantity,
-            onPressed: quantity > 0
-                ? () => _set(denomination, quantity - 1)
-                : null,
-            icon: const Icon(Icons.remove_circle_outline),
-          ),
-          _QuantityField(
-            denomination: denomination,
-            money: _money(denomination),
-            controller: _fields[denomination]!,
-            onChanged: (text) =>
-                _set(denomination, int.tryParse(text) ?? 0, syncField: false),
-          ),
-          IconButton(
-            tooltip: l.increaseQuantity,
-            onPressed: () => _set(denomination, quantity + 1),
-            icon: const Icon(Icons.add_circle_outline),
-          ),
-          const Spacer(),
-        ],
+      ],
+    );
+    final controls = <Widget>[
+      PosIconButton(
+        tooltip: l.decreaseDenominationQuantity(_money(denomination)),
+        onPressed: quantity > 0 ? () => _set(denomination, quantity - 1) : null,
+        icon: const PosIcon(PosGlyphs.remove),
       ),
+      Flexible(
+        child: _QuantityField(
+          key: _fieldKeys[denomination],
+          denomination: denomination,
+          money: _money(denomination),
+          controller: _fields[denomination]!,
+          onChanged: (text) =>
+              _set(denomination, int.tryParse(text) ?? 0, syncField: false),
+        ),
+      ),
+      PosIconButton(
+        tooltip: l.increaseDenominationQuantity(_money(denomination)),
+        onPressed: () => _set(denomination, quantity + 1),
+        icon: const PosIcon(PosGlyphs.add),
+      ),
+    ];
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: stacked ? UmiSpacing.sm : 2),
+      child: stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                label,
+                const SizedBox(height: UmiSpacing.xs),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: controls,
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                SizedBox(width: labelWidth, child: label),
+                const SizedBox(width: UmiSpacing.xs),
+                ...controls,
+                const Spacer(),
+              ],
+            ),
     );
   }
 }
@@ -346,6 +361,7 @@ final class _QuantityField extends StatefulWidget {
     required this.money,
     required this.controller,
     required this.onChanged,
+    super.key,
   });
 
   /// The denomination this field counts, in minor units.
@@ -382,45 +398,42 @@ final class _QuantityFieldState extends State<_QuantityField> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = PosTheme.of(context);
     final l = AppLocalizations.of(context);
     return SizedBox(
       // Wide enough for three digits and their padding, and no wider: the row
       // also has to carry two 48 px tap targets and the denomination itself, and
       // on a 390 px window the old 76 px field pushed the row 10 px past the
       // dialog's edge.
-      width: 64,
-      child: Semantics(
-        textField: true,
-        label: l.denominationQuantityLabel(widget.money),
-        child: TextField(
-          controller: widget.controller,
-          focusNode: _focus,
-          keyboardType: TextInputType.number,
-          textInputAction: TextInputAction.next,
-          textAlign: TextAlign.center,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(3),
-          ],
-          onChanged: widget.onChanged,
-          style: theme.textTheme.titleMedium?.copyWith(
+      width: 64 * MediaQuery.textScalerOf(context).scale(16) / 16,
+      child: PosField(
+        semanticLabel: l.denominationQuantityLabel(widget.money),
+        controller: widget.controller,
+        focusNode: _focus,
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.next,
+        textAlign: TextAlign.center,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(3),
+        ],
+        onChanged: widget.onChanged,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+        decoration: PosFieldDecoration(
+          isDense: true,
+          hintText: '0',
+          hintStyle: theme.textTheme.titleMedium?.copyWith(
+            color: theme.colorScheme.outline,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: '0',
-            hintStyle: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.outline,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-            filled: true,
-            fillColor: theme.colorScheme.surfaceContainerHighest,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(UmiRadius.control),
-              borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
-            ),
+          filled: true,
+          fillColor: theme.colorScheme.surfaceContainerHighest,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: PosFieldBorder(
+            borderRadius: BorderRadius.circular(UmiRadius.control),
+            borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
           ),
         ),
       ),

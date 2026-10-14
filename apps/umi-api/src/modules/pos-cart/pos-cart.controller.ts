@@ -11,12 +11,19 @@ import {
 } from '@nestjs/common';
 import {
   BindCartOriginRequest,
+  SetCartAccountDetailsRequest,
+  AssignCartTableRequest,
+  OpenTableAccountRequest,
+  ResumeCartAccountRequest,
+  SuspendCartRequest,
+  RemoveSentCartLineRequest,
   CartLineInput,
   CartQuery,
   ClearCartRequest,
   CreateCartRequest,
   PrepareSaleRequest,
   RemoveCartLineRequest,
+  SetCartFulfillmentRequest,
 } from '@umi/contract';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
@@ -49,6 +56,88 @@ export class PosCartController {
     @Query(new ZodValidationPipe(CartQuery)) query: CartQuery,
   ) {
     return this.cart.read(user, merchantId, query.locationId, query.operatorSessionId);
+  }
+
+  @Get('open-accounts')
+  listAccounts(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Query(new ZodValidationPipe(CartQuery)) query: CartQuery,
+  ) {
+    return this.cart.listAccounts(user, merchantId, query.locationId, query.operatorSessionId);
+  }
+
+  @Get('accounts/:cartId')
+  readAccount(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('cartId') cartId: string,
+    @Query(new ZodValidationPipe(CartQuery)) query: CartQuery,
+  ) {
+    return this.cart.readAccount(
+      user,
+      merchantId,
+      cartId,
+      query.locationId,
+      query.operatorSessionId,
+    );
+  }
+
+  @Post('table')
+  openTable(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(OpenTableAccountRequest)) dto: OpenTableAccountRequest,
+  ) {
+    return this.cart.openTable(user, merchantId, dto);
+  }
+
+  @Post('accounts/:cartId/resume')
+  resumeAccount(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('cartId') cartId: string,
+    @Body(new ZodValidationPipe(ResumeCartAccountRequest)) dto: ResumeCartAccountRequest,
+  ) {
+    return this.cart.resumeAccount(user, merchantId, cartId, dto);
+  }
+
+  @Post('accounts/:cartId/details')
+  setAccountDetails(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('cartId') cartId: string,
+    @Body(new ZodValidationPipe(SetCartAccountDetailsRequest)) dto: SetCartAccountDetailsRequest,
+  ) {
+    return this.cart.setAccountDetails(user, merchantId, cartId, dto);
+  }
+  @Post('accounts/:cartId/table')
+  assignAccountTable(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('cartId') cartId: string,
+    @Body(new ZodValidationPipe(AssignCartTableRequest)) dto: AssignCartTableRequest,
+  ) {
+    return this.cart.assignAccountTable(user, merchantId, cartId, dto);
+  }
+
+  @Post('suspend')
+  suspendAccount(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(SuspendCartRequest)) dto: SuspendCartRequest,
+  ) {
+    return this.cart.suspendAccount(user, merchantId, dto);
+  }
+
+  @Post('lines/:lineId/cancel-sent')
+  removeSent(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('lineId') lineId: string,
+    @Body(new ZodValidationPipe(RemoveSentCartLineRequest)) dto: RemoveSentCartLineRequest,
+  ) {
+    return this.cart.removeSent(user, merchantId, lineId, dto);
   }
 
   @Post('lines')
@@ -114,5 +203,14 @@ export class PosCartController {
     @Body(new ZodValidationPipe(BindCartOriginRequest)) dto: BindCartOriginRequest,
   ) {
     return this.cart.bindOrigin(user, merchantId, dto);
+  }
+
+  @Post('fulfillment')
+  setFulfillment(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Body(new ZodValidationPipe(SetCartFulfillmentRequest)) dto: SetCartFulfillmentRequest,
+  ) {
+    return this.cart.setFulfillment(user, merchantId, dto);
   }
 }

@@ -10,6 +10,10 @@ const repository = readFileSync(
   resolve(process.cwd(), 'src/modules/pos-exception/pos-exception.repository.ts'),
   'utf8',
 );
+const inventoryRepository = readFileSync(
+  resolve(process.cwd(), 'src/modules/pos-inventory/pos-inventory.repository.ts'),
+  'utf8',
+);
 
 describe('Gate 3D exception persistence', () => {
   it('keeps every original financial table outside exception mutation statements', () => {
@@ -31,6 +35,40 @@ describe('Gate 3D exception persistence', () => {
       expect(sql).toContain(table);
     }
     expect(sql).toContain('post-sale compensation is append-only');
+  });
+
+  it('never row-locks an append-only fact from the request path', () => {
+    // `90_rls.sql` revokes UPDATE from `api` on every one of these tables, so a
+    // bare `SELECT … FOR UPDATE` against them is not a lock — PostgreSQL refuses
+    // it with `permission denied for table …`. Measured on the iMin D3-504 on
+    // 2026-10-11: the refund disposition was refused with `409 APPROVAL_REQUIRED`,
+    // the manager approved, and the re-send died with
+    // `500 DatabaseError: permission denied for table pos_restock_intent`, which
+    // left the operator with a pending decision and a generic failure banner.
+    // `FOR UPDATE OF <alias>` on a table that *is* writable stays fine, which is
+    // how the cash-refund flow locks its shift.
+    const appendOnly = [
+      'pos_sale_exception',
+      'pos_sale_exception_line',
+      'pos_tender_compensation',
+      'pos_cash_compensation',
+      'pos_restock_intent',
+      'pos_exception_receipt',
+    ];
+    for (const [name, source] of [
+      ['pos-exception.repository.ts', repository],
+      ['pos-inventory.repository.ts', inventoryRepository],
+    ] as const) {
+      // Only the SQL of each statement: the odd halves of the template literals.
+      for (const statement of source.split('`').filter((chunk) => chunk.includes('merchant.'))) {
+        const locked = appendOnly.filter((table) => statement.includes(`merchant.${table}`));
+        if (locked.length === 0) continue;
+        expect(
+          `${name}: ${statement}`,
+          `a statement on ${locked.join(', ')} must not take a bare row lock`,
+        ).not.toMatch(/FOR UPDATE(?!\s+OF\b)/i);
+      }
+    }
   });
 
   it('blocks cumulative line and tender over-refunds', () => {

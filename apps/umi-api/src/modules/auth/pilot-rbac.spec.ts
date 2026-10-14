@@ -43,6 +43,7 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
       selfApproval: boolean;
       fingerprintBound: boolean;
     }>;
+    selfApprovalException: { role: string; reason: string };
   }>('config/umipos-pilot-approval-boundaries.json');
 
   const profile = (role: string) => matrix.profiles.find((value) => value.role === role)!;
@@ -132,7 +133,7 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
 
   it('keeps Supervisor location-bound and Manager below platform authority', () => {
     expect(permissions('supervisor')).toEqual(
-      expect.arrayContaining(['sale.resume.any', 'checkout.discount.approve']),
+      expect.arrayContaining(['sale.resume.any', 'checkout.discount.apply']),
     );
     expect(permissions('supervisor')).not.toContain('cash.variance.approve');
     expect(permissions('supervisor')).not.toContain('sale.refund.approve');
@@ -143,8 +144,8 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
         'sale.refund.full',
         'sale.refund.cash',
         'sale.refund.reconcile',
-        'cash.movement.paid_out.approve',
-        'cash.shift.close.approve',
+        'cash.movement.paid_out',
+        'cash.shift.close',
       ]),
     );
     expect(permissions('manager')).not.toContain('merchant.manage');
@@ -185,19 +186,32 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
       supervisor: [
         'sale.resume.any',
         'checkout.recover.any',
-        'checkout.discount.approve',
+        'checkout.discount.apply',
         'cash.count.recount',
         'sale.exception.history',
       ],
       manager: [
         'checkout.recover.any',
+        'cash.reconcile',
+        'cash.shift.close',
+        'sale.refund.full',
+        'sale.refund.manual_terminal',
+      ],
+      owner: ['merchant.manage', 'device.enroll', 'audit.read', 'sale.refund.manual_terminal'],
+      /**
+       * The ADMIN's journey is the only one that crosses an authorization: by the owner's
+       * decision of 2026-10-12, `*.approve` (and `sale.void.create`) belong to admin alone,
+       * so every other role's journey stops at the act and asks for a PIN.
+       */
+      admin: [
+        'merchant.manage',
+        'device.enroll',
+        'audit.read',
         'cash.variance.approve',
         'cash.shift.close.approve',
         'sale.refund.approve',
-        'sale.refund.manual_terminal',
+        'sale.void.create',
       ],
-      owner: ['merchant.manage', 'device.enroll', 'audit.read', 'sale.refund.approve'],
-      admin: ['merchant.manage', 'device.enroll', 'audit.read', 'cash.variance.approve'],
       viewer: ['catalog.read', 'insights.read'],
     };
 
@@ -231,9 +245,15 @@ describe('Gate 3D.1 pilot RBAC matrix', () => {
     expect(matrix.roleAssignmentPolicy.admin).toContain('supervisor');
   });
 
-  it('denies self-approval and binds every sensitive approval to a fingerprint', () => {
+  it('denies self-approval by default, opens it only to the admin, and binds every approval to a fingerprint', () => {
     expect(approvals.boundaries.length).toBeGreaterThanOrEqual(12);
     expect(approvals.boundaries.every((boundary) => !boundary.selfApproval)).toBe(true);
+    // THE ONE EXCEPTION, AND IT IS NAMED. Since 2026-10-13 only the admin authorizes, so
+    // the admin may approve their own act: in a one-admin café a second person does not
+    // exist, and the control is the credential. The exception is asserted here so it
+    // cannot be widened to another role without this gate failing.
+    expect(approvals.selfApprovalException.role).toBe('admin');
+    expect(approvals.selfApprovalException.reason.length).toBeGreaterThan(40);
     expect(approvals.boundaries.every((boundary) => boundary.fingerprintBound)).toBe(true);
     expect(
       approvals.boundaries.every(

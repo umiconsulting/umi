@@ -56,6 +56,19 @@ UX_CLICK_CONFIRM=disposable node tools/ux-sweep/click-audit.mjs \
   --routes /,/reportes --limit 5 --shots /tmp/ux/shots
 ```
 
+Three things decide whether that report means anything.
+
+- **The viewport is pinned to 1280x720 by default.** Without a pinned viewport the sidebar's nav
+  items resolve, call themselves visible and stable, and sit outside the viewport Playwright may
+  click in, so every sidebar click times out with `element is outside of the viewport`. The report
+  then looks like 115 dead controls and contains no writes at all.
+- **Prove the write pass wrote.** `grep -c '"method":"POST"'` on the API's log is the evidence; a
+  "click" report with a clean `failedRequests` column proves nothing on its own.
+- **The run paces itself, and says so.** The session is priced at 240 requests a minute and every
+  click reloads its route, so a 24-route pass spends a few thousand; the audit waits when three
+  quarters of the budget is gone and prints each wait. A run that is quiet for a minute is a run
+  waiting, not a run hung.
+
 ## flow-budget.mjs
 
 **Proves:** how many taps and how many milliseconds each core flow costs, against
@@ -73,14 +86,178 @@ moves its sidebar into a drawer, which adds a tap to every navigation flow.
 
 ## visual-regression.spec.mjs
 
-**Proves:** a style change that moves one of the five representative screens
+**Proves:** a style change that moves one of the seven representative screens
 fails the check, at both reference viewports (1024x768 and 1280x720). Baselines
 live in `__screenshots__/`.
 
 ```sh
-pnpm ux:visual           # compare against the checked-in baselines
+pnpm ux:visual           # compare against the checked-in baselines (~6 min, see below)
 pnpm ux:visual:update    # re-record them (only when the change is intended)
 ```
+
+Four rules the spec enforces on itself, because each one produced a baseline that
+was wrong rather than a baseline that failed:
+
+- **The test's name is the screen it pins.** `/` is the owner's first screen, and the
+  shell lands a role on the screen that role needs (`src/lib/role-landing.js`). A
+  platform administrator has no cited first screen and lands on the first entry of
+  that file's fallback chain, so a screenshot named `overview` was pinning the
+  Customers screen. The spec opens the module it names and fails if it cannot.
+- **No credential is ever pinned.** The operator's Chromium autofills the saved
+  Dashboard password into `/login`, so the spec empties every field and refuses to
+  continue while a value survives.
+- **The operator's own budget is not a finding.** The session is priced at 240
+  requests per minute (`LIMITS.user`), and fourteen page loads spend more than
+  that. The spec paces itself with three quarters of the budget spent and reloads
+  once when a 429 lands anyway; that is why a full run takes about six minutes.
+  Stop smoking the sweeps for a minute before blaming a screen for "could not be
+  loaded".
+- **The baselines belong to one session.** They were recorded from the local stack
+  as the platform administrator at the café `DATABASE_URL_APP` names. A run
+  against another café, or as another role, compares two different products'
+  worth of data and will fail on the merchant name alone.
+
+## floor-plan-map.spec.mjs
+
+**Proves:** the floor-plan console survives 200 tables, one slow drag and one
+rotate, with a CDP trace around the drag and the frame numbers reported against
+16.7 ms. It writes a real draft plan for the SELECTED location and restores the
+draft it replaced in `afterAll`, so the location is a fixture:
+
+```sh
+pnpm ux:floor-plan-map                                  # the brief's café (Congreso)
+UX_EXPECT_LOCATION='^ONCA$' pnpm ux:floor-plan-map      # the local stack's café
+```
+
+It is not part of `ux:visual` or `ux:verify`: it is one of the heavy DevTools
+instruments, and it takes minutes.
+
+## dashboard-role-surfaces.mjs
+
+**Proves:** what each ROLE actually sees, in a real browser, route by route. `pnpm
+check:role-surfaces` proves the API half of plan §C — "the client hides, and the API still
+decides" — by asking the API whether it refuses a role. It says nothing about the CLIENT half:
+whether the dashboard hides what the API refuses, and whether it draws a screen whose data it may
+not read. That is what this walks.
+
+```sh
+pnpm ux:roles:ui     # needs a dashboard serving a database whose four role logins work
+```
+
+On this workstation that database is the fixture `scripts/umipos-role-surface-fixture.sh` builds;
+point the dashboard at an API over it (`--base`) and pass `--cdp` at a browser the harness may
+borrow.
+
+Three things it learned the hard way, all worth keeping:
+
+- **Pin the merchant the contract names.** The platform account (the owner) sees thirty cafés in
+  that database, most of them harness merchants with no subscription, and the shell had selected
+  Nudge Café — so all seventeen of that role's routes refused with "is not active for this café"
+  and the walk reported seventeen mismatches that were the fixture talking. The selection lives in
+  `localStorage['umi-dashboard-selected-merchant']`, so it is pinned before the first load, like
+  the locale and the palette.
+- **The contract is about API surfaces, not about screens.** The first verdict rule called a
+  module "allowed" when _any_ of its rows allowed the role, and then reported the cashier's
+  `/settings` as a mismatch: the client refuses a screen that mixes `merchant.manage` data with
+  reward-config data the cashier may read. Those are two different questions, and the report now
+  separates them (`partial`, `landing`, `listed-only` are not findings).
+- **Do not wait for `networkidle`.** The shell holds a realtime socket open, so the network never
+  goes idle and every route would burn the full timeout. The screen is ready when it has drawn a
+  heading or a refusal.
+
+Measured on 2026-10-10: four roles × twenty-four routes, all four sign-ins working, one finding —
+`manager` on `/diagnostics`. The client draws the screen, the **Audit** tab asks the API for
+`/operations`, and the API refuses it (403 `PERMISSION_DENIED`: the contract's own
+`operations.audit` row expects exactly that for a manager, whose grant is `hardware.diagnostics`
+and not `audit.read`). The screen answers honestly — "You do not have the permission required for
+this operation." with a Retry — but the tab cannot ever load for that role, and the Retry cannot
+either. The server already publishes the domains a role may read (`state.data.domains`, which the
+workspace reads and the tab list does not), so the fix is to drive the tabs from the server's list
+instead of the hardcoded three.
+
+## pos-native-click-pass.mjs
+
+**Proves:** what the till's controls do when they are pressed. The dashboard has had this since
+`click-audit.mjs`; the till had journeys and an inventory but nothing that presses the controls an
+inventory merely measures. It walks the same eleven surface-and-mode screens as
+`pos-native-surfaces.mjs` (the maps are imported, so the two cannot drift).
+
+```sh
+pnpm ux:pos:clicks        # the app must be running and signed in
+```
+
+Three decisions, all of them about not fooling yourself:
+
+- **It never presses a committing control.** Every control is classified from its own words into
+  money (`cobrar`, `efectivo`, `propina`, `reanudar venta`…), shift (`turno`, `cajón`, `contar`…)
+  and destructive (`anular`, `vaciar`, `terminar`, `empezar`…). Those are listed in the report with
+  the reason and never pressed: a pass that charges and closes a till measures a café, not a
+  build, and the state it wrecks poisons the screens that follow. The money path belongs to
+  `pos-native-flows.mjs`, on a disposable database.
+- **The expectation is the weakest honest one.** A journey names what a tap should produce; an
+  audit presses to find out. `expect: { screenChanges: true }` (added to the driver for this)
+  asserts that the screen must not stay put, compared against the state it had before the press —
+  which still catches a swallowed press.
+- **Escape between presses.** A press that opens an overlay leaves it covering the rail. The first
+  run of this pass lost nine of eleven screens to exactly that, each reported as "not reached"
+  because the nav item it tried to click was behind an open menu. One `Escape` closes them —
+  measured, not assumed.
+
+Measured on 2026-10-10 on a disposable clone of the local café: **46 controls pressed across the
+eleven screens, zero app exceptions, and nothing written** (every POS table's newest row is from
+before the pass). Eleven presses reported no visible effect, and each has an explanation worth
+knowing rather than a defect: three were a control whose name changed between measuring and
+pressing (the harness re-resolves by name, and reported it), three were theme choices — the
+accessibility tree has no colours, so a palette change is invisible to this expectation — one was
+a refresh with nothing to refresh, two were controls already in their target state (the selected
+tab, the selected room), and one was "Nueva venta" on an empty cart.
+
+## pos-native-surfaces.mjs
+
+**Proves:** plan §7 Step F2 — "one command lists every actionable node on every POS surface with
+its size and label". It walks the **native** POS by pressing the navigation the operator presses,
+reads the accessibility tree on each of the seven surfaces, and applies the same 44 px floor the
+dashboard inventory applies.
+
+```sh
+pnpm ux:pos:surfaces      # the app must be running and signed in
+```
+
+Two rules decide whether a number in that report means anything, and both were learned on
+2026-10-10:
+
+- **The engine publishes a node's box intersected with its clip rect.** The kitchen board's last
+  row — cut by the bottom edge of the window — reported its five "Empezar" buttons as 115x34 while
+  the identical buttons one row up measured 115x48. The tool judges only nodes inside the window,
+  and a node flush against the edge is treated as cut, not as small.
+- **A control that is short in one place and tall in another is cut, not small.** The sales list's
+  third "Reanudar venta" measured 135x8 at the bottom of the _inner_ list while the two above it
+  measured 135x48, and the window's edge was 24 px further down, so the window rule could not see
+  it. The natural size of a control is the tallest instance of that name on the same screen;
+  anything shorter is reported as clipped. Both counts are in the report, so nothing is hidden.
+- **The screenshot is the cross-check.** The first version of this walk produced five phantom
+  undersized buttons; the picture the improved driver now captures showed them half-cut at the
+  window's edge. Capture, look, then believe the number.
+
+**It walks the modes, not just the bar.** A surface is not one screen: the kitchen board has
+`Comandas` and `Preparación`, the sales list has `Todas las ventas` / `Ventas suspendidas` /
+`Ventas canceladas`, and the room has a plan and a `Ver lista`. The first walk inventoried only
+whichever was open. Eleven (surface, mode) combinations are walked now, each with its own
+screenshot.
+
+The first run, on 2026-10-10, found two things and both are fixed:
+
+- **`Mesas` — the room chip "Salón, 5 mesas" measured 122x42.** The chip is 44 tall, but its tap
+  region sat _inside_ the surface's 1 px border, so the node the engine publishes was 42. The tap
+  region now wraps the surface (`floor_plan_surface.dart`): the chip looks identical and the target
+  is the whole 44 px box.
+- **The search areas on `Comanda` and `Ventas` were pressable and unnamed.** `PosField` opens the
+  keyboard from a whole-box `GestureDetector` that carried no name; the field's own words now live
+  on that node, with the gesture detector excluded from semantics (`pos_fields.dart`).
+
+Re-measured after the fix: eleven surface-and-mode screens reached, **0 controls under the floor
+and 0 pressable and unnamed**, with the POS flow suite (7/7) and the Flutter suite (673 tests)
+green.
 
 ## accessibility-gate.mjs
 
@@ -91,7 +268,20 @@ find. POS semantics are a separate harness (F2, not built yet).
 ```sh
 node tools/ux-sweep/accessibility-gate.mjs --out /tmp/ux/a11y.json --md /tmp/ux/a11y.md
 node tools/ux-sweep/accessibility-gate.mjs --no-fail   # report without failing
+node tools/ux-sweep/accessibility-gate.mjs --locale es --theme midnight   # one mode of six
 ```
+
+**Run it in more than one mode.** The gate ran for a year in whatever mode the
+browser happened to be in — English, default light palette — and that mode was the
+only one anybody checked. On 2026-10-10 the same 24 routes were audited in three
+palettes and two languages. The two dark palettes failed hard, and only there:
+`midnight` reported **7 serious** contrast violations and the deep-ocean `dark`
+palette **22**, because the navy and the muted inks were chosen against light
+surfaces and never re-read against dark ones. Both are fixed (`--navy-ink` per
+theme in `apps/umi-dashboard/src/styles.css`, and the `dark`/`midnight` `ink-3` /
+`ink-4` steps in `packages/tokens/tokens/dashboard.json`). Four modes measured
+after the fix — `umi`/en, `umi`/es, `dark`/es, `midnight`/en — all report **0
+serious**. A palette is a mode, and an unmeasured mode is an unverified one.
 
 ## devtools-probe.mjs
 

@@ -866,6 +866,28 @@ export class PosInventoryRepository {
     );
   }
 
+  /// Serializes two resolves of the same refund disposition.
+  ///
+  /// The intent row cannot carry the lock: Gate 3D keeps the post-sale
+  /// compensation facts append-only and `90_rls.sql` revokes `update` from the
+  /// request path on purpose, so `SELECT … FOR UPDATE` there is a refusal
+  /// (`permission denied for table pos_restock_intent`) rather than a lock. The
+  /// lock lives in the advisory space, keyed the same way this file keys its
+  /// stock movements, and the outcome index stays the final guarantee.
+  private async lockRestockIntent(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    restockIntentId: string,
+  ): Promise<void> {
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtextextended(
+         concat_ws(':','restock_intent',$1::text,$2::text,$3::text),0
+       ))`,
+      [merchantId, locationId, restockIntentId],
+    );
+  }
+
   async restock(
     client: PoolClient,
     merchantId: string,
@@ -876,6 +898,17 @@ export class PosInventoryRepository {
     await this.assertCurrentPolicy(client, merchantId, dto);
     const fingerprint = this.operationFingerprint('pos.inventory.restock', dto);
     await this.consumeApproval(client, dto, merchantId, 'inventory.restock.approve', fingerprint);
+    // The intent is read, never written: Gate 3D makes the post-sale compensation
+    // facts append-only and revokes UPDATE from the request path, so `FOR UPDATE`
+    // on this table is a database refusal, not a lock — measured on the iMin
+    // D3-504 on 2026-10-11 as `500 DatabaseError: permission denied for table
+    // pos_restock_intent` the moment the manager approved a refund disposition,
+    // which left the pending decision unresolved with no way forward. The
+    // serialization the row lock asked for lives in an advisory lock keyed on the
+    // intent (the convention this file already uses for stock movements), and the
+    // final uniqueness of a resolution stays with
+    // `inventory_restock_final_outcome_uidx`.
+    await this.lockRestockIntent(client, merchantId, dto.locationId, dto.restockIntentId);
     const intentResult = await client.query<{
       id: string;
       decision: string;
@@ -895,8 +928,7 @@ export class PosInventoryRepository {
           AND NOT EXISTS (
             SELECT 1 FROM merchant.inventory_restock_outcome terminal
              WHERE terminal.restock_intent_id=i.id AND terminal.outcome<>'review_required'
-          )
-        FOR UPDATE`,
+          )`,
       [dto.restockIntentId, merchantId, dto.locationId, dto.expectedVersion],
     );
     const intent = intentResult.rows[0];
@@ -1071,6 +1103,23 @@ export class PosInventoryRepository {
     );
     if (locationVersion.rows[0]?.version !== dto.expectedVersion) {
       throw new ConflictException({ code: 'INVENTORY_VERSION_CHANGED' });
+    }
+    // One active count per inventory location — that is what
+    // `inventory_count_active_scope_uidx` enforces — and the rule is the
+    // warehouse's, not the session's. Without this the second count of a shift
+    // reached the INSERT and the index answered with a raw duplicate key: a 500
+    // on the iMin D3-504 on 2026-10-11, because a till that had restarted (a new
+    // operator session) could not see the count it had just started.
+    const activeCount = await client.query<{ id: string }>(
+      `SELECT id::text FROM merchant.inventory_count
+        WHERE merchant_id=$1::uuid AND inventory_location_id=$2::uuid
+          AND status IN ('draft','counting','submitted','variance_calculated',
+            'reconciliation_required','approved')
+        LIMIT 1`,
+      [merchantId, dto.inventoryLocationId],
+    );
+    if (activeCount.rows[0]) {
+      throw new ConflictException({ code: 'INVENTORY_COUNT_ALREADY_ACTIVE' });
     }
     const fingerprint = commandFingerprint('pos.inventory.count.create', dto);
     const scopeResult = await client.query<{ itemIds: string[] }>(

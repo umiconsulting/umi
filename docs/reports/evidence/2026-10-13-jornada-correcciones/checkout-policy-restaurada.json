@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Permitir tarjeta en terminal manual",
+    "status": 200,
+    "body": {
+      "manualTerminalEnabled": false,
+      "mixedTenderEnabled": false,
+      "allowDineInWithoutTable": true,
+      "version": "7ea7d097-fa8c-4259-ab2e-fd7e3e40d50d"
+    }
+  },
+  {
+    "name": "Permitir Comer aquí sin mesa",
+    "status": 200,
+    "body": {
+      "manualTerminalEnabled": false,
+      "mixedTenderEnabled": false,
+      "allowDineInWithoutTable": false,
+      "version": "9e28b516-a411-4871-9d60-a9f90e145b5b"
+    }
+  }
+]

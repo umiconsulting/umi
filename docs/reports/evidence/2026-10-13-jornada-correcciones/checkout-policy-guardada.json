@@ -1,0 +1,9 @@
+{
+  "merchantId": "e6b14af1-b814-4efe-a6b0-67f5f02f4d53",
+  "locationId": "54be4d9e-fa0a-4a42-b95f-402acfccade6",
+  "manualTerminalEnabled": true,
+  "mixedTenderEnabled": true,
+  "allowDineInWithoutTable": true,
+  "maximumTenderLines": 2,
+  "version": "7bf89a85-de99-4ea6-a497-3655937bd8ac"
+}

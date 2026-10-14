@@ -359,4 +359,28 @@ describe('DevicesService', () => {
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
+
+  it('carries the requested mode into the update', async () => {
+    const { service, repo } = make();
+    await service.update(
+      device.merchantId,
+      device.id,
+      { displayName: 'Cocina', mobility: 'static', type: 'kds' },
+      [device.locationId],
+    );
+    expect(repo.updateDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'kds', displayName: 'Cocina', mobility: 'static' }),
+    );
+  });
+
+  it('leaves the mode alone when the update does not name one', async () => {
+    const { service, repo } = make();
+    await service.update(
+      device.merchantId,
+      device.id,
+      { displayName: 'Caja 2', mobility: 'mobile' },
+      [device.locationId],
+    );
+    expect(repo.updateDevice.mock.calls[0][0]).not.toHaveProperty('kind');
+  });
 });

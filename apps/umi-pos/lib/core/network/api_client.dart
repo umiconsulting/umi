@@ -22,13 +22,19 @@ abstract interface class AccessTokenProvider {
 }
 
 abstract interface class DeviceCredentialProvider {
-  Future<Map<String, String>> deviceHeaders();
+  /// The device's credential headers for one request.
+  ///
+  /// [path] is the app-relative route the headers will ride. A provider that
+  /// signs a possession proof needs it: the server verifies that proof on the
+  /// routes that establish trust and nowhere else, so a proof on the others is
+  /// pure cost. Providers that only carry a credential may ignore it.
+  Future<Map<String, String>> deviceHeaders({String? path});
 }
 
 final class NoDeviceCredentialProvider implements DeviceCredentialProvider {
   const NoDeviceCredentialProvider();
   @override
-  Future<Map<String, String>> deviceHeaders() async => const {};
+  Future<Map<String, String>> deviceHeaders({String? path}) async => const {};
 }
 
 final class NoAccessTokenProvider implements AccessTokenProvider {
@@ -178,7 +184,9 @@ final class BoundedApiClient implements ApiClient {
       final correlationId = _correlationId();
       try {
         final token = await _tokenProvider.accessToken();
-        final deviceHeaders = await _deviceCredentialProvider.deviceHeaders();
+        final deviceHeaders = await _deviceCredentialProvider.deviceHeaders(
+          path: path,
+        );
         final request =
             http.Request(method.name.toUpperCase(), base.resolve(path))
               ..headers.addAll({

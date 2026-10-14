@@ -3,12 +3,14 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import type {
   AssignHardwareRequest,
   ControlledReprintRequest,
+  DashboardHardwareList,
   HardwareCommandRequest,
   HardwareCommandTransitionRequest,
   HardwareDiagnosticRequest,
@@ -28,6 +30,8 @@ import { PosHardwareRepository } from './pos-hardware.repository';
 
 @Injectable()
 export class PosHardwareService {
+  private readonly logger = new Logger(PosHardwareService.name);
+
   constructor(
     private readonly repo: PosHardwareRepository,
     private readonly integrity: IntegrityService,
@@ -35,7 +39,19 @@ export class PosHardwareService {
 
   async registry(user: AuthUser, merchantId: string, query: HardwareRegistryQuery) {
     await this.authorize(user, merchantId, query, 'hardware.read');
-    return this.repo.snapshot(user.id, merchantId, query);
+    return this.repo.snapshot(user.id, merchantId, query, user.deviceId ?? null);
+  }
+
+  /**
+   * The back office's hardware inventory. No operator session and no register: this is a
+   * read of what the café owns, not an act at a till, so the caller's branch authority is
+   * the whole scope.
+   */
+  async listForDashboard(
+    merchantId: string,
+    locationIds: string[] | null,
+  ): Promise<DashboardHardwareList> {
+    return { devices: await this.repo.listForDashboard(merchantId, locationIds) };
   }
 
   async register(user: AuthUser, merchantId: string, dto: RegisterHardwareRequest) {
@@ -606,6 +622,17 @@ export class PosHardwareService {
       HARDWARE_FOUNDATION_ONLY: 'HARDWARE_CAPABILITY_UNSUPPORTED',
     };
     const code = Object.entries(mapping).find(([source]) => message.includes(source))?.[1];
+    // WHY THE CAUSE IS LOGGED HERE AND NOT ONLY RETURNED.
+    //
+    // Anything that reaches this catch-all is reported to the till as the generic
+    // HARDWARE_COMMAND_FAILED — correct (the operator must not read SQL) and useless for
+    // whoever has to fix it. Every receipt print failed that way for a whole release
+    // because a query compared a TEXT column against a uuid parameter and nothing said so:
+    // the till said "no se completó la operación" and the server said
+    // HARDWARE_COMMAND_FAILED, while the real sentence ("operator does not exist: text =
+    // uuid") existed only inside this function (iMin D3-504, 2026-10-12). One line in the
+    // log is the difference between an hour of guessing and a minute of reading.
+    this.logger.warn(`hardware command refused (${code ?? 'HARDWARE_COMMAND_FAILED'}): ${message}`);
     return new ConflictException({ code: code ?? 'HARDWARE_COMMAND_FAILED' });
   }
 }

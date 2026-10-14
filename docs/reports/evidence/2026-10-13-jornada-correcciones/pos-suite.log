@@ -1,0 +1,984 @@
+Resolving dependencies...
+Downloading packages...
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.1.0 available)
+  connectivity_plus 7.3.1 (7.3.2 available)
+  cryptography 2.7.0 (2.9.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  flutter_secure_storage 9.2.4 (11.2.0 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.3 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.1.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  hooks 2.0.2 (2.2.0 available)
+  http 1.5.0 (1.6.0 available)
+  jni 1.0.0 (1.1.0 available)
+  jni_flutter 1.0.1 (1.0.4+1 available)
+  js 0.6.7 (0.7.2 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  nm 0.5.0 (0.6.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  package_config 2.2.0 (3.0.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  process 5.0.5 (5.0.6 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences 2.5.3 (2.5.6 available)
+  shared_preferences_android 2.4.27 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.12 (0.7.15 available)
+  vm_service 15.2.0 (15.3.0 available)
+  webdriver 3.1.0 (3.2.0 available)
+  win32 5.15.0 (6.4.0 available)
+  xml 7.0.1 (7.1.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+35 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/api_client_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/api_client_test.dart: a bodyless POST does not declare a JSON request body
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/api_client_test.dart: an expired token is renewed once and the POST is retried
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/api_client_test.dart: a dead session surfaces the original error without looping
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/api_client_test.dart: a burst of expired requests triggers a single renewal
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/api_client_test.dart: the renewal request itself does not auto-refresh
+00:00 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/bootstrap_test.dart: bootstrap reaches ready-for-authentication without authenticating
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a refused add answers false and keeps the reason — the rail counts adds, not taps
+00:00 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a refused add answers false and keeps the reason — the rail counts adds, not taps
+00:00 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a refused add answers false and keeps the reason — the rail counts adds, not taps
+00:00 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/bootstrap_test.dart: bootstrap fails safely when encrypted storage is unavailable
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=storageUnavailable category=unavailable correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:00 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a refused add answers false and keeps the reason — the rail counts adds, not taps
+00:00 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: cart open creates or restores without an expected 404 read
+00:00 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: cart uses server snapshot and preserves partition across navigation
+00:00 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a course set while adding a line reaches the request
+00:00 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: an ordinary line defaults to the first course
+00:00 +14: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: moving an existing line to another course rewrites that line
+00:00 +15: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: changing a quantity keeps the line on its course
+00:00 +16: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: cart cleanup drops all presentation state
+00:00 +17: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: fire sends the cart, re-reads it and marks it fired
+00:00 +18: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: the order type is a cart fact, set once
+00:00 +19: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a cart that gained a line after the fire sends only that
+00:00 +20: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_test.dart: a refused fire keeps the cart and reports the code
+00:00 +21: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_load_failure_test.dart: a failure the API did not describe still clears busy and names itself
+00:00 +22: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_load_failure_test.dart: a load that fails can be retried, and the retry reaches the server
+00:00 +23: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: production configuration fails closed without TLS
+00:00 +24: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: production configuration rejects development controls
+00:00 +25: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: pilot rejects diagnostics and hardware simulator defaults
+00:00 +26: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: a web build is refused as a production POS
+00:00 +27: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: a web build is refused as a pilot POS
+00:00 +28: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: a web build is allowed as a development preview
+00:00 +29: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/config_test.dart: invalid environment fails closed
+00:00 +30: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller a gone interface is offline in one signal, not three failures
+00:00 +31: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller a gone interface outruns a request streak that has not landed
+00:00 +32: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller a returning interface is recovering, never online
+00:00 +33: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller a success from before the interface moved does not count
+00:00 +34: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller going offline by OS does not shorten the next request streak
+00:00 +35: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller an interface signal cannot override a revoked device
+00:00 +36: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller a returning interface does not disturb a replay in progress
+00:00 +37: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the OS source in the controller an adapter with no watcher leaves the state exactly as it was
+00:00 +38: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the plugin adapter any interface other than none is up, and none is down
+00:00 +39: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the plugin adapter a plugin that throws knows nothing, it is not an offline till
+00:00 +40: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the plugin adapter a plugin that answers nothing usable takes no position
+00:00 +41: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the plugin adapter the watch stream maps transitions and survives a plugin error
+00:00 +42: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the composition root wiring the OS stream drives the controller
+00:00 +43: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the composition root wiring a boot read that finds no interface starts the till offline
+00:00 +44: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the composition root wiring a boot read that fails is not a reason to go offline
+00:00 +45: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/connectivity_source_test.dart: the composition root wiring disposing the root cancels the interface watch
+00:00 +46: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/credential_vault_test.dart: installation identity is stable but is not proof of enrollment
+00:00 +47: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/credential_vault_test.dart: tenant change clears branch and operator partitions
+00:00 +48: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/credential_vault_test.dart: revocation cleanup preserves installation identity but removes trust and session
+00:00 +49: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: generated Dart contract reads the canonical fingerprint vector
+00:00 +50: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: search keeps the merchant-scoped masked customer projection
+00:00 +51: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: minimal customer creation does not infer consent
+00:00 +52: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: value preview stays server-authoritative
+00:00 +53: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: reward and wallet authorizations build one checkout selection
+00:00 +54: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: manual points adjustment keeps the preview command and exact approval binding
+00:00 +55: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/desktop_updater_test.dart: resolveAppImageAsset picks the x86_64 AppImage and strips the leading v from the tag
+00:00 +56: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/desktop_updater_test.dart: resolveAppImageAsset picks the x86_64 AppImage and strips the leading v from the tag
+00:00 +57: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/desktop_updater_test.dart: resolveAppImageAsset picks the x86_64 AppImage and strips the leading v from the tag
+00:00 +58: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +59: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +60: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +61: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +62: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +63: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +64: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +65: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +66: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +67: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +68: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +69: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +70: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +71: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +72: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:00 +73: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +74: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +75: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +76: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +77: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +78: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +79: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +80: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +81: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +82: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +83: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +84: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +85: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +86: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +87: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +88: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +89: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer centre will not offer an attach with no sale behind it
+00:01 +90: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +91: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +92: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +93: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +94: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +95: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +96: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +97: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +98: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +99: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/customer_value_test.dart: the customer center words money in pesos, never in raw minor units
+00:01 +100: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +101: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +102: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +103: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +104: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +105: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +106: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +107: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +108: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +109: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +110: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +111: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +112: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +113: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +114: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:01 +115: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +116: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +117: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +118: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +119: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +120: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +121: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +122: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +123: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +123: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: map labels shrink at 200 percent on a narrow floor plan
+floor-plan 375x812 text=200% nominal=23.400000000000002 rendered=3.2187895791583236 scale=0.13755511022044117
+00:02 +124: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +125: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +126: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +127: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +128: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +129: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: a queued ticket crosses its station threshold without a refresh
+00:02 +130: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +131: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +132: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +133: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +134: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +135: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +136: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +137: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +138: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +139: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +140: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +141: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +142: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +143: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +144: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +145: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +146: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +147: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +148: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +149: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +150: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +151: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +152: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +153: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +154: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +155: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +156: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +157: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +158: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +159: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +160: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +161: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +162: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +163: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +164: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +165: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +166: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +167: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +168: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +169: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +170: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +171: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +172: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +173: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +174: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +175: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +176: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +177: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +178: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +179: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +180: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +181: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +182: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +183: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +184: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +185: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +186: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +187: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +188: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:02 +189: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a screen station keeps its chip with no work
+00:02 +190: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: surface shows area tabs and switches the rendered area
+00:02 +191: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: surface shows area tabs and switches the rendered area
+00:02 +192: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: surface shows area tabs and switches the rendered area
+00:02 +193: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: surface shows area tabs and switches the rendered area
+00:03 +194: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: waiter opens the table account without room management permissions
+00:03 +195: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: waiter opens the table account without room management permissions
+00:03 +196: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: occupied table keeps its state glyph below its label
+00:03 +197: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready station can finish while the whole order stays partial
+00:03 +198: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +199: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +200: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +201: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +202: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +203: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +204: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +205: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:03 +206: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a voided line stays visible and is never tappable
+00:03 +207: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a voided line stays visible and is never tappable
+00:03 +208: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:03 +209: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:03 +210: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:03 +211: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:03 +212: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:03 +213: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:03 +214: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface the fire action names the next held course and sends it
+00:03 +215: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a free table can start a party (defect D27)
+00:03 +216: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a free table can start a party (defect D27)
+00:03 +217: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a queued ticket can be started, and the action is per state
+00:03 +218: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/offline_policy_test.dart: encrypted policy validates scope and exact cash limits
+00:03 +219: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/offline_policy_test.dart: encrypted policy validates scope and exact cash limits
+00:03 +220: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/offline_policy_test.dart: encrypted policy validates scope and exact cash limits
+00:03 +221: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +222: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +223: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +224: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +225: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +226: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +227: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +228: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +229: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +230: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +231: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:03 +232: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +233: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +234: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +235: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +236: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +237: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +238: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +239: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +240: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +241: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a ready ticket can be recalled, and only with a reason
+00:03 +242: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:03 +243: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:03 +244: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:03 +245: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:03 +246: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:03 +247: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:03 +248: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the surface a line shows every allergen label it carries
+00:03 +249: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: the plan hint stands down once a table mode is armed
+00:04 +250: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: the plan hint stands down once a table mode is armed
+00:04 +251: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: the plan hint stands down once a table mode is armed
+00:04 +252: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: the prep tab (plan 8.4) it asks with the till own scope and works the largest first
+00:04 +253: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: moving a party keeps its timer and marks the origin for cleaning
+00:04 +254: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/recovery_orchestrator_test.dart: restart queries a lost response before replay and maps it once
+00:04 +255: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/recovery_orchestrator_test.dart: restart queries a lost response before replay and maps it once
+00:04 +256: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +257: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +258: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +259: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +260: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +261: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +262: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +263: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +264: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +265: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +266: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +267: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:04 +268: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(375.0, 812.0) at 200%
+00:04 +269: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(375.0, 812.0) at 200%
+00:04 +270: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(375.0, 812.0) at 200%
+00:04 +271: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(375.0, 812.0) at 200%
+00:04 +272: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(375.0, 812.0) at 200%
+00:04 +273: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(375.0, 812.0) at 200%
+00:04 +274: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a target too small refuses locally with a recovery to read
+00:04 +275: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated ticket keeps reference, quantity and held instruction es Size(1280.0, 1000.0) at 200%
+00:04 +276: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a server refusal shows a typed message with a recovery action
+00:04 +277: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated board retains ticket and recovers failed refresh es at 200%
+00:04 +278: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: selected table remains visible after desktop becomes narrow
+00:04 +279: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: selected table remains visible after desktop becomes narrow
+00:04 +280: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: selected table remains visible after desktop becomes narrow
+00:04 +281: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated board retains ticket and recovers failed refresh en at 200%
+00:04 +282: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: populated board retains ticket and recovers failed refresh en at 200%
+00:04 +283: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity es
+00:04 +284: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity es
+00:04 +285: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity es
+00:04 +286: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity es
+00:04 +287: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity es
+00:04 +288: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity es
+00:04 +289: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity en
+00:04 +290: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity en
+00:04 +291: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: daily count is distinct from ticket quantity en
+00:05 +292: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/usb_printer_transport_test.dart: a write that never lands is unknown, so a retry could double
+00:05 +293: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es queued
+00:05 +294: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/usb_printer_transport_test.dart: health reads the printer status and reports it ready
+00:05 +295: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +296: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +297: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +298: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +299: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +300: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +301: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +302: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/kitchen/kitchen_board_test.dart: read-only kitchen role has no command affordances es ready
+00:05 +303: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/activity_listener_test.dart: a pointer press reports activity
+00:05 +304: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/activity_listener_test.dart: a pointer press reports activity
+00:05 +305: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/activity_listener_test.dart: a pointer press reports activity
+00:05 +306: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/activity_listener_test.dart: a pointer press reports activity
+00:05 +307: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/activity_listener_test.dart: a pointer press reports activity
+00:05 +308: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:05 +309: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:05 +310: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:05 +311: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +312: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +313: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +314: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +315: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +316: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +317: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +318: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +319: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +320: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +321: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +322: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +323: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +324: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +325: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +326: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +327: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +328: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: the open mobile cart sheet follows authoritative cart changes
+00:06 +329: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: total-only count keeps the principal policy and closes safely cancel=false
+00:06 +330: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: total-only count keeps the principal policy and closes safely cancel=false
+00:06 +331: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: total-only count keeps the principal policy and closes safely cancel=false
+00:06 +332: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: total-only count keeps the principal policy and closes safely cancel=false
+00:06 +333: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: total-only count keeps the principal policy and closes safely cancel=false
+00:06 +334: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_keyboard_test.dart: keyboard focus draws a ring and keeps control geometry
+00:06 +335: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_keyboard_test.dart: keyboard focus draws a ring and keeps control geometry
+00:06 +336: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: going takeout on a table account warns that the table is emptied
+00:06 +337: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +338: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +339: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +340: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +341: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +342: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +343: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:06 +344: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:07 +345: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: cash denominations fit beside persistent desktop navigation
+00:07 +346: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_semantics_test.dart: the live regions are the state and the answer, not the screen
+00:07 +347: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_semantics_test.dart: the live regions are the state and the answer, not the screen
+00:07 +348: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_semantics_test.dart: the live regions are the state and the answer, not the screen
+00:07 +349: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_semantics_test.dart: the live regions are the state and the answer, not the screen
+00:07 +350: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +351: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +352: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +353: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +354: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +355: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +356: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +357: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +358: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +359: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +360: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +361: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +362: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +363: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +364: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +365: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +366: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +367: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +368: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +369: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +370: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +371: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: an unavailable provider offers no card tile, and cash still pays
+00:07 +372: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: virtualized catalog surface renders authoritative product data
+00:07 +373: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: virtualized catalog surface renders authoritative product data
+00:07 +374: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: virtualized catalog surface renders authoritative product data
+00:07 +375: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: virtualized catalog surface renders authoritative product data
+00:07 +376: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +377: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +378: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +379: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +379: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: the count exit posts the sequence the count was taken at
+[umipos] cash op blew up BEFORE the server saw it: _TypeError type 'Null' is not a subtype of type 'String' in type cast
+#0      new CashShift.fromJson (package:umi_contract/umi_contract.dart:2316:38)
+#1      _FakeCashRepository.cancelCount (file:///home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart:268:22)
+#2      CashController.cancelCount.<anonymous closure> (package:umi_pos/features/cash/cash_controller.dart:758:25)
+<asynchronous suspension>
+#3      CashController._perform (package:umi_pos/features/cash/cash_controller.dart:1114:7)
+<asynchronous suspension>
+#4      CashController.cancelCount (package:umi_pos/features/cash/cash_controller.dart:756:5)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart:1001:5)
+<asynchronous suspension>
+#6      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#7      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#8      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+
+00:08 +380: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +381: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +382: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +383: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +384: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +385: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +386: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +387: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +388: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +389: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +390: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 1.0
+00:08 +391: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +392: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +392: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/contract_and_widget_test.dart: bootstrap presents the localized trusted-device boundary
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:08 +393: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +394: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +395: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +396: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +397: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +398: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +399: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +400: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:08 +401: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tender corrected after the preview re-keys the pair before the charge
+00:09 +402: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/contract_and_widget_test.dart: bootstrap presents the localized trusted-device boundary
+00:09 +403: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 2.0
+00:09 +403: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/contract_and_widget_test.dart: system English regional locale uses English presentation
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:09 +404: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 2.0
+00:09 +405: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short es viewport reveals editor, last product and cart actions at 2.0
+00:09 +406: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: detail choices and note survive desktop-phone-desktop resizing
+00:09 +407: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: detail choices and note survive desktop-phone-desktop resizing
+00:09 +408: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: detail choices and note survive desktop-phone-desktop resizing
+00:09 +409: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: an approval the till refuses is said out loud, and the amount survives it
+00:09 +410: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: an approval the till refuses is said out loud, and the amount survives it
+00:09 +411: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a tip is collected: the tender covers the amount due it creates
+00:09 +412: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: stopping the wait keeps the unresolved tender and cancels nothing
+00:09 +413: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_point_tender_test.dart: stopping the wait keeps the unresolved tender and cancels nothing
+00:09 +414: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: a rate-locked till says so and stops inviting a PIN
+00:09 +415: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: a rate-locked till says so and stops inviting a PIN
+00:09 +416: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: a rate-locked till says so and stops inviting a PIN
+00:09 +417: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 1.0
+00:09 +418: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 1.0
+00:09 +419: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 1.0
+00:10 +420: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +421: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +422: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +423: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +424: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +425: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +425: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: a refused close approval names itself and does not close the shift
+[umipos] cash op refused: VALIDATION_FAILED (AppException) details=null
+00:10 +426: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +427: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +428: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +429: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +429: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cash_center_test.dart: a movement the server has not settled refuses the next one OUT LOUD
+[umipos] cash op refused: CASH_RECOVERY_ACTION_REQUIRED (AppException) details=null
+00:10 +430: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +431: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +432: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +433: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +434: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +435: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/course_control_test.dart: the hint says what the number means, so it cannot read as a clock
+00:10 +436: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 2.0
+00:10 +437: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 2.0
+00:10 +438: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 2.0
+00:10 +439: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 2.0
+00:10 +440: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: short en viewport reveals editor, last product and cart actions at 2.0
+00:10 +441: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +442: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +443: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +444: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +445: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +446: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +447: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +448: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +449: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: typing a quantity feeds the tally and the line total
+00:10 +450: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: split tender: the change line measures the cash leg, not the bill
+00:10 +451: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: split tender: the change line measures the cash leg, not the bill
+00:10 +452: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: split tender: the change line measures the cash leg, not the bill
+00:10 +453: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: split tender: the change line measures the cash leg, not the bill
+00:11 +454: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: split tender: the change line measures the cash leg, not the bill
+00:11 +455: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: the buttons write the number into the field
+00:11 +456: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/cart_layout_test.dart: Nueva cuenta stands down on an empty account and writes nothing
+00:11 +457: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a second method tile replaces the first; it never splits
+00:11 +458: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/checkout_test.dart: a second method tile replaces the first; it never splits
+00:11 +459: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/denomination_counter_test.dart: focus selects the whole quantity, so typing replaces it
+00:11 +460: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +461: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +462: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +463: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +464: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +465: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +466: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +467: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +468: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +469: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +470: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +471: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +472: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +473: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +474: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +475: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: another POS session explains the conflict and permits another PIN
+00:11 +476: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +477: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +478: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +479: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +480: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +481: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +482: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +483: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/display_preferences_test.dart: settings remain usable at phone scale 2 in Brightness.dark
+00:11 +484: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/estacion_text_size_test.dart: rail keeps complete es words at scale 1.5
+00:11 +484: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:12 +485: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/estacion_text_size_test.dart: rail keeps complete es words at scale 1.5
+00:12 +486: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/estacion_text_size_test.dart: rail keeps complete es words at scale 1.5
+00:12 +487: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +488: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +489: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +490: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +491: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +492: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +493: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +494: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +495: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +496: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +497: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +498: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +499: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +500: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +501: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +502: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +503: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +504: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +505: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +506: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +507: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +508: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +509: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +510: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +511: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: enrollment and PIN actions explain invalid input by state
+00:12 +512: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +513: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +514: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +514: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/gate8a_operator_experience_test.dart: entry remains usable at compact width and 200 percent text
+umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.12.0 clientVersion=0.1.0-test environment=development api=https://api.example.test deviceKey=
+00:12 +515: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +516: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +517: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +518: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/hardware_service_test.dart: a completed wedge scan consumes Enter before a focused action
+00:12 +519: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +520: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +521: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +522: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +523: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +524: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +525: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +526: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +527: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +528: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a four-digit operator PIN is not sent as a setup code
+00:12 +529: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a rejected setup code shows an inline field error
+[umipos] enrollment failed code=ENROLLMENT_REJECTED category=authentication correlationId=null
+00:12 +530: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:12 +530: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/device_pairing_test.dart: a setup code timeout shows an inline recovery error
+[umipos] enrollment failed code=REQUEST_TIMEOUT category=authentication correlationId=null
+00:12 +531: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:12 +532: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:12 +533: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:12 +534: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:12 +535: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +536: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +537: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +538: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +539: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +540: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +541: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +542: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +543: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +544: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +545: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +546: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +547: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +548: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +549: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +550: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +551: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +552: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +553: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +554: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +555: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +556: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +557: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +558: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +559: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/incoming_orders_surface_test.dart: lists an incoming order and picks it up into the cart
+00:13 +560: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_production_test.dart: production uses visible decimals at the selected item scale
+00:13 +561: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_production_test.dart: production uses visible decimals at the selected item scale
+00:13 +562: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_production_test.dart: production uses visible decimals at the selected item scale
+00:13 +563: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_production_test.dart: production uses visible decimals at the selected item scale
+00:13 +564: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_test.dart: blind count requests only active items in its own warehouse
+00:13 +565: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_test.dart: blind count requests only active items in its own warehouse
+00:13 +566: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_test.dart: blind count requests only active items in its own warehouse
+00:13 +567: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_action_semantics_test.dart: an icon action has a name and accepts keyboard activation
+00:13 +568: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_button_states_test.dart: icon styles follow pointer and disabled states
+00:14 +569: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_button_states_test.dart: icon styles follow pointer and disabled states
+00:14 +570: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_button_states_test.dart: icon styles follow pointer and disabled states
+00:14 +571: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_button_states_test.dart: icon styles follow pointer and disabled states
+00:14 +572: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_dialog_keyboard_test.dart: modal keeps forward traversal and restores its source
+00:14 +573: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_dialog_keyboard_test.dart: modal keeps forward traversal and restores its source
+00:14 +574: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_dialog_keyboard_test.dart: modal keeps forward traversal and restores its source
+00:14 +575: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_dialog_keyboard_test.dart: modal keeps forward traversal and restores its source
+00:14 +576: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_dialog_keyboard_test.dart: modal keeps forward traversal and restores its source
+00:14 +577: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_dialog_keyboard_test.dart: modal keeps forward traversal and restores its source
+00:14 +578: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +579: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +580: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +581: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +582: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +583: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +584: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +585: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +586: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +587: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +588: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +589: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: primary typography preserves the button foreground
+00:14 +590: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/inventory_test.dart: Manager sees permission-aware inventory actions and count
+00:14 +591: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: editing menu fits a narrow enlarged viewport and copies text
+00:14 +592: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: editing menu fits a narrow enlarged viewport and copies text
+00:14 +593: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: editing menu fits a narrow enlarged viewport and copies text
+00:14 +594: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: editing menu fits a narrow enlarged viewport and copies text
+00:14 +595: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_editing_menu_test.dart: editing menu fits a narrow enlarged viewport and copies text
+00:14 +596: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_field_touch_test.dart: touch on field padding opens the Android keyboard
+00:14 +597: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_field_touch_test.dart: touch on field padding opens the Android keyboard
+00:14 +598: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_field_touch_test.dart: touch on field padding opens the Android keyboard
+00:15 +599: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_focus_scroll_test.dart: focusing a scrolled action reveals it without activating it
+00:15 +600: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_form_lifecycle_test.dart: initial text survives validation, save and reset
+00:15 +601: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_form_lifecycle_test.dart: initial text survives validation, save and reset
+00:15 +602: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_form_lifecycle_test.dart: initial text survives validation, save and reset
+00:15 +603: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_form_lifecycle_test.dart: initial text survives validation, save and reset
+00:15 +604: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_glyph_inventory_test.dart: every declared glyph has a drawing and fits its box
+00:15 +605: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_glyph_inventory_test.dart: every declared glyph has a drawing and fits its box
+00:15 +606: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_header_layout_test.dart: header and navigation consume system padding once
+00:15 +607: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_menu_behavior_test.dart: selection stays beside its source and restores keyboard focus
+00:15 +608: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_menu_behavior_test.dart: selection stays beside its source and restores keyboard focus
+00:16 +609: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_menu_behavior_test.dart: selection stays beside its source and restores keyboard focus
+00:16 +610: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_menu_behavior_test.dart: selection stays beside its source and restores keyboard focus
+00:16 +611: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_motion_test.dart: line progress announces known amounts and stops reduced motion
+00:16 +612: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +613: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +614: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +615: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +616: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +617: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +618: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1024.0
+00:16 +619: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_layout_test.dart: navigation keeps complete es labels at 1.0 in Size(375.0, 812.0)
+00:16 +620: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1280.0
+00:16 +621: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1280.0
+00:16 +622: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1280.0
+00:16 +623: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_navigation_focus_test.dart: menu returns focus to its destination without selecting in es at 1280.0
+00:16 +624: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +625: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +626: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +627: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +628: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +629: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +630: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +631: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +632: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:16 +633: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:17 +634: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:17 +635: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:17 +636: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:17 +637: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:17 +638: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_selection_focus_test.dart: keyboard reveals and identifies a selected document reference
+00:17 +639: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_type_and_entry_test.dart: enrollment retains focus when the Android keyboard opens
+00:17 +640: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_type_and_entry_test.dart: enrollment retains focus when the Android keyboard opens
+00:17 +641: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_type_and_entry_test.dart: enrollment retains focus when the Android keyboard opens
+00:17 +642: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_type_and_entry_test.dart: enrollment retains focus when the Android keyboard opens
+00:17 +643: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_type_and_entry_test.dart: enrollment retains focus when the Android keyboard opens
+00:17 +644: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/pos_type_and_entry_test.dart: enrollment retains focus when the Android keyboard opens
+00:17 +645: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:17 +646: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:17 +647: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:17 +648: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:17 +649: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +650: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +651: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +652: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +653: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +654: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +655: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +656: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +657: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +658: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +659: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +660: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +661: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +662: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +663: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +664: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +665: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +666: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +667: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +668: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +669: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +670: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +671: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +672: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +673: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +674: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:18 +675: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +676: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +677: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +678: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +679: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +680: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +681: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +682: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +683: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +684: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +685: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +686: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +687: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +688: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +689: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +690: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +691: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +692: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +693: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +694: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +695: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +696: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +697: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +698: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +699: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +700: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +701: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +702: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +703: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +704: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +705: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +706: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +707: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +708: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +709: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +710: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:19 +711: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +712: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +713: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +714: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +715: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +716: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +717: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +718: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +719: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +720: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +721: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +722: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +723: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +724: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +725: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +726: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(375.0, 812.0)
+00:20 +727: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:20 +728: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:20 +729: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:20 +730: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:20 +731: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:20 +732: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:21 +733: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +734: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +735: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +736: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +737: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +738: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +739: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +740: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +741: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +742: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +743: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +744: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +745: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +746: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +747: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +748: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +749: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +750: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +751: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +752: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +753: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +754: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +755: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +756: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +757: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +758: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +759: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +760: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +761: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +762: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +763: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +764: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +765: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +766: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +767: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +768: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +769: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +770: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +771: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +772: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +773: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +774: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +775: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +776: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +777: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +778: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +779: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +780: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +781: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +782: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +783: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +784: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +785: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +786: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +787: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +788: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +789: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +790: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +791: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +792: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +793: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +794: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:21 +795: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +796: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +797: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +798: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +799: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +800: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +801: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +802: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +803: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +804: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +805: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +806: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +807: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +808: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +809: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 1.0 Size(812.0, 375.0)
+00:22 +810: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_print_action_test.dart: the button prints this receipt, and the dialog stays open
+00:22 +811: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +812: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +813: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +814: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +815: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +816: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +817: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +818: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +819: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +820: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +821: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +822: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +823: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +824: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +825: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +826: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +827: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +828: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:23 +829: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +830: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +831: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +832: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +833: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +834: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +835: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +836: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +837: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +838: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +839: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:23 +840: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +841: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +842: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +843: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +844: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +845: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +846: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +847: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +848: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +849: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +850: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +851: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +852: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:24 +853: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +854: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +855: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +856: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +857: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +858: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +859: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +860: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +861: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +862: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +863: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +864: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +865: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +866: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +867: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +868: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(375.0, 812.0)
+00:25 +869: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/order_entry_flow_test.dart: fresh mobile account asks for type immediately and once
+00:25 +870: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/order_entry_flow_test.dart: fresh mobile account asks for type immediately and once
+00:25 +871: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +872: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +873: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +874: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +875: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +876: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +877: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +878: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +879: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +880: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +881: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:25 +882: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +883: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +884: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +885: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +886: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +887: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +888: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in es at 2.0 Size(812.0, 375.0)
+00:26 +889: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/order_entry_flow_test.dart: fixed dine in checkout creates three tables and opens checkout without charging
+00:27 +890: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 1.0 Size(375.0, 812.0)
+00:27 +891: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 1.0 Size(375.0, 812.0)
+00:27 +892: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 1.0 Size(375.0, 812.0)
+00:27 +893: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 1.0 Size(375.0, 812.0)
+00:27 +894: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 1.0 Size(812.0, 375.0)
+00:28 +895: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 2.0 Size(375.0, 812.0)
+00:30 +896: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/receipt_document_long_test.dart: 500 variable receipt lines keep keyboard, total and bounded content in en at 2.0 Size(812.0, 375.0)
+00:31 +897: All tests passed!

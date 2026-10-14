@@ -1,0 +1,10 @@
+ carts | last_account 
+-------+--------------
+    86 |          154
+(1 row)
+
+ account_number | status | lifecycle_state | lines 
+----------------+--------+-----------------+-------
+            154 | draft  | building_cart   |     0
+(1 row)
+

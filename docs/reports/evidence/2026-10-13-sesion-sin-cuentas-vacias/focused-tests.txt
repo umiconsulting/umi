@@ -1,0 +1,100 @@
+Resolving dependencies...
+Downloading packages...
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.1.0 available)
+  connectivity_plus 7.3.1 (7.3.2 available)
+  cryptography 2.7.0 (2.9.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  flutter_secure_storage 9.2.4 (11.2.0 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.3 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.1.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  hooks 2.0.2 (2.2.0 available)
+  http 1.5.0 (1.6.0 available)
+  jni 1.0.0 (1.1.0 available)
+  jni_flutter 1.0.1 (1.0.4+1 available)
+  js 0.6.7 (0.7.2 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  nm 0.5.0 (0.6.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  package_config 2.2.0 (3.0.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  process 5.0.5 (5.0.6 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences 2.5.3 (2.5.6 available)
+  shared_preferences_android 2.4.27 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.12 (0.7.15 available)
+  vm_service 15.2.0 (15.3.0 available)
+  webdriver 3.1.0 (3.2.0 available)
+  win32 5.15.0 (6.4.0 available)
+  xml 7.0.1 (7.1.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+35 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart
+00:00 +0: suspended uses a thick plain glyph inside its history tile
+00:00 +1: cancelled uses a thick plain glyph inside its history tile
+00:00 +2: startup recovers the active server sale without creating another
+00:00 +3: startup creates one sale only when no active sale exists
+00:00 +4: suspending the same sale twice creates one transition
+00:00 +5: canEditSale follows the sale on screen, so a control can stand down
+00:00 +6: successful checkout starts the next sale once
+00:00 +7: resume cannot replace an active editable sale
+00:00 +8: cancel is blocked while checkout owns the transition
+00:00 +9: operator exit cancels one empty sale and does not orphan it
+00:00 +10: empty account survives repeated exits with cart authority false
+00:00 +11: identified account is preserved on exit {accountName: Ana} with cart authority false
+00:00 +12: identified account is preserved on exit {tableId: 00000000-0000-4000-8000-000000000080, tableName: Mesa 8} with cart authority false
+00:00 +13: identified account is preserved on exit {firedOrderId: 00000000-0000-4000-8000-000000000081} with cart authority false
+00:00 +14: identified account is preserved on exit {items: [{id: 00000000-0000-4000-8000-000000000030, productId: 00000000-0000-4000-8000-000000000031, productName: Cappuccino, saleAction: merchandise, quantity: 1, courseNumber: 1, variant: null, modifiers: [], note: null, fired: false, price: {unitPrice: {minorUnits: 6200, currency: MXN}, lineSubtotal: {minorUnits: 6200, currency: MXN}, tax: {minorUnits: 855, currency: MXN}, lineTotal: {minorUnits: 6200, currency: MXN}, taxRateBasisPoints: 1600}}]} with cart authority false
+00:00 +15: empty account survives repeated exits with cart authority true
+00:00 +16: identified account is preserved on exit {accountName: Ana} with cart authority true
+00:00 +17: identified account is preserved on exit {tableId: 00000000-0000-4000-8000-000000000080, tableName: Mesa 8} with cart authority true
+00:00 +18: identified account is preserved on exit {firedOrderId: 00000000-0000-4000-8000-000000000081} with cart authority true
+00:00 +19: identified account is preserved on exit {items: [{id: 00000000-0000-4000-8000-000000000030, productId: 00000000-0000-4000-8000-000000000031, productName: Cappuccino, saleAction: merchandise, quantity: 1, courseNumber: 1, variant: null, modifiers: [], note: null, fired: false, price: {unitPrice: {minorUnits: 6200, currency: MXN}, lineSubtotal: {minorUnits: 6200, currency: MXN}, tax: {minorUnits: 855, currency: MXN}, lineTotal: {minorUnits: 6200, currency: MXN}, taxRateBasisPoints: 1600}}]} with cart authority true
+00:00 +20: a committed sale is titled by its account and wears the blue check
+00:00 +21: history recovery closes only an empty draft before resume
+00:00 +22: failed empty-draft cancellation never resumes another order
+00:00 +23: failed resume after an empty replacement remains retryable
+00:00 +24: large history keeps name, amount and action reachable in es at 1.5
+00:00 +25: large history keeps name, amount and action reachable in es at 2.0
+00:01 +26: large history keeps name, amount and action reachable in en at 1.5
+00:01 +27: large history keeps name, amount and action reachable in en at 2.0
+00:01 +28: receipt view requires explicit printing and permission in es: false
+00:01 +29: receipt view requires explicit printing and permission in es: true
+00:01 +30: receipt view requires explicit printing and permission in en: false
+00:01 +31: receipt view requires explicit printing and permission in en: true
+00:01 +32: backward keyboard reveals offscreen history controls in es
+00:01 +33: backward keyboard reveals offscreen history controls in en
+00:02 +34: phone history identifies orders and keeps server totals
+00:02 +35: history recovery cannot clear an order with lines or active checkout
+00:02 +36: a cancellation carries a typed reason and an optional note
+00:02 +37: an empty note stays null: the reason is the fact
+00:02 +38: the cancel dialog will not cancel until a reason is chosen
+00:02 +39: customer attachment stays in the authoritative sale snapshot
+00:02 +40: a new sale abandons a cart in progress only when it is asked to
+00:02 +41: rapid new sale actions create one editable sale
+00:02 +42: a cancelled sale cannot be resumed
+00:02 +43: operator exit suspends a nonempty sale
+00:02 +44: a network failure preserves the editable sale and permits retry
+00:02 +45: rename, detach, history query, and receipt navigation stay typed
+00:02 +46: sale history loads the next cursor without losing the first page
+00:02 +47: latest history query wins when responses arrive out of order
+00:02 +48: obsolete history failure cannot end loading or change the sale
+00:02 +49: a new history query discards a pending append and its cursor
+00:02 +50: a history failure preserves the active commercial sale phase
+00:02 +51: disposing the controller discards a pending history response
+00:02 +52: changing location invalidates a pending history response
+00:02 +53: history page retry preserves rows and cursor at 1.0
+00:02 +54: history page retry preserves rows and cursor at 2.0
+00:02 +55: history distinguishes pending, failure, retry and no matches at 1.0
+00:02 +56: history distinguishes pending, failure, retry and no matches at 2.0
+00:02 +57: sale center exposes localized accessible actions
+00:02 +58: All tests passed!

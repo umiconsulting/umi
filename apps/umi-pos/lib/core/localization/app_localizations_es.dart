@@ -301,42 +301,57 @@ class AppLocalizationsEs extends AppLocalizations {
   String get modifiersLabel => 'Modificadores';
 
   @override
-  String get taxIncludedLabel => 'Impuesto configurado';
+  String get taxIncludedLabel => 'El precio incluye impuestos';
 
   @override
   String get closeAction => 'Cerrar';
 
   @override
-  String get cartTitle => 'Carrito actual';
+  String get kitchenSoundsEnable => 'Activar sonidos';
 
   @override
-  String get cartEmpty => 'Abre un producto para iniciar este carrito.';
+  String get kitchenSoundsMute => 'Silenciar sonidos';
 
   @override
-  String get cartUnavailable => 'El carrito no está disponible temporalmente.';
+  String get kitchenTimeOverdue => 'Tiempo vencido';
+
+  @override
+  String get cartTitle => 'Comanda';
+
+  @override
+  String get cartEmpty => 'Elige un producto de la carta para empezar.';
+
+  @override
+  String get cartUnavailable => 'La comanda no está disponible temporalmente.';
 
   @override
   String get cartNoteLabel => 'Nota del operador';
 
   @override
-  String get cartCourseLabel => 'Curso';
+  String get cartCourseLabel => 'Tiempo de servicio';
 
   @override
-  String get cartCoursePrevious => 'Curso anterior';
+  String get cartCourseHint => '1 se sirve con todo · 2 se prepara después';
 
   @override
-  String get cartCourseNext => 'Curso siguiente';
+  String get cartCoursePrevious => 'Tiempo anterior';
+
+  @override
+  String get cartCourseNext => 'Tiempo siguiente';
 
   @override
   String cartCourseCurrent(int course) {
-    return 'Curso $course';
+    return 'Tiempo $course';
   }
 
   @override
-  String get addToCartAction => 'Agregar al carrito';
+  String get addToCartAction => 'Agregar a la comanda';
 
   @override
   String get removeFromCartAction => 'Eliminar línea';
+
+  @override
+  String get cartQuantityLabel => 'Cantidad';
 
   @override
   String get increaseQuantity => 'Aumentar cantidad';
@@ -348,7 +363,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get subtotalLabel => 'Subtotal';
 
   @override
-  String get taxLabel => 'Impuestos';
+  String get taxLabel => 'Impuestos incluidos';
 
   @override
   String get discountLabel => 'Descuento';
@@ -360,13 +375,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get businessDateLabel => 'Fecha operativa';
 
   @override
+  String get localTimeLabel => 'Hora local';
+
+  @override
   String get checkoutNextGate => 'Checkout disponible en el siguiente Gate';
 
   @override
   String get checkoutAction => 'Cobrar';
 
   @override
-  String get checkoutTitle => 'Cobro autorizado';
+  String get checkoutTitle => 'Cobrar pedido';
 
   @override
   String get operatorLabel => 'Operador';
@@ -376,6 +394,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cashPayment => 'Efectivo';
+
+  @override
+  String get cardPayment => 'Tarjeta';
+
+  @override
+  String get receiptThanksMessage => 'Gracias por su visita';
 
   @override
   String get externalTerminalPayment => 'Terminal externa';
@@ -398,7 +422,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get totalsConfirmedBody =>
-      'UMI recalculó el carrito. Revisa cada total antes de confirmar el pago.';
+      'UMI recalculó la comanda. Revisa cada total antes de confirmar el pago.';
 
   @override
   String get paymentProcessing => 'Procesando pago';
@@ -420,7 +444,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get saleCompletedTitle => 'Venta completada';
 
   @override
-  String get finishSaleAction => 'Finalizar e iniciar otro carrito';
+  String get finishSaleAction => 'Finalizar e iniciar otra comanda';
 
   @override
   String get checkoutFailed =>
@@ -482,7 +506,63 @@ class AppLocalizationsEs extends AppLocalizations {
   String get manualTerminalLabel => 'Terminal manual';
 
   @override
+  String get bankTransferLabel => 'Transferencia bancaria';
+
+  @override
+  String get bankTransferPendingNote =>
+      'Muestra los datos al cliente. La cuenta sigue abierta hasta confirmar el abono.';
+
+  @override
+  String get bankTransferViewDetails => 'Ver datos bancarios';
+
+  @override
+  String get bankTransferAmountLabel => 'Importe a transferir';
+
+  @override
+  String get bankTransferBankLabel => 'Banco';
+
+  @override
+  String get bankTransferHolderLabel => 'Titular';
+
+  @override
+  String get bankTransferAccountLabel => 'Número de cuenta';
+
+  @override
+  String get bankTransferConceptLabel => 'Concepto sugerido';
+
+  @override
+  String get bankTransferAccountWord => 'Cuenta';
+
+  @override
+  String get bankTransferInstructions =>
+      'Verifica el abono en el banco o con el CEP antes de cobrar. Este POS no verifica transferencias de forma automática.';
+
+  @override
+  String get bankTransferSelectAction => 'Usar transferencia';
+
+  @override
+  String get bankTransferConfirmTitle => 'Confirmar abono recibido';
+
+  @override
+  String get bankTransferConfirmBody =>
+      'Confirma sólo si viste el abono en el banco o verificaste el CEP. Una captura del cliente no confirma el pago.';
+
+  @override
+  String get bankTransferConfirmAction => 'Confirmar abono y cobrar';
+
+  @override
   String get terminalProcessingAction => 'Procesando fuera del POS';
+
+  @override
+  String get manualTerminalConfirmTitle => 'Confirmar cobro en la terminal';
+
+  @override
+  String manualTerminalConfirmBody(String amount) {
+    return 'Confirma sólo si la terminal externa aprobó el cargo de $amount. Si no conoces el resultado, cierra este aviso y revisa la terminal antes de intentar otro cobro.';
+  }
+
+  @override
+  String get manualTerminalConfirmAction => 'Confirmar cargo y cobrar';
 
   @override
   String get terminalSuccessAction => 'Confirmar éxito';
@@ -712,7 +792,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get confirmCancelSaleBody =>
-      'El carrito se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.';
+      'La comanda se cerrará sin pago ni recibo. La cancelación permanecerá en el historial de auditoría.';
 
   @override
   String get saleRestoredMessage => 'Tu venta activa se restauró.';
@@ -734,6 +814,18 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get searchCustomerHint => 'Buscar clientes';
+
+  @override
+  String get customerPickerEmptyTitle => 'Aquí aparecerán tus clientes';
+
+  @override
+  String get customerPickerEmptyBody =>
+      'Los que llegan por WhatsApp, los de loyalty y los de Wallet se van sumando aquí. También puedes buscarlos por nombre, teléfono o correo, o cobrarle a un cliente anónimo.';
+
+  @override
+  String customerPickerNoMatch(String query) {
+    return 'Nadie coincide con «$query».';
+  }
 
   @override
   String get recentCustomersAction => 'Clientes recientes';
@@ -796,7 +888,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get openReceiptAction => 'Abrir recibo';
 
   @override
-  String get reprintReceiptAction => 'Ver para reimpresión';
+  String get reprintReceiptAction => 'Imprimir recibo';
 
   @override
   String get receiptAvailableMessage => 'Recibo disponible';
@@ -818,10 +910,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get saveCartLineAction => 'Guardar cambios';
 
   @override
-  String get clearCartAction => 'Vaciar carrito';
+  String get clearCartAction => 'Vaciar comanda';
 
   @override
-  String get confirmClearCartTitle => '¿Vaciar este carrito?';
+  String get confirmClearCartTitle => '¿Vaciar esta comanda?';
 
   @override
   String get confirmClearCartBody =>
@@ -926,6 +1018,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get blindCountAction => 'Iniciar conteo ciego';
 
   @override
+  String get countDrawerAction => 'Contar el cajón';
+
+  @override
   String get recountAction => 'Iniciar reconteo';
 
   @override
@@ -993,6 +1088,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get submitBlindCountAction => 'Enviar conteo ciego';
 
   @override
+  String get submitCountAction => 'Enviar conteo';
+
+  @override
   String get cashOperationFailedMessage =>
       'No fue posible completar la operación de caja de forma segura.';
 
@@ -1007,6 +1105,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cashStatusReconciliation => 'Se requiere conciliación';
+
+  @override
+  String get cashCarriedOverShiftNotice =>
+      'Este turno quedó abierto de un día anterior y el cajón es suyo hasta que se cierre. Cuenta la caja y ciérralo antes de seguir con el día: así el efectivo de hoy no se mezcla con el de ayer.';
 
   @override
   String get cashStatusClosed => 'Turno cerrado';
@@ -1050,6 +1152,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get refundableAmountLabel => 'Importe restante reembolsable';
+
+  @override
+  String get refundAmountLabel => 'Importe del reembolso';
 
   @override
   String get remainingRefundableQuantityLabel => 'Cantidad restante';
@@ -1275,7 +1380,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String tableStateSeatTitle(String table) {
-    return 'Sentar la mesa $table';
+    return 'Sentar en $table';
   }
 
   @override
@@ -1419,7 +1524,20 @@ class AppLocalizationsEs extends AppLocalizations {
   String get tableStateCancelAction => 'Cancelar';
 
   @override
-  String get kitchenBoardTitle => 'Cocina';
+  String get kitchenBoardTitle => 'KDS';
+
+  @override
+  String get kitchenStationAll => 'Todos';
+
+  @override
+  String get sentLineVoidApprovalOperation =>
+      'Cancelar un platillo que cocina ya empezó';
+
+  @override
+  String get sentLineVoidApprovalReasonLabel => 'Motivo de la cancelación';
+
+  @override
+  String get sentLineVoidApprovalCancelAction => 'Volver';
 
   @override
   String get kitchenBoardRefresh => 'Actualizar';
@@ -1444,7 +1562,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get kitchenPrepEmpty =>
-      'Aún no hay artículos con par. Define el par en Inventario.';
+      'No hay niveles objetivo de preparación. Configúralos en Inventario del panel administrativo.';
 
   @override
   String kitchenPrepWindow(String from, String to) {
@@ -1458,7 +1576,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get kitchenPrepUnitColumn => 'Unidad';
 
   @override
-  String get kitchenPrepParColumn => 'Par';
+  String get kitchenPrepParColumn => 'Objetivo';
 
   @override
   String get kitchenPrepOnHandColumn => 'Existencia';
@@ -1486,6 +1604,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get kitchenStatusException => 'Excepción';
+
+  @override
+  String get kitchenStatusCancelled => 'Cancelado';
+
+  @override
+  String get kitchenTicketDiscardAction => 'Descartar';
+
+  @override
+  String get kitchenItemRouteMissing => 'Sin estación asignada';
 
   @override
   String get kitchenPriorityUrgent => 'Urgente';
@@ -1523,7 +1650,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String kitchenCourseGroup(int course) {
-    return 'Curso $course';
+    return 'Tiempo $course';
   }
 
   @override
@@ -1738,14 +1865,14 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String newSaleConfirmBody(int count) {
-    return 'Este carrito tiene $count línea(s) sin cobrar. Se abandona y empieza una venta vacía; no se cobra nada por él.';
+    return 'Esta comanda tiene $count línea(s) sin cobrar. Se abandona y empieza una venta vacía; no se cobra nada por ella.';
   }
 
   @override
-  String get keepCartAction => 'Seguir con este carrito';
+  String get keepCartAction => 'Seguir con esta comanda';
 
   @override
-  String get tenderConflictTitle => 'Este carrito no se puede cobrar así';
+  String get tenderConflictTitle => 'Esta comanda no se puede cobrar así';
 
   @override
   String get tenderConflictBody =>
@@ -2013,6 +2140,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Conteo ciego: el esperado se revela cuando envías tu conteo.';
 
   @override
+  String get countDialogVisibleHint =>
+      'El efectivo esperado está a la vista. Envía lo que contaste.';
+
+  @override
   String countDialogRecountHint(int attempt) {
     return 'Reconteo $attempt: este conteo reemplaza al anterior en el historial.';
   }
@@ -2122,7 +2253,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String tableStatePanelTitle(String table) {
-    return 'Mesa $table';
+    return '$table';
   }
 
   @override
@@ -2136,4 +2267,228 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tableStateGroupField => 'Grupo';
+
+  @override
+  String get noSaleSurfaceTitle => 'Tu rol no abre una caja de venta';
+
+  @override
+  String get noSaleSurfaceBody =>
+      'Usa las pestañas para abrir las herramientas de tu rol.';
+
+  @override
+  String get fireOrderAction => 'Enviar a cocina';
+
+  @override
+  String get firedOrderMarker => 'Enviada a cocina';
+
+  @override
+  String get firedLineMarker => 'Enviada';
+
+  @override
+  String get cancelReasonCustomerChanged => 'El cliente cambió de opinión';
+
+  @override
+  String get cancelReasonOperatorMistake => 'Error del operador';
+
+  @override
+  String get cancelReasonDuplicate => 'Comanda duplicada';
+
+  @override
+  String get cancelReasonOther => 'Otro motivo';
+
+  @override
+  String get cancelSaleNoteLabel => 'Nota (opcional)';
+
+  @override
+  String get otherReasonDetailLabel => 'Describe el motivo';
+
+  @override
+  String get firedOrderSent => 'Comanda enviada a cocina.';
+
+  @override
+  String firedOrderSentReference(String reference) {
+    return 'Comanda $reference enviada a cocina.';
+  }
+
+  @override
+  String get entryCheckingTerminal => 'Comprobando tu terminal';
+
+  @override
+  String get entryRestoringSession => 'Recuperando tu sesión';
+
+  @override
+  String get entryAuthenticating => 'Verificando tu acceso';
+
+  @override
+  String get entryVerifyingPin => 'Verificando tu PIN';
+
+  @override
+  String get entryStartingOperator => 'Preparando tu sesión';
+
+  @override
+  String get entryLoadingBody =>
+      'Estamos preparando el acceso a tu punto de venta.';
+
+  @override
+  String get productVariantRequiredHint =>
+      'Elige una variante para agregar el producto.';
+
+  @override
+  String get productOptionsRequiredHint =>
+      'Completa las opciones obligatorias para continuar.';
+
+  @override
+  String get countedTotalLabel => 'Total contado';
+
+  @override
+  String get openCashAndContinueAction => 'Abrir caja y continuar';
+
+  @override
+  String get openCashAndContinueHint =>
+      'Abre el turno, vuelve al cobro y continuaremos con este pedido.';
+
+  @override
+  String get productInformationLabel => 'Información del producto';
+
+  @override
+  String get productBarcodeLabel => 'Código de barras';
+
+  @override
+  String get returnAndChargeAction => 'Volver y cobrar';
+
+  @override
+  String get previousShiftSummaryLabel => 'Arqueo del turno anterior';
+
+  @override
+  String get resumeCurrentOrderHint =>
+      'Para reanudar otro pedido, suspende o termina el pedido actual.';
+
+  @override
+  String get displaySettingsTitle => 'Ajustes';
+
+  @override
+  String get displaySettingsScope =>
+      'Estas preferencias se guardan en esta terminal y se aplican a todos sus operadores.';
+
+  @override
+  String get appearanceLabel => 'Apariencia';
+
+  @override
+  String get followSystemLabel => 'Seguir al sistema';
+
+  @override
+  String get lightAppearanceLabel => 'Clara';
+
+  @override
+  String get darkAppearanceLabel => 'Oscura';
+
+  @override
+  String get midnightAppearanceLabel => 'Medianoche';
+
+  @override
+  String get languageLabel => 'Idioma';
+
+  @override
+  String get motionLabel => 'Movimiento';
+
+  @override
+  String get reducedMotionLabel => 'Reducido';
+
+  @override
+  String get reducedMotionDescription =>
+      'Reduce las transiciones. Siempre se respeta la preferencia de movimiento reducido del sistema.';
+
+  @override
+  String get operatorSessionLabel => 'Sesión del operador';
+
+  @override
+  String get savingDisplayPreferences => 'Guardando preferencias…';
+
+  @override
+  String get displayPreferencesReadError =>
+      'No se pudieron leer las preferencias. Se usa la apariencia del sistema; puedes guardar una nueva elección.';
+
+  @override
+  String get displayPreferencesWriteError =>
+      'No se guardó el cambio. Se conserva la elección anterior. Vuelve a elegir para reintentar.';
+
+  @override
+  String get incomingOrdersLoading => 'Consultando pedidos entrantes…';
+
+  @override
+  String get incomingOrdersEmptyDescription =>
+      'Los pedidos de web, WhatsApp y otros canales aparecerán aquí cuando estén disponibles para esta sucursal.';
+
+  @override
+  String get incomingOrdersErrorDescription =>
+      'Comprueba la conexión y vuelve a consultar. El pedido actual se conserva.';
+
+  @override
+  String get refreshAction => 'Actualizar';
+
+  @override
+  String get receiptReferenceAction => 'Referencia del recibo';
+
+  @override
+  String get closeOrderAction => 'Cerrar comanda';
+
+  @override
+  String decreaseDenominationQuantity(String denomination) {
+    return 'Disminuir cantidad de $denomination';
+  }
+
+  @override
+  String increaseDenominationQuantity(String denomination) {
+    return 'Aumentar cantidad de $denomination';
+  }
+
+  @override
+  String openingFloatExceedsMaximum(String amount) {
+    return 'Máximo $amount. Reduce el conteo.';
+  }
+
+  @override
+  String get allSalesLabel => 'Todas las ventas';
+
+  @override
+  String get recentSalesLabel => 'Recientes';
+
+  @override
+  String get oldestSalesLabel => 'Antiguas';
+
+  @override
+  String get saleHistoryLoading => 'Buscando ventas…';
+
+  @override
+  String get saleHistoryNoMatches =>
+      'No hay ventas que coincidan con esta búsqueda.';
+
+  @override
+  String get saleHistoryLoadFailed => 'No se pudo cargar el historial.';
+
+  @override
+  String get textSizeLabel => 'Tamaño del texto';
+
+  @override
+  String get textSizeDescription => 'Elige un tamaño cómodo para leer.';
+
+  @override
+  String get largeTextLabel => 'Grande';
+
+  @override
+  String get extraLargeTextLabel => 'Muy grande';
+
+  @override
+  String get receiptTicketLabel => 'Ticket';
+
+  @override
+  String get receiptDocumentTitle => 'Recibo';
+
+  @override
+  String get receiptTaxLabel => 'Impuestos';
+
+  @override
+  String kitchenAllDayCount(int ordered) {
+    return 'Hoy: $ordered';
+  }
 }

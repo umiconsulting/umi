@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/errors/operator_error_message.dart';
 import '../../core/security/operator_permissions.dart';
+import '../../shared/widgets/station_document.dart';
+import '../cash/money_input.dart';
 import '../entry/entry_controller.dart';
 import '../sale/sale_lifecycle_controller.dart';
 import 'customer_value_controller.dart';
@@ -20,7 +22,7 @@ Future<void> showCustomerCenter(
   final location = state.selectedBranch;
   if (operator == null || merchant == null || location == null) return;
   await Navigator.of(context).push<void>(
-    MaterialPageRoute(
+    PosPageRoute(
       builder: (_) => CustomerValueSurface(
         entry: entry,
         controller: controller,
@@ -83,15 +85,17 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
   @override
   Widget build(BuildContext context) {
     final state = widget.controller.state;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_copy('Centro de clientes', 'Customer center')),
+    return PosPage(
+      appBar: PosHeader(
+        title: StationHeading(
+          title: _copy('Centro de clientes', 'Customer center'),
+        ),
         actions: [
           if (widget.permissions.allows('customer.create'))
-            IconButton(
+            PosIconButton(
               tooltip: _copy('Crear cliente', 'Create customer'),
               onPressed: state.busy ? null : _create,
-              icon: const Icon(Icons.person_add_alt_1_outlined),
+              icon: const PosIcon(PosGlyphs.personAddAlt1Outlined),
             ),
         ],
       ),
@@ -100,16 +104,16 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              // A `TextField` on the shared `inputDecorationTheme`, the same
+              // A `PosField` on the shared `inputDecorationTheme`, the same
               // field the catalog searches with. `SearchBar` publishes a 24 px
               // `<input>` inside its 48 px pill, so the editable region — the
               // node a screen reader and the sweep both measure — was under
               // the touch floor while the pill looked fine.
-              child: TextField(
+              child: PosField(
                 controller: _search,
                 textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
+                decoration: PosFieldDecoration(
+                  prefixIcon: const PosIcon(PosGlyphs.search),
                   hintText: _copy(
                     'Busca por nombre, teléfono o correo',
                     'Search by name, phone, or email',
@@ -134,8 +138,8 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
             if (state.errorCode != null)
               Semantics(
                 liveRegion: true,
-                child: ListTile(
-                  leading: const Icon(Icons.error_outline),
+                child: PosListRow(
+                  leading: const PosIcon(PosGlyphs.errorOutline),
                   title: Text(
                     _copy(
                       'No se completó la operación.',
@@ -160,7 +164,7 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
 
   Widget _customerList(CustomerValueState state) {
     if (state.busy && state.customers.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: PosSpinner());
     }
     if (state.customers.isEmpty) {
       return Center(
@@ -179,8 +183,8 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
         final contact = customer.contacts.isEmpty
             ? null
             : customer.contacts.first['maskedValue'] as String?;
-        return ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+        return PosListRow(
+          leading: const PosAvatar(child: PosIcon(PosGlyphs.personOutline)),
           title: Text(customer.displayName),
           subtitle: Text(
             contact?.isNotEmpty == true ? contact! : customer.publicReference,
@@ -200,15 +204,15 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
       children: [
         Row(
           children: [
-            IconButton(
+            PosIconButton(
               tooltip: _copy('Volver', 'Back'),
               onPressed: widget.controller.deselect,
-              icon: const Icon(Icons.arrow_back),
+              icon: const PosIcon(PosGlyphs.arrowBack),
             ),
             Expanded(
               child: Text(
                 customer.displayName,
-                style: Theme.of(context).textTheme.headlineSmall,
+                style: PosTheme.of(context).textTheme.headlineSmall,
               ),
             ),
           ],
@@ -217,18 +221,18 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
         const SizedBox(height: 12),
         if (customer.contacts.isNotEmpty)
           ...customer.contacts.map(
-            (contact) => ListTile(
-              leading: Icon(
+            (contact) => PosListRow(
+              leading: PosIcon(
                 contact['type'] == 'email'
-                    ? Icons.email_outlined
-                    : Icons.phone_outlined,
+                    ? PosGlyphs.emailOutlined
+                    : PosGlyphs.phoneOutlined,
               ),
               title: Text((contact['maskedValue'] as String?) ?? ''),
               subtitle: Text(_copy('Contacto protegido', 'Protected contact')),
             ),
           ),
-        ListTile(
-          leading: const Icon(Icons.privacy_tip_outlined),
+        PosListRow(
+          leading: const PosIcon(PosGlyphs.privacyTipOutlined),
           title: Text(_copy('Consentimiento separado', 'Separate consent')),
           subtitle: Text(
             _copy(
@@ -239,28 +243,35 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
         ),
         if (widget.permissions.allows(
           attached ? 'customer.detach' : 'customer.attach',
-        ))
-          FilledButton.icon(
-            onPressed: () async {
-              if (attached) {
-                await widget.sales.detachCustomer();
-              } else {
-                await widget.sales.attachCustomer(
-                  SaleCustomerSummary(
-                    id: customer.id,
-                    displayName: customer.displayName,
-                    contactHint: customer.contacts.isEmpty
-                        ? null
-                        : customer.contacts.first['maskedValue'] as String?,
-                  ),
-                );
-              }
-              if (mounted) setState(() {});
-            },
-            icon: Icon(
+        )) ...[
+          PosButton.icon(
+            // Offered only while there is a sale it can change. The command
+            // behind it returns in silence when there is none, so a button that
+            // looks ready would leave the operator tapping at nothing. It stands
+            // down, and says why, instead.
+            onPressed: widget.sales.canEditSale
+                ? () async {
+                    if (attached) {
+                      await widget.sales.detachCustomer();
+                    } else {
+                      await widget.sales.attachCustomer(
+                        SaleCustomerSummary(
+                          id: customer.id,
+                          displayName: customer.displayName,
+                          contactHint: customer.contacts.isEmpty
+                              ? null
+                              : customer.contacts.first['maskedValue']
+                                    as String?,
+                        ),
+                      );
+                    }
+                    if (mounted) setState(() {});
+                  }
+                : null,
+            icon: PosIcon(
               attached
-                  ? Icons.person_remove_outlined
-                  : Icons.person_add_outlined,
+                  ? PosGlyphs.personRemoveOutlined
+                  : PosGlyphs.personAddOutlined,
             ),
             label: Text(
               attached
@@ -268,10 +279,22 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
                   : _copy('Adjuntar a la venta', 'Attach to sale'),
             ),
           ),
+          if (!widget.sales.canEditSale)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _copy(
+                  'Empieza o reanuda una venta para adjuntar un cliente.',
+                  'Start or resume a sale to attach a customer.',
+                ),
+                style: PosTheme.of(context).textTheme.bodySmall,
+              ),
+            ),
+        ],
         if (state.history?.pointsBalance case final points?)
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.stars_outlined),
+          PosCard(
+            child: PosListRow(
+              leading: const PosIcon(PosGlyphs.starsOutlined),
               title: Text(_copy('Puntos disponibles', 'Available points')),
               trailing: Text('${points['available'] ?? 0}'),
               subtitle: Text(
@@ -287,17 +310,17 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
           runSpacing: 8,
           children: [
             if (widget.permissions.allows('loyalty.adjust'))
-              OutlinedButton.icon(
+              PosOutlineButton.icon(
                 onPressed: state.busy || state.history?.loyaltyAccount == null
                     ? null
                     : _adjustPoints,
-                icon: const Icon(Icons.tune),
+                icon: const PosIcon(PosGlyphs.tune),
                 label: Text(_copy('Ajustar puntos', 'Adjust points')),
               ),
             if (widget.permissions.allows('gift_card.issue'))
-              OutlinedButton.icon(
+              PosOutlineButton.icon(
                 onPressed: state.busy ? null : _issueGiftCard,
-                icon: const Icon(Icons.card_giftcard),
+                icon: const PosIcon(PosGlyphs.cardGiftcard),
                 label: Text(_copy('Emitir tarjeta', 'Issue gift card')),
               ),
           ],
@@ -308,25 +331,22 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
             Expanded(
               child: Text(
                 _copy('Historial', 'History'),
-                style: Theme.of(context).textTheme.titleMedium,
+                style: PosTheme.of(context).textTheme.titleMedium,
               ),
             ),
-            DropdownButton<String>(
+            PosSelect<String>(
               value: _historyCategory,
               items: const [
-                DropdownMenuItem(value: 'all', child: Text('Todo / All')),
-                DropdownMenuItem(value: 'sale', child: Text('Ventas / Sales')),
-                DropdownMenuItem(
+                PosSelectItem(value: 'all', child: Text('Todo / All')),
+                PosSelectItem(value: 'sale', child: Text('Ventas / Sales')),
+                PosSelectItem(
                   value: 'exception',
                   child: Text('Reembolsos / Refunds'),
                 ),
-                DropdownMenuItem(
-                  value: 'loyalty',
-                  child: Text('Puntos / Points'),
-                ),
-                DropdownMenuItem(value: 'reward', child: Text('Rewards')),
-                DropdownMenuItem(value: 'wallet', child: Text('Wallet')),
-                DropdownMenuItem(value: 'gift_card', child: Text('Gift cards')),
+                PosSelectItem(value: 'loyalty', child: Text('Puntos / Points')),
+                PosSelectItem(value: 'reward', child: Text('Rewards')),
+                PosSelectItem(value: 'wallet', child: Text('Wallet')),
+                PosSelectItem(value: 'gift_card', child: Text('Gift cards')),
               ],
               onChanged: state.busy
                   ? null
@@ -342,7 +362,7 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
             ),
           ],
         ),
-        if (state.busy) const LinearProgressIndicator(),
+        if (state.busy) const PosProgress(),
         if (state.history?.entries.isEmpty ?? true)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -353,14 +373,14 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
         else
           ...state.history!.entries.map(_historyTile),
         if (state.history?.nextCursor != null)
-          TextButton.icon(
+          PosTextButton.icon(
             onPressed: state.busy
                 ? null
                 : () => widget.controller.loadMoreHistory(
                     widget.scope,
                     category: _historyCategory,
                   ),
-            icon: const Icon(Icons.expand_more),
+            icon: const PosIcon(PosGlyphs.expandMore),
             label: Text(_copy('Cargar más', 'Load more')),
           ),
       ],
@@ -383,13 +403,23 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
     };
     final points = entry['points'];
     final total = entry['total'] as Map<String, Object?>?;
+    // Money here goes through the app's single formatter. The row used to print
+    // the raw minor units beside the currency code, so a MXN 20.00 wallet hold
+    // read `2000 MXN` and a MXN 500.00 gift card read `50000 MXN` — a
+    // hundredfold overstatement of the customer's own money. Both figures are
+    // the ledger's own numbers (`loyalty_stored_value_ledger.amount_minor_units`,
+    // `loyalty_gift_card.amount_cents`), measured on the iMin D3-504 on
+    // 2026-10-11.
     final detail = points != null
         ? '$points ${_copy('puntos', 'points')}'
         : total != null
-        ? '${total['minorUnits']} ${total['currency']}'
+        ? formatMinorUnits(
+            (total['minorUnits'] as num?)?.toInt() ?? 0,
+            total['currency'] as String? ?? '',
+          )
         : entry['status'] as String? ?? '';
-    return ListTile(
-      leading: const Icon(Icons.receipt_long_outlined),
+    return PosListRow(
+      leading: const PosIcon(PosGlyphs.receiptLongOutlined),
       title: Text('$label · ${entry['publicReference'] ?? ''}'),
       subtitle: Text('${entry['businessDate'] ?? ''} · $detail'),
     );
@@ -400,26 +430,26 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
     final note = TextEditingController();
     var direction = 'increase';
     var reason = 'customer_service_correction';
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PosAlertDialog(
           title: Text(_copy('Ajustar puntos', 'Adjust points')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                DropdownButtonFormField<String>(
+                PosSelectFormField<String>(
                   initialValue: direction,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Dirección', 'Direction'),
                   ),
                   items: [
-                    DropdownMenuItem(
+                    PosSelectItem(
                       value: 'increase',
                       child: Text(_copy('Aumentar', 'Increase')),
                     ),
-                    DropdownMenuItem(
+                    PosSelectItem(
                       value: 'decrease',
                       child: Text(_copy('Disminuir', 'Decrease')),
                     ),
@@ -427,33 +457,33 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
                   onChanged: (value) =>
                       setDialogState(() => direction = value ?? direction),
                 ),
-                TextField(
+                PosField(
                   controller: amount,
                   autofocus: true,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Puntos', 'Points'),
                   ),
                 ),
-                DropdownButtonFormField<String>(
+                PosSelectFormField<String>(
                   initialValue: reason,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Motivo', 'Reason'),
                   ),
                   items: [
-                    DropdownMenuItem(
+                    PosSelectItem(
                       value: 'customer_service_correction',
                       child: Text(
                         _copy('Corrección de servicio', 'Service correction'),
                       ),
                     ),
-                    DropdownMenuItem(
+                    PosSelectItem(
                       value: 'operational_correction',
                       child: Text(
                         _copy('Corrección operativa', 'Operational correction'),
                       ),
                     ),
-                    DropdownMenuItem(
+                    PosSelectItem(
                       value: 'fraud_correction',
                       child: Text(
                         _copy('Corrección por fraude', 'Fraud correction'),
@@ -463,10 +493,10 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
                   onChanged: (value) =>
                       setDialogState(() => reason = value ?? reason),
                 ),
-                TextField(
+                PosField(
                   controller: note,
                   maxLength: 240,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Nota opcional', 'Optional note'),
                   ),
                 ),
@@ -474,11 +504,11 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
             ),
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
               child: Text(_copy('Cancelar', 'Cancel')),
             ),
-            FilledButton(
+            PosButton(
               onPressed: () => Navigator.pop(dialogContext, true),
               child: Text(_copy('Revisar', 'Review')),
             ),
@@ -501,20 +531,20 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
     );
     note.dispose();
     if (!mounted || preview == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showPosDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(_copy('Confirma el ajuste', 'Confirm adjustment')),
         content: Text(
           '${_copy('Saldo actual', 'Current balance')}: ${preview.currentAvailable}\n'
           '${_copy('Saldo final', 'Final balance')}: ${preview.projectedAvailable}',
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(_copy('Cancelar', 'Cancel')),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(_copy('Confirmar', 'Confirm')),
           ),
@@ -549,15 +579,15 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
 
   Future<void> _issueGiftCard() async {
     final amount = TextEditingController();
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(_copy('Emitir tarjeta de regalo', 'Issue gift card')),
-        content: TextField(
+        content: PosField(
           controller: amount,
           autofocus: true,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText: _copy('Valor en centavos', 'Value in minor units'),
             helperText: _copy(
               'Ejemplo: 50000 = MXN 500.00',
@@ -566,11 +596,11 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(_copy('Cancelar', 'Cancel')),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(_copy('Revisar', 'Review')),
           ),
@@ -586,20 +616,24 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
       currency: 'MXN',
     );
     if (!mounted || preview == null) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showPosDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(_copy('Confirma la emisión', 'Confirm issuance')),
+        // The preview's own figures, in the app's one money format. Printed raw
+        // they read `50000 MXN` for a MXN 500.00 card — the operator's last
+        // chance to say no, saying something that looks like a 100× mistake.
         content: Text(
-          '${preview.valueMinorUnits} ${preview.currency}\n'
-          '${_copy('Límite', 'Limit')}: ${preview.maximumValueMinorUnits}',
+          '${formatMinorUnits(preview.valueMinorUnits, preview.currency)}\n'
+          '${_copy('Límite', 'Limit')}: '
+          '${formatMinorUnits(preview.maximumValueMinorUnits, preview.currency)}',
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(_copy('Cancelar', 'Cancel')),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(_copy('Confirmar', 'Confirm')),
           ),
@@ -626,14 +660,14 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
       result.deliveryToken,
     );
     if (secret == null || !mounted) return;
-    await showDialog<void>(
+    await showPosDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (context) => PosAlertDialog(
         title: Text(_copy('Código de entrega única', 'One-time delivery code')),
-        content: SelectableText('${secret.maskedReference}\n${secret.code}'),
+        content: PosSelectableText('${secret.maskedReference}\n${secret.code}'),
         actions: [
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(context),
             child: Text(_copy('Código entregado', 'Code delivered')),
           ),
@@ -647,24 +681,24 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
     String fingerprint,
   ) async {
     final pin = TextEditingController();
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => PosAlertDialog(
         title: Text(_copy('Aprobación del responsable', 'Manager approval')),
-        content: TextField(
+        content: PosField(
           controller: pin,
           obscureText: true,
           keyboardType: TextInputType.number,
-          decoration: InputDecoration(
+          decoration: PosFieldDecoration(
             labelText: _copy('PIN del responsable', 'Manager PIN'),
           ),
         ),
         actions: [
-          TextButton(
+          PosTextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(_copy('Cancelar', 'Cancel')),
           ),
-          FilledButton(
+          PosButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(_copy('Aprobar', 'Approve')),
           ),
@@ -688,44 +722,44 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
     var language = Localizations.localeOf(context).languageCode == 'es'
         ? 'es'
         : 'en';
-    final accepted = await showDialog<bool>(
+    final accepted = await showPosDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (context, setDialogState) => PosAlertDialog(
           title: Text(_copy('Crear cliente mínimo', 'Create minimal customer')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                PosField(
                   controller: name,
                   autofocus: true,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Nombre', 'Name'),
                   ),
                 ),
-                TextField(
+                PosField(
                   controller: email,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Correo opcional', 'Optional email'),
                   ),
                 ),
-                TextField(
+                PosField(
                   controller: phone,
                   keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Teléfono opcional', 'Optional phone'),
                   ),
                 ),
-                DropdownButtonFormField<String>(
+                PosSelectFormField<String>(
                   initialValue: language,
-                  decoration: InputDecoration(
+                  decoration: PosFieldDecoration(
                     labelText: _copy('Idioma', 'Language'),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'es', child: Text('Español')),
-                    DropdownMenuItem(value: 'en', child: Text('English')),
+                    PosSelectItem(value: 'es', child: Text('Español')),
+                    PosSelectItem(value: 'en', child: Text('English')),
                   ],
                   onChanged: (value) =>
                       setDialogState(() => language = value ?? language),
@@ -741,11 +775,11 @@ final class _CustomerValueSurfaceState extends State<CustomerValueSurface> {
             ),
           ),
           actions: [
-            TextButton(
+            PosTextButton(
               onPressed: () => Navigator.pop(context, false),
               child: Text(_copy('Cancelar', 'Cancel')),
             ),
-            FilledButton(
+            PosButton(
               onPressed: () => Navigator.pop(context, true),
               child: Text(_copy('Crear', 'Create')),
             ),

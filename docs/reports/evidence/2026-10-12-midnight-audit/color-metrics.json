@@ -1,0 +1,115 @@
+{
+  "instrument": "Color.js 0.5.2 (MIT)",
+  "runtime": "v24.21.0",
+  "scope": "Diagnóstico de colores sRGB; propuestas sin instalar. APCA orientativo; WCAG no certifica toda la app.",
+  "pairs": [
+    {
+      "role": "Actual: texto de acción",
+      "foreground": "#131F44",
+      "background": "#A8BBDE",
+      "wcag21": 8.284,
+      "apca": 63.52,
+      "foregroundOKLCH": [0.2518125504121323, 0.07154780399022931, 267.5549936582225],
+      "backgroundOKLCH": [0.7893694430119251, 0.05419786324666804, 262.63751093889834]
+    },
+    {
+      "role": "Actual: enlace",
+      "foreground": "#A8BBDE",
+      "background": "#000000",
+      "wcag21": 10.828,
+      "apca": -65.23,
+      "foregroundOKLCH": [0.7893694430119251, 0.05419786324666804, 262.63751093889834],
+      "backgroundOKLCH": [0, 0, null]
+    },
+    {
+      "role": "Actual: cobro",
+      "foreground": "#131F44",
+      "background": "#7692CB",
+      "wcag21": 5.159,
+      "apca": 42.8,
+      "foregroundOKLCH": [0.2518125504121323, 0.07154780399022931, 267.5549936582225],
+      "backgroundOKLCH": [0.6612767997167078, 0.09119517659426153, 263.94911026772957]
+    },
+    {
+      "role": "Actual: señal sobre negro",
+      "foreground": "#7692CB",
+      "background": "#000000",
+      "wcag21": 6.744,
+      "apca": -43.66,
+      "foregroundOKLCH": [0.6612767997167078, 0.09119517659426153, 263.94911026772957],
+      "backgroundOKLCH": [0, 0, null]
+    },
+    {
+      "role": "Actual: Pan",
+      "foreground": "#FFFFFF",
+      "background": "#F58231",
+      "wcag21": 2.586,
+      "apca": -55.13,
+      "foregroundOKLCH": [1.0000000000000002, 4.996003610813204e-16, null],
+      "backgroundOKLCH": [0.7231711596066064, 0.16649193112630317, 51.27270702666647]
+    },
+    {
+      "role": "Actual: Bebidas",
+      "foreground": "#FFFFFF",
+      "background": "#4363D8",
+      "wcag21": 5.231,
+      "apca": -80.9,
+      "foregroundOKLCH": [1.0000000000000002, 4.996003610813204e-16, null],
+      "backgroundOKLCH": [0.5422938964190571, 0.18295945450702872, 268.1668821431907]
+    },
+    {
+      "role": "Actual: Pizzas",
+      "foreground": "#FFFFFF",
+      "background": "#E6194B",
+      "wcag21": 4.559,
+      "apca": -74.92,
+      "foregroundOKLCH": [1.0000000000000002, 4.996003610813204e-16, null],
+      "backgroundOKLCH": [0.5938014993251793, 0.22797228204654013, 16.834131406006634]
+    },
+    {
+      "role": "Propuesta: acción",
+      "foreground": "#F2F2F2",
+      "background": "#223979",
+      "wcag21": 9.723,
+      "apca": -90.25,
+      "foregroundOKLCH": [0.9611513666441094, 8.326672684688674e-16, null],
+      "backgroundOKLCH": [0.3646964831915567, 0.1129719992406204, 266.06171981765635]
+    },
+    {
+      "role": "Propuesta: selección",
+      "foreground": "#A8BBDE",
+      "background": "#111A2E",
+      "wcag21": 8.941,
+      "apca": -63.8,
+      "foregroundOKLCH": [0.7893694430119251, 0.05419786324666804, 262.63751093889834],
+      "backgroundOKLCH": [0.2203877135317096, 0.0415791511343925, 264.8269610507977]
+    },
+    {
+      "role": "Propuesta: borde de acción",
+      "foreground": "#7692CB",
+      "background": "#000000",
+      "wcag21": 6.744,
+      "apca": -43.66,
+      "foregroundOKLCH": [0.6612767997167078, 0.09119517659426153, 263.94911026772957],
+      "backgroundOKLCH": [0, 0, null]
+    },
+    {
+      "role": "Propuesta: texto Pan",
+      "foreground": "#131F44",
+      "background": "#F58231",
+      "wcag21": 6.212,
+      "apca": 50.81,
+      "foregroundOKLCH": [0.2518125504121323, 0.07154780399022931, 267.5549936582225],
+      "backgroundOKLCH": [0.7231711596066064, 0.16649193112630317, 51.27270702666647]
+    },
+    {
+      "role": "Silueta navy sobre negro",
+      "foreground": "#223979",
+      "background": "#000000",
+      "wcag21": 1.929,
+      "apca": -7.73,
+      "foregroundOKLCH": [0.3646964831915567, 0.1129719992406204, 266.06171981765635],
+      "backgroundOKLCH": [0, 0, null]
+    }
+  ]
+}

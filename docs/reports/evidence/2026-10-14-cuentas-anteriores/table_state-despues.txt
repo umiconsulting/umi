@@ -1,0 +1,7 @@
+ table_name | state | seated_at | party_size 
+------------+-------+-----------+------------
+ Mesa 1     | dirty |           |           
+ Mesa 3     | dirty |           |           
+ Mesa 6     | dirty |           |           
+(3 rows)
+

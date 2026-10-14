@@ -1,0 +1,5 @@
+ account_number | table_name | version | lifecycle_state | lines | party_size |         seated_at          | visit_matches 
+----------------+------------+---------+-----------------+-------+------------+----------------------------+---------------
+            152 | Mesa 6     |       4 | building_cart   |     1 |          4 | 2026-10-13 20:25:52.007+00 | t
+(1 row)
+

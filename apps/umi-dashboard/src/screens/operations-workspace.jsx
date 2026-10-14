@@ -1042,6 +1042,10 @@ function CatalogDialog({ row, onClose, onComplete }) {
   const [requiresPreparation, setRequiresPreparation] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [inventoryItemId, setInventoryItemId] = useState('');
+  // One row per live location, as the till reads it (`catalog.detail` resolves it with
+  // the same rule the menu uses). `null` means "not loaded yet", which is also the state
+  // of a product that does not exist: it starts available everywhere.
+  const [availability, setAvailability] = useState(null);
   const [loaded, setLoaded] = useState(!row);
   const [productId] = useState(() => row?.id || crypto.randomUUID());
 
@@ -1057,7 +1061,21 @@ function CatalogDialog({ row, onClose, onComplete }) {
     setRequiresPreparation(detail.requiresPreparation === true);
     setCategoryId(detail.categoryId || '');
     setInventoryItemId(detail.inventoryItemId || '');
+    setAvailability(
+      (detail.availability || []).map((entry) => ({ ...entry, saved: entry.status })),
+    );
     setLoaded(true);
+  }
+
+  /** `dirty` is what `save()` writes: the owner's decision, not the row's history. */
+  function setAvailabilityStatus(locationId, status) {
+    setAvailability((rows) =>
+      (rows || []).map((entry) =>
+        entry.locationId === locationId
+          ? { ...entry, status, dirty: status !== entry.saved }
+          : entry,
+      ),
+    );
   }
 
   async function save() {
@@ -1072,10 +1090,23 @@ function CatalogDialog({ row, onClose, onComplete }) {
       inventoryItemId: inventoryItemId || null,
       taxRateBasisPoints: 0,
     };
-    await command.execute(operation, productId, {
+    const saved = await command.execute(operation, productId, {
       targetVersion: row?.version ?? null,
       parameters,
     });
+    // "No hay producto" is its own command, one per location, and it keeps the version
+    // the previous command just wrote — the same guard every other catalogue write uses.
+    // An unchanged row is not written: the command is a decision, not a heartbeat.
+    let version = saved?.result?.version ?? row?.version ?? null;
+    for (const entry of availability || []) {
+      if (!entry.dirty) continue;
+      const written = await command.execute('catalog.availability', productId, {
+        locationId: entry.locationId,
+        targetVersion: version,
+        parameters: { status: entry.status },
+      });
+      version = written?.result?.version ?? version;
+    }
     onComplete();
   }
 
@@ -1163,6 +1194,38 @@ function CatalogDialog({ row, onClose, onComplete }) {
                 placeholder={t`UUID opcional`}
               />
             </label>
+            {availability && availability.length > 0 && (
+              <fieldset className="field-group">
+                <legend>
+                  <Trans>Disponibilidad</Trans>
+                </legend>
+                <p>
+                  <Trans>
+                    Marca «No disponible» cuando no haya producto en esa sucursal. La caja opaca la
+                    tarjeta, avisa «No disponible» y no deja agregarla a la cuenta.
+                  </Trans>
+                </p>
+                {availability.map((entry) => (
+                  <label key={entry.locationId}>
+                    {entry.name}
+                    <Select
+                      value={entry.status}
+                      onChange={(event) =>
+                        setAvailabilityStatus(entry.locationId, event.target.value)
+                      }
+                    >
+                      <option value="enabled">{t`Disponible`}</option>
+                      <option value="temporarily_unavailable">{t`No disponible`}</option>
+                      <option value="out_of_assortment">{t`Fuera de surtido`}</option>
+                      <option value="disabled">{t`Descontinuado`}</option>
+                      {entry.status === 'future_availability' && (
+                        <option value="future_availability">{t`Programado`}</option>
+                      )}
+                    </Select>
+                  </label>
+                ))}
+              </fieldset>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 className="btn btn-primary"

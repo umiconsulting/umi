@@ -12,6 +12,9 @@ import type {
   CartLineInput,
   CheckoutCancellationRequest,
   CheckoutCommand,
+  CheckoutPartialPaymentQuery,
+  CheckoutPartialPaymentRequest,
+  CheckoutPartialPaymentResult,
   CheckoutPolicy,
   CheckoutRecoveryQuery,
   CheckoutResult,
@@ -32,8 +35,13 @@ import { canonicalStoredValueFingerprint } from '../pos-customer-value/customer-
 import { PosCartRepository, type PricedSelection } from '../pos-cart/pos-cart.repository';
 import { getRequestContext } from '../../shared/database/request-context';
 import { CashRefusal } from '../pos-cash/cash-refusal';
-import { PosCheckoutRepository, type CheckoutCart } from './pos-checkout.repository';
+import {
+  PosCheckoutRepository,
+  type CheckoutCart,
+  type PartialPaymentRow,
+} from './pos-checkout.repository';
 import { calculateCheckout } from './checkout-calculator';
+import { receiptTimeInZone } from '../../shared/receipts/receipt-time';
 
 const safeMoney = (value: number) => {
   if (!Number.isSafeInteger(value)) {
@@ -42,6 +50,57 @@ const safeMoney = (value: number) => {
   return value;
 };
 
+const partialTender = (row: PartialPaymentRow): CheckoutCommand['tenderDrafts'][number] => ({
+  id: row.tenderId,
+  type: row.tenderType,
+  amount: { minorUnits: Number(row.amountMinorUnits), currency: row.currency },
+  amountReceived:
+    row.receivedMinorUnits === null
+      ? null
+      : { minorUnits: Number(row.receivedMinorUnits), currency: row.currency },
+  tipAmount: { minorUnits: Number(row.tipMinorUnits), currency: row.currency },
+  status: row.status,
+  correlationId: null,
+});
+
+function partialResult(cartId: string, rows: PartialPaymentRow[]): CheckoutPartialPaymentResult {
+  const first = rows[0];
+  const confirmed = rows
+    .filter((row) => row.status === 'confirmed_success')
+    .sort((left, right) => left.position! - right.position!);
+  const currency = first.currency;
+  const money = (minorUnits: number) => ({ minorUnits, currency });
+  const applied = confirmed.reduce(
+    (sum, row) => safeMoney(sum + Number(row.amountMinorUnits) - Number(row.tipMinorUnits)),
+    0,
+  );
+  const tip = confirmed.reduce((sum, row) => safeMoney(sum + Number(row.tipMinorUnits)), 0);
+  const remaining = Number(first.baseDueMinorUnits) - applied;
+  const blockedByUnknown = rows.some((row) => row.status === 'outcome_unknown');
+  return {
+    ok: true,
+    data: {
+      cartId,
+      cartVersion: first.cartVersion,
+      amountDue: money(Number(first.baseDueMinorUnits)),
+      appliedAmount: money(applied),
+      remainingBalance: money(remaining),
+      tipAmount: money(tip),
+      tenderDrafts: confirmed.map(partialTender),
+      unresolvedTender: rows.find((row) => row.status === 'outcome_unknown')
+        ? partialTender(rows.find((row) => row.status === 'outcome_unknown')!)
+        : null,
+      confirmationReferences: Object.fromEntries(
+        confirmed
+          .filter((row) => row.confirmationReference)
+          .map((row) => [row.tenderId, row.confirmationReference!]),
+      ),
+      blockedByUnknown,
+      canFinalize: remaining === 0 && !blockedByUnknown,
+    },
+  };
+}
+
 @Injectable()
 export class PosCheckoutService {
   constructor(
@@ -49,6 +108,371 @@ export class PosCheckoutService {
     private readonly carts: PosCartRepository,
     private readonly integrity: IntegrityService,
   ) {}
+
+  async partialPayments(
+    user: AuthUser,
+    merchantId: string,
+    cartId: string,
+    query: CheckoutPartialPaymentQuery,
+  ): Promise<CheckoutPartialPaymentResult> {
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      query.locationId,
+      query.operatorSessionId,
+    );
+    const rows = await this.repo.partialRowsForPos(
+      merchantId,
+      query.locationId,
+      cartId,
+      user.id,
+      query.operatorSessionId,
+      authorization.permissions.includes('checkout.recover.any') ||
+        authorization.permissions.includes('*'),
+    );
+    if (!rows || rows.length === 0) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+    return partialResult(cartId, rows);
+  }
+
+  async collectPartialPayment(
+    user: AuthUser,
+    merchantId: string,
+    cartId: string,
+    dto: CheckoutPartialPaymentRequest,
+  ): Promise<CheckoutPartialPaymentResult> {
+    const authorization = await this.authorize(
+      user,
+      merchantId,
+      dto.locationId,
+      dto.operatorSessionId,
+    );
+    const result = await this.withInventoryErrors(
+      this.integrity.execute<CheckoutPartialPaymentResult>(
+        {
+          merchantId,
+          locationId: dto.locationId,
+          commandId: randomUUID(),
+          idempotencyKey: dto.idempotencyKey,
+          commandType: 'pos.checkout.collect_partial_payment',
+          payload: { cartId, ...dto },
+        },
+        async (context) => {
+          const cart = await this.repo.lockCart(
+            context.client,
+            merchantId,
+            dto.locationId,
+            dto.operatorSessionId,
+            cartId,
+            dto.expectedCartVersion,
+            authorization.operatorName,
+          );
+          if (!cart)
+            return {
+              ok: false,
+              code: 'OPTIMISTIC_VERSION_CONFLICT',
+              failureClass: 'conflict',
+              retryable: false,
+            };
+          const repriced = await this.reprice(context.client, cart, dto.idempotencyKey);
+          if (!repriced)
+            return {
+              ok: false,
+              code: 'CHECKOUT_CART_CHANGED',
+              failureClass: 'conflict',
+              retryable: false,
+            };
+          const baseDue = repriced.public.totals.grandTotal.minorUnits;
+          const currency = repriced.public.totals.grandTotal.currency;
+          const policy = await this.repo.policy(
+            context.client,
+            merchantId,
+            dto.locationId,
+            currency,
+          );
+          let rows = await this.repo.partialRows(
+            context.client,
+            merchantId,
+            dto.locationId,
+            cartId,
+          );
+          if (
+            rows.filter((row) => row.status !== 'operator_reported_failure').length >= 32 &&
+            !rows.some((row) => row.tenderId === dto.tender.id)
+          ) {
+            throw new ConflictException({ code: 'TENDER_LIMIT_REACHED' });
+          }
+          if (
+            rows.some(
+              (row) =>
+                row.cartVersion !== cart.version ||
+                row.cartFingerprint !== repriced.public.fingerprint ||
+                Number(row.baseDueMinorUnits) !== baseDue ||
+                row.currency !== currency,
+            )
+          )
+            throw new ConflictException({ code: 'CHECKOUT_CART_CHANGED' });
+          const requested = dto.tender;
+          const amount = requested.amount.minorUnits;
+          const tip = requested.tipAmount?.minorUnits ?? 0;
+          const principal = amount - tip;
+          if (
+            requested.amount.currency !== currency ||
+            (requested.tipAmount && requested.tipAmount.currency !== currency) ||
+            (requested.amountReceived && requested.amountReceived.currency !== currency) ||
+            tip < 0 ||
+            principal <= 0 ||
+            (tip > 0 &&
+              (!policy.tip.enabled ||
+                tip > policy.tip.maximumTip.minorUnits ||
+                (policy.tip.requiredPermission !== null &&
+                  !authorization.permissions.includes(policy.tip.requiredPermission) &&
+                  !authorization.permissions.includes('*'))))
+          )
+            throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+          if (requested.type === 'wallet' || requested.type === 'gift_card') {
+            throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+          }
+          if (
+            requested.type === 'manual_terminal' &&
+            (!policy.manualTerminalEnabled ||
+              (!authorization.permissions.includes('checkout.terminal.confirm') &&
+                !authorization.permissions.includes('*')))
+          ) {
+            throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+          }
+          if (
+            requested.type === 'bank_transfer' &&
+            (!policy.bankTransferEnabled || !policy.bankTransferDetails)
+          ) {
+            throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+          }
+          if (
+            !policy.mixedTenderEnabled &&
+            rows.some(
+              (row) => row.status === 'confirmed_success' && row.tenderType !== requested.type,
+            )
+          ) {
+            throw new ConflictException({ code: 'MIXED_TENDER_DISABLED' });
+          }
+          const existing = rows.find((row) => row.tenderId === requested.id);
+          if (existing?.status === 'confirmed_success') {
+            if (
+              existing.amountMinorUnits !== String(amount) ||
+              existing.tipMinorUnits !== String(tip) ||
+              existing.tenderType !== requested.type ||
+              existing.receivedMinorUnits !==
+                (requested.amountReceived === null
+                  ? null
+                  : String(requested.amountReceived.minorUnits))
+            ) {
+              throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
+            }
+            return { ok: true, value: partialResult(cartId, rows) };
+          }
+          if (existing?.status === 'operator_reported_failure') {
+            throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
+          }
+          if (
+            rows.some((row) => row.status === 'outcome_unknown' && row.tenderId !== requested.id)
+          ) {
+            throw new ConflictException({ code: 'PAYMENT_OUTCOME_UNKNOWN' });
+          }
+          const applied = rows
+            .filter((row) => row.status === 'confirmed_success')
+            .reduce(
+              (sum, row) =>
+                safeMoney(sum + Number(row.amountMinorUnits) - Number(row.tipMinorUnits)),
+              0,
+            );
+          if (principal > baseDue - applied) {
+            throw new ConflictException({ code: 'TENDER_OVERALLOCATION' });
+          }
+          if (requested.type === 'cash') {
+            if (
+              !dto.cashShiftId ||
+              !requested.amountReceived ||
+              requested.amountReceived.minorUnits < amount ||
+              !['draft', 'confirmed_success'].includes(requested.status)
+            ) {
+              throw new ConflictException({ code: 'INSUFFICIENT_CASH' });
+            }
+          } else if (requested.type === 'manual_terminal') {
+            if (
+              !['confirmed_success', 'outcome_unknown', 'operator_reported_failure'].includes(
+                requested.status,
+              )
+            ) {
+              throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+            }
+          } else if (requested.status !== 'confirmed_success') {
+            throw new ConflictException({ code: 'INVALID_TENDER_AMOUNT' });
+          }
+          if (
+            requested.type !== 'cash' &&
+            requested.status === 'confirmed_success' &&
+            !dto.confirmationReference
+          ) {
+            throw new ConflictException({ code: 'CONFIRMATION_REFERENCE_REQUIRED' });
+          }
+          if (requested.status === 'operator_reported_failure') {
+            if (!existing || !dto.confirmationReference) {
+              throw new ConflictException({ code: 'CONFIRMATION_REFERENCE_REQUIRED' });
+            }
+            await context.client.query(
+              `UPDATE merchant.pos_partial_payment
+                  SET status='operator_reported_failure',position=NULL,
+                      confirmation_reference=$5
+                WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
+                  AND tender_id=$4::uuid AND status='outcome_unknown'`,
+              [merchantId, dto.locationId, cartId, requested.id, dto.confirmationReference],
+            );
+            await context.appendAudit({
+              eventType: 'checkout.partial_terminal_declined',
+              entityType: 'pos_cart',
+              entityId: cartId,
+              outcome: 'success',
+              publicData: { tenderId: requested.id, evidence: dto.confirmationReference },
+            });
+            rows = await this.repo.partialRows(context.client, merchantId, dto.locationId, cartId);
+            return { ok: true, value: partialResult(cartId, rows) };
+          }
+          const normalizedStatus =
+            requested.status === 'outcome_unknown' ? 'outcome_unknown' : 'confirmed_success';
+          if (existing) {
+            if (
+              existing.amountMinorUnits !== String(amount) ||
+              existing.tipMinorUnits !== String(tip) ||
+              existing.tenderType !== requested.type ||
+              normalizedStatus !== 'confirmed_success'
+            ) {
+              throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
+            }
+            await context.client.query(
+              `UPDATE merchant.pos_partial_payment
+                  SET status='confirmed_success',confirmation_reference=$5
+                WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
+                  AND tender_id=$4::uuid AND status='outcome_unknown'`,
+              [merchantId, dto.locationId, cartId, requested.id, dto.confirmationReference],
+            );
+          } else {
+            const position = rows.filter((row) => row.status === 'confirmed_success').length;
+            await context.client.query(
+              `INSERT INTO merchant.pos_partial_payment
+                 (merchant_id,location_id,cart_id,tender_id,position,cart_version,
+                  cart_fingerprint,base_due_minor_units,currency,tender_type,
+                  amount_minor_units,tip_minor_units,received_minor_units,status,
+                  cash_shift_id,confirmation_reference,operator_session_id,command_id)
+               VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,
+                       $14,$15::uuid,$16,$17::uuid,$18::uuid)`,
+              [
+                merchantId,
+                dto.locationId,
+                cartId,
+                requested.id,
+                position,
+                cart.version,
+                repriced.public.fingerprint,
+                baseDue,
+                currency,
+                requested.type,
+                amount,
+                tip,
+                requested.amountReceived?.minorUnits ?? null,
+                normalizedStatus,
+                dto.cashShiftId,
+                dto.confirmationReference,
+                dto.operatorSessionId,
+                context.commandId,
+              ],
+            );
+          }
+          rows = await this.repo.partialRows(context.client, merchantId, dto.locationId, cartId);
+          if (normalizedStatus === 'outcome_unknown') {
+            await context.appendAudit({
+              eventType: 'checkout.partial_outcome_unknown',
+              entityType: 'pos_cart',
+              entityId: cartId,
+              outcome: 'failure',
+              publicData: { tenderId: requested.id },
+            });
+            return { ok: true, value: partialResult(cartId, rows) };
+          }
+          const tenders = rows
+            .filter((row) => row.status === 'confirmed_success')
+            .sort((left, right) => left.position! - right.position!)
+            .map(partialTender);
+          const command: CheckoutCommand = {
+            cartId,
+            locationId: dto.locationId,
+            operatorSessionId: dto.operatorSessionId,
+            expectedCartVersion: cart.version,
+            cashShiftId: dto.cashShiftId,
+            paymentMethod:
+              requested.type === 'manual_terminal' ? 'external_terminal' : requested.type,
+            totalsFingerprint: null,
+            idempotencyKey: dto.idempotencyKey,
+            tenderDrafts: tenders,
+            tipDraft: null,
+            discountDrafts: [],
+            approvalIds: [],
+            receiptDelivery: { destination: 'display', channel: null, customerContactId: null },
+          };
+          const calculated = calculateCheckout(
+            repriced.public,
+            command,
+            policy,
+            new Map(),
+            null,
+            true,
+          );
+          if (!calculated.summary) {
+            throw new ConflictException({
+              code: calculated.ok ? 'CHECKOUT_CONFLICT' : calculated.code,
+            });
+          }
+          const draft = await this.repo.saveDraft(
+            context.client,
+            user.deviceId!,
+            cart,
+            command,
+            'collecting_payment',
+            calculated.summary,
+            'none',
+            calculated.confirmation.fingerprint,
+          );
+          if (!draft) throw new ConflictException({ code: 'CHECKOUT_CONFLICT' });
+          const summary: PaymentSummary = { ...calculated.summary, checkoutId: draft.id };
+          await this.repo.payments(context.client, cart, draft.id, summary, context.correlationId);
+          if (requested.type === 'cash') {
+            await this.repo.recordPartialCash(
+              context.client,
+              cart,
+              summary.tenders[summary.tenders.length - 1],
+              dto.cashShiftId!,
+              context.commandId,
+              draft.id,
+            );
+          }
+          await context.appendAudit({
+            eventType: 'checkout.partial_payment_confirmed',
+            entityType: 'pos_cart',
+            entityId: cartId,
+            outcome: 'success',
+            publicData: {
+              tenderId: requested.id,
+              principalMinorUnits: principal,
+              tipMinorUnits: tip,
+            },
+          });
+          return { ok: true, value: partialResult(cartId, rows) };
+        },
+      ),
+    );
+    if (result.status !== 'succeeded' || !result.result) {
+      throw new ConflictException({ code: result.failureCode ?? 'CHECKOUT_CONFLICT' });
+    }
+    return result.result;
+  }
 
   async checkout(user: AuthUser, merchantId: string, dto: CheckoutCommand) {
     const authorization = await this.authorize(
@@ -94,6 +518,51 @@ export class PosCheckoutService {
               retryable: false,
             };
           }
+          const partialRows = await this.repo.partialRows(
+            context.client,
+            merchantId,
+            dto.locationId,
+            dto.cartId,
+          );
+          const registeredPartial = partialRows.length > 0;
+          if (registeredPartial) {
+            const confirmed = partialRows
+              .filter((row) => row.status === 'confirmed_success')
+              .sort((left, right) => left.position! - right.position!);
+            const matches =
+              partialRows.every(
+                (row) =>
+                  row.status !== 'outcome_unknown' &&
+                  row.cartVersion === cart.version &&
+                  row.cartFingerprint === repriced.public.fingerprint &&
+                  Number(row.baseDueMinorUnits) === repriced.public.totals.grandTotal.minorUnits,
+              ) &&
+              dto.discountDrafts.length === 0 &&
+              dto.customerValue == null &&
+              dto.tipDraft === null &&
+              confirmed.length === dto.tenderDrafts.length &&
+              confirmed.every((row, index) => {
+                const tender = dto.tenderDrafts[index];
+                return (
+                  tender.id === row.tenderId &&
+                  tender.type === row.tenderType &&
+                  tender.status === 'confirmed_success' &&
+                  tender.amount.minorUnits === Number(row.amountMinorUnits) &&
+                  tender.amount.currency === row.currency &&
+                  (tender.tipAmount?.minorUnits ?? 0) === Number(row.tipMinorUnits) &&
+                  (tender.amountReceived?.minorUnits ?? null) ===
+                    (row.receivedMinorUnits === null ? null : Number(row.receivedMinorUnits))
+                );
+              });
+            if (!matches) {
+              return {
+                ok: false,
+                code: 'CHECKOUT_PARTIAL_LEDGER_CONFLICT',
+                failureClass: 'conflict',
+                retryable: false,
+              };
+            }
+          }
           const policy = await this.repo.policy(
             context.client,
             merchantId,
@@ -114,6 +583,7 @@ export class PosCheckoutService {
             policy,
             lineAmounts,
             customerValueAllocation.rewardDiscount,
+            registeredPartial,
           );
           const customerValueBasisFingerprint = calculateCheckout(
             repriced.public,
@@ -470,18 +940,12 @@ export class PosCheckoutService {
               ),
             };
           }
-          const terminalApprovalRequired = summary.tenders.some(
-            (tender) =>
-              tender.type === 'manual_terminal' &&
-              tender.applied.minorUnits > policy.manualTerminalApprovalThreshold.minorUnits,
-          );
           const negativeStockApprovalRequired = await this.repo.negativeStockApprovalRequired(
             context.client,
             cart,
           );
           const requiredApprovals = [
             ...(calculation.approvalRequired ? [policy.discount.approvalPermission] : []),
-            ...(terminalApprovalRequired ? [policy.manualTerminalApprovalPermission] : []),
             ...(negativeStockApprovalRequired ? ['inventory.negative_stock.override'] : []),
           ];
           let approvalIdsByPermission: Record<string, string> = {};
@@ -555,6 +1019,13 @@ export class PosCheckoutService {
             dto.customerValue ?? null,
           );
           const sale = committed.sale;
+          // THE RECEIPT AS ISSUED, NOT AS DRAFTED.
+          //
+          // `commit` issues the ticket number once it knows which day the sale belongs to,
+          // so the receipt it returns is the one the customer gets. The events below, the
+          // stored result and everything the till shows name that same short number, which
+          // is what makes the paper, the screen and the sale search agree.
+          const issuedReceipt = committed.receipt;
           await context.appendFinancial(
             {
               aggregateType: 'pos_sale',
@@ -563,7 +1034,7 @@ export class PosCheckoutService {
               amountMinorUnits: confirmed.totals.grandTotal.minorUnits,
               currency: confirmed.totals.grandTotal.currency,
               publicData: {
-                receiptRef: receipt.receiptRef,
+                receiptRef: issuedReceipt.receiptRef,
                 tenderCount: summary.tenders.length,
               },
             },
@@ -574,7 +1045,7 @@ export class PosCheckoutService {
             entityType: 'pos_sale',
             entityId: sale.id,
             outcome: 'success',
-            publicData: { receiptRef: receipt.receiptRef },
+            publicData: { receiptRef: issuedReceipt.receiptRef },
           });
           const committedResult: CheckoutResult = {
             status: 'completed',
@@ -583,7 +1054,7 @@ export class PosCheckoutService {
             payments,
             reservation,
             sale,
-            receipt,
+            receipt: issuedReceipt,
             failure: null,
             paymentSummary: { ...summary, state: 'completed' },
             recoveryState: 'none',
@@ -906,6 +1377,10 @@ export class PosCheckoutService {
           priceDelta: { minorUnits: modifier.priceDelta, currency },
         })),
         note: line.note,
+        // This payload reprices the cart for the confirmation; the till's own `fired`
+        // marker is not what it computes. A settled sale reaches the kitchen either
+        // way, so these lines are 'fired' as far as this shape is concerned.
+        fired: true,
         price: {
           unitPrice: { minorUnits: unit, currency },
           lineSubtotal: { minorUnits: lineTotal, currency },
@@ -979,10 +1454,17 @@ export class PosCheckoutService {
     const allocate = (amount: number, weight: number): number =>
       Number((BigInt(amount) * BigInt(weight)) / BigInt(Math.max(gross, 1)));
     return {
+      // A PROVISIONAL NAMER, REPLACED BY THE TICKET FOLIO AT COMMIT.
+      //
+      // This snapshot is built before the day is settled (a sale paid out of a shift belongs
+      // to the shift's day), so the folio is not known yet —
+      // `allocateReceiptFolio` issues it inside the commit transaction and hands the issued
+      // receipt back. This value names the payment attempt, so a receipt that never commits
+      // still carries a unique reference of its own.
       receiptRef: `POS-${payments[0].attempt.id}`,
       merchantId: cart.merchantId,
       locationId: cart.locationId,
-      issuedAt: now,
+      issuedAt: receiptTimeInZone(now, cart.timezone ?? 'UTC'),
       businessDate: cart.businessDate,
       lines: lineSnapshot.map((item, index) => {
         const finalLine = index === lineSnapshot.length - 1;
@@ -1021,6 +1503,10 @@ export class PosCheckoutService {
       currency: confirmation.totals.grandTotal.currency,
       version: 1,
       merchantName: cart.merchantName,
+      // Frozen from the cart the same instant the sale is committed: the logo the
+      // customer's paper showed, not whatever the café uploads next. `undefined`
+      // rather than null because the schema says "absent when there is none".
+      merchantLogoUrl: cart.merchantLogoUrl ?? undefined,
       locationName: cart.locationName,
       operatorName: cart.operatorName,
       payment: {

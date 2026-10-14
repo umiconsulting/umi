@@ -836,4 +836,139 @@ export class DashboardOperationsRepository {
       locationId ?? undefined,
     );
   }
+
+  /**
+   * The drawer policy this location counts under, or null when it has no row.
+   *
+   * The two fields travel together and the screen shows both as one switch: a
+   * blind location counts the drawer by denomination, and a visible one only
+   * asks for the total.
+   */
+  cashPolicy(merchantId: string, userId: string, locationId: string) {
+    return this.pg.runWithMerchant(merchantId, userId, async (client) => {
+      const { rows } = await client.query<{
+        blindCountRequired: boolean;
+        countMethod: string;
+      }>(
+        `SELECT blind_count_required AS "blindCountRequired",
+                count_method AS "countMethod"
+           FROM merchant.cash_shift_policy
+          WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+          ORDER BY issued_at DESC
+          LIMIT 1`,
+        [merchantId, locationId],
+      );
+      return rows[0] ?? null;
+    });
+  }
+
+  checkoutPolicy(merchantId: string, userId: string, locationId: string) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows } = await client.query(
+          `SELECT manual_terminal_enabled AS "manualTerminalEnabled",
+          bank_transfer_enabled AS "bankTransferEnabled",
+          CASE WHEN bank_transfer_holder_name IS NULL THEN NULL ELSE jsonb_build_object(
+            'holderName',bank_transfer_holder_name,
+            'bankName',bank_transfer_bank_name,
+            'clabe',bank_transfer_clabe,
+            'accountNumber',bank_transfer_account_number
+          ) END AS "bankTransferDetails",
+          mixed_tender_enabled AS "mixedTenderEnabled",
+          allow_dine_in_without_table AS "allowDineInWithoutTable", version
+        FROM merchant.pos_checkout_policy WHERE merchant_id=$1::uuid AND location_id=$2::uuid`,
+          [merchantId, locationId],
+        );
+        return rows[0] ?? null;
+      },
+      locationId,
+    );
+  }
+
+  setCheckoutPolicy(
+    merchantId: string,
+    userId: string,
+    locationId: string,
+    policy: {
+      manualTerminalEnabled: boolean;
+      bankTransferEnabled: boolean;
+      bankTransferDetails: {
+        holderName: string;
+        bankName: string;
+        clabe?: string | null;
+        accountNumber?: string | null;
+      } | null;
+      mixedTenderEnabled: boolean;
+      allowDineInWithoutTable: boolean;
+    },
+  ) {
+    return this.pg.runWithMerchant(
+      merchantId,
+      userId,
+      async (client) => {
+        const { rows } = await client.query(
+          `UPDATE merchant.pos_checkout_policy SET manual_terminal_enabled=$3,
+          mixed_tender_enabled=$4, allow_dine_in_without_table=$5,
+          bank_transfer_enabled=$6, bank_transfer_holder_name=$7,
+          bank_transfer_bank_name=$8, bank_transfer_clabe=$9,
+          bank_transfer_account_number=$10,
+          maximum_tender_lines=CASE WHEN $4 THEN greatest(maximum_tender_lines,2) ELSE maximum_tender_lines END,
+          version=gen_random_uuid()::text, updated_at=now()
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+        RETURNING manual_terminal_enabled AS "manualTerminalEnabled",
+          bank_transfer_enabled AS "bankTransferEnabled",
+          CASE WHEN bank_transfer_holder_name IS NULL THEN NULL ELSE jsonb_build_object(
+            'holderName',bank_transfer_holder_name,
+            'bankName',bank_transfer_bank_name,
+            'clabe',bank_transfer_clabe,
+            'accountNumber',bank_transfer_account_number
+          ) END AS "bankTransferDetails",
+          mixed_tender_enabled AS "mixedTenderEnabled",
+          allow_dine_in_without_table AS "allowDineInWithoutTable",version`,
+          [
+            merchantId,
+            locationId,
+            policy.manualTerminalEnabled,
+            policy.mixedTenderEnabled,
+            policy.allowDineInWithoutTable,
+            policy.bankTransferEnabled,
+            policy.bankTransferDetails?.holderName ?? null,
+            policy.bankTransferDetails?.bankName ?? null,
+            policy.bankTransferDetails?.clabe ?? null,
+            policy.bankTransferDetails?.accountNumber ?? null,
+          ],
+        );
+        return rows[0] ?? null;
+      },
+      locationId,
+    );
+  }
+
+  /**
+   * Sets the blind count for one location and moves the count method with it.
+   *
+   * A blind drawer counts what it holds, denomination by denomination. A visible
+   * one only needs the total, so the method follows the flag in the same write:
+   * the two can never disagree on the till. False when the location holds no
+   * policy row, which the caller reports rather than inventing one.
+   */
+  setCashPolicy(
+    merchantId: string,
+    userId: string,
+    locationId: string,
+    blindCountRequired: boolean,
+  ) {
+    return this.pg.runWithMerchant(merchantId, userId, async (client) => {
+      const { rowCount } = await client.query(
+        `UPDATE merchant.cash_shift_policy
+            SET blind_count_required=$3,
+                count_method=CASE WHEN $3 THEN 'denomination_or_total' ELSE 'total_only' END
+          WHERE merchant_id=$1::uuid AND location_id=$2::uuid`,
+        [merchantId, locationId, blindCountRequired],
+      );
+      return (rowCount ?? 0) > 0;
+    });
+  }
 }

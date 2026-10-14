@@ -162,6 +162,10 @@ export const ADMINISTRATIVE_COMMAND_POLICIES: readonly AdministrativeCommandPoli
   policy('catalog.detail', DASHBOARD, 'catalog.manage'),
   policy('catalog.update', DASHBOARD, 'catalog.manage'),
   policy('catalog.archive', DASHBOARD, 'catalog.manage'),
+  // "No hay producto" (the 86 state), per location. A write, so it takes the same
+  // `catalog.manage` key as the rest of the catalogue's authoring: the person who may
+  // change a price may also say the kitchen is out.
+  policy('catalog.availability', DASHBOARD, 'catalog.manage'),
   // Recipes and inventory authoring (recipes module plan §11, phase 1). The console
   // authors; the till operates. The permissions are the ones migration 76 seeded to
   // owner, admin and manager, so the console's own staff hold them.

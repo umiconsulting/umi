@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:umi_contract/umi_contract.dart' show UmiRoutes;
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/security/device_key.dart';
 
@@ -91,7 +92,7 @@ void main() {
       clock: () => DateTime.utc(2026, 9, 3, 12),
     );
 
-    final headers = await provider.deviceHeaders();
+    final headers = await provider.deviceHeaders(path: UmiRoutes.posPinLogin);
 
     final installationId = headers['x-umi-installation-id']!;
     final timestamp = headers['x-umi-device-proof-ts']!;
@@ -127,7 +128,7 @@ void main() {
       clock: () => DateTime.utc(2026, 9, 3, 12),
     );
 
-    final headers = await provider.deviceHeaders();
+    final headers = await provider.deviceHeaders(path: UmiRoutes.posPinLogin);
 
     expect(headers['x-umi-device-proof-alg'], 'es256');
     expect(headers['x-umi-device-proof'], 'es256-signature');
@@ -142,6 +143,36 @@ void main() {
     );
 
     expect(await provider.deviceHeaders(), isEmpty);
+  });
+
+  test('a route the server does not verify carries no proof', () async {
+    // The proof is read on the two POS auth routes and nowhere else. Signing
+    // every other request is two Ed25519 scalar multiplications the server
+    // never looks at — which is what starved the pilot till's CPU.
+    final storage = MemorySecureStorage();
+    final vault = CredentialVault(storage);
+    await vault.saveDevice(
+      id: 'device-1',
+      publicId: 'public-1',
+      credential: 'bearer-secret',
+      credentialVersion: 1,
+      state: 'active',
+      merchantId: 'merchant-1',
+      locationId: 'location-1',
+    );
+    final provider = ProvingDeviceCredentials(
+      vault,
+      SoftwareDeviceKey(storage),
+      clock: () => DateTime.utc(2026, 9, 3, 12),
+    );
+
+    final headers = await provider.deviceHeaders(
+      path: '/api/v1/pos/merchants/x/hardware/runtime',
+    );
+
+    expect(headers['x-umi-device-credential'], 'bearer-secret');
+    expect(headers.containsKey('x-umi-device-proof'), isFalse);
+    expect(headers.containsKey('x-umi-device-proof-ts'), isFalse);
   });
 }
 

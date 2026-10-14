@@ -79,10 +79,8 @@ List<PrepListItem> sortPrepItems(List<PrepListItem> items) {
 
 /// Compare two quantities at different scales without losing a digit.
 int _compareMagnitudes(ScaledQuantityView left, ScaledQuantityView right) {
-  final leftScaled =
-      BigInt.from(left.value) * _powerOfTen(right.scale);
-  final rightScaled =
-      BigInt.from(right.value) * _powerOfTen(left.scale);
+  final leftScaled = BigInt.from(left.value) * _powerOfTen(right.scale);
+  final rightScaled = BigInt.from(right.value) * _powerOfTen(left.scale);
   return leftScaled.compareTo(rightScaled);
 }
 

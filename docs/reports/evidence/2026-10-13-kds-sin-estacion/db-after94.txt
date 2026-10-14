@@ -1,0 +1,16 @@
+BEGIN
+          captured_at          
+-------------------------------
+ 2026-10-13 22:33:54.479753+00
+(1 row)
+
+  public_reference   |                  id                  | kitchen_status | version | commercial_status |      product_name       | station |  status   |   route_reason   | target_seconds |     station_completed_at      
+---------------------+--------------------------------------+----------------+---------+-------------------+-------------------------+---------+-----------+------------------+----------------+-------------------------------
+ Cuenta 004 · Mesa 1 | 50e2ef12-ba2f-4d0c-97be-41a28829257b | completed      |      11 | committed         | Aeropress               | Barra   | ready     | configured_route |            300 | 2026-10-13 22:33:52.906111+00
+ Cuenta 004 · Mesa 1 | 50e2ef12-ba2f-4d0c-97be-41a28829257b | completed      |      11 | committed         | Amanecer                | Barra   | ready     | configured_route |            300 | 2026-10-13 22:33:52.906647+00
+ Cuenta 004 · Mesa 1 | 50e2ef12-ba2f-4d0c-97be-41a28829257b | completed      |      11 | committed         | Capuccino               | Cocina  | ready     | configured_route |            300 | 2026-10-13 21:49:27.861965+00
+ Cuenta 013 · Mesa 2 | bfd5e02f-ee14-47b3-be3e-31b143ac1795 | cancelled      |       3 | cancelled         | Americano limón mineral |         | cancelled | missing_route    |            300 | 2026-10-13 22:22:57.758723+00
+ Cuenta 013 · Mesa 2 | bfd5e02f-ee14-47b3-be3e-31b143ac1795 | cancelled      |       3 | cancelled         | Americano               |         | cancelled | missing_route    |            300 | 2026-10-13 22:22:57.758931+00
+(5 rows)
+
+COMMIT

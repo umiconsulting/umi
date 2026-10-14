@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "754650387881",
+    "project_id": "umiconsulting-pos-prod",
+    "storage_bucket": "umiconsulting-pos-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:754650387881:android:00fc29399417be180be0b8",
+        "android_client_info": {
+          "package_name": "co.umiconsulting.umi_pos.estacion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvDVCfEoNLvKf9mB4qnhRUIeuwaTgqCvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -54,10 +54,7 @@ final class PrepListController extends ChangeNotifier {
     bool includeAbovePar = false,
   }) async {
     final generation = ++_generation;
-    _state = PrepListState(
-      phase: PrepListPhase.loading,
-      list: _state.list,
-    );
+    _state = PrepListState(phase: PrepListPhase.loading, list: _state.list);
     notifyListeners();
     try {
       final list = prepListView(

@@ -1,13 +1,17 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
+import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/inventory/inventory_controller.dart';
 import 'package:umi_pos/features/inventory/inventory_repository.dart';
 import 'package:umi_pos/features/inventory/inventory_surface.dart';
+
+import 'support/pos_finders.dart';
 
 const scope = InventoryScope(
   merchantId: '00000000-0000-4000-8000-000000000001',
@@ -23,6 +27,10 @@ class _InventoryFake implements InventoryRepository {
     this.recoverSubmitCount = false,
     this.recoverReconcileCount = false,
     this.withActiveCount = false,
+    this.quantityScale = 0,
+    this.withOutsideCountItems = false,
+    this.refuseRestockOnce = false,
+    this.refuseCreateCount = false,
   });
 
   final bool withRestock;
@@ -31,8 +39,23 @@ class _InventoryFake implements InventoryRepository {
   final bool recoverSubmitCount;
   final bool recoverReconcileCount;
   final bool withActiveCount;
+  final int quantityScale;
+  final bool withOutsideCountItems;
+
+  /// Refuses the first restock the way the server does when the operation needs
+  /// an independent approval: 409 `APPROVAL_REQUIRED`, recoverable, carrying the
+  /// permission and the fingerprint the client must hand back with the approval.
+  final bool refuseRestockOnce;
+
+  /// Refuses the count the way the contract does when the body does not match
+  /// it: 400 `VALIDATION_FAILED`, not recoverable, nothing to retry blindly.
+  final bool refuseCreateCount;
+  InventoryAdjustment? adjustment;
+  CreateInventoryCountRequest? createdCount;
+  SubmitInventoryCountRequest? submittedCount;
   int historyCalls = 0;
   RestockCommand? restockCommand;
+  int restockCalls = 0;
   int prepListCalls = 0;
   String? prepListMerchantId;
   PosPrepListQuery? prepListQuery;
@@ -75,18 +98,62 @@ class _InventoryFake implements InventoryRepository {
         'displayName': 'Café en grano',
         'publicReference': 'CAFE-01',
         'baseUnit': 'gram',
-        'scale': 0,
+        'scale': quantityScale,
+        'active': true,
         'version': 1,
       },
+      if (withOutsideCountItems)
+        for (final entry in [
+          (
+            '00000000-0000-4000-8000-000000000040',
+            'Sin saldo en el almacén',
+            true,
+          ),
+          ('00000000-0000-4000-8000-000000000041', 'Artículo archivado', false),
+          (
+            '00000000-0000-4000-8000-000000000042',
+            'Saldo de otro almacén',
+            true,
+          ),
+        ])
+          {
+            'id': entry.$1,
+            'displayName': entry.$2,
+            'publicReference': entry.$1,
+            'baseUnit': 'gram',
+            'scale': quantityScale,
+            'active': entry.$3,
+            'version': 1,
+          },
     ],
     balances: [
       {
         'inventoryItemId': '00000000-0000-4000-8000-000000000005',
+        'inventoryLocationId': '00000000-0000-4000-8000-000000000004',
         'onHand': 1000,
         'reserved': 100,
         'available': 900,
         'version': 1,
       },
+      if (withOutsideCountItems)
+        for (final entry in [
+          (
+            '00000000-0000-4000-8000-000000000041',
+            '00000000-0000-4000-8000-000000000004',
+          ),
+          (
+            '00000000-0000-4000-8000-000000000042',
+            '00000000-0000-4000-8000-000000000043',
+          ),
+        ])
+          {
+            'inventoryItemId': entry.$1,
+            'inventoryLocationId': entry.$2,
+            'onHand': 10,
+            'reserved': 0,
+            'available': 10,
+            'version': 1,
+          },
     ],
     restockReviews: withRestock
         ? [
@@ -154,13 +221,35 @@ class _InventoryFake implements InventoryRepository {
   Future<InventoryMutationResult> adjust(
     String merchantId,
     InventoryAdjustment command,
-  ) => throw UnimplementedError();
+  ) async {
+    adjustment = command;
+    return InventoryMutationResult(
+      commandId: command.commandId,
+      entries: const [],
+      balances: const [],
+      recovered: false,
+      correlationId: 'adjustment-test',
+    );
+  }
+
   @override
   Future<InventoryMutationResult> restock(
     String merchantId,
     RestockCommand command,
   ) async {
+    restockCalls += 1;
     restockCommand = command;
+    if (refuseRestockOnce && restockCalls == 1 && command.approvalId == null) {
+      throw AppException(
+        category: AppErrorCategory.conflict,
+        code: 'APPROVAL_REQUIRED',
+        recoverable: true,
+        fieldErrors: {
+          'approvalPermission': const ['inventory.restock.approve'],
+          'approvalFingerprint': [List.filled(64, 'a').join()],
+        },
+      );
+    }
     return InventoryMutationResult(
       commandId: command.commandId,
       entries: const [],
@@ -195,6 +284,14 @@ class _InventoryFake implements InventoryRepository {
     String merchantId,
     CreateInventoryCountRequest command,
   ) async {
+    createdCount = command;
+    if (refuseCreateCount) {
+      throw const AppException(
+        category: AppErrorCategory.unknown,
+        code: 'VALIDATION_FAILED',
+        recoverable: false,
+      );
+    }
     if (recoverCreateCount) {
       throw const AppException(
         category: AppErrorCategory.transport,
@@ -234,6 +331,7 @@ class _InventoryFake implements InventoryRepository {
     String merchantId,
     SubmitInventoryCountRequest command,
   ) async {
+    submittedCount = command;
     if (recoverSubmitCount) {
       throw const AppException(
         category: AppErrorCategory.transport,
@@ -351,24 +449,198 @@ Map<String, Object?> _historyEntry(int sequence) => {
   'occurredAt': '2026-08-05T10:00:00.000Z',
 };
 
-Widget _app(Iterable<String> permissions, {_InventoryFake? fake}) =>
-    MaterialApp(
-      locale: const Locale('es'),
-      supportedLocales: const [Locale('es'), Locale('en')],
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      home: InventorySurface(
-        controller: InventoryController(fake ?? _InventoryFake()),
-        scope: scope,
-        permissions: OperatorPermissions(permissions),
-      ),
-    );
+Widget _app(
+  Iterable<String> permissions, {
+  _InventoryFake? fake,
+  double textScale = 1,
+}) => PosApp(
+  theme: UmiTheme.light(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(
+      context,
+    ).copyWith(textScaler: TextScaler.linear(textScale)),
+    child: child!,
+  ),
+  locale: const Locale('es'),
+  supportedLocales: const [Locale('es'), Locale('en')],
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+
+    GlobalWidgetsLocalizations.delegate,
+  ],
+  home: InventorySurface(
+    controller: InventoryController(fake ?? _InventoryFake()),
+    scope: scope,
+    permissions: OperatorPermissions(permissions),
+  ),
+);
 
 void main() {
+  testWidgets('blind count requests only active items in its own warehouse', (
+    tester,
+  ) async {
+    final fake = _InventoryFake(
+      quantityScale: 3,
+      withActiveCount: true,
+      withOutsideCountItems: true,
+    );
+    await tester.pumpWidget(
+      _app(const ['inventory.read', 'inventory.count.submit'], fake: fake),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(PosField), findsOneWidget);
+    expect(find.text('Sin saldo en el almacén'), findsNothing);
+    expect(find.text('Artículo archivado'), findsNothing);
+    expect(find.text('Saldo de otro almacén'), findsNothing);
+    await tester.enterText(find.byType(PosField), '1.25');
+    await tester.ensureVisible(find.text('Enviar conteo'));
+    await tester.tap(find.text('Enviar conteo'));
+    await tester.pumpAndSettle();
+    expect(fake.submittedCount!.lines, hasLength(1));
+    expect(
+      fake.submittedCount!.lines.single['inventoryItemId'],
+      '00000000-0000-4000-8000-000000000005',
+    );
+    expect(fake.submittedCount!.lines.single['counted'], {
+      'value': 1250,
+      'scale': 3,
+      'unit': 'gram',
+    });
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets(
+    'stock adjustment uses visible decimals and refuses silent rounding',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      final fake = _InventoryFake(quantityScale: 3);
+      await tester.pumpWidget(
+        _app(const ['inventory.read', 'inventory.adjust.increase'], fake: fake),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Disponible 0.9'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Aumentar existencias de Café en grano'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Aumentar'));
+      await tester.pumpAndSettle();
+      final field = find.descendant(
+        of: find.byType(PosAlertDialog),
+        matching: find.byType(PosField),
+      );
+      await tester.enterText(field, '1.2345');
+      await tester.pump();
+      final confirm = find.widgetWithText(PosButton, 'Confirmar');
+      expect(tester.widget<PosButton>(confirm).onPressed, isNull);
+      expect(fake.adjustment, isNull);
+      await tester.enterText(field, '1.25');
+      await tester.pump();
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(fake.adjustment!.quantity, {
+        'value': 1250,
+        'scale': 3,
+        'unit': 'gram',
+      });
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      semantics.dispose();
+    },
+  );
+
+  testWidgets('blind count validates decimals and keeps exact item units', (
+    tester,
+  ) async {
+    final fake = _InventoryFake(quantityScale: 3, withActiveCount: true);
+    await tester.pumpWidget(
+      _app(const ['inventory.read', 'inventory.count.submit'], fake: fake),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(PosField).first, '1.2345');
+    await tester.ensureVisible(find.text('Enviar conteo'));
+    await tester.tap(find.text('Enviar conteo'));
+    await tester.pumpAndSettle();
+    expect(fake.submittedCount, isNull);
+    expect(
+      find.text('Registra una cantidad válida, incluido cero.'),
+      findsOneWidget,
+    );
+    await tester.enterText(find.byType(PosField).first, '1.25');
+    await tester.tap(find.text('Enviar conteo'));
+    await tester.pumpAndSettle();
+    expect(fake.submittedCount!.lines.first['counted'], {
+      'value': 1250,
+      'scale': 3,
+      'unit': 'gram',
+    });
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  setUpAll(() async {
+    final body = FontLoader('IBM Plex Sans');
+    for (final weight in ['Regular', 'Medium', 'SemiBold', 'Bold']) {
+      body.addFont(rootBundle.load('assets/fonts/IBMPlexSans-$weight.ttf'));
+    }
+    await body.load();
+    final heading = FontLoader('Bricolage Grotesque');
+    for (final weight in ['SemiBold', 'Bold']) {
+      heading.addFont(
+        rootBundle.load('assets/fonts/BricolageGrotesque12pt-$weight.ttf'),
+      );
+    }
+    await heading.load();
+  });
+  for (final size in [const Size(375, 812), const Size(812, 375)]) {
+    for (final activeCount in [false, true]) {
+      testWidgets(
+        'inventory actions and content remain reachable at 200% $size count=$activeCount',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPhysicalSize);
+          await tester.pumpWidget(
+            _app(
+              const [
+                'inventory.read',
+                'inventory.history.read',
+                'inventory.count.create',
+                'inventory.count.submit',
+                'inventory.count.reconcile',
+                'inventory.production.produce',
+                'inventory.adjust.increase',
+                'inventory.adjust.decrease',
+                'inventory.waste.create',
+              ],
+              fake: _InventoryFake(withActiveCount: activeCount),
+              textScale: 2,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            MediaQuery.textScalerOf(
+              tester.element(find.byType(InventorySurface)),
+            ).scale(16),
+            32,
+          );
+          expect(tester.takeException(), isNull);
+          final target = find.text(
+            activeCount ? 'Enviar conteo' : 'Historial inmutable',
+          );
+          await tester.scrollUntilVisible(
+            target,
+            150,
+            scrollable: find.byType(Scrollable).last,
+          );
+          await tester.pumpAndSettle();
+          expect(target.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
   test('The prep list read uses the till own scope', () async {
     final fake = _InventoryFake();
     final controller = InventoryController(fake);
@@ -467,8 +739,8 @@ void main() {
 
     expect(find.text('Café en grano'), findsOneWidget);
     expect(find.text('Disponible 900'), findsOneWidget);
-    expect(find.text('+'), findsNothing);
-    expect(find.byIcon(Icons.delete_sweep_outlined), findsNothing);
+    expect(find.text('Aumentar'), findsNothing);
+    expect(find.byPosGlyph(PosGlyphs.deleteSweepOutlined), findsNothing);
   });
 
   testWidgets('Manager sees permission-aware inventory actions and count', (
@@ -486,9 +758,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('+'), findsOneWidget);
-    expect(find.text('−'), findsOneWidget);
-    expect(find.byIcon(Icons.delete_sweep_outlined), findsOneWidget);
+    expect(find.text('Aumentar'), findsOneWidget);
+    expect(find.text('Reducir'), findsOneWidget);
+    expect(find.byPosGlyph(PosGlyphs.deleteSweepOutlined), findsOneWidget);
     expect(find.text('Iniciar conteo ciego'), findsOneWidget);
   });
 
@@ -511,22 +783,22 @@ void main() {
     expect(find.text('Conteo ciego activo'), findsOneWidget);
     expect(find.textContaining('1000'), findsNothing);
 
-    await tester.enterText(find.byType(TextField).first, '0');
+    await tester.enterText(find.byType(PosField).first, '0');
     await tester.tap(find.text('Enviar conteo'));
     await tester.pumpAndSettle();
     expect(find.text('Varianza del conteo'), findsOneWidget);
     expect(find.textContaining('-1000'), findsOneWidget);
 
-    var reconcile = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Solicitar reconciliación'),
+    var reconcile = tester.widget<PosButton>(
+      find.widgetWithText(PosButton, 'Solicitar reconciliación'),
     );
     expect(reconcile.onPressed, isNull);
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byType(PosSelectFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Error de conteo').last);
     await tester.pumpAndSettle();
-    reconcile = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Solicitar reconciliación'),
+    reconcile = tester.widget<PosButton>(
+      find.widgetWithText(PosButton, 'Solicitar reconciliación'),
     );
     expect(reconcile.onPressed, isNotNull);
   });
@@ -544,15 +816,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Destino por componente'), findsOneWidget);
     expect(find.text('Botella retornable · BOT-RET · 1 unit'), findsOneWidget);
-    expect(find.text('Café en grano · CAFE-GRA · 10 gram'), findsOneWidget);
+    expect(find.text('Café en grano · CAFE-GRA · 10 g'), findsOneWidget);
     expect(find.textContaining('00000000-0000-4000'), findsNothing);
-    expect(find.byType(DropdownButtonFormField<String>), findsNWidgets(2));
+    expect(find.byType(PosSelectFormField<String>), findsNWidgets(2));
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>).last);
+    await tester.tap(find.byType(PosSelectFormField<String>).last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Enviar a inspección').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Confirmar'));
+    await tester.tap(find.widgetWithText(PosButton, 'Confirmar'));
     await tester.pumpAndSettle();
 
     final decisions = fake.restockCommand!.componentDecisions!;
@@ -560,4 +832,91 @@ void main() {
     expect(decisions.first['outcome'], 'not_restocked');
     expect(decisions.last['outcome'], 'inspection_queued');
   });
+
+  test(
+    'a restock refused for approval survives a refresh and is re-sent approved',
+    () async {
+      // Walked on the iMin D3-504 on 2026-10-11: the refund disposition came
+      // back `409 APPROVAL_REQUIRED` with the permission and the fingerprint, the
+      // manager approved, and the command was never re-sent — the screen kept
+      // `Esta operación requiere una aprobación vinculada.` over a pending
+      // decision that stayed pending. This is the state machine in isolation.
+      final fake = _InventoryFake(withRestock: true, refuseRestockOnce: true);
+      final controller = InventoryController(fake);
+      await controller.load(scope);
+      final review = controller.state.overview!.restockReviews.single;
+
+      await controller.resolveRestock(scope, review, {
+        for (final component
+            in (review['components']! as List<Object?>).cast<Map<String, Object?>>())
+          component['inventoryItemId']! as String: 'restocked',
+      });
+      expect(fake.restockCalls, 1);
+      expect(controller.state.pendingOperation, isNotNull);
+      expect(controller.state.approvalPermission, 'inventory.restock.approve');
+      expect(controller.state.approvalFingerprint, List.filled(64, 'a').join());
+
+      // The screen refreshes while the approver types the PIN — the till polls
+      // the overview on every visit and after every recovery attempt.
+      await controller.load(scope);
+      expect(
+        controller.state.pendingOperation,
+        isNotNull,
+        reason: 'a refresh must not forget the command that is waiting for approval',
+      );
+
+      await controller.approvePendingOperation(scope, 'approval-1');
+      expect(fake.restockCalls, 2, reason: 'the approval must re-send the command');
+      expect(fake.restockCommand!.approvalId, 'approval-1');
+      expect(fake.restockCommand!.approvalFingerprint, List.filled(64, 'a').join());
+    },
+  );
+
+  test('a blind count names its item scope instead of sending null', () async {
+    // Walked on the iMin D3-504 on 2026-10-11: `Iniciar conteo ciego` answered
+    // `400 VALIDATION_FAILED` and the till said only `No fue posible completar la
+    // operación de inventario.` The contract types `itemIds` as an array with an
+    // empty default, and the generated `toJson` writes the field whatever its
+    // value — so a null was refused before the command reached the domain.
+    final fake = _InventoryFake();
+    final controller = InventoryController(fake);
+    await controller.load(scope);
+
+    await controller.startCount(scope);
+
+    expect(fake.createdCount, isNotNull, reason: 'the count reached the server');
+    expect(fake.createdCount!.itemIds, isNotNull);
+    expect(fake.createdCount!.itemIds, isEmpty);
+    expect(fake.createdCount!.toJson()['itemIds'], isNotNull);
+  });
+
+  testWidgets(
+    'a refusal this screen has no words for names what the server said',
+    (tester) async {
+      // The surface's own switch covers the codes it has something specific to
+      // say about; everything else used to collapse into one generic sentence.
+      // `VALIDATION_FAILED` reached the operator as `No fue posible completar la
+      // operación de inventario.` — three times on the iMin D3-504 on
+      // 2026-10-11 — with nothing to act on. The fallback is the shared mapping
+      // now, which has an actionable sentence for it.
+      final fake = _InventoryFake(refuseCreateCount: true);
+      await tester.pumpWidget(
+        _app(const ['inventory.read', 'inventory.count.create'], fake: fake),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Iniciar conteo ciego'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('El servidor no aceptó el formato'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('No fue posible completar la operación de inventario.'),
+        findsNothing,
+      );
+      expect(find.textContaining('VALIDATION_FAILED'), findsNothing);
+    },
+  );
 }

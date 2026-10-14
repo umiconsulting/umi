@@ -1,0 +1,22 @@
+BEGIN
+          captured_at          
+-------------------------------
+ 2026-10-13 22:59:21.926794+00
+(1 row)
+
+ full_name  | state  | kitchen_read | inventory_read 
+------------+--------+--------------+----------------
+ Admin ONCA | active | t            | t
+ Admin ONCA | active | t            | t
+ Barista 2  | active | t            | f
+ Mesero 2   | active | t            | f
+(4 rows)
+
+  public_reference   | version | kitchen_status | station |      product_name       | item_status 
+---------------------+---------+----------------+---------+-------------------------+-------------
+ Cuenta 118 · Mesa 1 |       3 | in_preparation | Barra   | Americano limón mineral | preparing
+ Cuenta 141 · Mesa 1 |       3 | queued         | Barra   | Americano limón mineral | queued
+ Cuenta 150 · Mesa 3 |       2 | queued         | Barra   | Capuccino               | queued
+(3 rows)
+
+COMMIT

@@ -5,14 +5,19 @@
   /* The console's own accent, the way .btn-primary resolves it: the merchant
      brand on the light theme, the single blue accent on the dark ones. */
   --fp-accent: var(--merchant-brand, var(--umi-navy));
+  /* The tab's NAME is text on the tab's own surface, so it takes the accent's
+     ink rather than the accent itself. */
+  --fp-accent-ink: color-mix(in srgb, var(--merchant-brand, var(--umi-navy)) 70%, #000);
 }
 [data-theme='dark'] .floor-plan,
 [data-theme='midnight'] .floor-plan {
   --fp-accent: var(--umi-blue);
+  --fp-accent-ink: var(--umi-blue);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) .floor-plan {
     --fp-accent: var(--umi-blue);
+    --fp-accent-ink: var(--umi-blue);
   }
 }
 .fp-toolbar {
@@ -120,7 +125,7 @@
   border-bottom-color: var(--fp-accent);
 }
 .fp-tab-active .fp-tab-name {
-  color: var(--fp-accent);
+  color: var(--fp-accent-ink);
 }
 .fp-add-area {
   flex: 0 0 auto;

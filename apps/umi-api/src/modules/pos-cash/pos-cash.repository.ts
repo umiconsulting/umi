@@ -973,7 +973,23 @@ export class PosCashRepository {
     if (resolved.rows[0].present) throw new Error('VARIANCE_ALREADY_RESOLVED');
     const { rows } = await client.query<CashShift>(
       `UPDATE merchant.cash_shift
-       SET status='open',version=version+1,suspended_at=NULL
+       -- UN CAJÓN A MEDIO CIERRE NO VUELVE A «ABIERTO» SOLO POR REANUDARSE.
+       --
+       -- Reanudar devolvía el turno a 'open' aunque tuviera un conteo esperando
+       -- aprobación, y desde ahí el cierre no tenía ruta: el servidor solo ofrecía
+       -- el reconteo —que rechaza, porque el turno no está en conciliación— y nunca
+       -- la resolución. Así quedó el turno del 2026-10-07 con su conteo del
+       -- 2026-10-08: dinero contado y sin forma de cerrarlo (medido en el iMin
+       -- D3-504, 2026-10-12). El cajón vuelve a manos de su operador —se limpia
+       -- 'suspended_at' — pero su estado sigue siendo el que el conteo dejó.
+       SET status = CASE
+             WHEN EXISTS (
+               SELECT 1 FROM merchant.cash_count_attempt a
+                WHERE a.shift_id=$1::uuid AND a.state <> 'resolved'
+             ) THEN 'reconciliation_required'
+             ELSE 'open'
+           END,
+           version=version+1,suspended_at=NULL
        WHERE id=$1::uuid
        RETURNING id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                  register_id::text AS "registerId",device_id::text AS "deviceId",
@@ -1564,9 +1580,25 @@ export class PosCashRepository {
              -- "Turno abierto" for a shift that was already finished — which is
              -- how the till came to offer a drawer the API would not open.
              AND status NOT IN ('closed','blocked','recovered')
-             AND responsible_operator_id=$4::uuid
+             -- WHOSE HAND IS ON THE DRAWER IS THE TERMINAL'S BUSINESS, NOT THE
+             -- PERSON'S. This read used to demand the caller BE the responsible
+             -- operator, and that one predicate is what stranded a café after an
+             -- app update: the reinstall mints a new operator session (and often
+             -- a new person signs in), the drawer is still held by this very
+             -- terminal, but the shift became INVISIBLE here — so the till
+             -- offered "open a shift", the server refused it because the register
+             -- was held, and the dead end had the operator re-reading a button
+             -- that could not work. Measured on the iMin on 2026-10-11 with a
+             -- drawer left open since the 7th.
+             --
+             -- Visible is not the same as usable. Who opened it still decides
+             -- WHAT HAPPENS NEXT: a different session reads back as
+             -- operator_mismatch with ['resume'] in allowedActions, which is the
+             -- resume the operator takes deliberately; a drawer held by another
+             -- live terminal never appears here at all (that stays
+             -- held_by_active_till, behind the manager's count).
            ORDER BY opened_at DESC LIMIT 1`,
-          [merchantId, locationId, deviceId, operatorId],
+          [merchantId, locationId, deviceId],
         );
         // NOTHING OF THIS OPERATOR'S ON THIS TERMINAL — but maybe on another one.
         // A shift belongs to the operator and the register; the holding device is only
@@ -1880,7 +1912,11 @@ export class PosCashRepository {
           registers: mappedRegisters,
           currentShift: shift,
           ledger,
-          expectedCash: latestCount ? expected : null,
+          // The blind policy withholds the drawer's total until a count is in.
+          // It used to withhold it whenever no count existed, which made the
+          // policy flag decorative: a location that answered "conteo visible"
+          // still read a masked drawer. The flag now decides.
+          expectedCash: policy.blindCountRequired && !latestCount ? null : expected,
           latestCount,
           varianceResolution,
           reconciliation,
@@ -1906,7 +1942,27 @@ export class PosCashRepository {
                 ? !sessionMatches
                   ? ['resume']
                   : shift.status === 'open'
-                    ? ['movement', 'suspend', 'handoff', 'count', 'no_sale']
+                    ? [
+                        'movement',
+                        'suspend',
+                        'handoff',
+                        'no_sale',
+                        // UN CONTEO A MEDIO CIERRE MANDA SOBRE EL ESTADO DEL TURNO.
+                        //
+                        // Un conteo sometido pone el turno en `reconciliation_required`
+                        // — pero reanudar el cajón después devuelve el estado a `open`
+                        // (la transición lo hizo con el turno del 2026-10-07, que tenía
+                        // su conteo del 2026-10-08 esperando aprobación). Desde `open`
+                        // el till ofrecía el reconteo —que el servidor rechaza, porque
+                        // el turno no está en conciliación— y nunca la resolución: el
+                        // dinero estaba contado y no había forma de cerrarlo
+                        // (medido en el iMin D3-504, 2026-10-12). Mientras el conteo
+                        // siga esperando, el turno está a medio cerrar y la ruta que se
+                        // ofrece es la del cierre.
+                        ...(latestCount && latestCount.count.state !== 'resolved'
+                          ? ['resolve_variance', 'reconcile']
+                          : ['count']),
+                      ]
                     : shift.status === 'suspended' || shift.status === 'handoff_pending'
                       ? ['resume', 'count']
                       : handoffReady
@@ -1936,30 +1992,124 @@ export class PosCashRepository {
     dto: ShiftTransitionRequest,
     target: 'suspended' | 'open',
   ) {
-    const source =
-      target === 'suspended'
-        ? ['open']
-        : [
-            'open',
-            'suspended',
-            'handoff_pending',
-            'counting',
-            'reconciliation_required',
-            'closing',
-          ];
+    // READ IT FIRST, INSIDE THE SAME LOCK, SO A REFUSAL CAN NAME WHY.
+    //
+    // This used to be one UPDATE with a five-clause WHERE and a bare
+    // `throw new Error('INVALID_SHIFT_TRANSITION')` for the empty result. Two
+    // consequences, both measured: the operator read `500 INTERNAL_ERROR` for a
+    // conflict (nothing maps that message to a status), and the clauses could not
+    // tell the caller WHICH one failed. The clauses also asked the wrong question
+    // — see the resume branch below.
+    const held = await client.query<{
+      status: string;
+      version: number;
+      registerId: string;
+      currency: string;
+      businessDate: string;
+      ledgerSequence: string;
+      holdingDeviceId: string;
+      holdingDeviceCredentialVersion: number;
+      responsibleOperatorId: string;
+      operatorSessionId: string;
+      previousSessionOnRecord: boolean;
+    }>(
+      `SELECT status,version,register_id::text AS "registerId",currency,
+              business_date::text AS "businessDate",
+              ledger_sequence::text AS "ledgerSequence",
+              holding_device_id::text AS "holdingDeviceId",
+              holding_device_credential_version AS "holdingDeviceCredentialVersion",
+              responsible_operator_id::text AS "responsibleOperatorId",
+              operator_session_id::text AS "operatorSessionId",
+              -- The session this drawer speaks for is referenced by the custody
+              -- row this transition is about to write, and that reference is
+              -- ON DELETE RESTRICT. A session the platform has already cleaned up
+              -- would make the insert fail and take the resume down with it, so
+              -- the read answers whether the chain link can be written at all.
+              EXISTS (
+                SELECT 1 FROM runtime.operator_session os
+                 WHERE os.id=cash_shift.operator_session_id
+              ) AS "previousSessionOnRecord"
+       FROM merchant.cash_shift
+       WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+       FOR UPDATE`,
+      [dto.shiftId, merchantId, dto.locationId],
+    );
+    const current = held.rows[0];
+    if (!current) {
+      throw new CashRefusal('RESOURCE_NOT_FOUND', 404, {
+        reason: 'shift_not_found',
+        shiftId: dto.shiftId,
+      });
+    }
+    if (current.version !== dto.expectedShiftVersion) {
+      throw new CashRefusal('OPTIMISTIC_VERSION_CONFLICT', 409, {
+        reason: 'shift_changed',
+        shiftId: dto.shiftId,
+        shiftStatus: current.status,
+        shiftVersion: current.version,
+        expectedShiftVersion: dto.expectedShiftVersion,
+      });
+    }
+    // WHOSE HAND IS ON THE DRAWER IS THE TERMINAL'S BUSINESS, NOT THE PERSON'S.
+    //
+    // The write used to match `responsible_operator_id = the acting operator`, and
+    // that is the predicate that stranded the ONCA till on 2026-10-11. The drawer
+    // was open, held by this very device, and the operator in front of it was
+    // somebody else — so the resume that the cash screen offered could never
+    // succeed, and neither could any later movement, count or close on that
+    // drawer, because they all match the same column. The read that ADVERTISES
+    // the resume (`cashCenter`, below) already decided this on
+    // `holding_device_id`; one predicate was answering two questions.
+    //
+    // So: the terminal that holds the drawer may hand it to the operator standing
+    // at it. That is the whole gate — the caller is authenticated on this device,
+    // and the route already demanded `cash.shift.resume` for the operator session
+    // it names. A drawer held by ANOTHER terminal is refused by name here, and
+    // that is the case the manager path (`recover`) exists for.
+    if (current.holdingDeviceId !== authorization.deviceId) {
+      throw new CashRefusal('INVALID_SHIFT_TRANSITION', 409, {
+        reason: 'shift_held_by_another_device',
+        shiftId: dto.shiftId,
+        shiftStatus: current.status,
+        holdingDeviceId: current.holdingDeviceId,
+        actingDeviceId: authorization.deviceId,
+      });
+    }
+    // The statuses the move is defined for, and the statuses it is not.
+    //
+    // `open` is in the resume list because a resume does not always change the
+    // status: a drawer whose session was replaced is already open, and resuming it
+    // re-pins the identity. `counting`, `reconciliation_required` and `closing`
+    // used to be in this list too, and that was worse than a wrong answer — the
+    // UPDATE returned the status it already had and the API reported SUCCESS, so
+    // four no-ops sit in the audit table as `cash.shift_open` `success` against a
+    // drawer that never opened. `transitions` in `cash-domain.ts` forbids those
+    // edges, and the client gated on the status the server ignored. Now they are
+    // refused by name.
+    const admittable = target === 'suspended' ? ['open'] : ['open', 'suspended', 'handoff_pending'];
+    if (!admittable.includes(current.status)) {
+      throw new CashRefusal('INVALID_SHIFT_TRANSITION', 409, {
+        reason: 'shift_state_not_movable',
+        shiftId: dto.shiftId,
+        from: current.status,
+        to: target,
+        shiftVersion: current.version,
+      });
+    }
     const { rows } = await client.query<CashShift>(
       `UPDATE merchant.cash_shift
-       SET status=CASE
-             WHEN $7='open' AND status IN ('counting','reconciliation_required','closing')
-               THEN status
-             ELSE $7
-           END,
+       SET status=$7,
            version=version+1,
-           operator_session_id=CASE WHEN $7='open' THEN $9::uuid ELSE operator_session_id END,
+           -- THE PERSON MOVES WITH THE DRAWER when the drawer is resumed: the
+           -- session speaks for the shift and responsible_operator_id answers
+           -- for the money, and every later write (movement, count, close) matches
+           -- the second one. Re-pinning only the session would hand the operator a
+           -- drawer they still could not count or close.
+           operator_session_id=CASE WHEN $7='open' THEN $8::uuid ELSE operator_session_id END,
+           responsible_operator_id=CASE WHEN $7='open' THEN $4::uuid ELSE responsible_operator_id END,
            suspended_at=CASE WHEN $7='suspended' THEN now() ELSE NULL END
        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
-         AND responsible_operator_id=$4::uuid AND holding_device_id=$5::uuid
-         AND version=$6 AND status=ANY($8::text[])
+         AND version=$6 AND holding_device_id=$5::uuid
        RETURNING id::text,merchant_id::text AS "merchantId",location_id::text AS "locationId",
                  register_id::text AS "registerId",device_id::text AS "deviceId",
                  device_credential_version AS "deviceCredentialVersion",
@@ -1980,26 +2130,73 @@ export class PosCashRepository {
         authorization.deviceId,
         dto.expectedShiftVersion,
         target,
-        source,
         authorization.operatorSessionId,
       ],
     );
-    if (!rows[0]) throw new Error('INVALID_SHIFT_TRANSITION');
+    const shift = rows[0];
+    if (!shift) {
+      // The row is locked and every clause above was checked against it, so this
+      // is a lost lock or a bug in this file — not something the operator did.
+      throw new CashRefusal('OPTIMISTIC_VERSION_CONFLICT', 409, {
+        reason: 'shift_changed',
+        shiftId: dto.shiftId,
+        shiftStatus: current.status,
+        expectedShiftVersion: dto.expectedShiftVersion,
+      });
+    }
     await client.query(
       `UPDATE merchant.physical_register SET status=$2,version=version+1
        WHERE id=$1::uuid`,
       [
-        rows[0].registerId,
-        rows[0].status === 'open'
+        shift.registerId,
+        shift.status === 'open'
           ? 'in_use'
-          : rows[0].status === 'counting'
+          : shift.status === 'counting'
             ? 'counting'
-            : rows[0].status === 'reconciliation_required' || rows[0].status === 'closing'
+            : shift.status === 'reconciliation_required' || shift.status === 'closing'
               ? 'reconciliation_required'
               : 'suspended',
       ],
     );
-    return rows[0];
+    // THE HAND-OVER IS A LINK IN THE CHAIN, OR IT DID NOT HAPPEN.
+    //
+    // `operator_resume` (migration 015) names both sides: the session that spoke
+    // for the drawer and the one that speaks for it now, plus the responsible
+    // operator on either side. A resume that swapped the name on the money with
+    // nothing written down is the one record an audit cannot reconstruct.
+    if (
+      target === 'open' &&
+      (current.operatorSessionId !== authorization.operatorSessionId ||
+        current.responsibleOperatorId !== authorization.operatorId) &&
+      current.previousSessionOnRecord
+    ) {
+      const expected = await this.expectedCash(client, dto.shiftId);
+      await this.recordCustody(client, merchantId, {
+        locationId: dto.locationId,
+        registerId: current.registerId,
+        shiftId: dto.shiftId,
+        eventType: 'operator_resume',
+        previousHoldingDeviceId: current.holdingDeviceId,
+        previousHoldingCredentialVersion: current.holdingDeviceCredentialVersion,
+        previousOperatorSessionId: current.operatorSessionId,
+        newHoldingDeviceId: authorization.deviceId,
+        newHoldingCredentialVersion: authorization.credentialVersion,
+        newOperatorSessionId: authorization.operatorSessionId,
+        actingOperatorId: authorization.operatorId,
+        responsibleOperatorId: authorization.operatorId,
+        shiftStatusBefore: current.status,
+        shiftStatusAfter: shift.status,
+        expectedCashMinorUnits: expected.expectedDrawerCash.minorUnits,
+        countedCashMinorUnits: null,
+        currency: current.currency,
+        reasonCode: dto.reasonCode ?? 'operator_session_replaced',
+        note: null,
+        approvalId: null,
+        commandId: dto.commandId,
+        ledgerSequence: Number(current.ledgerSequence),
+      });
+    }
+    return shift;
   }
 
   async incomingPinRecord(

@@ -1,16 +1,19 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/tables/floor_plan_controller.dart';
 import 'package:umi_pos/features/tables/floor_plan_surface.dart';
+import 'package:umi_pos/features/tables/table_state_controller.dart';
 
 import '../../support/fakes.dart';
 
@@ -132,6 +135,108 @@ Future<EntryController> readyEntryController() async {
 }
 
 void main() {
+  testWidgets('map labels shrink at 200 percent on a narrow floor plan', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(375, 812);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      PosApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(375, 812),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: PosPage(
+            body: FloorPlanMap(
+              area: areaFixture('room', 'Sala', [
+                tableElement(
+                  id: 'small',
+                  label: 'Mesa 123',
+                  capacity: 4,
+                  width: 100,
+                  height: 100,
+                ),
+              ]),
+              onTableTap: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.text('Mesa 123'),
+    );
+    final scale =
+        (paragraph.localToGlobal(const Offset(10, 0)) -
+                paragraph.localToGlobal(Offset.zero))
+            .distance /
+        10;
+    final nominal = (paragraph.text as TextSpan).style!.fontSize! * 2;
+    final rendered = nominal * scale;
+    // FittedBox preserves the furniture bounds by shrinking the label, defeating
+    // the user's enlargement. Keep the readable text fallback for this case.
+    expect(rendered, lessThan(nominal * 0.75));
+    // ignore: avoid_print
+    print(
+      'floor-plan 375x812 text=200% nominal=$nominal rendered=$rendered scale=$scale',
+    );
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('short map frames tables with readable touch targets', (
+    tester,
+  ) async {
+    final area = areaFixture('room', 'Room', [
+      tableElement(
+        id: 'a',
+        label: 'T1',
+        capacity: 4,
+        x: 500,
+        y: 400,
+        width: 50,
+        height: 50,
+        shape: 'round',
+      ),
+      tableElement(
+        id: 'b',
+        label: 'T2',
+        capacity: 4,
+        x: 575,
+        y: 400,
+        width: 50,
+        height: 50,
+      ),
+    ]);
+    String? selected;
+    await tester.pumpWidget(
+      PosApp(
+        home: Center(
+          child: SizedBox(
+            width: 500,
+            height: 80,
+            child: FloorPlanMap(
+              area: area,
+              onTableTap: (table) => selected = table.id,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final id in ['a', 'b']) {
+      final table = find.byKey(ValueKey('floor-plan-element-$id'));
+      final touch = find.descendant(
+        of: table,
+        matching: find.byType(PosTapRegion),
+      );
+      expect(tester.getSize(touch).shortestSide, greaterThanOrEqualTo(48));
+      await tester.tap(table);
+      expect(selected, id);
+    }
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'idle lock closes the map and its table detail and clears the layout',
     (tester) async {
@@ -169,7 +274,7 @@ void main() {
       final controller = FloorPlanController(repository);
       late BuildContext entryContext;
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           home: Builder(
@@ -177,7 +282,7 @@ void main() {
               entryContext = context;
               return AnimatedBuilder(
                 animation: entry,
-                builder: (_, _) => Scaffold(
+                builder: (_, _) => PosPage(
                   body: Text(
                     entry.state.phase == EntryPhase.ready
                         ? 'Catalog'
@@ -232,7 +337,7 @@ void main() {
       await tester.pumpAndSettle();
       // A surface wide enough for the detail panel holds the table there. The
       // map keeps the room on screen instead of covering it with a dialog.
-      expect(find.text('Table T1'), findsOneWidget);
+      expect(find.text('T1'), findsNWidgets(2));
       expect(find.byType(FloorPlanMap), findsOneWidget);
       await tester.pump(const Duration(seconds: 31));
       await tester.pumpAndSettle();
@@ -255,13 +360,13 @@ void main() {
     final controller = FloorPlanController(repository);
     late BuildContext entryContext;
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Builder(
           builder: (context) {
             entryContext = context;
-            return const Scaffold(body: Text('Operator PIN'));
+            return const PosPage(body: Text('Operator PIN'));
           },
         ),
       ),
@@ -352,8 +457,8 @@ void main() {
       });
       String? selected;
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
+        PosApp(
+          home: PosPage(
             body: FloorPlanMap(
               area: area,
               onTableTap: (element) => selected = element.id,
@@ -387,8 +492,8 @@ void main() {
     ];
     String? selected;
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      PosApp(
+        home: PosPage(
           body: FloorPlanAreaSelector(
             areas: areas,
             selectedAreaId: 'dining',
@@ -408,8 +513,8 @@ void main() {
   });
   testWidgets('area selector counts follow the active locale', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      PosApp(
+        home: PosPage(
           body: Builder(
             builder: (context) => Localizations.override(
               context: context,
@@ -457,8 +562,8 @@ void main() {
       ),
     ]);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
+      PosApp(
+        home: PosPage(
           body: FloorPlanMap(area: area, onTableTap: (_) {}),
         ),
       ),
@@ -479,7 +584,7 @@ void main() {
     );
     expect(
       tester
-          .widget<Material>(
+          .widget<PosSurface>(
             find.byKey(const ValueKey('floor-plan-element-big')),
           )
           .shape,
@@ -487,11 +592,11 @@ void main() {
     );
     expect(
       tester
-          .widget<Material>(
+          .widget<PosSurface>(
             find.byKey(const ValueKey('floor-plan-element-big')),
           )
           .color,
-      Colors.white,
+      PosColors.white,
     );
     expect(find.text('T2'), findsOneWidget);
     expect(find.byKey(const ValueKey('floor-plan-divider-tiny')), findsNothing);
@@ -507,13 +612,13 @@ void main() {
     final controller = FloorPlanController(repository);
     late BuildContext entryContext;
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         supportedLocales: AppLocalizations.supportedLocales,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         home: Builder(
           builder: (context) {
             entryContext = context;
-            return const Scaffold(body: Text('Catalog'));
+            return const PosPage(body: Text('Catalog'));
           },
         ),
       ),
@@ -560,7 +665,7 @@ void main() {
       }),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(DropdownButton<String>), findsNothing);
+    expect(find.byType(PosSelect<String>), findsNothing);
     expect(find.byType(FloorPlanAreaSelector), findsOneWidget);
     expect(find.text('Dining room'), findsOneWidget);
     expect(find.text('2 tables'), findsOneWidget);
@@ -576,5 +681,69 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     entry.dispose();
+  });
+  testWidgets('occupied table keeps its state glyph below its label', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    try {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      for (final size in [const Size(1280, 720), const Size(375, 812)]) {
+        tester.view.physicalSize = size;
+        final area = areaFixture('dining', 'Dining room', [
+          tableElement(
+            id: 'occupied',
+            label: 'Mesa 1',
+            capacity: 2,
+            shape: 'round',
+            width: 200,
+            height: 200,
+          ),
+        ]);
+        await tester.pumpWidget(
+          PosApp(
+            home: PosPage(
+              body: FloorPlanMap(
+                area: area,
+                onTableTap: (_) {},
+                tableStates: const {
+                  'occupied': FloorPlanTableVisual(
+                    state: tableStateSeated,
+                    turn: '12 min',
+                    partySize: 2,
+                    selected: true,
+                  ),
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final glyph = find.byWidgetPredicate(
+          (widget) => widget is PosIcon && widget.icon == PosGlyphs.eventSeat,
+        );
+        expect(
+          tester.getRect(glyph).top,
+          greaterThan(tester.getRect(find.text('12 min')).bottom),
+        );
+        expect(
+          tester.getRect(glyph).top,
+          greaterThan(tester.getRect(find.text('Mesa 1')).bottom),
+        );
+        expect(
+          tester.getSemantics(find.text('Mesa 1')),
+          isSemantics(
+            label: 'Mesa 1, 2 seats, Seated, 2 guests, Time 12 min',
+            isButton: true,
+            isEnabled: true,
+            isSelected: true,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      }
+    } finally {
+      semantics.dispose();
+    }
   });
 }

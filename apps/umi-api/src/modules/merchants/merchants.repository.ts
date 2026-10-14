@@ -292,18 +292,24 @@ export class MerchantsRepository {
   async loadBranding(merchantId: string): Promise<{
     brandColor: string | null;
     secondaryColor: string | null;
+    logoUrl: string | null;
     businessDayStart: string | null;
+    posDayClosePolicy: string | null;
     segmentThresholds: Record<string, unknown>;
   }> {
     const { rows } = await this.pg.withMerchant((c) =>
       c.query<{
         brandColor: string | null;
         secondaryColor: string | null;
+        logoUrl: string | null;
         businessDayStart: string | null;
+        posDayClosePolicy: string | null;
         segmentThresholds: Record<string, unknown> | null;
       }>(
         `SELECT brand_color AS "brandColor", secondary_color AS "secondaryColor",
+                logo_url AS "logoUrl",
                 business_day_start::text AS "businessDayStart",
+                pos_day_close_policy AS "posDayClosePolicy",
                 segment_thresholds AS "segmentThresholds"
          FROM merchant.merchant
          WHERE id = $1::uuid
@@ -315,7 +321,11 @@ export class MerchantsRepository {
     return {
       brandColor: row?.brandColor ?? null,
       secondaryColor: row?.secondaryColor ?? null,
+      // The café's own logo (migration 014). Set by the branding upload, and read
+      // here so the settings screen can show the one that is actually live.
+      logoUrl: row?.logoUrl ?? null,
       businessDayStart: row?.businessDayStart ?? null,
+      posDayClosePolicy: row?.posDayClosePolicy ?? null,
       segmentThresholds: row?.segmentThresholds ?? {},
     };
   }
@@ -519,6 +529,7 @@ export class MerchantsRepository {
       name?: string;
       timezone?: string;
       businessDayStart?: string;
+      posDayClosePolicy?: 'manual' | 'auto_void';
       segmentThresholds?: SegmentThresholdsDto;
     },
   ): Promise<void> {
@@ -529,6 +540,7 @@ export class MerchantsRepository {
              timezone = COALESCE($3, timezone),
              business_day_start = COALESCE($4::time, business_day_start),
              segment_thresholds = COALESCE($5::jsonb, segment_thresholds),
+             pos_day_close_policy = COALESCE($6, pos_day_close_policy),
              updated_at = now()
          WHERE id = $1::uuid`,
         [
@@ -537,6 +549,7 @@ export class MerchantsRepository {
           patch.timezone ?? null,
           patch.businessDayStart ?? null,
           patch.segmentThresholds ? JSON.stringify(patch.segmentThresholds) : null,
+          patch.posDayClosePolicy ?? null,
         ],
       ),
     );

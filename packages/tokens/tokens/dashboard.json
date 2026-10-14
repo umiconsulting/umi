@@ -5,7 +5,7 @@
     "default": "umi",
     "order": ["umi", "dark", "midnight"],
     "prefersDark": "dark",
-    "labels": { "umi": "Umi", "dark": "Oscuro", "midnight": "Midnight" }
+    "labels": { "umi": "Umi", "dark": "Oscuro", "midnight": "Medianoche" }
   },
   "brand": {
     "$description": "Brand",
@@ -70,12 +70,12 @@
     "ink-3": {
       "$type": "color",
       "$value": "#5C678F",
-      "$themes": { "dark": "#727B8F", "midnight": "#8A8A8A" }
+      "$themes": { "dark": "#7E8799", "midnight": "#8A8A8A" }
     },
     "ink-4": {
       "$type": "color",
       "$value": "#7D8AAE",
-      "$themes": { "dark": "#565E70", "midnight": "#6A6A6A" }
+      "$themes": { "dark": "#79829C", "midnight": "#7E7E7E" }
     },
     "ink-warm": {
       "$type": "color",

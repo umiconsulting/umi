@@ -5,6 +5,7 @@ import type {
   AssignHardwareRequest,
   ControlledReprintRequest,
   ControlledReprintResult,
+  DashboardHardwareRow,
   HardwareCommandRequest,
   HardwareCommandResult,
   HardwareCommandTransitionRequest,
@@ -23,6 +24,8 @@ import type {
   UpdateHardwarePolicyRequest,
 } from '@umi/contract';
 import { PgService } from '../../shared/database/pg.service';
+import { receiptBarcodeExpression } from '../../shared/receipts/receipt-barcode';
+import { receiptTimeInZone } from '../../shared/receipts/receipt-time';
 import { hardwareCommandFingerprint, requiredHardwareCapability } from './hardware-fingerprint';
 
 export interface HardwareAuthorization {
@@ -97,6 +100,52 @@ export interface AdministrativeHardwareCommandInput {
   printJobType?: 'test_page' | 'receipt_copy';
   originalPrintJobId?: string | null;
 }
+
+/**
+ * One print job, with the state of its newest event.
+ *
+ * The state of a job is the state of its last event, so the newest event rides along in
+ * every read of a job. The lateral join below is that rule in SQL.
+ */
+interface PrintJobRow {
+  jobId: string;
+  targetPrinterId: string;
+  type: PrintJob['type'];
+  sourceAggregateType: string;
+  sourceAggregateId: string;
+  correlationId: string;
+  idempotencyKey: string;
+  payloadFingerprint: string;
+  copies: number;
+  status: PrintJob['status'];
+  attempts: number;
+  createdAt: Date | string;
+  startedAt: Date | string | null;
+  completedAt: Date | string | null;
+  failureCode: string | null;
+  originalJobId: string | null;
+}
+
+/**
+ * The columns of one print job, with the state of its newest event. Both the queue and
+ * the single job read use this text, so the two cannot drift apart.
+ */
+const PRINT_JOB_SELECT = `SELECT j.id::text AS "jobId",j.printer_id::text AS "targetPrinterId",
+              j.job_type AS type,
+              j.source_aggregate_type AS "sourceAggregateType",
+              j.source_aggregate_id AS "sourceAggregateId",
+              j.correlation_id AS "correlationId",j.idempotency_key AS "idempotencyKey",
+              j.payload_fingerprint AS "payloadFingerprint",j.copies,
+              coalesce(e.status,'queued') AS status,coalesce(e.attempt,0) AS attempts,
+              j.created_at AS "createdAt",
+              CASE WHEN e.status='printing' THEN e.occurred_at END AS "startedAt",
+              CASE WHEN e.status IN ('printed','terminal_failure','cancelled','unknown_outcome')
+                THEN e.occurred_at END AS "completedAt",
+              e.failure_code AS "failureCode",j.original_job_id::text AS "originalJobId"
+         FROM merchant.hardware_print_job j
+         LEFT JOIN LATERAL (SELECT * FROM merchant.hardware_print_job_event e
+           WHERE e.merchant_id=j.merchant_id AND e.print_job_id=j.id
+           ORDER BY e.sequence DESC LIMIT 1) e ON true`;
 
 const iso = (value: Date | string | null): string | null =>
   value === null
@@ -498,20 +547,77 @@ export class PosHardwareRepository {
     return this.device(client, merchantId, hardwareId);
   }
 
+  /**
+   * The merchant's hardware, as the back office reads it.
+   *
+   * Names, not ids: the person reading this is taking inventory, and the register and the
+   * paired terminal arrive resolved in the same query. Archived rows are history and are
+   * excluded — the same rule the device list follows.
+   */
+  async listForDashboard(
+    merchantId: string,
+    locationIds: string[] | null,
+  ): Promise<DashboardHardwareRow[]> {
+    const { rows } = await this.pg.worker.query<DashboardHardwareRow>(
+      `SELECT h.id::text, h.location_id::text AS "locationId", h.device_type AS type,
+              h.manufacturer, h.model, h.public_reference AS "publicReference",
+              h.transport, h.capabilities, h.enabled,
+              h.connection_state AS "connectionState",
+              r.display_name AS "registerName",
+              d.name AS "assignedDeviceName",
+              h.last_heartbeat_at AS "lastHeartbeatAt",
+              h.last_diagnostic_at AS "lastDiagnosticAt",
+              h.created_at AS "createdAt"
+         FROM merchant.hardware_device h
+         LEFT JOIN merchant.physical_register r
+           ON r.id = h.register_id AND r.merchant_id = h.merchant_id
+         LEFT JOIN merchant.device d
+           ON d.id = h.assigned_pos_device_id AND d.merchant_id = h.merchant_id
+        WHERE h.merchant_id = $1::uuid
+          AND h.archived_at IS NULL
+          AND ($2::uuid[] IS NULL OR h.location_id = any($2::uuid[]))
+        ORDER BY h.device_type, h.public_reference
+        LIMIT 200`,
+      [merchantId, locationIds],
+    );
+    return rows;
+  }
+
   async snapshot(
     userId: string,
     merchantId: string,
     query: HardwareRegistryQuery & { operatorSessionId: string },
+    /**
+     * The terminal asking. A printer plugged into this till is assigned to the
+     * DEVICE, not to a register, so a read scoped only by register cannot see it —
+     * which is how `Imprimir recibo` came to answer a bare `Bad state:
+     * HARDWARE_RECEIPT_PRINTER_UNAVAILABLE` on the iMin on 2026-10-11, with the
+     * Epson sitting enabled and `connected` one join away. `null` keeps the read
+     * exactly as narrow as it was.
+     */
+    deviceId: string | null = null,
   ): Promise<HardwareRuntimeSnapshot> {
     return this.pg.runWithMerchant(
       merchantId,
       userId,
       async (client) => {
         await client.query(
-          `SELECT * FROM merchant.read_hardware_runtime($1::uuid,$2::uuid,$3::uuid,$4::uuid)`,
-          [merchantId, query.locationId, query.operatorSessionId, query.registerId ?? null],
+          `SELECT * FROM merchant.read_hardware_runtime($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid)`,
+          [
+            merchantId,
+            query.locationId,
+            query.operatorSessionId,
+            query.registerId ?? null,
+            deviceId,
+          ],
         );
-        const devices = await this.devices(client, merchantId, query.locationId, query.registerId);
+        const devices = await this.devices(
+          client,
+          merchantId,
+          query.locationId,
+          query.registerId,
+          deviceId,
+        );
         const printJobs = await this.printJobs(client, merchantId, query.locationId);
         const policy = await this.policy(
           client,
@@ -663,6 +769,8 @@ export class PosHardwareRepository {
             merchantId,
             dto.locationId,
             dto.sourceAggregateId,
+            dto.copy === true,
+            dto.commandId,
           )
         : dto.printPayload;
     const canonical = { ...dto, printPayload };
@@ -771,6 +879,30 @@ export class PosHardwareRepository {
     const dispatchCommandId = deterministicUuid(`hardware-reprint:${dto.commandId}`);
     const dispatchIdempotencyKey = `hardware-reprint-dispatch-${dto.commandId}`;
     const original = await this.printJobSource(client, merchantId, jobId, dto.locationId);
+    // THE MARK ON A COPY IS THE CAFÉ'S MARK TODAY, NOT THE ONE FROZEN IN THE JOB.
+    //
+    // Everything else in this payload is content and stays as the customer's paper
+    // had it — the items, the totals, the receipt number. The logo is a URL, and a
+    // URL is a fact about the environment that wrote it: after the local setup was
+    // consolidated onto one API, a reprint of a job written against the old address
+    // printed with no mark at all, because the till fetched an address that answers
+    // nothing (measured on the iMin D3-504, 2026-10-11). Resolving it HERE and not in
+    // SQL is deliberate: the fingerprint below covers this exact object, so the
+    // payload that is stored, the one the till prints and the one the fingerprint
+    // names have to be the same bytes.
+    const payload = await this.reprintPayload(
+      client,
+      merchantId,
+      original.printPayload,
+      dispatchCommandId,
+    );
+    // The job's document is the ORIGINAL's whole safe_document — the credential
+    // version, the drawer, the display and the print payload together — with only
+    // the mark resolved. Passing the print payload alone stored a document whose
+    // receipt fields sat at the root, and the head refused it as a
+    // `terminal_hardware_failure` because the renderer's required fields were
+    // missing (measured, 2026-10-11).
+    const document = { ...original.safeDocument, printPayload: payload };
     const command: HardwareCommandRequest = {
       locationId: dto.locationId,
       registerId: original.registerId,
@@ -785,12 +917,12 @@ export class PosHardwareRepository {
       payloadFingerprint: '0'.repeat(64),
       drawer: null,
       display: null,
-      printPayload: original.printPayload,
+      printPayload: payload,
     };
     command.payloadFingerprint = hardwareCommandFingerprint(command);
     await client.query(
       `SELECT merchant.create_controlled_reprint(
-         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8,$9,$10
+         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8,$9,$10,$11::jsonb
        )`,
       [
         merchantId,
@@ -803,6 +935,7 @@ export class PosHardwareRepository {
         dto.reason,
         correlationId,
         command.payloadFingerprint,
+        document,
       ],
     );
     return { job: await this.printJob(client, merchantId, newJobId), command };
@@ -897,12 +1030,16 @@ export class PosHardwareRepository {
     merchantId: string,
     locationId: string,
     registerId?: string,
+    deviceId?: string | null,
   ) {
     const { rows } = await client.query<DeviceRow>(
       `${this.deviceSelect()} WHERE d.merchant_id=$1::uuid AND d.location_id=$2::uuid
-        AND ($3::uuid IS NULL OR d.register_id=$3::uuid) AND d.archived_at IS NULL
+        -- The register's hardware, OR the hardware attached to this terminal.
+        AND ($3::uuid IS NULL OR d.register_id=$3::uuid
+             OR ($4::uuid IS NOT NULL AND d.assigned_pos_device_id=$4::uuid))
+        AND d.archived_at IS NULL
         ORDER BY d.device_type,d.public_reference LIMIT 100`,
-      [merchantId, locationId, registerId ?? null],
+      [merchantId, locationId, registerId ?? null, deviceId ?? null],
     );
     return rows.map((row) => this.mapDevice(row));
   }
@@ -1050,29 +1187,89 @@ export class PosHardwareRepository {
     merchantId: string,
     locationId: string,
     receiptId: string,
+    /**
+     * The sale already happened; this paper is a duplicate. See
+     * `HardwareCommandRequest.copy`.
+     */
+    copy = false,
+    /**
+     * The print job this paper is coming out of. It travels on the payload so the
+     * impression — not just the sale — has a name on the paper. See the contract's
+     * `impressionId`.
+     */
+    impressionId: string | null = null,
   ): Promise<ReceiptPrintPayload> {
     const { rows } = await client.query<{
       id: string;
       receiptNumber: string;
       businessDate: string;
+      issuedAt: Date;
+      timezone: string | null;
       currency: string;
       snapshot: Record<string, unknown>;
       exceptionMarker: 'refund' | 'void' | null;
+      accountNumber: string | null;
+      originalReceiptNumber: string | null;
+      merchantLogoUrl: string | null;
     }>(
-      `SELECT id::text,receipt_number AS "receiptNumber",business_date::text AS "businessDate",
-              currency,snapshot,NULL::text AS "exceptionMarker"
-         FROM merchant.receipt_snapshot
-        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+      // THE ORDER NUMBER COMES FROM THE SALE THAT WROTE THIS RECEIPT.
+      //
+      // The snapshot does not carry it (it froze the document, not the account), so it
+      // is joined back through the committed sale: receipt → cart → daily account number. That
+      // also means the owner's new "Orden 131" reaches receipts that were committed
+      // before this change, which is the point of reading it rather than re-freezing it.
+      `SELECT r.id::text,r.receipt_number AS "receiptNumber",r.business_date::text AS "businessDate",
+              r.issued_at AS "issuedAt",m.timezone,
+              r.currency,r.snapshot,NULL::text AS "exceptionMarker",
+              COALESCE(c.daily_account_number,c.account_number)::text AS "accountNumber",
+              NULL::text AS "originalReceiptNumber",
+              r.snapshot->>'merchantLogoUrl' AS "merchantLogoUrl"
+         FROM merchant.receipt_snapshot r
+         LEFT JOIN merchant.merchant m ON m.id=r.merchant_id
+         LEFT JOIN merchant.pos_committed_sale s ON s.receipt_snapshot_id=r.id
+         LEFT JOIN merchant.pos_cart c ON c.id=s.cart_id
+        WHERE r.id=$1::uuid AND r.merchant_id=$2::uuid AND r.location_id=$3::uuid
        UNION ALL
-       SELECT id::text,receipt_number,business_date::text,currency,snapshot,
-              CASE WHEN snapshot->>'exceptionType'='void' THEN 'void' ELSE 'refund' END
-         FROM merchant.pos_exception_receipt
-        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+       SELECT er.id::text,er.receipt_number,er.business_date::text,
+              er.issued_at,m.timezone,
+              er.currency,er.snapshot,
+              CASE WHEN er.snapshot->>'exceptionType'='void' THEN 'void' ELSE 'refund' END,
+              COALESCE(c.daily_account_number,c.account_number)::text,
+              er.snapshot->>'originalReceiptReference',
+              COALESCE(er.snapshot->>'merchantLogoUrl',m.logo_url)
+         FROM merchant.pos_exception_receipt er
+         JOIN merchant.merchant m ON m.id=er.merchant_id
+         JOIN merchant.pos_sale_exception e ON e.id=er.exception_id
+              AND e.merchant_id=er.merchant_id AND e.location_id=er.location_id
+         JOIN merchant.pos_committed_sale s ON s.id=e.sale_id
+              AND s.merchant_id=e.merchant_id AND s.location_id=e.location_id
+         JOIN merchant.pos_cart c ON c.id=s.cart_id AND c.merchant_id=s.merchant_id
+        WHERE er.id=$1::uuid AND er.merchant_id=$2::uuid AND er.location_id=$3::uuid
        LIMIT 1`,
       [receiptId, merchantId, locationId],
     );
     const row = rows[0];
     if (!row) throw new Error('HARDWARE_RECEIPT_NOT_FOUND');
+    // HOW MANY TIMES THIS RECEIPT HAS ALREADY BEEN PRINTED, before this one. The
+    // print job is written after the payload is built, so what is counted here is
+    // everything that came before — which is exactly the index this paper carries.
+    const { rows: impressions } = await client.query<{ prior: string }>(
+      `SELECT count(*)::text AS prior
+         FROM merchant.hardware_print_job
+        WHERE merchant_id=$1::uuid AND source_aggregate_type='receipt'
+          -- source_aggregate_id is TEXT, not uuid: it names the aggregate whatever kind
+          -- it is (a receipt, a cash action). Casting the PARAMETER to uuid made Postgres
+          -- answer "operator does not exist: text = uuid" and every receipt print died as
+          -- a generic HARDWARE_COMMAND_FAILED before a single command was written —
+          -- measured on the iMin D3-504, 2026-10-12, pressing "Imprimir recibo".
+          AND source_aggregate_id=$2::text`,
+      [merchantId, receiptId],
+    );
+    const prior = Number(impressions[0]?.prior ?? '0');
+    // The paper printed as part of the sale is the original; anything the client
+    // marks as a copy is a copy whatever the count says, so a reprint of a sale whose
+    // original never reached paper still says COPIA rather than claiming to be it.
+    const copyIndex = copy ? Math.max(1, prior) : prior;
     const source = row.snapshot;
     const money = (value: unknown): number =>
       typeof value === 'object' && value !== null && 'minorUnits' in value
@@ -1085,6 +1282,9 @@ export class PosHardwareRepository {
       : Array.isArray(source.tenders)
         ? source.tenders
         : [];
+    // The same figure the paper's TOTAL line prints, computed once so the barcode's own
+    // total and the printed total cannot disagree.
+    const totalMinorUnits: number = money(source.grandTotal) || money(allocation.total);
     return {
       receiptId: row.id,
       merchantName: String(source.merchantName ?? source.merchantDisplayName ?? 'Umi').slice(
@@ -1097,7 +1297,22 @@ export class PosHardwareRepository {
       ),
       registerName: null,
       receiptNumber: row.receiptNumber,
+      // THE GUEST'S IDENTITY, THEN THE DOCUMENT'S. See the contract.
+      orderNumber: row.accountNumber
+        ? String(row.accountNumber).padStart(3, '0').slice(0, 64)
+        : null,
+      originalReceiptNumber: row.originalReceiptNumber ?? null,
+      copyIndex,
+      impressionId,
       businessDate: row.businessDate,
+      // THE CLOCK THE CAFÉ READS, ON THE PAPER.
+      //
+      // The business date is the trading day, and a day is not a moment: two tickets from one
+      // afternoon were the same document to anyone holding them. The instant is the one the
+      // receipt froze, expressed in the LOCATION's timezone — the same conversion the sales
+      // history serves — so a till set to another timezone cannot print a time the café does
+      // not recognise.
+      issuedAt: receiptTimeInZone(row.issuedAt.toISOString(), row.timezone ?? 'UTC'),
       currency: row.currency,
       items: lines.slice(0, 500).map((value) => {
         const line = value as Record<string, unknown>;
@@ -1114,12 +1329,14 @@ export class PosHardwareRepository {
       discountMinorUnits: money(source.discountTotal) || money(allocation.discount),
       taxMinorUnits: money(source.taxTotal) || money(allocation.tax),
       tipMinorUnits: money(source.tip) || money(allocation.tip),
-      totalMinorUnits: money(source.grandTotal) || money(allocation.total),
+      totalMinorUnits,
       tenders: payments.slice(0, 16).map((value) => {
         const tender = value as Record<string, unknown>;
         const rawType = String(tender.method ?? tender.tenderType ?? tender.type ?? 'other');
-        const type = ['cash', 'manual_terminal', 'wallet', 'gift_card'].includes(rawType)
-          ? (rawType as 'cash' | 'manual_terminal' | 'wallet' | 'gift_card')
+        const type = ['cash', 'manual_terminal', 'bank_transfer', 'wallet', 'gift_card'].includes(
+          rawType,
+        )
+          ? (rawType as 'cash' | 'manual_terminal' | 'bank_transfer' | 'wallet' | 'gift_card')
           : 'other';
         return {
           type,
@@ -1134,8 +1351,134 @@ export class PosHardwareRepository {
       loyaltySummary: null,
       customerValueSummary: null,
       exceptionMarker: row.exceptionMarker,
-      qrValue: null,
+      // THE KEY AND THE CONTEXT, ON THE PAPER ITSELF.
+      //
+      // This slot was declared by the contract and by the thermal adapter and had never been
+      // filled: the payload always said `null`, so the only ticket number a machine could
+      // read was what a person could already read. See `receipt-barcode.ts` for the shape.
+      qrValue: receiptBarcodeExpression({
+        receiptId: row.id,
+        folio: row.receiptNumber,
+        businessDate: row.businessDate,
+        currency: row.currency,
+        totalMinorUnits,
+      }),
       footer: null,
+      // THE CAFÉ'S MARK, FROM THE SNAPSHOT THAT FROZE IT.
+      //
+      // `merchant.logo_url` reaches the receipt at commit and the checkout freezes
+      // it into the snapshot as `merchantLogoUrl` (migration 014). This function is
+      // the ONLY writer of a receipt's print payload — the client's copy is
+      // discarded on purpose, so a till cannot print a receipt nobody issued — and
+      // it never carried the mark, so every printed ticket came out without it
+      // while the SAME receipt showed it on screen. The till's plumbing for it
+      // (contract 2.28.0, `logoUrl`) had been in place since the day before and had
+      // never once been exercised end to end: measured on the iMin D3-504,
+      // 2026-10-11, the print job's payload had no `logoUrl` key at all.
+      logoUrl:
+        typeof source.merchantLogoUrl === 'string' && source.merchantLogoUrl.length > 0
+          ? source.merchantLogoUrl.slice(0, 2048)
+          : (row.merchantLogoUrl?.slice(0, 2048) ?? undefined),
+      // A copy of a finished sale says so on the paper.
+      copy: copy ? true : undefined,
+      // THE LANGUAGE OF THE PAPER, FROM THE CAFÉ AND NOT FROM THE TILL.
+      //
+      // `merchant.merchant.locale` is the merchant's own language and the one every
+      // document it issues should speak; the till's UI language is the operator's
+      // choice and can be English in a Spanish café. The renderer takes this and falls
+      // back to Spanish, which is the language the paper was always supposed to be in
+      // (owner, 2026-10-12).
+      locale: await this.merchantLocale(client, merchantId),
+    };
+  }
+
+  /** The merchant's own language, for the words printed on its receipts. */
+  private async merchantLocale(
+    client: PoolClient,
+    merchantId: string,
+  ): Promise<string | undefined> {
+    const { rows } = await client.query<{ locale: string | null }>(
+      `SELECT locale FROM merchant.merchant WHERE id=$1::uuid`,
+      [merchantId],
+    );
+    const locale = rows[0]?.locale?.trim();
+    return locale && locale.length > 0 ? locale.slice(0, 10) : undefined;
+  }
+
+  /**
+   * The copy's payload with a mark the till can actually fetch.
+   *
+   * The café's logo lives at `merchant.logo_url`, which is a URL — and a URL names
+   * the host and port that wrote it. A reprint of a job created in another
+   * environment therefore carried an address the till could not reach, and the mark
+   * simply did not appear on the paper while the same receipt drew it on screen.
+   *
+   * The mark and the links to the original sale are refreshed. The items, totals,
+   * taxes and receipt number remain the document the customer already has.
+   */
+  private async reprintPayload(
+    client: PoolClient,
+    merchantId: string,
+    original: ReceiptPrintPayload,
+    impressionId: string,
+  ): Promise<ReceiptPrintPayload> {
+    // THE IMPRESSION IS FIXED AT PRINT TIME, EVEN WHEN THE CONTENT IS FROZEN.
+    //
+    // A controlled reprint copies the original job's payload — the items, the totals,
+    // the receipt number are the document the customer already has — and that is
+    // right. But the order it belongs to, which copy this is and which job it came
+    // out of are facts about THIS impression, not content: copying them printed a
+    // second copy that claimed to be the first, and a paper with no order on it at
+    // all when the original was written before the till printed order numbers
+    // (owner, 2026-10-12).
+    const { rows } = await client.query<{
+      logoUrl: string | null;
+      orderNumber: string | null;
+      originalReceiptNumber: string | null;
+      prior: string;
+      locale: string | null;
+    }>(
+      `SELECT m.logo_url AS "logoUrl",
+              m.locale AS "locale",
+              COALESCE(c.daily_account_number,c.account_number,
+                original_cart.daily_account_number,original_cart.account_number)::text AS "orderNumber",
+              exception_receipt.snapshot->>'originalReceiptReference'
+                AS "originalReceiptNumber",
+              (SELECT count(*)::text FROM merchant.hardware_print_job j
+                WHERE j.merchant_id=$1::uuid AND j.source_aggregate_type='receipt'
+                  AND j.source_aggregate_id=$2::text) AS prior
+         FROM merchant.merchant m
+         LEFT JOIN merchant.pos_committed_sale s ON s.receipt_snapshot_id=$2::uuid
+         LEFT JOIN merchant.pos_cart c ON c.id=s.cart_id
+         LEFT JOIN merchant.pos_exception_receipt exception_receipt
+           ON exception_receipt.id=$2::uuid
+         LEFT JOIN merchant.pos_sale_exception exception_sale
+           ON exception_sale.id=exception_receipt.exception_id
+         LEFT JOIN merchant.pos_committed_sale original_sale
+           ON original_sale.id=exception_sale.sale_id
+         LEFT JOIN merchant.pos_cart original_cart
+           ON original_cart.id=original_sale.cart_id
+        WHERE m.id=$1::uuid`,
+      [merchantId, original.receiptId],
+    );
+    const row = rows[0];
+    const prior = Number(row?.prior ?? '0');
+    return {
+      ...original,
+      // The mark is a fact about the environment, not about the sale: see the comment
+      // this call replaced.
+      logoUrl: row?.logoUrl ?? original.logoUrl,
+      orderNumber: row?.orderNumber
+        ? String(row.orderNumber).padStart(3, '0').slice(0, 64)
+        : (original.orderNumber ?? null),
+      originalReceiptNumber: row?.originalReceiptNumber ?? original.originalReceiptNumber ?? null,
+      // A copy speaks the merchant's language too, re-read in case it changed since the
+      // sale froze the original payload.
+      locale: row?.locale?.trim() ? String(row.locale).slice(0, 10) : original.locale,
+      // The sale's own paper is the original; anything reprinted is a copy, and the
+      // count says which one.
+      copyIndex: Math.max(1, prior),
+      impressionId,
     };
   }
 
@@ -1153,13 +1496,15 @@ export class PosHardwareRepository {
       sourceAggregateId: string;
       configurationVersion: number;
       printPayload: ReceiptPrintPayload;
+      safeDocument: Record<string, unknown>;
     }>(
       `SELECT j.id::text AS "jobId",j.register_id::text AS "registerId",
               j.printer_id::text AS "targetPrinterId",
               j.source_aggregate_type AS "sourceAggregateType",
               j.source_aggregate_id AS "sourceAggregateId",
               d.configuration_version::int AS "configurationVersion",
-              j.safe_document->'printPayload' AS "printPayload"
+              j.safe_document->'printPayload' AS "printPayload",
+              j.safe_document AS "safeDocument"
          FROM merchant.hardware_print_job j
          JOIN merchant.hardware_device d ON d.id=j.printer_id AND d.merchant_id=j.merchant_id
         WHERE (j.id=$1::uuid OR j.source_aggregate_id=$1::text)
@@ -1171,52 +1516,45 @@ export class PosHardwareRepository {
     return rows[0];
   }
 
-  private async printJobs(client: PoolClient, merchantId: string, locationId: string) {
-    const { rows } = await client.query<{ id: string }>(
-      `SELECT id::text FROM merchant.hardware_print_job
-        WHERE merchant_id=$1::uuid AND location_id=$2::uuid ORDER BY created_at,id LIMIT 100`,
+  /**
+   * The jobs of one location, in ONE statement.
+   *
+   * This was a list of ids and then one query for each job. A location with 59 jobs
+   * therefore ran about 64 statements for every status read, and the till asks for that
+   * read every ten seconds: the read grew slower while the day ran (28 ms at 06:00,
+   * 48 ms at 08:20 on 2026-10-12), and each request carried the queue of the whole
+   * location. The lateral join answers the same question once.
+   */
+  private async printJobs(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+  ): Promise<PrintJob[]> {
+    const { rows } = await client.query<PrintJobRow>(
+      `${PRINT_JOB_SELECT}
+        WHERE j.merchant_id=$1::uuid AND j.location_id=$2::uuid
+        ORDER BY j.created_at,j.id LIMIT 100`,
       [merchantId, locationId],
     );
-    return Promise.all(rows.map((row) => this.printJob(client, merchantId, row.id)));
+    return rows.map((row) => this.toPrintJob(row));
   }
 
   private async printJob(client: PoolClient, merchantId: string, jobId: string): Promise<PrintJob> {
-    const { rows } = await client.query<{
-      jobId: string;
-      targetPrinterId: string;
-      type: PrintJob['type'];
-      sourceAggregateType: string;
-      sourceAggregateId: string;
-      correlationId: string;
-      idempotencyKey: string;
-      payloadFingerprint: string;
-      copies: number;
-      status: PrintJob['status'];
-      attempts: number;
-      createdAt: Date | string;
-      startedAt: Date | string | null;
-      completedAt: Date | string | null;
-      failureCode: string | null;
-      originalJobId: string | null;
-    }>(
-      `SELECT j.id::text AS "jobId",j.printer_id::text AS "targetPrinterId",j.job_type AS type,
-              j.source_aggregate_type AS "sourceAggregateType",j.source_aggregate_id AS "sourceAggregateId",
-              j.correlation_id AS "correlationId",j.idempotency_key AS "idempotencyKey",
-              j.payload_fingerprint AS "payloadFingerprint",j.copies,
-              coalesce(e.status,'queued') AS status,coalesce(e.attempt,0) AS attempts,
-              j.created_at AS "createdAt",
-              CASE WHEN e.status='printing' THEN e.occurred_at END AS "startedAt",
-              CASE WHEN e.status IN ('printed','terminal_failure','cancelled','unknown_outcome')
-                THEN e.occurred_at END AS "completedAt",
-              e.failure_code AS "failureCode",j.original_job_id::text AS "originalJobId"
-         FROM merchant.hardware_print_job j
-         LEFT JOIN LATERAL (SELECT * FROM merchant.hardware_print_job_event e
-           WHERE e.merchant_id=j.merchant_id AND e.print_job_id=j.id
-           ORDER BY e.sequence DESC LIMIT 1) e ON true
+    const { rows } = await client.query<PrintJobRow>(
+      `${PRINT_JOB_SELECT}
         WHERE j.merchant_id=$1::uuid AND j.id=$2::uuid`,
       [merchantId, jobId],
     );
     const row = rows[0];
+    if (!row) throw new Error('HARDWARE_NOT_FOUND');
+    return this.toPrintJob(row);
+  }
+
+  /**
+   * The one shape a job travels in. The queue read, the single read, and the answer to a
+   * print command all use it, so a field cannot appear in one and go missing in another.
+   */
+  private toPrintJob(row: PrintJobRow): PrintJob {
     return {
       ...row,
       createdAt: iso(row.createdAt)!,

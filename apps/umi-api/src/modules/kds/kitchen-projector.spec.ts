@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { projectKitchenOrder } from './kitchen-projector';
+import { appendKitchenItems, projectKitchenOrder } from './kitchen-projector';
 
 describe('projectKitchenOrder', () => {
   it('creates one station-routed kitchen projection for preparation lines', async () => {
@@ -170,5 +170,63 @@ describe('projectKitchenOrder', () => {
     await expect(
       projectKitchenOrder({ query } as never, 'merchant-1', 'order-1'),
     ).resolves.toBeNull();
+  });
+
+  it('a second round that finds no ticket creates the ticket it needs', async () => {
+    // The first round may have had nothing for the kitchen — no active route matched a line, so no
+    // ticket was written, which is right. The SECOND round is where the work can start, and the
+    // append path used to give up as soon as it found no ticket: the dish was fired, the till marked
+    // the line sent, and no station ever saw it (measured on the iMin D3-504 on 2026-10-11).
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] }) // no kitchen order for this source, yet
+      .mockResolvedValueOnce({ rows: [] }) // …nor for the projection it has to run
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            orderId: 'order-1',
+            merchantId: 'merchant-1',
+            locationId: 'location-1',
+            publicReference: 'pos-cart:cart-1',
+            source: 'pos',
+            fulfillmentType: 'dine_in',
+            businessDate: '2026-08-09',
+            queuedAt: '2026-08-09T20:00:00.000Z',
+            lineId: 'line-2',
+            productId: 'product-1',
+            categoryId: 'category-1',
+            requiresPreparation: true,
+            productName: 'Latte',
+            variantName: 'Chico',
+            quantity: 1,
+            courseNumber: 1,
+            preparationNote: null,
+            displayOrder: 0,
+            targetSeconds: 240,
+            modifiers: [],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'route-1',
+            stationId: 'station-1',
+            productId: null,
+            categoryId: null,
+            priority: 1,
+            targetSeconds: 180,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ id: 'kitchen-1' }] })
+      .mockResolvedValue({ rows: [] });
+
+    await expect(appendKitchenItems({ query } as never, 'merchant-1', 'order-1')).resolves.toBe(
+      'kitchen-1',
+    );
+    expect(
+      query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO merchant.kitchen_order')),
+    ).toBe(true);
   });
 });

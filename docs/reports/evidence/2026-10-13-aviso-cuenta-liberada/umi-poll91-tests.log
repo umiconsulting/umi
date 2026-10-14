@@ -1,0 +1,76 @@
+Resolving dependencies...
+Downloading packages...
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.1.0 available)
+  connectivity_plus 7.3.1 (7.3.2 available)
+  cryptography 2.7.0 (2.9.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  flutter_secure_storage 9.2.4 (11.2.0 available)
+  flutter_secure_storage_linux 1.2.3 (3.0.3 available)
+  flutter_secure_storage_macos 3.1.3 (4.0.0 available)
+  flutter_secure_storage_platform_interface 1.1.2 (2.1.1 available)
+  flutter_secure_storage_web 1.2.1 (2.1.1 available)
+  flutter_secure_storage_windows 3.1.2 (4.2.2 available)
+  hooks 2.0.2 (2.2.0 available)
+  http 1.5.0 (1.6.0 available)
+  jni 1.0.0 (1.1.0 available)
+  jni_flutter 1.0.1 (1.0.4+1 available)
+  js 0.6.7 (0.7.2 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  nm 0.5.0 (0.6.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  package_config 2.2.0 (3.0.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  process 5.0.5 (5.0.6 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences 2.5.3 (2.5.6 available)
+  shared_preferences_android 2.4.27 (2.4.28 available)
+  shared_preferences_foundation 2.5.6 (2.5.7 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.12 (0.7.15 available)
+  vm_service 15.2.0 (15.3.0 available)
+  webdriver 3.1.0 (3.2.0 available)
+  win32 5.15.0 (6.4.0 available)
+  xml 7.0.1 (7.1.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Got dependencies!
+35 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: availability checks pause with the app and stop when the account closes
+00:00 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart: a refused account stays in the list with its owner notice
+00:00 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart: a refused account stays in the list with its owner notice
+00:00 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: account name is optional and cancel is distinct from a blank name
+00:00 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: account name is optional and cancel is distinct from a blank name
+00:00 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: account name is optional and cancel is distinct from a blank name
+00:00 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: account name is optional and cancel is distinct from a blank name
+00:00 +14: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +15: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +16: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +17: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +18: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +19: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +20: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +21: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +22: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +23: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +24: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +25: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +26: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +27: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: fulfillment filter includes table and tableless dine-in accounts
+00:00 +28: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: account list keeps send status visible and secondary details in tooltips
+00:00 +29: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: account list keeps send status visible and secondary details in tooltips
+00:00 +30: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_list_test.dart: without table view excludes assigned accounts after refresh
+00:00 +31: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: an account left open before the 04:00 boundary is grouped as yesterday
+00:01 +32: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: a day of only fresh accounts shows no carried-over notice
+00:01 +33: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/open_accounts_test.dart: the server's business date outranks the till's 04:00 guess
+00:01 +34: All tests passed!

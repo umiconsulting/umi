@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { projectKitchenOrder } from '../../modules/kds/kitchen-projector';
+import { appendKitchenItems, projectKitchenOrder } from '../../modules/kds/kitchen-projector';
 
 /**
  * THE way an order is written. Every producer — the WhatsApp checkout today, the POS
@@ -70,6 +70,36 @@ export interface NewOrderLine {
   modifiers?: NewOrderModifier[];
 }
 
+/**
+ * The order's own word for how it leaves the counter.
+ *
+ * THE CART AND THE ORDER SPEAK TWO VOCABULARIES, AND THE ORDER'S WINS HERE.
+ *
+ * `merchant.pos_cart.fulfillment_type` admits `dine_in` or `takeout` (migration
+ * `005_pos_cart_fulfillment.sql`), because that is what the till's top bar says to the
+ * operator. `merchant.customer_order.fulfillment_type` admits `pickup`, `dine_in` or
+ * `delivery` (build-v3 `20_merchant.sql`), because that is the word the web channel and
+ * the reports already use for a customer who collects the order.
+ *
+ * Migration 005 states that the cart's value "flows to customer_order.fulfillment_type
+ * when the order is written at fire or checkout" — and it copies the value verbatim, so
+ * a TAKEAWAY SALE COULD NEVER BE WRITTEN. The order table refused `takeout` with a check
+ * violation, the checkout answered 500, and the operator read "no fue posible completar
+ * el cobro de forma segura". Every sale that had ever worked was `dine_in`; the first
+ * one the owner tried to send out of the counter failed (measured on the iMin D3-504,
+ * 2026-10-12: 52 `dine_in` orders, 3 `pickup` from the web, and zero `takeout`).
+ *
+ * The normalisation lives HERE because this file owns the order's write model: the POS
+ * checkout, the fire, the web channel and the conversation all come through this INSERT.
+ * A value this product does not know is REFUSED instead of written, so a third word
+ * cannot enter the order table by accident.
+ */
+const orderFulfillmentType = (value: string): string => {
+  if (value === 'takeout') return 'pickup';
+  if (value === 'dine_in' || value === 'pickup' || value === 'delivery') return value;
+  throw new Error('writeOrder: unknown fulfillment_type');
+};
+
 export interface NewOrderDiscount {
   /** Line-scoped when set; order-scoped when omitted. A comp MUST be line-scoped. */
   orderItemIndex?: number;
@@ -139,7 +169,7 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
       order.conversationId ?? null,
       order.locationId ?? null,
       order.source,
-      order.fulfillmentType,
+      orderFulfillmentType(order.fulfillmentType),
       order.notes ?? null,
       order.pickupPerson ?? null,
       order.externalRef ?? null,
@@ -249,4 +279,80 @@ export async function writeOrder(client: PoolClient, order: NewOrder): Promise<W
   await projectKitchenOrder(client, order.merchantId, orderId);
 
   return { orderId, lineIds, created: true };
+}
+
+/**
+ * Append lines to an order that already exists — the second round (plan §8.2 F6).
+ *
+ * `writeOrder` is idempotent by `external_ref` and deliberately returns the existing
+ * order WITHOUT rewriting its lines, so it cannot add a second round. This is the other
+ * half: it inserts the new lines after the order's current display order, appends the
+ * `order_upserted` event a puller needs to see that the LINES changed, and grows the
+ * kitchen ticket with the new items. The caller transaction owns it, exactly like
+ * `writeOrder`, so a failed fire leaves no half-sent round behind.
+ */
+export async function appendOrderItems(
+  client: PoolClient,
+  order: { merchantId: string; orderId: string; lines: NewOrderLine[] },
+): Promise<{ lineIds: string[] }> {
+  if (order.lines.length === 0) return { lineIds: [] };
+
+  const position = await client.query<{ next: number }>(
+    `SELECT COALESCE(MAX(display_order)+1,0) AS next
+       FROM merchant.order_item WHERE order_id=$1::uuid`,
+    [order.orderId],
+  );
+  let displayOrder = Number(position.rows[0]?.next ?? 0);
+
+  const lineIds: string[] = [];
+  for (const line of order.lines) {
+    const row = await client.query<{ id: string }>(
+      `INSERT INTO merchant.order_item
+         (order_id, product_id, name, variant_name, quantity, unit_price,
+          station_id, notes, display_order, course_number)
+       VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7::uuid, $8, $9, $10)
+       RETURNING id::text`,
+      [
+        order.orderId,
+        line.productId ?? null,
+        line.name,
+        line.variantName ?? null,
+        line.quantity,
+        line.unitPriceCents,
+        line.stationId ?? null,
+        line.notes ?? null,
+        displayOrder,
+        line.courseNumber ?? 1,
+      ],
+    );
+    displayOrder += 1;
+    lineIds.push(row.rows[0].id);
+
+    for (const modifier of line.modifiers ?? []) {
+      await client.query(
+        `INSERT INTO merchant.order_item_modifier
+           (merchant_id, order_item_id, modifier_id, name, quantity, price_delta)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6)`,
+        [
+          order.merchantId,
+          row.rows[0].id,
+          modifier.modifierId ?? null,
+          modifier.name,
+          modifier.quantity ?? 1,
+          modifier.priceDeltaCents,
+        ],
+      );
+    }
+  }
+
+  // The puller cannot see a line appear otherwise: adding lines does not change the
+  // order's status, so a status-only feed never advances — the same reason a void
+  // writes this kind (ORDER_MODEL, `order_event`).
+  await client.query(
+    `INSERT INTO merchant.order_event (order_id, kind) VALUES ($1::uuid, 'order_upserted')`,
+    [order.orderId],
+  );
+
+  await appendKitchenItems(client, order.merchantId, order.orderId);
+  return { lineIds };
 }

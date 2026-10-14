@@ -1,6 +1,33 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
-import { deviceStatus, KdsService, stationKeyFromName, ticketBelongsToDevice } from './kds.service';
+import {
+  deviceStatus,
+  KdsService,
+  parseAlertSettings,
+  stationKeyFromName,
+  ticketBelongsToDevice,
+} from './kds.service';
+
+describe('station alerts', () => {
+  const settings = {
+    overdueSeconds: 300,
+    soundsEnabled: true,
+    arrivalSound: 'arrival',
+    overdueSound: 'overdue',
+    readySound: 'ready',
+  };
+  it('accepts persisted settings and rejects unsupported sounds and thresholds', () => {
+    expect(parseAlertSettings(settings)).toEqual(settings);
+    for (const patch of [
+      { overdueSeconds: 0 },
+      { overdueSeconds: 86401 },
+      { soundsEnabled: 'yes' },
+      { readySound: 'remote-url' },
+    ]) {
+      expect(() => parseAlertSettings({ ...settings, ...patch })).toThrow(BadRequestException);
+    }
+  });
+});
 import { KitchenBoardEvents } from '../realtime/kitchen-board.events';
 import {
   DEVICE_REVOKED_BODY,
@@ -42,6 +69,8 @@ function make() {
       permissions: ['kitchen.read', 'kitchen.prepare', 'kitchen.ready', 'kitchen.complete'],
     }),
     listStations: vi.fn().mockResolvedValue([]),
+    ownsPosOrder: vi.fn().mockResolvedValue(false),
+    posKitchenStatus: vi.fn().mockResolvedValue({ readyItems: [] }),
     executeKitchenCommand: vi.fn().mockResolvedValue({
       status: 'succeeded',
       result: { kitchenOrderId: 'o1', status: 'in_preparation', version: 2, sequence: 5 },
@@ -61,6 +90,7 @@ function make() {
     rateLimit as never,
     realtime as never,
     new KitchenBoardEvents(),
+    { execute: vi.fn() } as never,
   );
   return { svc, repo, rateLimit, realtime };
 }
@@ -1055,6 +1085,50 @@ describe('KdsService.boardForPos', () => {
     locationId: 'a1000000-0000-4000-8000-000000000001',
     operatorSessionId: '77777777-7777-4777-8777-777777777777',
   };
+
+  it('answers an idle watch before Fastify closes its inactive socket', async () => {
+    vi.useFakeTimers();
+    try {
+      const { svc } = make();
+      let answered = false;
+      const response = svc.watchBoardForPos(POS_USER, 't1', QUERY).then((result) => {
+        answered = true;
+        return result;
+      });
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(answered).toBe(true);
+      await expect(response).resolves.toMatchObject({ ok: true, changed: false, waitedMs: 8_000 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets order.fire read ready items only from the operator own account, never the board', async () => {
+    const { svc, repo } = make();
+    repo.authorizePos.mockResolvedValue({ allowed: false, permissions: ['order.fire'] });
+    repo.ownsPosOrder.mockResolvedValue(true);
+    await expect(svc.statusForPos(POS_USER, 't1', 'order', QUERY)).resolves.toEqual({
+      readyItems: [],
+    });
+    expect(repo.ownsPosOrder).toHaveBeenCalledWith(
+      't1',
+      QUERY.locationId,
+      'order',
+      QUERY.operatorSessionId,
+    );
+    await expect(svc.boardForPos(POS_USER, 't1', QUERY)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    repo.ownsPosOrder.mockResolvedValue(false);
+    await expect(svc.statusForPos(POS_USER, 't1', 'other', QUERY)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    repo.authorizePos.mockResolvedValue({ allowed: false, permissions: [] });
+    repo.ownsPosOrder.mockResolvedValue(true);
+    await expect(svc.statusForPos(POS_USER, 't1', 'order', QUERY)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+  });
 
   it('refuses an operator whose session holds no kitchen.read', async () => {
     const { svc, repo } = make();

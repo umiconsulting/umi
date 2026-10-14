@@ -1,0 +1,13 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+[Nest] 3424981  - 10/12/2026, 4:53:53 AM     LOG [PgService] D1 role guard OK (app = RLS-confined api, worker = BYPASSRLS worker)
+[Nest] 3424981  - 10/12/2026, 4:53:53 AM     LOG [PgService] Postgres pools ready (app + worker roles, no TLS — local/dev)
+ ✓ src/modules/pos-entry/operator-resume.integration.ts (11 tests) 246ms
+
+ Test Files  1 passed (1)
+      Tests  11 passed (11)
+   Start at  04:53:53
+   Duration  615ms (transform 98ms, setup 0ms, collect 224ms, tests 246ms, environment 0ms, prepare 43ms)
+

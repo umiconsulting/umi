@@ -77,6 +77,54 @@ cd "$pos_root"
 # fullscreen BEFORE the window is mapped — asking a mapped window to do it kills
 # the client on this compositor. See linux/runner/my_application.cc.
 export UMIPOS_FULLSCREEN=1
+# The client must be an X11 window, and this line is what makes it one.
+#
+# Both this script's own readiness check and every click the driver sends go
+# through `xdotool`, which speaks X11: on a Wayland compositor a GTK app defaults
+# to the Wayland backend, `xdotool search` then finds NOTHING, this loop times out
+# as "the POS did not start", and the driver has no window to aim at. Forcing the
+# X11 backend (XWayland) keeps the launcher's check honest and the harness able to
+# click the real till.
+export GDK_BACKEND=x11
+# A WORKSPACE OF ITS OWN, BEFORE THE WINDOW EXISTS, AND WITHOUT TAKING FOCUS.
+#
+# House rule, asked for by the owner: a window under test never lands on the workspace the person
+# in front of the machine is using. Moving a window afterwards is a flicker on that workspace and
+# a flicker on a fullscreen game is an interruption, so the rule is installed FIRST and the window
+# maps straight onto an empty workspace. `no_initial_focus` is what keeps it from pulling the
+# screen across; it is a field this compositor's rule API accepts (probed, not assumed — the
+# legacy name `noinitialfocus` is rejected).
+# And where the operator's screen was, so it can be put back: a freshly mapped window can still ask
+# for focus, and a compositor that follows focus then takes the view with it.
+before_workspace="$(hyprctl monitors -j 2>/dev/null | python3 -c '
+import json, sys
+try:
+    monitors = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+focused = next((m for m in monitors if m.get("focused")), None)
+print((focused or {}).get("activeWorkspace", {}).get("id", ""))
+' 2>/dev/null || true)"
+pos_workspace=""
+if command -v hyprctl >/dev/null 2>&1; then
+  pos_workspace="$(bash "$workspace_root/tools/ux-sweep/window-empty-workspace.sh" --next-free || true)"
+  if [[ -n "$pos_workspace" ]]; then
+    hyprctl eval "
+if umi_pos_workspace_rule then umi_pos_workspace_rule:set_enabled(false) end
+umi_pos_workspace_rule = hl.window_rule({
+  name='umi-pos-empty-workspace',
+  -- `[Cc]`: the app's id is `co.umiconsulting.umi_pos` and this compositor reports the class as
+  -- `Co.umiconsulting.umi_pos`. A case-sensitive pattern silently matches nothing, the rule does
+  -- nothing, and the window lands on whatever workspace the operator is using — the exact
+  -- interruption this rule exists to prevent.
+  match={class='[Cc]o[.]umiconsulting[.]umi_pos$'},
+  workspace='${pos_workspace}',
+  no_initial_focus=true,
+  no_focus=true,
+})" >/dev/null 2>&1 || true
+  fi
+fi
+
 setsid nohup "$flutter_bin" run -d linux --debug \
   --dart-define=UMIPOS_ENVIRONMENT=development \
   --dart-define=UMIPOS_API_BASE_URL="$api_base" \
@@ -87,6 +135,27 @@ setsid nohup "$flutter_bin" run -d linux --debug \
   --dart-define=UMIPOS_CONTRACT_VERSION="$contract_version" \
   --dart-define=UMIPOS_CONFIG_SCHEMA_VERSION=1 \
   >>"$log_file" 2>&1 &
+
+# The rule places it; this makes sure. The app process is the `bundle/umi_pos` child, not the
+# `flutter run` wrapper this script started, so the pid is resolved from the process table.
+if [[ -n "$pos_workspace" ]]; then
+  for _ in $(seq 1 40); do
+    pos_pid="$(pgrep -f 'bundle/umi_pos' | head -n 1 || true)"
+    if [[ -n "$pos_pid" ]] &&
+      bash "$workspace_root/tools/ux-sweep/window-empty-workspace.sh" "$pos_pid" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.5
+  done
+fi
+
+# PUT THE OPERATOR'S SCREEN BACK. `no_focus` above should make this unnecessary, and it is kept
+# because "should" is not a guarantee: the app asks for focus itself when it maps, and the cost of
+# being wrong is the owner's screen disappearing behind a till they did not ask to see. Measured
+# on 2026-10-10: a launch left the visible workspace on the till's.
+if [[ -n "${before_workspace:-}" ]]; then
+  hyprctl dispatch "hl.dsp.focus({workspace=\"${before_workspace}\"})" >/dev/null 2>&1 || true
+fi
 
 for _ in $(seq 1 300); do
   window_count="$(DISPLAY="${DISPLAY:-:0}" xdotool search --name '^UmiPOS$' 2>/dev/null | grep -c . || true)"

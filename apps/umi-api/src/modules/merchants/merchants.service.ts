@@ -25,8 +25,15 @@ export interface Capabilities {
     timezone: string | null;
     brandColor: string | null;
     secondaryColor: string | null;
+    /** The café's own logo (migration 014); null until one is uploaded. */
+    logoUrl: string | null;
     /** Trading-day rollover hour, `HH:MM:SS` (merchant.business_day_start). */
     businessDayStart: string | null;
+    /**
+     * What the day close does with an account still open at the cutoff
+     * (`merchant.pos_day_close_policy`): `manual` (a person resolves it) or `auto_void`.
+     */
+    posDayClosePolicy: string | null;
     /** Owner-tuned customer-segment cutoffs (merchant.segment_thresholds); {} when unset. */
     segmentThresholds: Record<string, unknown>;
   };
@@ -129,7 +136,9 @@ export class MerchantsService {
         timezone: access.timezone,
         brandColor: branding.brandColor,
         secondaryColor: branding.secondaryColor,
+        logoUrl: branding.logoUrl,
         businessDayStart: branding.businessDayStart,
+        posDayClosePolicy: branding.posDayClosePolicy,
         segmentThresholds: branding.segmentThresholds,
       },
       selectedLocation,
@@ -159,8 +168,15 @@ export class MerchantsService {
       subscriptionStatus: dashboard?.status?.toUpperCase?.() ?? 'ACTIVE',
       primaryColor: capabilities.merchant.brandColor ?? '#B5605A',
       secondaryColor: capabilities.merchant.secondaryColor ?? '#E8C9A3',
+      // Both the settings screen and the till want the same field the readers already
+      // use; `brand.logoUrl` on the dashboard was always empty because nothing wrote
+      // `merchant.logo_url`. It is written now (see modules/merchant-branding).
+      logoUrl: capabilities.merchant.logoUrl,
       // The trading-day rollover hour as HH:MM for a time input; default local midnight.
       businessDayStart: (capabilities.merchant.businessDayStart ?? '00:00:00').slice(0, 5),
+      // Toast's `Auto-close orders`, with Toast's factory value: the day close does not
+      // touch an open account until the owner asks it to.
+      posDayClosePolicy: capabilities.merchant.posDayClosePolicy ?? 'manual',
       // Effective segment cutoffs = code defaults merged with the owner's overrides, so
       // the settings screen shows real numbers even when nothing has been stored yet.
       segmentThresholds: {

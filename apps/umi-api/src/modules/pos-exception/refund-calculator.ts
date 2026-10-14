@@ -9,7 +9,7 @@ export interface RefundSourceLine {
 
 export interface RefundSourceTender {
   id: string;
-  type: 'cash' | 'manual_terminal' | 'wallet' | 'gift_card';
+  type: 'cash' | 'manual_terminal' | 'bank_transfer' | 'wallet' | 'gift_card';
   amount: number;
   refunded: number;
 }
@@ -57,9 +57,33 @@ export function calculateRefundPreview(
       throw new RangeError('REFUND_QUANTITY_EXCEEDS_REMAINING');
     }
     const merchandise = allocateQuantity(line.merchandise, line.quantity, selection.quantity);
-    const tax = allocateQuantity(line.tax, line.quantity, selection.quantity);
     const discount = allocateQuantity(line.discount, line.quantity, selection.quantity);
     const tip = allocateQuantity(line.tip, line.quantity, selection.quantity);
+    const proportionalTax = allocateQuantity(line.tax, line.quantity, selection.quantity);
+    /**
+     * THE PARTS MUST ADD UP TO WHAT THE CUSTOMER PAID FOR THESE UNITS.
+     *
+     * Each component used to be allocated with its own integer division, and they then summed to
+     * LESS than the line's own share whenever a division dropped a cent. A line of two Lattes at
+     * MXN 65.00 stores merchandise 11207 and tax 1793, and refunding ONE of them allocated
+     * 11207/2 = 5603 and 1793/2 = 896: **MXN 64.99 refunded for a cup the customer paid MXN 65.00
+     * for**. Measured on the iMin on 2026-10-11 — `merchant.pos_sale_exception` came back with
+     * merchandise 5603, tax 896, total 6499 against a receipt line of 13000 for quantity 2.
+     *
+     * The share of the line's total is exact, because a counter sale's line total is
+     * `unitPrice x quantity`. So the tax takes the remainder — the convention the receipt itself
+     * uses, where the net is rounded and the tax is `total - net` — and the line's components add
+     * up to its share again. A one-quantity line is untouched: share, merchandise and tax are the
+     * same numbers they always were. `proportionalTax` remains the answer for a line whose discount
+     * and tip would make the residual negative.
+     */
+    const share = allocateQuantity(
+      line.merchandise - line.discount + line.tax + line.tip,
+      line.quantity,
+      selection.quantity,
+    );
+    const residual = safe(share - merchandise + discount - tip);
+    const tax = residual >= 0 ? residual : proportionalTax;
     return {
       lineId: line.id,
       quantity: selection.quantity,

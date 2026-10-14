@@ -1,0 +1,13 @@
+                  id                  | display_label | account_number | lifecycle_state | version |               table_id               |            fired_order_id            | lines | quantity 
+--------------------------------------+---------------+----------------+-----------------+---------+--------------------------------------+--------------------------------------+-------+----------
+ b1ff9f25-9380-451b-b431-c3601046e900 |               |            100 | suspended       |      16 |                                      | b1296834-3d49-45ce-8083-3a6303a36668 |     4 |        4
+ 883212f0-ea8f-47d1-b453-4c8e84fab62c |               |            108 | suspended       |       6 | d05ee98f-bcad-42c7-9e08-ddcd5941b012 | 5c6ac8ef-c41e-4deb-a4d8-fe466a06ccc2 |     1 |        1
+ f9e82051-5b47-48b0-91a1-fd685e57b032 | Ana terraza   |            109 | suspended       |      18 | d05ee98f-bcad-42c7-9e08-ddcd5941b013 | c007b146-c5ce-4dcb-9ca9-481eac57fe0f |     1 |        1
+ 6186d969-e28c-492f-b937-10e73890f3c5 | Flujo QA      |            117 | suspended       |      18 |                                      | 07753644-0268-4cb8-b88d-49d5617b86fa |     1 |        1
+(4 rows)
+
+ checkouts | payment_attempts | tenders 
+-----------+------------------+---------
+         0 |                0 |       0
+(1 row)
+

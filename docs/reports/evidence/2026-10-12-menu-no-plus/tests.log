@@ -1,0 +1,16 @@
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: catalog cache is bounded and partitioned by tenant, branch and language
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: controller loads incrementally and deduplicates product IDs
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/midnight_color_exposure_test.dart: Midnight limits category color and retains accessible selection
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/midnight_color_exposure_test.dart: Midnight limits category color and retains accessible selection
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/midnight_color_exposure_test.dart: Midnight limits category color and retains accessible selection
+00:00 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: virtualized catalog surface renders authoritative product data
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: virtualized catalog surface renders authoritative product data
+00:00 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: the category index stacks its ears and opens the one chosen
+00:01 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: an unavailable product is dimmed, says "No disponible", and its tap never reaches the cart
+00:01 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: a product with no photo is a block of its category colour with its initials
+00:01 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: product detail keeps variant choices horizontal inside its scroll surface
+00:01 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: product action stays visible while options scroll at Size(1280.0, 720.0)
+00:01 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: product action stays visible while options scroll at Size(375.0, 812.0)
+00:01 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: detail choices and note survive desktop-phone-desktop resizing
+00:01 +14: All tests passed!

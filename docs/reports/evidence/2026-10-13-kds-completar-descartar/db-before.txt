@@ -1,0 +1,35 @@
+BEGIN
+        measured_at_utc        
+-------------------------------
+ 2026-10-13 21:44:49.917134+00
+(1 row)
+
+                  id                  | name |     timezone     | business_day_start | pos_day_close_policy | current_business_date 
+--------------------------------------+------+------------------+--------------------+----------------------+-----------------------
+ e6b14af1-b814-4efe-a6b0-67f5f02f4d53 | ONCA | America/Mazatlan | 04:00:00           | manual               | 2026-10-13
+(1 row)
+
+           kitchen_order_id           |  public_reference   | kitchen_status | business_date | commercial_status | account_number | lifecycle_state | cart_status |             cancellation_reason              |         cancelled_at          | paid_sales 
+--------------------------------------+---------------------+----------------+---------------+-------------------+----------------+-----------------+-------------+----------------------------------------------+-------------------------------+------------
+ 50e2ef12-ba2f-4d0c-97be-41a28829257b | Cuenta 004 · Mesa 1 | exception      | 2026-10-12    | placed            |              4 | committed       | committed   |                                              |                               |          1
+ bfd5e02f-ee14-47b3-be3e-31b143ac1795 | Cuenta 013 · Mesa 2 | exception      | 2026-10-12    | placed            |             13 | cancelled       | abandoned   |                                              | 2026-10-13 16:20:13.385134+00 |          0
+ a87a0710-ff95-4381-9df0-061c7b4418f1 | Cuenta 070          | queued         | 2026-10-12    | placed            |             70 | cancelled       | abandoned   | User-authorized local test reset; no payment | 2026-10-13 18:03:14.618687+00 |          0
+ 12b4f2ac-1e85-4567-a388-67027dbd2b35 | Cuenta 071          | queued         | 2026-10-12    | placed            |             71 | cancelled       | abandoned   | User-authorized local test reset; no payment | 2026-10-13 18:03:14.618687+00 |          0
+(4 rows)
+
+  public_reference   |      product_name       | item_status |              station_id              | station_name |   route_reason   | station_completed_at 
+---------------------+-------------------------+-------------+--------------------------------------+--------------+------------------+----------------------
+ Cuenta 004 · Mesa 1 | Aeropress               | exception   |                                      |              | missing_route    | 
+ Cuenta 004 · Mesa 1 | Amanecer                | exception   |                                      |              | missing_route    | 
+ Cuenta 004 · Mesa 1 | Capuccino               | preparing   | 31e932c0-cc15-4ee4-bebe-0dd1351e8f72 | Cocina       | configured_route | 
+ Cuenta 013 · Mesa 2 | Americano limón mineral | exception   |                                      |              | missing_route    | 
+ Cuenta 013 · Mesa 2 | Americano               | exception   |                                      |              | missing_route    | 
+ Cuenta 070          | Carajillo               | queued      | 86655f73-6afa-4427-9741-cb2e0bedef20 | Barra        | configured_route | 
+ Cuenta 071          | Aeropress               | queued      | 86655f73-6afa-4427-9741-cb2e0bedef20 | Barra        | configured_route | 
+(7 rows)
+
+ account_number | status | lifecycle_state | business_date | table_name | display_label 
+----------------+--------+-----------------+---------------+------------+---------------
+(0 rows)
+
+COMMIT

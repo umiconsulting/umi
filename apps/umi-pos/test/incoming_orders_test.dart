@@ -22,6 +22,8 @@ Cart _cart() => const Cart(
   operatorSessionId: '00000000-0000-4000-8000-000000000004',
   status: 'draft',
   version: 3,
+  firedOrderId: null,
+  fulfillmentType: 'dine_in',
   items: [],
   totals: {
     'subtotal': {'minorUnits': 0, 'currency': 'MXN'},
@@ -59,6 +61,18 @@ final class _Repo implements CartRepository {
     lastBind = input;
     return _cart();
   }
+
+  @override
+  Future<FireOrderResult> fire(
+    String merchantId,
+    FireOrderRequest request,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<Cart> setFulfillment(
+    String merchantId,
+    SetCartFulfillmentRequest input,
+  ) async => throw UnimplementedError();
 
   @override
   Future<Cart> create(String merchantId, CreateCartRequest request) async =>

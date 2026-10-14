@@ -108,7 +108,22 @@ void main() {
       );
     });
 
-    test('an empty field is always seeded from the total', () {
+    test('an empty field is seeded while the cashier has not typed', () {
+      expect(
+        tenderNeedsReseed(
+          receivedEmpty: true,
+          tenderEdited: false,
+          tenderedMinorUnits: 0,
+          grandTotalMinorUnits: 11000,
+        ),
+        isTrue,
+      );
+    });
+
+    test('an empty field the cashier is editing is left empty', () {
+      // Clearing the seeded figure is the first step of typing the amount the
+      // customer hands over. Refilling it here put the old amount back and the
+      // next digit landed on top of it.
       expect(
         tenderNeedsReseed(
           receivedEmpty: true,
@@ -116,7 +131,7 @@ void main() {
           tenderedMinorUnits: 0,
           grandTotalMinorUnits: 11000,
         ),
-        isTrue,
+        isFalse,
       );
     });
 

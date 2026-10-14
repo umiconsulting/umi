@@ -48,3 +48,4 @@ app.*.map.json
 /packaging/tools/
 /packaging/build/
 /packaging/dist/
+.estacion-runtime/

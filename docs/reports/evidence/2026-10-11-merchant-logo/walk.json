@@ -1,0 +1,35 @@
+{
+  "base": "http://127.0.0.1:4020",
+  "logo": "/tmp/umi-logo-b.png",
+  "steps": [
+    {
+      "step": "sign in",
+      "ok": true,
+      "note": "typed a credential"
+    },
+    {
+      "step": "open Ajustes and find the card",
+      "ok": true,
+      "note": "at http://127.0.0.1:4020/ajustes"
+    },
+    {
+      "step": "upload the logo through the card",
+      "ok": true,
+      "note": "/tmp/umi-logo-b.png → http://127.0.0.1:4013/logos/10000000-0000-4000-8000-000000000101-49b62047a3640eea.png (640×640 rendered)"
+    },
+    {
+      "step": "the card says it saved",
+      "ok": true
+    },
+    {
+      "step": "remove the logo",
+      "ok": true,
+      "note": "the preview goes back to Sin logo"
+    },
+    {
+      "step": "upload it a second time",
+      "ok": true,
+      "note": "http://127.0.0.1:4013/logos/10000000-0000-4000-8000-000000000101-49b62047a3640eea.png"
+    }
+  ]
+}

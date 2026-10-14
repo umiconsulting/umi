@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../features/offline/connectivity_controller.dart';
 

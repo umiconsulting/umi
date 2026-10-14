@@ -267,6 +267,18 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
+  /**
+   * The credential check behind POS PIN login. It deliberately does NOT filter on
+   * `d.kind`.
+   *
+   * One binary serves the till and the kitchen board, and it reads its own kind from
+   * `GET /devices/status`. A `kds` device still signs in with an operator PIN — the
+   * app then offers the kitchen surface and withholds the till's (see
+   * `tillSurfacesFor(..., kdsDevice: true)`) — so refusing the sign-in here left a
+   * device the owner had switched to KDS unable to start at all. The device record
+   * decides what the app MAY show; this query only decides whether the device is the
+   * one it claims to be.
+   */
   async validatePosDevice(input: {
     deviceId: string;
     merchantId: string;
@@ -280,7 +292,6 @@ export class AuthRepository {
           WHERE d.id = $1::uuid
             AND d.merchant_id = $2::uuid
             AND d.location_id = $3::uuid
-            AND d.kind = 'pos_terminal'
             AND d.status = 'active'
             AND d.installation_hash = $4
             AND d.credential_hash = $5
@@ -625,6 +636,36 @@ export class AuthRepository {
               u.status AS "status"
        FROM umi.user AS u
        WHERE u.id = $1::uuid AND u.password_hash IS NOT NULL
+       LIMIT 1`,
+      [userId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * The operator a POS refresh names. Deliberately has NO `password_hash` filter.
+   *
+   * `findUserById` above is the PASSWORD door's read, and it demands a password because
+   * a password sign-in has to find one. The till's door is the PIN: the dashboard creates
+   * its operators with a name, an email and a till PIN — no password, `status = 'invited'`
+   * on `umi.user` while the employment is `active`. Reading them back through the password
+   * door returned nothing, so `posRefresh` answered `invalid_token` and a register that had
+   * signed in with a PIN died exactly one access TTL later. Every 30 minutes, for ever.
+   * Found on the pilot till, 2026-10-08: the access token expired mid-shift, the refresh
+   * was refused, and the hardware centre could not even read its own runtime.
+   *
+   * WHAT PROVES THIS CALLER, given no password: everything BEFORE this read — a verified
+   * refresh JWT over `JWT_SECRET`, a device-bound session matched by installation hash and
+   * credential hash, and a signed device proof. The caller then checks `status` against
+   * POS_PIN_LOGIN_STATUSES, the same list the PIN door uses, so a suspended operator is
+   * still refused here.
+   */
+  async findPosOperatorById(userId: string): Promise<UserSummary | null> {
+    const { rows } = await this.pg.query<UserSummary>(
+      `SELECT u.id::text AS "userId", u.email, u.full_name AS "displayName",
+              u.status AS "status"
+       FROM umi.user AS u
+       WHERE u.id = $1::uuid
        LIMIT 1`,
       [userId],
     );

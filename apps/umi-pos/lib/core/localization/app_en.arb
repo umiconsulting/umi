@@ -87,13 +87,17 @@
   "unavailableLabel": "Unavailable",
   "variantsLabel": "Variants",
   "modifiersLabel": "Modifiers",
-  "taxIncludedLabel": "Tax configured",
+  "taxIncludedLabel": "Tax included in the price",
   "closeAction": "Close",
-  "cartTitle": "Current cart",
-  "cartEmpty": "Open a product to begin this cart.",
-  "cartUnavailable": "The cart is temporarily unavailable.",
+  "kitchenSoundsEnable": "Enable sounds",
+  "kitchenSoundsMute": "Mute sounds",
+  "kitchenTimeOverdue": "Overdue",
+  "cartTitle": "Order",
+  "cartEmpty": "Choose a product from the menu to begin.",
+  "cartUnavailable": "The order is temporarily unavailable.",
   "cartNoteLabel": "Operator note",
   "cartCourseLabel": "Course",
+  "cartCourseHint": "1 is served with everything · 2 is held back",
   "cartCoursePrevious": "Previous course",
   "cartCourseNext": "Next course",
   "cartCourseCurrent": "Course {course}",
@@ -105,35 +109,39 @@
       }
     }
   },
-  "addToCartAction": "Add to cart",
+  "addToCartAction": "Add to order",
   "removeFromCartAction": "Remove line",
+  "cartQuantityLabel": "Quantity",
   "increaseQuantity": "Increase quantity",
   "decreaseQuantity": "Decrease quantity",
   "subtotalLabel": "Subtotal",
-  "taxLabel": "Taxes",
-  "discountLabel": "Discount preview",
+  "taxLabel": "Included tax",
+  "discountLabel": "Discount",
   "totalLabel": "Total",
   "businessDateLabel": "Business date",
+  "localTimeLabel": "Local time",
   "checkoutNextGate": "Checkout available in the next Gate",
   "checkoutAction": "Checkout",
-  "checkoutTitle": "Authoritative checkout",
+  "checkoutTitle": "Checkout",
   "operatorLabel": "Operator",
   "paymentMethodLabel": "Payment method",
   "cashPayment": "Cash",
+  "cardPayment": "Card",
+  "receiptThanksMessage": "Thank you for your visit",
   "externalTerminalPayment": "External terminal",
   "reviewTotalsAction": "Review authoritative totals",
   "confirmAndPayAction": "Confirm and pay",
   "confirmAction": "Confirm",
   "confirmSaleTitle": "Confirm this sale?",
   "confirmSaleBody": "The displayed totals were recalculated by UMI. This confirmation starts payment.",
-  "totalsConfirmedBody": "UMI recalculated this cart. Review every total before confirming payment.",
+  "totalsConfirmedBody": "UMI recalculated this order. Review every total before confirming payment.",
   "paymentProcessing": "Payment is processing",
   "paymentUnknownTitle": "Payment status unknown",
   "paymentUnknownBody": "Do not start a new payment. Query this payment status or ask a manager for help.",
   "queryPaymentAction": "Query payment status",
   "correlationLabel": "Correlation",
   "saleCompletedTitle": "Sale completed",
-  "finishSaleAction": "Finish and start a new cart",
+  "finishSaleAction": "Finish and start a new order",
   "checkoutFailed": "Checkout could not be completed safely.",
   "provisionalSalePendingTitle": "Sale pending synchronization",
   "provisionalSalePendingBody": "Sale saved securely on this device and pending synchronization. Official receipt data will be assigned after server acceptance.",
@@ -152,7 +160,27 @@
   "tenderAmountLabel": "Amount applied",
   "exactAmountAction": "Exact amount",
   "manualTerminalLabel": "Manual terminal",
+  "bankTransferLabel": "Bank transfer",
+  "bankTransferPendingNote": "Show the bank details to the customer. The account stays open until you confirm the deposit.",
+  "bankTransferViewDetails": "View bank details",
+  "bankTransferAmountLabel": "Amount to transfer",
+  "bankTransferBankLabel": "Bank",
+  "bankTransferHolderLabel": "Account holder",
+  "bankTransferAccountLabel": "Account number",
+  "bankTransferConceptLabel": "Suggested concept",
+  "bankTransferAccountWord": "Account",
+  "bankTransferInstructions": "Check the deposit with the bank or a CEP before charging. This POS does not verify transfers automatically.",
+  "bankTransferSelectAction": "Use bank transfer",
+  "bankTransferConfirmTitle": "Confirm deposit received",
+  "bankTransferConfirmBody": "Confirm only after seeing the deposit in the bank or verifying a CEP. A customer screenshot is not proof of payment.",
+  "bankTransferConfirmAction": "Confirm deposit and charge",
   "terminalProcessingAction": "Processing externally",
+  "manualTerminalConfirmTitle": "Confirm the terminal charge",
+  "manualTerminalConfirmBody": "Confirm only if the external terminal approved the {amount} charge. If the result is unknown, close this message and check the terminal before attempting another charge.",
+  "@manualTerminalConfirmBody": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "manualTerminalConfirmAction": "Confirm charge and checkout",
   "terminalSuccessAction": "Confirm success",
   "terminalFailureAction": "Report failure",
   "terminalUnknownAction": "Outcome unknown",
@@ -160,7 +188,6 @@
   "noTipAction": "No tip",
   "customTipPercentLabel": "Custom tip percent",
   "customTipFixedLabel": "Custom tip amount",
-  "discountLabel": "Discount",
   "percentageDiscountAction": "Percentage",
   "fixedDiscountAction": "Fixed amount",
   "discountPercentLabel": "Discount percent",
@@ -170,7 +197,7 @@
   "displayReceiptAction": "Display receipt",
   "printLaterAction": "Print later",
   "noReceiptAction": "No receipt",
-  "managerApprovalAction": "Request manager approval",
+  "managerApprovalAction": "Authorize",
   "managerApprovalTitle": "Manager approval required",
   "managerPinLabel": "Manager PIN",
   "managerApprovalDeniedMessage": "The manager PIN or permission is not valid for this checkout.",
@@ -222,7 +249,7 @@
   "suspendedSaleLabel": "Suspended sale name",
   "cancelSaleReasonLabel": "Cancellation reason",
   "confirmCancelSaleTitle": "Cancel this sale?",
-  "confirmCancelSaleBody": "The cart will close without payment or receipt. The cancellation remains in the audit history.",
+  "confirmCancelSaleBody": "The order will close without payment or receipt. The cancellation remains in the audit history.",
   "saleRestoredMessage": "Your active sale was restored.",
   "readyForNextCustomerMessage": "Ready for the next customer.",
   "currentCustomerLabel": "Current customer",
@@ -230,6 +257,16 @@
   "attachCustomerAction": "Attach customer",
   "detachCustomerAction": "Use anonymous customer",
   "searchCustomerHint": "Search customers",
+  "customerPickerEmptyTitle": "Your customers will show up here",
+  "customerPickerEmptyBody": "The ones who arrive through WhatsApp, the loyalty ones and the Wallet ones collect here. You can also search them by name, phone or email — or just charge an anonymous customer.",
+  "customerPickerNoMatch": "Nobody matches “{query}”.",
+  "@customerPickerNoMatch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "recentCustomersAction": "Recent customers",
   "saleHistoryTitle": "Sales",
   "incomingOrdersTitle": "Incoming orders",
@@ -250,214 +287,216 @@
   "saleStateCancelled": "Cancelled",
   "saleStateRecovered": "Recovered",
   "openReceiptAction": "Open receipt",
-  "reprintReceiptAction": "Reprint view",
+  "reprintReceiptAction": "Print receipt",
   "receiptAvailableMessage": "Receipt available",
   "saleLifecycleError": "The sale action could not be completed safely.",
   "saleSearchHint": "Search by name, customer, or receipt",
-  "saleNameFallback": "Sale"
-  ,"editCartLineAction": "Edit item"
-  ,"saveCartLineAction": "Save changes"
-  ,"clearCartAction": "Clear cart"
-  ,"confirmClearCartTitle": "Clear this cart?"
-  ,"confirmClearCartBody": "All items will be removed from the current sale."
-  ,"cashCenterTitle": "Cash Center"
-  ,"cashCenterAction": "Open Cash Center"
-  ,"registerAvailableLabel": "Register available"
-  ,"registerAssignedLabel": "Assigned register"
-  ,"shiftRequiredMessage": "Open a cash shift before you accept cash."
-  ,"adoptShiftTitle": "Your shift is still open on another terminal"
-  ,"adoptShiftMessage": "This terminal lost its stored identity. The shift and the cash are still there; bring them to this screen to continue."
-  ,"adoptShiftAction": "Bring the shift to this terminal"
-  ,"reclaimRegisterTitle": "This drawer is held by a terminal that no longer exists"
-  ,"reclaimRegisterMessage": "No active terminal holds this drawer. Free it so a shift can be opened on it; the cash is not counted because it is still in the drawer."
-  ,"reclaimRegisterAction": "Free the drawer"
-  ,"cashShiftRequiredMessage": "This charge has no cash shift to book the money against."
-  ,"resumeShiftAndRetryAction": "Resume shift and retry"
-  ,"reclaimRegisterAndRetryAction": "Free the drawer and retry"
-  ,"cashHeldByActiveTillMessage": "Another active terminal holds this drawer. Ask a manager to count it before you continue."
-  ,"openShiftAction": "Open cash shift"
-  ,"invalidAmountMessage": "Enter a valid amount, for example 1,500.00."
-  ,"openingFloatLabel": "Opening float"
-  ,"denominationCountLabel": "Denomination count"
-  ,"paidInAction": "Paid In"
-  ,"paidOutAction": "Paid Out"
-  ,"safeDropAction": "Safe Drop"
-  ,"drawerCorrectionAction": "Drawer correction"
-  ,"noSaleDrawerAction": "Request drawer opening"
-  ,"drawerRequestRecordedMessage": "The drawer opening request was recorded. Hardware operation is not verified."
-  ,"suspendShiftAction": "Suspend shift"
-  ,"resumeShiftAction": "Resume shift"
-  ,"handoffShiftAction": "Hand off shift"
-  ,"incomingOperatorPinLabel": "Incoming operator PIN"
-  ,"blindCountAction": "Start blind count"
-  ,"recountAction": "Start recount"
-  ,"expectedCashLabel": "Expected cash"
-  ,"countedCashLabel": "Counted cash"
-  ,"cashVarianceLabel": "Variance"
-  ,"cashOverageLabel": "Overage"
-  ,"cashShortageLabel": "Shortage"
-  ,"cashToleranceLabel": "Tolerance"
-  ,"varianceReasonLabel": "Variance reason"
-  ,"cashApprovalAction": "Request variance approval"
-  ,"reconcileShiftAction": "Reconcile shift"
-  ,"closeShiftAction": "Close shift"
-  ,"shiftClosedMessage": "The cash shift is closed."
-  ,"blockedShiftMessage": "This shift is blocked. Follow the recovery guidance."
-  ,"pendingCashPostingMessage": "A pending cash posting must finish before close."
-  ,"ambiguousCashEffectMessage": "A cash effect is unknown. Verify the original operation."
-  ,"cashRecoveryMessage": "The saved cash operation state was restored."
-  ,"shiftSummaryTitle": "Shift summary"
-  ,"cashMovementAmountLabel": "Movement amount"
-  ,"cashMovementReasonLabel": "Movement reason"
-  ,"submitCashMovementAction": "Confirm cash movement"
-  ,"submitBlindCountAction": "Submit blind count"
-  ,"cashOperationFailedMessage": "The cash operation could not complete safely."
-  ,"cashStatusOpen": "Shift open"
-  ,"cashStatusSuspended": "Shift suspended"
-  ,"cashStatusCounting": "Cash count in progress"
-  ,"cashStatusReconciliation": "Reconciliation required"
-  ,"cashStatusClosed": "Shift closed"
-  ,"confirmCloseShiftTitle": "Close this cash shift?"
-  ,"confirmCloseShiftBody": "The close is final. New cash postings will require a new shift."
-  ,"confirmAction": "Confirm"
-  ,"varianceReasonNone": "No variance"
-  ,"varianceReasonCounting": "Counting error"
-  ,"varianceReasonChange": "Change error"
-  ,"varianceReasonHandling": "Cash handling error"
-  ,"varianceReasonUnknown": "Operational difference"
-  ,"saleExceptionAction": "Post-sale actions"
-  ,"saleExceptionTitle": "Refund or void"
-  ,"fullRefundAction": "Full refund"
-  ,"partialRefundAction": "Partial refund"
-  ,"voidSaleAction": "Void sale"
-  ,"refundableAmountLabel": "Remaining refundable amount"
-  ,"remainingRefundableQuantityLabel": "Remaining quantity"
-  ,"alreadyRefundedLabel": "Already refunded"
-  ,"refundReasonLabel": "Refund reason"
-  ,"restockAction": "Restock"
-  ,"doNotRestockAction": "Do not restock"
-  ,"inspectionRequiredAction": "Inspection required"
-  ,"taxRefundLabel": "Tax refund"
-  ,"discountAllocationLabel": "Discount allocation"
-  ,"tipRefundLabel": "Tip refund"
-  ,"cashRefundLabel": "Cash refund"
-  ,"manualTerminalRefundLabel": "Manual terminal refund"
-  ,"manualTerminalRefundProviderNotice": "Process the refund in the external terminal. UmiPOS records your observation. It does not prove provider success."
-  ,"manualTerminalRefundOnCommitNotice": "The terminal will be refunded when you confirm."
-  ,"cardTerminalRefundLabel": "Card terminal refund"
-  ,"managerPinLabel": "Manager PIN"
-  ,"approvalExpiredMessage": "The approval expired. Request a new approval."
-  ,"paymentOutcomeUnknownMessage": "The terminal outcome is unknown. Verify the original terminal operation."
-  ,"verifyTerminalAction": "Verify terminal outcome"
-  ,"terminalRefundSuccessAction": "The external refund succeeded"
-  ,"terminalRefundFailureAction": "The external refund failed"
-  ,"terminalRefundUnknownAction": "The outcome is unknown"
-  ,"refundBlockedMessage": "The server blocked this post-sale action."
-  ,"refundPolicyExpiredMessage": "The refund policy window expired."
-  ,"supportRequiredMessage": "Support review is required."
-  ,"compensatingReceiptTitle": "Refund receipt"
-  ,"fullyRefundedLabel": "Fully refunded"
-  ,"partiallyRefundedLabel": "Partially refunded"
-  ,"voidedSaleLabel": "Voided"
-  ,"recoveredRefundMessage": "The saved refund result was restored."
-  ,"refundCommittedMessage": "The refund was committed."
-  ,"refundPreviewAction": "Review refund"
-  ,"commitRefundAction": "Commit refund"
-  ,"refundConfirmationTitle": "Commit this refund?"
-  ,"refundConfirmationBody": "This action creates permanent compensation facts. The original sale stays unchanged."
-  ,"originalSaleLabel": "Original sale"
-  ,"exceptionHistoryLabel": "Exception history"
-  ,"refundOperationFailedMessage": "The post-sale action could not complete safely."
-  ,"selectRefundLinesMessage": "Select at least one refundable line."
-  ,"refundReasonCustomerChangedMind": "Customer changed their mind"
-  ,"refundReasonProductDefect": "Product defect"
-  ,"refundReasonIncorrectItem": "Incorrect item"
-  ,"refundReasonIncorrectQuantity": "Incorrect quantity"
-  ,"refundReasonDuplicateCharge": "Duplicate charge"
-  ,"refundReasonQualityIssue": "Quality issue"
-  ,"refundReasonOrderPreparationError": "Order preparation error"
-  ,"refundReasonPricingError": "Pricing error"
-  ,"voidReasonOperatorError": "Operator error"
-  ,"voidReasonDuplicateSale": "Duplicate sale"
-  ,"voidReasonIncorrectTender": "Incorrect tender"
-  ,"voidReasonSaleEnteredByMistake": "Sale entered by mistake"
-  ,"otherApprovedReasonLabel": "Other approved reason"
-  ,"decreaseRefundQuantityTooltip": "Decrease refund quantity"
-  ,"increaseRefundQuantityTooltip": "Increase refund quantity"
-  ,"restockIntentLabel": "Restock intent"
-  ,"restockNotApplicableLabel": "Restock does not apply"
-  ,"restockInventoryReviewLabel": "Inventory review required"
-  ,"sessionEndedReauth": "Your session ended. Please re-enter your PIN."
-  ,"operatorShift": "Shift: {name}"
-  ,"tableStateOpenLabel": "Open"
-  ,"tableStateSeatedLabel": "Seated"
-  ,"tableStateOrderedLabel": "Order taken"
-  ,"tableStateServedLabel": "Served"
-  ,"tableStateAwaitingPaymentLabel": "Awaiting payment"
-  ,"tableStateDirtyLabel": "Needs cleaning"
-  ,"tableStatePartySizeLabel": "{count} guests"
-  ,"@tableStatePartySizeLabel": {
+  "saleNameFallback": "Sale",
+  "editCartLineAction": "Edit item",
+  "saveCartLineAction": "Save changes",
+  "clearCartAction": "Clear order",
+  "confirmClearCartTitle": "Clear this order?",
+  "confirmClearCartBody": "All items will be removed from the current sale.",
+  "cashCenterTitle": "Cash Center",
+  "cashCenterAction": "Open Cash Center",
+  "registerAvailableLabel": "Register available",
+  "registerAssignedLabel": "Assigned register",
+  "shiftRequiredMessage": "Open a cash shift before you accept cash.",
+  "adoptShiftTitle": "Your shift is still open on another terminal",
+  "adoptShiftMessage": "This terminal lost its stored identity. The shift and the cash are still there; bring them to this screen to continue.",
+  "adoptShiftAction": "Bring the shift to this terminal",
+  "reclaimRegisterTitle": "This drawer is held by a terminal that no longer exists",
+  "reclaimRegisterMessage": "No active terminal holds this drawer. Free it so a shift can be opened on it; the cash is not counted because it is still in the drawer.",
+  "reclaimRegisterAction": "Free the drawer",
+  "cashShiftRequiredMessage": "This charge has no cash shift to book the money against.",
+  "resumeShiftAndRetryAction": "Resume shift and retry",
+  "reclaimRegisterAndRetryAction": "Free the drawer and retry",
+  "cashHeldByActiveTillMessage": "Another active terminal holds this drawer. Ask a manager to count it before you continue.",
+  "openShiftAction": "Open cash shift",
+  "invalidAmountMessage": "Enter a valid amount, for example 1,500.00.",
+  "openingFloatLabel": "Opening float",
+  "denominationCountLabel": "Denomination count",
+  "paidInAction": "Paid In",
+  "paidOutAction": "Paid Out",
+  "safeDropAction": "Safe Drop",
+  "drawerCorrectionAction": "Drawer correction",
+  "noSaleDrawerAction": "Request drawer opening",
+  "drawerRequestRecordedMessage": "The drawer opening request was recorded. Hardware operation is not verified.",
+  "suspendShiftAction": "Suspend shift",
+  "resumeShiftAction": "Resume shift",
+  "handoffShiftAction": "Hand off shift",
+  "incomingOperatorPinLabel": "Incoming operator PIN",
+  "blindCountAction": "Start blind count",
+  "countDrawerAction": "Count the drawer",
+  "recountAction": "Start recount",
+  "expectedCashLabel": "Expected cash",
+  "countedCashLabel": "Counted cash",
+  "cashVarianceLabel": "Variance",
+  "cashOverageLabel": "Overage",
+  "cashShortageLabel": "Shortage",
+  "cashToleranceLabel": "Tolerance",
+  "varianceReasonLabel": "Variance reason",
+  "cashApprovalAction": "Request variance approval",
+  "reconcileShiftAction": "Reconcile shift",
+  "closeShiftAction": "Close shift",
+  "shiftClosedMessage": "The cash shift is closed.",
+  "blockedShiftMessage": "This shift is blocked. Follow the recovery guidance.",
+  "pendingCashPostingMessage": "A pending cash posting must finish before close.",
+  "ambiguousCashEffectMessage": "A cash effect is unknown. Verify the original operation.",
+  "cashRecoveryMessage": "The saved cash operation state was restored.",
+  "shiftSummaryTitle": "Shift summary",
+  "cashMovementAmountLabel": "Movement amount",
+  "cashMovementReasonLabel": "Movement reason",
+  "submitCashMovementAction": "Confirm cash movement",
+  "submitBlindCountAction": "Submit blind count",
+  "submitCountAction": "Submit count",
+  "cashOperationFailedMessage": "The cash operation could not complete safely.",
+  "cashStatusOpen": "Shift open",
+  "cashStatusSuspended": "Shift suspended",
+  "cashStatusCounting": "Cash count in progress",
+  "cashStatusReconciliation": "Reconciliation required",
+  "cashCarriedOverShiftNotice": "This shift was left open on a previous day, and the drawer is its own until it closes. Count the cash and close it before the day goes on: that keeps today's money out of yesterday's.",
+  "cashStatusClosed": "Shift closed",
+  "confirmCloseShiftTitle": "Close this cash shift?",
+  "confirmCloseShiftBody": "The close is final. New cash postings will require a new shift.",
+  "varianceReasonNone": "No variance",
+  "varianceReasonCounting": "Counting error",
+  "varianceReasonChange": "Change error",
+  "varianceReasonHandling": "Cash handling error",
+  "varianceReasonUnknown": "Operational difference",
+  "saleExceptionAction": "Post-sale actions",
+  "saleExceptionTitle": "Refund or void",
+  "fullRefundAction": "Full refund",
+  "partialRefundAction": "Partial refund",
+  "voidSaleAction": "Void sale",
+  "refundableAmountLabel": "Remaining refundable amount",
+  "refundAmountLabel": "Refund amount",
+  "remainingRefundableQuantityLabel": "Remaining quantity",
+  "alreadyRefundedLabel": "Already refunded",
+  "refundReasonLabel": "Refund reason",
+  "restockAction": "Restock",
+  "doNotRestockAction": "Do not restock",
+  "inspectionRequiredAction": "Inspection required",
+  "taxRefundLabel": "Tax refund",
+  "discountAllocationLabel": "Discount allocation",
+  "tipRefundLabel": "Tip refund",
+  "cashRefundLabel": "Cash refund",
+  "manualTerminalRefundLabel": "Manual terminal refund",
+  "manualTerminalRefundProviderNotice": "Process the refund in the external terminal. UmiPOS records your observation. It does not prove provider success.",
+  "manualTerminalRefundOnCommitNotice": "The terminal will be refunded when you confirm.",
+  "cardTerminalRefundLabel": "Card terminal refund",
+  "approvalExpiredMessage": "The approval expired. Request a new approval.",
+  "paymentOutcomeUnknownMessage": "The terminal outcome is unknown. Verify the original terminal operation.",
+  "verifyTerminalAction": "Verify terminal outcome",
+  "terminalRefundSuccessAction": "The external refund succeeded",
+  "terminalRefundFailureAction": "The external refund failed",
+  "terminalRefundUnknownAction": "The outcome is unknown",
+  "refundBlockedMessage": "The server blocked this post-sale action.",
+  "refundPolicyExpiredMessage": "The refund policy window expired.",
+  "supportRequiredMessage": "Support review is required.",
+  "compensatingReceiptTitle": "Refund receipt",
+  "fullyRefundedLabel": "Fully refunded",
+  "partiallyRefundedLabel": "Partially refunded",
+  "voidedSaleLabel": "Voided",
+  "recoveredRefundMessage": "The saved refund result was restored.",
+  "refundCommittedMessage": "The refund was committed.",
+  "refundPreviewAction": "Review refund",
+  "commitRefundAction": "Commit refund",
+  "refundConfirmationTitle": "Commit this refund?",
+  "refundConfirmationBody": "This action creates permanent compensation facts. The original sale stays unchanged.",
+  "originalSaleLabel": "Original sale",
+  "exceptionHistoryLabel": "Exception history",
+  "refundOperationFailedMessage": "The post-sale action could not complete safely.",
+  "selectRefundLinesMessage": "Select at least one refundable line.",
+  "refundReasonCustomerChangedMind": "Customer changed their mind",
+  "refundReasonProductDefect": "Product defect",
+  "refundReasonIncorrectItem": "Incorrect item",
+  "refundReasonIncorrectQuantity": "Incorrect quantity",
+  "refundReasonDuplicateCharge": "Duplicate charge",
+  "refundReasonQualityIssue": "Quality issue",
+  "refundReasonOrderPreparationError": "Order preparation error",
+  "refundReasonPricingError": "Pricing error",
+  "voidReasonOperatorError": "Operator error",
+  "voidReasonDuplicateSale": "Duplicate sale",
+  "voidReasonIncorrectTender": "Incorrect tender",
+  "voidReasonSaleEnteredByMistake": "Sale entered by mistake",
+  "otherApprovedReasonLabel": "Other approved reason",
+  "decreaseRefundQuantityTooltip": "Decrease refund quantity",
+  "increaseRefundQuantityTooltip": "Increase refund quantity",
+  "restockIntentLabel": "Restock intent",
+  "restockNotApplicableLabel": "Restock does not apply",
+  "restockInventoryReviewLabel": "Inventory review required",
+  "sessionEndedReauth": "Your session ended. Please re-enter your PIN.",
+  "operatorShift": "Shift: {name}",
+  "tableStateOpenLabel": "Open",
+  "tableStateSeatedLabel": "Seated",
+  "tableStateOrderedLabel": "Order taken",
+  "tableStateServedLabel": "Served",
+  "tableStateAwaitingPaymentLabel": "Awaiting payment",
+  "tableStateDirtyLabel": "Needs cleaning",
+  "tableStatePartySizeLabel": "{count} guests",
+  "@tableStatePartySizeLabel": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
-  }
-  ,"tableStateElapsedLabel": "{duration} at table"
-  ,"@tableStateElapsedLabel": {
+  },
+  "tableStateElapsedLabel": "{duration} at table",
+  "@tableStateElapsedLabel": {
     "placeholders": {
       "duration": {
         "type": "String"
       }
     }
-  }
-  ,"tableStateGroupLabel": "Group of {count} tables"
-  ,"@tableStateGroupLabel": {
+  },
+  "tableStateGroupLabel": "Group of {count} tables",
+  "@tableStateGroupLabel": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
-  }
-  ,"tableStateSeatAction": "Seat"
-  ,"tableStateSeatTitle": "Seat table {table}"
-  ,"@tableStateSeatTitle": {
+  },
+  "tableStateSeatAction": "Seat",
+  "tableStateSeatTitle": "Seat guests at {table}",
+  "@tableStateSeatTitle": {
     "placeholders": {
       "table": {
         "type": "String"
       }
     }
-  }
-  ,"tableStatePartySizeField": "Guests"
-  ,"tableStateMoveAction": "Move"
-  ,"tableStateMoveArmed": "Moving {table}. Tap a free table."
-  ,"@tableStateMoveArmed": {
+  },
+  "tableStatePartySizeField": "Guests",
+  "tableStateMoveAction": "Move",
+  "tableStateMoveArmed": "Moving {table}. Tap a free table.",
+  "@tableStateMoveArmed": {
     "placeholders": {
       "table": {
         "type": "String"
       }
     }
-  }
-  ,"tableStateSplitAction": "Split"
-  ,"tableStateClearAction": "Clear table"
-  ,"tableStateReadyAction": "Mark ready"
-  ,"tableStateOrderedAction": "Order sent"
-  ,"tableStateServedAction": "Mark served"
-  ,"tableStateAwaitingPaymentAction": "Bill requested"
-  ,"tableStateSelectAction": "Select"
-  ,"tableStateMergeAction": "Merge"
-  ,"tableStateSelectHint": "Select two or more free tables"
-  ,"tableStateSelectedCount": "{count} selected"
-  ,"@tableStateSelectedCount": {
+  },
+  "tableStateSplitAction": "Split",
+  "tableStateClearAction": "Clear table",
+  "tableStateReadyAction": "Mark ready",
+  "tableStateOrderedAction": "Order sent",
+  "tableStateServedAction": "Mark served",
+  "tableStateAwaitingPaymentAction": "Bill requested",
+  "tableStateSelectAction": "Select",
+  "tableStateMergeAction": "Merge",
+  "tableStateSelectHint": "Select two or more free tables",
+  "tableStateSelectedCount": "{count} selected",
+  "@tableStateSelectedCount": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
-  }
-  ,"tableStateMergeTitle": "Merge tables"
-  ,"tableStateMergeSummary": "{tables} tables · {seats} seats"
-  ,"@tableStateMergeSummary": {
+  },
+  "tableStateMergeTitle": "Merge tables",
+  "tableStateMergeSummary": "{tables} tables · {seats} seats",
+  "@tableStateMergeSummary": {
     "placeholders": {
       "tables": {
         "type": "int"
@@ -466,48 +505,52 @@
         "type": "int"
       }
     }
-  }
-  ,"tableStateTargetOccupied": "That table already has a party."
-  ,"tableStateTargetTooSmall": "That table cannot seat {count} guests."
-  ,"@tableStateTargetTooSmall": {
+  },
+  "tableStateTargetOccupied": "That table already has a party.",
+  "tableStateTargetTooSmall": "That table cannot seat {count} guests.",
+  "@tableStateTargetTooSmall": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
-  }
-  ,"tableStateFailureTitle": "Could not complete"
-  ,"tableStateFailureRefresh": "Refresh map"
-  ,"tableStateFailureAlreadyOccupiedMessage": "That table already has a party."
-  ,"tableStateFailureAlreadyOccupiedRecovery": "Pick another table, or refresh the map before trying again."
-  ,"tableStateFailureCapacityExceededMessage": "The party is larger than the table seats."
-  ,"tableStateFailureCapacityExceededRecovery": "Choose a bigger table, or merge two tables."
-  ,"tableStateFailureNotOccupiedMessage": "There is no party on that table."
-  ,"tableStateFailureNotOccupiedRecovery": "Refresh the map: somebody else may have cleared the table."
-  ,"tableStateFailureNotGroupedMessage": "That table is not merged with another."
-  ,"tableStateFailureNotGroupedRecovery": "Only a table inside a group can be split."
-  ,"tableStateFailureNotInPlanMessage": "That table is not in the published floor plan."
-  ,"tableStateFailureNotInPlanRecovery": "Publish the plan from the dashboard, then refresh this view."
-  ,"tableStateFailureIdempotencyConflictMessage": "That change was already sent with different content."
-  ,"tableStateFailureIdempotencyConflictRecovery": "Refresh the map and repeat the action from the current state."
-  ,"tableStateFailurePermissionDeniedMessage": "Your role cannot change tables."
-  ,"tableStateFailurePermissionDeniedRecovery": "Ask a manager to do it, or sign in as another operator."
-  ,"tableStateFailurePlanNotPublishedMessage": "This location has no published floor plan."
-  ,"tableStateFailurePlanNotPublishedRecovery": "Publish the plan from the dashboard to operate its tables."
-  ,"tableStateFailureGenericMessage": "The table action could not be completed."
-  ,"tableStateFailureGenericRecovery": "Refresh the map and try again."
-  ,"tableStateCancelAction": "Cancel"
-  ,"kitchenBoardTitle": "Kitchen"
-  ,"kitchenBoardRefresh": "Refresh"
-  ,"kitchenBoardLoadFailed": "Could not load the kitchen."
-  ,"kitchenBoardEmpty": "No kitchen tickets."
-  ,"kitchenBoardTabTickets": "Tickets"
-  ,"kitchenPrepTab": "Preparation"
-  ,"kitchenPrepRefresh": "Reload prep"
-  ,"kitchenPrepLoadFailed": "Could not load the prep list."
-  ,"kitchenPrepEmpty": "No items have a par yet. Set the par in Inventory."
-  ,"kitchenPrepWindow": "Forecast usage from {from} to {to}"
-  ,"@kitchenPrepWindow": {
+  },
+  "tableStateFailureTitle": "Could not complete",
+  "tableStateFailureRefresh": "Refresh map",
+  "tableStateFailureAlreadyOccupiedMessage": "That table already has a party.",
+  "tableStateFailureAlreadyOccupiedRecovery": "Pick another table, or refresh the map before trying again.",
+  "tableStateFailureCapacityExceededMessage": "The party is larger than the table seats.",
+  "tableStateFailureCapacityExceededRecovery": "Choose a bigger table, or merge two tables.",
+  "tableStateFailureNotOccupiedMessage": "There is no party on that table.",
+  "tableStateFailureNotOccupiedRecovery": "Refresh the map: somebody else may have cleared the table.",
+  "tableStateFailureNotGroupedMessage": "That table is not merged with another.",
+  "tableStateFailureNotGroupedRecovery": "Only a table inside a group can be split.",
+  "tableStateFailureNotInPlanMessage": "That table is not in the published floor plan.",
+  "tableStateFailureNotInPlanRecovery": "Publish the plan from the dashboard, then refresh this view.",
+  "tableStateFailureIdempotencyConflictMessage": "That change was already sent with different content.",
+  "tableStateFailureIdempotencyConflictRecovery": "Refresh the map and repeat the action from the current state.",
+  "tableStateFailurePermissionDeniedMessage": "Your role cannot change tables.",
+  "tableStateFailurePermissionDeniedRecovery": "Ask a manager to do it, or sign in as another operator.",
+  "tableStateFailurePlanNotPublishedMessage": "This location has no published floor plan.",
+  "tableStateFailurePlanNotPublishedRecovery": "Publish the plan from the dashboard to operate its tables.",
+  "tableStateFailureGenericMessage": "The table action could not be completed.",
+  "tableStateFailureGenericRecovery": "Refresh the map and try again.",
+  "tableStateCancelAction": "Cancel",
+  "kitchenBoardTitle": "KDS",
+  "kitchenStationAll": "All",
+  "sentLineVoidApprovalOperation": "Cancel a dish the kitchen already started",
+  "sentLineVoidApprovalReasonLabel": "Reason for the cancel",
+  "sentLineVoidApprovalCancelAction": "Back",
+  "kitchenBoardRefresh": "Refresh",
+  "kitchenBoardLoadFailed": "Could not load the kitchen.",
+  "kitchenBoardEmpty": "No kitchen tickets.",
+  "kitchenBoardTabTickets": "Tickets",
+  "kitchenPrepTab": "Preparation",
+  "kitchenPrepRefresh": "Reload prep",
+  "kitchenPrepLoadFailed": "Could not load the prep list.",
+  "kitchenPrepEmpty": "No preparation targets are set. Set them in Inventory in the management dashboard.",
+  "kitchenPrepWindow": "Forecast usage from {from} to {to}",
+  "@kitchenPrepWindow": {
     "description": "The window the forecast usage covers. It comes from the response.",
     "placeholders": {
       "from": {
@@ -517,228 +560,239 @@
         "type": "String"
       }
     }
-  }
-  ,"kitchenPrepItemColumn": "Item"
-  ,"kitchenPrepUnitColumn": "Unit"
-  ,"kitchenPrepParColumn": "Par"
-  ,"kitchenPrepOnHandColumn": "On hand"
-  ,"kitchenPrepForecastColumn": "Forecast usage"
-  ,"kitchenPrepQuantityColumn": "Quantity to make"
-  ,"kitchenPrepNoPar": "No par"
-  ,"kitchenStatusQueued": "Queued"
-  ,"kitchenStatusInPreparation": "Preparing"
-  ,"kitchenStatusPartiallyReady": "Partial"
-  ,"kitchenStatusReady": "Ready"
-  ,"kitchenStatusException": "Exception"
-  ,"kitchenPriorityUrgent": "Urgent"
-  ,"kitchenPriorityHigh": "High"
-  ,"kitchenElapsedNow": "now"
-  ,"kitchenElapsedMinutes": "{minutes} min"
-  ,"@kitchenElapsedMinutes": {
+  },
+  "kitchenPrepItemColumn": "Item",
+  "kitchenPrepUnitColumn": "Unit",
+  "kitchenPrepParColumn": "Target",
+  "kitchenPrepOnHandColumn": "On hand",
+  "kitchenPrepForecastColumn": "Forecast usage",
+  "kitchenPrepQuantityColumn": "Quantity to make",
+  "kitchenPrepNoPar": "No par",
+  "kitchenStatusQueued": "Queued",
+  "kitchenStatusInPreparation": "Preparing",
+  "kitchenStatusPartiallyReady": "Partial",
+  "kitchenStatusReady": "Ready",
+  "kitchenStatusException": "Exception",
+  "kitchenStatusCancelled": "Cancelled",
+  "kitchenTicketDiscardAction": "Discard",
+  "kitchenItemRouteMissing": "No station assigned",
+  "kitchenPriorityUrgent": "Urgent",
+  "kitchenPriorityHigh": "High",
+  "kitchenElapsedNow": "now",
+  "kitchenElapsedMinutes": "{minutes} min",
+  "@kitchenElapsedMinutes": {
     "description": "How long a kitchen ticket has been waiting.",
     "placeholders": {
       "minutes": {
         "type": "int"
       }
     }
-  }
-  ,"kitchenElapsedHoursMinutes": "{hours} h {minutes} min"
-  ,"@kitchenElapsedHoursMinutes": {
+  },
+  "kitchenElapsedHoursMinutes": "{hours} h {minutes} min",
+  "@kitchenElapsedHoursMinutes": {
     "description": "How long a kitchen ticket has been waiting, once it is over an hour.",
     "placeholders": {
-      "hours": { "type": "int" },
-      "minutes": { "type": "int" }
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
     }
-  }
-  ,"kitchenElapsedDaysHours": "{days} d {hours} h"
-  ,"@kitchenElapsedDaysHours": {
+  },
+  "kitchenElapsedDaysHours": "{days} d {hours} h",
+  "@kitchenElapsedDaysHours": {
     "description": "How long a kitchen ticket has been waiting, once it is over a day. A ticket is not meant to reach this, and one that does must be readable at a glance rather than counted in minutes.",
     "placeholders": {
-      "days": { "type": "int" },
-      "hours": { "type": "int" }
+      "days": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
     }
-  }
-  ,"kitchenItemMarkReady": "Mark {item} ready"
-  ,"@kitchenItemMarkReady": {
+  },
+  "kitchenItemMarkReady": "Mark {item} ready",
+  "@kitchenItemMarkReady": {
     "description": "What a tap on one kitchen line does.",
     "placeholders": {
       "item": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenItemAlreadyReady": "{item} is already ready"
-  ,"@kitchenItemAlreadyReady": {
+  },
+  "kitchenItemAlreadyReady": "{item} is already ready",
+  "@kitchenItemAlreadyReady": {
     "description": "Read by a screen reader on a line that is already bumped.",
     "placeholders": {
       "item": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenCourseGroup": "Course {course}"
-  ,"@kitchenCourseGroup": {
+  },
+  "kitchenCourseGroup": "Course {course}",
+  "@kitchenCourseGroup": {
     "description": "The heading that names one course on a kitchen ticket. A ticket groups its lines by course so a dessert is not started with the starters.",
     "placeholders": {
       "course": {
         "type": "int"
       }
     }
-  }
-  ,"kitchenCourseHeld": "Held · {count}"
-  ,"@kitchenCourseHeld": {
+  },
+  "kitchenCourseHeld": "Held · {count}",
+  "@kitchenCourseHeld": {
     "description": "The label on a course the kitchen has not been told to start. The count is how many lines it holds.",
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
-  }
-  ,"kitchenCourseHeldNote": "Not cooking yet"
-  ,"@kitchenCourseHeldNote": {
+  },
+  "kitchenCourseHeldNote": "Not cooking yet",
+  "@kitchenCourseHeldNote": {
     "description": "Says out loud that a held group is not work to start yet, so a cook does not begin it early."
-  }
-  ,"kitchenCourseFire": "Fire course {course}"
-  ,"@kitchenCourseFire": {
+  },
+  "kitchenCourseFire": "Fire course {course}",
+  "@kitchenCourseFire": {
     "description": "The one action that fires the next held course on a ticket.",
     "placeholders": {
       "course": {
         "type": "int"
       }
     }
-  }
-  ,"kitchenItemHeld": "{item} is not cooking yet"
-  ,"@kitchenItemHeld": {
+  },
+  "kitchenItemHeld": "{item} is not cooking yet",
+  "@kitchenItemHeld": {
     "description": "Read by a screen reader on a held line: it is not offered as work to start.",
     "placeholders": {
       "item": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenItemVoided": "VOIDED"
-  ,"kitchenTicketStartAction": "Start"
-  ,"kitchenTicketCompleteAction": "Complete"
-  ,"kitchenTicketRecallAction": "Recall"
-  ,"kitchenTicketSending": "Sending…"
-  ,"kitchenRecallTitle": "Recall ticket"
-  ,"kitchenRecallBody": "Why is this ticket coming back to the kitchen?"
-  ,"kitchenRecallReasonCustomerReturned": "The customer sent it back"
-  ,"kitchenRecallReasonWrongItem": "The wrong dish went out"
-  ,"kitchenRecallReasonQuality": "It was not right"
-  ,"kitchenRecallReasonOther": "Another reason"
-  ,"kitchenRecallNoteLabel": "Note (optional)"
-  ,"kitchenRecallCancel": "Cancel"
-  ,"kitchenFailureTitle": "The kitchen did not change"
-  ,"kitchenFailureRefresh": "Refresh kitchen"
-  ,"kitchenFailureVersionConflictMessage": "Somebody else already moved ticket {reference}."
-  ,"@kitchenFailureVersionConflictMessage": {
+  },
+  "kitchenItemVoided": "VOIDED",
+  "kitchenTicketStartAction": "Start",
+  "kitchenTicketCompleteAction": "Complete",
+  "kitchenTicketRecallAction": "Recall",
+  "kitchenTicketSending": "Sending…",
+  "kitchenRecallTitle": "Recall ticket",
+  "kitchenRecallBody": "Why is this ticket coming back to the kitchen?",
+  "kitchenRecallReasonCustomerReturned": "The customer sent it back",
+  "kitchenRecallReasonWrongItem": "The wrong dish went out",
+  "kitchenRecallReasonQuality": "It was not right",
+  "kitchenRecallReasonOther": "Another reason",
+  "kitchenRecallNoteLabel": "Note (optional)",
+  "kitchenRecallCancel": "Cancel",
+  "kitchenFailureTitle": "The kitchen did not change",
+  "kitchenFailureRefresh": "Refresh kitchen",
+  "kitchenFailureVersionConflictMessage": "Somebody else already moved ticket {reference}.",
+  "@kitchenFailureVersionConflictMessage": {
     "description": "The ticket moved between the board read and the bump.",
     "placeholders": {
       "reference": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenFailureVersionConflictGenericMessage": "Somebody else already moved that ticket."
-  ,"kitchenFailureVersionConflictRecovery": "The board has been refreshed. Check the ticket and mark whatever is still pending."
-  ,"kitchenFailureFingerprintMessage": "That change was already sent with different content, for ticket {reference}."
-  ,"@kitchenFailureFingerprintMessage": {
+  },
+  "kitchenFailureVersionConflictGenericMessage": "Somebody else already moved that ticket.",
+  "kitchenFailureVersionConflictRecovery": "The board has been refreshed. Check the ticket and mark whatever is still pending.",
+  "kitchenFailureFingerprintMessage": "That change was already sent with different content, for ticket {reference}.",
+  "@kitchenFailureFingerprintMessage": {
     "description": "The same command id was reused with different content.",
     "placeholders": {
       "reference": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenFailureFingerprintRecovery": "Refresh the board and repeat the action from the current state."
-  ,"kitchenFailureInvalidTransitionMessage": "The ticket cannot take that step from its current state."
-  ,"kitchenFailureInvalidTransitionRecovery": "Refresh the board. To send a ticket back to the kitchen, use Recall on a ready ticket."
-  ,"kitchenFailurePermissionDeniedMessage": "Your role cannot move the kitchen."
-  ,"kitchenFailurePermissionDeniedRecovery": "Ask a manager to do it, or sign in as another operator."
-  ,"kitchenFailureTicketMissingMessage": "Ticket {reference} did not reach this device's station."
-  ,"@kitchenFailureTicketMissingMessage": {
+  },
+  "kitchenFailureFingerprintRecovery": "Refresh the board and repeat the action from the current state.",
+  "kitchenFailureInvalidTransitionMessage": "The ticket cannot take that step from its current state.",
+  "kitchenFailureInvalidTransitionRecovery": "Refresh the board. To send a ticket back to the kitchen, use Recall on a ready ticket.",
+  "kitchenFailurePermissionDeniedMessage": "Your role cannot move the kitchen.",
+  "kitchenFailurePermissionDeniedRecovery": "Ask a manager to do it, or sign in as another operator.",
+  "kitchenFailureTicketMissingMessage": "Ticket {reference} did not reach this device's station.",
+  "@kitchenFailureTicketMissingMessage": {
     "description": "The route refused the ticket for this device: it is either gone from the board or outside this device's kitchen station scope.",
     "placeholders": {
       "reference": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenFailureTicketMissingGenericMessage": "That ticket did not reach this device's station."
-  ,"kitchenFailureTicketMissingRecovery": "The ticket is still in the kitchen. Refresh the board, and if it keeps happening ask a manager to check that this device is assigned to its station."
-  ,"kitchenFailureDeviceMessage": "This device is no longer registered for the kitchen."
-  ,"kitchenFailureDeviceRecovery": "Enroll this device again from the dashboard."
-  ,"kitchenFailureGenericMessage": "The kitchen action could not be completed."
-  ,"kitchenFailureGenericRecovery": "Refresh the board and try again."
-  ,"terminalChargeTitle": "Card terminal"
-  ,"terminalChargeInstruction": "Charge {amount} on the terminal and confirm the outcome here."
-  ,"@terminalChargeInstruction": {
+  },
+  "kitchenFailureTicketMissingGenericMessage": "That ticket did not reach this device's station.",
+  "kitchenFailureTicketMissingRecovery": "The ticket is still in the kitchen. Refresh the board, and if it keeps happening ask a manager to check that this device is assigned to its station.",
+  "kitchenFailureDeviceMessage": "This device is no longer registered for the kitchen.",
+  "kitchenFailureDeviceRecovery": "Enroll this device again from the dashboard.",
+  "kitchenFailureGenericMessage": "The kitchen action could not be completed.",
+  "kitchenFailureGenericRecovery": "Refresh the board and try again.",
+  "terminalChargeTitle": "Card terminal",
+  "terminalChargeInstruction": "Charge {amount} on the terminal and confirm the outcome here.",
+  "@terminalChargeInstruction": {
     "description": "Read on the terminal face, above the operator declaration.",
     "placeholders": {
       "amount": {
         "type": "String"
       }
     }
-  }
-  ,"terminalOperatorDeclaration": "The terminal is an operator declaration: the POS does not read its outcome."
-  ,"terminalStatusLabel": "Status"
-  ,"terminalStatusNotStarted": "Not started"
-  ,"terminalStatusProcessing": "Charging outside the POS"
-  ,"terminalStatusConfirmed": "Charge confirmed"
-  ,"terminalStatusFailed": "Failure reported"
-  ,"terminalStatusUnknown": "Outcome unknown"
-  ,"terminalStatusCancelled": "Cancelled before charging"
-  ,"cardTerminalLabel": "Card terminal"
-  ,"terminalWaitingTitle": "Waiting at the terminal…"
-  ,"terminalStopWaitingAction": "Stop waiting"
-  ,"terminalApprovedMessage": "The terminal approved the charge."
-  ,"terminalDeclinedMessage": "The terminal refused the charge ({code})."
-  ,"terminalUnresolvedMessage": "There is a card payment nobody has confirmed. The sale cannot close until it is resolved."
-  ,"terminalStoppedWaitingMessage": "You stopped waiting: the terminal may still hold the order. The attempt stays recorded and can be queried."
-  ,"terminalLastAnswerLabel": "Terminal says"
-  ,"terminalApprovedCollectMessage": "The terminal approved the charge. Press Charge to close the sale."
-  ,"terminalDeclinedNoChargeMessage": "The terminal declined the charge and nothing was taken. You can take cash, or start a new sale to retry the card."
-  ,"terminalUnavailableMessage": "The card terminal is not available. You can take cash."
-  ,"terminalBusyMessage": "The terminal is busy with another order. Try again."
-  ,"newSaleConfirmTitle": "Start a new sale?"
-  ,"newSaleConfirmBody": "This cart holds {count} unbilled line(s). It is abandoned and an empty sale starts; nothing is charged for it."
-  ,"@newSaleConfirmBody": {
+  },
+  "terminalOperatorDeclaration": "The terminal is an operator declaration: the POS does not read its outcome.",
+  "terminalStatusLabel": "Status",
+  "terminalStatusNotStarted": "Not started",
+  "terminalStatusProcessing": "Charging outside the POS",
+  "terminalStatusConfirmed": "Charge confirmed",
+  "terminalStatusFailed": "Failure reported",
+  "terminalStatusUnknown": "Outcome unknown",
+  "terminalStatusCancelled": "Cancelled before charging",
+  "cardTerminalLabel": "Card terminal",
+  "terminalWaitingTitle": "Waiting at the terminal…",
+  "terminalStopWaitingAction": "Stop waiting",
+  "terminalApprovedMessage": "The terminal approved the charge.",
+  "terminalDeclinedMessage": "The terminal refused the charge ({code}).",
+  "terminalUnresolvedMessage": "There is a card payment nobody has confirmed. The sale cannot close until it is resolved.",
+  "terminalStoppedWaitingMessage": "You stopped waiting: the terminal may still hold the order. The attempt stays recorded and can be queried.",
+  "terminalLastAnswerLabel": "Terminal says",
+  "terminalApprovedCollectMessage": "The terminal approved the charge. Press Charge to close the sale.",
+  "terminalDeclinedNoChargeMessage": "The terminal declined the charge and nothing was taken. You can take cash, or start a new sale to retry the card.",
+  "terminalUnavailableMessage": "The card terminal is not available. You can take cash.",
+  "terminalBusyMessage": "The terminal is busy with another order. Try again.",
+  "newSaleConfirmTitle": "Start a new sale?",
+  "newSaleConfirmBody": "This order holds {count} unbilled line(s). It is abandoned and an empty sale starts; nothing is charged for it.",
+  "@newSaleConfirmBody": {
     "description": "Asked before `New sale` abandons a sale that is still in progress.",
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
-  }
-  ,"keepCartAction": "Keep this cart"
-  ,"tenderConflictTitle": "This cart cannot be paid like this"
-  ,"tenderConflictBody": "It holds a split between cash and card, and this location takes one method per sale. The payment record stays for review; to carry on, start a new sale."
-  ,"splitTenderTitle": "Split payment"
-  ,"splitTenderAction": "Split payment"
-  ,"splitTenderCancelAction": "Single method"
-  ,"splitTenderPickSecond": "Choose the second payment method."
-  ,"singleMethodOnlyNote": "This location charges one method per sale."
-  ,"tenderShortBy": "Short by {amount}"
-  ,"@tenderShortBy": {
+  },
+  "keepCartAction": "Keep this order",
+  "tenderConflictTitle": "This order cannot be paid like this",
+  "tenderConflictBody": "It holds a split between cash and card, and this location takes one method per sale. The payment record stays for review; to carry on, start a new sale.",
+  "splitTenderTitle": "Split payment",
+  "splitTenderAction": "Split payment",
+  "splitTenderCancelAction": "Single method",
+  "splitTenderPickSecond": "Choose the second payment method.",
+  "singleMethodOnlyNote": "This location charges one method per sale.",
+  "tenderShortBy": "Short by {amount}",
+  "@tenderShortBy": {
     "description": "How much of a split payment the selected methods still do not cover.",
     "placeholders": {
       "amount": {
         "type": "String"
       }
     }
-  }
-  ,"tenderOverBy": "Over by {amount}"
-  ,"@tenderOverBy": {
+  },
+  "tenderOverBy": "Over by {amount}",
+  "@tenderOverBy": {
     "description": "How much a split payment takes beyond the bill.",
     "placeholders": {
       "amount": {
         "type": "String"
       }
     }
-  }
-  ,"kitchenAllDayTooltip": "Ordered today: {ordered}. Still to make: {outstanding}."
-  ,"@kitchenAllDayTooltip": {
+  },
+  "kitchenAllDayTooltip": "Ordered today: {ordered}. Still to make: {outstanding}.",
+  "@kitchenAllDayTooltip": {
     "description": "What the all-day count on a kitchen item means, spoken by the tooltip and the screen reader.",
     "placeholders": {
       "ordered": {
@@ -748,126 +802,127 @@
         "type": "int"
       }
     }
-  }
-  ,"inventoryProductionAction": "Produce"
-  ,"inventoryProductionTitle": "Produce prep"
-  ,"inventoryProductionOutputLabel": "Output item"
-  ,"inventoryProductionQuantityLabel": "Quantity produced"
-  ,"inventoryProductionQuantityHelper": "Use the item's scale and base unit."
-  ,"inventoryProductionLotLabel": "Batch code (optional)"
-  ,"inventoryProductionExpiryLabel": "Expiry (optional)"
-  ,"inventoryProductionExpiryHint": "YYYY-MM-DD"
-  ,"inventoryProductionResultTitle": "Produced batch"
-  ,"inventoryProductionLotReferenceLabel": "Batch"
-  ,"inventoryProductionExpiryReferenceLabel": "Expiry"
-  ,"inventoryProductionProducedLabel": "Produced"
-  ,"inventoryProductionDeclaredLabel": "Recipe yield"
-  ,"inventoryProductionYieldLossLabel": "Yield loss"
-  ,"inventoryProductionUnitCostLabel": "Unit cost"
-  ,"inventoryProductionTotalCostLabel": "Batch cost"
-  ,"inventoryProductionConsumedTitle": "Consumed inputs"
-  ,"inventoryProductionIncompleteCostMessage": "Some inputs have no recorded cost."
-  ,"inventoryProductionNoCostLabel": "No cost"
-  ,"inventoryProductionRecipeRequiredMessage": "This item has no production recipe."
-  ,"inventoryProductionQuantityNotExactMessage": "The quantity does not divide exactly across the recipe inputs."
-  ,"inventoryProductionInsufficientStockMessage": "There is not enough stock of an input to make this batch."
-  ,"inventoryUnitEach": "ea"
-  ,"inventoryUnitGram": "g"
-  ,"inventoryUnitKilogram": "kg"
-  ,"inventoryUnitMilliliter": "ml"
-  ,"inventoryUnitLiter": "L"
-  ,"inventoryUnitPortion": "portion"
-  ,"inventoryUnitPackage": "pack"
-  ,"inventoryUnitBox": "box"
-  ,"adoptShiftCardTitle": "Recover the shift"
-  ,"cashShiftCardTitle": "The shift"
-  ,"cashOpenedAtLabel": "Opened"
-  ,"openingFloatRequiredHint": "The opening float cannot be zero."
-  ,"cashEquationLabel": "The drawer's account"
-  ,"cashExpectedHiddenLabel": "Revealed when you count"
-  ,"cashExpectedHiddenHint": "A blind count withholds the expected amount until you submit yours."
-  ,"cashSalesLabel": "Cash sales"
-  ,"cashPaidInLabel": "Paid in"
-  ,"cashPaidOutLabel": "Paid out"
-  ,"cashSafeDropLabel": "Safe drop"
-  ,"cashAdjustmentsLabel": "Adjustments"
-  ,"cashPolicyLabel": "Drawer policy"
-  ,"cashPolicyCountLabel": "Count"
-  ,"cashPolicyAllowLabel": "Allowed"
-  ,"cashBlindCountOnLabel": "Blind count"
-  ,"cashBlindCountOffLabel": "Visible count"
-  ,"cashOfflineRequiredLabel": "Needs a connection"
-  ,"cashCloseApprovalLabel": "Close PIN: variance >"
-  ,"cashMovementApprovalLabel": "Movement PIN from"
-  ,"cashJournalLabel": "Shift journal"
-  ,"cashStepCountDetail": "Count the drawer's denominations and send the total."
-  ,"cashStepVarianceDetail": "Explain the variance so it lands in the history."
-  ,"cashStepReconcileDetail": "The system compares expected against counted."
-  ,"cashStepCloseDetail": "Closing is final; the shift stops taking cash."
-  ,"cashJournalEmptyMessage": "No movements yet."
-  ,"cashCountObservationLabel": "Count"
-  ,"cashVarianceResolutionLabel": "Variance resolution"
-  ,"cashCloseAdjustmentLabel": "Close adjustment"
-  ,"cancelCountAction": "Cancel the count and reopen"
-  ,"cancelCountMessage": "The count stays in the history. The drawer takes cash again."
-  ,"cashVarianceTitle": "Drawer count"
-  ,"cashVarianceBalancedLabel": "No variance"
-  ,"cashVarianceWithinToleranceLabel": "Within tolerance"
-  ,"cashVarianceOutsideToleranceLabel": "Outside tolerance"
-  ,"cashPolicyMaxFloatLabel": "Maximum float"
-  ,"cashMovementReasonHint": "e.g. ice purchase"
-  ,"cashMovementApprovalHint": "From {amount}, the manager's PIN is required."
-  ,"@cashMovementApprovalHint": {
+  },
+  "inventoryProductionAction": "Produce",
+  "inventoryProductionTitle": "Produce prep",
+  "inventoryProductionOutputLabel": "Output item",
+  "inventoryProductionQuantityLabel": "Quantity produced",
+  "inventoryProductionQuantityHelper": "Use the item's scale and base unit.",
+  "inventoryProductionLotLabel": "Batch code (optional)",
+  "inventoryProductionExpiryLabel": "Expiry (optional)",
+  "inventoryProductionExpiryHint": "YYYY-MM-DD",
+  "inventoryProductionResultTitle": "Produced batch",
+  "inventoryProductionLotReferenceLabel": "Batch",
+  "inventoryProductionExpiryReferenceLabel": "Expiry",
+  "inventoryProductionProducedLabel": "Produced",
+  "inventoryProductionDeclaredLabel": "Recipe yield",
+  "inventoryProductionYieldLossLabel": "Yield loss",
+  "inventoryProductionUnitCostLabel": "Unit cost",
+  "inventoryProductionTotalCostLabel": "Batch cost",
+  "inventoryProductionConsumedTitle": "Consumed inputs",
+  "inventoryProductionIncompleteCostMessage": "Some inputs have no recorded cost.",
+  "inventoryProductionNoCostLabel": "No cost",
+  "inventoryProductionRecipeRequiredMessage": "This item has no production recipe.",
+  "inventoryProductionQuantityNotExactMessage": "The quantity does not divide exactly across the recipe inputs.",
+  "inventoryProductionInsufficientStockMessage": "There is not enough stock of an input to make this batch.",
+  "inventoryUnitEach": "ea",
+  "inventoryUnitGram": "g",
+  "inventoryUnitKilogram": "kg",
+  "inventoryUnitMilliliter": "ml",
+  "inventoryUnitLiter": "L",
+  "inventoryUnitPortion": "portion",
+  "inventoryUnitPackage": "pack",
+  "inventoryUnitBox": "box",
+  "adoptShiftCardTitle": "Recover the shift",
+  "cashShiftCardTitle": "The shift",
+  "cashOpenedAtLabel": "Opened",
+  "openingFloatRequiredHint": "The opening float cannot be zero.",
+  "cashEquationLabel": "The drawer's account",
+  "cashExpectedHiddenLabel": "Revealed when you count",
+  "cashExpectedHiddenHint": "A blind count withholds the expected amount until you submit yours.",
+  "cashSalesLabel": "Cash sales",
+  "cashPaidInLabel": "Paid in",
+  "cashPaidOutLabel": "Paid out",
+  "cashSafeDropLabel": "Safe drop",
+  "cashAdjustmentsLabel": "Adjustments",
+  "cashPolicyLabel": "Drawer policy",
+  "cashPolicyCountLabel": "Count",
+  "cashPolicyAllowLabel": "Allowed",
+  "cashBlindCountOnLabel": "Blind count",
+  "cashBlindCountOffLabel": "Visible count",
+  "cashOfflineRequiredLabel": "Needs a connection",
+  "cashCloseApprovalLabel": "Close PIN: variance >",
+  "cashMovementApprovalLabel": "Movement PIN from",
+  "cashJournalLabel": "Shift journal",
+  "cashStepCountDetail": "Count the drawer's denominations and send the total.",
+  "cashStepVarianceDetail": "Explain the variance so it lands in the history.",
+  "cashStepReconcileDetail": "The system compares expected against counted.",
+  "cashStepCloseDetail": "Closing is final; the shift stops taking cash.",
+  "cashJournalEmptyMessage": "No movements yet.",
+  "cashCountObservationLabel": "Count",
+  "cashVarianceResolutionLabel": "Variance resolution",
+  "cashCloseAdjustmentLabel": "Close adjustment",
+  "cancelCountAction": "Cancel the count and reopen",
+  "cancelCountMessage": "The count stays in the history. The drawer takes cash again.",
+  "cashVarianceTitle": "Drawer count",
+  "cashVarianceBalancedLabel": "No variance",
+  "cashVarianceWithinToleranceLabel": "Within tolerance",
+  "cashVarianceOutsideToleranceLabel": "Outside tolerance",
+  "cashPolicyMaxFloatLabel": "Maximum float",
+  "cashMovementReasonHint": "e.g. ice purchase",
+  "cashMovementApprovalHint": "From {amount}, the manager's PIN is required.",
+  "@cashMovementApprovalHint": {
     "description": "States the amount above which a cash movement needs a manager PIN, shown inside the movement dialog.",
     "placeholders": {
       "amount": {
         "type": "String"
       }
     }
-  }
-  ,"noSaleDialogHint": "Opening the drawer without a sale is recorded with your operator and the reason."
-  ,"handoffDialogHint": "The shift passes to the incoming operator. The drawer does not move."
-  ,"countDialogBlindHint": "Blind count: the expected amount is revealed when you submit."
-  ,"countDialogRecountHint": "Recount {attempt}: this count replaces the previous one in the history."
-  ,"@countDialogRecountHint": {
+  },
+  "noSaleDialogHint": "Opening the drawer without a sale is recorded with your operator and the reason.",
+  "handoffDialogHint": "The shift passes to the incoming operator. The drawer does not move.",
+  "countDialogBlindHint": "Blind count: the expected amount is revealed when you submit.",
+  "countDialogVisibleHint": "The expected cash is on screen. Submit what you counted.",
+  "countDialogRecountHint": "Recount {attempt}: this count replaces the previous one in the history.",
+  "@countDialogRecountHint": {
     "description": "Shown in the blind-count dialog when this count replaces an earlier one.",
     "placeholders": {
       "attempt": {
         "type": "int"
       }
     }
-  }
-  ,"cashUnavailableTitle": "The drawer could not be read"
-  ,"cashUnavailableHint": "Check the connection and try again. If it keeps failing, tell the manager before taking cash."
-  ,"cashStatusReadyToClose": "Ready to close"
-  ,"closeDialogApprovalHint": "This close asks for the manager's PIN."
-  ,"denominationQuantityLabel": "Quantity of {amount}"
-  ,"@denominationQuantityLabel": {
+  },
+  "cashUnavailableTitle": "The drawer could not be read",
+  "cashUnavailableHint": "Check the connection and try again. If it keeps failing, tell the manager before taking cash.",
+  "cashStatusReadyToClose": "Ready to close",
+  "closeDialogApprovalHint": "This close asks for the manager's PIN.",
+  "denominationQuantityLabel": "Quantity of {amount}",
+  "@denominationQuantityLabel": {
     "description": "Accessible name of the quantity field for one cash denomination.",
     "placeholders": {
       "amount": {
         "type": "String"
       }
     }
-  }
-  ,"cashLastReadLabel": "Updated"
-  ,"cashLedgerSequenceLabel": "Ledger sequence"
-  ,"cashReadOnlyTitle": "View only"
-  ,"cashReadOnlyMessage": "With your current permissions there are no cash actions for this shift. You can read the drawer's account and the shift journal; if you need to move cash or close the shift, ask a manager."
-  ,"cashDrawerUnansweredMessage": "The drawer did not answer. The operation is recorded; open it by hand and tell a manager."
-  ,"cashPolicyUndefinedLabel": "Not set"
-  ,"cashPolicyExpiredTitle": "The cash policy has expired"
-  ,"cashPolicyExpiredMessage": "This terminal cannot move cash, count or close until the owner publishes a current policy. The money in the drawer is not touched."
-  ,"cashPolicyExpiresAtLabel": "Valid until"
-  ,"cashPolicyVersionLabel": "Version"
-  ,"cashOfflineLabel": "Cash without a connection"
-  ,"cashOfflineUnavailableLabel": "Not available yet"
-  ,"movementReasonRequiredMessage": "Write the reason for the movement."
-  ,"@movementReasonRequiredMessage": {
+  },
+  "cashLastReadLabel": "Updated",
+  "cashLedgerSequenceLabel": "Ledger sequence",
+  "cashReadOnlyTitle": "View only",
+  "cashReadOnlyMessage": "With your current permissions there are no cash actions for this shift. You can read the drawer's account and the shift journal; if you need to move cash or close the shift, ask a manager.",
+  "cashDrawerUnansweredMessage": "The drawer did not answer. The operation is recorded; open it by hand and tell a manager.",
+  "cashPolicyUndefinedLabel": "Not set",
+  "cashPolicyExpiredTitle": "The cash policy has expired",
+  "cashPolicyExpiredMessage": "This terminal cannot move cash, count or close until the owner publishes a current policy. The money in the drawer is not touched.",
+  "cashPolicyExpiresAtLabel": "Valid until",
+  "cashPolicyVersionLabel": "Version",
+  "cashOfflineLabel": "Cash without a connection",
+  "cashOfflineUnavailableLabel": "Not available yet",
+  "movementReasonRequiredMessage": "Write the reason for the movement.",
+  "@movementReasonRequiredMessage": {
     "description": "Error on the movement reason field when it is left empty."
-  }
-  ,"cashMovementApprovalScope": "You are approving {operation} of {amount}."
-  ,"@cashMovementApprovalScope": {
+  },
+  "cashMovementApprovalScope": "You are approving {operation} of {amount}.",
+  "@cashMovementApprovalScope": {
     "description": "Says what a manager is being asked to approve: the operation and its amount.",
     "placeholders": {
       "operation": {
@@ -878,20 +933,19 @@
       }
     }
   },
-  "managerApprovalEyebrow": "You are authorizing"
-  ,"@managerApprovalEyebrow": {
+  "managerApprovalEyebrow": "You are authorizing",
+  "@managerApprovalEyebrow": {
     "description": "Small label above the operation in the manager approval dialog."
-  }
-  ,"managerApprovalAction": "Authorize"
-  ,"@managerApprovalAction": {
+  },
+  "@managerApprovalAction": {
     "description": "Primary button in the manager approval dialog. Names the act, not just 'confirm'."
-  }
-  ,"managerApprovalCancelAction": "Cancel movement"
-  ,"@managerApprovalCancelAction": {
+  },
+  "managerApprovalCancelAction": "Cancel movement",
+  "@managerApprovalCancelAction": {
     "description": "Secondary button in the manager approval dialog. Abandons the movement, not the screen."
-  }
-  ,"managerApprovalPinHint": "The manager types their PIN."
-  ,"@managerApprovalPinHint": {
+  },
+  "managerApprovalPinHint": "The manager types their PIN.",
+  "@managerApprovalPinHint": {
     "description": "Says who is expected to enter the PIN in the approval dialog."
   },
   "@openShiftOnStrandedDrawerMessage": {
@@ -926,7 +980,7 @@
   "@managerApprovalDrawerAfter": {
     "description": "The expected cash in the drawer once the movement is booked."
   },
-  "tableStatePanelTitle": "Table {table}",
+  "tableStatePanelTitle": "{table}",
   "@tableStatePanelTitle": {
     "description": "Heading of the persistent table detail panel. Combines the word for table with the published table label.",
     "placeholders": {
@@ -950,5 +1004,145 @@
   "tableStateGroupField": "Group",
   "@tableStateGroupField": {
     "description": "Label of the row that shows how many tables one party holds."
+  },
+  "noSaleSurfaceTitle": "Your role does not open a till",
+  "@noSaleSurfaceTitle": {
+    "description": "Home title for an operator whose role does not hold the order surface."
+  },
+  "noSaleSurfaceBody": "Use the tabs to open your role's tools.",
+  "@noSaleSurfaceBody": {
+    "description": "Home body for an operator whose role does not hold the order surface."
+  },
+  "fireOrderAction": "Send to kitchen",
+  "@fireOrderAction": {
+    "description": "Sends the cart to the kitchen before the money (the fired order)."
+  },
+  "firedOrderMarker": "Sent to kitchen",
+  "@firedOrderMarker": {
+    "description": "Marks a cart that already has a kitchen ticket; its lines are frozen."
+  },
+  "firedLineMarker": "Sent",
+  "@firedLineMarker": {
+    "description": "Marks a single cart line the kitchen already has, beside its quantity."
+  },
+  "cancelReasonCustomerChanged": "The customer changed their mind",
+  "@cancelReasonCustomerChanged": {
+    "description": "A typed cancellation reason."
+  },
+  "cancelReasonOperatorMistake": "Operator mistake",
+  "@cancelReasonOperatorMistake": {
+    "description": "A typed cancellation reason."
+  },
+  "cancelReasonDuplicate": "Duplicate ticket",
+  "@cancelReasonDuplicate": {
+    "description": "A typed cancellation reason."
+  },
+  "cancelReasonOther": "Other reason",
+  "@cancelReasonOther": {
+    "description": "A typed cancellation reason; it carries no claim by itself."
+  },
+  "cancelSaleNoteLabel": "Note (optional)",
+  "@cancelSaleNoteLabel": {
+    "description": "The operator's optional comment on a cancellation, never the reason."
+  },
+  "otherReasonDetailLabel": "Describe the reason",
+  "@otherReasonDetailLabel": {
+    "description": "Required explanation when the operator selects Other for a cancellation, refund, or void."
+  },
+  "firedOrderSent": "Order sent to the kitchen.",
+  "@firedOrderSent": {
+    "description": "Confirmation when the kitchen ticket was sent, with no reference."
+  },
+  "firedOrderSentReference": "Order {reference} sent to the kitchen.",
+  "@firedOrderSentReference": {
+    "description": "Confirmation that names the ticket reference the operator reads to a cook.",
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  },
+  "entryCheckingTerminal": "Checking your terminal",
+  "entryRestoringSession": "Restoring your session",
+  "entryAuthenticating": "Verifying your access",
+  "entryVerifyingPin": "Verifying your PIN",
+  "entryStartingOperator": "Preparing your session",
+  "entryLoadingBody": "We are preparing access to your point of sale.",
+  "productVariantRequiredHint": "Choose a variant to add this product.",
+  "productOptionsRequiredHint": "Complete the required options to continue.",
+  "countedTotalLabel": "Counted total",
+  "openCashAndContinueAction": "Open cash shift and continue",
+  "openCashAndContinueHint": "Open the shift, return to checkout, and continue with this order.",
+  "productInformationLabel": "Product information",
+  "productBarcodeLabel": "Barcode",
+  "returnAndChargeAction": "Return and charge",
+  "previousShiftSummaryLabel": "Previous shift count",
+  "resumeCurrentOrderHint": "Suspend or finish the current order before resuming another.",
+  "displaySettingsTitle": "Settings",
+  "displaySettingsScope": "These preferences are saved on this terminal and apply to all its operators.",
+  "appearanceLabel": "Appearance",
+  "followSystemLabel": "Follow system",
+  "lightAppearanceLabel": "Light",
+  "darkAppearanceLabel": "Dark",
+  "midnightAppearanceLabel": "Midnight",
+  "languageLabel": "Language",
+  "motionLabel": "Motion",
+  "reducedMotionLabel": "Reduced",
+  "reducedMotionDescription": "Reduce transitions. The system’s reduced motion preference is always respected.",
+  "operatorSessionLabel": "Operator session",
+  "savingDisplayPreferences": "Saving preferences…",
+  "displayPreferencesReadError": "Preferences could not be read. The system appearance is used; you can save a new choice.",
+  "displayPreferencesWriteError": "The change was not saved. The previous choice is kept. Select it again to retry.",
+  "incomingOrdersLoading": "Checking incoming orders…",
+  "incomingOrdersEmptyDescription": "Orders from the web, WhatsApp and other channels will appear here when available for this location.",
+  "incomingOrdersErrorDescription": "Check the connection and try again. Your current order is kept.",
+  "refreshAction": "Refresh",
+  "receiptReferenceAction": "Receipt reference",
+  "closeOrderAction": "Close order",
+  "decreaseDenominationQuantity": "Decrease quantity of {denomination}",
+  "increaseDenominationQuantity": "Increase quantity of {denomination}",
+  "@decreaseDenominationQuantity": {
+    "placeholders": {
+      "denomination": {
+        "type": "String"
+      }
+    }
+  },
+  "@increaseDenominationQuantity": {
+    "placeholders": {
+      "denomination": {
+        "type": "String"
+      }
+    }
+  },
+  "openingFloatExceedsMaximum": "Maximum {amount}. Reduce the count.",
+  "@openingFloatExceedsMaximum": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "allSalesLabel": "All sales",
+  "recentSalesLabel": "Newest",
+  "oldestSalesLabel": "Oldest",
+  "saleHistoryLoading": "Searching sales…",
+  "saleHistoryNoMatches": "No sales match this search.",
+  "saleHistoryLoadFailed": "Could not load sales history.",
+  "textSizeLabel": "Text size",
+  "textSizeDescription": "Choose a comfortable reading size.",
+  "largeTextLabel": "Large",
+  "extraLargeTextLabel": "Extra large",
+  "receiptTicketLabel": "Ticket",
+  "receiptDocumentTitle": "Receipt",
+  "receiptTaxLabel": "Tax",
+  "kitchenAllDayCount": "Today: {ordered}",
+  "@kitchenAllDayCount": {
+    "description": "Daily ordered quantity, distinct from the quantity on this ticket.",
+    "placeholders": {
+      "ordered": {
+        "type": "int"
+      }
+    }
   }
 }

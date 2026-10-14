@@ -1,0 +1,17 @@
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/accounts_workspace_test.dart: accounts switch views and create without a table from either view
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: direct account mode opens once without a separate seating command
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: direct account mode opens once without a separate seating command
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: waiter opens the table account without room management permissions
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a free table can start a party (defect D27)
+00:01 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:01 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a dirty table is marked for clearing, and can be made ready
+00:01 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:01 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: the plan hint stands down once a table mode is armed
+00:01 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: moving a party keeps its timer and marks the origin for cleaning
+00:01 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:01 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a target too small refuses locally with a recovery to read
+00:01 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a server refusal shows a typed message with a recovery action
+00:01 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: selected table remains visible after desktop becomes narrow
+00:01 +14: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow tables use a readable list at enlarged text
+00:02 +15: All tests passed!

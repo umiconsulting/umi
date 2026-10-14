@@ -1,0 +1,21 @@
+               table_id               | state  |           seated_at           |               visit_id               | account_number | status | lifecycle_state | table_name |            table_visit_id            
+--------------------------------------+--------+-------------------------------+--------------------------------------+----------------+--------+-----------------+------------+--------------------------------------
+ b390142b-ca2e-467f-8589-4a20142b7f4e | seated | 2026-10-13 20:01:42.835809+00 | f5932bc6-840f-4d75-ab28-52e08f11fae0 |            141 | draft  | suspended       | Mesa 1     | f5932bc6-840f-4d75-ab28-52e08f11fae0
+ 326ca60a-a010-4ef0-8158-65c72561b154 | seated | 2026-10-13 21:44:47.920289+00 | 96d0f6b2-cc2d-4db8-826e-814a2158feb2 |            150 | draft  | recovered       | Mesa 3     | 96d0f6b2-cc2d-4db8-826e-814a2158feb2
+ 39fba3c1-2869-469b-9ed4-91bbc9158c01 | seated | 2026-10-13 20:25:52.007+00    | 15a94ef7-375f-45ff-9ab4-9e0c032c2e65 |            152 | draft  | suspended       | Mesa 6     | 15a94ef7-375f-45ff-9ab4-9e0c032c2e65
+ 787357b5-8cf6-4116-942a-fe1c2e3cde5d | dirty  |                               |                                      |                |        |                 |            | 
+ 2a091561-8320-4119-b475-2f732eada7ee | dirty  |                               |                                      |                |        |                 |            | 
+ 11123ca8-aa19-417e-b43f-11d5152f5e8f | dirty  |                               |                                      |                |        |                 |            | 
+ 31164c30-60a4-48e3-ba3b-04dbda0a3b13 | dirty  |                               |                                      |                |        |                 |            | 
+ 4b1cb6a7-9c9b-43bf-a379-5b8cccb6f15b | dirty  |                               |                                      |                |        |                 |            | 
+ 14b1acab-e4e0-49bd-9903-5a429952c937 | dirty  |                               |                                      |                |        |                 |            | 
+ 18432a67-3b18-4305-b377-5e47ddb776d6 | seated | 2026-10-13 20:32:25.2126+00   | 5529ad2e-8c65-4fbc-8cad-e9b29fdf35a9 |                |        |                 |            | 
+ 3cadef48-b9b3-44ed-a427-658b67a88190 | dirty  |                               |                                      |                |        |                 |            | 
+ faeecca8-992b-44bd-909e-ca17363b2bc2 | dirty  |                               |                                      |                |        |                 |            | 
+ bc7d02f0-8026-4f63-9179-1edc67df9fef | dirty  |                               |                                      |                |        |                 |            | 
+ ec634769-9099-4fac-b765-a1e627800b1b | dirty  |                               |                                      |                |        |                 |            | 
+ b8321b4f-1958-43f4-9bca-32b875117b1b | dirty  |                               |                                      |                |        |                 |            | 
+ 90209ebf-4aa3-4cf3-a5a2-9aed683feccc | dirty  |                               |                                      |                |        |                 |            | 
+ ba49f7cf-6454-4dc0-9231-1e6d9b19385d | seated | 2026-10-13 20:32:25.2126+00   | 7c8403c8-d311-4dcf-ab5a-d0993256b5f4 |                |        |                 |            | 
+(17 rows)
+

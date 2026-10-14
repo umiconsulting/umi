@@ -66,8 +66,83 @@ import type { ZodTypeAny } from 'zod';
  * usage-variance, recipe-cost, menu-engineering and prep-list reads. Additive to the
  * artifact: no described path changed meaning, so the URL major stays at 1.
  */
-/** 2.25.0 defines selected-tier visit costs and retained progress in scan responses. */
-export const CONTRACT_VERSION = '2.25.0';
+/**
+ * 2.24.0 — the fired order (ADR 2026-10-07-pos-fired-order §7): the cart view
+ * carries `firedOrderId`, so the till can tell an already-fired cart from a fresh
+ * one without asking again. Additive to the artifact: no described path changed
+ * meaning, so the URL major stays at 1.
+ */
+/**
+ * 2.25.0 — the order type (plan §8.2 F3, decision D5): the cart view carries
+ * `fulfillmentType` and a route sets it, so the fire and the checkout write the
+ * operator's choice onto the order instead of both assuming dine-in. Additive to
+ * the artifact: no described path changed meaning, so the URL major stays at 1.
+ */
+/**
+ * 2.26.0 — the second round (plan §8.2 F6): the cart line view carries `fired`,
+ * so the till can tell a line the kitchen already has from one it has rung but
+ * not sent. Additive to the artifact: no described path changed meaning, so the
+ * URL major stays at 1.
+ */
+/**
+ * 2.27.0 — the typed cancellation reason (plan §8.3): `CancelSaleRequest` asks for
+ * a `reasonCode` from a fixed list, and the sale view carries it. A relaxation of
+ * the optional note plus one new required field on one route, so the URL major
+ * stays at 1.
+ */
+/**
+ * 2.28.0 — `catalog.availability`, a dashboard administrative command: the owner says
+ * "no hay producto" for one product at one location, and the till reads it. One new
+ * member of an existing enum, no path changed meaning, so the URL major stays at 1.
+ */
+/**
+ * 2.29.0 — two facts about a cash shift the till had no way to be told.
+ *
+ * `INVALID_SHIFT_TRANSITION` joins `API_ERROR_CODES`: a resume or a suspend that
+ * cannot be made (a version the caller no longer holds, a drawer on another
+ * terminal, a status the move does not admit) is a conflict the operator can act
+ * on, and it reached them as a 500 `INTERNAL_ERROR` because the code was not
+ * publishable. `operator_resume` joins the custody event types: the terminal that
+ * holds a drawer hands it to the operator standing at it, which is the ordinary
+ * shape after an app update and was the one rebinding with no recorded link.
+ *
+ * One new member of each of two existing enums; no path changed meaning, so the
+ * URL major stays at 1.
+ */
+/**
+ * 2.31.0 — cancelling an already-sent cart line may carry the manager elevation that
+ * authorizes it (`RemoveSentCartLineRequest.approvalId` / `approvalFingerprint`). Both
+ * are nullable and default to null, so a client that never sends them behaves exactly
+ * as before; the URL major stays at 1 because no path changed meaning.
+ *
+ * 2.32.0 — that cancel is a same-day act, and the refusal has its own code:
+ * `CART_LINE_DAY_CLOSED` says the account belongs to a business day the merchant has
+ * already closed, which is a different next step from the kitchen having started the
+ * dish. Additive: one new member of the error allow-list, no path changed meaning.
+ *
+ * 2.33.0 — the printed receipt carries the café's `locale`, so the paper's labels are
+ * in the merchant's language instead of the renderer's English fallback. Additive and
+ * optional on the wire.
+ *
+ * 2.34.0 — the till can read the kitchen's STATIONS (`GET …/kitchen/stations`), so the
+ * board's tabs are the merchant's stations rather than only those with tickets. Additive:
+ * one new read.
+ *
+ * 2.35.0 — el cobro acepta transferencia como medio propio. La política de la
+ * sucursal contiene sus datos bancarios y el logo del comercio.
+ */
+/** 2.38.1 — el cajón y la impresora validan sus resultados por separado. */
+/**
+ * 2.39.0 — las dos líneas de trabajo se encuentran.
+ *
+ * Esta rama trae la entrega del mostrador (2.24.0–2.38.1): mesas, KDS, cobro
+ * dividido, transferencia bancaria y avisos push. `main` traía en paralelo la
+ * superficie de recompensas —allí numerada 2.25.0: costos de visita por nivel
+ * seleccionado y progreso retenido en las respuestas de escaneo—. Ninguna de las
+ * dos numeraciones describe al artefacto que resulta de unirlas, así que el
+ * contrato combinado toma el siguiente número libre. Aditivo sobre ambas.
+ */
+export const CONTRACT_VERSION = '2.39.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

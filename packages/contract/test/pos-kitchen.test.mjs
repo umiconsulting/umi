@@ -6,10 +6,33 @@ import {
   KitchenOrderProjection,
   PosKitchenCommandRequest,
   PosKitchenStatusResult,
+  KitchenUnassignedOrderProjection,
+  PosKitchenUnassignedCommandRequest,
   routeCatalog,
 } from '../dist/index.js';
 
 const id = (last) => `00000000-0000-4000-8000-${last.padStart(12, '0')}`;
+
+test('unassigned commands use order identity and preview, never client-selected stations', () => {
+  const request = {
+    locationId: id('1'),
+    operatorSessionId: id('2'),
+    kitchenOrderId: id('3'),
+    idempotencyKey: id('4'),
+    expectedVersion: 1,
+    routingFingerprint: 'b'.repeat(64),
+  };
+  assert.equal(PosKitchenUnassignedCommandRequest.safeParse(request).success, true);
+  for (const patch of [
+    { stationId: id('5') },
+    { expectedVersion: 0 },
+    { routingFingerprint: 'short' },
+  ])
+    assert.equal(
+      PosKitchenUnassignedCommandRequest.safeParse({ ...request, ...patch }).success,
+      false,
+    );
+});
 
 test('Gate 4A kitchen projection contains preparation-safe fields only', () => {
   const projection = KitchenOrderProjection.parse({
@@ -68,6 +91,18 @@ test('Gate 4A kitchen projection contains preparation-safe fields only', () => {
     ],
   });
   assert.equal(projection.status, 'partially_ready');
+  const unassigned = KitchenUnassignedOrderProjection.parse({
+    ...projection,
+    stationId: null,
+    proposedRoutes: [],
+    routingFingerprint: 'a'.repeat(64),
+  });
+  assert.equal(unassigned.stationId, null);
+  assert.equal(KitchenOrderProjection.safeParse(unassigned).success, false);
+  assert.equal(
+    KitchenUnassignedOrderProjection.safeParse({ ...unassigned, stationId: id('5') }).success,
+    false,
+  );
   assert.deepEqual(
     projection.items.map((item) => [item.courseNumber, item.fired]),
     [
@@ -112,9 +147,9 @@ test('Gate 4A commands bind identity, version, and scope-safe payload', () => {
   assert.equal(KitchenCommandRequest.safeParse({ ...command, expectedVersion: 0 }).success, false);
 });
 
-test('Gate 4A exposes a generated POS status route', () => {
+test('the generated POS status route lets an order writer read their kitchen status', () => {
   const route = routeCatalog['GET /api/v1/pos/merchants/:merchantId/kitchen/orders/:sourceOrderId'];
-  assert.equal(route.permission, 'kitchen.read');
+  assert.equal(route.permission, 'order.fire');
   assert.equal(route.idempotent, true);
   const status = PosKitchenStatusResult.parse({
     kitchenOrderId: id('1'),
@@ -124,9 +159,17 @@ test('Gate 4A exposes a generated POS status route', () => {
     priority: 'normal',
     version: 4,
     stationIds: [id('5')],
+    items: [
+      { sourceOrderItemId: id('6'), status: 'ready' },
+      { sourceOrderItemId: id('7'), status: 'preparing' },
+    ],
     updatedAt: '2026-08-09T12:02:00.000Z',
   });
   assert.equal(status.status, 'ready');
+  assert.deepEqual(
+    status.items.map((item) => item.status),
+    ['ready', 'preparing'],
+  );
 });
 
 test('the POS command route carries the command plus the board read context', () => {

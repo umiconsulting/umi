@@ -1,0 +1,11 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/pos-checkout/checkout-order-kitchen.integration.ts (2 tests) 95ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  03:02:03
+   Duration  430ms (transform 83ms, setup 0ms, collect 194ms, tests 95ms, environment 0ms, prepare 43ms)
+

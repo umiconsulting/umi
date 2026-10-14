@@ -80,7 +80,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner", "supervisor"]
+      "profiles": ["admin", "cashier", "manager", "owner", "staff", "supervisor"]
     },
     {
       "key": "cash.drawer.no_sale.approve",
@@ -97,7 +97,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "cash.movement.paid_in",
@@ -130,7 +130,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "cash.movement.paid_out",
@@ -163,7 +163,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "cash.movement.safe_drop",
@@ -196,7 +196,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "cash.reconcile",
@@ -261,7 +261,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "cash.shift.handoff",
@@ -357,7 +357,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "catalog.read",
@@ -421,7 +421,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner", "supervisor"]
+      "profiles": ["admin"]
     },
     {
       "key": "checkout.recover.any",
@@ -453,7 +453,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner", "supervisor"]
+      "profiles": ["admin"]
     },
     {
       "key": "checkout.terminal.confirm",
@@ -622,7 +622,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "customer.read",
@@ -706,7 +706,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "gift_card.authorize",
@@ -757,7 +757,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "gift_card.lookup",
@@ -1098,7 +1098,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "inventory.adjust.decrease",
@@ -1146,7 +1146,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "inventory.count.create",
@@ -1210,7 +1210,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "inventory.damage.create",
@@ -1306,7 +1306,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "inventory.quarantine.enter",
@@ -1370,7 +1370,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "inventory.restock.resolve",
@@ -1402,7 +1402,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "inventory.waste.create",
@@ -1645,7 +1645,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "loyalty.policy.manage",
@@ -1696,7 +1696,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "loyalty.reward.authorize",
@@ -1795,7 +1795,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "offline.replay",
@@ -1812,6 +1812,22 @@
       "seedGap": false,
       "status": "active",
       "profiles": ["admin", "cashier", "manager", "owner", "staff", "supervisor"]
+    },
+    {
+      "key": "order.void_after_preparation.approve",
+      "source": "docs/migration/build-v3/migrations/026_void_after_preparation.sql",
+      "control": "PosCartRepository.removeSent (consumes runtime.elevation_grant)",
+      "merchantScope": true,
+      "locationScope": true,
+      "deviceRequired": true,
+      "operatorSessionRequired": true,
+      "approvalRequired": true,
+      "entitlement": "pos",
+      "classification": "approval",
+      "tested": true,
+      "seedGap": false,
+      "status": "active",
+      "profiles": ["admin"]
     },
     {
       "key": "sale.exception.history",
@@ -1875,7 +1891,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "sale.refund.cash",
@@ -2019,7 +2035,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner", "supervisor"]
+      "profiles": ["admin"]
     },
     {
       "key": "stored_value.approve",
@@ -2036,7 +2052,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "stored_value.reconcile",
@@ -2053,7 +2069,7 @@
       "tested": true,
       "seedGap": false,
       "status": "active",
-      "profiles": ["admin", "manager", "owner"]
+      "profiles": ["admin"]
     },
     {
       "key": "wallet.authorize",

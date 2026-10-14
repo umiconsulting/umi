@@ -28,6 +28,13 @@ const confirmation: TotalsConfirmation = {
 const policy: CheckoutPolicy = {
   version: '1',
   manualTerminalEnabled: true,
+  bankTransferEnabled: true,
+  bankTransferDetails: {
+    holderName: 'ONCA',
+    bankName: 'Banco de prueba',
+    clabe: '012345678901234567',
+    accountNumber: null,
+  },
   mixedTenderEnabled: true,
   maximumTenderLines: 8,
   manualTerminalApprovalThreshold: money(50_000),
@@ -69,6 +76,86 @@ const command: CheckoutCommand = {
 };
 
 describe('Gate 3B checkout calculator', () => {
+  it('reparte propina por tramo y admite tres cobros registrados aunque el límite simultáneo sea dos', () => {
+    const registeredPolicy = { ...policy, maximumTenderLines: 2 };
+    const result = calculateCheckout(
+      confirmation,
+      {
+        ...command,
+        tenderDrafts: [
+          {
+            id: id(60),
+            type: 'cash',
+            amount: money(3000),
+            amountReceived: money(3000),
+            tipAmount: money(0),
+            status: 'confirmed_success',
+            correlationId: null,
+          },
+          {
+            id: id(61),
+            type: 'cash',
+            amount: money(2500),
+            amountReceived: money(2500),
+            tipAmount: money(0),
+            status: 'confirmed_success',
+            correlationId: null,
+          },
+          {
+            id: id(62),
+            type: 'bank_transfer',
+            amount: money(5000),
+            amountReceived: null,
+            tipAmount: money(500),
+            status: 'confirmed_success',
+            correlationId: null,
+          },
+        ],
+      },
+      registeredPolicy,
+      new Map(),
+      null,
+      true,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.summary.amountDue.minorUnits).toBe(10_500);
+    expect(result.summary.tip?.amount.minorUnits).toBe(500);
+    expect(result.summary.tenders[2].tipAmount?.minorUnits).toBe(500);
+    expect(result.summary.remainingBalance.minorUnits).toBe(0);
+  });
+
+  it('rechaza métodos distintos en tramos si la política desactiva medios mixtos', () => {
+    const result = calculateCheckout(
+      confirmation,
+      {
+        ...command,
+        tenderDrafts: [
+          {
+            id: id(63),
+            type: 'cash',
+            amount: money(5000),
+            amountReceived: money(5000),
+            status: 'confirmed_success',
+            correlationId: null,
+          },
+          {
+            id: id(64),
+            type: 'bank_transfer',
+            amount: money(5000),
+            amountReceived: null,
+            status: 'confirmed_success',
+            correlationId: null,
+          },
+        ],
+      },
+      { ...policy, mixedTenderEnabled: false, maximumTenderLines: 1 },
+      new Map(),
+      null,
+      true,
+    );
+    expect(result).toMatchObject({ ok: false, code: 'INVALID_TENDER_AMOUNT' });
+  });
   it('calculates exact cash and change with integer money', () => {
     const result = calculateCheckout(
       confirmation,
@@ -458,5 +545,37 @@ describe('Gate 3B checkout calculator', () => {
       `loyalty_reward:${authorizationId}`,
     );
     expect(result.approvalRequired).toBe(false);
+  });
+
+  it('requires a configured transfer and explicit confirmation before commit', () => {
+    const transfer: CheckoutCommand = {
+      ...command,
+      paymentMethod: 'bank_transfer',
+      tenderDrafts: [
+        {
+          id: id(24),
+          type: 'bank_transfer',
+          amount: money(10_000),
+          amountReceived: null,
+          status: 'draft',
+          correlationId: 'transfer-24',
+        },
+      ],
+    };
+    expect(calculateCheckout(confirmation, transfer, policy)).toMatchObject({
+      ok: false,
+      code: 'REMAINING_BALANCE',
+    });
+    const confirmed = {
+      ...transfer,
+      tenderDrafts: [{ ...transfer.tenderDrafts[0], status: 'confirmed_success' as const }],
+    };
+    expect(calculateCheckout(confirmation, confirmed, policy)).toMatchObject({
+      ok: true,
+      summary: { tenders: [{ type: 'bank_transfer', status: 'confirmed_success' }] },
+    });
+    expect(
+      calculateCheckout(confirmation, confirmed, { ...policy, bankTransferEnabled: false }),
+    ).toMatchObject({ ok: false, code: 'INVALID_TENDER_AMOUNT' });
   });
 });

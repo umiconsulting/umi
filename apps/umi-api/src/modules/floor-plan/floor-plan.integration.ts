@@ -219,4 +219,49 @@ describe('floor-plan publication under real RLS', () => {
       service.readForPos({ ...user, deviceId: randomUUID() }, merchantId, query),
     ).rejects.toMatchObject({ status: 403 });
   });
+  it('blocks deletion for a suspended account without seating and preserves its closed record', async () => {
+    const actor = (
+      await pg.query<{ id: string; user_id: string }>(
+        'SELECT id,user_id FROM runtime.operator_session WHERE merchant_id=$1 LIMIT 1',
+        [merchantId],
+      )
+    ).rows[0];
+    const cartId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.pos_cart
+      (id,merchant_id,location_id,operator_session_id,original_operator_session_id,
+       operator_user_id,original_operator_user_id,table_id,table_name,lifecycle_state)
+      VALUES ($1,$2,$3,$4,$4,$5,$5,$6,'T1','suspended')`,
+      [cartId, merchantId, locationId, actor.id, actor.user_id, document.areas[0].elements[0].id],
+    );
+    const empty = structuredClone(document);
+    empty.areas[0].elements = [];
+    const current = await scoped(() => service.read(access, locationId));
+    const saved = await scoped(() =>
+      service.change(access, { ...command(current.version), document: empty }),
+    );
+    await expect(
+      scoped(() => service.change(access, command(saved.version))),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+        fieldErrors: { tableIds: [document.areas[0].elements[0].id] },
+      },
+    });
+    expect((await scoped(() => service.read(access, locationId))).published).toEqual(document);
+    await pg.query("UPDATE merchant.pos_cart SET lifecycle_state='recovered' WHERE id=$1", [
+      cartId,
+    ]);
+    await pg.query(
+      "UPDATE merchant.pos_cart SET status='abandoned',lifecycle_state='cancelled',cancelled_at=now(),cancellation_reason='Local test' WHERE id=$1",
+      [cartId],
+    );
+    const before = (await pg.query('SELECT * FROM merchant.pos_cart WHERE id=$1', [cartId]))
+      .rows[0];
+    const published = await scoped(() => service.change(access, command(saved.version)));
+    expect(published.published).toEqual(empty);
+    expect(
+      (await pg.query('SELECT * FROM merchant.pos_cart WHERE id=$1', [cartId])).rows[0],
+    ).toEqual(before);
+  });
 });

@@ -13,7 +13,12 @@
     -Server
   }
 
-  @api path /api/* /health /health/*
+  # `/logos/*` is the API's too. It is the café's uploaded logo (migration 014),
+  # served content-addressed and public because the Apple/Google pass builders fetch
+  # it with a plain unauthenticated `fetch` — and because the dashboard draws it.
+  # Without this line those paths fall through to the dashboard container, whose
+  # static server has no such file, and every logo renders as a broken image.
+  @api path /api/* /logos/* /health /health/*
   reverse_proxy @api umi-api:3000
   reverse_proxy umi-dashboard:8080
 }

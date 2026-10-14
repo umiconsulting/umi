@@ -48,11 +48,13 @@ describe('Gate 3B checkout persistence', () => {
     version: 1,
     businessDate: '2026-07-29',
     merchantName: 'Umi',
+    merchantLogoUrl: null,
     locationName: 'Local',
     operatorName: 'Cashier',
     customerId: null,
     originOrderId: null,
     originChannel: null,
+    fulfillmentType: 'dine_in' as const,
     lines: [],
   });
 
@@ -177,6 +179,133 @@ describe('Gate 3B checkout persistence', () => {
     ).rejects.toMatchObject({ response: { code: 'TENDER_OVERALLOCATION' } });
   });
 
+  it('records a bank transfer under its own payment method with operator proof', async () => {
+    const query = vi.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('INSERT INTO merchant.pos_tender_fact')) {
+        expect(params?.[6]).toBe('bank_transfer');
+        return { rowCount: 1, rows: [{ id: id(8) }] };
+      }
+      if (sql.includes('tender_draft_id')) return { rowCount: 0, rows: [] };
+      if (sql.includes('INSERT INTO merchant.pos_payment_attempt')) {
+        expect(params?.[4]).toBe('bank_transfer');
+        expect(params?.[8]).toBe('operator_attested');
+        return {
+          rowCount: 1,
+          rows: [
+            {
+              id: id(20),
+              method: 'bank_transfer',
+              amountMinorUnits: '5500',
+              currency: 'MXN',
+              status: 'succeeded',
+              queryOnly: false,
+              correlationId: 'corr',
+              expiresAt: null,
+              createdAt: '2026-07-29T10:00:00.000Z',
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+    const summary = capturedTenderSummary();
+    summary.tenders[0].type = 'bank_transfer';
+    const outcomes = await new PosCheckoutRepository({} as never).payments(
+      { query } as never,
+      capturedCart(),
+      id(7),
+      summary,
+      'corr',
+    );
+    expect(outcomes[0].attempt.method).toBe('bank_transfer');
+  });
+
+  it('posts two cash payments to their own shifts once, even after a session changes', async () => {
+    const shifts = [id(30), id(31)];
+    const sessions = [id(12), id(13)];
+    const tenders = [id(8), id(9)];
+    const ledgerIds = [id(20), id(21)];
+    const posted = new Map<string, string>();
+    const ledgerCalls: Array<{ sql: string; params: unknown[] }> = [];
+    const query = vi.fn(async (sql: string, params?: unknown[]) => {
+      if (sql.includes('FROM merchant.pos_partial_payment')) {
+        const index = tenders.indexOf(String(params?.[3]));
+        return {
+          rows: [
+            {
+              ledgerId: posted.get(tenders[index]) ?? null,
+              status: 'confirmed_success',
+              amount: '500',
+              received: '600',
+              currency: 'MXN',
+              shiftId: shifts[index],
+              operatorSessionId: sessions[index],
+            },
+          ],
+        };
+      }
+      if (sql.includes('FROM merchant.cash_shift')) {
+        const index = shifts.indexOf(String(params?.[0]));
+        return {
+          rows: [
+            {
+              sequence: index === 0 ? '2' : '7',
+              registerId: id(40 + index),
+              businessDate: index === 0 ? '2026-10-13' : '2026-10-14',
+            },
+          ],
+        };
+      }
+      if (sql.includes('INSERT INTO merchant.cash_ledger_entry')) {
+        ledgerCalls.push({ sql, params: params ?? [] });
+        const index = shifts.indexOf(String(params?.[3]));
+        return { rows: [{ id: ledgerIds[index] }] };
+      }
+      if (sql.includes('UPDATE merchant.pos_partial_payment')) {
+        posted.set(String(params?.[3]), String(params?.[4]));
+        return { rowCount: 1, rows: [] };
+      }
+      return { rowCount: 1, rows: [] };
+    });
+    const repository = new PosCheckoutRepository({} as never);
+    const tender = (tenderId: string): PaymentSummary['tenders'][number] => ({
+      tenderId,
+      type: 'cash',
+      applied: { minorUnits: 500, currency: 'MXN' },
+      received: { minorUnits: 600, currency: 'MXN' },
+      change: { minorUnits: 100, currency: 'MXN' },
+      status: 'confirmed_success',
+    });
+    for (const index of [0, 1]) {
+      await expect(
+        repository.recordPartialCash(
+          { query } as never,
+          { ...capturedCart(), operatorSessionId: sessions[index] },
+          tender(tenders[index]),
+          shifts[index],
+          id(50 + index),
+          id(7),
+        ),
+      ).resolves.toBe(ledgerIds[index]);
+    }
+    // A retry from the second session reads the original cash fact. It cannot
+    // move the first payment to the new shift or create another ledger entry.
+    await expect(
+      repository.recordPartialCash(
+        { query } as never,
+        { ...capturedCart(), operatorSessionId: sessions[1] },
+        tender(tenders[0]),
+        shifts[1],
+        id(60),
+        id(7),
+      ),
+    ).resolves.toBe(ledgerIds[0]);
+    expect(ledgerCalls).toHaveLength(2);
+    expect(ledgerCalls.map((call) => call.params[3])).toEqual(shifts);
+    expect(ledgerCalls.map((call) => call.params[10])).toEqual(tenders);
+    expect(ledgerCalls.every((call) => call.sql.includes('NULL,$11::uuid'))).toBe(true);
+  });
+
   it('leaves the protected stock balance write lock to append_stock_ledger', async () => {
     const source = readFileSync(join(__dirname, 'pos-checkout.repository.ts'), 'utf8');
     expect(source).toContain('FROM merchant.stock_balance');
@@ -292,11 +421,13 @@ describe('Gate 3B checkout persistence', () => {
           version: 1,
           businessDate: '2026-07-29',
           merchantName: 'Umi',
+          merchantLogoUrl: null,
           locationName: 'Local',
           operatorName: 'Cashier',
           customerId: null,
           originOrderId: null,
           originChannel: null,
+          fulfillmentType: 'dine_in',
           lines: [],
         },
         id(7),

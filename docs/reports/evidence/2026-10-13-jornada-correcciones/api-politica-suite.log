@@ -1,0 +1,14 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/dashboard-operations/dashboard-operations.repository.spec.ts (5 tests) 11ms
+ ✓ src/modules/pos-checkout/pos-checkout.repository.spec.ts (10 tests) 36ms
+ ✓ src/modules/dashboard-operations/dashboard-operations.service.spec.ts (12 tests) 28ms
+ ✓ src/modules/pos-checkout/pos-checkout.service.spec.ts (15 tests) 51ms
+
+ Test Files  4 passed (4)
+      Tests  42 passed (42)
+   Start at  13:01:01
+   Duration  985ms (transform 669ms, setup 0ms, collect 2.24s, tests 126ms, environment 1ms, prepare 267ms)
+

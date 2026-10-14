@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/offline/recovery_actions.dart';
@@ -21,11 +20,11 @@ void main() {
     );
     final executor = _Executor();
     await tester.pumpWidget(
-      MaterialApp(
+      PosApp(
         locale: const Locale('es'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
+        home: PosPage(
           body: RecoveryCenter(
             journal: journal,
             recovery: recovery,
@@ -62,11 +61,11 @@ void main() {
         connectivity: ConnectivityController(),
       );
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           locale: const Locale('en'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
+          home: PosPage(
             body: RecoveryCenter(
               journal: journal,
               recovery: recovery,
@@ -101,11 +100,11 @@ void main() {
         connectivity: ConnectivityController(),
       );
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           locale: const Locale('es'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
+          home: PosPage(
             body: RecoveryCenter(
               journal: journal,
               recovery: recovery,

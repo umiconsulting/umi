@@ -29,6 +29,7 @@ final class AppException implements Exception {
       'SESSION_REVOKED' => AppErrorCategory.authentication,
       'PERMISSION_DENIED' => AppErrorCategory.permission,
       'CONFLICT' ||
+      'OPERATOR_SESSION_BUSY' ||
       'IDEMPOTENCY_CONFLICT' ||
       'OPTIMISTIC_VERSION_CONFLICT' ||
       // The kitchen command route names the same refusal its own way: the

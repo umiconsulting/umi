@@ -18,8 +18,16 @@ import {
   useStaffData,
 } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
+import { PERMISSION_LABELS } from './permission-labels.js';
 
-const ROLE_LABELS = { ADMIN: msg`Admin`, STAFF: msg`Barista` };
+// THE PLATFORM'S WORD, NOT ONE BUSINESS'S. `STAFF` was labelled "Barista" — a
+// word from one café's trade, shown to every business on the platform. The
+// schema settled this on 2026-07-xx when the catalogue section was named
+// `COMMERCE (generic — no "menu")`: the model is generic commerce, and a
+// business's own vocabulary belongs to its CONFIGURATION, never to ours. A café
+// that wants a role called "Barista" creates one — `merchant.role` exists for
+// exactly that, and ONCA has four of them.
+const ROLE_LABELS = { ADMIN: msg`Admin`, STAFF: msg`Personal` };
 
 /**
  * A permission group is an API key, not a word. The console shows the word.
@@ -751,7 +759,20 @@ function RoleEditor({ role, permissions, canManage, onReload }) {
                         disabled={locked || !permission.delegable}
                         onChange={() => toggle(permission.key)}
                       />
-                      <span style={{ flex: 1, fontSize: 13.5 }}>{permission.description}</span>
+                      <span style={{ flex: 1, fontSize: 13.5 }}>
+                        {PERMISSION_LABELS[permission.key]
+                          ? i18n._(PERMISSION_LABELS[permission.key])
+                          : permission.description}
+                        {locked || !permission.delegable ? (
+                          <small style={{ display: 'block', color: 'var(--ink-3)' }}>
+                            {role.isSystem
+                              ? t`Este rol del sistema no se puede modificar.`
+                              : !canManage
+                                ? t`Necesitas permiso para administrar roles.`
+                                : t`Este permiso está reservado y no se puede asignar a un rol personalizado.`}
+                          </small>
+                        ) : null}
+                      </span>
                       {RISK_LABELS[permission.riskLevel] ? (
                         <span className={`risk-chip risk-${permission.riskLevel}`}>
                           {i18n._(RISK_LABELS[permission.riskLevel])}
@@ -918,6 +939,7 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
   const [form, setForm] = useState({
     name: '',
     phone: '',
+    email: '',
     roleId: defaultRoleId,
     pin: '',
     confirmation: '',
@@ -925,7 +947,15 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const validPin = !form.pin || (/^\d{4,8}$/.test(form.pin) && form.pin === form.confirmation);
-  const valid = form.name.trim() && form.phone.trim() && form.roleId && validPin;
+  const email = form.email.trim();
+  const validEmail = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const valid =
+    form.name.trim() &&
+    (form.phone.trim() || email) &&
+    form.roleId &&
+    validPin &&
+    validEmail &&
+    (!form.pin || email);
   const submit = async () => {
     if (!valid || saving) return;
     setSaving(true);
@@ -934,6 +964,7 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
       await onCreate({
         name: form.name.trim(),
         phone: form.phone.trim(),
+        ...(email ? { email } : {}),
         roleId: form.roleId,
         ...(form.pin ? { operatorPin: form.pin } : {}),
       });
@@ -971,6 +1002,22 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
             onChange={(event) => setForm((value) => ({ ...value, phone: event.target.value }))}
           />
         </div>
+        <div className="field">
+          <label htmlFor={`${uid}-email`}>
+            <Trans>Correo para entrar al POS</Trans>
+          </label>
+          <input
+            id={`${uid}-email`}
+            className="input tall"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))}
+          />
+          <p className="quiet-label">
+            <Trans>Obligatorio si esta persona usará un PIN en el POS.</Trans>
+          </p>
+        </div>
         <RolePicker
           roles={roles}
           roleId={form.roleId}
@@ -987,7 +1034,14 @@ const InvitePanel = ({ roles, canAssignAdmin, onClose, onCreate }) => {
       </div>
       <SheetFooter
         error={
-          error || (!validPin ? t`El PIN debe tener de 4 a 8 dígitos y debe coincidir.` : null)
+          error ||
+          (!validPin
+            ? t`El PIN debe tener de 4 a 8 dígitos y debe coincidir.`
+            : !validEmail
+              ? t`Escribe un correo válido.`
+              : form.pin && !email
+                ? t`Escribe un correo para usar el PIN en el POS.`
+                : null)
         }
         saving={saving}
         valid={Boolean(valid)}
@@ -1003,6 +1057,7 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
   const { t } = useLingui();
   const uid = useId();
   const [name, setName] = useState(person.name);
+  const [email, setEmail] = useState(person.email || '');
   const [roleId, setRoleId] = useState(person.roleId || '');
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -1010,14 +1065,22 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
   const [error, setError] = useState(null);
   const validPin = !pin || (/^\d{4,8}$/.test(pin) && pin === confirmation);
   const validName = Boolean(name.trim());
-  const changed = name.trim() !== person.name || roleId !== person.roleId || Boolean(pin);
+  const cleanEmail = email.trim();
+  const validEmail = !cleanEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail);
+  const hasPinEmail = !(pin || person.hasOperatorPin) || Boolean(cleanEmail);
+  const changed =
+    name.trim() !== person.name ||
+    cleanEmail !== (person.email || '') ||
+    roleId !== person.roleId ||
+    Boolean(pin);
   const save = async () => {
-    if (!changed || !validPin || !validName || saving) return;
+    if (!changed || !validPin || !validName || !validEmail || !hasPinEmail || saving) return;
     setSaving(true);
     setError(null);
     try {
       await onUpdate({
         ...(name.trim() !== person.name ? { name: name.trim() } : {}),
+        ...(cleanEmail !== (person.email || '') ? { email: cleanEmail } : {}),
         ...(roleId !== person.roleId ? { roleId } : {}),
         ...(pin ? { operatorPin: pin } : {}),
       });
@@ -1061,6 +1124,19 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
       }
     >
       <div className="sheet-body">
+        <div className="field">
+          <label htmlFor={`${uid}-email`}>
+            <Trans>Correo para entrar al POS</Trans>
+          </label>
+          <input
+            id={`${uid}-email`}
+            className="input tall"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
         <PinFields
           uid={uid}
           pin={pin}
@@ -1092,10 +1168,14 @@ const AccessPanel = ({ person, roles, canAssignAdmin, onClose, onUpdate }) => {
             ? t`Escribe el nombre de la persona.`
             : !validPin
               ? t`El PIN debe tener de 4 a 8 dígitos y debe coincidir.`
-              : null)
+              : !validEmail
+                ? t`Escribe un correo válido.`
+                : !hasPinEmail
+                  ? t`Escribe un correo para usar el PIN en el POS.`
+                  : null)
         }
         saving={saving}
-        valid={changed && validPin && validName}
+        valid={changed && validPin && validName && validEmail && hasPinEmail}
         onClose={onClose}
         onSave={save}
         saveLabel={t`Guardar acceso`}

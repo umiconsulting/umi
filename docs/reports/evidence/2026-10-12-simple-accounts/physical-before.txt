@@ -1,0 +1,7 @@
+                  id                  | display_label | account_number | lifecycle_state | version |               table_id               |            fired_order_id            
+--------------------------------------+---------------+----------------+-----------------+---------+--------------------------------------+--------------------------------------
+ b1ff9f25-9380-451b-b431-c3601046e900 |               |            100 | suspended       |      16 |                                      | b1296834-3d49-45ce-8083-3a6303a36668
+ 883212f0-ea8f-47d1-b453-4c8e84fab62c |               |            108 | suspended       |       6 | d05ee98f-bcad-42c7-9e08-ddcd5941b012 | 5c6ac8ef-c41e-4deb-a4d8-fe466a06ccc2
+ f9e82051-5b47-48b0-91a1-fd685e57b032 | Ana terraza   |            109 | suspended       |      16 | d05ee98f-bcad-42c7-9e08-ddcd5941b013 | c007b146-c5ce-4dcb-9ca9-481eac57fe0f
+(3 rows)
+

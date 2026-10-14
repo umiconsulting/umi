@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { i18n } from '@/test/i18n.jsx';
 import {
+  deviceEnrollmentRequest,
   fmtLastSeenEs,
   locationName,
   mobilityLabel,
@@ -11,6 +12,44 @@ import {
   posDeviceStatus,
   visiblePosEnrollmentRequests,
 } from './device-utils.js';
+
+/**
+ * The KDS option in "Añadir dispositivo" used to mint a legacy iPad pairing PIN, whose
+ * device this app cannot even start on. Picking the honest option for a kitchen tablet
+ * therefore produced a device that would never work. Both products now submit the same
+ * enrolment request; the product picks only the `type`.
+ */
+describe('Solicitud de registro de un dispositivo nuevo', () => {
+  const base = {
+    name: '  Cocina  ',
+    platform: 'android',
+    mobility: 'static',
+    locationId: 'loc-1',
+    idempotencyKey: '00000000-0000-4000-8000-000000000001',
+  };
+
+  it('registra un UmiKDS con tipo kds', () => {
+    const body = deviceEnrollmentRequest({ ...base, product: 'kds' });
+    expect(body.type).toBe('kds');
+    expect(body.displayName).toBe('Cocina');
+    expect(body.locationId).toBe('loc-1');
+  });
+
+  it('registra un UmiPOS con tipo pos_terminal', () => {
+    expect(deviceEnrollmentRequest({ ...base, product: 'pos' }).type).toBe('pos_terminal');
+  });
+
+  it('cae en la caja cuando no hay producto elegido', () => {
+    // A blank product must not mint a kitchen device by accident.
+    expect(deviceEnrollmentRequest({ ...base, product: '' }).type).toBe('pos_terminal');
+  });
+
+  it('manda la sucursal como nula cuando no hay ninguna elegida', () => {
+    expect(deviceEnrollmentRequest({ ...base, product: 'pos', locationId: '' }).locationId).toBe(
+      null,
+    );
+  });
+});
 
 describe('Solicitudes de registro de UmiPOS', () => {
   it('retira la solicitud en cuanto se completa', () => {

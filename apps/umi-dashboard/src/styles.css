@@ -11,6 +11,23 @@
    file; only color-scheme is declared here. Umi (the :root default) is light;
    Midnight is dark. List every dark theme here as it is added. */
 :root {
+  /* ACCENT INK. An accent colour is drawn, not read: the same value that works
+     as a border or a fill is too light for 12px TEXT on a light surface. On the
+     light shell every accent used as text is darkened here; the dark shell keeps
+     the accent as-is, because darkening it would move it TOWARD the dark
+     background. The dashboard's accessibility gate fails on `color-contrast`
+     without this. */
+  --accent-ink: color-mix(in srgb, var(--merchant-brand, var(--umi-navy)) 70%, #000);
+  /* The same rule for the console's own blue, which is what the profile's
+     platform chip and the dark shell's accents use. */
+  --blue-ink: color-mix(in srgb, var(--umi-blue) 70%, #000);
+  /* THE NAVY IS A FILL, NOT AN INK. It reads on a light tint (chips, badges,
+     alerts, avatars, the "current plan" tag) and disappears on a dark one: on
+     the midnight palette `--umi-navy` on #0D0D0D measured 1.8:1 and the
+     accessibility gate failed on eight rules across seven routes on 2026-10-10.
+     The dark blocks below swap this ONE token for the light blue, so every
+     surface that draws navy TEXT follows the theme without a second palette. */
+  --navy-ink: var(--umi-navy);
   color-scheme: light;
   /* A dashboard-local token, added by the inventory redesign plan §4. The dense
      work surfaces (rows, tiles, list controls) need a tighter corner than the
@@ -29,10 +46,20 @@
 [data-theme='midnight'],
 [data-theme='dark'] {
   color-scheme: dark;
+  /* On the dark shell the accent is lightened instead of darkened: the pill it
+     is written on (12px, on a 14% tint of the same accent) measured 4.3:1 with
+     the raw brand and needs 4.5:1. Moving the ink AWAY from the dark ground is
+     the only direction that adds contrast there. */
+  --accent-ink: color-mix(in srgb, var(--merchant-brand, var(--umi-blue)) 72%, #fff);
+  --blue-ink: var(--umi-blue);
+  --navy-ink: var(--umi-blue);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark;
+    --accent-ink: color-mix(in srgb, var(--merchant-brand, var(--umi-blue)) 72%, #fff);
+    --blue-ink: var(--umi-blue);
+    --navy-ink: var(--umi-blue);
   }
 }
 
@@ -219,6 +246,14 @@ textarea:focus-visible,
 table td,
 table th {
   font-variant-numeric: tabular-nums lining-nums;
+}
+/* An amount is read as money, not as an identifier. The body face carries it
+   with the same authority as the prose around it; JetBrains Mono stays for
+   serials, POS ids and receipt numbers, where the character shape matters. */
+.money {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: 0;
 }
 .muted {
   color: var(--ink-3);
@@ -495,7 +530,7 @@ table th {
 }
 .collapse-btn:hover {
   transform: scale(1.06);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 
 /* X mark logo */
@@ -581,6 +616,10 @@ table th {
   /* One measurement everywhere: every button clears the pointer-target floor
      (--control-min = 44px, plan 5.2 "Minimum control 44 x 44 pt"). */
   height: var(--control-min);
+  /* …IN BOTH AXES. An icon-only button ("Actions for Cocina KDS") is as wide as
+     its glyph plus padding, which measured 40px and made the inventory report it
+     as undersized. The floor is a square. */
+  min-width: var(--control-min);
   padding: 0 16px;
   border-radius: 12px;
   font-weight: 550;
@@ -799,7 +838,7 @@ table th {
 }
 .badge-info {
   background: var(--info-soft);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 .badge-neutral {
   background: var(--canvas-2);
@@ -807,7 +846,7 @@ table th {
 }
 .badge-admin {
   background: rgba(34, 57, 121, 0.1);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 .badge-staff {
   background: var(--canvas-2);
@@ -1054,7 +1093,7 @@ table th {
   height: 30px;
   border-radius: 9px;
   background: var(--canvas-2);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1182,7 +1221,7 @@ table th {
 }
 .alert.info .ico {
   background: var(--info-soft);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 
 /* ============================================================
@@ -1570,18 +1609,37 @@ textarea.input {
   --h: 22px;
   position: relative;
   width: var(--w);
-  height: var(--h);
-  background: var(--line-strong);
+  /* THE BUTTON TAKES THE FLOOR; THE PILL KEEPS ITS SIZE.
+     The track is 22px tall by design and should stay that way, but the control
+     is pressed with a thumb on a café tablet. So the track is painted by
+     ::before and the knob by ::after, both centred inside a button as tall as
+     every other target (--control-min = 44px, plan §5.2). The pill looks
+     identical; the thing a finger lands on is 44px. */
+  height: var(--control-min);
+  background: transparent;
   border-radius: var(--r-pill);
   transition: background 0.18s var(--ease);
   flex: 0 0 var(--w);
   cursor: pointer;
 }
+.switch::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--w);
+  height: var(--h);
+  background: var(--line-strong);
+  border-radius: var(--r-pill);
+  transition: background 0.18s var(--ease);
+}
 .switch::after {
   content: '';
   position: absolute;
-  top: 2px;
+  top: 50%;
   left: 2px;
+  transform: translateY(-50%);
   width: calc(var(--h) - 4px);
   height: calc(var(--h) - 4px);
   background: white;
@@ -1590,10 +1648,13 @@ textarea.input {
   box-shadow: 0 1px 3px rgba(19, 31, 68, 0.25);
 }
 .switch.on {
+  background: transparent;
+}
+.switch.on::before {
   background: var(--umi-navy);
 }
 .switch.on::after {
-  transform: translateX(calc(var(--w) - var(--h)));
+  transform: translateY(-50%) translateX(calc(var(--w) - var(--h)));
 }
 .switch.lg {
   --w: 44px;
@@ -1655,8 +1716,10 @@ textarea.input {
   background: rgba(0, 0, 0, 0.06);
 }
 .chip.read {
-  background: rgba(34, 57, 121, 0.08);
-  color: var(--umi-navy);
+  /* The tint follows the ink, so the chip keeps its "quiet, on file" reading in
+     every theme instead of a navy wash that vanishes on a dark ground. */
+  background: color-mix(in srgb, var(--navy-ink) 10%, transparent);
+  color: var(--navy-ink);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -2262,7 +2325,16 @@ input[type='color']::-webkit-color-swatch {
 /* Day row (hours) */
 .day-row {
   display: grid;
-  grid-template-columns: 90px 1fr 1fr 50px;
+  /* `minmax(0, 1fr)`, NOT `1fr`. A native `<input type="time">` cannot shrink
+     below its own min-content width, and `1fr` refuses to go below min-content
+     too — so the two time fields held the row at their intrinsic width and the
+     row overflowed its card by 29px, which pushed the "copy to the other days"
+     button OUTSIDE the card, under the neighbouring column. Every one of those
+     seven buttons was unreachable by pointer (axe-free, but a real defect: the
+     2026-10-10 click pass reported `card intercepts pointer events` five times
+     on this screen). The inputs take `min-width: 0` with this, so the columns
+     shrink instead of the control escaping its card. */
+  grid-template-columns: 90px minmax(0, 1fr) minmax(0, 1fr) 50px;
   gap: 14px;
   align-items: center;
   padding: 12px 4px;
@@ -3105,7 +3177,7 @@ time,
 }
 .customer-avatar {
   background: var(--info-soft);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 .customer-avatar.large {
   width: 52px;
@@ -3284,7 +3356,7 @@ time,
   white-space: nowrap;
 }
 .profile-tabs button.on {
-  color: var(--umi-navy);
+  color: var(--navy-ink);
   border-bottom-color: var(--umi-blue);
 }
 .profile-body {
@@ -3319,7 +3391,7 @@ time,
   align-items: center;
   justify-content: center;
   background: var(--surface);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
   flex: 0 0 34px;
 }
 .customer-metric div {
@@ -3385,7 +3457,7 @@ time,
   align-items: center;
   justify-content: center;
   background: var(--info-soft);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
   flex: 0 0 30px;
 }
 .portrait-titles {
@@ -3449,7 +3521,7 @@ time,
 }
 .segment-badge.seg-vip {
   background: var(--info-soft);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 .segment-badge.seg-regular {
   background: var(--success-soft);
@@ -3532,7 +3604,7 @@ time,
   align-items: center;
   justify-content: center;
   background: var(--info-soft);
-  color: var(--umi-navy);
+  color: var(--navy-ink);
 }
 .profile-split {
   display: grid;
@@ -4514,7 +4586,9 @@ time,
 }
 .profile-chip.platform {
   border-color: var(--umi-blue);
-  color: var(--umi-blue);
+  /* Text, not a border: the chip's label needs the ink, and the border keeps the
+     drawn blue. */
+  color: var(--blue-ink);
   background: transparent;
 }
 .profile-merchants {
@@ -4546,8 +4620,8 @@ time,
   /* --umi-blue is a fill, not an ink: at 10px on the card it measured 3.1:1
      (axe: `color-contrast`, /profile). The navy reads as the same "this one"
      blue and clears the bar by a wide margin. */
-  color: var(--umi-navy);
-  border: 1px solid var(--umi-navy);
+  color: var(--navy-ink);
+  border: 1px solid var(--navy-ink);
   border-radius: var(--r-pill);
   padding: 1px 7px;
 }
@@ -4900,7 +4974,9 @@ time,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  /* A filter chip is a pointer target like any other: the row takes the 44px
+     floor rather than the 32px that looked tight in the toolbar. */
+  height: var(--control-min);
   padding: 0 12px;
   white-space: nowrap;
   border-radius: var(--r-pill);
@@ -5259,7 +5335,7 @@ time,
   border-color: var(--line-strong);
 }
 .inv-area[aria-pressed='true'] {
-  border-color: var(--umi-navy);
+  border-color: var(--navy-ink);
   box-shadow: var(--shadow-inner);
 }
 .inv-area-name {

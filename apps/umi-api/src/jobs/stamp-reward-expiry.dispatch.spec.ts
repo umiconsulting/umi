@@ -30,6 +30,9 @@ it('routes reminder jobs through the existing outbound consumer', async () => {
     {} as never,
     {} as never,
     {} as never,
+    // The outbound consumer also carries the till's "ready" pushes since the
+    // counter release; this journey only exercises the reward reminder branch.
+    {} as never,
     {
       deliverReminder: async (group: unknown) => {
         groups.push(group);

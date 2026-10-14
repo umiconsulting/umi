@@ -1,0 +1,44 @@
+BEGIN
+          captured_at          
+-------------------------------
+ 2026-10-13 22:35:35.310356+00
+(1 row)
+
+ sequence |          occurred_at          |  public_reference   |     kind      | aggregate_version |     status      |                             safe_payload                              |            correlation_id            
+----------+-------------------------------+---------------------+---------------+-------------------+-----------------+-----------------------------------------------------------------------+--------------------------------------
+      317 | 2026-10-13 22:22:44.320954+00 | Cuenta 004 · Mesa 1 | order_updated |                 7 | partially_ready | {"action": "resolve_routes", "resolvedItems": 2, "discardedItems": 0} | 87f20c40-cc18-437d-825c-aa37fd14934d
+      318 | 2026-10-13 22:22:57.760798+00 | Cuenta 013 · Mesa 2 | order_updated |                 3 | cancelled       | {"action": "discard", "resolvedItems": 0, "discardedItems": 2}        | 4fb5b72d-d6ed-462e-9729-927339b94a05
+      319 | 2026-10-13 22:26:01.246297+00 | Cuenta 004 · Mesa 1 | order_updated |                 8 | partially_ready | {"reasonCode": null}                                                  | b63d69a6-a681-4429-8f10-914430782226
+      320 | 2026-10-13 22:26:07.280611+00 | Cuenta 004 · Mesa 1 | item_updated  |                 9 | partially_ready | {"reasonCode": null}                                                  | 6dc71fab-0095-4bda-8957-651e4ab5884c
+      321 | 2026-10-13 22:33:44.099502+00 | Cuenta 004 · Mesa 1 | item_updated  |                10 | ready           | {"reasonCode": null}                                                  | 903d7651-2c77-4f11-bd98-36ded1f6c4a0
+      322 | 2026-10-13 22:33:52.907702+00 | Cuenta 004 · Mesa 1 | order_updated |                11 | completed       | {"reasonCode": null}                                                  | c3d6a275-b5a8-4ff8-b29b-ab4216f20bf3
+(6 rows)
+
+          occurred_at          | full_name  |            event_type             |  entity_type  |              entity_id               | outcome |                                 public_data                                  
+-------------------------------+------------+-----------------------------------+---------------+--------------------------------------+---------+------------------------------------------------------------------------------
+ 2026-10-13 22:22:44.32207+00  | Admin ONCA | kitchen.unassigned.resolve_routes | kitchen_order | 50e2ef12-ba2f-4d0c-97be-41a28829257b | success | {"version": 7, "resolvedItems": 2, "discardedItems": 0, "remainingItems": 0}
+ 2026-10-13 22:22:57.762159+00 | Cocinero 2 | kitchen.unassigned.discard        | kitchen_order | bfd5e02f-ee14-47b3-be3e-31b143ac1795 | success | {"version": 3, "resolvedItems": 0, "discardedItems": 2, "remainingItems": 0}
+ 2026-10-13 22:26:01.247157+00 | Barista 2  | kitchen.start_preparation         | kitchen_order | 50e2ef12-ba2f-4d0c-97be-41a28829257b | success | {"status": "partially_ready", "stationId": null}
+ 2026-10-13 22:26:07.281032+00 | Barista 2  | kitchen.mark_item_ready           | kitchen_order | 50e2ef12-ba2f-4d0c-97be-41a28829257b | success | {"status": "partially_ready", "stationId": null}
+ 2026-10-13 22:33:44.10045+00  | Barista 2  | kitchen.mark_item_ready           | kitchen_order | 50e2ef12-ba2f-4d0c-97be-41a28829257b | success | {"status": "ready", "stationId": null}
+ 2026-10-13 22:33:52.908582+00 | Barista 2  | kitchen.complete                  | kitchen_order | 50e2ef12-ba2f-4d0c-97be-41a28829257b | success | {"status": "completed", "stationId": null}
+(6 rows)
+
+          created_at           |   command_type    |  status   | expected_version | device_id |            correlation_id            
+-------------------------------+-------------------+-----------+------------------+-----------+--------------------------------------
+ 2026-10-13 22:26:01.241742+00 | start_preparation | succeeded |                7 |           | b63d69a6-a681-4429-8f10-914430782226
+ 2026-10-13 22:26:07.277953+00 | mark_item_ready   | succeeded |                8 |           | 6dc71fab-0095-4bda-8957-651e4ab5884c
+ 2026-10-13 22:33:44.094062+00 | mark_item_ready   | succeeded |                9 |           | 903d7651-2c77-4f11-bd98-36ded1f6c4a0
+ 2026-10-13 22:33:52.903119+00 | complete          | succeeded |               10 |           | c3d6a275-b5a8-4ff8-b29b-ab4216f20bf3
+(4 rows)
+
+                  id                  | full_name  | state  |          started_at           |              device_id               | can_manage_routes | can_mark_ready | can_complete | can_ack_cancel 
+--------------------------------------+------------+--------+-------------------------------+--------------------------------------+-------------------+----------------+--------------+----------------
+ 1d921641-5183-44b9-8d9d-c616d98c45b0 | Admin ONCA | active | 2026-10-13 03:17:51.956883+00 | 20b09b25-0f2e-45c8-ade6-be4d8c33864f | t                 | t              | t            | t
+ eb4ce5c0-38ad-42dd-a29b-d7dff606a41b | Admin ONCA | active | 2026-10-13 20:08:03.446157+00 | 9187d8fc-5a1f-4d7b-8b5d-9a35218a735f | t                 | t              | t            | t
+ fdfc498d-2a07-4692-892a-374dda84b908 | Barista 2  | active | 2026-10-13 21:34:14.510376+00 | 69d2c7e6-5309-4950-ad40-68a903b5c06a | f                 | t              | t            | t
+ 78322982-f23c-444a-8a99-b9e26675a2c2 | Mesero 1   | active | 2026-10-13 16:32:22.659005+00 | eff544fe-75b9-4f79-9915-c27196a8e86b | f                 | f              | f            | f
+ b8ab3de0-e5ce-4f94-a8c9-453e217af266 | Mesero 2   | active | 2026-10-13 21:24:51.687397+00 | eff544fe-75b9-4f79-9915-c27196a8e86b | f                 | f              | f            | f
+(5 rows)
+
+COMMIT

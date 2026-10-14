@@ -1,20 +1,54 @@
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 
 function harness() {
   const send = vi.fn();
   const status = vi.fn(() => ({ send }));
+  // The real `ArgumentsHost` carries the REQUEST too, and the filter reads its
+  // method and URL for the refusal line. A double that offers only the response
+  // is not a smaller host — it is a different one, and the filter crashed on it
+  // in CI while a fresh `http.getRequest` was being added.
   const host = {
     getType: () => 'http',
     switchToHttp: () => ({
       getResponse: () => ({ status }),
+      getRequest: () => ({
+        method: 'POST',
+        url: '/api/v1/pos/merchants/x/cart?operatorSessionId=y',
+      }),
     }),
   };
   return { host, status, send };
 }
 
 describe('AllExceptionsFilter public contract', () => {
+  it.each([
+    'CART_ACTOR_BUSY',
+    'CART_ACCOUNT_BUSY',
+    'CART_VERSION_CONFLICT',
+    'CART_PAYMENT_UNRESOLVED',
+    'CART_TABLE_ACCOUNT_EXISTS',
+    'CART_ALREADY_ASSIGNED',
+    'TABLE_HAS_OPEN_ACCOUNT',
+    'KITCHEN_PREPARATION_STARTED',
+  ])('preserves the actionable open-account refusal %s in the HTTP envelope', (code) => {
+    const { host, status, send } = harness();
+    new AllExceptionsFilter().catch(new ConflictException({ code }), host as never);
+
+    expect(status).toHaveBeenCalledWith(409);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 409,
+        error: expect.objectContaining({ code, retryable: false }),
+      }),
+    );
+  });
+
   it('emits a canonical validation error and keeps compatibility metadata', () => {
     const { host, status, send } = harness();
     new AllExceptionsFilter().catch(

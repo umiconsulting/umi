@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cart/course_control.dart';
 
 /// The till's course control (§8H step 4).
@@ -15,10 +15,10 @@ Future<List<int>> _pump(
 }) async {
   final changes = <int>[];
   await tester.pumpWidget(
-    MaterialApp(
+    PosApp(
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
-      home: Scaffold(
+      home: PosPage(
         body: CourseControl(
           course: course,
           enabled: enabled,
@@ -32,6 +32,62 @@ Future<List<int>> _pump(
 }
 
 void main() {
+  testWidgets('the hint says what the number means, so it cannot read as a clock', (
+    tester,
+  ) async {
+    // The owner's question, verbatim: "dice tiempo de servicio, ¿a qué se refiere y
+    // por qué no hay tiempo?". The label is the kitchen's word for a course and the
+    // value is an ordinal; without a line saying so, the row read as a duration that
+    // never arrives. The hint travels with the control because the meaning does.
+    await tester.pumpWidget(
+      PosApp(
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: PosPage(
+          body: CourseControl(course: 1, hint: '1 se sirve con todo', onChanged: (_) {}),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('1 se sirve con todo'), findsOneWidget);
+  });
+
+  testWidgets('Spanish service course fits an enlarged narrow viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 480);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        home: MediaQuery(
+          data: MediaQueryData(
+            size: const Size(320, 480),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: PosPage(
+            body: Padding(
+              padding: const EdgeInsets.all(16),
+              child: CourseControl(course: 2, onChanged: (_) {}),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Tiempo de servicio'), findsOneWidget);
+    for (final key in [CourseControl.decreaseKey, CourseControl.increaseKey]) {
+      final rect = tester.getRect(find.byKey(key));
+      expect(rect.width, greaterThanOrEqualTo(48));
+      expect(rect.height, greaterThanOrEqualTo(48));
+      expect(rect.right, lessThanOrEqualTo(320));
+    }
+  });
+
   testWidgets('the control states the course it was given', (tester) async {
     await _pump(tester, course: 3);
 
@@ -60,7 +116,7 @@ void main() {
     await _pump(tester, course: CourseControl.minCourse);
     expect(
       tester
-          .widget<IconButton>(find.byKey(CourseControl.decreaseKey))
+          .widget<PosIconButton>(find.byKey(CourseControl.decreaseKey))
           .onPressed,
       isNull,
     );
@@ -68,7 +124,7 @@ void main() {
     await _pump(tester, course: CourseControl.maxCourse);
     expect(
       tester
-          .widget<IconButton>(find.byKey(CourseControl.increaseKey))
+          .widget<PosIconButton>(find.byKey(CourseControl.increaseKey))
           .onPressed,
       isNull,
     );
@@ -81,13 +137,13 @@ void main() {
 
     expect(
       tester
-          .widget<IconButton>(find.byKey(CourseControl.decreaseKey))
+          .widget<PosIconButton>(find.byKey(CourseControl.decreaseKey))
           .onPressed,
       isNull,
     );
     expect(
       tester
-          .widget<IconButton>(find.byKey(CourseControl.increaseKey))
+          .widget<PosIconButton>(find.byKey(CourseControl.increaseKey))
           .onPressed,
       isNull,
     );

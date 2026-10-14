@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/cash/cash_controller.dart';
 import 'package:umi_pos/features/cash/cash_repository.dart';
@@ -72,11 +72,11 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
-        MaterialApp(
+        PosApp(
           theme: base.copyWith(
             textTheme: base.textTheme.apply(fontFamily: 'PreviewSans'),
           ),
-          home: const Scaffold(
+          home: const PosPage(
             body: Padding(
               padding: EdgeInsets.all(24),
               child: Column(
@@ -102,7 +102,7 @@ void main() {
       await tester.pump();
       Directory('test/render/shots').createSync(recursive: true);
       await expectLater(
-        find.byType(MaterialApp),
+        find.byType(PosApp),
         matchesGoldenFile('shots/cash-notice-$themeName.png'),
       );
     });
@@ -143,17 +143,16 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pumpWidget(
         RepaintBoundary(
-          child: MaterialApp(
+          child: PosApp(
             theme: theme,
             locale: const Locale('es'),
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [
               AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
+
               GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
             ],
-            home: Scaffold(
+            home: PosPage(
               body: CashCenter(
                 controller: controller,
                 permissions: OperatorPermissions(_permissionsFor(state)),
@@ -170,7 +169,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 60));
       }
       if (hover) {
-        final target = find.byType(OutlinedButton).first;
+        final target = find.byType(PosOutlineButton).first;
         final gesture = await tester.createGesture(
           kind: PointerDeviceKind.mouse,
         );
@@ -197,11 +196,11 @@ void main() {
         // movement in first. One env flag walks both, so the screen a manager
         // actually reads is a picture rather than an assumption.
         if (dialog == 'approval') {
-          await tester.enterText(find.byType(TextField).first, '120');
-          await tester.enterText(find.byType(TextField).last, 'hielo');
+          await tester.enterText(find.byType(PosField).first, '120');
+          await tester.enterText(find.byType(PosField).last, 'hielo');
           await tester.pump();
           await tester.tap(
-            find.widgetWithText(FilledButton, 'Confirmar movimiento de caja'),
+            find.widgetWithText(PosButton, 'Confirmar movimiento de caja'),
           );
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 400));
@@ -213,7 +212,7 @@ void main() {
       // silently overwrites its twin at another size proves nothing.
       final size = '${viewport.width.toInt()}x${viewport.height.toInt()}';
       await expectLater(
-        find.byType(MaterialApp),
+        find.byType(PosApp),
         matchesGoldenFile(
           'shots/cash-$state${dialog == null ? '' : '-$dialog'}'
           '${tabs == 0 ? '' : '-tab$tabs'}'
@@ -239,19 +238,19 @@ void main() {
 /// the fourth step's label and the button under it, and a tap that lands on the
 /// label would capture a screenshot of nothing happening.
 Finder _dialogOpener(String dialog) => switch (dialog) {
-  'movement' => find.widgetWithText(OutlinedButton, 'Entrada de efectivo'),
-  'approval' => find.widgetWithText(OutlinedButton, 'Entrada de efectivo'),
-  'handoff' => find.widgetWithText(OutlinedButton, 'Entregar turno'),
+  'movement' => find.widgetWithText(PosOutlineButton, 'Entrada de efectivo'),
+  'approval' => find.widgetWithText(PosOutlineButton, 'Entrada de efectivo'),
+  'handoff' => find.widgetWithText(PosOutlineButton, 'Entregar turno'),
   'nosale' => find.widgetWithText(
-    OutlinedButton,
+    PosOutlineButton,
     'Solicitar apertura de cajón',
   ),
-  'count' => find.widgetWithText(FilledButton, 'Iniciar conteo ciego'),
-  'recount' => find.widgetWithText(FilledButton, 'Iniciar conteo ciego'),
-  'resolve' => find.widgetWithText(FilledButton, 'Motivo de la diferencia'),
-  'close' => find.widgetWithText(FilledButton, 'Cerrar turno'),
+  'count' => find.widgetWithText(PosButton, 'Iniciar conteo ciego'),
+  'recount' => find.widgetWithText(PosButton, 'Iniciar conteo ciego'),
+  'resolve' => find.widgetWithText(PosButton, 'Motivo de la diferencia'),
+  'close' => find.widgetWithText(PosButton, 'Cerrar turno'),
   'cancelcount' => find.widgetWithText(
-    TextButton,
+    PosTextButton,
     'Cancelar conteo y volver a abierto',
   ),
   _ => throw ArgumentError('unknown RENDER_DIALOG "$dialog"'),
@@ -794,5 +793,9 @@ final class _PreviewRepository implements CashRepository {
       throw UnimplementedError();
   @override
   Future<ElevationGrantView> approve(ManagerApprovalRequest r) =>
+      throw UnimplementedError();
+
+  @override
+  Future<ElevationGrantView> verifyOperatorPin(VerifyOperatorPinRequest r) =>
       throw UnimplementedError();
 }

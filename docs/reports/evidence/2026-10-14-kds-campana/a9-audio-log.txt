@@ -1,0 +1,8 @@
+10-14 10:19:36.071 21366 21366 I flutter : umi_pos.bootstrap phase=recoverableFailure category=apiUnavailable correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:22:21.139 21366 21366 I flutter : umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:22:21.171 21366 21366 I flutter : umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:39:15.635 23608 23608 I flutter : umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:39:16.005 23608 23608 I flutter : umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:43:45.044 25760 25760 I flutter : umi_pos.bootstrap phase=initializing category=- correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:43:45.402 25760 25760 I flutter : umi_pos.bootstrap phase=readyForAuthentication category=- correlation=- clientContract=2.38.0 clientVersion=0.1.0 environment=development api=http://192.168.1.9:4001 deviceKey=
+10-14 10:45:47.187 25760 25760 I flutter : kds.audio sound=arrival playback=started

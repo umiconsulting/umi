@@ -1,0 +1,31 @@
+{
+  "iMin": {
+    "serial": "192.168.1.10:5555",
+    "metadata": [
+      "versionCode=82 minSdk=24 targetSdk=36",
+      "versionName=0.1.0",
+      "lastUpdateTime=2026-10-13 09:28:44"
+    ]
+  },
+  "A9": {
+    "serial": "192.168.1.14:35559",
+    "metadata": [
+      "versionCode=82 minSdk=24 targetSdk=36",
+      "versionName=0.1.0",
+      "lastUpdateTime=2026-10-13 09:29:00"
+    ]
+  },
+  "A11": {
+    "serial": "192.168.1.13:38333",
+    "metadata": [
+      "versionCode=82 minSdk=24 targetSdk=36",
+      "versionName=0.1.0",
+      "lastUpdateTime=2026-10-13 09:33:06"
+    ]
+  },
+  "apk": {
+    "path": "/tmp/umi-empty-login-build82.apk",
+    "sha256": "da0e0dd29c718d760b0dff4adcf3da8294227503ca8a5b28afe4403252ba5211",
+    "bytes": 33167798
+  }
+}

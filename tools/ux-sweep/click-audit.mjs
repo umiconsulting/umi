@@ -37,6 +37,8 @@
  *   --click-timeout <ms> Timeout for one click (default 5000).
  *   --settle <ms>       Wait after a route loads before collecting (default 1500).
  *   --viewport WxH      Pin the viewport (e.g. 1280x720).
+ *   --skip-shell        Do not click the sidebar and top bar, so the pass is
+ *                       about the screen instead of the navigation.
  *   --delay <ms>        Pause between routes. The API allows 300 requests per
  *                       minute per IP, and each route load costs several.
  *
@@ -63,7 +65,11 @@ import {
   routeSlug,
 } from './lib/collect.mjs';
 
-const WORKSPACE = process.env.UX_WORKSPACE || '/home/jc/umi';
+// The workspace this tool belongs to, derived from its own path: a hard-coded
+// home directory belongs to the machine the harness was first written on, and on
+// any other box `require('@playwright/test')` resolves against a tree that does
+// not exist.
+const WORKSPACE = process.env.UX_WORKSPACE || new URL('../..', import.meta.url).pathname;
 const require = createRequire(`${WORKSPACE}/`);
 const { chromium } = require('@playwright/test');
 
@@ -77,14 +83,52 @@ const LIMIT = Number(arg('--limit', '10'));
 const CLICK_TIMEOUT = Number(arg('--click-timeout', '5000'));
 const SETTLE = Number(arg('--settle', '1500'));
 const ROUTES = parseRoutes(arg('--routes'), DEFAULT_ROUTES);
-const VIEWPORT = parseViewport(arg('--viewport', null));
+// PIN THE VIEWPORT, AND PIN IT BY DEFAULT.
+//
+// Without it the browser keeps its own window size, and the sidebar's nav items
+// then resolve, report themselves visible, enabled and stable — and sit outside
+// the viewport that Playwright is allowed to click in. Every sidebar click fails
+// with "element is outside of the viewport", which reads as 115 broken controls
+// and produces a report with no writes in it. `--viewport 1280x720` makes the
+// same clicks succeed; 1280x720 is the reference viewport the other sweeps pin
+// (see tools/ux-sweep/README.md), so it is the default here too.
+const VIEWPORT = parseViewport(arg('--viewport', '1280x720'));
 const DELAY = Number(arg('--delay', '0'));
+const SKIP_SHELL = process.argv.includes('--skip-shell');
 
 // The whole run is destructive by construction, so the confirmation is a
 // literal string. "disposable" is not a flag; it is the operator claiming the
 // database behind this browser can be thrown away.
 const CONFIRM = process.env.UX_CLICK_CONFIRM || '';
 const ENABLED = CONFIRM === 'disposable';
+
+/*
+ * PACE THE RUN, OR THE OPERATOR'S OWN CEILING BECOMES A FINDING.
+ *
+ * The API prices a principal at 240 requests per minute
+ * (`operational.interceptor.ts`, `LIMITS.user`), and every click in this audit
+ * reloads the route before it presses. A 24-route write pass spends thousands of
+ * requests, so the routes near the end are answered 429 and the audit records
+ * `failedRequests: 429` — which reads exactly like a broken screen and is only
+ * the harness spending the budget. Wait before a route load or a click reload
+ * that would cross three quarters of it, and say so, so a slow run is legible.
+ */
+const SPENT_AT = [];
+const BUDGET_PER_MINUTE = 240;
+const PACING_CEILING = Math.floor(BUDGET_PER_MINUTE * 0.75);
+
+async function pace(page, label) {
+  const now = Date.now();
+  const inWindow = SPENT_AT.filter((at) => at > now - 60_000);
+  if (inWindow.length < PACING_CEILING) return;
+  const freedAt = Math.min(...inWindow) + 60_000;
+  const waitMs = Math.max(1_000, freedAt - now + 1_000);
+  process.stderr.write(
+    `  pacing before ${label}: ${inWindow.length} of ${BUDGET_PER_MINUTE} requests this minute ` +
+      `are spent; waiting ${Math.round(waitMs / 1000)}s\n`,
+  );
+  await page.waitForTimeout(waitMs);
+}
 
 /** A link to somewhere else is not a Dashboard control, and clicking it is out of scope. */
 function offOriginHref(href) {
@@ -104,9 +148,25 @@ function decide(control) {
   return { click: true, why: null };
 }
 
+/*
+ * THE SHELL IS ON EVERY ROUTE, SO IT EATS EVERY BUDGET.
+ *
+ * The sidebar comes first in DOM order, so the first N "safe" controls of every
+ * route are the same N navigation items: a 24-route pass with `--limit 5` clicked
+ * the sidebar 120 times, navigated 46 times, and wrote nothing — one real control
+ * was never pressed in any screen. `--skip-shell` drops the chrome (`aside.side`,
+ * `header.topbar`) from the click list, which is what makes the pass about the
+ * screen. The shell's own controls are covered once, by the flow budgets.
+ */
+const SHELL_PREFIX = /^div#root > div\.app > (aside\.side|header\.topbar)\b/u;
+function inShellChrome(control) {
+  return SHELL_PREFIX.test(String(control.selector || ''));
+}
+
 /** Click one control by its DOM index and record everything that followed. */
 async function clickOne(page, diagnostics, route, index, shotsDir) {
   const url = `${BASE}${route}`;
+  await pace(page, `a click on ${route}`);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForTimeout(SETTLE);
   // Re-stamp data-ux-audit so the index from the route collection still points
@@ -135,7 +195,12 @@ async function clickOne(page, diagnostics, route, index, shotsDir) {
     await target.click({ timeout: CLICK_TIMEOUT, noWaitAfter: true });
   } catch (error) {
     clicked = false;
-    clickError = (error?.message || String(error)).slice(0, 300);
+    // THE REASON SURVIVES, NOT JUST THE TIMEOUT. Playwright's message names the
+    // actionability check that never passed ("element is outside of the viewport",
+    // "element is not stable"), and that sentence is the difference between a
+    // harness bug and a screen bug. 300 characters cut it off after "waiting for
+    // el…" and cost a full re-run to read.
+    clickError = (error?.message || String(error)).replace(/\u001b\[[0-9;]*m/gu, '').slice(0, 1500);
   }
   await page.waitForTimeout(750);
 
@@ -181,6 +246,17 @@ async function main() {
   await applyViewport(page, VIEWPORT);
   if (SHOTS) await mkdir(SHOTS, { recursive: true });
   const diagnostics = attachDiagnostics(page);
+  // ONLY THE API'S OWN CALLS SPEND THE BUDGET. The dev server ships the app as
+  // ~200 unbundled modules, so counting every response made one page load look
+  // like it had spent the whole minute and the audit then waited for a budget
+  // nobody had touched.
+  page.on('response', (response) => {
+    try {
+      if (new URL(response.url()).pathname.startsWith('/api')) SPENT_AT.push(Date.now());
+    } catch {
+      // A response with an unparseable URL is not an API call.
+    }
+  });
 
   const report = {
     generatedAt: new Date().toISOString(),
@@ -193,6 +269,7 @@ async function main() {
 
   for (const [i, route] of ROUTES.entries()) {
     if (i > 0 && DELAY > 0) await page.waitForTimeout(DELAY);
+    await pace(page, route);
     const entry = await collectRoute(page, {
       route,
       base: BASE,
@@ -226,7 +303,9 @@ async function main() {
       decision: decide(control),
     }));
 
-    const safe = controls.filter((c) => !c.disabled && c.classification === 'safe');
+    const safe = controls.filter(
+      (c) => !c.disabled && c.classification === 'safe' && !(SKIP_SHELL && inShellChrome(c)),
+    );
     const record = {
       ok: true,
       route,

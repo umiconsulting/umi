@@ -1,0 +1,6 @@
+          created_at           |         expires_at         |      reason_code      |           note            | exception_type 
+-------------------------------+----------------------------+-----------------------+---------------------------+----------------
+ 2026-10-13 20:52:04.511978+00 | 2026-10-13 20:57:04.518+00 | customer_changed_mind | SIM_revision_sin_devolver | full_refund
+ 2026-10-13 20:46:32.934469+00 | 2026-10-13 20:51:32.942+00 | customer_changed_mind | SIM_revision_sin_devolver | full_refund
+(2 rows)
+

@@ -1,0 +1,5 @@
+ manual_terminal_enabled | mixed_tender_enabled | allow_dine_in_without_table 
+-------------------------+----------------------+-----------------------------
+ f                       | f                    | f
+(1 row)
+

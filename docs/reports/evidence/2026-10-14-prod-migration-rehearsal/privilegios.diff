@@ -1,0 +1,12 @@
+366,367c366,367
+< T merchant.customer_history_event postgres=arwdDxtm/postgres
+< T merchant.customer_history_event_scoped postgres=arwdDxtm/postgres
+---
+> T merchant.customer_history_event -
+> T merchant.customer_history_event_scoped -
+379,380c379,380
+< T merchant.gift_card_lookup_attempt postgres=arwdDxtm/postgres
+< T merchant.gift_card_secret_delivery postgres=arwdDxtm/postgres
+---
+> T merchant.gift_card_lookup_attempt -
+> T merchant.gift_card_secret_delivery -

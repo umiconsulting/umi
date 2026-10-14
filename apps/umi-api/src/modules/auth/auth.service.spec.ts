@@ -33,6 +33,7 @@ function make() {
     clearPosPinFailures: vi.fn().mockResolvedValue(undefined),
     createPosSession: vi.fn().mockResolvedValue(undefined),
     validatePosSession: vi.fn(),
+    findPosOperatorById: vi.fn(),
     rotatePosSessionToken: vi.fn().mockResolvedValue(true),
     revokePosSession: vi.fn().mockResolvedValue(undefined),
     revokePosSessionsForOperator: vi.fn().mockResolvedValue(undefined),
@@ -71,7 +72,7 @@ function make() {
     mfa as never,
     rateLimit as never,
   );
-  return { svc, repo, passwords, jwt, email, mfa };
+  return { svc, repo, passwords, jwt, email, mfa, config };
 }
 
 /** Narrow for assertions; fails loudly rather than silently reading undefined. */
@@ -243,6 +244,14 @@ describe('AuthService POS session lifecycle', () => {
       displayName: 'Owner',
       status: 'active',
     });
+    // The POS refresh resolves the operator through its OWN read, which admits a
+    // PIN-only invited login. `findUserById` stays stubbed for the dashboard door.
+    h.repo.findPosOperatorById.mockResolvedValue({
+      userId: 'u1',
+      email: 'owner@kala.co',
+      displayName: 'Owner',
+      status: 'active',
+    });
   });
 
   it('rotates a device-bound POS session', async () => {
@@ -279,7 +288,7 @@ describe('AuthService POS session lifecycle', () => {
       ephemeralPublicKey: null,
     });
 
-    h.repo.findUserById.mockResolvedValue({
+    h.repo.findPosOperatorById.mockResolvedValue({
       userId: 'u1',
       email: 'owner@kala.co',
       displayName: 'Owner',
@@ -287,7 +296,7 @@ describe('AuthService POS session lifecycle', () => {
     });
     await expect(h.svc.posRefresh(input)).resolves.toMatchObject({ accessToken: 'access-tok' });
 
-    h.repo.findUserById.mockResolvedValue({
+    h.repo.findPosOperatorById.mockResolvedValue({
       userId: 'u1',
       email: 'owner@kala.co',
       displayName: 'Owner',
@@ -616,6 +625,30 @@ describe('AuthService.forgotPassword', () => {
     const arg = h.email.send.mock.calls[0][0];
     expect(arg.to).toBe('owner@kala.co');
     expect(arg.html).toContain('/reset-password?token=');
+  });
+
+  it('builds the reset link from PUBLIC_DASHBOARD_URL when APP_URL is absent', async () => {
+    // A deployed environment requires PUBLIC_DASHBOARD_URL but not APP_URL. The
+    // link must not fall through to a dead localhost port in that case.
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(CRED);
+    h.config.get.mockImplementation((key: string) =>
+      key === 'PUBLIC_DASHBOARD_URL' ? 'https://dashboard.test/' : undefined,
+    );
+    await h.svc.forgotPassword('owner@kala.co');
+    const arg = h.email.send.mock.calls[0][0];
+    expect(arg.html).toContain('https://dashboard.test/reset-password?token=');
+  });
+
+  it('prefers APP_URL over PUBLIC_DASHBOARD_URL for the reset link', async () => {
+    h.repo.findSignInCredentialByEmail.mockResolvedValue(CRED);
+    h.config.get.mockImplementation((key: string) => {
+      if (key === 'APP_URL') return 'https://console.test';
+      if (key === 'PUBLIC_DASHBOARD_URL') return 'https://dashboard.test';
+      return undefined;
+    });
+    await h.svc.forgotPassword('owner@kala.co');
+    const arg = h.email.send.mock.calls[0][0];
+    expect(arg.html).toContain('https://console.test/reset-password?token=');
   });
 });
 

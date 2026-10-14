@@ -1,8 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
+import '../../shared/money.dart';
+import '../../shared/widgets/station_document.dart';
+import '../../shared/widgets/status_card.dart';
 import 'cart_controller.dart';
 import 'incoming_orders_controller.dart';
 
@@ -17,27 +20,31 @@ Future<void> showIncomingOrders(
   required String merchantId,
   required String locationId,
   required String operatorSessionId,
-}) => showModalBottomSheet<void>(
-  context: context,
-  isScrollControlled: true,
-  constraints: const BoxConstraints(maxWidth: 680),
-  builder: (_) => _IncomingOrders(
-    incoming: incoming,
-    cart: cart,
-    merchantId: merchantId,
-    locationId: locationId,
-    operatorSessionId: operatorSessionId,
+}) => Navigator.of(context).push<void>(
+  PosPageRoute<void>(
+    builder: (_) => IncomingOrdersSurface(
+      incoming: incoming,
+      cart: cart,
+      merchantId: merchantId,
+      locationId: locationId,
+      operatorSessionId: operatorSessionId,
+    ),
   ),
 );
 
-final class _IncomingOrders extends StatefulWidget {
-  const _IncomingOrders({
+final class IncomingOrdersSurface extends StatefulWidget {
+  const IncomingOrdersSurface({
     required this.incoming,
     required this.cart,
     required this.merchantId,
     required this.locationId,
     required this.operatorSessionId,
+    this.embedded = false,
+    this.onAdopted,
+    super.key,
   });
+  final bool embedded;
+  final VoidCallback? onAdopted;
   final IncomingOrdersController incoming;
   final CartController cart;
   final String merchantId;
@@ -45,10 +52,10 @@ final class _IncomingOrders extends StatefulWidget {
   final String operatorSessionId;
 
   @override
-  State<_IncomingOrders> createState() => _IncomingOrdersState();
+  State<IncomingOrdersSurface> createState() => IncomingOrdersSurfaceState();
 }
 
-final class _IncomingOrdersState extends State<_IncomingOrders> {
+final class IncomingOrdersSurfaceState extends State<IncomingOrdersSurface> {
   @override
   void initState() {
     super.initState();
@@ -76,41 +83,50 @@ final class _IncomingOrdersState extends State<_IncomingOrders> {
     final bound = await widget.incoming.pickUp(cart, order);
     if (bound != null && mounted) {
       widget.cart.restore(bound);
-      Navigator.pop(context);
+      if (widget.onAdopted != null) {
+        widget.onAdopted!();
+      } else {
+        Navigator.pop(context);
+      }
     }
   }
+
+  Future<void> _reload() => widget.incoming.load(
+    widget.merchantId,
+    widget.locationId,
+    widget.operatorSessionId,
+  );
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final state = widget.incoming.state;
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .7,
+    return PosPage(
+      appBar: PosHeader(
+        automaticallyImplyLeading: false,
+        title: StationHeading(title: l.incomingOrdersTitle),
+        leading: widget.embedded
+            ? null
+            : PosIconButton(
+                tooltip: l.closeAction,
+                onPressed: () => Navigator.pop(context),
+                icon: const PosIcon(PosGlyphs.arrowBack),
+              ),
+        actions: [
+          PosIconButton(
+            tooltip: l.refreshAction,
+            onPressed:
+                state.phase == IncomingOrdersPhase.loading || state.binding
+                ? null
+                : _reload,
+            icon: const PosIcon(PosGlyphs.refresh),
+          ),
+        ],
+      ),
+      body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(UmiSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      l.incomingOrdersTitle,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l.closeAction,
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: UmiSpacing.md),
-              Expanded(child: _body(l, state)),
-            ],
-          ),
+          child: _body(l, state),
         ),
       ),
     );
@@ -120,12 +136,45 @@ final class _IncomingOrdersState extends State<_IncomingOrders> {
     switch (state.phase) {
       case IncomingOrdersPhase.idle:
       case IncomingOrdersPhase.loading:
-        return const Center(child: CircularProgressIndicator());
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const PosProgress(),
+              const SizedBox(height: UmiSpacing.md),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  l.incomingOrdersLoading,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        );
       case IncomingOrdersPhase.failure:
-        return Center(child: Text(l.incomingOrdersError));
+        return StatusCard(
+          icon: PosGlyphs.cloudOff,
+          title: l.incomingOrdersError,
+          message: l.incomingOrdersErrorDescription,
+          action: PosButton.icon(
+            onPressed: _reload,
+            icon: const PosIcon(PosGlyphs.refresh),
+            label: Text(l.retryAction),
+          ),
+        );
       case IncomingOrdersPhase.ready:
         if (state.orders.isEmpty) {
-          return Center(child: Text(l.incomingOrdersEmpty));
+          return StatusCard(
+            icon: PosGlyphs.inventory2Outlined,
+            title: l.incomingOrdersEmpty,
+            message: l.incomingOrdersEmptyDescription,
+            action: PosOutlineButton.icon(
+              onPressed: _reload,
+              icon: const PosIcon(PosGlyphs.refresh),
+              label: Text(l.refreshAction),
+            ),
+          );
         }
         return ListView.separated(
           itemCount: state.orders.length,
@@ -153,34 +202,54 @@ final class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return Card(
+    return PosCard(
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.md),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    order.customerName ?? order.reference ?? order.orderId,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: UmiSpacing.xs),
-                  Text(
-                    '${_channelLabel(order.channel)} · ${order.itemCount} · '
-                    '\$${(order.totalMinorUnits / 100).toStringAsFixed(2)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: UmiSpacing.md),
-            FilledButton(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final details = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.customerName ?? order.reference ?? order.orderId,
+                  style: PosTheme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: UmiSpacing.xs),
+                Text(
+                  // The one money formatter: this row used to price the order in
+                  // dollars (`$330.00`) on a till that says `MXN` everywhere
+                  // else. The projection carries no currency of its own —
+                  // `merchant.order_total` has none — so the till names the one
+                  // it trades in, the same constant the gift-card dialog uses.
+                  '${_channelLabel(order.channel)} · ${order.itemCount} · '
+                  '${formatMinorUnits(order.totalMinorUnits, 'MXN')}',
+                  style: PosTheme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            );
+            final action = PosButton(
               onPressed: binding ? null : onTake,
               child: Text(l.incomingOrdersTake),
-            ),
-          ],
+            );
+            if (constraints.maxWidth <
+                400 * MediaQuery.textScalerOf(context).scale(1)) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  details,
+                  const SizedBox(height: UmiSpacing.md),
+                  action,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: details),
+                const SizedBox(width: UmiSpacing.md),
+                action,
+              ],
+            );
+          },
         ),
       ),
     );

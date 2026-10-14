@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/app/umi_pos_app.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import 'support/fakes.dart';
 
@@ -49,12 +49,31 @@ void main() {
   testWidgets('bootstrap presents the localized trusted-device boundary', (
     tester,
   ) async {
+    tester.binding.platformDispatcher.localesTestValue = [
+      const Locale('es', 'MX'),
+    ];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
     final root = testRoot();
     await root.controller.initialize();
     await root.entry.initialize();
     await tester.pumpWidget(UmiPosApp(root: root));
     await tester.pumpAndSettle();
     expect(find.text('Registrar este dispositivo'), findsOneWidget);
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(PosField), findsOneWidget);
+  });
+  testWidgets('system English regional locale uses English presentation', (
+    tester,
+  ) async {
+    tester.binding.platformDispatcher.localesTestValue = [
+      const Locale('en', 'US'),
+    ];
+    addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+    final root = testRoot();
+    await root.controller.initialize();
+    await root.entry.initialize();
+    await tester.pumpWidget(UmiPosApp(root: root));
+    await tester.pumpAndSettle();
+    expect(find.text('Enroll this device'), findsOneWidget);
+    expect(find.byType(PosField), findsOneWidget);
   });
 }

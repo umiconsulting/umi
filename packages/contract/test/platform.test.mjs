@@ -84,6 +84,8 @@ test('Gate 2D cart contracts bound quantities, notes, and checkout authority', (
       operatorSessionId: id,
       status: 'draft',
       version: 1,
+      firedOrderId: null,
+      fulfillmentType: 'dine_in',
       items: [],
       totals: {
         subtotal: { minorUnits: 0, currency: 'MXN' },

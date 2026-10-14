@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/umi_theme.dart';
@@ -22,6 +22,7 @@ final class CourseControl extends StatelessWidget {
     required this.course,
     required this.onChanged,
     this.enabled = true,
+    this.hint,
     super.key,
   });
 
@@ -39,18 +40,41 @@ final class CourseControl extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool enabled;
 
+  /// One line under the label saying what the number MEANS. The label alone
+  /// ("Tiempo de servicio") reads like a duration to anyone who is not a waiter, and
+  /// the control shows a number, so the screen looked like a clock that never
+  /// arrives. The owner asked exactly that on 2026-10-12. Optional, so a surface with
+  /// no room for it keeps the plain label.
+  final String? hint;
+
   bool get _canDecrease => enabled && course > minCourse;
   bool get _canIncrease => enabled && course < maxCourse;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final scheme = PosTheme.of(context).colorScheme;
+    final textTheme = PosTheme.of(context).textTheme;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.cartCourseLabel, style: textTheme.titleSmall),
-        const Spacer(),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.cartCourseLabel, style: textTheme.titleSmall),
+              if (hint case final String line)
+                Text(
+                  line,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: UmiSpacing.sm),
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(UmiRadius.control),
@@ -62,7 +86,7 @@ final class CourseControl extends StatelessWidget {
           ),
           child: Row(
             children: [
-              IconButton(
+              PosIconButton(
                 key: decreaseKey,
                 tooltip: l10n.cartCoursePrevious,
                 onPressed: _canDecrease ? () => onChanged(course - 1) : null,
@@ -70,11 +94,12 @@ final class CourseControl extends StatelessWidget {
                   minWidth: UmiTouchTarget.minimum,
                   minHeight: UmiTouchTarget.minimum,
                 ),
-                icon: const Icon(Icons.remove, size: 20),
+                icon: const PosIcon(PosGlyphs.remove, size: 20),
               ),
               // The number is a statement, not a field: the screen reader gets
               // the whole sentence rather than a bare digit.
               Semantics(
+                container: true,
                 label: l10n.cartCourseCurrent(course),
                 child: ExcludeSemantics(
                   child: SizedBox(
@@ -92,7 +117,7 @@ final class CourseControl extends StatelessWidget {
                   ),
                 ),
               ),
-              IconButton(
+              PosIconButton(
                 key: increaseKey,
                 tooltip: l10n.cartCourseNext,
                 onPressed: _canIncrease ? () => onChanged(course + 1) : null,
@@ -100,7 +125,7 @@ final class CourseControl extends StatelessWidget {
                   minWidth: UmiTouchTarget.minimum,
                   minHeight: UmiTouchTarget.minimum,
                 ),
-                icon: const Icon(Icons.add, size: 20),
+                icon: const PosIcon(PosGlyphs.add, size: 20),
               ),
             ],
           ),

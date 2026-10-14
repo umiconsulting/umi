@@ -19,7 +19,9 @@ stateDiagram-v2
 
 El efectivo esperado proviene de hechos. El conteo real proviene del operador.
 
-La variación es la diferencia. El conteo ciego no debe mostrar el valor esperado antes del registro.
+La variación es la diferencia. La política del local decide si el conteo es ciego o visible.
+Un conteo ciego no muestra el valor esperado antes del registro, y para ser ciego de verdad
+no puede mostrar tampoco los términos que lo componen.
 
 Un cierre conserva apertura, movimientos, conteo, variación, actor y aprobación. No edites su historia.
 

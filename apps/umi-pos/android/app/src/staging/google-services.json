@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "344877669392",
+    "project_id": "umiconsulting-pos-staging",
+    "storage_bucket": "umiconsulting-pos-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:344877669392:android:db7379da7ee54a60973e95",
+        "android_client_info": {
+          "package_name": "co.umiconsulting.umi_pos.estacion"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXCJSrjWSoqjjBuP686Pm9NILezmfNKq4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

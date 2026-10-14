@@ -37,6 +37,31 @@ const baseOrder: NewOrder = {
 };
 
 describe('writeOrder', () => {
+  it('writes the ORDER word for a takeaway sale, so the counter can send one out', async () => {
+    // The till says "Para llevar", the cart stores `takeout` (migration 005), and the
+    // order table knows `pickup` (20_merchant.sql). The writer used to copy the cart's
+    // word verbatim: `customer_order_fulfillment_type_check` refused it, the checkout
+    // answered 500, and the operator read "no fue posible completar el cobro de forma
+    // segura" on every takeaway sale (iMin D3-504, 2026-10-12 — 52 dine_in orders, and
+    // not one takeout, because not one could be written).
+    const { client, sqlFor } = recordingClient();
+    await writeOrder(client, { ...baseOrder, fulfillmentType: 'takeout' });
+
+    const insert = sqlFor('INSERT INTO merchant.customer_order');
+    expect(insert).toHaveLength(1);
+    expect(insert[0].params).toContain('pickup');
+    expect(insert[0].params).not.toContain('takeout');
+  });
+
+  it('refuses a fulfilment type this product does not know', async () => {
+    // A third word must not enter the order table by accident. `dine_in` passes straight
+    // through, and anything else that is not one of the order's own values stops here.
+    const { client } = recordingClient();
+    await expect(
+      writeOrder(client, { ...baseOrder, fulfillmentType: 'drive_thru' }),
+    ).rejects.toThrow('unknown fulfillment_type');
+  });
+
   it('writes the opening order_event — the row that makes an order visible to the kitchen', async () => {
     const { client, sqlFor } = recordingClient();
     await writeOrder(client, baseOrder);

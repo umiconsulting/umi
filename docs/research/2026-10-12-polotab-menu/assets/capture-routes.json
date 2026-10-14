@@ -1,0 +1,91 @@
+[
+  {
+    "name": "pos-home",
+    "dimensions": {
+      "width": 1380,
+      "height": 1080
+    }
+  },
+  {
+    "name": "pos-device",
+    "dimensions": {
+      "width": 1400,
+      "height": 940
+    }
+  },
+  {
+    "name": "polomini-menu",
+    "dimensions": {
+      "width": 1638,
+      "height": 1182
+    }
+  },
+  {
+    "name": "polomini-trio",
+    "dimensions": {
+      "width": 2544,
+      "height": 960
+    }
+  },
+  {
+    "name": "mobile-comanda",
+    "dimensions": {
+      "width": 550,
+      "height": 848
+    }
+  },
+  {
+    "name": "homepage",
+    "url": "https://www.polotab.com/",
+    "status": 200,
+    "title": "PoloTab | Punto de Venta para Cafeterías y Restaurantes",
+    "videos": [],
+    "frames": ["https://www.polotab.com/"]
+  },
+  {
+    "name": "polomini-page",
+    "url": "https://www.polotab.com/polomini",
+    "status": 200,
+    "title": "PoloMini — Comandero Móvil para Cafeterías | PoloTab",
+    "videos": [],
+    "frames": ["https://www.polotab.com/polomini"]
+  },
+  {
+    "name": "promo-page",
+    "url": "https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos",
+    "status": 200,
+    "title": "Aplicar una promoción en el POS | Soporte PoloTab",
+    "videos": [],
+    "frames": ["https://www.polotab.com/soporte/aplicar-una-promocion-en-el-pos"]
+  },
+  {
+    "name": "drive-promo",
+    "url": "https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view",
+    "status": 200,
+    "title": "Aplicar promo en POS.MOV - Google Drive",
+    "videos": [],
+    "frames": [
+      "https://drive.google.com/file/d/1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl/view",
+      "about:blank",
+      "https://accounts.google.com/ServiceLogin?passive=1209600&osid=1&continue=https://drive.google.com/drivesharing/clientmodel?id%3D1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl%26foreignService%3Dtexmex%26authuser%3D0%26origin%3Dhttps://drive.google.com&followup=https://drive.google.com/drivesharing/clientmodel?id%3D1AEl2Xd-4HoX0UqPgxDISOjN54f65kVNl%26foreignService%3Dtexmex%26authuser%3D0%26origin%3Dhttps://drive.google.com",
+      "https://clients6.google.com/static/proxy.html?usegapi=1&jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#parent=https%3A%2F%2Fdrive.google.com&rpctoken=881993193",
+      "https://feedback-pa.clients6.google.com/static/proxy.html?usegapi=1&jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#parent=https%3A%2F%2Fdrive.google.com&rpctoken=582567013",
+      "https://youtube.googleapis.com/embed/?autohide=1&ps=docs&enablecastapi=0&hl=es-419&partnerid=30&post_message_origin=https%3A%2F%2Fdrive.google.com&origin=https%3A%2F%2Fdrive.google.com&hbenv=apps-elements&enablejsapi=1"
+    ]
+  },
+  {
+    "name": "drive-comandero",
+    "url": "https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view",
+    "status": 200,
+    "title": "PoloMini Comandero.mov - Google Drive",
+    "videos": [],
+    "frames": [
+      "https://drive.google.com/file/d/1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms/view",
+      "about:blank",
+      "https://accounts.google.com/ServiceLogin?passive=1209600&osid=1&continue=https://drive.google.com/drivesharing/clientmodel?id%3D1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms%26foreignService%3Dtexmex%26authuser%3D0%26origin%3Dhttps://drive.google.com&followup=https://drive.google.com/drivesharing/clientmodel?id%3D1qwRgVgrGZDX3nm9KvAYiO20dRgw8z7Ms%26foreignService%3Dtexmex%26authuser%3D0%26origin%3Dhttps://drive.google.com",
+      "https://clients6.google.com/static/proxy.html?usegapi=1&jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#parent=https%3A%2F%2Fdrive.google.com&rpctoken=729361464",
+      "https://feedback-pa.clients6.google.com/static/proxy.html?usegapi=1&jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#parent=https%3A%2F%2Fdrive.google.com&rpctoken=431861192",
+      "https://youtube.googleapis.com/embed/?autohide=1&ps=docs&enablecastapi=0&hl=es-419&partnerid=30&post_message_origin=https%3A%2F%2Fdrive.google.com&origin=https%3A%2F%2Fdrive.google.com&hbenv=apps-elements&enablejsapi=1"
+    ]
+  }
+]

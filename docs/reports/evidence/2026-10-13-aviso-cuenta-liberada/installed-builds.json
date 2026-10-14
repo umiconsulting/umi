@@ -1,0 +1,20 @@
+{
+  "apkSha256": "9f7dde4dcf9a5791dbe8bdb81e705b07028cac1f95ef71ae335739f4a5b82171",
+  "devices": [
+    {
+      "device": "iMin",
+      "serial": "192.168.1.10:5555",
+      "version": ["versionCode=91 minSdk=24 targetSdk=36", "versionName=0.1.0"]
+    },
+    {
+      "device": "A9 KDS",
+      "serial": "192.168.1.14:35559",
+      "version": ["versionCode=91 minSdk=24 targetSdk=36", "versionName=0.1.0"]
+    },
+    {
+      "device": "A11 POS móvil",
+      "serial": "192.168.1.13:38333",
+      "version": ["versionCode=91 minSdk=24 targetSdk=36", "versionName=0.1.0"]
+    }
+  ]
+}

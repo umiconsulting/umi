@@ -72,6 +72,7 @@ final class InventoryController extends ChangeNotifier {
         history: _state.history,
         count: _state.count,
         pendingReconciliation: _state.pendingReconciliation,
+        pendingOperation: _state.pendingOperation,
         production: _state.production,
         approvalPermission: _state.approvalPermission,
         approvalFingerprint: _state.approvalFingerprint,
@@ -98,6 +99,7 @@ final class InventoryController extends ChangeNotifier {
                   ? null
                   : InventoryCountResult.fromJson(overview.activeCount!)),
           pendingReconciliation: _state.pendingReconciliation,
+          pendingOperation: _state.pendingOperation,
           production: _state.production,
           approvalPermission: _state.approvalPermission,
           approvalFingerprint: _state.approvalFingerprint,
@@ -110,6 +112,7 @@ final class InventoryController extends ChangeNotifier {
           history: _state.history,
           count: _state.count,
           pendingReconciliation: _state.pendingReconciliation,
+          pendingOperation: _state.pendingOperation,
           production: _state.production,
           approvalPermission: _state.approvalPermission,
           approvalFingerprint: _state.approvalFingerprint,
@@ -117,6 +120,33 @@ final class InventoryController extends ChangeNotifier {
         ),
       );
     }
+  }
+
+  /// Forgets the command that was waiting for an approval.
+  ///
+  /// The state keeps `pendingOperation` across refreshes on purpose: the till
+  /// reloads the overview while the approver types their PIN, and every refresh
+  /// used to drop the command. On the iMin D3-504 (2026-10-11) that turned the
+  /// refund disposition into a dead end — `409 APPROVAL_REQUIRED`, the manager
+  /// approved, and the command was **never re-sent**, with the screen left
+  /// saying `Esta operación requiere una aprobación vinculada.` over a decision
+  /// that stayed pending. It is cleared only when the command itself reaches a
+  /// terminal state: it succeeded, or recovery proved it.
+  void _clearPendingOperation() {
+    if (_state.pendingOperation == null) return;
+    _set(
+      InventoryUiState(
+        busy: _state.busy,
+        overview: _state.overview,
+        history: _state.history,
+        count: _state.count,
+        pendingReconciliation: _state.pendingReconciliation,
+        production: _state.production,
+        approvalPermission: _state.approvalPermission,
+        approvalFingerprint: _state.approvalFingerprint,
+        errorCode: _state.errorCode,
+      ),
+    );
   }
 
   /// The prep list for the till's own merchant and location (§8.4).
@@ -428,6 +458,14 @@ final class InventoryController extends ChangeNotifier {
       policyFingerprint: overview.policy['fingerprint']! as String,
       businessDate: _businessDate(),
       scope: 'full_location',
+      // Every item in the location, said out loud. The contract types this as an
+      // array with an empty default, and the generated `toJson` writes the field
+      // whatever its value — so leaving it null put `"itemIds": null` on the
+      // wire and the strict schema refused the whole command with
+      // `400 VALIDATION_FAILED`, which the till showed as
+      // `No fue posible completar la operación de inventario.`
+      // (iMin D3-504, 2026-10-11: `Iniciar conteo ciego` could not start).
+      itemIds: const [],
     );
     _set(
       InventoryUiState(busy: true, overview: overview, history: _state.history),
@@ -882,11 +920,13 @@ final class InventoryController extends ChangeNotifier {
         overview: _state.overview,
         history: _state.history,
         count: _state.count,
+        pendingOperation: _state.pendingOperation,
         production: _state.production,
       ),
     );
     try {
       await operation(command);
+      _clearPendingOperation();
       await load(scope);
     } on AppException catch (error) {
       if (error.recoverable) {
@@ -902,6 +942,7 @@ final class InventoryController extends ChangeNotifier {
               ),
             );
             if (recovered.state == 'recovered' && recovered.result != null) {
+              _clearPendingOperation();
               await load(scope);
               return;
             }

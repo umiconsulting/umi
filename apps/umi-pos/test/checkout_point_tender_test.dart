@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
@@ -9,6 +8,7 @@ import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
 import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
@@ -68,6 +68,9 @@ final _cardTenderId = tenderId(_cartId, 'card_terminal');
 const _policy = {
   'version': 'test-1',
   'manualTerminalEnabled': true,
+  'bankTransferEnabled': false,
+  'bankTransferDetails': null,
+  'merchantLogoUrl': null,
   'mixedTenderEnabled': false,
   'maximumTenderLines': 8,
   'manualTerminalApprovalThreshold': {'minorUnits': 50000, 'currency': 'MXN'},
@@ -415,6 +418,8 @@ final class _CartRepository implements CartRepository {
     operatorSessionId: _operatorSessionId,
     status: 'prepared',
     version: 3,
+    firedOrderId: null,
+    fulfillmentType: 'dine_in',
     items: [],
     totals: _cartTotals,
     checkoutEnabled: false,
@@ -454,6 +459,18 @@ final class _CartRepository implements CartRepository {
   Future<Cart> bindOrigin(
     String merchantId,
     BindCartOriginRequest input,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<FireOrderResult> fire(
+    String merchantId,
+    FireOrderRequest request,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<Cart> setFulfillment(
+    String merchantId,
+    SetCartFulfillmentRequest input,
   ) async => throw UnimplementedError();
 }
 
@@ -515,7 +532,7 @@ final class _Sheet {
   final CheckoutController checkout;
 
   Finder get cardTile => find.byKey(const ValueKey('method-card-terminal'));
-  Finder get chargeButton => find.byType(FilledButton).last;
+  Finder get chargeButton => find.byType(PosButton).last;
 
   Future<void> dispose() async {
     await tester.pumpWidget(const SizedBox());
@@ -562,19 +579,18 @@ Future<_Sheet> _openSheet(
     currency: 'MXN',
   );
   await tester.pumpWidget(
-    MaterialApp(
+    PosApp(
       // The plan names the waiting copy in Spanish; the assertions read it.
       locale: const Locale('es'),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: const [
         AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
+
         GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
       ],
       home: Builder(
-        builder: (context) => Scaffold(
-          body: FilledButton(
+        builder: (context) => PosPage(
+          body: PosButton(
             onPressed: () => showCheckoutSheet(
               context,
               checkout: checkout,

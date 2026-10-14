@@ -1,0 +1,77 @@
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: catalog cache is bounded and partitioned by tenant, branch and language
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: controller loads incrementally and deduplicates product IDs
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: scanner lookup uses the exact barcode query
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +14: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: server search empty result is distinct from an empty branch catalog
+00:00 +15: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: large history keeps name, amount and action reachable in es at 1.5
+00:00 +16: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: large history keeps name, amount and action reachable in es at 1.5
+00:00 +17: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden es text change
+00:01 +18: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden es text change
+00:01 +19: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden es text change
+00:01 +20: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden es text change
+00:01 +21: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: large history keeps name, amount and action reachable in en at 1.5
+00:01 +22: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: large history keeps name, amount and action reachable in en at 1.5
+00:01 +23: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden en text change
+00:01 +24: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden en text change
+00:01 +25: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: new sale advertises focus before any key after a hidden en text change
+00:01 +26: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: receipt view requires explicit printing and permission in es: false
+00:01 +27: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: receipt view requires explicit printing and permission in es: false
+00:01 +28: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: receipt view requires explicit printing and permission in es: false
+00:01 +29: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: product action stays visible while options scroll at Size(375.0, 812.0)
+00:01 +30: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across es layout and text changes
+00:01 +31: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across es layout and text changes
+00:01 +32: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: detail choices and note survive desktop-phone-desktop resizing
+00:01 +33: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/catalog_test.dart: detail choices and note survive desktop-phone-desktop resizing
+00:01 +34: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains overflow focus across es layout and text changes
+00:02 +35: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: receipt view requires explicit printing and permission in en: true
+00:02 +36: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains account focus across es layout and text changes
+00:02 +37: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains account focus across es layout and text changes
+00:02 +38: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: backward keyboard reveals offscreen history controls in en
+00:02 +39: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +40: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +41: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +42: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +43: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +44: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +45: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +46: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +47: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +48: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +49: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +50: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +51: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +52: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +53: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +54: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +55: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +56: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +57: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +58: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains newSale focus across en layout and text changes
+00:02 +59: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: history page retry preserves rows and cursor at 1.0
+00:02 +60: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains overflow focus across en layout and text changes
+00:02 +61: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains overflow focus across en layout and text changes
+00:02 +62: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/sale_lifecycle_test.dart: history distinguishes pending, failure, retry and no matches at 1.0
+00:02 +63: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains account focus across en layout and text changes
+00:02 +64: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains account focus across en layout and text changes
+00:02 +65: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: header retains account focus across en layout and text changes
+00:02 +66: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: scanner respects the active destination and cancels an old lookup
+00:03 +67: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: primary destinations retain navigation and the current order
+00:04 +68: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: mobile overflow names the current destination
+00:04 +69: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: a seller lands on the comanda with its tabs and not the kitchen
+00:04 +70: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: a cook lands on the kitchen and is never shown the comanda
+00:04 +71: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: a KDS device does not offer the sale surface to a seller
+00:04 +72: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: a seller fires the cart and the marker replaces the button
+00:04 +73: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: the top-bar order type reaches the cart
+00:04 +74: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/role_surface_test.dart: a line added after the fire brings the send button back
+00:04 +75: All tests passed!

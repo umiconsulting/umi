@@ -42,6 +42,7 @@ import type {
 } from '@umi/contract';
 import type { AppConfig } from '../../shared/config/config.schema';
 import { PgService } from '../../shared/database/pg.service';
+import { PREVIEW_WINDOW_MS } from '../../shared/loyalty/preview-window';
 import { commandFingerprint } from '../integrity/canonical-json';
 import {
   calculatePointsEarn,
@@ -584,19 +585,28 @@ export class PosCustomerValueRepository {
           businessDate: row.businessDate,
         });
         const previewExpiresAt = new Date(
-          Math.min(new Date(p?.expiresAt ?? Date.now() + 300_000).getTime(), Date.now() + 300_000),
+          Math.min(
+            new Date(p?.expiresAt ?? Date.now() + PREVIEW_WINDOW_MS).getTime(),
+            Date.now() + PREVIEW_WINDOW_MS,
+          ),
         ).toISOString();
         if (account && p?.enabled && dto.customerId && earnCalculation) {
+          // ONE LIVE PREVIEW PER CHECKOUT VERSION, REFRESHED BY ASKING AGAIN.
+          //
+          // This used to be a bare `INSERT … ON CONFLICT (merchant_id, preview_fingerprint) DO
+          // NOTHING`, and that shape could not keep its own promise: the fingerprint is
+          // deterministic, so a second look at the same cart version changed nothing at all (an
+          // expired row stayed expired, for ever), while a command whose BASIS changed — a tender
+          // the operator corrected after the preview was taken — produced a different fingerprint,
+          // missed the conflict target and landed on the five-column unique as a duplicate-key 500.
+          // Both are measured on the iMin D3-504 on 2026-10-11, and both left the sale un-chargeable
+          // with the till saying only "No fue posible completar el cobro de forma segura."
+          // `merchant.replace_loyalty_earn_preview` replaces the row this version has, which is what
+          // the five-column unique already says a version may have: one.
           await client.query(
-            `INSERT INTO merchant.loyalty_earn_preview(
-              merchant_id,location_id,cart_id,customer_id,account_id,checkout_version,
-              customer_attachment_version,loyalty_program_id,loyalty_policy_version,
-              loyalty_policy_fingerprint,checkout_fingerprint,preview_fingerprint,input_fingerprint,
-              gross_eligible_minor_units,excluded_minor_units,final_eligible_minor_units,
-              expected_points,earn_status,explanation_codes,effective_rules,business_date,expires_at)
-             VALUES($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8::uuid,$9,$10,$11,$12,$13,
-               $14,$15,$16,$17,$18,$19::text[],$20::jsonb,$21::date,$22::timestamptz)
-             ON CONFLICT(merchant_id,preview_fingerprint) DO NOTHING`,
+            `SELECT merchant.replace_loyalty_earn_preview(
+               $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6,$7,$8::uuid,$9,$10,$11,$12,$13,
+               $14,$15,$16,$17,$18,$19::text[],$20::jsonb,$21::date,$22::timestamptz)`,
             [
               merchantId,
               dto.locationId,

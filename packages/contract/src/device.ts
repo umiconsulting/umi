@@ -148,11 +148,20 @@ export type DeviceEnrollmentRequestList = z.infer<typeof DeviceEnrollmentRequest
 export const DeviceList = z.object({ devices: z.array(DeviceSummary).max(200) }).strict();
 export type DeviceList = z.infer<typeof DeviceList>;
 
-/** The two fields an owner may change on an enrolled device after the fact. */
+/**
+ * What an owner may change on an enrolled device after the fact.
+ *
+ * `type` is the mode the tablet runs: the till (`pos_terminal`) or the kitchen
+ * board (`kds`). One binary serves both, and it reads its own kind from
+ * `GET /devices/status`, so flipping this field is what moves a tablet between
+ * the two jobs. It is optional because renaming a device and restating its
+ * mobility are older, narrower edits that must keep working.
+ */
 export const UpdateDeviceRequest = z
   .object({
     displayName: z.string().trim().min(1).max(120),
     mobility: DeviceMobility,
+    type: DeviceType.optional(),
   })
   .strict();
 export type UpdateDeviceRequest = z.infer<typeof UpdateDeviceRequest>;

@@ -363,11 +363,28 @@ export const ReceiptSnapshot = z
     currency: CurrencyCode,
     version: z.number().int().positive(),
     merchantName: z.string().min(1).max(240).optional(),
+    /**
+     * The café's logo, as `merchant.merchant.logo_url` held it when the sale was
+     * committed (migration 014). Frozen into the snapshot like every other fact on
+     * this receipt: a reprint must show the paper the customer was handed, even
+     * after the café changes its logo. Optional because receipts committed before
+     * the logo existed genuinely have none.
+     *
+     * Absolute, public and content-addressed — safe for a client to cache forever.
+     */
+    merchantLogoUrl: z.string().min(1).max(2048).optional(),
     locationName: z.string().min(1).max(240).optional(),
     operatorName: z.string().min(1).max(240).optional(),
     payment: z
       .object({
-        method: z.enum(['cash', 'external_terminal', 'card', 'stored_value', 'gift_card']),
+        method: z.enum([
+          'cash',
+          'external_terminal',
+          'bank_transfer',
+          'card',
+          'stored_value',
+          'gift_card',
+        ]),
         status: z.enum(['succeeded', 'captured']),
         reference: z.string().min(1).max(100),
         amount: Money,
@@ -379,7 +396,7 @@ export const ReceiptSnapshot = z
         z
           .object({
             tenderId: Uuid,
-            method: z.enum(['cash', 'manual_terminal', 'wallet', 'gift_card']),
+            method: z.enum(['cash', 'manual_terminal', 'bank_transfer', 'wallet', 'gift_card']),
             amount: Money,
             received: Money.nullable(),
             change: Money,
@@ -448,14 +465,39 @@ export const API_ERROR_CODES = [
   // What `EntitlementGuard(@RequireProduct('pos'))` returns.
   'ENTITLEMENT_DISABLED',
   'OPERATOR_SESSION_REQUIRED',
+  'OPERATOR_SESSION_BUSY',
   'CART_VALIDATION_FAILED',
   'CART_NOT_FOUND',
+  // Open-account refusals must survive the HTTP error allow-list so the POS can
+  // explain ownership, payment and table conflicts instead of a generic conflict.
+  'CART_ACTOR_BUSY',
+  'CART_ACCOUNT_BUSY',
+  'CART_VERSION_CONFLICT',
+  'CART_PAYMENT_UNRESOLVED',
+  'CART_TABLE_ACCOUNT_EXISTS',
+  'CART_ALREADY_ASSIGNED',
+  'TABLE_HAS_OPEN_ACCOUNT',
+  'KITCHEN_PREPARATION_STARTED',
+  // The ticket belongs to a business day the merchant has already closed. Cancelling a
+  // sent line is a same-day act (Toast's rule, decided here for the same reason): the
+  // day's takings and counts have been read, so a plate from an earlier day is resolved
+  // by charging it or by the day close, never by unmaking the line.
+  'CART_LINE_DAY_CLOSED',
   'PRODUCT_UNAVAILABLE',
   'VARIANT_NOT_AVAILABLE',
   'MODIFIER_SELECTION_INVALID',
   'CHECKOUT_GATE_NOT_AVAILABLE',
   'CHECKOUT_CONFIRMATION_REQUIRED',
   'CHECKOUT_CART_CHANGED',
+  // Sequential partial payments return these precise refusals to the POS so it
+  // can distinguish a stale ledger, an unresolved payment, and an invalid leg.
+  'CHECKOUT_CONFLICT',
+  'CHECKOUT_PARTIAL_LEDGER_CONFLICT',
+  'CONFIRMATION_REFERENCE_REQUIRED',
+  'INSUFFICIENT_CASH',
+  'INVALID_TENDER_AMOUNT',
+  'MIXED_TENDER_DISABLED',
+  'TENDER_LIMIT_REACHED',
   'INVENTORY_UNAVAILABLE',
   'INVENTORY_PARTIALLY_AVAILABLE',
   'INVENTORY_POLICY_REQUIRED',
@@ -467,6 +509,20 @@ export const API_ERROR_CODES = [
   'INVENTORY_LOCATION_CHANGED',
   'INVENTORY_UNIT_CONVERSION_REQUIRED',
   'INVENTORY_QUANTITY_NOT_EXACT',
+  // The inventory refusals the till has words for. The API has thrown these
+  // since Gate 3E and the union never carried them, so
+  // `AllExceptionsFilter`'s allow-list re-labelled every one of them as
+  // `CONFLICT` and the till answered `La información cambió` to an operator who
+  // had done nothing wrong (measured on the iMin D3-504 on 2026-10-11: counting
+  // twice in the same warehouse). A code the client can be told about is a code
+  // the contract publishes.
+
+  'INVENTORY_COUNT_ALREADY_ACTIVE',
+  'INVENTORY_VERSION_CHANGED',
+  'INVENTORY_VARIANCE_REASON_REQUIRED',
+  'INVENTORY_CURSOR_INVALID',
+  'DUPLICATE_RESTOCK_COMPONENT',
+  'PERMISSION_REVOKED',
   'INVENTORY_QUANTITY_OUT_OF_RANGE',
   'INVENTORY_SOURCE_STATE_INSUFFICIENT',
   'NEGATIVE_STOCK_BLOCKED',
@@ -486,6 +542,8 @@ export const API_ERROR_CODES = [
   'FLOOR_PLAN_NOT_PUBLISHED',
   // Publishing a layout that removes or moves a table a party is sitting at.
   'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+  'FLOOR_PLAN_ALREADY_CONFIGURED',
+  'FLOOR_PLAN_DRAFT_PENDING',
   // Table-order intake, §8I step 2 (build-v3-75). Two refusals that a GUEST reads,
   // so each one has to be actionable on its own:
   //   · the QR's token is unknown, revoked, or names a table that is gone. One code
@@ -518,6 +576,16 @@ export const API_ERROR_CODES = [
   // resume its own shift, reclaim an orphaned one, or ask a manager to count the
   // drawer out. It stays a CONFLICT, never a server fault.
   'CASH_SHIFT_REQUIRED',
+  // A shift that cannot make the move the caller asked for. The repository used
+  // to answer with a bare `Error('INVALID_SHIFT_TRANSITION')` when the row it
+  // meant to update did not match — a version the caller no longer had, a drawer
+  // held by another terminal, or a status the move does not admit (a drawer
+  // under count cannot be resumed as open). Nothing mapped that message, so the
+  // operator read `500 INTERNAL_ERROR`: a server fault for a conflict they could
+  // have acted on. The refusal now names the reason in `details` (`reason`
+  // plus the shift's state on both sides), the way `CASH_SHIFT_REQUIRED` names
+  // the register and its hold.
+  'INVALID_SHIFT_TRANSITION',
   'RECIPE_CHANGED',
   'RESTOCK_INTENT_NOT_ELIGIBLE',
   'RESTOCK_EXCEEDS_ORIGINAL_CONSUMPTION',

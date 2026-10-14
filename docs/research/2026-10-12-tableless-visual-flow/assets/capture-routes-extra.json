@@ -1,0 +1,82 @@
+[
+  {
+    "name": "fudo-tables",
+    "url": "https://soporte.fu.do/es/articles/11730839-1-abrir-mesas",
+    "status": 200,
+    "title": "1. Abrir mesas | Fudo | Centro de Ayuda",
+    "images": [
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609911328/ecc1c2026bee63a161c1a0233e50/mesas2_png-height%3D348-name%3Dmesas2.png-width%3D423?expires=1791805500&signature=c52c82a6154b0a8064a1cd8ded730a416fd624c74bc0fa4eb4307f9328ea9036&req=dSYnH8B%2FnIJdUfMW1HO4zSCVPHYi2c6Hmy5HMHDuuJA2Zv3%2BP%2BFQHstIk3A%2F%0AQJAiS6KVwQpprvdXyrw%3D%0A",
+        "alt": "mesas2",
+        "w": 423,
+        "h": 348,
+        "file": "fudo-tables-01.png"
+      }
+    ]
+  },
+  {
+    "name": "fudo-counter",
+    "url": "https://soporte.fu.do/es/articles/11730844-7-mostrador-meson",
+    "status": 200,
+    "title": "7. Mostrador/Mesón | Fudo | Centro de Ayuda",
+    "images": [
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609911622/cafeab2d2da48f6083ce852d5673/pedido_mostrador2_png-height%3D336-name%3Dpedido_mostrador2.png-width%3D397?expires=1791805500&signature=521105df6d2ca3f98b5c45a7092099478f269c845c24cb268cd6aecc0b73bfd7&req=dSYnH8B%2FnIddW%2FMW1HO4zTNapd8jQQLlBLkaZ7JA3J2jQrHyb2NQSa8%2FG0LK%0ACpZF%0A",
+        "alt": "pedido_mostrador2",
+        "w": 397,
+        "h": 336,
+        "file": "fudo-counter-01.png"
+      },
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-7.com/i/o/ti1ln81q/1609911636/ad6242018f1777f1fced8b7a1a98/image-png-Dec-21-2023-10-17-06-2904-PM_png-height%3D738-name%3Dimage-png-Dec-21-2023-10-17-06-2904-PM.png-width%3D685?expires=1791805500&signature=3119b4e2c609a4c32afaf30945e1fc273a7e226e71a2527617d68fe6eeddc63f&req=dSYnH8B%2FnIdcX%2FMW1HO4zYaj7KJqaAAVF2TI3oEy4iBYCgoFeMtBAR%2F4S%2Bk2%0AiDYz09Wmp327ae6d6nI%3D%0A",
+        "alt": "",
+        "w": 685,
+        "h": 413,
+        "file": "fudo-counter-02.png"
+      },
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-1.com/i/o/ti1ln81q/1609911650/b4b5f416823e5a1cbf230a41664f/image-png-Dec-12-2024-06-32-52-2844-PM.png?expires=1791805500&signature=ac0a6a64ec3da24384fbe5d296d29a997f3b8a785643f0d43c75873cff0812bd&req=dSYnH8B%2FnIdaWfMW1HO4zbGINKWmPIdhY2%2Bgf2ufIN88zeU2lyrI8JmtfpNe%0AfkMHPTXGFR9Rp5u0spI%3D%0A",
+        "alt": "",
+        "w": 664,
+        "h": 667,
+        "file": "fudo-counter-03.png"
+      },
+      {
+        "src": "https://fudo-b84301faceb0.intercom-attachments-1.com/i/o/ti1ln81q/1609911684/01668c5c825465609ce4343f15ce/imageedit_1_3553121561-jpg.jpeg?expires=1791805500&signature=e83b59ce3968e9e9a401d9f093a1c4fdcd6f89dd736d78e8ce76d34e7aef1b71&req=dSYnH8B%2FnIdXXfMW1HO4zaFsGGkm9vawaXUk67gxNG6leZ%2Fls9mmFzdCIEPG%0ADo2Xxlwlb7eQMo1yUh8%3D%0A",
+        "alt": "",
+        "w": 896,
+        "h": 900,
+        "file": "fudo-counter-04.png"
+      }
+    ]
+  },
+  {
+    "name": "square-tickets",
+    "url": "https://squareup.com/help/us/en/article/5337-use-open-tickets-with-square",
+    "status": 200,
+    "title": "Create and edit open tickets | Square Support Center - United States",
+    "images": []
+  },
+  {
+    "name": "square-checks",
+    "url": "https://squareup.com/help/us/en/article/8166-manage-checks-with-square-for-restaurants",
+    "status": 200,
+    "title": "Manage checks | Square Support Center - United States",
+    "images": [
+      {
+        "src": "https://images.ctfassets.net/gc4s9mi2asix/18nEYNxfvso6QGQTVeDrh7/7a591f614e6f1a03c61ff356675c9a57/RST-Check-Actions-US-EN-1.png",
+        "alt": "",
+        "w": 2048,
+        "h": 1536,
+        "file": "square-checks-01.png"
+      },
+      {
+        "src": "https://images.ctfassets.net/gc4s9mi2asix/3uIn1UXhfvaLkM8G9W9Bdw/f3ecbe8577381fa3f59820f161888200/RST-Check-Actions-US-EN-2.png",
+        "alt": "",
+        "w": 2048,
+        "h": 1536,
+        "file": "square-checks-02.png"
+      }
+    ]
+  }
+]

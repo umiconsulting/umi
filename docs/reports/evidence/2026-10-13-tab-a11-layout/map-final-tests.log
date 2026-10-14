@@ -1,0 +1,30 @@
+00:00 +0: loading /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart
+00:00 +0: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: map labels shrink at 200 percent on a narrow floor plan
+floor-plan 375x812 text=200% nominal=23.400000000000002 rendered=3.2187895791583236 scale=0.13755511022044117
+00:00 +1: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +2: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +3: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +4: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +5: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +6: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +7: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +8: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +9: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +10: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: accounts show the plan and open only through the detail panel
+00:00 +11: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/floor_plan_test.dart: surface shows area tabs and switches the rendered area
+00:00 +12: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: waiter opens the table account without room management permissions
+00:01 +13: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: waiter opens the table account without room management permissions
+00:01 +14: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 1.0
+00:01 +15: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow accounts keep detail and summary at scale 2.0
+00:01 +16: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a free table can start a party (defect D27)
+00:01 +17: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a seated table draws its state, a filled marker and a timer
+00:01 +18: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a dirty table is marked for clearing, and can be made ready
+00:01 +19: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: two free tables merge into one bounded region, and split
+00:01 +20: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: the plan hint stands down once a table mode is armed
+00:01 +21: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: moving a party keeps its timer and marks the origin for cleaning
+00:01 +22: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a table with a party offers the three service actions
+00:02 +23: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a target too small refuses locally with a recovery to read
+00:02 +24: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: a server refusal shows a typed message with a recovery action
+00:02 +25: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: selected table remains visible after desktop becomes narrow
+00:02 +26: /home/juan/Projects/umiconsulting/umi/apps/umi-pos/test/features/tables/table_state_surface_test.dart: narrow tables use a readable list at enlarged text
+00:02 +27: All tests passed!

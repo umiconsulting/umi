@@ -235,12 +235,13 @@ if (mode === 'register') {
 
   // Three states are possible, and only the panel tells them apart: closed, open with the
   // product still unchosen, and open with UmiPOS already selected from an earlier run.
-  const posName = page.locator('input[id$="-pos-name"]');
-  const productTrigger = () =>
-    page
-      .locator('button')
-      .filter({ hasText: /select a product|selecciona un producto/i })
-      .first();
+  //
+  // The ids are the ones the sheet uses TODAY: every field is `-device-*` (`-device-product`,
+  // `-device-name`, `-device-platform`). This probe was written against `-pos-name` /
+  // `-pos-platform`, so it reported "the UmiPOS register panel did not appear" over a panel
+  // that was open and correct — the enrolment step read as broken while it worked.
+  const posName = page.locator('input[id$="-device-name"]');
+  const productTrigger = () => page.locator('[id$="-device-product"]').first();
 
   if ((await posName.count()) === 0 && (await productTrigger().count()) === 0) {
     const openButton = page
@@ -256,20 +257,26 @@ if (mode === 'register') {
     await page.waitForTimeout(1500);
   }
 
-  if ((await posName.count()) === 0 && (await productTrigger().count()) > 0) {
-    await productTrigger().click();
-    await page.waitForTimeout(600);
-    const option = page
-      .locator('[role="option"], li, button')
-      .filter({ hasText: /^\s*UmiPOS\s*$/i })
-      .first();
-    if ((await option.count()) === 0) {
-      say('FAIL: UmiPOS is not offered. The product is inactive for this merchant.');
-      await dump('register-no-umipos-option');
-      process.exit(1);
+  // The sheet keeps the product chosen last, so a run that follows a KDS enrolment
+  // opens on UmiKDS and the UmiPOS fields never appear. Select UmiPOS whenever the
+  // trigger is not already showing it.
+  if ((await productTrigger().count()) > 0) {
+    const current = ((await productTrigger().innerText()) || '').trim();
+    if (!/^UmiPOS$/i.test(current)) {
+      await productTrigger().click();
+      await page.waitForTimeout(600);
+      const option = page
+        .locator('[role="option"]')
+        .filter({ hasText: /^\s*UmiPOS\s*$/i })
+        .first();
+      if ((await option.count()) === 0) {
+        say(`FAIL: UmiPOS is not offered (the trigger reads "${current}").`);
+        await dump('register-no-umipos-option');
+        process.exit(1);
+      }
+      await option.click();
+      await page.waitForTimeout(1200);
     }
-    await option.click();
-    await page.waitForTimeout(1200);
   }
 
   if ((await posName.count()) === 0) {
@@ -279,7 +286,7 @@ if (mode === 'register') {
   }
 
   // The name box is empty; what the dump prints as "Main register" is its placeholder.
-  await page.locator('input[id$="-pos-name"]').fill(name);
+  await page.locator('input[id$="-device-name"]').fill(name);
   say(`name set to ${name}`);
 
   // The claim is rejected when the request's platform differs from the till's, and the
@@ -287,7 +294,7 @@ if (mode === 'register') {
   // enrollment: the till showed "el código no es válido o caducó" for a code that was
   // fresh, and the API had answered ENROLLMENT_REJECTED.
   const platform = String(flag('platform', 'linux'));
-  const platformTrigger = page.locator('[id$="-pos-platform"]').first();
+  const platformTrigger = page.locator('[id$="-device-platform"]').first();
   if ((await platformTrigger.count()) > 0) {
     await platformTrigger.click();
     await page.waitForTimeout(500);

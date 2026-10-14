@@ -1,6 +1,51 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FloorPlanDocument, PublishedFloorPlan, floorElementBounds } from '../dist/index.js';
+import {
+  FloorPlanDocument,
+  PublishedFloorPlan,
+  InitializePosTablesRequest,
+  AddPosTableRequest,
+  floorElementBounds,
+} from '../dist/index.js';
+
+test('additional tables accept identity and capacity, never a replacement layout', () => {
+  const request = {
+    locationId: '00000000-0000-4000-8000-000000000001',
+    operatorSessionId: '00000000-0000-4000-8000-000000000002',
+    idempotencyKey: '00000000-0000-4000-8000-000000000003',
+    areaId: '00000000-0000-4000-8000-000000000004',
+    expectedPublishedVersion: 2,
+    label: 'Mesa extra',
+    capacity: 4,
+  };
+  assert.equal(AddPosTableRequest.safeParse(request).success, true);
+  for (const patch of [
+    { capacity: 0 },
+    { capacity: 101 },
+    { label: '' },
+    { document: {} },
+    { x: 100 },
+  ]) {
+    assert.equal(AddPosTableRequest.safeParse({ ...request, ...patch }).success, false);
+  }
+});
+
+test('POS table initialization accepts only bounded unique slots and no layout edits', () => {
+  const request = {
+    locationId: '00000000-0000-4000-8000-000000000001',
+    operatorSessionId: '00000000-0000-4000-8000-000000000002',
+    idempotencyKey: '00000000-0000-4000-8000-000000000003',
+    expectedPublishedVersion: 0,
+    slots: [0, 49],
+  };
+  assert.equal(InitializePosTablesRequest.safeParse(request).success, true);
+  for (const slots of [[], [0, 0], [-1], [50], [0.5]]) {
+    assert.equal(InitializePosTablesRequest.safeParse({ ...request, slots }).success, false);
+  }
+  for (const extra of [{ capacity: 8 }, { gridColumns: 6 }, { document: {} }]) {
+    assert.equal(InitializePosTablesRequest.safeParse({ ...request, ...extra }).success, false);
+  }
+});
 
 const element = {
   id: '00000000-0000-4000-8000-000000000002',

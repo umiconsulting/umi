@@ -367,44 +367,58 @@ function ReceiptDetailDrawer({ row, onClose, onReprint }) {
                   <li
                     key={ex.id}
                     style={{
-                      fontSize: 12.5,
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 12,
                       borderTop: '1px solid var(--line-soft)',
                       paddingTop: 8,
                     }}
                   >
-                    <span>
-                      <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
-                        {i18n._(EXCEPTION_LABEL[ex.exceptionType] || ex.exceptionType)}
-                      </span>
-                      {' · '}
-                      {ex.operator || '—'}
-                      {ex.approved ? (
-                        <span style={{ color: 'var(--success)' }}> · {t`aprobado`}</span>
-                      ) : null}
-                      {ex.reasonCode ? (
-                        <span style={{ color: 'var(--ink-3)' }}>
-                          {' '}
-                          · {String(ex.reasonCode).replaceAll('_', ' ')}
-                        </span>
-                      ) : null}
-                      <span style={{ color: 'var(--ink-3)' }}>
-                        {' '}
-                        · {formatOperationDate(ex.occurredAt)}
-                      </span>
-                    </span>
-                    <span
-                      className="figures"
+                    <div
                       style={{
-                        fontFamily: 'var(--font-mono)',
-                        color: 'var(--danger)',
-                        whiteSpace: 'nowrap',
+                        fontSize: 12.5,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 12,
                       }}
                     >
-                      −{formatOperationMoney(ex.totalMinorUnits, ex.currency)}
-                    </span>
+                      <span>
+                        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                          {i18n._(EXCEPTION_LABEL[ex.exceptionType] || ex.exceptionType)}
+                        </span>
+                        {' · '}
+                        {ex.operator || '—'}
+                        {ex.approved ? (
+                          <span style={{ color: 'var(--success)' }}> · {t`aprobado`}</span>
+                        ) : null}
+                        {ex.reasonCode ? (
+                          <span style={{ color: 'var(--ink-3)' }}>
+                            {' '}
+                            · {String(ex.reasonCode).replaceAll('_', ' ')}
+                          </span>
+                        ) : null}
+                        <span style={{ color: 'var(--ink-3)' }}>
+                          {' '}
+                          · {formatOperationDate(ex.occurredAt)}
+                        </span>
+                      </span>
+                      <span
+                        className="figures"
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--danger)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        −{formatOperationMoney(ex.totalMinorUnits, ex.currency)}
+                      </span>
+                    </div>
+                    {/* The note the till collected on this void or refund. It is the
+                        operator's sentence about the exception, and until now it
+                        reached this screen and stopped. */}
+                    {ex.note ? (
+                      <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 4 }}>
+                        <span style={{ color: 'var(--ink-3)' }}>{t`Nota`}: </span>
+                        {ex.note}
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

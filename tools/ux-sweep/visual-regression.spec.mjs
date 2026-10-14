@@ -29,6 +29,34 @@ import { chromium, expect, test as base } from '@playwright/test';
 const CDP = process.env.UX_CDP || 'http://127.0.0.1:9222';
 const BASE = process.env.UX_BASE || 'http://127.0.0.1:4000';
 
+/*
+ * THE SESSION'S BUDGET IS SHARED, SO THE RUN PACES ITSELF.
+ *
+ * Every page here reads through the operator's one signed-in session, and the API
+ * prices a principal at 240 requests per minute (`operational.interceptor.ts`,
+ * `LIMITS.user`). Fourteen page loads at roughly twenty calls each spend more than
+ * that, and the routes near the end of a run are then answered 429 — which renders
+ * the same "could not be loaded" text as a real outage and made this suite look
+ * flaky. Two rules keep it honest: wait before a load that would cross three
+ * quarters of the budget, and (below) reload once when a 429 still lands.
+ */
+const SPENT_AT = [];
+const BUDGET_PER_MINUTE = 240;
+const PACING_CEILING = Math.floor(BUDGET_PER_MINUTE * 0.75);
+
+async function pace(page, label) {
+  const now = Date.now();
+  const inWindow = SPENT_AT.filter((at) => at > now - 60_000);
+  if (inWindow.length < PACING_CEILING) return;
+  const freedAt = Math.min(...inWindow) + 60_000;
+  const waitMs = Math.max(1_000, freedAt - now + 1_000);
+  console.log(
+    `[visual] pacing before ${label}: ${inWindow.length} of the session's ${BUDGET_PER_MINUTE} ` +
+      `requests per minute are spent; waiting ${Math.round(waitMs / 1000)}s.`,
+  );
+  await page.waitForTimeout(waitMs);
+}
+
 const ROUTES = [
   { name: 'overview', path: '/' },
   { name: 'operations', path: '/operations' },
@@ -174,8 +202,38 @@ for (const viewport of VIEWPORTS) {
       await pinTheme(page);
       await pinLocale(page);
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto(`${BASE}${route.path}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-      await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
+
+      // THE OPERATOR'S OWN CEILING IS NOT A FINDING.
+      //
+      // Every page here reads through the same signed-in session, and the API
+      // prices a principal at 240 requests per minute (`operational.interceptor.ts`,
+      // `LIMITS.user`). Fourteen page loads at ~20 calls each spend more than that,
+      // so the last routes of a run are answered 429 and render "could not be
+      // loaded" — which looks exactly like the outage frame the guard below exists
+      // to refuse. Tell the two apart: count the 429s a page saw, and when the
+      // screen is in an error state because of them, wait out the window and load
+      // it once more. A screen that is still broken on the second load is a real
+      // finding and fails as before.
+      const tooManyRequests = [];
+      page.on('response', (response) => {
+        // ONLY THE API'S OWN CALLS SPEND THE BUDGET. The dev server ships the app
+        // as ~200 unbundled modules, so counting every response made one page load
+        // look like it had spent the whole minute.
+        try {
+          if (new URL(response.url()).pathname.startsWith('/api')) SPENT_AT.push(Date.now());
+        } catch {
+          // A response with an unparseable URL is not an API call.
+        }
+        if (response.status() === 429)
+          tooManyRequests.push(response.headers()['x-ratelimit-reset']);
+      });
+
+      const openAndSettle = async () => {
+        await page.goto(`${BASE}${route.path}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
+      };
+      await pace(page, `${route.name} at ${viewport.name}`);
+      await openAndSettle();
       // WAIT FOR THE SCREEN, NOT FOR THE CLOCK.
       //
       // This used to be `waitForTimeout(2000)`, and a fixed sleep cannot tell a
@@ -201,21 +259,122 @@ for (const viewport of VIEWPORTS) {
       // A short settle for the paint the data triggered, not a substitute for it.
       await page.waitForTimeout(400);
 
-      // REFUSE TO PIN A FAILURE.
+      // THE NAME OF THE TEST IS THE SCREEN IT PINS.
       //
-      // The `reportes` baseline on record is an outage frame - `OFFLINE · RETRY`,
-      // "The sales report could not be loaded.", an empty body. It was recorded
-      // by hand at some point and every run since has compared against it, so
-      // the check was asserting that the screen still looks broken. Nothing
-      // stops a person from re-recording a failure either, so the guard belongs
-      // here: if the screen is in an error state, this fails and says so.
-      const body = await page.evaluate(() => document.body.innerText || '');
-      const errorState = body.match(
-        // The BODY's failure affordances. The masthead's connectivity chip reads
-        // "Offline · Retry" too, and that is a volatile value rather than a
-        // failed screen - it is masked above, not treated as a failure here.
-        /could not be loaded|could not be [a-z]+ed|failed to load|is unavailable|no se pudo cargar/i,
-      );
+      // `/` is the owner's first screen, and the shell then lands the operator on
+      // the screen their ROLE needs (`apps/umi-dashboard/src/lib/role-landing.js`,
+      // plan §8C). A platform administrator has no cited first screen — the file's
+      // fallback chain starts at `customers` — so a session holding the platform
+      // grant loads `/` and reads the Customers screen. A screenshot named
+      // `overview` was therefore pinning a different screen than its name claims,
+      // and it could never agree with a baseline recorded from a café `admin`.
+      // Open the module this test names, from the shell's own navigation, and fail
+      // if the shell never gets there.
+      const moduleOf = (pathname) => {
+        const raw = String(pathname).split('/').filter(Boolean)[0] || 'overview';
+        return raw === 'conversations' || raw === 'insights' ? 'customers' : raw;
+      };
+      const readErrorState = async () =>
+        (await page.evaluate(() => document.body.innerText || '')).match(
+          // The BODY's failure affordances. The masthead's connectivity chip reads
+          // "Offline · Retry" too, and that is a volatile value rather than a
+          // failed screen - it is masked below, not treated as a failure here.
+          /could not be loaded|could not be [a-z]+ed|failed to load|is unavailable|no se pudo cargar/i,
+        );
+
+      const prepareScreen = async () => {
+        const renderedModule = await page.evaluate(() => window.location.pathname);
+        if (moduleOf(renderedModule) !== route.name) {
+          // Only `overview` has no path of its own — `/` IS its path — so it is the
+          // one module the landing can move and the one this branch exists for. The
+          // screen is reached the way the shell walks a route, not by clicking a nav
+          // item: at 1024 x 768 the sidebar is a closed drawer and its buttons are
+          // outside the viewport, which a click cannot dismiss.
+          const path = route.name === 'overview' ? '/' : `/${route.name}`;
+          if (route.name !== 'overview') {
+            throw new Error(
+              `${route.name} at ${viewport.name}: the app rendered "${renderedModule}" instead of ` +
+                `${path}, and this spec has no way to open it.`,
+            );
+          }
+          await page.evaluate((target) => {
+            window.history.pushState({}, '', target);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }, path);
+          await page
+            .waitForFunction(
+              (wanted) => {
+                const raw = window.location.pathname.split('/').filter(Boolean)[0] || 'overview';
+                return raw === wanted;
+              },
+              route.name,
+              { timeout: 15_000 },
+            )
+            .catch(() => {
+              throw new Error(
+                `${route.name} at ${viewport.name}: the shell did not open ${path} after the ` +
+                  'landing moved it, so a screenshot here would pin another screen.',
+              );
+            });
+          await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+          await page.waitForTimeout(400);
+        }
+
+        // NEVER PIN A CREDENTIAL.
+        //
+        // The operator's Chromium autofills the saved Dashboard password into
+        // `/login` before the screenshot, so a re-recorded baseline would carry a
+        // filled form into the repository: the account address, and a field whose
+        // fill state is itself information. Empty every field first, then refuse to
+        // continue while a value survives — the same shape as the error-state guard
+        // below, which refuses to pin a failure.
+        if (route.name === 'login') {
+          await page.evaluate(() => {
+            for (const input of document.querySelectorAll('input')) input.value = '';
+          });
+          const stillFilled = await page.evaluate(() =>
+            [...document.querySelectorAll('input')]
+              .filter((input) => input.value && input.type !== 'hidden')
+              .map((input) => input.name || input.type || 'input'),
+          );
+          if (stillFilled.length > 0) {
+            throw new Error(
+              `/login at ${viewport.name} still holds a value in ${stillFilled.join(', ')}; ` +
+                'a baseline must not pin a credential.',
+            );
+          }
+        }
+
+        // REFUSE TO PIN A FAILURE.
+        //
+        // The `reportes` baseline on record is an outage frame - `OFFLINE · RETRY`,
+        // "The sales report could not be loaded.", an empty body. It was recorded
+        // by hand at some point and every run since has compared against it, so
+        // the check was asserting that the screen still looks broken. Nothing
+        // stops a person from re-recording a failure either, so the guard belongs
+        // here: if the screen is in an error state, this fails and says so.
+        return readErrorState();
+      };
+
+      let errorState = await prepareScreen();
+      if (errorState && tooManyRequests.length > 0) {
+        const resets = tooManyRequests
+          .map((value) => Number(value) * 1000)
+          .filter((value) => Number.isFinite(value));
+        const untilReset = resets.length > 0 ? Math.max(...resets) - Date.now() : 60_000;
+        const waitMs = Math.min(90_000, Math.max(5_000, untilReset + 2_000));
+        console.log(
+          `[visual] ${route.name} at ${viewport.name}: the session hit its 240 requests/minute ` +
+            `budget, so this screen was answered 429. Waiting ${Math.round(waitMs / 1000)}s and ` +
+            'loading it once more.',
+        );
+        await page.waitForTimeout(waitMs);
+        tooManyRequests.length = 0;
+        await openAndSettle();
+        await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+        await page.waitForTimeout(400);
+        errorState = await prepareScreen();
+      }
       if (errorState) {
         throw new Error(
           `${route.name} at ${viewport.name} is showing an error state ("${errorState[0]}"); ` +

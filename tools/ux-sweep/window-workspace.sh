@@ -27,6 +27,47 @@ if [[ -z "$window_id" ]]; then
   exit 1
 fi
 
+# HYPRLAND FIRST. This compositor does not implement the EWMH calls `wmctrl`
+# needs - `wmctrl -l` lists nothing here - and every `wmctrl` line below then
+# fails against a window it cannot see, which is the "the window manager never
+# took it" this script used to print for a window that was up and focused.
+# Hyprland's own dispatchers act on the ACTIVE window, and right after the
+# launcher starts the till the active window IS the till.
+if command -v hyprctl >/dev/null 2>&1; then
+  hypr_active="$(hyprctl activewindow -j 2>/dev/null | python3 -c '
+import json,re,sys
+try:
+    win = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+title = win.get("title") or ""
+klass = win.get("class") or ""
+if re.search(sys.argv[1], title) or re.search(sys.argv[1], klass):
+    print("yes")
+' "$pattern" 2>/dev/null || true)"
+  if [[ "$hypr_active" == "yes" ]]; then
+    # A workspace with nothing on it, so the till never shares a screen.
+    if [[ -n "$pinned" ]]; then
+      target="$pinned"
+    else
+      target="$(hyprctl workspaces -j 2>/dev/null | python3 -c '
+import json,sys
+try:
+    spaces = json.load(sys.stdin)
+except Exception:
+    spaces = []
+used = {int(w.get("id", 0)) for w in spaces if (w.get("windows") or 0) > 0}
+free = next((n for n in range(1, 10) if n not in used), None)
+print(free if free is not None else (max(used) + 1 if used else 1))
+')"
+    fi
+    hyprctl dispatch "hl.dsp.window.move({workspace=$target})" >/dev/null 2>&1 || true
+    hyprctl dispatch 'hl.dsp.window.fullscreen()' >/dev/null 2>&1 || true
+    echo "$target"
+    exit 0
+  fi
+fi
+
 if [[ -n "$pinned" ]]; then
   target="$pinned"
 else

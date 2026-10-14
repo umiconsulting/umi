@@ -1,0 +1,51 @@
+{
+  "instrument": "Color.js 0.5.2 (MIT)",
+  "pairs": [
+    {
+      "role": "Letras de categorías y productos",
+      "foreground": "#F2F2F2",
+      "background": "#0D0D0D",
+      "wcag": 17.36100010594876,
+      "apca": -99.0757400278736
+    },
+    {
+      "role": "Acción Cobrar",
+      "foreground": "#F2F2F2",
+      "background": "#223979",
+      "wcag": 9.722836673106597,
+      "apca": -90.25453635240989
+    },
+    {
+      "role": "Selección y botones secundarios",
+      "foreground": "#A8BBDE",
+      "background": "#111A2E",
+      "wcag": 8.940901971273686,
+      "apca": -63.797710980140195
+    },
+    {
+      "role": "Borde activo sobre negro",
+      "foreground": "#7692CB",
+      "background": "#000000",
+      "wcag": 6.7440929755472245,
+      "apca": -43.664004524468055
+    }
+  ],
+  "exposure": {
+    "instrument": "Pillow 12.3.0; conteo de píxeles sRGB exactos",
+    "crop": [281, 439, 1387, 987],
+    "colors": ["#F58231", "#4363D8"],
+    "before": {
+      "shot": "../2026-10-12-midnight-audit/01-catalog-menu.png",
+      "pixels": 323209,
+      "area": 606088,
+      "percent": 53.32707461622735
+    },
+    "after": {
+      "shot": "01-catalog.png",
+      "pixels": 18721,
+      "area": 606088,
+      "percent": 3.0888253850925937
+    }
+  },
+  "scope": "Controles medidos y región visible; no certificación completa ni ensayo de reconocimiento por operadores"
+}

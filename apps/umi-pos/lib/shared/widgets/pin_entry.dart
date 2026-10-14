@@ -12,7 +12,7 @@
 /// keyboard working; [PinPad] only draws.
 library;
 
-import 'package:flutter/material.dart';
+import 'package:umi_pos/core/theme/pos_ui.dart';
 
 import '../../core/theme/umi_theme.dart';
 
@@ -30,7 +30,7 @@ final class PinDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final slots = length < minLength ? minLength : length;
-    final scheme = Theme.of(context).colorScheme;
+    final scheme = PosTheme.of(context).colorScheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -42,7 +42,7 @@ final class PinDots extends StatelessWidget {
               height: 16,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: i < length ? scheme.primary : Colors.transparent,
+                color: i < length ? scheme.primary : PosColors.transparent,
                 border: Border.all(
                   color: i < length ? scheme.primary : scheme.outlineVariant,
                   width: 2,
@@ -71,6 +71,7 @@ final class PinPad extends StatelessWidget {
     required this.es,
     this.enabled = true,
     this.keyHeight = 68,
+    this.rowGap = UmiSpacing.sm,
     super.key,
   });
 
@@ -89,20 +90,24 @@ final class PinPad extends StatelessWidget {
   /// target; the default is what the PIN pad has always been drawn at.
   final double keyHeight;
 
+  /// The space between rows. It is separable from [keyHeight] because the largest
+  /// text size needs the room back without shrinking the keys below the floor.
+  final double rowGap;
+
   @override
   Widget build(BuildContext context) {
     final keys = <Widget>[
       for (final digit in const ['1', '2', '3', '4', '5', '6', '7', '8', '9'])
         _PinKey(label: digit, onTap: enabled ? () => onDigit(digit) : null),
       _PinKey(
-        icon: Icons.close,
+        icon: PosGlyphs.close,
         semanticLabel: es ? 'Borrar todo' : 'Clear all',
         onTap: enabled && canEdit ? onClear : null,
         emphasized: false,
       ),
       _PinKey(label: '0', onTap: enabled ? () => onDigit('0') : null),
       _PinKey(
-        icon: Icons.backspace_outlined,
+        icon: PosGlyphs.backspaceOutlined,
         semanticLabel: es ? 'Borrar' : 'Backspace',
         onTap: enabled && canEdit ? onBackspace : null,
         emphasized: false,
@@ -113,7 +118,7 @@ final class PinPad extends StatelessWidget {
       children: [
         for (var row = 0; row < 4; row++)
           Padding(
-            padding: EdgeInsets.only(top: row == 0 ? 0 : UmiSpacing.sm),
+            padding: EdgeInsets.only(top: row == 0 ? 0 : rowGap),
             child: SizedBox(
               height: keyHeight,
               child: Row(
@@ -141,7 +146,7 @@ final class _PinKey extends StatelessWidget {
   });
 
   final String? label;
-  final IconData? icon;
+  final PosGlyph? icon;
   final String? semanticLabel;
   final VoidCallback? onTap;
   final bool emphasized;
@@ -149,15 +154,15 @@ final class _PinKey extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final child = icon != null
-        ? Icon(icon, size: 26)
-        : Text(label!, style: Theme.of(context).textTheme.headlineSmall);
+        ? PosIcon(icon, size: 26)
+        : Text(label!, style: PosTheme.of(context).textTheme.headlineSmall);
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
       child: SizedBox.expand(
         child: emphasized
-            ? FilledButton.tonal(onPressed: onTap, child: child)
-            : OutlinedButton(onPressed: onTap, child: child),
+            ? PosButton.tonal(onPressed: onTap, child: child)
+            : PosOutlineButton(onPressed: onTap, child: child),
       ),
     );
   }

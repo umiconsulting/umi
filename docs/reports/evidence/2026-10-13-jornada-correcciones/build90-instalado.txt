@@ -1,0 +1,10 @@
+192.168.1.10:5555
+versionCode=90 minSdk=24 targetSdk=36
+versionName=0.1.0
+192.168.1.14:35559
+versionCode=90 minSdk=24 targetSdk=36
+versionName=0.1.0
+192.168.1.13:38333
+versionCode=90 minSdk=24 targetSdk=36
+versionName=0.1.0
+2eedfc5a953d61362c6c3382f3643c99a793853002cc4f2fd44106820d4b76af  apps/umi-pos/build/app/outputs/flutter-apk/app-profile.apk

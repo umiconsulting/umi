@@ -18,15 +18,28 @@ describe('POS cash center SQL regression', () => {
 
   it('uses contiguous parameters for the active shift query', () => {
     const source = readFileSync(join(__dirname, 'pos-cash.repository.ts'), 'utf8');
+    // The ACTIVE SHIFT read only — the commands that move money key on the
+    // responsible operator for their own good reasons, so a slice wide enough to
+    // catch them would say nothing about this one.
     const query = source.slice(
-      source.indexOf('FROM merchant.cash_shift'),
-      source.indexOf('const mappedRegisters'),
+      source.indexOf('const current = await client.query<CashShift>('),
+      source.indexOf('const adoptable'),
     );
 
     expect(query).toContain('device_id=$3::uuid');
-    expect(query).toContain('responsible_operator_id=$4::uuid');
     expect(query).not.toContain('device_id=$4::uuid');
-    expect(query).toContain('[merchantId, locationId, deviceId, operatorId]');
+    expect(query).toContain('[merchantId, locationId, deviceId]');
+    // THE DRAWER'S CUSTODY IS THE TERMINAL'S, NOT THE PERSON'S.
+    //
+    // This query used to demand `responsible_operator_id = the caller`, and that
+    // predicate stranded a café after an app update: the reinstall mints a new
+    // operator session, the drawer is still held by this very terminal, and the
+    // shift went INVISIBLE — so the till offered to open a shift the server then
+    // refused, with no action that could work. Who opened the drawer still decides
+    // what happens next (`operator_mismatch` → `['resume']`), but it must not decide
+    // whether the terminal can see its own drawer. Measured on the iMin, 2026-10-11.
+    expect(query).not.toContain('responsible_operator_id=$4::uuid');
+    expect(query).not.toContain('AND responsible_operator_id');
   });
 
   it('sends ledgerSequence as a number, never as a bigint string', () => {
@@ -76,6 +89,11 @@ describe('POS cash center SQL regression', () => {
     // A recorded variance reason is a decision about money. This undoes a count,
     // not a decision, so the presence of a resolution refuses the exit.
     expect(source).toContain('VARIANCE_ALREADY_RESOLVED');
-    expect(source).toContain("SET status='open',version=version+1,suspended_at=NULL");
+    // The exit no longer forces 'open'. A drawer whose count is still waiting for
+    // approval stays in reconciliation, because from 'open' the close had no route
+    // (the iMin shift of 2026-10-07 with its count of 2026-10-08). What the
+    // resumption clears is the suspension.
+    expect(source).toContain("THEN 'reconciliation_required'");
+    expect(source).toContain('version=version+1,suspended_at=NULL');
   });
 });

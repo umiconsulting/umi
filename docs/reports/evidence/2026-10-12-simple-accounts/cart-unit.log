@@ -1,0 +1,12 @@
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/juan/Projects/umiconsulting/umi/apps/umi-api
+
+ ✓ src/modules/pos-cart/pos-cart.service.spec.ts (11 tests) 8ms
+ ✓ src/modules/pos-cart/pos-cart.repository.spec.ts (6 tests) 7ms
+
+ Test Files  2 passed (2)
+      Tests  17 passed (17)
+   Start at  04:57:59
+   Duration  620ms (transform 258ms, setup 0ms, collect 682ms, tests 16ms, environment 0ms, prepare 95ms)
+
