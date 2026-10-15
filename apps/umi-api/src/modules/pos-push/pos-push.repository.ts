@@ -98,6 +98,19 @@ export class PosPushRepository {
     );
   }
 
+  /**
+   * A quién se le avisa que un platillo está listo: **a los meseros**.
+   *
+   * No a quien capturó el pedido. Antes esta consulta elegía al operador que había
+   * enviado la línea a cocina (`pos_cart_line.fired_by_user_id`), y eso significa
+   * que si el cajero mandaba una cuenta de mesa, el aviso de cocina le llegaba al
+   * cajero — que no va a llevar el plato — mientras el mesero que trae el POS
+   * portátil no se enteraba de nada.
+   *
+   * El aviso va a los operadores que llevan el POS portátil en esa sucursal: los
+   * que tienen un rol de mesero activo y un token vivo de este entorno y proyecto.
+   * Un token sin sesión abierta, revocado o de otro aparato no recibe nada.
+   */
   async recipients(input: {
     merchantId: string;
     kitchenOrderId: string;
@@ -115,11 +128,12 @@ export class PosPushRepository {
            AND ki.merchant_id=ko.merchant_id AND ki.id=$3::uuid
          JOIN merchant.pos_cart c ON c.fired_order_id=ko.source_order_id
            AND c.merchant_id=ko.merchant_id AND c.location_id=ko.location_id
-         JOIN merchant.pos_cart_line line ON line.cart_id=c.id
-           AND line.merchant_id=c.merchant_id
-           AND line.order_item_id=ki.source_order_item_id
          JOIN runtime.pos_push_token p ON p.merchant_id=ko.merchant_id
-           AND p.location_id=ko.location_id AND p.user_id=line.fired_by_user_id
+           AND p.location_id=ko.location_id
+         JOIN merchant.staff st ON st.merchant_id=p.merchant_id
+           AND st.user_id=p.user_id AND st.status='active'
+         JOIN merchant.role waiter ON waiter.id=st.merchant_role_id
+           AND waiter.merchant_id=st.merchant_id AND waiter.key='waiter'
          JOIN runtime.operator_session os ON os.id=p.operator_session_id
            AND os.merchant_id=p.merchant_id AND os.user_id=p.user_id
            AND os.device_id=p.device_id AND os.location_id=p.location_id
