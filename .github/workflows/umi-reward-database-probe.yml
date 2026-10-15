@@ -1,0 +1,92 @@
+name: Reward release database check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Share the deployment lock. This check never calls the deployment workflow.
+concurrency:
+  group: deploy-umi-api
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: ${{ github.ref == 'refs/heads/main' && vars.UMI_REWARD_RELEASE_HOLD == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Test diagnostic controls
+        run: node --test scripts/umi-reward-database-probe.spec.cjs
+
+      - name: Check the existing worker connection
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT || '22' }}
+        shell: bash
+        run: |
+          set +x
+          set -euo pipefail
+          umask 077
+          test -n "$SSH_KEY"
+          [[ "$SSH_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]]
+          [[ "$SSH_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]{1,5}$ ]]
+          SSH_PORT=$((10#$SSH_PORT))
+          ((SSH_PORT >= 1 && SSH_PORT <= 65535))
+          probe_dir=$(mktemp -d)
+          trap 'rm -rf -- "$probe_dir"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$probe_dir/key"
+          read -r key_type key_data < .github/umi-vps-ed25519.pub
+          test "$key_type" = 'ssh-ed25519'
+          key_host="$SSH_HOST"
+          if [ "$SSH_PORT" != 22 ]; then key_host="[$SSH_HOST]:$SSH_PORT"; fi
+          printf '%s %s %s\n' "$key_host" "$key_type" "$key_data" > "$probe_dir/known_hosts"
+          probe_status=0
+          # HOME expands on the VPS, after SSH authenticates the saved host key.
+          # shellcheck disable=SC2016
+          timeout 90s ssh -F /dev/null -i "$probe_dir/key" \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=yes -o HostKeyAlgorithms=ssh-ed25519 \
+            -o UserKnownHostsFile="$probe_dir/known_hosts" -o GlobalKnownHostsFile=/dev/null \
+            -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            'cd "$HOME/umi/apps/umi-api" && docker compose -f docker-compose.yml exec -T umi-worker node -' \
+            < scripts/umi-reward-database-probe.cjs \
+            > "$probe_dir/result.json" 2> "$probe_dir/errors" || probe_status=$?
+          # Treat remote output as untrusted. Print only the fixed result fields.
+          PROBE_RESULT_FILE="$probe_dir/result.json" node <<'NODE'
+          const fs = require('node:fs');
+          try {
+            const result = JSON.parse(fs.readFileSync(process.env.PROBE_RESULT_FILE, 'utf8'));
+            if (result.ok !== true) {
+              const stages = ['configuration', 'connection', 'tls', 'query', 'validation', 'close'];
+              const stage = stages.includes(result.stage) ? result.stage : 'transport';
+              console.log(JSON.stringify({ok: false, stage, error: 'CHECK_FAILED'}));
+              process.exitCode = 1;
+            } else {
+              const fields = ['clientTlsVerified', 'databaseMatches', 'readOnly', 'canonicalSchemas',
+                'tenantMatches', 'serverTls', 'roleIsPostgres', 'roleIsSuperuser',
+                'roleHasBypassRls', 'allCanonicalTablesReadable', 'rewardSchemaPresent'];
+              const required = fields.slice(0, 5);
+              if (result.project !== 'xbudknbimkgjjgohnjgp' ||
+                fields.some(field => typeof result[field] !== 'boolean') ||
+                required.some(field => result[field] !== true) ||
+                !Number.isInteger(result.serverMajor) || result.serverMajor < 17 || result.serverMajor > 99) {
+                throw new Error('Invalid probe result');
+              }
+              console.log(JSON.stringify({ok: true, project: 'xbudknbimkgjjgohnjgp',
+                serverMajor: result.serverMajor, ...Object.fromEntries(fields.map(field => [field, result[field]]))}));
+            }
+          } catch {
+            console.log(JSON.stringify({ok: false, stage: 'transport', error: 'CHECK_FAILED'}));
+            process.exitCode = 1;
+          }
+          NODE
+          test "$probe_status" = 0
