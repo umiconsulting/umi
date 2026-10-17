@@ -42,6 +42,25 @@ Wallet updates and reminders require a healthy worker and delivery configuration
 This release activates El Gran Ribera only. All commands below use its fixed UUID.
 Use the approved database connection through a protected libpq service named `umi-production-admin`.
 Keep its credentials outside Git and command arguments.
+
+Add this entry to the operator's `~/.pg_service.conf`. Preserve the other entries.
+The endpoint identifies the Supabase project verified for the private backup.
+
+```ini
+[umi-production-admin]
+host=aws-1-us-east-2.pooler.supabase.com
+port=5432
+user=postgres.xbudknbimkgjjgohnjgp
+dbname=postgres
+sslmode=verify-full
+sslrootcert=/absolute/path/to/provider-ca.crt
+connect_timeout=10
+```
+
+Replace the certificate path with the protected provider CA file. Confirm the project and administrator login before production access.
+Set the service file permissions to `0600`. Keep the password in the existing protected password file, or enter it at the hidden `psql` prompt.
+The service entry contains no password. A connection error stops the command.
+
 Run preflight after the base migration and before activation.
 Save results outside Git because the results contain customer balances.
 
@@ -74,13 +93,15 @@ PGSERVICE=umi-production-admin psql -X -v ON_ERROR_STOP=1 \
 These are separate release stages. Record each migration version and result in the private deployment record.
 Repeat preflight immediately before activation if deployment or verification changed the database.
 The generic `single-cycle-activate.sql` script is retired. It refuses execution and points to the EGR migration.
-The migration skips only an empty merchant table. A populated database without EGR stops with an error.
+The migration requires EGR to exist, including in an otherwise empty database. An absent tenant stops with an error.
+It never reports successful activation before the tenant exists. Run the migration after tenant creation.
 Either identity mismatch also stops the migration.
 It holds the merchant row lock through activation and verifies the resulting 30-day policy.
 The build-v3 bootstrap remains base-only. It never includes the tenant activation migration.
 
 The migration postcondition checks the policy. The verification script also reports card state, audit candidates, and activation grace deadlines.
-Compare its results with the saved preflight before the controlled staff workflow. Incorrect activation grace deadlines must be zero.
+Compare its results with the saved preflight before the controlled staff workflow.
+Verification must exit successfully. It raises an error for an inactive or incompatible policy, or an incorrect activation grace deadline.
 Check unaudited candidate IDs against the saved preflight card IDs. A card present in preflight must have an activation audit if it still exists.
 Card creation timestamps use the start of the registration transaction. A transaction can start before activation and insert its card afterward.
 Such a card needs no activation audit. Use the saved preflight IDs to identify the original cards; the timestamp filter is only a diagnostic.
@@ -95,6 +116,49 @@ Reactivation preserves the first activation time and deadlines.
 Verify one controlled staff workflow in production after activation.
 Use an approved fixture card and receipt. Read the committed response and history.
 Do not use a customer's balance as a release test.
+
+## Reproduce the EGR pilot
+
+The pilot retains its fixed UUID and handle. Recreating that identity requires a separate reviewed change; activation does not select a replacement tenant.
+The customer card and scan APIs already expose `rewardPolicy`, `rewardExpiryDays`, and the reward deadline through the [policy response fields](../../apps/umi-api/src/shared/loyalty/reward-policy-presentation.ts).
+Cash and [dashboard screens](../../apps/umi-dashboard/src/screens/customers.jsx) already show the reward choices, retained visits, expiry, and blocked visits.
+This release needs no new policy settings interface.
+
+Use a dedicated database whose name starts with `umi_egr_pilot_fixture_` for the EGR fixture.
+The fixture refuses the production database name. Use the same fixture on a dedicated staging database after the canonical schema exists.
+Keep the shared ONCA rehearsal database unchanged.
+
+Use the repository's local PostgreSQL 17 service on port 4003. Put the PostgreSQL client tools on `PATH`.
+Add this separate service entry:
+
+```ini
+[umi-egr-local]
+host=127.0.0.1
+port=4003
+user=postgres
+dbname=umi_egr_pilot_fixture_local
+sslmode=disable
+```
+
+Start PostgreSQL with the existing protected local configuration. Create a separate fixture database.
+Apply the canonical build-v3 schema with its base reward migration before the fixture:
+
+```sh
+docker compose --env-file deploy/local/.env -f deploy/local/compose.yml up -d postgres
+createdb -h 127.0.0.1 -p 4003 -U postgres umi_egr_pilot_fixture_local
+PGSERVICE=umi-egr-local bash docs/migration/build-v3/00_run.sh umi_egr_pilot_fixture_local
+PGSERVICE=umi-egr-local psql -X -v ON_ERROR_STOP=1 \
+  -f docs/releases/sql/single-cycle-egr-fixture.sql
+```
+
+The fixture creates the exact EGR identity, the 7/9 reward ladder, and sample progress without production customer data.
+It does not activate the policy. Reruns preserve existing card progress and activation deadlines.
+Run the preflight, gated activation migration, and verification commands above with `PGSERVICE=umi-egr-local`.
+On staging, select a separate service with the staging host, port, administrator, provider CA, and dedicated fixture database.
+Keep verified TLS enabled for remote staging connections.
+
+The canonical rehearsal test runs this fixture with the actual migration and activation routine in CI.
+It also checks that verification fails for an absent policy or an incorrect grace deadline.
 
 ## Recovery and rollback
 

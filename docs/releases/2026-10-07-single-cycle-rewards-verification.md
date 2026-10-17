@@ -48,7 +48,7 @@ Original history and the gift, stored value, and points tables remained unchange
 Partial progress and existing reward obligations remained preserved.
 Further base and activation applications preserved policy timestamps, deadlines, all card data, entitlements, links, and audits.
 The initial PostgreSQL guard suite passed 13 tests. The review corrections increased this suite to 20 tests, and all passed.
-The revised guards reject a missing EGR tenant in a populated database and require the exact transaction activation setting.
+The revised guards reject a missing EGR tenant, including in an empty database, and require the exact transaction activation setting.
 The substitute routine and table now match the real policy constraints, activation-time check, and pending-policy update.
 The lock test restores its committed fixture, and a subsequent test verifies that cleanup.
 
@@ -60,6 +60,27 @@ For live activation, compare candidate card IDs with the saved preflight. An ove
 
 No application consumers started, and this rehearsal made no production changes.
 The worker, Cash build, and delivery checks remain open. Keep reminder flags off until the approved template adapter passes verification.
+
+## Reproducible EGR fixture, October 17
+
+The final follow-up passed all 20 migration guard tests on PostgreSQL 17.11.
+The empty-database regression failed before removal of the successful skip. It now verifies that a failed activation makes no policy writes and that seeding EGR permits a retry.
+
+A separate fresh database passed the actual `00_run.sh` bootstrap and all nine canonical rehearsal tests.
+The synthetic fixture uses the exact EGR identity and a 7/9 reward ladder without production customer data.
+It rejects unsafe database names and incompatible reward ladders. Fixture and activation reruns preserve changed progress, policy timestamps, and reward deadlines.
+Another tenant's policy and cards remain unchanged.
+
+The verification regressions first reproduced successful exits for an absent policy and an incorrect grace deadline.
+The final script exits with an SQL error for those cases and for an incompatible active policy.
+The tests require `psql` exit code 3 and the expected diagnostic, so connection failures cannot satisfy these assertions.
+The local-only harness also passed with an inherited `PGHOSTADDR` override after removing that override from child connections.
+Verification uses one read-only, repeatable-read snapshot in UTC.
+The stricter script also passed against the restored archive, and the saved history and balance preservation assertions passed again.
+
+The canonical rehearsal is part of API CI. The base reward migration and `00_run.sh` remain unchanged.
+The release guide includes the libpq service setup and separate local and staging fixture instructions.
+No production database was accessed or changed during this follow-up.
 
 ## Browser operations
 

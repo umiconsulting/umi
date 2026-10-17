@@ -178,9 +178,9 @@ describe('EGR activation migration guards (with a substitute activation routine)
     );
   });
 
-  test('skips an empty merchant table without release opt-in', async () => {
-    await client.query(migration);
-    await client.query(migration);
+  test('rejects an empty merchant table and permits activation after EGR is seeded', async () => {
+    await rejectsWithoutMutation(/EGR.*absent/i, { authorize: false });
+    await rejectsWithoutMutation(/EGR.*absent/i);
     assert.equal(
       (await client.query('SELECT count(*)::int n FROM merchant.loyalty_reward_policy')).rows[0].n,
       0,
@@ -190,11 +190,24 @@ describe('EGR activation migration guards (with a substitute activation routine)
       0,
     );
     assert.deepEqual((await client.query('SELECT id FROM merchant.merchant')).rows, []);
+    await seed();
+    await activate();
+    assert.deepEqual(
+      (
+        await client.query(
+          'SELECT merchant_id,mode,expiry_days,started_at IS NOT NULL AS started FROM merchant.loyalty_reward_policy',
+        )
+      ).rows,
+      [{ merchant_id: merchantId, mode: 'single_cycle', expiry_days: 30, started: true }],
+    );
+    assert.deepEqual((await client.query('SELECT * FROM merchant.activation_calls')).rows, [
+      { merchant_id: merchantId, days: 30 },
+    ]);
   });
 
   test('rejects absent EGR identities in a nonempty merchant table', async () => {
     await seed(otherId, 'ci-rehearsal');
-    await rejectsWithoutMutation(/EGR.*absent.*nonempty/i);
+    await rejectsWithoutMutation(/EGR.*absent/i);
   });
 
   test('accepts exact release opt-in for target activation', async () => {

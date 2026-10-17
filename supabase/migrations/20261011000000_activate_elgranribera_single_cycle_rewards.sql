@@ -22,11 +22,7 @@ BEGIN
   END LOOP;
 
   IF identity_count = 0 THEN
-    IF NOT EXISTS (SELECT 1 FROM merchant.merchant) THEN
-      RAISE NOTICE 'Merchant table is empty; EGR activation skipped';
-      RETURN;
-    END IF;
-    RAISE EXCEPTION 'EGR identities are absent in a nonempty merchant table';
+    RAISE EXCEPTION 'EGR identities are absent; seed the exact EGR identity before activation';
   END IF;
   IF identity_count <> 1 OR identity_matches IS NOT TRUE THEN
     RAISE EXCEPTION 'EGR identity mismatch: UUID and handle must identify the same merchant';
