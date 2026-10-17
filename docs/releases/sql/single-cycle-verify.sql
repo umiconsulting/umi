@@ -12,4 +12,24 @@ WHERE merchant_id=:'merchant_id'::uuid AND redeemed_at IS NULL AND expired_at IS
 GROUP BY source,recovery,tier ORDER BY source,recovery,tier;
 SELECT count(*) AS activated_cards,sum(imported_units) AS imported_obligations
 FROM merchant.loyalty_reward_activation_audit WHERE merchant_id=:'merchant_id'::uuid;
+-- created_at uses transaction start. Compare these candidates with saved preflight IDs.
+SELECT count(*) AS earlier_creation_timestamps,
+  count(a.card_id) AS audited_candidates,
+  count(*) FILTER (WHERE a.card_id IS NULL) AS unaudited_candidates
+FROM merchant.loyalty_card c
+JOIN merchant.loyalty_reward_policy p ON p.merchant_id=c.merchant_id
+LEFT JOIN merchant.loyalty_reward_activation_audit a
+  ON a.merchant_id=c.merchant_id AND a.card_id=c.id
+WHERE c.merchant_id=:'merchant_id'::uuid AND c.created_at<=p.started_at;
+SELECT c.id AS unaudited_candidate_card_id,c.created_at
+FROM merchant.loyalty_card c
+JOIN merchant.loyalty_reward_policy p ON p.merchant_id=c.merchant_id
+LEFT JOIN merchant.loyalty_reward_activation_audit a
+  ON a.merchant_id=c.merchant_id AND a.card_id=c.id
+WHERE c.merchant_id=:'merchant_id'::uuid AND c.created_at<=p.started_at AND a.card_id IS NULL;
+SELECT count(*) AS incorrect_activation_grace_deadlines
+FROM merchant.loyalty_reward_entitlement e
+JOIN merchant.loyalty_reward_policy p ON p.merchant_id=e.merchant_id
+WHERE e.merchant_id=:'merchant_id'::uuid AND e.activated_at=p.started_at
+  AND e.expires_at IS DISTINCT FROM p.started_at+make_interval(days=>p.expiry_days);
 COMMIT;
