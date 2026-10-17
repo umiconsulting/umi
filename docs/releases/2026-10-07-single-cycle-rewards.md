@@ -1,6 +1,6 @@
 # Single cycle reward release
 
-Status: local implementation. Production activation has not occurred.
+Status: local migration rehearsal passed. Current production database activation remains unverified.
 
 Current production gates are recorded in [the production preparation record](2026-10-07-single-cycle-rewards-production-preflight.md).
 
@@ -19,13 +19,17 @@ Retained visits have no deadline until their next visit 7.
 5. Deploy the matching API, worker, Cash, dashboard, and contract artifacts.
 6. Verify Cash forwards scans to the canonical API through `CASH_API_ORIGIN`.
 7. Verify pass requests use the canonical API through `WALLET_API_ORIGIN`.
-8. Enable `OUTBOX_RELAY_ENABLED=true` for the worker's reminder delivery.
-9. Enable `LIFECYCLE_CRONS_ENABLED=true` for seven-day reminders.
+8. Keep `OUTBOX_RELAY_ENABLED=false` until the approved WhatsApp template adapter is implemented and verified.
+9. Keep `LIFECYCLE_CRONS_ENABLED=false` until that adapter and the effects on other scheduled jobs are reviewed.
 10. Confirm the system queue runs `stamp_reward_expiry` every 60 seconds.
 11. Verify wallet provider credentials and channels in the target environment.
 12. Announce the 30-day grace period for existing rewards before activation.
 
-The migration starts no tenant policy. Activation is a separate production action.
+The base migration starts no tenant policy. Apply the separate activation migration after the compatible backend and clients deploy.
+The activation migration is `supabase/migrations/20261011000000_activate_elgranribera_single_cycle_rewards.sql`.
+It activates only UUID `a13905a2-0319-4cc1-cacf-eee47b75e309` with handle `elgranribera`.
+Apply the base migration first. Deploy the compatible API and worker next, then the compatible clients. Apply activation last.
+Keep the activation migration out of any database release that precedes those deployments.
 Both build-time Cash origins need verification in the deployed artifact.
 Changing environment values without rebuilding can leave earlier routes in service.
 Expiry checks run inside mutations and reads even when the worker is late.
@@ -34,19 +38,24 @@ Wallet updates and reminders require a healthy worker and delivery configuration
 ## Preflight and activation
 
 Use the scripts beside this document with an explicit merchant UUID.
-Run preflight after the migration and before activation.
+Run preflight after the base migration and before activation.
 Save results outside Git because the results contain customer balances.
 
 ```sh
 psql "$TARGET_DATABASE_URL" -v ON_ERROR_STOP=1 -v merchant_id="$TARGET_MERCHANT_ID" \
   -f docs/releases/sql/single-cycle-preflight.sql
 
-psql "$TARGET_DATABASE_URL" -v ON_ERROR_STOP=1 -v merchant_id="$TARGET_MERCHANT_ID" \
-  -f docs/releases/sql/single-cycle-activate.sql
+# Apply the reviewed activation migration after the compatible backend and clients are verified.
 
 psql "$TARGET_DATABASE_URL" -v ON_ERROR_STOP=1 -v merchant_id="$TARGET_MERCHANT_ID" \
   -f docs/releases/sql/single-cycle-verify.sql
 ```
+
+Apply the activation migration through the reviewed migration release between preflight and verification.
+The old `single-cycle-activate.sql` script stops with a pointer to that migration.
+The migration skips a database only when both tenant identities are absent. Either identity mismatch stops the migration.
+It holds the merchant row lock through activation and verifies the resulting 30-day policy.
+The build-v3 bootstrap remains base-only. It never includes the tenant activation migration.
 
 Activation locks cards and imports existing obligations with a 30-day grace period.
 It normalizes cycle anchors and preserves lifetime events and partial progress.

@@ -1,13 +1,13 @@
 # Production preparation for single cycle rewards
 
-Checked October 7, 2026, America/Mazatlan. This records preparation, not a production release.
+Updated October 17, 2026, America/Mazatlan. This records preparation, not a production release.
+The production observations below date from October 7 unless stated otherwise.
 
 Implementation: [PR 213](https://github.com/umiconsulting/umi/pull/213).
-The reward policy, expiry, and scan screen changes have not been deployed.
-The additive migration has not been applied, and no merchant policy has been activated.
+Current production database migration and activation states remain unverified.
 The separate authorized customer balance correction is complete; its evidence stays outside Git.
 
-## Verified
+## Verified on October 7
 
 - The production API reports Healthy, with database and Redis checks passing.
 - It serves commit `fabffb075f343283ac65b13ea1d21ef6ddef8032`, contract `2.23.0`, and current/expected schema `build-v3-79`.
@@ -18,11 +18,27 @@ The separate authorized customer balance correction is complete; its evidence st
 - The Cash status says **Canceled by Ignored Build Step**. It does not prove a Cash preview build.
 - CodeRabbit skipped review because the PR is a draft. The independent implementation review is recorded separately.
 
-## Remaining gates
+## Production observations, October 17
 
-1. Obtain a working protected production connection and create a fresh private backup. The saved database password was rejected by both the provider's direct endpoint and its documented session pooler. Its dotenv parsing was independently checked. No dump exists yet. The provider backup metadata API returned an empty backup list with point-in-time recovery disabled, so it supplies no existing backup to restore.
-2. Rehearse restoration in the isolated local PostgreSQL 17 cluster. Production includes provider-managed extensions; document any local restore omissions and verify the complete application data and schema.
-3. Apply the additive migration before deploying API readers. Check the new tables, functions, grants, and migration behavior explicitly: the migration does not change the `build-v3-79` readiness stamp.
+The production API reported Healthy at commit `7f4d2f4c0abd0e77cc5ea1616cf4ed133c4c6d59`, contract `2.39.0`, and schema `build-v3-79`.
+The release hold was `false`, with its last update on October 14 at 21:32 UTC.
+These deployments occurred outside this rehearsal. Current database migration and tenant activation states require read-only verification.
+API health does not prove worker execution or the current client builds.
+
+## Backup and restore evidence, October 17
+
+The complete custom archive was created on October 11. Its checksum passed a fresh verification on October 17.
+The isolated PostgreSQL 17.11 restore passed for `umi`, `merchant`, and `runtime`, with the required public trigger function and supported extensions.
+Canonical metadata, the compared application data, and sequence states matched the archive.
+Provider schemas and extensions remain outside the local restore scope. The complete archive remains preserved.
+The [verification record](2026-10-07-single-cycle-rewards-verification.md#archive-restore-and-activation-rehearsal-october-17) states the compatibility adjustments and activation results.
+No application consumers started, and this rehearsal made no production changes.
+
+## Release gates
+
+1. Backup access and archive verification passed. Create a fresh private backup immediately before the production release.
+2. Restoration passed for the application scope described above. Retain the complete archive and review the provider exclusions before production changes.
+3. Verify the current production database state through read-only checks before further migration actions. Check the tables, functions, grants, and tenant policy explicitly: the migration does not change the `build-v3-79` readiness stamp.
 4. Verify the production worker's scheduler, consumer, expiry queue, and delivery settings. API health proves API readiness; it does not prove worker execution.
 5. Confirm a Cash production build runs and embeds both canonical API origins. An earlier completed Git integration deployment exists, but recent main deployments and this PR were skipped by the ignored-build rule.
 6. Implement the approved-template request path before enabling proactive WhatsApp reminders. The current adapter sends a plain message body, which does not meet the provider's template requirement outside the 24-hour customer service window. Configuration alone cannot fix that request. Complete delivery configuration and review the effect of global lifecycle flags on other scheduled jobs. Database expiry can operate while reminders remain disabled.
@@ -35,15 +51,14 @@ Reminder delivery references: [WhatsApp service window](https://www.twilio.com/d
 
 No credentials, private backup, or customer reconciliation data belong in the PR.
 
-## Merge into main with deployment held
+## Historical deployment hold plan
 
-The October 10 merge uses a deployment hold so the reviewed code can enter `main` before the database migration.
+The October 10 plan held deployment so reviewed code could enter `main` before the database migration.
+The GitHub jobs checked `UMI_REWARD_RELEASE_HOLD`. The Cash and dashboard configurations disabled Vercel deployments from `main`.
+The plan required the matching API and worker before the clients.
 
-- Set repository variable `UMI_REWARD_RELEASE_HOLD=true` before the merge. Both production GitHub deployment jobs check it. Dashboard previews stay enabled.
-- Cash and dashboard Vercel configurations set `git.deploymentEnabled.main=false`. Other branches retain the provider's default deployment behavior.
-- Keep the three production apps on their current versions. New clients offer durable redemption retries, which the old API cannot honor.
-- After the backup, migration, and release checks pass, release the hold through a reviewed change. Deploy the matching API and worker before the clients.
-- Restore Vercel main deployments only after the matching API is ready. Remove or set the repository hold variable to `false` only as part of that release.
-- The API workflow has no manual dispatch trigger. Plan a current-main deployment trigger after the database checks; re-enabling a trigger does not deploy a missed commit.
+The October 17 observations above supersede that planned hold state.
+Use the current release gates and [release sequence](2026-10-07-single-cycle-rewards.md) for subsequent actions.
+Verify the current database and deployments before any production change.
 
 Configuration source: [Vercel configuration schema](https://openapi.vercel.sh/vercel.json). It defines branch-specific deployment control and enables unspecified branches by default.
