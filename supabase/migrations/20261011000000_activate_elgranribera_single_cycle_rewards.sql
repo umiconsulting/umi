@@ -1,5 +1,7 @@
 -- El Gran Ribera activation migration.
 -- Release order: base migration, compatible backend and clients, then this migration.
+-- Set the release opt-in only after the required application checks pass.
+-- The opt-in records the operator decision; it does not verify application versions.
 -- One DO statement keeps the identity check and activation atomic.
 DO $activation$
 DECLARE
@@ -20,8 +22,11 @@ BEGIN
   END LOOP;
 
   IF identity_count = 0 THEN
-    RAISE NOTICE 'EGR identities are absent; activation skipped';
-    RETURN;
+    IF NOT EXISTS (SELECT 1 FROM merchant.merchant) THEN
+      RAISE NOTICE 'Merchant table is empty; EGR activation skipped';
+      RETURN;
+    END IF;
+    RAISE EXCEPTION 'EGR identities are absent in a nonempty merchant table';
   END IF;
   IF identity_count <> 1 OR identity_matches IS NOT TRUE THEN
     RAISE EXCEPTION 'EGR identity mismatch: UUID and handle must identify the same merchant';
@@ -30,6 +35,11 @@ BEGIN
   IF to_regprocedure('merchant.activate_single_cycle_reward_policy(uuid,integer)') IS NULL
      OR to_regclass('merchant.loyalty_reward_policy') IS NULL THEN
     RAISE EXCEPTION 'Apply the base reward schema migration before EGR activation';
+  END IF;
+
+  IF current_setting('umi.reward_policy_activation', true)
+     IS DISTINCT FROM 'elgranribera:20261011000000' THEN
+    RAISE EXCEPTION 'EGR activation requires umi.reward_policy_activation = elgranribera:20261011000000 after application verification';
   END IF;
 
   PERFORM merchant.activate_single_cycle_reward_policy(target_id, 30);

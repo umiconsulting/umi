@@ -47,7 +47,16 @@ The actual EGR activation migration passed against the restored application.
 Original history and the gift, stored value, and points tables remained unchanged.
 Partial progress and existing reward obligations remained preserved.
 Further base and activation applications preserved policy timestamps, deadlines, all card data, entitlements, links, and audits.
-The separate PostgreSQL guard suite passed all 13 tests, including identity mismatches, rollback, and the merchant row lock.
+The initial PostgreSQL guard suite passed 13 tests. The review corrections increased this suite to 20 tests, and all passed.
+The revised guards reject a missing EGR tenant in a populated database and require the exact transaction activation setting.
+The substitute routine and table now match the real policy constraints, activation-time check, and pending-policy update.
+The lock test restores its committed fixture, and a subsequent test verifies that cleanup.
+
+The revised migration also passed a fresh archive restore with the actual activation routine.
+An attempt without the activation setting failed and left the policy and entitlement tables empty.
+The documented transaction command activated the policy. Its rerun preserved all data in the saved comparison.
+The revised verification script reported zero unaudited candidates and zero incorrect activation grace deadlines in the restored snapshot.
+For live activation, compare candidate card IDs with the saved preflight. An overlapping registration can have an earlier transaction timestamp without an activation audit.
 
 No application consumers started, and this rehearsal made no production changes.
 The worker, Cash build, and delivery checks remain open. Keep reminder flags off until the approved template adapter passes verification.
