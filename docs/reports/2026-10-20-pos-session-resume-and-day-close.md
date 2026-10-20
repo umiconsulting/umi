@@ -60,12 +60,14 @@ Sources:
 - [Square — Create and edit open tickets](https://squareup.com/help/us/en/article/5337-use-open-tickets-with-square)
 - [Toast — Find Checks](https://support.toasttab.com/en/article/Finding-Checks)
 - [Toast — Send, Stay and Hold](https://support.toasttab.com/en/article/Differences-Between-the-Send-Stay-and-Hold-Buttons)
+- [Toast — Manage Payments and the Payment Terminal](https://support.toasttab.com/en/article/New-POS-Managing-Payments)
 - [Lightspeed — About the Orders List](https://resto-support.lightspeedhq.com/hc/en-us/articles/360005901634-About-the-Orders-List)
 - [Lightspeed — Hold an order](https://o-series-support.lightspeedhq.com/hc/en-us/articles/31329465555739-How-to-hold-an-order-with-Lightspeed)
 
 Public product images reviewed:
 
 - [Square check actions](evidence/2026-10-20-session-resume/square-check-actions.png)
+- [Toast Payment Terminal with Open, Paid and Closed checks](evidence/2026-10-20-session-resume/toast-payment-terminal.png)
 - [Lightspeed Orders](evidence/2026-10-20-session-resume/lightspeed-orders.png)
 
 Independent-review limit: searches in English and Spanish did not return a
