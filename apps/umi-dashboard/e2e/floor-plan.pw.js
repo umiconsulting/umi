@@ -2,6 +2,63 @@ import { test, expect } from '@playwright/test';
 
 const merchantId = '11111111-1111-4111-8111-111111111111';
 const locationId = '22222222-2222-4222-8222-222222222222';
+const blockedTableId = '44444444-4444-4444-8444-444444444444';
+const blockedAccountId = '55555555-5555-4555-8555-555555555555';
+
+function blockedPlan(x = 200) {
+  return {
+    schemaVersion: 1,
+    areas: [
+      {
+        id: '66666666-6666-4666-8666-666666666666',
+        name: 'Salon',
+        width: 1000,
+        height: 700,
+        elements: [
+          {
+            id: blockedTableId,
+            kind: 'table',
+            shape: 'rectangle',
+            label: 'Brasil',
+            capacity: 4,
+            x,
+            y: 200,
+            width: 100,
+            height: 70,
+            rotation: 0,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function occupiedRoom() {
+  return {
+    locationId,
+    serverTime: new Date().toISOString(),
+    states: [
+      {
+        tableId: blockedTableId,
+        state: 'seated',
+        seatedAt: new Date(Date.now() - 600_000).toISOString(),
+        partySize: 2,
+        groupId: null,
+        openAccountId: blockedAccountId,
+        openAccountFolio: 'Cuenta 012',
+        openAccountTableId: blockedTableId,
+      },
+    ],
+  };
+}
+
+function occupiedRefusal() {
+  return {
+    tableIds: [blockedTableId],
+    blockers: ['Brasil'],
+    blockerAccounts: [`${blockedTableId}|${blockedAccountId}|4|012`],
+  };
+}
 
 // The element list is the room in words: the board itself is a canvas, so this list is
 // what a screen reader gets. Each table button therefore reads
@@ -10,7 +67,7 @@ const locationId = '22222222-2222-4222-8222-222222222222';
 // separately, by the tests that care about it.
 const tableItem = (page) => page.getByRole('button', { name: /^T1 · 4(?: ·|$)/ });
 
-async function openEditor(page) {
+async function openEditor(page, options = {}) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const server = {
@@ -21,8 +78,16 @@ async function openEditor(page) {
       publishedVersion: 0,
       published: null,
       publishedAt: null,
+      ...options.state,
     },
     writes: [],
+    publishes: [],
+    room: options.room ?? {
+      locationId,
+      serverTime: new Date().toISOString(),
+      states: [],
+    },
+    occupied: options.occupied ?? null,
     delay: 0,
   };
   await page.addInitScript(() => {
@@ -52,11 +117,31 @@ async function openEditor(page) {
           products: { dashboard: { status: 'active' } },
         },
       });
+    if (url.pathname.endsWith('/table-state')) return route.fulfill({ json: server.room });
     if (url.pathname.includes('/floor-plan')) {
       if (request.method() !== 'GET') {
         const body = request.postDataJSON();
+        if (!body.document && server.occupied && !body.closeBlockingAccounts) {
+          server.publishes.push(body);
+          return route.fulfill({
+            status: 409,
+            json: {
+              statusCode: 409,
+              error: {
+                code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+                message: 'Occupied table',
+                fieldErrors: server.occupied,
+              },
+            },
+          });
+        }
+        if (!body.document && body.closeBlockingAccounts) {
+          server.occupied = null;
+          server.room = { ...server.room, states: [] };
+        }
         expect(body.expectedVersion).toBe(server.state.version);
         server.writes.push(body);
+        if (!body.document) server.publishes.push(body);
         server.state = { ...server.state, version: server.state.version + 1 };
         if (body.document) server.state.draft = body.document;
         else
@@ -339,5 +424,124 @@ test('a long resize normalizes scale and locks edits during a delayed save', asy
   });
   await expect(page.getByLabel('Width', { exact: true })).toHaveValue('100');
   await expect(page.getByLabel('Height', { exact: true })).toHaveValue('70');
+  expect(errors).toEqual([]);
+});
+
+test('an occupied publish offers close or wait, and resumes the queue after reload', async ({
+  page,
+}) => {
+  const { server, errors } = await openEditor(page, {
+    state: {
+      version: 3,
+      draft: blockedPlan(200),
+      publishedVersion: 3,
+      published: blockedPlan(100),
+      publishedAt: new Date().toISOString(),
+    },
+    room: occupiedRoom(),
+    occupied: occupiedRefusal(),
+  });
+
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(
+    dialog.getByRole('heading', { name: 'The floor plan was not published' }),
+  ).toBeVisible();
+  await expect(dialog.getByText('Brasil · Account 012', { exact: true })).toBeVisible();
+  expect(server.publishes).toHaveLength(1);
+
+  await dialog.getByRole('button', { name: 'Wait and publish automatically' }).click();
+  await expect(page.getByText('Publication queued', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      'The floor plan will publish automatically when these tables are free. The till keeps using the current plan while it waits.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(server.publishes).toHaveLength(1);
+
+  await page.reload();
+  await expect(page.getByText('Publication queued', { exact: true })).toBeVisible();
+  expect(server.publishes).toHaveLength(1);
+
+  server.occupied = null;
+  server.room = { ...server.room, states: [] };
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(
+    page.getByText('Floor plan published. The blocking tables are now free.', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(server.publishes).toHaveLength(2);
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem(
+        `umi:floor-plan:publish-queue:${'11111111-1111-4111-8111-111111111111'}:${'22222222-2222-4222-8222-222222222222'}`,
+      ),
+    ),
+  ).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test('closing blocking accounts publishes only after the operator chooses it', async ({ page }) => {
+  const { server, errors } = await openEditor(page, {
+    state: {
+      version: 3,
+      draft: blockedPlan(200),
+      publishedVersion: 3,
+      published: blockedPlan(100),
+      publishedAt: new Date().toISOString(),
+    },
+    room: occupiedRoom(),
+    occupied: occupiedRefusal(),
+  });
+
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Close blocking accounts and publish' })
+    .click();
+  await expect(page.getByText('Floor plan published.', { exact: true })).toBeVisible();
+  expect(server.publishes).toHaveLength(2);
+  expect(server.publishes[1].closeBlockingAccounts).toBe(true);
+  expect(server.state.published.areas[0].elements[0].x).toBe(200);
+  expect(errors).toEqual([]);
+});
+
+test('a queued publication refuses to publish over a newer floor-plan version', async ({
+  page,
+}) => {
+  const { server, errors } = await openEditor(page, {
+    state: {
+      version: 3,
+      draft: blockedPlan(200),
+      publishedVersion: 3,
+      published: blockedPlan(100),
+      publishedAt: new Date().toISOString(),
+    },
+    room: occupiedRoom(),
+    occupied: occupiedRefusal(),
+  });
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Wait and publish automatically' })
+    .click();
+  server.state = {
+    ...server.state,
+    version: 4,
+    draft: blockedPlan(300),
+  };
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'Automatic publication needs review' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      'The floor plan changed in another session. We will not publish your draft over those changes. Reload the current version and publish it again.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(server.publishes).toHaveLength(1);
   expect(errors).toEqual([]);
 });
