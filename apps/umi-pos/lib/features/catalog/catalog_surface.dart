@@ -22,6 +22,7 @@ import '../../shared/widgets/station_document.dart';
 import '../cart/account_details_surface.dart';
 import '../cart/accounts_workspace.dart';
 import '../cart/cart_controller.dart';
+import '../cart/cart_optimism.dart';
 import '../cart/course_control.dart';
 import '../cart/incoming_orders_controller.dart';
 import '../cart/incoming_orders_surface.dart';
@@ -125,6 +126,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   final _accountFocus = FocusNode();
   (Size, bool, bool, bool, Locale)? _lastHeaderLayout;
   bool _initialLoadStarted = false;
+  bool _initialAccountPolicyApplied = false;
+  bool _restoringAccount = false;
+  int _openAccountCount = 0;
   bool _leaving = false;
   String? _lastSaleErrorCode;
 
@@ -337,6 +341,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }
 
   Future<void> _createFirstTableAccount() async {
+    if (_accountRestoring) {
+      _showAccountRestoreNotice();
+      return;
+    }
     if (_accountTransition) return;
     final table = await _chooseOrderTable();
     if (table != null && mounted) await _openTableAccount(table);
@@ -447,6 +455,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   }
 
   Future<void> _resumeAccount(Cart selected) async {
+    if (_accountRestoring) {
+      _showAccountRestoreNotice();
+      return;
+    }
     if (_accountTransition) return;
     final entry = widget.entry.state;
     if (entry.operator == null) return;
@@ -472,6 +484,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         expectedCartId: selected.id,
       );
       if (!mounted) return;
+      // An account with a fired order has no live sale to read until the
+      // operator starts checkout. The resume itself already succeeded, so a
+      // missing sale is not a product refusal and must not put an error line
+      // over an account the till has open.
+      final cartReady =
+          widget.cart.state.cart?.id == selected.id &&
+          widget.cart.state.errorCode == null;
       setState(() {
         _blockedAccount = null;
         _editingAccountId = widget.cart.state.cart!.id;
@@ -479,7 +498,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         _inlineDetail = null;
         _orderTypeTouched = false;
         _orderType = widget.cart.state.cart!.fulfillmentType;
-        _notice = refreshed
+        _notice = refreshed || cartReady
             ? null
             : operatorErrorMessage(
                 context,
@@ -491,13 +510,20 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     }
   }
 
-  Future<void> _openTableAccount(FloorPlanElement table) async {
-    if (_accountTransition) return;
+  Future<bool> _openTableAccount(
+    FloorPlanElement table, {
+    int? partySize,
+  }) async {
+    if (_accountRestoring) {
+      _showAccountRestoreNotice();
+      return false;
+    }
+    if (_accountTransition) return false;
     final entry = widget.entry.state;
     if (entry.selectedTenant == null ||
         entry.selectedBranch == null ||
         entry.operator == null) {
-      return;
+      return false;
     }
     setState(() => _accountTransition = true);
     try {
@@ -506,8 +532,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         locationId: entry.selectedBranch!.id,
         operatorSessionId: entry.operator!.id,
         tableId: table.id,
+        tableName: table.label,
+        partySize: partySize,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       if (!opened) {
         showPosFeedback(
           context,
@@ -516,14 +544,19 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             widget.cart.state.errorCode ?? 'CART_VALIDATION_FAILED',
           ),
         );
-        return;
+        return false;
       }
       widget.sales.accountSaved();
-      final refreshed = await widget.sales.refreshCurrent(
-        expectedCartId: widget.cart.state.cart!.id,
-      );
+      // The local account already has the table. A cloud refresh here is what
+      // turned a successful offline seating into a red "operation failed"
+      // banner: it asked the API again after the journal had done its job.
+      final refreshed =
+          widget.cart.isOffline ||
+          await widget.sales.refreshCurrent(
+            expectedCartId: widget.cart.state.cart!.id,
+          );
       widget.checkout.reset();
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() {
         _section = TillSurface.order;
         _inlineDetail = null;
@@ -536,6 +569,75 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 widget.sales.state.errorCode ?? 'CART_VALIDATION_FAILED',
               );
       });
+      return true;
+    } finally {
+      if (mounted) setState(() => _accountTransition = false);
+    }
+  }
+
+  /// Open a resumable account for guests who are present but cannot claim a
+  /// physical table.
+  ///
+  /// A full room is not a terminal lock-out. This account is tableless on
+  /// purpose: it appears under open accounts as "Sin mesa", keeps its folio and
+  /// can be resumed, while the floor never lies by inventing a table UUID.
+  Future<bool> _openTemporaryAccount() async {
+    if (_accountRestoring) {
+      _showAccountRestoreNotice();
+      return false;
+    }
+    if (_accountTransition) return false;
+    final entry = widget.entry.state;
+    final merchantId = entry.selectedTenant?.id;
+    final locationId = entry.selectedBranch?.id;
+    final operatorSessionId = entry.operator?.id;
+    if (merchantId == null || locationId == null || operatorSessionId == null) {
+      return false;
+    }
+    setState(() => _accountTransition = true);
+    try {
+      final current = widget.cart.state.cart;
+      if (current != null && !accountIsBare(current)) {
+        final preserved = await widget.cart.preserveForAccountSwitch();
+        if (!preserved) {
+          if (mounted) {
+            setState(() {
+              _notice =
+                  'No se pudo guardar la cuenta actual en este equipo. Vuelve a intentarlo antes de cambiar de cuenta.';
+              _noticeCode = 'CART_LOCAL_STORAGE_FAILED';
+            });
+          }
+          return false;
+        }
+        widget.sales.accountSaved();
+        widget.checkout.reset();
+        widget.cart.clearLocal();
+      }
+      if (widget.cart.state.cart == null) {
+        await widget.cart.open(merchantId, locationId, operatorSessionId);
+      }
+      final ready = widget.cart.state.cart;
+      if (ready == null) {
+        if (mounted) _refuseCartWrite();
+        return false;
+      }
+      if (ready.fulfillmentType != 'dine_in') {
+        await widget.cart.setFulfillment('dine_in');
+      }
+      if (!mounted) return false;
+      setState(() {
+        _section = TillSurface.order;
+        _editingAccountId = null;
+        _inlineDetail = null;
+        _orderTypeTouched = false;
+        _orderType = 'dine_in';
+        _noticeCode = null;
+        _notice =
+            'Cuenta temporal abierta sin mesa. Puedes agregarla a una mesa o cobrarla desde Cuentas abiertas.';
+      });
+      _search.clear();
+      widget.catalog.search('');
+      return true;
     } finally {
       if (mounted) setState(() => _accountTransition = false);
     }
@@ -580,7 +682,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     try {
       final table = await _chooseOrderTable(assigningAccountId: cart.id);
       if (table == null || !mounted) return false;
-      if (!await widget.cart.assignAccountTable(table.id)) {
+      if (!await widget.cart.assignAccountTable(
+        table.id,
+        tableName: table.label,
+      )) {
         if (mounted) _refuseCartWrite();
         return false;
       }
@@ -780,6 +885,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 height: (media.size.height - media.viewInsets.bottom) * .82,
                 child: _CartPanel(
                   controller: widget.cart,
+                  restoringAccount: _restoringAccount,
+                  onNewSale: () => _newSale(context),
                   lineStatuses: _currentLineStatuses,
                   checkout: widget.checkout,
                   cash: widget.cash,
@@ -837,9 +944,22 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// why. A button that looks ready and answers with nothing is the defect this code
   /// keeps meeting; the account it names is `Cuenta NNN`, shown by the comanda itself.
   bool get _canStartNewAccount {
+    if (_accountRestoring) return false;
     if (!widget.cart.supportsOpenAccounts) return true;
     final cart = widget.cart.state.cart;
     return cart == null || !accountIsBare(cart);
+  }
+
+  bool get _accountRestoring =>
+      _restoringAccount || widget.sales.isRestoringCurrent;
+
+  void _showAccountRestoreNotice() {
+    if (!mounted) return;
+    setState(() {
+      _noticeCode = null;
+      _noticeDetails = null;
+      _notice = AppLocalizations.of(context).cartRestoringAccountHint;
+    });
   }
 
   /// What `Nueva cuenta` is holding, said the way the till says an account elsewhere.
@@ -955,6 +1075,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// nothing reads a lost tap as a broken till.
   void _refuseCartWrite() {
     if (!mounted) return;
+    if (_accountRestoring) {
+      _showAccountRestoreNotice();
+      return;
+    }
     final code = widget.cart.state.errorCode ?? 'CART_VALIDATION_FAILED';
     setState(() {
       _noticeCode = code;
@@ -1012,8 +1136,41 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final permissions = OperatorPermissions(operator?.permissions ?? const []);
     final access = OperatorActionAccess(permissions);
     final sells = !_kdsDevice;
-    await _recover();
+    final restoresAccount = operator != null && access.canWriteCart && sells;
+    final restoreStartupAccount =
+        _initialAccountPolicyApplied || widget.cart.state.cart != null;
+    _initialAccountPolicyApplied = true;
+    // The first frame after sign-in has no cart yet. Painting the normal empty
+    // comanda there offers `Nueva venta` while the server may still be returning
+    // the account that was already open. The tap cannot start the order the
+    // operator asked for, and the restored account then appears underneath it, so
+    // the till looks like the button opened an old order. Keep the panel in a
+    // named restore state from the first frame until the current read answers.
+    _restoringAccount = restoresAccount && restoreStartupAccount;
     try {
+      if (restoresAccount && !restoreStartupAccount) {
+        // Entry is a boundary. The account survives in Cuentas, but a fresh
+        // operator entry paints a clean till instead of silently adopting the
+        // active cart from this operator's previous session.
+        await widget.sales.open(
+          entry.selectedTenant!.id,
+          entry.selectedBranch!.id,
+          operator.id,
+          useCartAuthority: !access.showSaleActions,
+          restoreCurrent: false,
+        );
+      }
+      // Start the account read before the catalogue, but do not make the catalogue
+      // depend on it. A slow or malformed sale answer must not leave the menu empty.
+      Future<void>? accountRestore;
+      if (restoresAccount && restoreStartupAccount) {
+        accountRestore = _restoreCurrentAccount(
+          entry.selectedTenant!.id,
+          entry.selectedBranch!.id,
+          operator.id,
+          useCartAuthority: !access.showSaleActions,
+        );
+      }
       // The order surface belongs to a seller. A role without `cart.write` never
       // opens it, never opens the sale lifecycle behind it, and therefore never
       // meets the 403 the old shell painted as the red banner (plan §8.2 F1,
@@ -1028,6 +1185,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           ),
         );
         widget.connectivity.apiReachable(authorityValid: true);
+        // Warm the option sheets while the link is up, so the same products can
+        // still be customised later in a dead spot. Fire and forget: nothing on
+        // screen waits for it.
+        unawaited(widget.catalog.warmDetails());
       }
       if (operator != null) {
         widget.cash.setContext(
@@ -1048,14 +1209,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         if (access.showCashCenter && sells) {
           await widget.cash.load();
         }
-        if (access.canWriteCart && sells) {
-          await widget.sales.open(
-            entry.selectedTenant!.id,
-            entry.selectedBranch!.id,
-            operator.id,
-            useCartAuthority: !access.showSaleActions,
-          );
-        }
         await widget.exceptions.setContext(
           merchantId: entry.selectedTenant!.id,
           locationId: entry.selectedBranch!.id,
@@ -1064,7 +1217,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         await _startScanner(operator.permissions);
         widget.connectivity.apiReachable(authorityValid: true);
       }
-      await _recover();
+      if (accountRestore != null) await accountRestore;
     } on AppException catch (error) {
       // The same narrow vocabulary the kitchen board uses: a transport failure or
       // a timeout means "no answer", and everything else reached the API and got
@@ -1080,8 +1233,65 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     } catch (_) {
       // Not an API answer at all: a parse error or a bug in this file. The wire
       // told us nothing, so the connectivity state says nothing about it.
+    } finally {
+      _restoringAccount = false;
+      if (mounted) setState(() {});
     }
+    // Attach the replay scope whatever happened above.
+    //
+    // This used to be the last statement of the `try`, so the one boot that
+    // needs it most — the catalogue failing to open because there is no uplink —
+    // skipped it. Without a scope the recovery controller cannot replay from a
+    // heartbeat, and a sale taken on that boot sat in the journal while the API
+    // was demonstrably answering every ten seconds.
+    unawaited(_recoverInBackground());
+    unawaited(_refreshOpenAccountCount());
     if (mounted) _requestMobileOrderStart();
+  }
+
+  Future<void> _refreshOpenAccountCount() async {
+    final state = widget.entry.state;
+    final merchant = state.selectedTenant?.id;
+    final location = state.selectedBranch?.id;
+    final operator = state.operator;
+    if (!widget.cart.supportsOpenAccounts ||
+        merchant == null ||
+        location == null ||
+        operator == null) {
+      return;
+    }
+    try {
+      final accounts = await widget.cart.openAccounts(
+        merchant,
+        location,
+        operator.id,
+        preferCache: true,
+      );
+      if (!mounted || widget.entry.state.operator?.id != operator.id) return;
+      setState(() => _openAccountCount = accounts.length);
+    } catch (_) {
+      // The count is a navigation hint. A failed background read never covers
+      // the till with an error; opening Cuentas performs the authoritative read.
+    }
+  }
+
+  Future<void> _restoreCurrentAccount(
+    String merchantId,
+    String locationId,
+    String operatorSessionId, {
+    required bool useCartAuthority,
+  }) async {
+    try {
+      await widget.sales.open(
+        merchantId,
+        locationId,
+        operatorSessionId,
+        useCartAuthority: useCartAuthority,
+      );
+    } finally {
+      _restoringAccount = false;
+      if (mounted) setState(() {});
+    }
   }
 
   Future<void> _startScanner(List<String> permissions) async {
@@ -1147,7 +1357,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           _refuseUnavailable(product.name);
           return;
         }
-        final added = await _addProduct(productId: product.id);
+        // A scanned product with no variants and no options is a product whose
+        // price the summary already carries, so the till can paint the line while
+        // the server prices it for real.
+        final added = await _addProduct(
+          productId: product.id,
+          provisional: ProvisionalLine.fromSummary(product: product),
+        );
         if (!added) {
           _refuseCartWrite();
           return;
@@ -1257,7 +1473,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     setState(() {});
     if (widget.sales.state.readyForNextCustomer) _requestMobileOrderStart();
     final errorCode = widget.sales.state.errorCode;
-    if (errorCode != null && errorCode != _lastSaleErrorCode) {
+    final offline =
+        widget.connectivity.state == PosConnectivity.offline ||
+        widget.connectivity.state == PosConnectivity.degraded ||
+        widget.connectivity.state == PosConnectivity.blocked;
+    if (errorCode != null && errorCode != _lastSaleErrorCode && !offline) {
       _lastSaleErrorCode = errorCode;
       if (!_reauthIfSessionLost(errorCode)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1351,21 +1571,27 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// before this in `_canStartNewAccount`; the guard here is what makes the rule
   /// hold for the other callers (the Cuentas workspace and the mobile order start).
   Future<void> _newSale(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    if (_accountRestoring) {
+      _showAccountRestoreNotice();
+      return;
+    }
     if (widget.cart.supportsOpenAccounts) {
       if (_accountTransition) return;
       final open = widget.cart.state.cart;
       if (open == null) {
+        // A refused write on the previous, already-closed account can leave a
+        // validation failure in the controller after its cart is gone. Starting
+        // from Cuentas is a new decision: clear that stale refusal before the
+        // service-type step, or the empty order paints an endless spinner.
+        widget.cart.clearLocal();
         setState(() {
           _section = TillSurface.order;
           _editingAccountId = null;
           _inlineDetail = null;
-          _notice = _mobileDevice
-              ? null
-              : (Localizations.localeOf(context).languageCode == 'es'
-                    ? 'Agrega un producto para iniciar la cuenta.'
-                    : 'Add a product to start the account.');
+          _notice = null;
         });
-        if (_mobileDevice) await _prepareMobileOrder();
+        await _startOrderAfterParking();
         return;
       }
       if (accountIsBare(open)) {
@@ -1386,13 +1612,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           widget.catalog.search('');
           if (_scroll.hasClients) _scroll.jumpTo(0);
         }
-        if (mounted) await _prepareMobileOrder();
+        await _startOrderAfterParking();
         return;
       }
       setState(() => _accountTransition = true);
       try {
         if (widget.cart.state.cart != null) {
-          if (!await widget.cart.saveAccount()) {
+          // Offline, the open command parks the account on replay. The server
+          // suspends a cart with content before it applies the next open, so a
+          // save that cannot reach the API is neither required nor useful.
+          final parked =
+              widget.cart.isOffline || await widget.cart.saveAccount();
+          if (!parked) {
             if (mounted) _refuseCartWrite();
             return;
           }
@@ -1412,10 +1643,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       } finally {
         if (mounted) setState(() => _accountTransition = false);
       }
-      if (mounted) await _prepareMobileOrder();
+      await _startOrderAfterParking();
       return;
     }
-    final l = AppLocalizations.of(context);
     final lines = widget.cart.state.cart?.items.length ?? 0;
     if (lines > 0) {
       final confirmed = await showPosDialog<bool>(
@@ -1442,6 +1672,31 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     await widget.sales.newSale();
   }
 
+  /// One entry point for a new account.
+  ///
+  /// The operator chooses the service context first. Dine-in asks for the table
+  /// before the first product. Takeaway keeps the account tableless. The form
+  /// uses one action and one vocabulary; fulfillment remains the server's
+  /// existing `dine_in` or `takeout` fact.
+  Future<void> _startOrderAfterParking() async {
+    if (!mounted || !widget.cart.supportsOpenAccounts) return;
+    final type = await showOrderTypePicker(context);
+    if (type == null || !mounted) return;
+    if (type == 'dine_in' && widget.floorPlan != null) {
+      final table = await _chooseOrderTable();
+      if (table != null && mounted) await _openTableAccount(table);
+      return;
+    }
+    setState(() {
+      _section = TillSurface.order;
+      _pendingOrderType = type;
+      _orderType = type;
+      _orderTypeTouched = true;
+      _noticeCode = null;
+      _notice = null;
+    });
+  }
+
   Future<bool> _addProduct({
     required String productId,
     String? variantId,
@@ -1449,11 +1704,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     int quantity = 1,
     String? note,
     int courseNumber = 1,
+    ProvisionalLine? provisional,
   }) async {
+    if (_accountRestoring) {
+      _refuseCartWrite();
+      return false;
+    }
     if (widget.cart.state.cart == null) {
       if (_mobileDevice && !await _prepareMobileOrder()) return false;
       if (widget.cart.state.cart == null) {
-        if (!await widget.sales.newSale()) return false;
+        // A failed sale-history read must not discard a cart the local-first
+        // opener has already created. The cart is the order the operator is
+        // building; the history snapshot can catch up after replay.
+        await widget.sales.newSale();
+        if (widget.cart.state.cart == null) {
+          final entry = widget.entry.state;
+          final merchant = entry.selectedTenant?.id;
+          final location = entry.selectedBranch?.id;
+          final operator = entry.operator?.id;
+          if (merchant != null && location != null && operator != null) {
+            await widget.cart.open(merchant, location, operator);
+          }
+        }
         if (widget.cart.state.cart == null) return false;
         if (_pendingOrderType != null) {
           await widget.cart.setFulfillment(_pendingOrderType!);
@@ -1471,6 +1743,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       quantity: quantity,
       note: note,
       courseNumber: courseNumber,
+      provisional: provisional,
     );
   }
 
@@ -1790,6 +2063,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ),
           )
         : null;
+    final syncSummary = syncLaneSummary(
+      context,
+      cloud: widget.connectivity.state,
+      hub: widget.connectivity.hubState,
+      pending: widget.cart.pendingSyncCount,
+    );
     final header = PosHeader(
       toolbarHeight: compactHeader ? 56 : 72,
       // The order context (PoloTab's "Para llevar" pill) takes the title slot —
@@ -1814,7 +2093,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.sm),
           child: Semantics(
             liveRegion: true,
-            label: connectivityLabel(context, widget.connectivity.state),
+            label: syncSummary,
             // Status, not a control. `PosTag` publishes `checked` on web
             // (PosSurface's chip.dart does that for every chip), so without
             // excluding it the bar announces "En línea, checkbox, not
@@ -1823,10 +2102,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             child: ExcludeSemantics(
               child: compactHeader
                   ? PosTooltip(
-                      message: connectivityLabel(
-                        context,
-                        widget.connectivity.state,
-                      ),
+                      message: syncSummary,
                       child: SizedBox.square(
                         dimension: 32,
                         child: Center(
@@ -1846,6 +2122,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                             : PosGlyphs.cloudOffOutlined,
                         size: 18,
                       ),
+                      // A local command is normal work. The count stays in the
+                      // tooltip; the label names the connection the operator
+                      // can act on.
                       label: Text(
                         connectivityLabel(context, widget.connectivity.state),
                       ),
@@ -1859,10 +2138,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             icon: PosGlyphs.addShoppingCartOutlined,
             focusNode: access.showSaleActions ? _newSaleFocus : null,
             compact: compactHeader,
-            label: widget.cart.supportsOpenAccounts || !access.showSaleActions
-                ? (spanish ? 'Nueva cuenta' : 'New account')
-                : l.newSaleAction,
-            disabledHint: _newAccountStanddown(spanish),
+            label: spanish ? 'Iniciar pedido' : 'Start order',
+            disabledHint: _accountRestoring
+                ? l.cartRestoringAccountHint
+                : _newAccountStanddown(spanish),
             onPressed: _canStartNewAccount ? () => _newSale(context) : null,
           ),
         // NO ACCOUNTS BUTTON UP HERE. The accounts workspace is one of the
@@ -2105,19 +2384,32 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   _noticeDetails = null;
                 });
               },
-              chooseOrderType: _mobileDevice,
               withoutTable: _accountsWithoutTable,
               onViewChanged: (value) =>
                   setState(() => _accountsWithoutTable = value),
-              load: () => widget.cart.openAccounts(
-                widget.entry.state.selectedTenant!.id,
-                widget.entry.state.selectedBranch!.id,
-                widget.entry.state.operator!.id,
-              ),
+              load: () async {
+                final accounts = await widget.cart.openAccounts(
+                  widget.entry.state.selectedTenant!.id,
+                  widget.entry.state.selectedBranch!.id,
+                  widget.entry.state.operator!.id,
+                );
+                if (mounted) {
+                  setState(() => _openAccountCount = accounts.length);
+                }
+                return accounts;
+              },
               onSelected: (account) => unawaited(_resumeAccount(account)),
               onCancelCarriedOver: permissions.allows('sale.lifecycle')
                   ? widget.sales.cancelCarriedOver
                   : null,
+              onDismissNotice: () {
+                if (!mounted) return;
+                setState(() {
+                  _notice = null;
+                  _noticeCode = null;
+                  _noticeDetails = null;
+                });
+              },
               // The workspace offers the same action as the top bar, so it stands
               // down on the same bare account. The tile is what hides here: a
               // disabled "Nueva cuenta sin mesa" beside an empty account that is
@@ -2134,6 +2426,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                 embedded: true,
                 directAccounts: true,
                 onOpenAccount: _openTableAccount,
+                onOpenTemporaryAccount: permissions.allows('cart.write')
+                    ? _openTemporaryAccount
+                    : null,
                 onSetUpTables: () => unawaited(_createFirstTableAccount()),
               ),
             )
@@ -2208,7 +2503,11 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             ),
             TillSurface.tables => PosDestination(
               key: ValueKey(surface),
-              icon: const PosIcon(PosGlyphs.tableRestaurantOutlined),
+              icon: PosBadge.count(
+                count: _openAccountCount,
+                isLabelVisible: _openAccountCount > 0,
+                child: const PosIcon(PosGlyphs.tableRestaurantOutlined),
+              ),
               label:
                   widget.cart.supportsOpenAccounts &&
                       OperatorPermissions(
@@ -2433,6 +2732,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
               Expanded(
                 child: _CartPanel(
                   controller: widget.cart,
+                  restoringAccount: _restoringAccount,
+                  onNewSale: () => _newSale(context),
                   lineStatuses: _currentLineStatuses,
                   checkout: widget.checkout,
                   cash: widget.cash,
@@ -2728,6 +3029,24 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     ]);
   }
 
+  Future<void> _recoverInBackground() async {
+    try {
+      await _recover();
+    } on AppException catch (error) {
+      // Recovery is durable work, not a prerequisite for opening the menu.
+      // Keep its transport signal honest without replacing the till with an
+      // unrelated failure while the queue retries from the journal.
+      if (error.category == AppErrorCategory.transport ||
+          error.category == AppErrorCategory.timeout) {
+        widget.connectivity.apiFailure();
+      } else {
+        widget.connectivity.apiReachable(authorityValid: true);
+      }
+    } catch (_) {
+      // The recovery centre owns the actionable failure state.
+    }
+  }
+
   Future<void> _recover() async {
     final scope = _scope();
     if (scope == null) return;
@@ -2818,6 +3137,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   onTap: () => products[index].availability == 'enabled'
                       ? _showDetail(
                           products[index].id,
+                          summary: products[index],
                           canWrite: OperatorPermissions(
                             widget.entry.state.operator?.permissions ??
                                 const [],
@@ -2880,12 +3200,37 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   Future<void> _showDetail(
     String id, {
     CartItem? item,
+    CatalogProductSummary? summary,
     bool? canWrite,
     int? scanGeneration,
   }) async {
     try {
       if (item == null && !await _prepareMobileOrder()) return;
       if (!mounted) return;
+      if (item == null &&
+          summary != null &&
+          !summary.hasVariants &&
+          !summary.hasModifiers) {
+        final permitted =
+            canWrite ??
+            OperatorPermissions(
+              widget.entry.state.operator?.permissions ?? const [],
+            ).allows('cart.write');
+        if (!permitted) {
+          _refuseCartWrite();
+          return;
+        }
+        final added = await _addProduct(
+          productId: summary.id,
+          provisional: ProvisionalLine.fromSummary(product: summary),
+        );
+        if (!added) {
+          _refuseCartWrite();
+          return;
+        }
+        _recordFrequent(summary.id, summary.name, summary.price);
+        return;
+      }
       final detail = await widget.catalog.detail(id);
       if (!mounted ||
           (scanGeneration != null && !_scanCurrent(scanGeneration))) {
@@ -2911,7 +3256,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           canAdd &&
           detail.variants.isEmpty &&
           detail.optionGroups.isEmpty) {
-        final added = await _addProduct(productId: detail.id);
+        final added = await _addProduct(
+          productId: detail.id,
+          provisional: ProvisionalLine.fromSelection(product: detail),
+        );
         if (!added) {
           _refuseCartWrite();
           return;
@@ -2930,6 +3278,24 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       // session shows up here too — bounce to the PIN instead of a dead-end
       // "catalog unavailable" toast.
       if (_reauthIfSessionLost(error.code)) return;
+      // No answer is not a broken catalogue. The grid is being served from the
+      // till's own copy, and the only thing missing is this one product's
+      // options — which were never fetched on this terminal. Say that, instead
+      // of painting "the catalogue is unavailable" over a menu that is right in
+      // front of the operator.
+      final offline =
+          error.category == AppErrorCategory.transport ||
+          error.category == AppErrorCategory.timeout ||
+          error.category == AppErrorCategory.server;
+      if (offline) {
+        final spanish = Localizations.localeOf(context).languageCode == 'es';
+        setState(
+          () => _notice = spanish
+              ? 'Sin conexión: las opciones de este producto aún no están guardadas en esta terminal.'
+              : 'Offline: this product’s options are not saved on this terminal yet.',
+        );
+        return;
+      }
       setState(
         () => _notice = AppLocalizations.of(context).catalogUnexpectedError,
       );
@@ -3931,6 +4297,7 @@ final class _Detail extends StatefulWidget {
     int quantity,
     String? note,
     int courseNumber,
+    ProvisionalLine? provisional,
   })
   addProduct;
   final bool canWrite;
@@ -4334,6 +4701,15 @@ final class _DetailState extends State<_Detail> {
                         quantity: quantity,
                         note: note.text,
                         courseNumber: course,
+                        provisional: ProvisionalLine.fromSelection(
+                          product: detail,
+                          variantId: variantId,
+                          modifierQuantities: {
+                            for (final modifier in modifiers)
+                              modifier['modifierId']! as String:
+                                  (modifier['quantity']! as num).toInt(),
+                          },
+                        ),
                       )
                     : await widget.cart.edit(
                         item: widget.item!,
@@ -4576,6 +4952,8 @@ final class _Message extends StatelessWidget {
 final class _CartPanel extends StatelessWidget {
   const _CartPanel({
     required this.controller,
+    required this.restoringAccount,
+    this.onNewSale,
     required this.lineStatuses,
     required this.checkout,
     required this.cash,
@@ -4594,6 +4972,8 @@ final class _CartPanel extends StatelessWidget {
     this.beforeFire,
   });
   final CartController controller;
+  final bool restoringAccount;
+  final Future<void> Function()? onNewSale;
   final Map<String, String> lineStatuses;
   final CheckoutController checkout;
   final CashController cash;
@@ -4613,6 +4993,77 @@ final class _CartPanel extends StatelessWidget {
   final Future<void> Function()? onAssignTable;
   final Future<bool> Function()? beforeCheckout;
   final Future<bool> Function()? beforeFire;
+
+  Future<void> _openCheckout(BuildContext context, {bool split = false}) async {
+    if (beforeCheckout != null && !await beforeCheckout!()) return;
+    if (!context.mounted) return;
+    await showCheckoutSheet(
+      context,
+      checkout: checkout,
+      cashShiftId: cash.activeShiftId,
+      cart: controller,
+      entry: entry,
+      sales: sales,
+      customerValue: customerValue,
+      deviceChannel: deviceChannel,
+      openSplitOnLoad: split,
+      // The sale's completion screen prints through the same call
+      // Ventas uses. It is the customer asking for their receipt at
+      // the counter — the most ordinary reason a ticket is printed
+      // after the sale — and it was the one screen with no way to.
+      onPrint: onPrint,
+      // A charge refused for a missing shift hands the
+      // recovery decision here, where the cash state
+      // lives: reclaim a drawer whose terminal is gone,
+      // otherwise take the till's own shift back. The
+      // returned id is what the retry uses.
+      onOpenCashShift: permissions.allows('cash.shift.open')
+          ? () async {
+              final continueCheckout = await showCashCenter(
+                context,
+                controller: cash,
+                permissions: permissions,
+                onHandoffCompleted: entry.lock,
+                returnToCheckout: true,
+              );
+              return continueCheckout == true ? cash.activeShiftId : null;
+            }
+          : null,
+      onRecoverCashShift: (holdState) async {
+        if (holdState == 'held_by_orphaned_till') {
+          final orphaned = cash.reclaimableRegisters;
+          if (orphaned.isEmpty) return null;
+          await cash.reclaimRegister(orphaned.first['id']! as String);
+          return cash.activeShiftId;
+        }
+        // A paused shift is this till's own and the
+        // session still matches, so the server resumes it
+        // for the operator who is standing here. The till
+        // asks that operator for their PIN first: the
+        // drawer sat unattended while the shift was
+        // paused, and whoever takes it back says so.
+        //
+        // A drawer the server says this TERMINAL holds is taken
+        // back by the id the refusal named. The cash screen's idea
+        // of "the current shift" can be a load old — and after an
+        // app update it is exactly the shift the till cannot see —
+        // so the recovery names the shift instead of guessing at it.
+        final held = checkout.state.holdShiftId;
+        debugPrint(
+          '[umipos] checkout recovery: hold=${checkout.state.holdState} held=$held',
+        );
+        if (held != null) {
+          final resumed = await cash.resumeShiftById(held);
+          if (resumed != null) return resumed;
+        }
+        if (cash.canResumePausedShift) {
+          if (!context.mounted) return null;
+          return _resumePausedShiftWithPin(context, cash);
+        }
+        return cash.recoverOwnShift();
+      },
+    );
+  }
 
   Future<void> _cancelSentLine(BuildContext context, CartItem item) async {
     final es = Localizations.localeOf(context).languageCode == 'es';
@@ -4685,12 +5136,14 @@ final class _CartPanel extends StatelessWidget {
       }
     }
     if (!cancelled && context.mounted) {
+      final code = controller.state.errorCode;
       showPosFeedback(
         context,
-        operatorErrorMessage(
-          context,
-          controller.state.errorCode ?? 'CART_VALIDATION_FAILED',
-        ),
+        code != null
+            ? operatorErrorMessage(context, code)
+            : es
+            ? 'Espera a que termine el envío anterior y vuelve a intentarlo.'
+            : 'Wait for the previous send to finish, then try again.',
       );
     }
   }
@@ -4758,7 +5211,7 @@ final class _CartPanel extends StatelessWidget {
       };
 
   Future<void> _clearAccount(BuildContext context, AppLocalizations l) async {
-    if (controller.state.phase == CartPhase.loading) return;
+    if (controller.isWriting) return;
     final confirmed = await showPosDialog<bool>(
       context: context,
       builder: (dialogContext) => PosAlertDialog(
@@ -4881,7 +5334,23 @@ final class _CartPanel extends StatelessWidget {
             _heading(context, l),
             Expanded(
               child: Center(
-                child: controller.state.phase == CartPhase.failure
+                child: restoringAccount
+                    ? Padding(
+                        padding: const EdgeInsets.all(UmiSpacing.md),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const PosSpinner(),
+                            const SizedBox(height: UmiSpacing.md),
+                            Text(
+                              l.cartRestoringAccount,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : controller.state.phase == CartPhase.failure ||
+                          controller.state.phase == CartPhase.validationFailure
                     ? Padding(
                         padding: const EdgeInsets.all(UmiSpacing.md),
                         child: Column(
@@ -4898,16 +5367,27 @@ final class _CartPanel extends StatelessWidget {
                             ),
                             const SizedBox(height: UmiSpacing.md),
                             PosButton(
-                              onPressed: () => sales.newSale(),
-                              child: Text(l.retryAction),
+                              onPressed:
+                                  controller.state.phase ==
+                                      CartPhase.validationFailure
+                                  ? onNewSale ?? () => sales.newSale()
+                                  : () => sales.newSale(),
+                              child: Text(
+                                controller.state.phase ==
+                                        CartPhase.validationFailure
+                                    ? (spanish
+                                          ? 'Iniciar pedido'
+                                          : 'Start order')
+                                    : l.retryAction,
+                              ),
                             ),
                           ],
                         ),
                       )
                     : controller.state.phase == CartPhase.idle
                     ? PosButton(
-                        onPressed: () => sales.newSale(),
-                        child: Text(l.newSaleAction),
+                        onPressed: onNewSale ?? () => sales.newSale(),
+                        child: Text(spanish ? 'Iniciar pedido' : 'Start order'),
                       )
                     : const PosSpinner(),
               ),
@@ -4919,6 +5399,24 @@ final class _CartPanel extends StatelessWidget {
     final items = cart.items.map(CartItem.fromJson).toList(growable: false);
     final totals = TotalsPreview.fromJson(cart.totals);
     final discounts = DiscountPreview.fromJson(totals.discounts);
+    final canSplit =
+        permissions.allows('checkout.commit') &&
+        checkout.supportsPartialPayments;
+    // A partial payment needs a method that can carry it. The location policy
+    // may allow only cash, and cash needs an open shift. Without this check the
+    // button is enabled and opens a split screen that cannot record anything.
+    //
+    // BEFORE THE POLICY HAS LOADED, there is nothing to judge yet. The checkout
+    // sheet loads that policy on open and refuses honestly if no split-capable
+    // tender exists. Treating "not loaded" as "not available" disabled the
+    // control on its first use, when no shift had been opened or checkout had
+    // never been visited; the sheet could have loaded the answer itself.
+    final policy = checkout.policy;
+    final partialTenderReady =
+        policy == null ||
+        cash.activeShiftId != null ||
+        policy.manualTerminalEnabled == true ||
+        policy.bankTransferEnabled == true;
     // The fired order (ADR 2026-10-07-pos-fired-order §5). Once the cart carries a
     // fired order the server freezes it, so the line controls and the clear action
     // go with it — an edit the server will refuse is a button that lies. The
@@ -4956,9 +5454,7 @@ final class _CartPanel extends StatelessWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             child: PosTextButton.icon(
-              onPressed: controller.state.phase == CartPhase.loading
-                  ? null
-                  : onAssignTable,
+              onPressed: controller.isWriting ? null : onAssignTable,
               icon: const PosIcon(PosGlyphs.tableRestaurantOutlined),
               label: Text(
                 cart.tableName ?? (spanish ? 'Agregar mesa' : 'Add table'),
@@ -5054,10 +5550,20 @@ final class _CartPanel extends StatelessWidget {
                         icon: const PosIcon(PosGlyphs.editOutlined),
                       ),
                       PosIconButton(
+                        key: ValueKey('repeat-cart-line-${item.id}'),
+                        tooltip: l.repeatCartLineAction,
+                        onPressed:
+                            permissions.allows('cart.write') &&
+                                !controller.isWriting
+                            ? () => controller.repeat(item)
+                            : null,
+                        icon: const PosIcon(PosGlyphs.syncAlt),
+                      ),
+                      PosIconButton(
                         tooltip: l.removeFromCartAction,
                         onPressed:
                             !permissions.allows('cart.write') ||
-                                controller.state.phase == CartPhase.loading
+                                controller.isWriting
                             ? null
                             : !item.fired
                             ? () => controller.remove(item)
@@ -5113,9 +5619,7 @@ final class _CartPanel extends StatelessWidget {
       const SizedBox(height: UmiSpacing.sm),
       if (onSave != null)
         PosOutlineButton.icon(
-          onPressed: controller.state.phase == CartPhase.loading
-              ? null
-              : onSave,
+          onPressed: controller.isWriting ? null : onSave,
           icon: const PosIcon(PosGlyphs.pauseCircleOutline),
           label: Text(spanish ? 'Guardar y salir' : 'Save and leave'),
         ),
@@ -5123,6 +5627,7 @@ final class _CartPanel extends StatelessWidget {
         labels: [
           if (permissions.allows('order.fire') && unfiredCount > 0)
             spanish ? 'Enviar a cocina' : 'Send to kitchen',
+          if (canSplit) l.splitCheckAction,
           if (permissions.allows('checkout.commit')) l.checkoutAction,
         ],
         buttons: [
@@ -5135,7 +5640,7 @@ final class _CartPanel extends StatelessWidget {
               // and the word stays beside it so the action is still read, not
               // guessed at from a picture.
               child: PosButton.tonalIcon(
-                onPressed: controller.state.phase == CartPhase.loading
+                onPressed: controller.isWriting
                     ? null
                     : () async {
                         if (beforeFire != null && !await beforeFire!()) return;
@@ -5156,6 +5661,19 @@ final class _CartPanel extends StatelessWidget {
               ),
             ),
           ],
+          if (canSplit)
+            PosOutlineButton.icon(
+              key: const ValueKey('account-split-check'),
+              onPressed:
+                  items.isEmpty ||
+                      controller.isWriting ||
+                      !checkout.canCollectPartialPayments ||
+                      !partialTenderReady
+                  ? null
+                  : () => _openCheckout(context, split: true),
+              icon: const PosIcon(PosGlyphs.callSplit),
+              label: Text(l.splitCheckAction),
+            ),
           if (permissions.allows('checkout.commit'))
             PosButton.icon(
               style: PosButton.styleFrom(
@@ -5182,83 +5700,9 @@ final class _CartPanel extends StatelessWidget {
               onPressed:
                   items.isEmpty ||
                       !permissions.allows('checkout.commit') ||
-                      controller.state.phase == CartPhase.loading
+                      controller.isWriting
                   ? null
-                  : () async {
-                      if (beforeCheckout != null && !await beforeCheckout!()) {
-                        return;
-                      }
-                      if (!context.mounted) return;
-                      await showCheckoutSheet(
-                        context,
-                        checkout: checkout,
-                        cashShiftId: cash.activeShiftId,
-                        cart: controller,
-                        entry: entry,
-                        sales: sales,
-                        customerValue: customerValue,
-                        deviceChannel: deviceChannel,
-                        // The sale's completion screen prints through the same call
-                        // Ventas uses. It is the customer asking for their receipt at
-                        // the counter — the most ordinary reason a ticket is printed
-                        // after the sale — and it was the one screen with no way to.
-                        onPrint: onPrint,
-                        // A charge refused for a missing shift hands the
-                        // recovery decision here, where the cash state
-                        // lives: reclaim a drawer whose terminal is gone,
-                        // otherwise take the till's own shift back. The
-                        // returned id is what the retry uses.
-                        onOpenCashShift: permissions.allows('cash.shift.open')
-                            ? () async {
-                                final continueCheckout = await showCashCenter(
-                                  context,
-                                  controller: cash,
-                                  permissions: permissions,
-                                  onHandoffCompleted: entry.lock,
-                                  returnToCheckout: true,
-                                );
-                                return continueCheckout == true
-                                    ? cash.activeShiftId
-                                    : null;
-                              }
-                            : null,
-                        onRecoverCashShift: (holdState) async {
-                          if (holdState == 'held_by_orphaned_till') {
-                            final orphaned = cash.reclaimableRegisters;
-                            if (orphaned.isEmpty) return null;
-                            await cash.reclaimRegister(
-                              orphaned.first['id']! as String,
-                            );
-                            return cash.activeShiftId;
-                          }
-                          // A paused shift is this till's own and the
-                          // session still matches, so the server resumes it
-                          // for the operator who is standing here. The till
-                          // asks that operator for their PIN first: the
-                          // drawer sat unattended while the shift was
-                          // paused, and whoever takes it back says so.
-                          //
-                          // A drawer the server says this TERMINAL holds is taken
-                          // back by the id the refusal named. The cash screen's idea
-                          // of "the current shift" can be a load old — and after an
-                          // app update it is exactly the shift the till cannot see —
-                          // so the recovery names the shift instead of guessing at it.
-                          final held = checkout.state.holdShiftId;
-                          debugPrint(
-                            '[umipos] checkout recovery: hold=${checkout.state.holdState} held=$held',
-                          );
-                          if (held != null) {
-                            final resumed = await cash.resumeShiftById(held);
-                            if (resumed != null) return resumed;
-                          }
-                          if (cash.canResumePausedShift) {
-                            if (!context.mounted) return null;
-                            return _resumePausedShiftWithPin(context, cash);
-                          }
-                          return cash.recoverOwnShift();
-                        },
-                      );
-                    },
+                  : () => _openCheckout(context),
               icon: const PosIcon(PosGlyphs.paymentsOutlined),
               label: Text(l.checkoutAction),
             ),

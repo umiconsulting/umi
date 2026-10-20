@@ -8,7 +8,15 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
 import '../../core/observability/telemetry.dart';
+import '../../core/storage/local_working_copy.dart';
 import '../../shared/approvals/manager_approval_repository.dart';
+import '../../shared/business_day.dart';
+import '../kitchen/hub_command_forwarder.dart';
+import '../offline/connectivity_controller.dart';
+import '../offline/offline_journal.dart';
+import '../offline/replay_engine.dart';
+import 'cart_command_queue.dart';
+import 'cart_optimism.dart';
 import 'cart_repository.dart';
 
 enum CartPhase { idle, loading, ready, validationFailure, failure }
@@ -63,12 +71,49 @@ final class CartController extends ChangeNotifier {
     required CartRepository repository,
     required Telemetry telemetry,
     ManagerApprovalRepository? approvals,
+    LocalWorkingCopy? workingCopy,
+    EncryptedOfflineJournal? offlineJournal,
+    CartDeviceIdentity? Function()? deviceIdentity,
+    ConnectivityController? connectivity,
+    OfflineRecoveryController? recovery,
+    HubCommandForwarder? hub,
   }) : _repository = repository,
        _approvals = approvals,
-       _telemetry = telemetry;
+       _telemetry = telemetry,
+       _workingCopy = workingCopy,
+       _deviceIdentity = deviceIdentity,
+       _journal = offlineJournal,
+       _connectivity = connectivity {
+    _journal?.pendingCount.addListener(_journalCountChanged);
+    if (offlineJournal != null && deviceIdentity != null) {
+      _queue = CartCommandQueue(
+        repository: repository,
+        journal: offlineJournal,
+        scope: _queueScope,
+        onCart: _acceptQueuedCart,
+        onError: _failure,
+        onEvent: _event,
+        onBusy: _setQueueBusy,
+        onSettled: notifyListeners,
+        connectivity: connectivity,
+        recovery: recovery,
+        hub: hub,
+      );
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint('[umipos] cart queue=available');
+      }
+    } else if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint('[umipos] cart queue=unavailable');
+    }
+  }
   final CartRepository _repository;
   final ManagerApprovalRepository? _approvals;
+  final ConnectivityController? _connectivity;
   final Telemetry _telemetry;
+  final LocalWorkingCopy? _workingCopy;
+  final CartDeviceIdentity? Function()? _deviceIdentity;
+  final EncryptedOfflineJournal? _journal;
+  CartCommandQueue? _queue;
   CartState _state = const CartState();
   CartState get state => _state;
   String? _merchantId;
@@ -95,6 +140,59 @@ final class CartController extends ChangeNotifier {
   /// same account and the second read is not about a cart already let go.
   bool _verifyingRelease = false;
 
+  /// A write is on the wire.
+  ///
+  /// This is what serializes the till's writes onto one account. It used to be
+  /// spelled "the state says `loading`", which had the side effect of greying the
+  /// screen for every tap; now that a predicted cart is painted at once the state
+  /// stays `ready`, so the fact needs its own name. It is the client's half of the
+  /// server's rule that only one writer holds an account at a time
+  /// (`CART_ACCOUNT_BUSY`, `apps/umi-api/src/modules/pos-cart/pos-cart.repository.ts`).
+  bool _inFlight = false;
+  bool _disposed = false;
+
+  /// True while a direct cart write is on the wire.
+  ///
+  /// A command waiting in [CartCommandQueue] is already durable and already
+  /// painted. Treating that backlog as a write in progress greyed out editing,
+  /// split and charge while the till retried an unrelated earlier command; the
+  /// operator then needed an app restart to recover an account that was usable
+  /// all along. The queue is the serialization point for line edits, so its
+  /// backlog is synchronization status, not a lock on the account.
+  bool get isWriting => _inFlight || _state.phase == CartPhase.loading;
+
+  /// Local commands that have not reached the server yet.
+  ///
+  /// This is deliberately separate from [isWriting]: the header may say there
+  /// is local work without disabling the next tap.
+  bool get hasPendingLocalWrites => _queue?.hasPending ?? false;
+
+  /// Durable unsynced work, as the operator must see it.
+  ///
+  /// The queue also holds an in-memory list of commands it has not finished
+  /// sending. That list is an implementation detail: a command can succeed on
+  /// the server and still sit there until the next settle pass. Counting it
+  /// here made the header say "1 local" over an empty journal and kept
+  /// "Dividir cuenta" disabled after the server had accepted every step. The
+  /// journal is the authority once secure offline storage is available.
+  int get pendingSyncCount {
+    final journal = _journal;
+    if (journal != null && journal.supportsSecureOffline) {
+      return journal.pendingCount.value;
+    }
+    return _queue?.pendingCount ?? 0;
+  }
+
+  void _journalCountChanged() {
+    if (!_disposed) notifyListeners();
+  }
+
+  /// Idle means neither a write on the wire nor an account being opened.
+  bool get _busy =>
+      _inFlight ||
+      _state.phase == CartPhase.loading ||
+      (_queue?.hasPending ?? false);
+
   bool get supportsOpenAccounts => _repository is OpenAccountCartRepository;
   bool get supportsAccountDetails =>
       _repository is AccountDetailsCartRepository;
@@ -102,9 +200,7 @@ final class CartController extends ChangeNotifier {
   Future<bool> renameAccount(String? name) async {
     final cart = _state.cart;
     final repository = _repository;
-    if (cart == null ||
-        repository is! AccountDetailsCartRepository ||
-        _state.phase == CartPhase.loading) {
+    if (cart == null || repository is! AccountDetailsCartRepository || _busy) {
       return false;
     }
     final cleanName = name?.trim();
@@ -123,18 +219,41 @@ final class CartController extends ChangeNotifier {
         ),
       ),
       'account_renamed',
+      // The name is the till's own fact: nothing the server knows can change it,
+      // so the prediction is not a guess.
+      predict: () => optimisticRenameAccount(
+        cart,
+        cleanName == null || cleanName.isEmpty ? null : cleanName,
+      ),
     );
   }
 
-  Future<bool> assignAccountTable(String tableId) async {
+  Future<bool> assignAccountTable(String tableId, {String? tableName}) async {
     final cart = _state.cart;
     final repository = _repository;
-    if (cart == null ||
-        repository is! AccountDetailsCartRepository ||
-        _state.phase == CartPhase.loading) {
+    if (cart == null || repository is! AccountDetailsCartRepository) {
       return false;
     }
-    return _mutation(
+    // This is the path the counter takes ("Cobrar" asks for the table), and it
+    // is a different method from `openTableAccount`. Guarding it exactly the
+    // same way keeps one rule for both: offline, the table choice is journaled
+    // and the server validates the claim when the command lands.
+    // A pending line is not a reason to refuse the table. The queue owns the
+    // order of writes, so the assignment waits behind the line that is already
+    // painted instead of racing it with an older cart version. Refusing here
+    // made "Agregar mesa" show a stale product error and left the account
+    // tableless whenever a line had not settled yet.
+    if (_queue != null && (_connectivityIsDown || _queue!.hasPending)) {
+      return _queueTableLocally(
+        merchantId: _merchantId!,
+        locationId: _locationId!,
+        operatorSessionId: _operatorSessionId!,
+        tableId: tableId,
+        tableName: tableName,
+      );
+    }
+    if (_busy) return false;
+    final assigned = await _mutation(
       () => (repository as AccountDetailsCartRepository).assignAccountTable(
         _merchantId!,
         cart.id,
@@ -148,6 +267,16 @@ final class CartController extends ChangeNotifier {
       ),
       'account_table_assigned',
     );
+    if (!assigned && _queue != null && _tableWriteCanWait()) {
+      return _queueTableLocally(
+        merchantId: _merchantId!,
+        locationId: _locationId!,
+        operatorSessionId: _operatorSessionId!,
+        tableId: tableId,
+        tableName: tableName,
+      );
+    }
+    return assigned;
   }
 
   bool get supportsSentLineCancellation =>
@@ -213,7 +342,7 @@ final class CartController extends ChangeNotifier {
     if (cart == null ||
         !item.fired ||
         repository is! SentCartLineRepository ||
-        _state.phase == CartPhase.loading) {
+        _busy) {
       return false;
     }
     return _mutation(
@@ -250,7 +379,7 @@ final class CartController extends ChangeNotifier {
     if (cart == null ||
         repository is! OpenAccountCartRepository ||
         _merchantId == null ||
-        _state.phase == CartPhase.loading) {
+        _busy) {
       return false;
     }
     return _mutation(
@@ -268,29 +397,74 @@ final class CartController extends ChangeNotifier {
     );
   }
 
+  /// Make the current local lane durable before starting another account.
+  ///
+  /// This is the account-switch boundary, not a server save: the commands keep
+  /// their order in the journal and the following `pos.cart.open` will park the
+  /// previous account when replay reaches it. No command is dropped merely
+  /// because the operator changed customers.
+  Future<bool> preserveForAccountSwitch() async {
+    final queue = _queue;
+    if (queue == null || !queue.hasPending) return true;
+    return queue.preservePendingCommands();
+  }
+
   Future<List<Cart>> openAccounts(
     String merchantId,
     String locationId,
-    String operatorSessionId,
-  ) async {
+    String operatorSessionId, {
+    bool preferCache = false,
+  }) async {
     final repository = _repository;
     if (repository is! OpenAccountCartRepository) return const [];
-    return (repository as OpenAccountCartRepository).openAccounts(
-      merchantId,
-      CartQuery(locationId: locationId, operatorSessionId: operatorSessionId),
+    final query = CartQuery(
+      locationId: locationId,
+      operatorSessionId: operatorSessionId,
     );
+    final cached = await _readCachedAccounts(merchantId, query);
+    if (preferCache && cached != null) {
+      unawaited(
+        _refreshCachedAccounts(
+          repository as OpenAccountCartRepository,
+          merchantId,
+          query,
+        ),
+      );
+      return cached;
+    }
+    try {
+      // The account screen is a decision surface. Returning yesterday's cache
+      // first painted accounts the server had already closed, then a refresh
+      // needed a second tap to reveal the truth. Offline remains cache-first via
+      // the fallback below; online, the list waits for the authoritative answer.
+      final accounts = await (repository as OpenAccountCartRepository)
+          .openAccounts(merchantId, query);
+      unawaited(_persistAccounts(merchantId, query, accounts));
+      return accounts;
+    } on AppException {
+      if (cached != null) return cached;
+      rethrow;
+    }
   }
 
   /// Read another account without claiming it or replacing the current cart.
-  Future<Cart> readAccount(Cart account, String operatorSessionId) {
-    return (_repository as OpenAccountCartRepository).account(
+  Future<Cart> readAccount(Cart account, String operatorSessionId) async {
+    final query = CartQuery(
+      locationId: account.locationId,
+      operatorSessionId: operatorSessionId,
+    );
+    final cached = await _readCachedCart(account.merchantId, account.id);
+    if (cached != null) {
+      unawaited(_refreshCachedCart(account.merchantId, account.id, query));
+      return cached;
+    }
+    final value = await (_repository as OpenAccountCartRepository).account(
       account.merchantId,
       account.id,
-      CartQuery(
-        locationId: account.locationId,
-        operatorSessionId: operatorSessionId,
-      ),
+      query,
     );
+    unawaited(_persistCart(value));
+    return value;
   }
 
   /// Open or recover the table's account. Save the current account first.
@@ -299,12 +473,30 @@ final class CartController extends ChangeNotifier {
     required String locationId,
     required String operatorSessionId,
     required String tableId,
+    String? tableName,
+    int? partySize,
   }) async {
     final repository = _repository;
-    if (repository is! OpenAccountCartRepository ||
-        _state.phase == CartPhase.loading) {
-      return false;
+    if (repository is! OpenAccountCartRepository) return false;
+    // Offline, the room is the only authority the till has, and the assignment
+    // travels with the journal: the server checks the table again when the sale
+    // lands, so a table two tills claimed in a dead spot is a conflict to
+    // report, not a wrong room on a receipt.
+    //
+    // Checked before `_busy`: a till with commands still draining is exactly
+    // the one that needs this path, and the queue serializes the command
+    // itself.
+    if (_queue != null && _connectivityIsDown) {
+      return _queueTableLocally(
+        merchantId: merchantId,
+        locationId: locationId,
+        operatorSessionId: operatorSessionId,
+        tableId: tableId,
+        tableName: tableName,
+        partySize: partySize,
+      );
     }
+    if (_busy) return false;
     var current = _state.cart;
     if (current?.tableId != null &&
         current!.tableId != tableId &&
@@ -328,14 +520,163 @@ final class CartController extends ChangeNotifier {
     _merchantId = merchantId;
     _locationId = locationId;
     _operatorSessionId = operatorSessionId;
-    return _mutation(
+    final opened = await _mutation(
       () => (repository as OpenAccountCartRepository).openTableAccount(
         merchantId,
         query: _query,
         tableId: tableId,
+        partySize: partySize,
         idempotencyKey: _uuid(),
       ),
       'table_account_opened',
+    );
+    // The link can fail between the connectivity snapshot and this request. The
+    // room action already succeeded; journal the account assignment instead of
+    // replacing it with a red "operation failed" banner.
+    if (!opened && _queue != null && _tableWriteCanWait()) {
+      return _queueTableLocally(
+        merchantId: merchantId,
+        locationId: locationId,
+        operatorSessionId: operatorSessionId,
+        tableId: tableId,
+        tableName: tableName,
+        partySize: partySize,
+      );
+    }
+    return opened;
+  }
+
+  /// True while the till has strong enough evidence that the API is gone.
+  bool get _connectivityIsDown {
+    final state = _connectivity?.state;
+    return state == PosConnectivity.offline ||
+        // `degraded` is one failed call: the API is not answering reliably, and
+        // waiting for the third failure to offer a table is waiting through
+        // taps the operator has already made. The journal path is safe either
+        // way — replay re-checks the table.
+        state == PosConnectivity.degraded ||
+        state == PosConnectivity.blocked;
+  }
+
+  /// A failed table write that says nothing about the command's truth is safe
+  /// to journal. A typed refusal is not: queueing it would replay a command the
+  /// server has already explained cannot apply.
+  bool _tableWriteCanWait() {
+    if (_connectivityIsDown) return true;
+    const definiteRefusals = {
+      'CART_VALIDATION_FAILED',
+      'CART_NOT_FOUND',
+      'CART_TABLE_ACCOUNT_EXISTS',
+      'CART_ALREADY_ASSIGNED',
+      'CART_PAYMENT_UNRESOLVED',
+      'TABLE_ALREADY_OCCUPIED',
+      'TABLE_NOT_OCCUPIED',
+      'TABLE_CAPACITY_EXCEEDED',
+      'TABLE_NOT_IN_PLAN',
+      'PERMISSION_DENIED',
+      'DEVICE_REVOKED',
+    };
+    return !definiteRefusals.contains(_state.errorCode);
+  }
+
+  /// Whether a write must take the journal-backed path now.
+  ///
+  /// The account surface uses this before it asks the server to save the
+  /// current account. A journaled `pos.cart.open` parks an account with lines
+  /// on replay, so waiting on a save that cannot land only adds a failure the
+  /// operator cannot act on.
+  bool get isOffline => _connectivityIsDown;
+
+  /// Open (or move) a table account without the API.
+  ///
+  /// The cart is created locally and journaled exactly like any other account;
+  /// the table rides on its own command so replay assigns it to the cart the
+  /// server ends up creating. Reusing `open()` here keeps one code path for
+  /// "start an account" whether or not there is a link.
+  Future<bool> _queueTableLocally({
+    required String merchantId,
+    required String locationId,
+    required String operatorSessionId,
+    required String tableId,
+    String? tableName,
+    int? partySize,
+  }) async {
+    if (_merchantId != merchantId ||
+        _locationId != locationId ||
+        _operatorSessionId != operatorSessionId ||
+        _state.cart == null) {
+      return _queueTableAccountGroup(
+        merchantId: merchantId,
+        locationId: locationId,
+        operatorSessionId: operatorSessionId,
+        tableId: tableId,
+        tableName: tableName,
+        partySize: partySize,
+      );
+    }
+    final cart = _state.cart;
+    if (cart == null || cart.id.isEmpty) return false;
+    if (cart.tableId == tableId) return true;
+    final idempotencyKey = _uuid();
+    // `cartId` is not on the typed request — the route carries it — but the
+    // queued command and the journal do, because replay has to know which cart
+    // the table belongs to.
+    final payload = {
+      'cartId': cart.id,
+      ...AssignCartTableRequest(
+        locationId: locationId,
+        operatorSessionId: operatorSessionId,
+        tableId: tableId,
+        partySize: partySize,
+        expectedVersion: cart.version,
+        idempotencyKey: idempotencyKey,
+      ).toJson(),
+    };
+    return _submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.table.set',
+      payload: payload,
+      event: 'cart_table_set',
+      predict: (base, aliases) => optimisticSetTable(base, tableId, tableName),
+    );
+  }
+
+  bool _queueTableAccountGroup({
+    required String merchantId,
+    required String locationId,
+    required String operatorSessionId,
+    required String tableId,
+    String? tableName,
+    int? partySize,
+  }) {
+    final queue = _queue;
+    if (queue == null) return false;
+    clearLocal();
+    _merchantId = merchantId;
+    _locationId = locationId;
+    _operatorSessionId = operatorSessionId;
+    final local = _emptyLocalCart(merchantId, locationId, operatorSessionId);
+    queue.initialize(local);
+    _set(CartState(phase: CartPhase.ready, cart: local));
+    final idempotencyKey = _uuid();
+    return _submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.command.group',
+      payload: {
+        'groupId': idempotencyKey,
+        'aggregateKeys': ['account:${local.id}', 'table:$tableId'],
+        'effects': [
+          {
+            'type': 'open_table_account',
+            'provisionalCartId': local.id,
+            'tableId': tableId,
+            'partySize': partySize ?? 1,
+          },
+        ],
+      },
+      event: 'table_account_opened',
+      predict: (base, aliases) => optimisticSetTable(base, tableId, tableName),
+      provisionalCartId: local.id,
     );
   }
 
@@ -356,14 +697,15 @@ final class CartController extends ChangeNotifier {
     required String operatorSessionId,
   }) async {
     final repository = _repository;
-    if (repository is! OpenAccountCartRepository ||
-        _state.phase == CartPhase.loading) {
-      return false;
-    }
+    if (repository is! OpenAccountCartRepository) return false;
     if (_state.cart?.id == account.id &&
         _operatorSessionId == operatorSessionId) {
+      // The account is already open on this till. Selecting it is a screen
+      // transition, not a write; a queued local command must not turn the
+      // current account into an unreachable one.
       return true;
     }
+    if (_busy) return false;
     if (_state.cart != null && !await saveAccount()) return false;
     clearLocal();
     _merchantId = account.merchantId;
@@ -394,6 +736,28 @@ final class CartController extends ChangeNotifier {
     _merchantId = merchantId;
     _locationId = locationId;
     _operatorSessionId = operatorSessionId;
+    if (_queue != null) {
+      final idempotencyKey = _uuid();
+      final local = _emptyLocalCart(merchantId, locationId, operatorSessionId);
+      _queue!.initialize(local);
+      _set(CartState(phase: CartPhase.ready, cart: local));
+      _submitQueued(
+        idempotencyKey: idempotencyKey,
+        commandType: 'pos.cart.open',
+        payload: {
+          'cartId': local.id,
+          ...CreateCartRequest(
+            locationId: locationId,
+            operatorSessionId: operatorSessionId,
+            idempotencyKey: idempotencyKey,
+          ).toJson(),
+        },
+        event: 'cart_opened',
+        predict: (base, aliases) => base,
+        provisionalCartId: local.id,
+      );
+      return;
+    }
     _set(const CartState(phase: CartPhase.loading));
     try {
       final cart = await _repository.create(
@@ -404,6 +768,8 @@ final class CartController extends ChangeNotifier {
           idempotencyKey: _uuid(),
         ),
       );
+      _queue?.initialize(cart);
+      unawaited(_persistCart(cart));
       _set(CartState(phase: CartPhase.ready, cart: cart));
     } on AppException catch (error) {
       _failure(error);
@@ -415,6 +781,8 @@ final class CartController extends ChangeNotifier {
     _merchantId = cart.merchantId;
     _locationId = cart.locationId;
     _operatorSessionId = operatorSessionId ?? cart.operatorSessionId;
+    _queue?.initialize(cart);
+    unawaited(_persistCart(cart));
     _set(CartState(phase: CartPhase.ready, cart: cart));
   }
 
@@ -432,9 +800,19 @@ final class CartController extends ChangeNotifier {
         _operatorSessionId == null) {
       return;
     }
+    if (_queue?.awaitsSynchronization ?? false) {
+      // The local cart is ahead of the server. A read now would replace it,
+      // and it would also wait on the unavailable API before checkout opens.
+      return;
+    }
     try {
       final refreshed = await _readSelected();
-      _set(CartState(phase: CartPhase.ready, cart: refreshed));
+      unawaited(_persistCart(refreshed));
+      if (_queue?.hasPending ?? false) {
+        _queue!.acceptServerCart(refreshed);
+      } else {
+        _set(CartState(phase: CartPhase.ready, cart: refreshed));
+      }
     } on AppException catch (error) {
       _failure(error);
     }
@@ -451,6 +829,7 @@ final class CartController extends ChangeNotifier {
     int quantity = 1,
     String? note,
     int courseNumber = 1,
+    ProvisionalLine? provisional,
   }) async {
     // TEMPORARY INSTRUMENT — remove once the phantom line is named.
     //
@@ -482,24 +861,61 @@ final class CartController extends ChangeNotifier {
         recoverable: true,
       );
     }
+    final cleanNote = (note?.trim().isEmpty ?? true) ? null : note!.trim();
+    // The line the till paints before the server answers. Only for a product the
+    // catalogue could price on its own — no variant and no option to choose — which
+    // is exactly the tap that has no sheet to wait behind anyway. Everything else
+    // keeps the old path, because a wrong price painted confidently is worse than a
+    // spinner.
+    final lineId = _uuid();
+    final canPredict =
+        provisional != null && provisional.productId == productId;
+    final idempotencyKey = _uuid();
+    final input = CartLineInput(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      productId: productId,
+      variantId: variantId,
+      modifierSelections: modifiers,
+      quantity: quantity,
+      courseNumber: courseNumber,
+      note: cleanNote,
+      clientLineId: lineId,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    );
+    if (canPredict &&
+        _submitQueued(
+          idempotencyKey: idempotencyKey,
+          commandType: 'pos.cart.line.add',
+          payload: input.toJson(),
+          event: 'product_added',
+          provisionalLineId: lineId,
+          predict: (base, aliases) => optimisticAddLine(
+            base,
+            lineId: lineId,
+            line: provisional,
+            quantity: quantity,
+            courseNumber: courseNumber,
+            note: cleanNote,
+          ),
+        )) {
+      return true;
+    }
     return _mutation(
-      () => _repository.add(
-        _merchantId!,
-        CartLineInput(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          productId: productId,
-          variantId: variantId,
-          modifierSelections: modifiers,
-          quantity: quantity,
-          courseNumber: courseNumber,
-          note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
-      ),
+      () => _repository.add(_merchantId!, input),
       'product_added',
+      predict: canPredict
+          ? () => optimisticAddLine(
+              cart,
+              lineId: lineId,
+              line: provisional,
+              quantity: quantity,
+              courseNumber: courseNumber,
+              note: cleanNote,
+            )
+          : null,
     );
   }
 
@@ -509,71 +925,128 @@ final class CartController extends ChangeNotifier {
     }
     final cart = _state.cart;
     if (cart == null) return;
+    final next = quantity.clamp(1, 999).toInt();
+    final idempotencyKey = _uuid();
+    final input = CartLineInput(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      productId: item.productId,
+      variantId: item.variant?['variantId'] as String?,
+      modifierSelections: item.modifiers
+          .map(
+            (value) => {
+              'modifierId': value['modifierId']!,
+              'quantity': value['quantity']!,
+            },
+          )
+          .toList(),
+      quantity: next,
+      // The course is not what this action is about, so it rides along
+      // unchanged: the line is rewritten whole, and a missing course here
+      // would silently drop a dessert back to course 1.
+      courseNumber: item.courseNumber,
+      note: item.note,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    );
+    if (_submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.line.update',
+      payload: {'lineId': item.id, ...input.toJson()},
+      event: 'quantity_changed',
+      predict: (base, aliases) =>
+          optimisticSetQuantity(base, aliases[item.id] ?? item.id, next),
+    )) {
+      return;
+    }
     await _mutation(
-      () => _repository.update(
-        _merchantId!,
-        item.id,
-        CartLineInput(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          productId: item.productId,
-          variantId: item.variant?['variantId'] as String?,
-          modifierSelections: item.modifiers
-              .map(
-                (value) => {
-                  'modifierId': value['modifierId']!,
-                  'quantity': value['quantity']!,
-                },
-              )
-              .toList(),
-          quantity: quantity.clamp(1, 999).toInt(),
-          // The course is not what this action is about, so it rides along
-          // unchanged: the line is rewritten whole, and a missing course here
-          // would silently drop a dessert back to course 1.
-          courseNumber: item.courseNumber,
-          note: item.note,
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
-      ),
+      () => _repository.update(_merchantId!, item.id, input),
       'quantity_changed',
+      // The line already carries what one unit costs, so this is arithmetic the
+      // server repeats identically rather than a guess about price.
+      predict: () => optimisticSetQuantity(cart, item.id, next),
+    );
+  }
+
+  /// Add the same configured line again.
+  ///
+  /// The existing line carries the server price, variant and modifiers, so the
+  /// repeat can paint at once and the server can still confirm the new line.
+  Future<bool> repeat(CartItem item) {
+    final price = PriceSnapshot.fromJson(item.price);
+    return add(
+      productId: item.productId,
+      variantId: item.variant?['variantId'] as String?,
+      modifiers: item.modifiers,
+      quantity: item.quantity,
+      note: item.note,
+      courseNumber: item.courseNumber,
+      provisional: ProvisionalLine(
+        productId: item.productId,
+        productName: item.productName,
+        saleAction: item.saleAction,
+        unitMinorUnits: (price.unitPrice['minorUnits'] as num?)?.toInt() ?? 0,
+        currency: price.unitPrice['currency'] as String? ?? 'MXN',
+        taxRateBasisPoints: price.taxRateBasisPoints,
+      ),
     );
   }
 
   Future<void> remove(CartItem item) async {
     final cart = _state.cart;
     if (cart == null) return;
+    final idempotencyKey = _uuid();
+    final payload = RemoveCartLineRequest(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    ).toJson();
+    if (_submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.line.remove',
+      payload: {'lineId': item.id, ...payload},
+      event: 'product_removed',
+      predict: (base, aliases) =>
+          optimisticRemoveLine(base, aliases[item.id] ?? item.id),
+    )) {
+      return;
+    }
     await _mutation(
       () => _repository.remove(
         _merchantId!,
         item.id,
-        RemoveCartLineRequest(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
+        RemoveCartLineRequest.fromJson(payload),
       ),
       'product_removed',
+      predict: () => optimisticRemoveLine(cart, item.id),
     );
   }
 
   Future<void> clear() async {
     final cart = _state.cart;
     if (cart == null || cart.items.isEmpty) return;
+    final idempotencyKey = _uuid();
+    final payload = ClearCartRequest(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    ).toJson();
+    if (_submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.clear',
+      payload: payload,
+      event: 'cart_cleared',
+      predict: (base, aliases) => optimisticClear(base),
+    )) {
+      return;
+    }
     await _mutation(
-      () => _repository.clear(
-        _merchantId!,
-        ClearCartRequest(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
-      ),
+      () => _repository.clear(_merchantId!, ClearCartRequest.fromJson(payload)),
       'cart_cleared',
     );
   }
@@ -589,24 +1062,53 @@ final class CartController extends ChangeNotifier {
   }) async {
     final cart = _state.cart;
     if (cart == null) return false;
-    return _mutation(
-      () => _repository.update(
-        _merchantId!,
-        item.id,
-        CartLineInput(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          productId: item.productId,
+    final cleanNote = (note?.trim().isEmpty ?? true) ? null : note!.trim();
+    final nextQuantity = quantity.clamp(1, 999).toInt();
+    final idempotencyKey = _uuid();
+    final input = CartLineInput(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      productId: item.productId,
+      variantId: variantId,
+      modifierSelections: modifiers,
+      quantity: nextQuantity,
+      courseNumber: courseNumber,
+      note: cleanNote,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    );
+    if (optimisticEditLine(
+          cart,
+          item,
           variantId: variantId,
-          modifierSelections: modifiers,
-          quantity: quantity.clamp(1, 999).toInt(),
+          modifiers: modifiers,
+          quantity: nextQuantity,
           courseNumber: courseNumber,
-          note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
+          note: cleanNote,
+        ) !=
+        null) {
+      if (_submitQueued(
+        idempotencyKey: idempotencyKey,
+        commandType: 'pos.cart.line.update',
+        payload: {'lineId': item.id, ...input.toJson()},
+        event: 'cart_line_edited',
+        predict: (base, aliases) => optimisticEditLine(
+          base,
+          item,
+          lineId: aliases[item.id] ?? item.id,
+          variantId: variantId,
+          modifiers: modifiers,
+          quantity: nextQuantity,
+          courseNumber: courseNumber,
+          note: cleanNote,
         ),
-      ),
+      )) {
+        return true;
+      }
+    }
+    return _mutation(
+      () => _repository.update(_merchantId!, item.id, input),
       'cart_line_edited',
     );
   }
@@ -614,16 +1116,27 @@ final class CartController extends ChangeNotifier {
   Future<void> prepare() async {
     final cart = _state.cart;
     if (cart == null || cart.items.isEmpty) return;
+    final idempotencyKey = _uuid();
+    final payload = PrepareSaleRequest(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    ).toJson();
+    if (_submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.prepare',
+      payload: payload,
+      event: 'totals_loaded',
+      predict: (base, aliases) => base,
+    )) {
+      return;
+    }
     await _mutation(
       () => _repository.prepare(
         _merchantId!,
-        PrepareSaleRequest(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
+        PrepareSaleRequest.fromJson(payload),
       ),
       'totals_loaded',
     );
@@ -647,23 +1160,42 @@ final class CartController extends ChangeNotifier {
         _merchantId == null ||
         _locationId == null ||
         _operatorSessionId == null ||
-        _state.phase == CartPhase.loading) {
+        (_busy && _queue == null)) {
       return null;
     }
     // Nothing new to send: a cart whose every line already reached the kitchen has
     // nothing to add to the ticket it owns.
     if (!cart.items.any((item) => item['fired'] != true)) return null;
+    final idempotencyKey = _uuid();
+    final payload = FireOrderRequest(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    ).toJson();
+    final lineCount = cart.items.where((item) => item['fired'] != true).length;
+    if (await _submitQueuedPersisted(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.fire',
+      payload: payload,
+      event: 'order_fired',
+      predict: (base, aliases) => optimisticFire(base),
+    )) {
+      return FireOrderResult(
+        cartId: cart.id,
+        cartVersion: cart.version + 1,
+        orderId: _uuid(),
+        reference: null,
+        lineCount: lineCount,
+        firedAt: DateTime.now().toUtc().toIso8601String(),
+      );
+    }
     _set(CartState(phase: CartPhase.loading, cart: cart));
     try {
       final result = await _repository.fire(
         _merchantId!,
-        FireOrderRequest(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
+        FireOrderRequest.fromJson(payload),
       );
       final refreshed = await _readSelected();
       _set(CartState(phase: CartPhase.ready, cart: refreshed));
@@ -703,17 +1235,29 @@ final class CartController extends ChangeNotifier {
     if (cart.fulfillmentType == fulfillmentType) {
       return;
     }
+    final idempotencyKey = _uuid();
+    final payload = SetCartFulfillmentRequest(
+      cartId: cart.id,
+      locationId: _locationId!,
+      operatorSessionId: _operatorSessionId!,
+      fulfillmentType: fulfillmentType,
+      expectedVersion: cart.version,
+      idempotencyKey: idempotencyKey,
+    ).toJson();
+    if (_submitQueued(
+      idempotencyKey: idempotencyKey,
+      commandType: 'pos.cart.fulfillment.set',
+      payload: payload,
+      event: 'cart_fulfillment_set',
+      predict: (base, aliases) =>
+          optimisticSetFulfillment(base, fulfillmentType),
+    )) {
+      return;
+    }
     await _mutation(
       () => _repository.setFulfillment(
         _merchantId!,
-        SetCartFulfillmentRequest(
-          cartId: cart.id,
-          locationId: _locationId!,
-          operatorSessionId: _operatorSessionId!,
-          fulfillmentType: fulfillmentType,
-          expectedVersion: cart.version,
-          idempotencyKey: _uuid(),
-        ),
+        SetCartFulfillmentRequest.fromJson(payload),
       ),
       'cart_fulfillment_set',
     );
@@ -730,6 +1274,7 @@ final class CartController extends ChangeNotifier {
     _merchantId = null;
     _locationId = null;
     _operatorSessionId = null;
+    _queue?.clearLocal();
     _state = const CartState();
     notifyListeners();
   }
@@ -737,28 +1282,59 @@ final class CartController extends ChangeNotifier {
   /// True when the server accepted the command. The exception is captured into the
   /// cart's error state either way — the caller is the one that has to know whether
   /// the write landed, so it is answered here instead of guessed from the state.
-  Future<bool> _mutation(Future<Cart> Function() action, String event) async {
-    if (_state.phase == CartPhase.loading) return false;
-    _set(CartState(phase: CartPhase.loading, cart: _state.cart));
+  ///
+  /// [predict] is the difference between a tap that waits and a tap that does not.
+  /// When the caller can say what the cart becomes — see `cart_optimism.dart` — the
+  /// till paints that at once and the server's answer, which is the authoritative
+  /// one, replaces it when it arrives. When the caller cannot, this behaves exactly
+  /// as it always did: `loading`, then the server's cart.
+  Future<bool> _mutation(
+    Future<Cart> Function() action,
+    String event, {
+    Cart? Function()? predict,
+  }) async {
+    if (_busy) return false;
+    final base = _state.cart;
+    final predicted = predict?.call();
+    _inFlight = true;
+    if (predicted != null) {
+      // Painted, not confirmed. The screen stops waiting on Boston; the write it
+      // describes is still only an intention until the server answers below.
+      _set(CartState(phase: CartPhase.ready, cart: predicted));
+    } else {
+      _set(CartState(phase: CartPhase.loading, cart: base));
+    }
     try {
       final cart = await action();
+      _queue?.acceptServerCart(cart);
+      unawaited(_persistCart(cart));
       _set(CartState(phase: CartPhase.ready, cart: cart));
       _event(event);
       return true;
     } on AppException catch (error) {
-      _failure(error);
+      // A refused write takes its prediction with it. Leaving a line on the screen
+      // that the server never accepted is the failure mode the whole design is
+      // careful about, so the cart goes back to the last answer that was true.
+      //
+      // The wire is settled before the refusal is recorded: `_failure` may go on to
+      // re-read the account, and that check asks whether a write is still out. A
+      // refusal that left the flag set would make the till refuse to look at itself.
+      _inFlight = false;
+      _failure(error, revertTo: predicted != null ? base : null);
       return false;
+    } finally {
+      _inFlight = false;
     }
   }
 
-  void _failure(AppException error) {
+  void _failure(AppException error, {Cart? revertTo}) {
     _event('validation_failed');
     _set(
       CartState(
         phase: error.code == 'CART_VALIDATION_FAILED'
             ? CartPhase.validationFailure
             : CartPhase.failure,
-        cart: _state.cart,
+        cart: revertTo ?? _state.cart,
         errorCode: error.code,
         errorDetails: error.details,
       ),
@@ -788,7 +1364,7 @@ final class CartController extends ChangeNotifier {
         _merchantId == null ||
         _locationId == null ||
         _operatorSessionId == null ||
-        _state.phase == CartPhase.loading) {
+        _busy) {
       return;
     }
     _verifyingRelease = true;
@@ -827,9 +1403,237 @@ final class CartController extends ChangeNotifier {
 
   void _event(String name) =>
       _telemetry.event(ClientEvent(name: name, values: const {}));
+
+  Future<List<Cart>?> _readCachedAccounts(
+    String merchantId,
+    CartQuery query,
+  ) async {
+    final workingCopy = _workingCopy;
+    if (workingCopy == null) return null;
+    try {
+      return await workingCopy.readOpenAccounts(merchantId, query);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _refreshCachedAccounts(
+    OpenAccountCartRepository repository,
+    String merchantId,
+    CartQuery query,
+  ) async {
+    try {
+      final accounts = await repository.openAccounts(merchantId, query);
+      await _persistAccounts(merchantId, query, accounts);
+    } on AppException {
+      // The cached accounts stay usable while the till is away from the API.
+    }
+  }
+
+  Future<Cart?> _readCachedCart(String merchantId, String cartId) async {
+    final workingCopy = _workingCopy;
+    if (workingCopy == null) return null;
+    try {
+      return await workingCopy.readCart(merchantId, cartId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _refreshCachedCart(
+    String merchantId,
+    String cartId,
+    CartQuery query,
+  ) async {
+    final repository = _repository;
+    if (repository is! OpenAccountCartRepository) return;
+    try {
+      final cart = await (repository as OpenAccountCartRepository).account(
+        merchantId,
+        cartId,
+        query,
+      );
+      await _persistCart(cart);
+    } on AppException {
+      // The last server answer remains available for display.
+    }
+  }
+
+  Future<void> _persistAccounts(
+    String merchantId,
+    CartQuery query,
+    List<Cart> accounts,
+  ) async {
+    try {
+      await _workingCopy?.writeOpenAccounts(merchantId, query, accounts);
+    } catch (_) {
+      _event('local_store_write_failed');
+    }
+  }
+
+  Future<void> _persistCart(Cart cart) async {
+    try {
+      await _workingCopy?.writeCart(cart);
+    } catch (_) {
+      _event('local_store_write_failed');
+    }
+  }
+
+  bool _submitQueued({
+    required String idempotencyKey,
+    required String commandType,
+    required Map<String, Object?> payload,
+    required String event,
+    required CartPrediction predict,
+    String? provisionalLineId,
+    String? provisionalCartId,
+  }) {
+    final queue = _queue;
+    if (queue == null) return false;
+    final painted =
+        queue.submit(
+          QueuedCartCommand(
+            commandId: cartCommandId(),
+            commandType: commandType,
+            idempotencyKey: idempotencyKey,
+            payload: payload,
+            event: event,
+            predict: predict,
+            provisionalLineId: provisionalLineId,
+            provisionalCartId: provisionalCartId,
+          ),
+        ) !=
+        null;
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint('[umipos] cart queue submit=$commandType painted=$painted');
+    }
+    return painted;
+  }
+
+  Future<bool> _submitQueuedPersisted({
+    required String idempotencyKey,
+    required String commandType,
+    required Map<String, Object?> payload,
+    required String event,
+    required CartPrediction predict,
+    String? provisionalLineId,
+    String? provisionalCartId,
+  }) async {
+    final queue = _queue;
+    if (queue == null) return false;
+    final painted = await queue.submitAndPersist(
+      QueuedCartCommand(
+        commandId: cartCommandId(),
+        commandType: commandType,
+        idempotencyKey: idempotencyKey,
+        payload: payload,
+        event: event,
+        predict: predict,
+        provisionalLineId: provisionalLineId,
+        provisionalCartId: provisionalCartId,
+      ),
+    );
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] cart queue submit-persisted=$commandType '
+        'painted=${painted != null}',
+      );
+    }
+    return painted != null;
+  }
+
+  CartCommandScope? _queueScope() {
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    final operatorSessionId = _operatorSessionId;
+    final device = _deviceIdentity?.call();
+    if (merchantId == null ||
+        locationId == null ||
+        operatorSessionId == null ||
+        device == null) {
+      return null;
+    }
+    return CartCommandScope(
+      merchantId: merchantId,
+      locationId: locationId,
+      operatorSessionId: operatorSessionId,
+      deviceId: device.deviceId,
+      credentialVersion: device.credentialVersion,
+    );
+  }
+
+  void _acceptQueuedCart(Cart cart) {
+    if (_disposed) return;
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] cart accept queued items=${cart.items.length} '
+        'total=${cart.totals['grandTotal']}',
+      );
+    }
+    unawaited(_persistCart(cart));
+    _set(CartState(phase: CartPhase.ready, cart: cart));
+  }
+
+  void _setQueueBusy(bool busy) {
+    if (_disposed || _inFlight == busy) return;
+    _inFlight = busy;
+    notifyListeners();
+  }
+
   void _set(CartState value) {
+    if (_disposed) return;
     _state = value;
     notifyListeners();
+  }
+
+  Cart _emptyLocalCart(
+    String merchantId,
+    String locationId,
+    String operatorSessionId,
+  ) {
+    final now = DateTime.now();
+    // The operational date, not the calendar or UTC one. A café whose day starts
+    // at 04:00 is still on yesterday's date at 03:00, and the server derives the
+    // same date from `business_day_start`. Using the calendar date here put an
+    // offline ticket in "Todos" but out of the KDS's "Hoy" bucket — the cook saw
+    // the arrival sound with no card on the active rail.
+    final businessDate = operationalDayStart(
+      now,
+    ).toIso8601String().substring(0, 10);
+    Map<String, Object?> money() => {'minorUnits': 0, 'currency': 'MXN'};
+    return Cart(
+      id: _uuid(),
+      merchantId: merchantId,
+      locationId: locationId,
+      operatorSessionId: operatorSessionId,
+      status: 'draft',
+      lifecycleState: 'building_cart',
+      version: 1,
+      firedOrderId: null,
+      fulfillmentType: 'dine_in',
+      items: const [],
+      totals: {
+        'subtotal': money(),
+        'tax': money(),
+        'discounts': {
+          'total': money(),
+          'entries': const <Map<String, Object?>>[],
+        },
+        'grandTotal': money(),
+        'businessDate': businessDate,
+      },
+      checkoutEnabled: false,
+      checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
+      updatedAt: now.toUtc().toIso8601String(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _journal?.pendingCount.removeListener(_journalCountChanged);
+    _queue?.dispose();
+    super.dispose();
   }
 
   String _uuid() {

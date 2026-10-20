@@ -17,6 +17,7 @@ import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
+import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/sale/sale_lifecycle_controller.dart';
 import 'package:umi_pos/features/sale/sale_repository.dart';
 
@@ -317,6 +318,7 @@ Future<
     CartController cart,
     SaleLifecycleController sales,
     _CartRepo repository,
+    ConnectivityController connectivity,
     Cart Function() persistedCart,
     VoidCallback dispose,
   })
@@ -384,8 +386,11 @@ _fixture({
       : openAccounts
       ? _AccountCartRepo(initialCart)
       : _CartRepo(initialCart);
-  final cart = CartController(repository: repository, telemetry: root.telemetry)
-    ..restore(initialCart);
+  final cart = CartController(
+    repository: repository,
+    telemetry: root.telemetry,
+    connectivity: root.connectivity,
+  )..restore(initialCart);
   if (repository is _DetailedAccountCartRepo) {
     repository.failRenameOnce = renameFailsOnce;
   }
@@ -419,6 +424,7 @@ _fixture({
     cart: cart,
     sales: sales,
     repository: repository,
+    connectivity: root.connectivity,
     persistedCart: () => repository.cart,
     dispose: () {
       if (sales != root.sales) sales.dispose();
@@ -599,11 +605,14 @@ void main() {
         // does offer stay reachable.
         expect(find.text('Guardar y salir'), findsNothing);
         final checkout = find.text('Cobrar').hitTestable();
+        final split = find.byKey(const ValueKey('account-split-check'));
         expect(checkout, findsOneWidget);
+        expect(split, findsOneWidget);
         expect(
           tester.getRect(checkout).bottom,
           lessThanOrEqualTo(1014 / 1.375),
         );
+        expect(tester.getRect(split).bottom, lessThanOrEqualTo(1014 / 1.375));
         expect(
           fixture.cart.state.cart!.items.every(
             (line) => line['fired'] == false,
@@ -968,6 +977,55 @@ void main() {
     },
   );
 
+  testWidgets(
+    'an empty validation failure offers a new order instead of an endless spinner',
+    (tester) async {
+      tester.view.physicalSize = const Size(1340, 800);
+      tester.view.devicePixelRatio = 213 / 160;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fixture = await _fixture(
+        accountName: 'Cuenta 096',
+        tableName: 'Mesa 10',
+        accountInitiallyMissing: true,
+        waiterMode: true,
+      );
+      fixture.cart.clearLocal();
+      fixture.repository.createFailure = const AppException(
+        category: AppErrorCategory.conflict,
+        code: 'CART_VALIDATION_FAILED',
+        recoverable: true,
+      );
+      await fixture.sales.open(
+        'merchant',
+        'location',
+        'operator',
+        useCartAuthority: true,
+      );
+      await fixture.sales.newSale();
+
+      await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+      await tester.pumpAndSettle();
+
+      expect(fixture.cart.state.cart, isNull);
+      expect(fixture.cart.state.phase, CartPhase.validationFailure);
+      expect(find.textContaining('la cuenta cambió'), findsOneWidget);
+      expect(find.widgetWithText(PosButton, 'Iniciar pedido'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(PosButton, 'Iniciar pedido'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
+      expect(fixture.cart.state.phase, CartPhase.idle);
+      expect(fixture.cart.state.errorCode, isNull);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      fixture.dispose();
+    },
+  );
+
   testWidgets('the bar about a closed account clears once the till is working again', (
     tester,
   ) async {
@@ -1075,6 +1133,39 @@ void main() {
       fixture.cart.state.cart?.id,
       account.id,
       reason: 'the tap keeps the account the operator already has',
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    fixture.dispose();
+  });
+
+  testWidgets('Nueva cuenta parks the account locally while the API is down', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1014);
+    tester.view.devicePixelRatio = 1.375;
+    addTearDown(tester.view.reset);
+    await fonts();
+    final fixture = await _fixture(
+      openAccounts: true,
+      lines: 2,
+      accountFolio: 'Cuenta 078',
+    );
+    await tester.pumpWidget(_scaledApp(fixture.surface, 'es', 1));
+    await tester.pump();
+
+    fixture.connectivity.networkDown();
+    await tester.tap(find.text('Iniciar pedido').first);
+    await tester.pumpAndSettle();
+
+    expect((fixture.repository as _AccountCartRepo).suspends, 0);
+    expect(fixture.cart.state.cart, isNull);
+    expect(
+      find.textContaining('No se completó la operación'),
+      findsNothing,
+      reason: 'a local-first new account does not report a failed remote save',
     );
     expect(tester.takeException(), isNull);
 

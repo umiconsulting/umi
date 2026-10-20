@@ -16,6 +16,7 @@ import 'package:umi_pos/features/catalog/catalog_repository.dart';
 import 'package:umi_pos/features/catalog/catalog_surface.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
+import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
 import 'package:umi_pos/features/entry/entry_gateway.dart';
 import 'package:umi_pos/features/exception/exception_controller.dart';
@@ -246,8 +247,10 @@ final class _CartRepo
   int creations = 0;
   int startAttempts = 0;
   int additions = 0;
+  CartLineInput? lastAdd;
   Cart? listedAccount;
   int resumes = 0;
+  int currentReads = 0;
 
   @override
   Future<List<Cart>> openAccounts(String merchantId, CartQuery query) async =>
@@ -272,6 +275,7 @@ final class _CartRepo
   @override
   Future<Cart> add(String merchantId, CartLineInput input) async {
     additions++;
+    lastAdd = input;
     return cart = Cart.fromJson({
       ...cart.toJson(),
       'items': [...cart.items, _cartWithLines(1).items.first],
@@ -318,6 +322,7 @@ final class _CartRepo
     String merchantId, {
     required CartQuery query,
     required String tableId,
+    int? partySize,
     required String idempotencyKey,
   }) async {
     tableOpens++;
@@ -356,9 +361,11 @@ final class _Sales implements SaleRepository {
     this.repo, {
     this.initialNoCart = false,
     this.resumeCancelFlow = false,
+    this.currentGate,
   });
   final bool initialNoCart;
   final bool resumeCancelFlow;
+  final Completer<void>? currentGate;
   final _CartRepo repo;
   int cancels = 0;
   @override
@@ -393,6 +400,9 @@ final class _Sales implements SaleRepository {
     String merchantId,
     SaleHistoryQuery query,
   ) async {
+    repo.currentReads++;
+    final gate = currentGate;
+    if (gate != null) await gate.future;
     if (initialNoCart &&
         repo.creations == 0 &&
         repo.tableOpens == 0 &&
@@ -443,7 +453,7 @@ final class _DeferredRecoveryStore implements SaleExceptionRecoveryStore {
       throw StateError('Unexpected recovery write');
 }
 
-final class _Checkout implements CheckoutRepository {
+abstract base class _CheckoutBase implements CheckoutRepository {
   int recoveries = 0;
   @override
   Future<CheckoutRecoverySnapshot> recovery(
@@ -474,6 +484,83 @@ final class _Checkout implements CheckoutRepository {
   dynamic noSuchMethod(Invocation invocation) =>
       throw StateError('Unexpected checkout call: ${invocation.memberName}');
 }
+
+final class _Checkout extends _CheckoutBase
+    implements PartialPaymentRepository {
+  int policyLoads = 0;
+  int partialReads = 0;
+
+  @override
+  Future<CheckoutPolicy> policy(
+    String merchantId,
+    PosCheckoutPolicyQuery query,
+  ) async {
+    policyLoads++;
+    return CheckoutPolicy.fromJson({
+      'version': 'test',
+      'manualTerminalEnabled': false,
+      'bankTransferEnabled': true,
+      'bankTransferDetails': <String, Object?>{
+        'holderName': 'ONCA DEMO',
+        'bankName': 'Banco de prueba',
+        'clabe': '012345678901234567',
+        'accountNumber': null,
+      },
+      'merchantLogoUrl': null,
+      'mixedTenderEnabled': false,
+      'maximumTenderLines': 1,
+      'manualTerminalApprovalThreshold': {
+        'minorUnits': 50000,
+        'currency': 'MXN',
+      },
+      'manualTerminalApprovalPermission': 'checkout.terminal.approve',
+      'tip': {
+        'enabled': true,
+        'presetBasisPoints': <int>[],
+        'customPercentageEnabled': false,
+        'customFixedEnabled': true,
+        'maximumTip': {'minorUnits': 5000, 'currency': 'MXN'},
+        'requiredPermission': null,
+        'version': 'test',
+      },
+      'discount': {
+        'enabled': false,
+        'maximumBasisPoints': 0,
+        'maximumAmount': {'minorUnits': 0, 'currency': 'MXN'},
+        'cashierThreshold': {'minorUnits': 0, 'currency': 'MXN'},
+        'customRequiresApproval': false,
+        'requiredPermission': 'checkout.discount.apply',
+        'approvalPermission': 'checkout.discount.approve',
+        'version': 'test',
+      },
+    });
+  }
+
+  @override
+  Future<CheckoutPartialPaymentResult> partialPayments(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentQuery query,
+  ) async {
+    partialReads++;
+    throw const AppException(
+      category: AppErrorCategory.unknown,
+      code: 'RESOURCE_NOT_FOUND',
+      recoverable: false,
+    );
+  }
+
+  @override
+  Future<CheckoutPartialPaymentResult> collectPartialPayment(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentRequest request,
+  ) {
+    throw StateError('The account split test does not collect payment.');
+  }
+}
+
+final class _NoPartialCheckout extends _CheckoutBase {}
 
 class _Plan implements FloorPlanRepository {
   int loads = 0;
@@ -579,7 +666,7 @@ Future<
     CartController cart,
     _CartRepo repo,
     _Plan plan,
-    _Checkout checkoutRepo,
+    _CheckoutBase checkoutRepo,
     VoidCallback dispose,
   })
 >
@@ -590,7 +677,10 @@ _fixture({
   bool emptyPlan = false,
   bool initialNoCart = false,
   bool resumeCancelFlow = false,
+  bool startWithoutCart = false,
+  Completer<void>? currentGate,
   bool withProduct = false,
+  bool partialPayments = true,
   _DeferredRecoveryStore? lateRecovery,
 }) async {
   final root = testRoot();
@@ -632,12 +722,13 @@ _fixture({
     });
   }
   final cart = CartController(repository: repo, telemetry: root.telemetry);
-  if (!initialNoCart) cart.restore(repo.cart);
+  if (!initialNoCart && !startWithoutCart) cart.restore(repo.cart);
   final sales = SaleLifecycleController(
     repository: _Sales(
       repo,
       initialNoCart: initialNoCart,
       resumeCancelFlow: resumeCancelFlow,
+      currentGate: currentGate,
     ),
     cart: cart,
     telemetry: root.telemetry,
@@ -647,7 +738,7 @@ _fixture({
     cache: CatalogCache(),
     telemetry: root.telemetry,
   );
-  final checkoutRepo = _Checkout();
+  final checkoutRepo = partialPayments ? _Checkout() : _NoPartialCheckout();
   final checkout = CheckoutController(
     repository: checkoutRepo,
     telemetry: root.telemetry,
@@ -688,6 +779,7 @@ Future<void> _mount(
   WidgetTester tester,
   Widget surface, {
   Size size = const Size(1440, 1000),
+  bool settle = true,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -705,7 +797,11 @@ Future<void> _mount(
       home: surface,
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 void main() {
@@ -715,15 +811,15 @@ void main() {
     final f = await _fixture(mobility: 'mobile');
     addTearDown(f.dispose);
     await _mount(tester, f.surface);
-    expect(find.text('Tipo de pedido'), findsOneWidget);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
     await tester.pump();
-    expect(find.text('Tipo de pedido'), findsOneWidget);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
     expect(f.repo.fulfillmentWrites, 0);
     await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
     await f.cart.refresh();
     await tester.pumpAndSettle();
-    expect(find.text('Tipo de pedido'), findsNothing);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
   });
   testWidgets('fixed fresh account starts without a type dialog', (
     tester,
@@ -731,14 +827,34 @@ void main() {
     final f = await _fixture();
     addTearDown(f.dispose);
     await _mount(tester, f.surface);
-    expect(find.text('Tipo de pedido'), findsNothing);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
     expect(f.repo.fulfillmentWrites, 0);
     expect(f.plan.loads, 0);
   });
   testWidgets(
+    'startup leaves an existing account in Accounts instead of opening it',
+    (tester) async {
+      final f = await _fixture(startWithoutCart: true);
+      addTearDown(f.dispose);
+      await _mount(tester, f.surface, size: const Size(1920, 1014));
+
+      expect(find.text('Cuenta 018'), findsNothing);
+      expect(find.text('Recuperando tu cuenta…'), findsNothing);
+      expect(find.widgetWithText(PosButton, 'Iniciar pedido'), findsOneWidget);
+      expect(f.cart.state.cart, isNull);
+      expect(f.repo.currentReads, 0);
+      expect(f.repo.creations, 0);
+      expect(f.repo.startAttempts, 0);
+    },
+  );
+  testWidgets(
     'cancelled resumed account does not lend Save and leave to a new account',
     (tester) async {
-      final f = await _fixture(initialNoCart: true, resumeCancelFlow: true);
+      final f = await _fixture(
+        initialNoCart: true,
+        resumeCancelFlow: true,
+        withProduct: true,
+      );
       addTearDown(f.dispose);
       await _mount(tester, f.surface, size: const Size(1920, 1014));
 
@@ -773,7 +889,16 @@ void main() {
       expect(f.cart.state.cart, isNull);
       expect(find.text('Guardar y salir'), findsNothing);
 
-      await tester.tap(find.widgetWithText(PosButton, 'Nueva venta'));
+      await tester.tap(find.widgetWithText(PosButton, 'Iniciar pedido'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(PosAlertDialog),
+          matching: find.text('Para llevar'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Latte'));
       await tester.pumpAndSettle();
       expect(f.repo.creations, 1);
       expect(f.cart.state.cart?.id, '00000000-0000-4000-8000-0000000000c2');
@@ -788,7 +913,7 @@ void main() {
     await _mount(tester, f.surface);
     await f.cart.refresh();
     await tester.pumpAndSettle();
-    expect(find.text('Tipo de pedido'), findsNothing);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
     expect(f.cart.state.cart!.items, hasLength(1));
     expect(f.repo.fulfillmentWrites, 0);
   });
@@ -810,7 +935,7 @@ void main() {
       await f.cart.refresh();
       await tester.pumpAndSettle();
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
-      expect(find.text('Tipo de pedido'), findsNothing);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
       expect(f.plan.loads, 0);
     },
   );
@@ -837,7 +962,7 @@ void main() {
     expect(f.cart.state.cart!.tableId, 'table');
     expect(f.cart.state.cart!.id, 'table-account');
     expect(find.byType(OrderTablePicker), findsNothing);
-    expect(find.text('Tipo de pedido'), findsNothing);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
   });
   testWidgets(
     'fixed dine in checkout cancel keeps the account and never opens checkout',
@@ -868,8 +993,44 @@ void main() {
     expect(f.repo.assignments, 0);
     expect(f.cart.state.cart!.fulfillmentType, 'takeout');
     expect(f.checkoutRepo.recoveries, 1);
+    expect(find.byType(PartialCheckoutSurface), findsNothing);
     // The checkout route is visible after the preserved account is recovered.
     expect(find.byType(CatalogSurface), findsNothing);
+  });
+  testWidgets('account split check opens the one-account ledger directly', (
+    tester,
+  ) async {
+    final f = await _fixture(lines: 1, type: 'takeout');
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+    final split = find.byKey(const ValueKey('account-split-check'));
+    expect(split, findsOneWidget);
+    expect(find.text('Dividir cuenta'), findsOneWidget);
+    await tester.tap(split);
+    await tester.pumpAndSettle();
+    expect(find.byType(PartialCheckoutSurface), findsOneWidget);
+    expect((f.checkoutRepo as _Checkout).partialReads, greaterThan(0));
+  });
+  testWidgets('split check is absent when the checkout cannot split', (
+    tester,
+  ) async {
+    final f = await _fixture(lines: 1, type: 'takeout', partialPayments: false);
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+    expect(find.byKey(const ValueKey('account-split-check')), findsNothing);
+    expect(find.text('Dividir cuenta'), findsNothing);
+  });
+  testWidgets('repeat adds one more of the same cart line', (tester) async {
+    final f = await _fixture(lines: 1);
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+    final line = CartItem.fromJson(f.cart.state.cart!.items.single);
+    await tester.tap(find.byKey(ValueKey('repeat-cart-line-${line.id}')));
+    await tester.pumpAndSettle();
+    expect(f.repo.additions, 1);
+    expect(f.repo.lastAdd?.productId, line.productId);
+    expect(f.repo.lastAdd?.quantity, line.quantity);
+    expect(f.cart.state.cart!.items, hasLength(2));
   });
   testWidgets(
     'mobile dine in creates three tables and opens the selected account',
@@ -912,7 +1073,7 @@ void main() {
       await f.cart.refresh();
       await tester.pumpAndSettle();
       expect(f.cart.state.cart!.tableId, 'created-table-2');
-      expect(find.text('Tipo de pedido'), findsNothing);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
     },
   );
   testWidgets(
@@ -964,11 +1125,11 @@ void main() {
       addTearDown(f.dispose);
       expect(f.cart.state.cart, isNull);
       await _mount(tester, f.surface);
-      expect(find.text('Tipo de pedido'), findsNothing);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
       expect(f.repo.creations, 0);
       await tester.tap(find.text('Latte').first);
       await tester.pumpAndSettle();
-      expect(find.text('Tipo de pedido'), findsOneWidget);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
       expect(f.cart.state.cart, isNull);
       expect(f.repo.creations, 0);
       await tester.tap(
@@ -983,7 +1144,7 @@ void main() {
       expect(f.repo.additions, 1);
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
       expect(f.cart.state.cart!.items, hasLength(1));
-      expect(find.text('Tipo de pedido'), findsNothing);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
     },
   );
   testWidgets('mobile dine in creates an account only after a table choice', (
@@ -1017,28 +1178,27 @@ void main() {
     expect(f.repo.additions, 1);
     expect(f.cart.state.cart?.tableId, 'table');
   });
-  testWidgets(
-    'fixed without a local cart does not start another account or ask',
-    (tester) async {
-      final f = await _fixture(initialNoCart: true);
-      addTearDown(f.dispose);
-      await _mount(tester, f.surface);
-      expect(f.cart.state.cart, isNull);
-      expect(f.repo.startAttempts, 0);
-      expect(f.repo.creations, 0);
-      expect(find.text('Tipo de pedido'), findsNothing);
-      await tester.pump();
-      expect(f.repo.startAttempts, 0);
-      await tester.tap(find.text('Nueva cuenta').first);
-      await tester.pumpAndSettle();
-      expect(f.repo.startAttempts, 0);
-      expect(f.cart.state.cart, isNull);
-      expect(
-        find.text('Agrega un producto para iniciar la cuenta.'),
-        findsOneWidget,
-      );
-    },
-  );
+  testWidgets('fixed without a local cart starts through the order chooser', (
+    tester,
+  ) async {
+    final f = await _fixture(initialNoCart: true);
+    addTearDown(f.dispose);
+    await _mount(tester, f.surface);
+    expect(f.cart.state.cart, isNull);
+    expect(f.repo.startAttempts, 0);
+    expect(f.repo.creations, 0);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+    await tester.pump();
+    expect(f.repo.startAttempts, 0);
+    await tester.tap(find.text('Iniciar pedido').first);
+    await tester.pumpAndSettle();
+    expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(f.repo.startAttempts, 0);
+    expect(f.cart.state.cart, isNull);
+    expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
+  });
   testWidgets(
     'mobile startup requests a frame after its last async task finishes while idle',
     (tester) async {
@@ -1047,14 +1207,14 @@ void main() {
       addTearDown(f.dispose);
       await _mount(tester, f.surface);
       expect(recovery.requested, isTrue);
-      expect(find.text('Tipo de pedido'), findsNothing);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
       expect(tester.binding.hasScheduledFrame, isFalse);
       recovery.pending.complete(null);
       // Flush async completion without supplying a frame or an operator gesture.
       await tester.idle();
       expect(tester.binding.hasScheduledFrame, isTrue);
       await tester.pumpAndSettle();
-      expect(find.text('Tipo de pedido'), findsOneWidget);
+      expect(find.text('¿Dónde se sirve este pedido?'), findsOneWidget);
       expect(f.repo.tableOpens, 0);
       expect(f.repo.fulfillmentWrites, 0);
     },

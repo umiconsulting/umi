@@ -195,16 +195,14 @@ export class PosCartRepository {
    *
    * Dos reglas que sí se copian literales:
    *
-   * 1. **Solo cuentas sin cobrar y sin guardar.** `status in ('draft','prepared')` con un
-   *    estado vivo (`building_cart`, `ready_for_checkout`, `recovered`) — exactamente los
-   *    mismos que acepta la anulación de una persona. Una venta cobrada es un hecho y el
-   *    cierre del día no la toca; una cuenta **guardada** (`suspended`) tampoco, y no por
-   *    comodidad: el propio guardián del esquema
-   *    (`merchant.pos_cart_lifecycle_guard`) solo permite salir de `suspended` hacia
-   *    `recovered`, así que anularla de un golpe es una transición que la base rechaza.
-   *    Se comprobó: el intento falla con `invalid sale lifecycle transition` y el barrido
-   *    entero se cae. Desguardarla es trabajo de una persona —es quien la guardó— y su
-   *    botón ya existe (`Continuar`).
+   * 1. **Solo cuentas sin dinero en juego.** `status in ('draft','prepared')` con un
+   *    estado abierto (`building_cart`, `ready_for_checkout`, `recovered`, `suspended`) —
+   *    exactamente los que acepta la anulación de una persona después de la migración
+   *    037. Una venta cobrada es un hecho y el cierre del día no la toca. Las cuentas
+   *    guardadas con "Guardar y salir" sí se resuelven al corte: dejarlas vivas hacía
+   *    que "todo queda cerrado a las 04:00" dependiera de que alguien recordara abrir
+   *    cada una. Si existe un pago, una tentativa o un resultado incierto, la cuenta se
+   *    conserva para revisión y nunca se abandona en silencio.
    * 2. **Solo cuentas que ya no son de hoy.** El corte del día de negocio las dejó atrás;
    *    una cuenta del día en curso está viva y nadie la anula por reloj.
    *
@@ -233,7 +231,11 @@ export class PosCartRepository {
         // person's decision, and this method is the only place that would overrule it.
         if (policy.rows[0]?.policy !== 'auto_void') return 0;
 
-        const voided = await client.query<{ id: string; tableId: string | null }>(
+        const voided = await client.query<{
+          id: string;
+          tableId: string | null;
+          firedOrderId: string | null;
+        }>(
           `WITH today AS (
              SELECT (((now() at time zone m.timezone) - m.business_day_start::interval))::date AS value
                FROM merchant.merchant m
@@ -251,11 +253,29 @@ export class PosCartRepository {
               AND location_id=$2::uuid
               AND business_date < (SELECT value FROM today)
               AND status IN ('draft','prepared')
-              AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+              AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered','suspended')
               AND (table_id IS NOT NULL OR display_label IS NOT NULL OR EXISTS (
                     SELECT 1 FROM merchant.pos_cart_line l
                      WHERE l.merchant_id=pos_cart.merchant_id AND l.cart_id=pos_cart.id))
-            RETURNING id::text AS id, table_id::text AS "tableId"`,
+              AND NOT EXISTS (
+                SELECT 1 FROM merchant.pos_checkout_draft d
+                 WHERE d.cart_id=pos_cart.id AND d.merchant_id=pos_cart.merchant_id
+                   AND d.state IN ('payment_accepted','payment_unknown','receipt_available','completed'))
+              AND NOT EXISTS (
+                SELECT 1 FROM merchant.pos_payment_attempt a
+                 WHERE a.cart_id=pos_cart.id AND a.merchant_id=pos_cart.merchant_id
+                   AND a.status NOT IN ('declined','cancelled'))
+              AND NOT EXISTS (
+                SELECT 1 FROM merchant.pos_partial_payment p
+                 WHERE p.cart_id=pos_cart.id AND p.merchant_id=pos_cart.merchant_id
+                   AND p.status IN ('confirmed_success','outcome_unknown'))
+              AND NOT EXISTS (
+                SELECT 1 FROM merchant.pos_tender_fact t
+                 WHERE t.cart_id=pos_cart.id AND t.merchant_id=pos_cart.merchant_id
+                   AND t.status IN ('operator_processing_externally','awaiting_operator_confirmation',
+                                    'confirmed_success','outcome_unknown','committed'))
+            RETURNING id::text AS id, table_id::text AS "tableId",
+                      fired_order_id::text AS "firedOrderId"`,
           [merchantId, locationId, 'Anulada por el cierre del día (auto-void)'],
         );
         const tableIds = voided.rows
@@ -265,8 +285,21 @@ export class PosCartRepository {
           await client.query(
             `UPDATE merchant.table_state
                 SET state='dirty',seated_at=NULL,party_size=NULL,group_id=NULL,updated_at=now()
-              WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=ANY($3::uuid[])`,
+              WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=ANY($3::uuid[])
+                AND NOT EXISTS (
+                  SELECT 1 FROM merchant.pos_cart active
+                   WHERE active.merchant_id=table_state.merchant_id
+                     AND active.location_id=table_state.location_id
+                     AND active.table_id=table_state.table_id
+                     AND active.status IN ('draft','prepared'))`,
             [merchantId, locationId, tableIds],
+          );
+        }
+        if (voided.rows.some((row) => row.firedOrderId != null)) {
+          await client.query(
+            `SELECT pg_notify('umi_kitchen_board',jsonb_build_object(
+              'merchant_id',$1::uuid,'location_id',$2::uuid,'kitchen_order_id',NULL)::text)`,
+            [merchantId, locationId],
           );
         }
         return voided.rowCount ?? 0;
@@ -299,6 +332,7 @@ export class PosCartRepository {
     operatorSessionId: string,
     tableId: string,
     expectedVersion?: number,
+    partySize = 1,
   ): Promise<Cart | null> {
     await client.query(`SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, [
       `${merchantId}:${locationId}:${tableId}`,
@@ -313,11 +347,11 @@ export class PosCartRepository {
     await client.query(
       `INSERT INTO merchant.table_state
       (merchant_id,location_id,table_id,state,seated_at,party_size)
-      VALUES ($1::uuid,$2::uuid,$3::uuid,'seated',now(),1)
+      VALUES ($1::uuid,$2::uuid,$3::uuid,'seated',now(),$4)
       ON CONFLICT (merchant_id,location_id,table_id) DO UPDATE
-        SET state='seated',seated_at=now(),party_size=1,updated_at=now()
+        SET state='seated',seated_at=now(),party_size=$4,updated_at=now()
         WHERE merchant.table_state.seated_at IS NULL`,
-      [merchantId, locationId, tableId],
+      [merchantId, locationId, tableId, partySize],
     );
     const visit = await client.query<{ id: string }>(
       `SELECT visit_id::text AS id FROM merchant.table_state
@@ -340,15 +374,25 @@ export class PosCartRepository {
         expectedVersion,
       );
     await this.assertActorAvailable(client, merchantId, locationId, operatorSessionId);
-    const inserted = await client.query<{ id: string }>(
-      `INSERT INTO merchant.pos_cart
-      (merchant_id,location_id,operator_session_id,original_operator_session_id,
-       original_operator_user_id,operator_user_id,table_id,table_name,table_visit_id,fulfillment_type)
-      SELECT $1::uuid,$2::uuid,os.id,os.id,os.user_id,os.user_id,$4::uuid,$5,$6::uuid,'dine_in'
-      FROM runtime.operator_session os WHERE os.id=$3::uuid AND os.merchant_id=$1::uuid
-      AND os.location_id=$2::uuid RETURNING id::text`,
-      [merchantId, locationId, operatorSessionId, tableId, table.label, visit.rows[0]?.id],
-    );
+    let inserted: { rows: Array<{ id: string }> };
+    try {
+      inserted = await client.query<{ id: string }>(
+        `INSERT INTO merchant.pos_cart
+        (merchant_id,location_id,operator_session_id,original_operator_session_id,
+         original_operator_user_id,operator_user_id,table_id,table_name,table_visit_id,fulfillment_type)
+        SELECT $1::uuid,$2::uuid,os.id,os.id,os.user_id,os.user_id,$4::uuid,$5,$6::uuid,'dine_in'
+        FROM runtime.operator_session os WHERE os.id=$3::uuid AND os.merchant_id=$1::uuid
+        AND os.location_id=$2::uuid RETURNING id::text`,
+        [merchantId, locationId, operatorSessionId, tableId, table.label, visit.rows[0]?.id],
+      );
+    } catch (error) {
+      // Two opens that pass the read check at the same moment still collide on
+      // the unique index. Report the business refusal, never a raw 500.
+      if ((error as { code?: string }).code === '23505') {
+        throw new ConflictException({ code: 'CART_ACTOR_BUSY' });
+      }
+      throw error;
+    }
     return inserted.rows[0]
       ? this.snapshotWithClient(client, merchantId, inserted.rows[0].id)
       : null;
@@ -365,11 +409,41 @@ export class PosCartRepository {
     await client.query(`SELECT id FROM runtime.operator_session WHERE id=$1::uuid FOR UPDATE`, [
       operatorSessionId,
     ]);
+    // An ended or expired session leaves its active cart behind. The unique
+    // index that keeps one active cart per operator does not read the session
+    // table, so that cart must move to suspended before a new one can exist.
+    // The account stays readable and resumable; no row is deleted.
+    await client.query(
+      `UPDATE merchant.pos_cart c
+       SET lifecycle_state='suspended', updated_at=now()
+       FROM runtime.operator_session actor
+       WHERE actor.id=$3::uuid
+         AND c.merchant_id=$1::uuid AND c.location_id=$2::uuid
+         AND c.operator_user_id=actor.user_id
+         AND c.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+         AND NOT EXISTS (
+           SELECT 1 FROM runtime.operator_session prior
+           WHERE prior.id=c.operator_session_id
+             AND prior.state IN ('active','locked')
+             AND prior.expires_at>now()
+         )`,
+      [merchantId, locationId, operatorSessionId],
+    );
     const occupied = await client.query(
       `SELECT 1 FROM merchant.pos_cart c
       JOIN runtime.operator_session actor ON actor.id=$3::uuid
       WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid AND c.operator_user_id=actor.user_id
       AND c.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+      -- A cart belongs to a session, and a session that ended or expired must
+      -- not block the same person on the next shift. Without this condition an
+      -- ended session leaves an orphaned building cart and every later attempt
+      -- to open an account returns CART_ACTOR_BUSY with no way out.
+      AND EXISTS (
+        SELECT 1 FROM runtime.operator_session prior
+        WHERE prior.id=c.operator_session_id
+          AND prior.state IN ('active','locked')
+          AND prior.expires_at>now()
+      )
       AND ($4::uuid IS NULL OR c.id<>$4::uuid)`,
       [merchantId, locationId, operatorSessionId, exceptCartId ?? null],
     );
@@ -664,13 +738,22 @@ export class PosCartRepository {
       [merchantId, dto.locationId, dto.tableId, cartId],
     );
     if (target.rowCount) throw new ConflictException({ code: 'CART_TABLE_ACCOUNT_EXISTS' });
-    if (row.tableId === dto.tableId) return this.snapshotWithClient(client, merchantId, cartId);
+    if (row.tableId === dto.tableId) {
+      if (dto.partySize != null) {
+        await client.query(
+          `UPDATE merchant.table_state SET party_size=$4, updated_at=now()
+           WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND table_id=$3::uuid`,
+          [merchantId, dto.locationId, dto.tableId, dto.partySize],
+        );
+      }
+      return this.snapshotWithClient(client, merchantId, cartId);
+    }
     await client.query(
       `INSERT INTO merchant.table_state(merchant_id,location_id,table_id,state,seated_at,party_size)
-      VALUES($1::uuid,$2::uuid,$3::uuid,'seated',now(),1)
-      ON CONFLICT(merchant_id,location_id,table_id) DO UPDATE SET state='seated',seated_at=now(),party_size=1,updated_at=now()
+      VALUES($1::uuid,$2::uuid,$3::uuid,'seated',now(),$4)
+      ON CONFLICT(merchant_id,location_id,table_id) DO UPDATE SET state='seated',seated_at=now(),party_size=$4,updated_at=now()
       WHERE merchant.table_state.seated_at IS NULL`,
-      [merchantId, dto.locationId, dto.tableId],
+      [merchantId, dto.locationId, dto.tableId, dto.partySize ?? 1],
     );
     const visit = await client.query<{ id: string }>(
       `SELECT visit_id::text AS id FROM merchant.table_state
@@ -903,10 +986,11 @@ export class PosCartRepository {
     );
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO merchant.pos_cart_line
-         (merchant_id,cart_id,product_id,variant_id,identity_key,product_name,variant_name,
+         (id,merchant_id,cart_id,product_id,variant_id,identity_key,product_name,variant_name,
           variant_attributes,quantity,note,base_price,variant_delta,modifier_total,
           tax_rate_basis_points,course_number)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       VALUES (COALESCE($16::uuid,gen_random_uuid()),
+         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        ON CONFLICT (cart_id,identity_key) WHERE fired_at IS NULL DO UPDATE
          SET quantity=merchant.pos_cart_line.quantity+excluded.quantity,
              course_number=excluded.course_number,updated_at=now()
@@ -927,6 +1011,7 @@ export class PosCartRepository {
         modifierTotal,
         priced.taxRateBasisPoints,
         input.courseNumber,
+        input.clientLineId ?? null,
       ],
     );
     const lineId = rows[0].id;
@@ -1620,15 +1705,16 @@ export class PosCartRepository {
         },
       };
     });
+    const { businessDate, currency: _currency, ...cartIdentity } = cart.rows[0];
     return {
-      ...cart.rows[0],
+      ...cartIdentity,
       items: items as Cart['items'],
       totals: {
         subtotal: { minorUnits: subtotal, currency },
         tax: { minorUnits: tax, currency },
         discounts: { total: { minorUnits: 0, currency }, entries: [] },
         grandTotal: { minorUnits: subtotal, currency },
-        businessDate: cart.rows[0].businessDate,
+        businessDate,
       },
       checkoutEnabled: false,
       checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',

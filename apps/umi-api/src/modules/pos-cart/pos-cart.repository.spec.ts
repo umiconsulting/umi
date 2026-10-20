@@ -567,11 +567,14 @@ describe('PosCartRepository.sweepCarriedOverAccounts — the day close', () => {
     expect(statement).toMatch(/m\.business_day_start::interval/iu);
     // A charged sale is never in scope.
     expect(statement).toMatch(/status IN \('draft','prepared'\)/iu);
-    // A SAVED account ("guardar y salir") is out of scope, and the schema says so: its
-    // only legal exit is `suspended` → `recovered`, so voiding it in one step is refused
-    // by `merchant.pos_cart_lifecycle_guard` and would take the whole sweep down.
-    expect(statement).toMatch(/'building_cart','ready_for_checkout','recovered'\)/iu);
-    expect(statement).not.toMatch(/'suspended'/iu);
+    // A SAVED account ("guardar y salir") is still open work. Migration 037 made
+    // suspended → cancelled a legal transition, so the clock closes it too instead of
+    // leaving yesterday's accounts to be discovered by a person.
+    expect(statement).toMatch(/'building_cart','ready_for_checkout','recovered','suspended'\)/iu);
+    expect(statement).toMatch(/pos_checkout_draft/iu);
+    expect(statement).toMatch(/pos_payment_attempt/iu);
+    expect(statement).toMatch(/pos_partial_payment/iu);
+    expect(statement).toMatch(/pos_tender_fact/iu);
     expect(write?.[1]).toEqual([MERCHANT, LOCATION, 'Anulada por el cierre del día (auto-void)']);
   });
 
