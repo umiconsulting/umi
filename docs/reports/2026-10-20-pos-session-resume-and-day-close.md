@@ -66,6 +66,7 @@ Sources:
 
 Public product images reviewed:
 
+- [Competitor comparison sheet](evidence/2026-10-20-session-resume/competitor-contact-sheet.png)
 - [Square check actions](evidence/2026-10-20-session-resume/square-check-actions.png)
 - [Toast Payment Terminal with Open, Paid and Closed checks](evidence/2026-10-20-session-resume/toast-payment-terminal.png)
 - [Lightspeed Orders](evidence/2026-10-20-session-resume/lightspeed-orders.png)
