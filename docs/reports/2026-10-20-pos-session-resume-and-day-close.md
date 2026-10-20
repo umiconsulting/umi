@@ -94,7 +94,7 @@ The staging merchant policy was changed from `manual` to `auto_void`; its
 
 ## Evidence on the iMin
 
-- Cold process launch to the PIN screen: approximately **5.4–5.9 seconds**. This
+- Cold process launch to the PIN screen: approximately **5.4–6.7 seconds**. This
   remains a separate startup-cost investigation.
 - PIN confirmation to usable menu: approximately **2 seconds** in the captured
   screen recording, down from the earlier path where account restoration was
@@ -124,7 +124,7 @@ Artifacts:
 - API typecheck: passed.
 - Staging API image:
   `ghcr.io/umiconsulting/umi-api:day-close-session-20261020`.
-- Installed iMin build: **225**, package
+- Installed iMin build: **226**, package
   `co.umiconsulting.umi_pos.clean`.
 
 ## Acceptance scenarios
