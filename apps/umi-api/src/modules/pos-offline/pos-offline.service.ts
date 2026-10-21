@@ -802,7 +802,7 @@ export class PosOfflineService {
             const body = error.getResponse();
             const code =
               typeof body === 'object' && body !== null && 'code' in body
-                ? String((body as { code: unknown }).code)
+                ? String(body.code)
                 : `http_${status}`;
             if (
               !(await refuseAndContinue(

@@ -700,7 +700,7 @@ describe('PosOfflineService', () => {
     const twoEffects = {
       ...group,
       payload: {
-        ...(group.payload as Record<string, unknown>),
+        ...group.payload,
         effects: [
           ...((group.payload as { effects: unknown[] }).effects ?? []),
           {
