@@ -798,16 +798,11 @@ export class KdsService {
       if (sourceReference.startsWith('pos-cart:')) {
         const provisionalCartId = sourceReference.slice('pos-cart:'.length);
         resolvedCartId =
-          (await this.repo.resolveReplayCartId(merchantId, provisionalCartId)) ??
-          provisionalCartId;
+          (await this.repo.resolveReplayCartId(merchantId, provisionalCartId)) ?? provisionalCartId;
       }
       let order = await this.repo.loadOrderForScope(merchantId, sourceReference, null);
       if (!order && resolvedCartId) {
-        order = await this.repo.loadOrderForScope(
-          merchantId,
-          `pos-cart:${resolvedCartId}`,
-          null,
-        );
+        order = await this.repo.loadOrderForScope(merchantId, `pos-cart:${resolvedCartId}`, null);
       }
       if (!order) throw new ConflictException({ code: 'KITCHEN_ORDER_NOT_FOUND' });
       command = {

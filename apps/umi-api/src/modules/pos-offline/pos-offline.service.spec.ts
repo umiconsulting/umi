@@ -890,13 +890,7 @@ describe('PosOfflineService', () => {
       },
     );
 
-    expect(orderCart.readAccount).toHaveBeenCalledWith(
-      user,
-      uid(4),
-      uid(40),
-      uid(5),
-      uid(77),
-    );
+    expect(orderCart.readAccount).toHaveBeenCalledWith(user, uid(4), uid(40), uid(5), uid(77));
     expect(add).toHaveBeenCalledWith(
       user,
       uid(4),

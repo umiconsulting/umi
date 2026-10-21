@@ -127,9 +127,7 @@ function publicError(status: number, payload: string | object, correlationId: st
   // on a server fault would leak whatever the failing code happened to know —
   // ids from another merchant, an internal path, a constraint name.
   const retryAfterSeconds =
-    status === 429 &&
-    'retryAfterSeconds' in source &&
-    typeof source.retryAfterSeconds === 'number'
+    status === 429 && 'retryAfterSeconds' in source && typeof source.retryAfterSeconds === 'number'
       ? source.retryAfterSeconds
       : undefined;
   const details =

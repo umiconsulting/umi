@@ -1512,10 +1512,7 @@ export class KdsRepository {
    * accepts `pos.cart.open`. The LAN KDS knows the provisional id, so the
    * accepted replay ledger is the durable bridge between the two identities.
    */
-  async resolveReplayCartId(
-    merchantId: string,
-    provisionalCartId: string,
-  ): Promise<string | null> {
+  async resolveReplayCartId(merchantId: string, provisionalCartId: string): Promise<string | null> {
     const { rows } = await this.pg.query<{ official_id: string | null }>(
       `SELECT result->>'officialId' AS official_id
          FROM merchant.offline_replay_command

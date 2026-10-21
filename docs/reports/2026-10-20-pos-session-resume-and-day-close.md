@@ -44,12 +44,12 @@ rolled over, but never when any payment or uncertain tender result exists.
 
 ## Competitive pattern
 
-| Stage | Square | Toast | Lightspeed |
-| --- | --- | --- | --- |
-| Find work | **HD:** open tickets are available under **Checkout > Tickets**, including from another logged-in device. | **HD:** **All Checks** exposes filters for **Open**, **Paid**, and **Closed**; select a check to open it. | **HD:** the **Orders List** gathers all orders in one place. |
-| Resume | **HD:** select the open ticket from the list. No requirement that the newest ticket auto-opens. | **HD:** select the check from the filtered list. | **HD:** open a held order by selecting it from the orders tab. |
-| Continue editing | **HD:** open tickets can be edited before later payment. | **HD:** Send, Stay and Hold keep explicit control over what fires and what remains editable. | **HD:** held and open orders remain explicit objects in the Orders area. |
-| Login behavior | Public documentation does not claim that sign-in auto-opens the last ticket. | Public documentation starts discovery at **All Checks**. | Public documentation starts discovery at **Orders**. |
+| Stage            | Square                                                                                                    | Toast                                                                                                     | Lightspeed                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Find work        | **HD:** open tickets are available under **Checkout > Tickets**, including from another logged-in device. | **HD:** **All Checks** exposes filters for **Open**, **Paid**, and **Closed**; select a check to open it. | **HD:** the **Orders List** gathers all orders in one place.             |
+| Resume           | **HD:** select the open ticket from the list. No requirement that the newest ticket auto-opens.           | **HD:** select the check from the filtered list.                                                          | **HD:** open a held order by selecting it from the orders tab.           |
+| Continue editing | **HD:** open tickets can be edited before later payment.                                                  | **HD:** Send, Stay and Hold keep explicit control over what fires and what remains editable.              | **HD:** held and open orders remain explicit objects in the Orders area. |
+| Login behavior   | Public documentation does not claim that sign-in auto-opens the last ticket.                              | Public documentation starts discovery at **All Checks**.                                                  | Public documentation starts discovery at **Orders**.                     |
 
 The consistent interaction model is therefore: **the account survives, but the
 operator chooses it**. The Umi change follows that model rather than inventing a

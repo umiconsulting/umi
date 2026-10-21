@@ -610,12 +610,7 @@ export class PosCartRepository {
     // refused with CART_ACTOR_BUSY even though it is the account the operator
     // asked for. Empty hidden carts are closed; carts with content are saved and
     // remain resumable from Cuentas.
-    await this.parkActiveActorCartForNewAccount(
-      client,
-      merchantId,
-      locationId,
-      operatorSessionId,
-    );
+    await this.parkActiveActorCartForNewAccount(client, merchantId, locationId, operatorSessionId);
     await this.assertActorAvailable(client, merchantId, locationId, operatorSessionId, cartId);
     if (row.operatorSessionId === operatorSessionId && row.lifecycleState !== 'suspended')
       return this.snapshotWithClient(client, merchantId, cartId);

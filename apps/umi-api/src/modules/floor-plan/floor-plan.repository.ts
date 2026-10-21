@@ -125,9 +125,7 @@ async function occupiedBlockers(
   if (disturbed.length === 0) return [];
 
   const draft = current.draft ? FloorPlanDocument.safeParse(current.draft).data : null;
-  const published = current.published
-    ? FloorPlanDocument.safeParse(current.published).data
-    : null;
+  const published = current.published ? FloorPlanDocument.safeParse(current.published).data : null;
   const labels = new Map<string, string>();
   for (const document of [published, draft]) {
     for (const area of document?.areas ?? []) {

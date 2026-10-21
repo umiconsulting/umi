@@ -26,12 +26,8 @@ describe('canonical command data', () => {
     // `taxVersion` (…'V') precedes `taxes` (…'e') by code unit; locale collation
     // puts them the other way and made every offline cash checkout replay as
     // `fingerprint_mismatch` while the cart commands beside it passed.
-    expect(canonicalJson({ taxes: [], taxVersion: 'v1' })).toBe(
-      '{"taxVersion":"v1","taxes":[]}',
-    );
-    expect(
-      commandFingerprint('x', { taxes: [], taxVersion: 'v1' }),
-    ).toBe(
+    expect(canonicalJson({ taxes: [], taxVersion: 'v1' })).toBe('{"taxVersion":"v1","taxes":[]}');
+    expect(commandFingerprint('x', { taxes: [], taxVersion: 'v1' })).toBe(
       commandFingerprint('x', { taxVersion: 'v1', taxes: [] }),
     );
   });

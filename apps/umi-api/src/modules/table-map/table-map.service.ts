@@ -188,11 +188,9 @@ export class TableMapService {
    */
   replayCommand(user: AuthUser, merchantId: string, value: unknown) {
     const envelope = OfflineTableCommandPayload.safeParse(value);
-    if (!envelope.success)
-      throw new ConflictException({ code: 'VALIDATION_FAILED' });
+    if (!envelope.success) throw new ConflictException({ code: 'VALIDATION_FAILED' });
     const request = envelope.data.request;
-    const invalid = () =>
-      new ConflictException({ code: 'VALIDATION_FAILED' });
+    const invalid = () => new ConflictException({ code: 'VALIDATION_FAILED' });
     switch (envelope.data.action) {
       case 'seat': {
         const parsed = SeatTableRequest.safeParse(request);

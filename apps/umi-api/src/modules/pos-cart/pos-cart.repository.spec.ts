@@ -65,9 +65,7 @@ describe('PosCartRepository.create', () => {
     expect(occupancyCheckAt).toBeGreaterThan(parkedAt);
     const parkedParams = calls[parkedAt]?.[1] as unknown[] | undefined;
     expect(parkedParams?.[3]).toBe(false);
-    expect(parkedParams?.[4]).toBe(
-      'Cuenta vacía: se cierra al abrir otra cuenta.',
-    );
+    expect(parkedParams?.[4]).toBe('Cuenta vacía: se cierra al abrir otra cuenta.');
   });
 
   it('names the owner of an active account without transferring its ownership', async () => {
