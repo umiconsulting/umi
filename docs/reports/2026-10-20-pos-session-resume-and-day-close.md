@@ -248,3 +248,26 @@ Artifacts:
 
 - [Temporary table account](evidence/2026-10-20-session-resume/imin-temporary-table-account.png)
 - [Item added to the temporary table](evidence/2026-10-20-session-resume/imin-temporary-table-item.png)
+
+## Follow-up: New account after firing to the kitchen
+
+Cuenta 007 was sent to the kitchen, but the top-bar **Start order** action did not
+reach the API. The cart controller's in-memory command lane still contained
+accepted commands, so `saveAccount()` regarded the till as busy and the UI rendered
+the previous generic product-validation error over a healthy account.
+
+Account switching no longer asks that racing save path to suspend the current
+account. It first makes pending local commands durable and then opens the next
+account; the server parks the previous account atomically when it receives the new
+open. A fired account with no current pre-payment sale also no longer surfaces
+`SALE_NOT_FOUND` as an error.
+
+Final proof with build **239**:
+
+- Cuenta 007 reopened with its fired item and no banner.
+- The top-bar action opened the service-type selector normally.
+- No extra `/cart` write was attempted before the operator selected the new type.
+
+Artifact:
+
+- [New account selector after a fired order](evidence/2026-10-20-session-resume/imin-new-account-after-fired-order.png)
