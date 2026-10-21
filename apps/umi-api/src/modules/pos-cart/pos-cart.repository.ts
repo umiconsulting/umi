@@ -112,32 +112,10 @@ export class PosCartRepository {
     locationId: string,
     operatorSessionId: string,
   ): Promise<string> {
-    // Resume the operator's existing account before attempting an insert. A table
-    // account can outlive its session, just like a counter account. The normal claim
-    // path checks the prior session and unresolved payments under the cart lock.
-    const existing = await client.query<{ id: string; operatorSessionId: string }>(
-      `SELECT c.id::text,c.operator_session_id::text AS "operatorSessionId"
-       FROM merchant.pos_cart c JOIN runtime.operator_session actor ON actor.id=$3::uuid
-       WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
-       AND actor.merchant_id=$1::uuid AND actor.location_id=$2::uuid
-       AND c.operator_user_id=actor.user_id
-       AND c.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
-       FOR UPDATE OF c`,
-      [merchantId, locationId, operatorSessionId],
-    );
-    const current = existing.rows[0];
-    if (current) {
-      if (current.operatorSessionId === operatorSessionId) return current.id;
-      const recovered = await this.claimAccount(
-        client,
-        merchantId,
-        locationId,
-        operatorSessionId,
-        current.id,
-      );
-      if (!recovered) throw new NotFoundException({ code: 'CART_NOT_FOUND' });
-      return recovered.id;
-    }
+    // "Create" is the explicit request for another account. The active account is
+    // saved first, never returned in place of the new one. Returning it here made
+    // `Nueva venta` reopen the invisible account from the previous session.
+    await this.parkActiveActorCartForNewAccount(client, merchantId, locationId, operatorSessionId);
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO merchant.pos_cart
          (merchant_id,location_id,operator_session_id,original_operator_session_id,
@@ -373,6 +351,11 @@ export class PosCartRepository {
         existing.rows[0].id,
         expectedVersion,
       );
+    // A table action is also an explicit request to leave the current account.
+    // A fresh login can intentionally keep that account out of the till while
+    // the server still has it active; park it here before creating the table
+    // account instead of answering CART_ACTOR_BUSY.
+    await this.parkActiveActorCartForNewAccount(client, merchantId, locationId, operatorSessionId);
     await this.assertActorAvailable(client, merchantId, locationId, operatorSessionId);
     let inserted: { rows: Array<{ id: string }> };
     try {
@@ -396,6 +379,57 @@ export class PosCartRepository {
     return inserted.rows[0]
       ? this.snapshotWithClient(client, merchantId, inserted.rows[0].id)
       : null;
+  }
+
+  private async parkActiveActorCartForNewAccount(
+    client: PoolClient,
+    merchantId: string,
+    locationId: string,
+    operatorSessionId: string,
+  ) {
+    await client.query(`SELECT id FROM runtime.operator_session WHERE id=$1::uuid FOR UPDATE`, [
+      operatorSessionId,
+    ]);
+    const active = await client.query<{ id: string; empty: boolean }>(
+      `SELECT c.id::text AS id,
+              NOT (
+                c.table_id IS NOT NULL OR c.display_label IS NOT NULL
+                OR c.fired_order_id IS NOT NULL
+                OR EXISTS (
+                  SELECT 1 FROM merchant.pos_cart_line line
+                   WHERE line.merchant_id=c.merchant_id AND line.cart_id=c.id
+                )
+              ) AS empty
+         FROM merchant.pos_cart c
+         JOIN runtime.operator_session actor ON actor.id=$3::uuid
+        WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
+          AND c.operator_user_id=actor.user_id
+          AND c.lifecycle_state IN ('building_cart','ready_for_checkout','recovered')
+        FOR UPDATE OF c`,
+      [merchantId, locationId, operatorSessionId],
+    );
+    const current = active.rows[0];
+    if (!current) return;
+    await this.assertAccountPaymentSafe(client, merchantId, current.id);
+    await client.query(
+      `UPDATE merchant.pos_cart
+          SET status=CASE WHEN $4::boolean THEN 'abandoned' ELSE status END,
+              lifecycle_state=CASE WHEN $4::boolean THEN 'cancelled' ELSE 'suspended' END,
+              suspended_at=CASE WHEN $4::boolean THEN NULL ELSE now() END,
+              cancellation_reason_code=CASE WHEN $4::boolean THEN 'other' ELSE NULL END,
+              cancellation_reason=CASE WHEN $4::boolean THEN $5 ELSE NULL END,
+              cancelled_at=CASE WHEN $4::boolean THEN now() ELSE NULL END,
+              version=version+1,
+              updated_at=now()
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND id=$3::uuid`,
+      [
+        merchantId,
+        locationId,
+        current.id,
+        current.empty,
+        'Cuenta vacía: se cierra al abrir otra cuenta.',
+      ],
+    );
   }
 
   private async assertActorAvailable(
@@ -569,6 +603,18 @@ export class PosCartRepository {
           deviceName: row.deviceName,
         },
       });
+    // Resuming another account is also an explicit account switch. A login can
+    // deliberately leave the current cart out of the till while the server still
+    // considers it active; without parking it here, the selected account is
+    // refused with CART_ACTOR_BUSY even though it is the account the operator
+    // asked for. Empty hidden carts are closed; carts with content are saved and
+    // remain resumable from Cuentas.
+    await this.parkActiveActorCartForNewAccount(
+      client,
+      merchantId,
+      locationId,
+      operatorSessionId,
+    );
     await this.assertActorAvailable(client, merchantId, locationId, operatorSessionId, cartId);
     if (row.operatorSessionId === operatorSessionId && row.lifecycleState !== 'suspended')
       return this.snapshotWithClient(client, merchantId, cartId);

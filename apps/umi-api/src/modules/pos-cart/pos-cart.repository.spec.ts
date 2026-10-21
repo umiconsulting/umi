@@ -16,6 +16,60 @@ const COMMAND = '80000000-0000-4000-8000-000000000001';
 const APPROVAL = '90000000-0000-4000-8000-000000000001';
 
 describe('PosCartRepository.create', () => {
+  it('parks a hidden active account before resuming the selected one', async () => {
+    const hiddenCart = '40000000-0000-4000-8000-000000000002';
+    const query = vi.fn(async (sql: unknown, ...params: unknown[]) => {
+      void params;
+      const statement = String(sql);
+      if (/SELECT c\.version,c\.operator_session_id/u.test(statement)) {
+        return {
+          rows: [
+            {
+              version: 2,
+              operatorSessionId: OPERATOR_SESSION,
+              lifecycleState: 'suspended',
+              ownerActive: false,
+              ownerName: 'Admin ONCA',
+              deviceName: 'D3',
+            },
+          ],
+          rowCount: 1,
+        };
+      }
+      if (/AS empty/u.test(statement)) {
+        return { rows: [{ id: hiddenCart, empty: false }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 0 };
+    });
+    const client = { query } as unknown as PoolClient;
+    const repository = new PosCartRepository({} as PgService);
+    vi.spyOn(
+      repository as unknown as { snapshotWithClient: () => Promise<Cart> },
+      'snapshotWithClient',
+    ).mockResolvedValue({ id: CART, version: 3, items: [] } as unknown as Cart);
+
+    await repository.claimAccount(client, MERCHANT, LOCATION, OPERATOR_SESSION, CART);
+
+    const calls = query.mock.calls;
+    const parkedAt = calls.findIndex(([sql]) =>
+      /lifecycle_state=CASE WHEN \$4::boolean THEN 'cancelled' ELSE 'suspended' END/u.test(
+        String(sql),
+      ),
+    );
+    const occupancyCheckAt = calls.findIndex(([sql]) =>
+      /SELECT 1 FROM merchant\.pos_cart c[\s\S]*JOIN runtime\.operator_session actor/u.test(
+        String(sql),
+      ),
+    );
+    expect(parkedAt).toBeGreaterThan(-1);
+    expect(occupancyCheckAt).toBeGreaterThan(parkedAt);
+    const parkedParams = calls[parkedAt]?.[1] as unknown[] | undefined;
+    expect(parkedParams?.[3]).toBe(false);
+    expect(parkedParams?.[4]).toBe(
+      'Cuenta vacía: se cierra al abrir otra cuenta.',
+    );
+  });
+
   it('names the owner of an active account without transferring its ownership', async () => {
     const query = vi
       .fn()
@@ -62,6 +116,7 @@ describe('PosCartRepository.create', () => {
       query: vi
         .fn()
         .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
         .mockResolvedValueOnce({ rows: [{ id: CART }], rowCount: 1 }),
     } as unknown as PoolClient;
     const pg = { app: { query: vi.fn() }, worker: { query: vi.fn() } };
@@ -71,8 +126,8 @@ describe('PosCartRepository.create', () => {
       CART,
     );
 
-    expect(client.query).toHaveBeenCalledTimes(2);
-    const [sql, params] = (client.query as unknown as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(client.query).toHaveBeenCalledTimes(3);
+    const [sql, params] = (client.query as unknown as ReturnType<typeof vi.fn>).mock.calls[2];
     const statement = String(sql);
     expect(statement).toMatch(/insert\s+into\s+merchant\.pos_cart\s*\(/iu);
     expect(statement).toContain("lifecycle_state='recovered'");
@@ -98,34 +153,54 @@ describe('PosCartRepository.create', () => {
     ).rejects.toMatchObject({ response: { code: 'CART_ACTOR_BUSY' } });
   });
 
-  it('resumes an existing table account through the guarded claim path', async () => {
+  it('parks an existing account before opening the next one', async () => {
     const client = {
       query: vi
         .fn()
-        .mockResolvedValue({ rows: [{ id: CART, operatorSessionId: 'previous-session' }] }),
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: CART, empty: false }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({
+          rows: [{ id: '40000000-0000-4000-8000-000000000002' }],
+          rowCount: 1,
+        }),
     } as unknown as PoolClient;
     const repository = new PosCartRepository({} as PgService);
-    const claim = vi.spyOn(repository, 'claimAccount').mockResolvedValue({ id: CART } as never);
     await expect(repository.create(client, MERCHANT, LOCATION, OPERATOR_SESSION)).resolves.toBe(
-      CART,
+      '40000000-0000-4000-8000-000000000002',
     );
-    expect(claim).toHaveBeenCalledWith(client, MERCHANT, LOCATION, OPERATOR_SESSION, CART);
-    expect(client.query).toHaveBeenCalledTimes(1);
+    const calls = (client.query as unknown as ReturnType<typeof vi.fn>).mock.calls;
+    const parked = calls.find(([sql]) =>
+      /lifecycle_state=CASE WHEN \$4::boolean/u.test(String(sql)),
+    );
+    expect(String(parked?.[0])).toMatch(/ELSE 'suspended'/u);
+    expect(parked?.[1]?.[3]).toBe(false);
+    expect(client.query).toHaveBeenCalledTimes(5);
   });
 
-  it('keeps an account already held by this session without a write', async () => {
+  it('cancels a bare account before opening another one', async () => {
     const client = {
       query: vi
         .fn()
-        .mockResolvedValue({ rows: [{ id: CART, operatorSessionId: OPERATOR_SESSION }] }),
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [{ id: CART, empty: true }], rowCount: 1 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+        .mockResolvedValueOnce({
+          rows: [{ id: '40000000-0000-4000-8000-000000000002' }],
+          rowCount: 1,
+        }),
     } as unknown as PoolClient;
     const repository = new PosCartRepository({} as PgService);
-    const claim = vi.spyOn(repository, 'claimAccount');
     await expect(repository.create(client, MERCHANT, LOCATION, OPERATOR_SESSION)).resolves.toBe(
-      CART,
+      '40000000-0000-4000-8000-000000000002',
     );
-    expect(claim).not.toHaveBeenCalled();
-    expect(client.query).toHaveBeenCalledTimes(1);
+    const parked = (client.query as unknown as ReturnType<typeof vi.fn>).mock.calls.find(([sql]) =>
+      /lifecycle_state=CASE WHEN \$4::boolean/u.test(String(sql)),
+    );
+    expect(parked?.[1]?.[3]).toBe(true);
+    expect(client.query).toHaveBeenCalledTimes(5);
   });
 });
 
