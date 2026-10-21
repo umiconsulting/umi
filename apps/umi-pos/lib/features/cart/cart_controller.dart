@@ -566,6 +566,7 @@ final class CartController extends ChangeNotifier {
     const definiteRefusals = {
       'CART_VALIDATION_FAILED',
       'CART_NOT_FOUND',
+      'CART_ACTOR_BUSY',
       'CART_TABLE_ACCOUNT_EXISTS',
       'CART_ALREADY_ASSIGNED',
       'CART_PAYMENT_UNRESOLVED',
@@ -725,11 +726,13 @@ final class CartController extends ChangeNotifier {
   Future<void> open(
     String merchantId,
     String locationId,
-    String operatorSessionId,
-  ) async {
+    String operatorSessionId, {
+    String? accountName,
+  }) async {
     final key = '$merchantId:$locationId:$operatorSessionId';
     if ('$_merchantId:$_locationId:$_operatorSessionId' == key &&
-        _state.cart != null) {
+        _state.cart != null &&
+        (accountName == null || _state.cart!.accountName == accountName)) {
       return;
     }
     clearLocal();
@@ -738,7 +741,12 @@ final class CartController extends ChangeNotifier {
     _operatorSessionId = operatorSessionId;
     if (_queue != null) {
       final idempotencyKey = _uuid();
-      final local = _emptyLocalCart(merchantId, locationId, operatorSessionId);
+      final local = _emptyLocalCart(
+        merchantId,
+        locationId,
+        operatorSessionId,
+        accountName: accountName,
+      );
       _queue!.initialize(local);
       _set(CartState(phase: CartPhase.ready, cart: local));
       _submitQueued(
@@ -750,6 +758,7 @@ final class CartController extends ChangeNotifier {
             locationId: locationId,
             operatorSessionId: operatorSessionId,
             idempotencyKey: idempotencyKey,
+            accountName: accountName,
           ).toJson(),
         },
         event: 'cart_opened',
@@ -766,6 +775,7 @@ final class CartController extends ChangeNotifier {
           locationId: locationId,
           operatorSessionId: operatorSessionId,
           idempotencyKey: _uuid(),
+          accountName: accountName,
         ),
       );
       _queue?.initialize(cart);
@@ -1589,8 +1599,9 @@ final class CartController extends ChangeNotifier {
   Cart _emptyLocalCart(
     String merchantId,
     String locationId,
-    String operatorSessionId,
-  ) {
+    String operatorSessionId, {
+    String? accountName,
+  }) {
     final now = DateTime.now();
     // The operational date, not the calendar or UTC one. A café whose day starts
     // at 04:00 is still on yesterday's date at 03:00, and the server derives the
@@ -1611,6 +1622,7 @@ final class CartController extends ChangeNotifier {
       version: 1,
       firedOrderId: null,
       fulfillmentType: 'dine_in',
+      accountName: accountName,
       items: const [],
       totals: {
         'subtotal': money(),

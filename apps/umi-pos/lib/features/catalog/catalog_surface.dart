@@ -498,6 +498,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         _inlineDetail = null;
         _orderTypeTouched = false;
         _orderType = widget.cart.state.cart!.fulfillmentType;
+        _noticeCode = null;
+        _noticeDetails = null;
         _notice = refreshed || cartReady
             ? null
             : operatorErrorMessage(
@@ -524,6 +526,31 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         entry.selectedBranch == null ||
         entry.operator == null) {
       return false;
+    }
+    final occupiedAccountId = widget.tableState
+        ?.stateOf(table.id)
+        .openAccountId;
+    if (occupiedAccountId != null) {
+      // An occupied table is already an account identity. Asking the server to
+      // open it through `cart/table` returned CART_ACTOR_BUSY while the exact
+      // account the operator wanted was open behind that table. Resolve and
+      // resume it instead of trying to create a second account.
+      final accounts = await widget.cart.openAccounts(
+        entry.selectedTenant!.id,
+        entry.selectedBranch!.id,
+        entry.operator!.id,
+      );
+      Cart? target;
+      for (final account in accounts) {
+        if (account.id == occupiedAccountId) {
+          target = account;
+          break;
+        }
+      }
+      if (target != null) {
+        await _resumeAccount(target);
+        return widget.cart.state.cart?.id == target.id;
+      }
     }
     setState(() => _accountTransition = true);
     try {
@@ -575,12 +602,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     }
   }
 
-  /// Open a resumable account for guests who are present but cannot claim a
-  /// physical table.
+  /// Open a resumable account identified as a temporary table.
   ///
-  /// A full room is not a terminal lock-out. This account is tableless on
-  /// purpose: it appears under open accounts as "Sin mesa", keeps its folio and
-  /// can be resumed, while the floor never lies by inventing a table UUID.
+  /// The account is tableless on purpose: the floor never invents a physical
+  /// table UUID, while the account still carries a normal folio, can receive
+  /// lines and is resumed from Cuentas like any other account. "Mesa temporal"
+  /// is its commercial label, not a claim that the published floor plan has a
+  /// new physical table.
   Future<bool> _openTemporaryAccount() async {
     if (_accountRestoring) {
       _showAccountRestoreNotice();
@@ -597,6 +625,22 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     setState(() => _accountTransition = true);
     try {
       final current = widget.cart.state.cart;
+      final alreadyTemporary =
+          current?.tableId == null &&
+          current?.accountName == temporaryTableAccountName;
+      if (alreadyTemporary) {
+        if (!mounted) return false;
+        setState(() {
+          _section = TillSurface.order;
+          _editingAccountId = null;
+          _inlineDetail = null;
+          _orderTypeTouched = false;
+          _orderType = 'dine_in';
+          _noticeCode = null;
+          _notice = null;
+        });
+        return true;
+      }
       if (current != null && !accountIsBare(current)) {
         final preserved = await widget.cart.preserveForAccountSwitch();
         if (!preserved) {
@@ -613,9 +657,12 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         widget.checkout.reset();
         widget.cart.clearLocal();
       }
-      if (widget.cart.state.cart == null) {
-        await widget.cart.open(merchantId, locationId, operatorSessionId);
-      }
+      await widget.cart.open(
+        merchantId,
+        locationId,
+        operatorSessionId,
+        accountName: temporaryTableAccountName,
+      );
       final ready = widget.cart.state.cart;
       if (ready == null) {
         if (mounted) _refuseCartWrite();
@@ -632,8 +679,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         _orderTypeTouched = false;
         _orderType = 'dine_in';
         _noticeCode = null;
-        _notice =
-            'Cuenta temporal abierta sin mesa. Puedes agregarla a una mesa o cobrarla desde Cuentas abiertas.';
+        _notice = null;
       });
       _search.clear();
       widget.catalog.search('');
@@ -1265,7 +1311,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         merchant,
         location,
         operator.id,
-        preferCache: true,
       );
       if (!mounted || widget.entry.state.operator?.id != operator.id) return;
       setState(() => _openAccountCount = accounts.length);
@@ -1482,14 +1527,25 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       if (!_reauthIfSessionLost(errorCode)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
-            setState(
-              () => _notice = AppLocalizations.of(context).saleLifecycleError,
-            );
+            setState(() {
+              _noticeCode = errorCode;
+              _noticeDetails = null;
+              _notice = operatorErrorMessage(context, errorCode);
+            });
           }
         });
       }
     } else if (errorCode == null) {
       _lastSaleErrorCode = null;
+      if (_noticeCode != null &&
+          _notice != null &&
+          widget.cart.state.errorCode == null) {
+        setState(() {
+          _notice = null;
+          _noticeCode = null;
+          _noticeDetails = null;
+        });
+      }
     }
     if (widget.sales.state.readyForNextCustomer) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2927,6 +2983,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       return null;
     }
     return ReplayScope(
+      deviceId: device.id,
       merchantId: tenant.id,
       locationId: branch.id,
       operatorSessionId: operator.id,
@@ -3044,6 +3101,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       }
     } catch (_) {
       // The recovery centre owns the actionable failure state.
+    } finally {
+      unawaited(_refreshOpenAccountCount());
     }
   }
 

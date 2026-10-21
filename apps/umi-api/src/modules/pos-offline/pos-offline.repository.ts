@@ -57,12 +57,18 @@ export class PosOfflineRepository {
       deviceKind: string;
       currency: string;
       lastAcceptedSequence: string;
+      lastProcessedSequence: string;
     }>(
       input.merchantId,
       input.locationId,
       `SELECT d.status AS lifecycle, d.credential_version AS "credentialVersion",
               os.permissions, os.entitlements, d.kind AS "deviceKind", b.currency,
-              COALESCE(c.last_accepted_sequence, 0)::text AS "lastAcceptedSequence"
+              COALESCE(c.last_accepted_sequence, 0)::text AS "lastAcceptedSequence",
+              COALESCE(
+                c.last_processed_sequence,
+                c.last_accepted_sequence,
+                0
+              )::text AS "lastProcessedSequence"
        FROM merchant.device d
        JOIN merchant.merchant b ON b.id=d.merchant_id
        JOIN runtime.operator_session os ON os.id=$5::uuid AND os.user_id=$1::uuid
@@ -85,6 +91,7 @@ export class PosOfflineRepository {
       ? {
           ...rows[0],
           lastAcceptedSequence: Number(rows[0].lastAcceptedSequence),
+          lastProcessedSequence: Number(rows[0].lastProcessedSequence),
         }
       : null;
   }
@@ -133,7 +140,11 @@ export class PosOfflineRepository {
   async replay(
     command: OfflineCommand,
     officialCommit: OfficialCommitResult | null = null,
+    officialId: string | null = null,
+    replayOperatorSessionId: string = command.operatorSessionId,
+    streamKey: string | null = null,
   ): Promise<ReplayResult> {
+    const provisionalId = normalizeProvisionalId(command.provisionalId);
     return this.pg.runWithMerchant(
       command.merchantId,
       getRequestContext()?.userId ?? null,
@@ -147,7 +158,9 @@ export class PosOfflineRepository {
           if (existing.rows[0].fingerprint !== command.fingerprint) {
             return this.recordConflict(command, 'fingerprint_mismatch', true);
           }
-          return { ...existing.rows[0].result, status: 'duplicate' };
+          return existing.rows[0].result.status === 'accepted'
+            ? { ...existing.rows[0].result, status: 'duplicate' }
+            : existing.rows[0].result;
         }
         await client.query(
           `INSERT INTO merchant.device_replay_cursor
@@ -160,24 +173,41 @@ export class PosOfflineRepository {
             command.deviceCredentialVersion,
           ],
         );
-        const cursor = await client.query<{ last: string }>(
-          `SELECT last_accepted_sequence::text AS last FROM merchant.device_replay_cursor
+        const cursor = await client.query<{ lastAccepted: string; lastProcessed: string }>(
+          `SELECT last_accepted_sequence::text AS "lastAccepted",
+                  last_processed_sequence::text AS "lastProcessed"
+           FROM merchant.device_replay_cursor
          WHERE device_id=$1::uuid AND credential_version=$2 FOR UPDATE`,
           [command.deviceId, command.deviceCredentialVersion],
         );
-        const last = Number(cursor.rows[0]?.last ?? 0);
-        if (command.deviceSequence !== last + 1) {
-          return this.recordConflict(
-            command,
-            command.deviceSequence <= last ? 'sequence_behind' : 'sequence_gap',
-            true,
+        const lastProcessed = Number(cursor.rows[0]?.lastProcessed ?? 0);
+        if (command.deviceSequence > lastProcessed + 1) {
+          return this.recordConflict(command, 'sequence_gap', true);
+        }
+        if (command.deviceSequence <= lastProcessed) {
+          const resolvedConflict = await client.query<{ found: boolean }>(
+            `SELECT true AS found
+             FROM merchant.offline_replay_conflict
+             WHERE merchant_id=$1::uuid AND device_id=$2::uuid
+               AND credential_version=$3 AND command_id=$4::uuid
+               AND resolution_state='resolved'
+             LIMIT 1`,
+            [
+              command.merchantId,
+              command.deviceId,
+              command.deviceCredentialVersion,
+              command.commandId,
+            ],
           );
+          if (!resolvedConflict.rows[0]?.found) {
+            return this.recordConflict(command, 'sequence_behind', true);
+          }
         }
         const result: ReplayResult = {
           commandId: command.commandId,
           deviceSequence: command.deviceSequence,
           status: 'accepted',
-          officialId: officialCommit?.officialSaleId ?? null,
+          officialId: officialCommit?.officialSaleId ?? officialId,
           officialCommit,
           serverConflictReference: null,
           failure: null,
@@ -185,9 +215,10 @@ export class PosOfflineRepository {
         await client.query(
           `INSERT INTO merchant.offline_replay_command
          (merchant_id,location_id,device_id,credential_version,device_sequence,command_id,
-          operator_session_id,idempotency_key,command_type,fingerprint,contract_version,
-          schema_version,client_created_at,result,provisional_id,payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          operator_session_id,replay_operator_session_id,idempotency_key,command_type,
+          fingerprint,contract_version,schema_version,client_created_at,result,
+          provisional_id,payload,stream_key)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
           [
             command.merchantId,
             command.locationId,
@@ -196,6 +227,7 @@ export class PosOfflineRepository {
             command.deviceSequence,
             command.commandId,
             command.operatorSessionId,
+            replayOperatorSessionId,
             command.idempotencyKey,
             command.commandType,
             command.fingerprint,
@@ -203,16 +235,29 @@ export class PosOfflineRepository {
             command.schemaVersion,
             command.createdAt,
             JSON.stringify(result),
-            command.provisionalId,
+            provisionalId,
             JSON.stringify(command.payload),
+            streamKey,
           ],
         );
         await client.query(
-          `UPDATE merchant.device_replay_cursor SET last_accepted_sequence=$3, updated_at=clock_timestamp()
+          `UPDATE merchant.device_replay_cursor
+           SET last_accepted_sequence=GREATEST(last_accepted_sequence,$3),
+               last_processed_sequence=GREATEST(last_processed_sequence,$3),
+               updated_at=clock_timestamp()
          WHERE device_id=$1::uuid AND credential_version=$2`,
           [command.deviceId, command.deviceCredentialVersion, command.deviceSequence],
         );
-        if (officialCommit && command.provisionalId) {
+        await client.query(
+          `UPDATE merchant.offline_replay_conflict
+              SET resolution_state='resolved',
+                  resolution_acknowledged_at=COALESCE(resolution_acknowledged_at, clock_timestamp()),
+                  last_observed_at=clock_timestamp()
+            WHERE merchant_id=$1::uuid AND device_id=$2::uuid AND command_id=$3::uuid
+              AND resolution_state <> 'resolved'`,
+          [command.merchantId, command.deviceId, command.commandId],
+        );
+        if (officialCommit && provisionalId) {
           await client.query(
             `INSERT INTO merchant.offline_provisional_mapping
             (merchant_id,location_id,device_id,command_id,provisional_id,official_sale_id,
@@ -224,7 +269,7 @@ export class PosOfflineRepository {
               command.locationId,
               command.deviceId,
               command.commandId,
-              command.provisionalId,
+              provisionalId,
               officialCommit.officialSaleId,
               officialCommit.officialReceiptId,
               officialCommit.officialReceiptNumber,
@@ -235,7 +280,7 @@ export class PosOfflineRepository {
             `SELECT official_sale_id::text AS "officialSaleId"
            FROM merchant.offline_provisional_mapping
            WHERE merchant_id=$1 AND provisional_id=$2`,
-            [command.merchantId, command.provisionalId],
+            [command.merchantId, provisionalId],
           );
           if (mapping.rows[0]?.officialSaleId !== officialCommit.officialSaleId) {
             throw new Error('PROVISIONAL_MAPPING_CONFLICT');
@@ -247,13 +292,20 @@ export class PosOfflineRepository {
            public_data,correlation_id,event_hash)
          VALUES ($1::uuid,$2::uuid,$3::uuid,'offline.replay.accepted',
           'offline_command',$3::uuid,'success',
-          jsonb_build_object('commandType',$4::text,'deviceSequence',$5::bigint),$3::text,'')`,
+          jsonb_build_object(
+            'commandType',$4::text,
+            'deviceSequence',$5::bigint,
+            'originDeviceId',$6::text,
+            'originOperatorSessionId',$7::text
+          ),$3::text,'')`,
           [
             command.merchantId,
             command.locationId,
             command.commandId,
             command.commandType,
             command.deviceSequence,
+            command.originDeviceId ?? null,
+            command.originOperatorSessionId ?? null,
           ],
         );
         return result;
@@ -301,39 +353,135 @@ export class PosOfflineRepository {
         AND credential_version=$4 AND command_id=$5::uuid`,
       [merchantId, locationId, deviceId, credentialVersion, commandId],
     );
-    return rows[0]?.result ?? null;
+    if (rows[0]?.result) return rows[0].result;
+    const conflict = await this.scopedQuery<{
+      commandId: string;
+      deviceSequence: string;
+      classification: ConflictClassification;
+      blocksFollowing: boolean;
+      operatorActionRequired: boolean;
+      managerActionRequired: boolean;
+      guidanceCode: string;
+      correlationId: string;
+      officialId: string | null;
+      retryable: boolean;
+      id: string;
+    }>(
+      merchantId,
+      locationId,
+      `SELECT command_id::text AS "commandId",
+              device_sequence::text AS "deviceSequence",
+              classification,blocks_following AS "blocksFollowing",
+              operator_action_required AS "operatorActionRequired",
+              manager_action_required AS "managerActionRequired",
+              guidance_code AS "guidanceCode",
+              correlation_id AS "correlationId",
+              official_id::text AS "officialId",
+              retryable,id::text
+       FROM merchant.offline_replay_conflict
+       WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+         AND device_id=$3::uuid AND credential_version=$4
+         AND command_id=$5::uuid
+       LIMIT 1`,
+      [merchantId, locationId, deviceId, credentialVersion, commandId],
+    );
+    const row = conflict.rows[0];
+    if (!row) return null;
+    return {
+      commandId: row.commandId,
+      deviceSequence: Number(row.deviceSequence),
+      status: 'conflict' as const,
+      officialId: row.officialId,
+      officialCommit: null,
+      serverConflictReference: row.id,
+      failure: {
+        classification: row.classification,
+        retryable: row.retryable,
+        blocksFollowing: row.blocksFollowing,
+        operatorActionRequired: row.operatorActionRequired,
+        managerActionRequired: row.managerActionRequired,
+        guidanceCode: row.guidanceCode,
+        correlationId: row.correlationId,
+      },
+    };
   }
 
   async diagnostics(merchantId: string, deviceId: string, credentialVersion: number) {
     const { rows } = await this.scopedQuery<{
       lastAcceptedSequence: string;
+      lastProcessedSequence: string;
       acceptedCount: string;
       lastReplayAt: Date | null;
     }>(
       merchantId,
       getRequestContext()?.locationId ?? '',
       `SELECT COALESCE(c.last_accepted_sequence,0)::text AS "lastAcceptedSequence",
+              COALESCE(c.last_processed_sequence,0)::text AS "lastProcessedSequence",
               count(r.command_id)::text AS "acceptedCount", max(r.accepted_at) AS "lastReplayAt"
        FROM merchant.device_replay_cursor c
        LEFT JOIN merchant.offline_replay_command r ON r.device_id=c.device_id
         AND r.credential_version=c.credential_version
        WHERE c.merchant_id=$1::uuid AND c.device_id=$2::uuid AND c.credential_version=$3
-       GROUP BY c.last_accepted_sequence`,
+       GROUP BY c.last_accepted_sequence,c.last_processed_sequence`,
       [merchantId, deviceId, credentialVersion],
     );
-    return rows[0] ?? { lastAcceptedSequence: '0', acceptedCount: '0', lastReplayAt: null };
+    return (
+      rows[0] ?? {
+        lastAcceptedSequence: '0',
+        lastProcessedSequence: '0',
+        acceptedCount: '0',
+        lastReplayAt: null,
+      }
+    );
   }
 
   async acknowledge(merchantId: string, deviceId: string, reconciliationId: string) {
-    const result = await this.scopedQuery(
+    const result = await this.scopedQuery<{ acknowledged: boolean; rewound: boolean }>(
       merchantId,
       getRequestContext()?.locationId ?? '',
-      `UPDATE merchant.offline_reconciliation SET acknowledged_at=clock_timestamp()
-       WHERE id=$1::uuid AND merchant_id=$2::uuid AND device_id=$3::uuid
-        AND acknowledged_at IS NULL`,
+      `WITH target AS (
+         SELECT id, credential_version, summary
+         FROM merchant.offline_reconciliation
+         WHERE id=$1::uuid AND merchant_id=$2::uuid AND device_id=$3::uuid
+           AND acknowledged_at IS NULL
+         FOR UPDATE
+       ),
+       acknowledged AS (
+         UPDATE merchant.offline_reconciliation r
+         SET acknowledged_at=clock_timestamp()
+         FROM target t
+         WHERE r.id=t.id
+         RETURNING t.credential_version, t.summary
+       ),
+       rewound AS (
+         UPDATE merchant.device_replay_cursor c
+         SET last_accepted_sequence=LEAST(
+               c.last_accepted_sequence,
+               COALESCE((a.summary->>'localLastAcknowledgedSequence')::bigint,
+                        c.last_accepted_sequence)
+             ),
+             updated_at=clock_timestamp()
+         FROM acknowledged a
+         WHERE c.merchant_id=$2::uuid AND c.device_id=$3::uuid
+           AND c.credential_version=a.credential_version
+           AND COALESCE((a.summary->>'reconciliationRequired')::boolean,false)
+           AND COALESCE((a.summary->>'serverLastAcceptedSequence')::bigint,0)
+               > COALESCE((a.summary->>'localLastAcknowledgedSequence')::bigint,0)
+           AND NOT EXISTS (
+             SELECT 1
+             FROM merchant.offline_replay_command r
+             WHERE r.merchant_id=$2::uuid AND r.device_id=$3::uuid
+               AND r.credential_version=c.credential_version
+               AND r.device_sequence >
+                   COALESCE((a.summary->>'localLastAcknowledgedSequence')::bigint,0)
+           )
+         RETURNING 1
+       )
+       SELECT EXISTS(SELECT 1 FROM acknowledged) AS acknowledged,
+              EXISTS(SELECT 1 FROM rewound) AS rewound`,
       [reconciliationId, merchantId, deviceId],
     );
-    return result.rowCount === 1;
+    return result.rows[0]?.acknowledged === true;
   }
 
   async persistReconciliation(input: {
@@ -362,7 +510,12 @@ export class PosOfflineRepository {
     return id;
   }
 
-  async conflicts(merchantId: string, locationId: string, deviceId: string) {
+  async conflicts(
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+    credentialVersion: number,
+  ) {
     const { rows } = await this.scopedQuery<{
       commandId: string;
       deviceSequence: string;
@@ -373,6 +526,7 @@ export class PosOfflineRepository {
       guidanceCode: string;
       correlationId: string;
       officialId: string | null;
+      retryable: boolean;
       id: string;
     }>(
       merchantId,
@@ -381,11 +535,13 @@ export class PosOfflineRepository {
               classification,blocks_following AS "blocksFollowing",
               operator_action_required AS "operatorActionRequired",
               manager_action_required AS "managerActionRequired",guidance_code AS "guidanceCode",
-              correlation_id AS "correlationId",official_id::text AS "officialId",id::text
+              correlation_id AS "correlationId",official_id::text AS "officialId",
+              retryable,id::text
        FROM merchant.offline_replay_conflict
        WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND device_id=$3::uuid
+        AND credential_version=$4
         AND resolution_state <> 'resolved' ORDER BY device_sequence LIMIT 100`,
-      [merchantId, locationId, deviceId],
+      [merchantId, locationId, deviceId, credentialVersion],
     );
     return rows.map((row) => ({
       commandId: row.commandId,
@@ -396,7 +552,7 @@ export class PosOfflineRepository {
       serverConflictReference: row.id,
       failure: {
         classification: row.classification,
-        retryable: false,
+        retryable: row.retryable,
         blocksFollowing: row.blocksFollowing,
         operatorActionRequired: row.operatorActionRequired,
         managerActionRequired: row.managerActionRequired,
@@ -404,6 +560,148 @@ export class PosOfflineRepository {
         correlationId: row.correlationId,
       },
     }));
+  }
+
+  async resolveConflict(
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+    credentialVersion: number,
+    commandId: string,
+  ) {
+    const { rows } = await this.scopedQuery<{
+      hasConflict: boolean;
+      resolved: boolean;
+      deviceSequence: string | null;
+      nextAcceptedSequence: string;
+      nextProcessedSequence: string;
+    }>(
+      merchantId,
+      locationId,
+      `WITH cursor_ready AS (
+         INSERT INTO merchant.device_replay_cursor
+           (merchant_id,location_id,device_id,credential_version)
+         VALUES ($1,$2,$3,$5)
+         ON CONFLICT (device_id,credential_version) DO NOTHING
+         RETURNING device_id
+       ),
+       conflict_row AS (
+         SELECT id,device_sequence,resolution_state,command_type,stream_key,classification
+         FROM merchant.offline_replay_conflict
+         WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+           AND device_id=$3::uuid AND command_id=$4::uuid
+           AND credential_version=$5
+         FOR UPDATE
+       ),
+       cursor_row AS (
+         SELECT last_accepted_sequence,last_processed_sequence
+         FROM merchant.device_replay_cursor c
+         LEFT JOIN cursor_ready ready ON TRUE
+         WHERE c.merchant_id=$1::uuid AND c.device_id=$3::uuid
+           AND c.credential_version=$5
+         FOR UPDATE OF c
+       ),
+       resolvable AS (
+         SELECT c.id,c.device_sequence,c.stream_key,c.classification
+         FROM conflict_row c,cursor_row r
+         WHERE (
+           c.resolution_state='resolved'
+           AND r.last_processed_sequence >= c.device_sequence
+         ) OR (
+           c.resolution_state='open'
+           AND (
+             r.last_processed_sequence >= c.device_sequence
+             OR c.classification='sequence_gap'
+           )
+           AND c.command_type IN (
+             'pos.table.command',
+             'pos.cart.table.set',
+             'pos.command.group',
+             -- A line that never reached a cart is safe to discard. The row
+             -- stays in history; only its open state closes. Checkout and
+             -- payment commands remain protected.
+             'pos.cart.line.add',
+             'pos.cart.line.update',
+             'pos.cart.line.remove',
+             'pos.cart.open',
+             'pos.cart.clear',
+             'pos.cart.prepare',
+             'pos.cart.fire',
+             'pos.cart.fulfillment.set'
+           )
+         )
+       ),
+       resolved AS (
+         UPDATE merchant.offline_replay_conflict c
+         SET resolution_state='resolved',
+             resolution_acknowledged_at=COALESCE(
+               c.resolution_acknowledged_at,
+               clock_timestamp()
+             ),
+             last_observed_at=clock_timestamp()
+         FROM resolvable r
+         WHERE c.id=r.id AND c.resolution_state='open'
+         RETURNING r.device_sequence,r.classification
+       ),
+       dependents AS (
+         UPDATE merchant.offline_replay_conflict c
+         SET resolution_state='resolved',
+             resolution_acknowledged_at=COALESCE(
+               c.resolution_acknowledged_at,
+               clock_timestamp()
+             ),
+             last_observed_at=clock_timestamp()
+         FROM resolvable r
+         WHERE r.stream_key IS NOT NULL
+           AND c.merchant_id=$1::uuid
+           AND c.location_id=$2::uuid
+           AND c.device_id=$3::uuid
+           AND c.credential_version=$5
+           AND c.stream_key=r.stream_key
+           AND c.classification='stream_blocked'
+           AND c.resolution_state <> 'resolved'
+         RETURNING c.device_sequence
+       ),
+       advanced AS (
+         UPDATE merchant.device_replay_cursor c
+         SET last_accepted_sequence=CASE
+               WHEN r.device_sequence=c.last_accepted_sequence + 1
+                 OR r.classification='sequence_gap'
+               THEN GREATEST(c.last_accepted_sequence,r.device_sequence)
+               ELSE c.last_accepted_sequence
+             END,
+             last_processed_sequence=GREATEST(
+               c.last_processed_sequence,
+               r.device_sequence
+             ),
+             updated_at=clock_timestamp()
+         FROM resolved r
+         WHERE c.merchant_id=$1::uuid AND c.device_id=$3::uuid
+           AND c.credential_version=$5
+         RETURNING c.last_accepted_sequence
+       )
+       SELECT EXISTS(SELECT 1 FROM conflict_row) AS "hasConflict",
+              EXISTS(SELECT 1 FROM resolvable) AS resolved,
+              (SELECT device_sequence::text FROM conflict_row) AS "deviceSequence",
+              COALESCE(
+                (SELECT last_accepted_sequence::text FROM advanced),
+                (SELECT last_accepted_sequence::text FROM cursor_row),
+                '0'
+              ) AS "nextAcceptedSequence",
+              COALESCE(
+                (SELECT last_processed_sequence::text FROM cursor_row),
+                '0'
+              ) AS "nextProcessedSequence"`,
+      [merchantId, locationId, deviceId, commandId, credentialVersion],
+    );
+    const row = rows[0];
+    if (!row?.hasConflict) return null;
+    return {
+      resolved: row.resolved,
+      deviceSequence: Number(row.deviceSequence),
+      nextAcceptedSequence: Number(row.nextAcceptedSequence),
+      nextProcessedSequence: Number(row.nextProcessedSequence),
+    };
   }
 
   async mappings(merchantId: string, locationId: string, deviceId: string) {
@@ -423,6 +721,38 @@ export class PosOfflineRepository {
       [merchantId, locationId, deviceId],
     );
     return rows;
+  }
+
+  /**
+   * Resolve a till-side cart identity after the command that created it.
+   *
+   * Replay batches are bounded. The server keeps the official cart id on the
+   * accepted open or group command, so a later batch does not need to guess
+   * from whichever account happens to be active now.
+   */
+  async provisionalCartId(
+    merchantId: string,
+    locationId: string,
+    provisionalId: string,
+  ): Promise<string | null> {
+    const normalized = normalizeProvisionalId(provisionalId);
+    if (normalized == null) return null;
+    const { rows } = await this.scopedQuery<{ officialId: string }>(
+      merchantId,
+      locationId,
+      `SELECT result->>'officialId' AS "officialId"
+       FROM merchant.offline_replay_command
+       WHERE merchant_id=$1::uuid
+         AND location_id=$2::uuid
+         AND provisional_id=$3
+         AND command_type IN ('pos.cart.open','pos.command.group')
+         AND result->>'status' IN ('accepted','duplicate')
+         AND result->>'officialId' IS NOT NULL
+       ORDER BY client_created_at DESC
+       LIMIT 1`,
+      [merchantId, locationId, normalized],
+    );
+    return rows[0]?.officialId ?? null;
   }
 
   async audit(merchantId: string, locationId: string, deviceId: string) {
@@ -467,6 +797,8 @@ export class PosOfflineRepository {
     command: OfflineCommand,
     classification: ConflictClassification,
     blocksFollowing: boolean,
+    guidanceCode: string = classification,
+    retryable = false,
   ): ReplayResult {
     return {
       commandId: command.commandId,
@@ -477,11 +809,11 @@ export class PosOfflineRepository {
       serverConflictReference: null,
       failure: {
         classification,
-        retryable: false,
+        retryable,
         blocksFollowing,
         operatorActionRequired: true,
         managerActionRequired: false,
-        guidanceCode: classification,
+        guidanceCode,
         correlationId: command.commandId,
       },
     };
@@ -491,30 +823,124 @@ export class PosOfflineRepository {
     command: OfflineCommand,
     classification: ConflictClassification,
     blocksFollowing: boolean,
+    guidanceCode: string = classification,
   ): Promise<ReplayResult> {
-    const result = this.conflict(command, classification, blocksFollowing);
+    const result = this.conflict(command, classification, blocksFollowing, guidanceCode);
     const { rows } = await this.scopedQuery<{ id: string }>(
       command.merchantId,
       command.locationId,
-      `INSERT INTO merchant.offline_replay_conflict
-        (merchant_id,location_id,device_id,command_id,device_sequence,classification,
-         blocks_following,operator_action_required,manager_action_required,guidance_code,
-         correlation_id,provisional_id)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6::text,$7,true,false,$6::text,$4::text,$8::uuid)
-       ON CONFLICT (merchant_id,device_id,command_id) DO UPDATE
-        SET last_observed_at=clock_timestamp()
-       RETURNING id::text`,
+      `SELECT merchant.record_offline_replay_conflict(
+         $1::uuid,$2::uuid,$3::uuid,$4,$5::uuid,$6,$7::text,$8,$10::text,
+         $9::uuid,$11::text,NULL,false,false
+       )::text AS id`,
       [
         command.merchantId,
         command.locationId,
         command.deviceId,
+        command.deviceCredentialVersion,
         command.commandId,
         command.deviceSequence,
         classification,
         blocksFollowing,
-        command.provisionalId,
+        normalizeProvisionalId(command.provisionalId),
+        guidanceCode,
+        command.commandType,
       ],
     );
     return { ...result, serverConflictReference: rows[0].id };
   }
+
+  /**
+   * Record a refusal for one account stream and advance the processed cursor.
+   *
+   * The command remains unaccepted. A later command for a different account can
+   * use the next device sequence. The same account stays blocked until an
+   * operator resolves the refusal.
+   */
+  async recordStreamConflict(
+    command: OfflineCommand,
+    classification: ConflictClassification,
+    streamKey: string,
+    guidanceCode: string = classification,
+    retryable = false,
+  ): Promise<ReplayResult> {
+    const result = this.conflict(command, classification, false, guidanceCode, retryable);
+    const { rows } = await this.scopedQuery<{ id: string }>(
+      command.merchantId,
+      command.locationId,
+      `SELECT merchant.record_offline_replay_conflict(
+         $1::uuid,$2::uuid,$3::uuid,$4,$5::uuid,$6,$7::text,false,$8::text,
+         $9::uuid,$10::text,$11::text,$12,true
+       )::text AS id`,
+      [
+        command.merchantId,
+        command.locationId,
+        command.deviceId,
+        command.deviceCredentialVersion,
+        command.commandId,
+        command.deviceSequence,
+        classification,
+        guidanceCode,
+        normalizeProvisionalId(command.provisionalId),
+        command.commandType,
+        streamKey,
+        retryable,
+      ],
+    );
+    return { ...result, serverConflictReference: rows[0].id };
+  }
+
+  async hasOpenStreamConflict(
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+    credentialVersion: number,
+    streamKey: string,
+  ): Promise<boolean> {
+    const { rows } = await this.scopedQuery<{ blocked: boolean }>(
+      merchantId,
+      locationId,
+      `SELECT EXISTS(
+         SELECT 1
+         FROM merchant.offline_replay_conflict
+         WHERE merchant_id=$1::uuid
+           AND location_id=$2::uuid
+           AND device_id=$3::uuid
+           AND credential_version=$4
+           AND stream_key=$5
+           AND resolution_state <> 'resolved'
+       ) AS blocked`,
+      [merchantId, locationId, deviceId, credentialVersion, streamKey],
+    );
+    return rows[0]?.blocked === true;
+  }
+
+  async hasResolvedConflict(
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+    credentialVersion: number,
+    commandId: string,
+  ): Promise<boolean> {
+    const { rows } = await this.scopedQuery<{ found: boolean }>(
+      merchantId,
+      locationId,
+      `SELECT EXISTS(
+         SELECT 1
+         FROM merchant.offline_replay_conflict
+         WHERE merchant_id=$1::uuid
+           AND location_id=$2::uuid
+           AND device_id=$3::uuid
+           AND credential_version=$4
+           AND command_id=$5::uuid
+           AND resolution_state='resolved'
+       ) AS found`,
+      [merchantId, locationId, deviceId, credentialVersion, commandId],
+    );
+    return rows[0]?.found === true;
+  }
+}
+
+function normalizeProvisionalId(value: string | null): string | null {
+  return value?.startsWith('prov-') ? value.slice('prov-'.length) : value;
 }

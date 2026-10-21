@@ -53,6 +53,7 @@ export class PosCartService {
           merchantId,
           dto.locationId,
           dto.operatorSessionId,
+          dto.accountName ?? undefined,
         );
         return this.repo.snapshotWithClient(client, merchantId, id);
       },
@@ -125,6 +126,7 @@ export class PosCartService {
           dto.operatorSessionId,
           dto.tableId,
           dto.expectedVersion,
+          dto.partySize ?? undefined,
         ),
     );
   }

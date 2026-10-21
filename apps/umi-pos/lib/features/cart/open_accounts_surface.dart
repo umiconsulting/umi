@@ -64,6 +64,7 @@ class OpenAccountsList extends StatefulWidget {
     this.showFulfillmentFilter = false,
     this.showDateFilter = false,
     this.onCancelCarriedOver,
+    this.onDismissNotice,
     this.clock = DateTime.now,
     this.currentBusinessDate,
     this.watchedAccount,
@@ -78,6 +79,7 @@ class OpenAccountsList extends StatefulWidget {
   final bool showFulfillmentFilter;
   final bool showDateFilter;
   final Future<void> Function(List<Cart>)? onCancelCarriedOver;
+  final VoidCallback? onDismissNotice;
   final DateTime Function() clock;
   final Cart? watchedAccount;
   final Future<Cart> Function(Cart)? readAccount;
@@ -264,6 +266,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
                       ],
                       selected: {_previousDaysOnly},
                       onSelectionChanged: (value) => setState(() {
+                        widget.onDismissNotice?.call();
                         _previousDaysOnly = value.first;
                         _selectedIds.clear();
                         _cancelError = null;
@@ -289,6 +292,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
                       ],
                       selected: {_fulfillmentType ?? 'all'},
                       onSelectionChanged: (value) => setState(() {
+                        widget.onDismissNotice?.call();
                         _fulfillmentType = value.first == 'all'
                             ? null
                             : value.first;
@@ -330,9 +334,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
           ],
         ),
         const SizedBox(height: 12),
-        if (_previousDaysOnly &&
-            widget.onCancelCarriedOver != null &&
-            selectable.isNotEmpty) ...[
+        if (widget.onCancelCarriedOver != null && selectable.isNotEmpty) ...[
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -581,8 +583,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
       message: details,
       child: PosListRow(
         key: ValueKey('open-account-${cart.id}'),
-        leading:
-            carried && _previousDaysOnly && widget.onCancelCarriedOver != null
+        leading: carried && widget.onCancelCarriedOver != null
             ? PosIconButton(
                 tooltip: _selectedIds.contains(cart.id)
                     ? (es ? 'Quitar selección' : 'Deselect')
@@ -595,6 +596,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
                 onPressed: _cancelling
                     ? null
                     : () => setState(() {
+                        widget.onDismissNotice?.call();
                         if (_selectedIds.contains(cart.id)) {
                           _selectedIds.remove(cart.id);
                           _selectionLimitReached = false;
@@ -628,7 +630,8 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
           [
             if (carried && age != null) age,
             if (carried && compact) es ? 'Anterior' : 'Earlier',
-            if (cart.tableId == null) es ? 'Sin mesa' : 'No table',
+            if (cart.tableId == null && cart.accountName == null)
+              es ? 'Sin mesa' : 'No table',
             ?cart.accountName,
             if (!carried) accountOpenedAt(context, cart),
             if (pending > 0) es ? 'Por enviar' : 'Not sent',
@@ -637,8 +640,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing:
-            carried && _previousDaysOnly && widget.onCancelCarriedOver != null
+        trailing: carried && widget.onCancelCarriedOver != null
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -656,6 +658,7 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
             ? null
             : _previousDaysOnly && widget.onCancelCarriedOver != null
             ? () => setState(() {
+                widget.onDismissNotice?.call();
                 if (_selectedIds.contains(cart.id)) {
                   _selectedIds.remove(cart.id);
                   _selectionLimitReached = false;
@@ -665,7 +668,10 @@ class _OpenAccountsListState extends State<OpenAccountsList> {
                   _selectionLimitReached = true;
                 }
               })
-            : () => widget.onSelected(cart),
+            : () {
+                widget.onDismissNotice?.call();
+                widget.onSelected(cart);
+              },
       ),
     );
   }

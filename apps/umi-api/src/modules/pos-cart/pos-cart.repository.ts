@@ -111,6 +111,7 @@ export class PosCartRepository {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
+    accountName?: string,
   ): Promise<string> {
     // "Create" is the explicit request for another account. The active account is
     // saved first, never returned in place of the new one. Returning it here made
@@ -119,8 +120,8 @@ export class PosCartRepository {
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO merchant.pos_cart
          (merchant_id,location_id,operator_session_id,original_operator_session_id,
-          original_operator_user_id,operator_user_id)
-       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id
+          original_operator_user_id,operator_user_id,display_label)
+       SELECT $1::uuid,$2::uuid,$3::uuid,$3::uuid,os.user_id,os.user_id,$4
        FROM merchant.location b
        JOIN runtime.operator_session os ON os.id=$3::uuid
        WHERE b.id=$2::uuid AND b.merchant_id=$1::uuid AND b.status='active'
@@ -135,7 +136,7 @@ export class PosCartRepository {
           OR (merchant.pos_cart.table_id IS NULL AND NOT EXISTS (SELECT 1 FROM runtime.operator_session prior
             WHERE prior.id=merchant.pos_cart.operator_session_id AND prior.state='active' AND prior.expires_at>now()))
        RETURNING id::text`,
-      [merchantId, locationId, operatorSessionId],
+      [merchantId, locationId, operatorSessionId, accountName ?? null],
     );
     if (!rows[0]) throw new ConflictException({ code: 'CART_ACTOR_BUSY' });
     return rows[0].id;

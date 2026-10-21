@@ -136,7 +136,7 @@ describe('PosCartRepository.create', () => {
     // 500. The trigger derives it, and the shift decides the sale's day.
     expect(statement).not.toContain('business_date');
     expect(statement).not.toContain('create_or_recover_pos_cart');
-    expect(params).toEqual([MERCHANT, LOCATION, OPERATOR_SESSION]);
+    expect(params).toEqual([MERCHANT, LOCATION, OPERATOR_SESSION, null]);
     // Nothing leaks onto a pool the caller did not scope.
     expect(pg.app.query).not.toHaveBeenCalled();
     expect(pg.worker.query).not.toHaveBeenCalled();

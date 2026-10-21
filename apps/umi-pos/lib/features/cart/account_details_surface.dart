@@ -2,6 +2,8 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/theme/pos_ui.dart';
 
+const temporaryTableAccountName = 'Mesa temporal';
+
 String accountDisplayTitle(Cart cart, {required bool spanish}) =>
     cart.accountFolio ?? (spanish ? 'Cuenta' : 'Account');
 

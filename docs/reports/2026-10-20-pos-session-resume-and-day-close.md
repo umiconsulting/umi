@@ -204,3 +204,47 @@ Artifacts:
 
 - [Account 002 resumed](evidence/2026-10-20-session-resume/imin-account002-resumed.png)
 - [Final clean menu](evidence/2026-10-20-session-resume/imin-final-clean-menu.png)
+
+## Follow-up: Temporary table and stale replay conflicts
+
+“Temporary table” previously opened a tableless account but displayed a success
+notice that said there was no table. The label and the object disagreed: the
+operator expected a normal account identified as a temporary table, while the
+screen described a generic empty account.
+
+The POS now creates the account with `Mesa temporal` as its persisted account
+name. The order header shows the normal folio plus `Mesa temporal`, Cuentas does
+not repeat “Sin mesa”, and no success banner is necessary. The destination
+remains the product menu because that is where the operator adds the first item.
+
+The same flow exposed a separate synchronization failure. A re-enrolled device
+retained eight `sequence_gap` conflicts from an earlier operator session. The
+server refused the stale sequence; the replay then used the old session and
+returned `401`; the POS kept a green local paint with a generic “item was not
+added” warning.
+
+The correction removes that cascade:
+
+- Definitively refused, non-financial cart steps are resolved automatically and
+  remain in history.
+- Replay now executes cart operations with the currently open operator session
+  while preserving the original writing session in the command record.
+- A missing replay cursor is created while resolving a sequence gap, and the
+  cursor advances through the explicitly discarded step.
+- `fire` and `prepare` may be discarded only when the server marks them
+  non-retryable; payment, checkout and unknown outcomes still require a person.
+- Successful recovery is acknowledged automatically when the local journal and
+  server cursor both have nothing pending.
+- The recovery diagnostics query no longer fails its PostgreSQL `GROUP BY`.
+
+Final iMin proof with build **237**:
+
+- Cuentas opened **Cuenta 006** as, and displayed, `Mesa temporal`.
+- Adding Americano limón mineral produced no error banner.
+- `POST /cart/lines` returned `201`; the server cart has the same line.
+- The header remained `local confirmed`, and no recovery item was left pending.
+
+Artifacts:
+
+- [Temporary table account](evidence/2026-10-20-session-resume/imin-temporary-table-account.png)
+- [Item added to the temporary table](evidence/2026-10-20-session-resume/imin-temporary-table-item.png)
