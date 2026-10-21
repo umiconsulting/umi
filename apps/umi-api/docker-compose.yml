@@ -51,6 +51,15 @@ services:
       # mounting it on only one service would boot the web container and fail the
       # worker — with the queue silently not draining.
       - ./certs:/certs:ro
+    healthcheck:
+      # The image default probes the web process on :3000. A worker deliberately
+      # has no HTTP listener; worker.ts writes this readiness file after the Nest
+      # application context, BullMQ processors and schedulers are online.
+      test: ['CMD', 'test', '-s', '/tmp/umi-worker-ready']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
     depends_on:
       redis:
         condition: service_healthy
