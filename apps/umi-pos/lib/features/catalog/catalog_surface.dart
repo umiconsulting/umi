@@ -1517,7 +1517,16 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     if (!mounted) return;
     setState(() {});
     if (widget.sales.state.readyForNextCustomer) _requestMobileOrderStart();
-    final errorCode = widget.sales.state.errorCode;
+    final rawErrorCode = widget.sales.state.errorCode;
+    final missingPrepaymentSale =
+        (rawErrorCode == 'RESOURCE_NOT_FOUND' ||
+            rawErrorCode == 'SALE_NOT_FOUND') &&
+        widget.cart.state.cart?.firedOrderId != null;
+    // A fired account has an order for the kitchen but intentionally has no
+    // "current sale" until checkout begins. The account resume explains that
+    // distinction already; painting the missing pre-payment sale as an error
+    // put a permanent generic banner over a healthy account.
+    final errorCode = missingPrepaymentSale ? null : rawErrorCode;
     final offline =
         widget.connectivity.state == PosConnectivity.offline ||
         widget.connectivity.state == PosConnectivity.degraded ||
@@ -1674,13 +1683,22 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       setState(() => _accountTransition = true);
       try {
         if (widget.cart.state.cart != null) {
-          // Offline, the open command parks the account on replay. The server
-          // suspends a cart with content before it applies the next open, so a
-          // save that cannot reach the API is neither required nor useful.
-          final parked =
-              widget.cart.isOffline || await widget.cart.saveAccount();
-          if (!parked) {
-            if (mounted) _refuseCartWrite();
+          // Account switching is local-first. Persist any command still in the
+          // in-memory lane, then let the next `pos.cart.open` park the previous
+          // account on the server. Calling `saveAccount` here raced the command
+          // queue: a sent line could leave an accepted in-memory command behind,
+          // `saveAccount` answered busy without an API request, and the top-bar
+          // action surfaced an old CART_VALIDATION_FAILED banner over a healthy
+          // account.
+          final preserved = await widget.cart.preserveForAccountSwitch();
+          if (!preserved) {
+            if (mounted) {
+              setState(() {
+                _noticeCode = 'CART_LOCAL_STORAGE_FAILED';
+                _notice =
+                    'No se pudo guardar la cuenta actual en este equipo. Vuelve a intentarlo antes de cambiar de cuenta.';
+              });
+            }
             return;
           }
           widget.sales.accountSaved();
@@ -1694,6 +1712,8 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
             _inlineDetail = null;
             _orderTypeTouched = false;
             _orderType = 'dine_in';
+            _noticeCode = null;
+            _notice = null;
           });
         }
       } finally {
