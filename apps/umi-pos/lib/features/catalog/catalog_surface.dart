@@ -157,8 +157,19 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   String? _promptedMobileCartId;
   Future<bool>? _orderStart;
   String? _pendingOrderType;
+  DateTime _suppressMenuTapUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
   bool get _mobileDevice => widget.entry.state.device?.mobility == 'mobile';
+  bool get _menuTapSuppressed => DateTime.now().isBefore(_suppressMenuTapUntil);
+
+  void _consumeModalPointer() {
+    // A fast tap can finish closing an account-type sheet on the same pointer-up
+    // that lands over a menu card. Suppress the menu for one gesture window so a
+    // choice such as Takeaway can never also open the product beneath it.
+    _suppressMenuTapUntil = DateTime.now().add(
+      const Duration(milliseconds: 250),
+    );
+  }
 
   void _requestMobileOrderStart() {
     final cart = widget.cart.state.cart;
@@ -196,7 +207,21 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       locationId: entry.selectedBranch!.id,
       operatorSessionId: entry.operator!.id,
     );
-    await plan.load(merchant, query);
+    final room = widget.tableState;
+    Future<void> refreshRoom() async =>
+        room?.load(merchant, query.locationId, query.operatorSessionId);
+    final planFresh =
+        plan.plan != null &&
+        plan.refreshedAt != null &&
+        DateTime.now().difference(plan.refreshedAt!) <
+            const Duration(seconds: 5);
+    final roomFresh =
+        room == null ||
+        (room.map != null && !room.stale && room.loading == false);
+    await Future.wait([
+      if (!planFresh) plan.load(merchant, query),
+      if (!roomFresh) refreshRoom(),
+    ]);
     if (!mounted) return null;
     if (plan.failed) {
       showPosFeedback(
@@ -213,10 +238,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         : FloorPlanDocument.fromJson(
             document,
           ).areas.map(FloorPlanArea.fromJson).toList();
-    final room = widget.tableState;
-    Future<void> refreshRoom() async =>
-        room?.load(merchant, query.locationId, query.operatorSessionId);
-    await refreshRoom();
     if (!mounted) return null;
     final permissions = OperatorPermissions(entry.operator!.permissions);
     return showOrderTablePicker(
@@ -258,6 +279,40 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     );
   }
 
+  /// Fetch the room while the operator is still choosing Dine in or Takeaway.
+  ///
+  /// The two reads are independent and small, but doing them only after the
+  /// service choice made Dine in feel delayed by a second modal transition. The
+  /// result is ignored on failure; the picker's own load path owns recovery.
+  Future<void> _warmOrderTableData() async {
+    final plan = widget.floorPlan;
+    final entry = widget.entry.state;
+    final operator = entry.operator;
+    final location = entry.selectedBranch;
+    final merchant = entry.selectedTenant;
+    if (plan == null ||
+        operator == null ||
+        location == null ||
+        merchant == null) {
+      return;
+    }
+    try {
+      await Future.wait([
+        plan.load(
+          merchant.id,
+          PosFloorPlanQuery(
+            locationId: location.id,
+            operatorSessionId: operator.id,
+          ),
+        ),
+        if (widget.tableState case final room?)
+          room.load(merchant.id, location.id, operator.id),
+      ]);
+    } catch (_) {
+      // The normal picker load reports actionable failures.
+    }
+  }
+
   Future<bool> _prepareMobileOrder() {
     if (!_mobileDevice) return Future.value(true);
     return _orderStart ??= _prepareMobileOrderOnce().whenComplete(
@@ -267,22 +322,18 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
 
   Future<bool> _prepareMobileOrderOnce() async {
     final cart = widget.cart.state.cart;
-    if (cart == null && _pendingOrderType == 'takeout') return true;
     if (cart == null) {
+      unawaited(_warmOrderTableData());
       final type = await showOrderTypePicker(context);
       if (type == null || !mounted) return false;
+      _consumeModalPointer();
       if (type == 'dine_in') {
         final table = await _chooseOrderTable();
         if (table == null || !mounted) return false;
         await _openTableAccount(table);
         return widget.cart.state.cart?.tableId == table.id;
       }
-      setState(() {
-        _pendingOrderType = type;
-        _orderType = type;
-        _orderTypeTouched = true;
-      });
-      return true;
+      return _openTablelessAccount(type);
     }
     if (_preparedMobileCartId == cart.id ||
         cart.tableId != null ||
@@ -291,8 +342,10 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       _preparedMobileCartId = cart.id;
       return true;
     }
+    unawaited(_warmOrderTableData());
     final type = await showOrderTypePicker(context);
     if (type == null || !mounted) return false;
+    _consumeModalPointer();
     if (type == 'dine_in') {
       final table = await _chooseOrderTable();
       if (table == null || !mounted) return false;
@@ -1006,15 +1059,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       _noticeDetails = null;
       _notice = AppLocalizations.of(context).cartRestoringAccountHint;
     });
-  }
-
-  /// What `Nueva cuenta` is holding, said the way the till says an account elsewhere.
-  String _newAccountStanddown(bool spanish) {
-    final cart = widget.cart.state.cart;
-    final reference = cart == null ? '' : accountReference(cart);
-    return spanish
-        ? 'Ya estás en una cuenta vacía ($reference). Agrega un producto para usarla.'
-        : 'You are already on an empty account ($reference). Add a product to use it.';
   }
 
   @override
@@ -1756,21 +1800,52 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
   /// existing `dine_in` or `takeout` fact.
   Future<void> _startOrderAfterParking() async {
     if (!mounted || !widget.cart.supportsOpenAccounts) return;
+    unawaited(_warmOrderTableData());
     final type = await showOrderTypePicker(context);
     if (type == null || !mounted) return;
+    _consumeModalPointer();
     if (type == 'dine_in' && widget.floorPlan != null) {
       final table = await _chooseOrderTable();
       if (table != null && mounted) await _openTableAccount(table);
       return;
     }
+    await _openTablelessAccount(type);
+  }
+
+  Future<bool> _openTablelessAccount(String type) async {
+    final entry = widget.entry.state;
+    final merchant = entry.selectedTenant?.id;
+    final location = entry.selectedBranch?.id;
+    final operator = entry.operator?.id;
+    if (merchant == null || location == null || operator == null) return false;
+    if (widget.cart.state.cart == null) {
+      await widget.cart.open(merchant, location, operator);
+      if (widget.cart.state.cart == null) {
+        if (mounted) _refuseCartWrite();
+        return false;
+      }
+    }
+    if (widget.cart.state.cart?.fulfillmentType != type) {
+      await widget.cart.setFulfillment(type);
+    }
+    if (!mounted || widget.cart.state.cart?.fulfillmentType != type) {
+      if (mounted) _refuseCartWrite();
+      return false;
+    }
+    final openedCart = widget.cart.state.cart!;
+    _preparedMobileCartId = openedCart.id;
+    _promptedMobileCartId = openedCart.id;
     setState(() {
       _section = TillSurface.order;
-      _pendingOrderType = type;
+      _editingAccountId = null;
+      _inlineDetail = null;
+      _pendingOrderType = null;
       _orderType = type;
-      _orderTypeTouched = true;
+      _orderTypeTouched = false;
       _noticeCode = null;
       _notice = null;
     });
+    return true;
   }
 
   Future<bool> _addProduct({
@@ -1951,17 +2026,14 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       // up, and everything the account carries stays put either way.
       final current = widget.cart.state.cart;
       if (current == null) {
+        _consumeModalPointer();
         if (_mobileDevice && value == 'dine_in') {
           final table = await _chooseOrderTable();
           if (table == null || !mounted) return;
           await _openTableAccount(table);
           return;
         }
-        setState(() {
-          _pendingOrderType = value;
-          _orderType = value;
-          _orderTypeTouched = true;
-        });
+        await _openTablelessAccount(value);
         return;
       }
       if (value == 'takeout' &&
@@ -2209,16 +2281,13 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
           ),
         ),
         // Primary, labelled, high-frequency actions (top-bar redesign).
-        if (access.canWriteCart)
+        if (access.canWriteCart && _canStartNewAccount)
           _BarAction(
             icon: PosGlyphs.addShoppingCartOutlined,
             focusNode: access.showSaleActions ? _newSaleFocus : null,
             compact: compactHeader,
             label: spanish ? 'Iniciar pedido' : 'Start order',
-            disabledHint: _accountRestoring
-                ? l.cartRestoringAccountHint
-                : _newAccountStanddown(spanish),
-            onPressed: _canStartNewAccount ? () => _newSale(context) : null,
+            onPressed: () => _newSale(context),
           ),
         // NO ACCOUNTS BUTTON UP HERE. The accounts workspace is one of the
         // destinations the sidebar already carries on every screen, and the owner
@@ -3283,6 +3352,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     bool? canWrite,
     int? scanGeneration,
   }) async {
+    if (_menuTapSuppressed) return;
     try {
       if (item == null && !await _prepareMobileOrder()) return;
       if (!mounted) return;
@@ -3409,39 +3479,26 @@ final class _BarAction extends StatelessWidget {
     required this.onPressed,
     this.focusNode,
     this.compact = false,
-    this.disabledHint,
   });
   final PosGlyph icon;
   final String label;
 
-  /// Null when the action cannot be honoured right now. The control then reads as
-  /// off, and [disabledHint] says what is missing — a live button that answers a tap
-  /// with nothing is the failure this bar keeps repeating.
-  final VoidCallback? onPressed;
+  final VoidCallback onPressed;
   final FocusNode? focusNode;
   final bool compact;
-  final String? disabledHint;
 
   @override
   Widget build(BuildContext context) {
     final theme = PosTheme.of(context);
     final palette = theme.colorScheme;
-    final off = onPressed == null;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: PosIconButton(
         onPressed: onPressed,
         focusNode: focusNode,
-        tooltip: off ? (disabledHint ?? label) : label,
+        tooltip: label,
         style: PosIconButton.styleFrom(
           foregroundColor: palette.onSurface,
-          // THE INK IS THE DISABLED STATE. Without it the control paints the same
-          // navy whether it can act or not, and a `Nueva cuenta` that stands down
-          // read as a button that does nothing (measured on the iMin D3, 2026-10-13:
-          // the icon dimmed and the word did not, because the label carries its own
-          // `labelLarge` colour). The theme already names the colour for a control
-          // that is off, and `Cobrar` uses it.
-          disabledForegroundColor: palette.onSurfaceVariant,
           minimumSize: const Size(0, UmiTouchTarget.minimum),
           padding: compact
               ? const EdgeInsets.all(12)
@@ -3457,12 +3514,7 @@ final class _BarAction extends StatelessWidget {
                 children: [
                   PosIcon(icon, size: 20),
                   const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: off ? palette.onSurfaceVariant : null,
-                    ),
-                  ),
+                  Text(label, style: theme.textTheme.labelLarge),
                 ],
               ),
       ),

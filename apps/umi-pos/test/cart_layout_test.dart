@@ -1103,30 +1103,10 @@ void main() {
     );
     expect(
       action,
-      findsOneWidget,
-      reason: 'a control that cannot be honoured says why, it does not lie',
+      findsNothing,
+      reason:
+          'a control with no valid action is removed instead of explaining itself',
     );
-    expect(
-      tester
-          .widget<PosIconButton>(
-            find.ancestor(of: action, matching: find.byType(PosIconButton)),
-          )
-          .onPressed,
-      isNull,
-      reason: 'the control stands down; it does not answer a tap with nothing',
-    );
-    expect(
-      tester
-          .widget<Text>(
-            find.descendant(of: action, matching: find.byType(Text)),
-          )
-          .style
-          ?.color,
-      PosTheme.of(tester.element(action)).colorScheme.onSurfaceVariant,
-      reason: 'a control that stands down paints its word as off',
-    );
-    await tester.tap(action, warnIfMissed: false);
-    await tester.pumpAndSettle();
     expect((fixture.repository as _AccountCartRepo).suspends, 0);
     expect(fixture.repository.creates, 0);
     expect(
