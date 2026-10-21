@@ -987,13 +987,23 @@ describe('table state · the room, the turn timer, merge/split and the publish g
     expect((await row(T2))?.state).toBe('ordered');
   });
 
-  it('refuses an operator whose session does not carry sale.lifecycle', async () => {
-    // The permission is read from `runtime.operator_session`, not from the request.
+  it('accepts cart.write for the room and refuses an operator with neither room permission', async () => {
+    // A waiter carries cart.write. Room commands therefore use the same permission
+    // as editing the account, while legacy cashier/manager sessions keep working.
     await pg.query(
       `UPDATE runtime.operator_session SET permissions=ARRAY['cart.write'] WHERE id=$1::uuid`,
       [OPERATOR_SESSION],
     );
-    expect(await refusal(() => seat(T2, 2))).toMatchObject({
+    await expect(seat(T2, 2)).resolves.toMatchObject({
+      changed: [{ state: 'seated' }],
+    });
+
+    // Neither room permission means neither reading nor moving the room.
+    await pg.query(
+      `UPDATE runtime.operator_session SET permissions=ARRAY['catalog.read'] WHERE id=$1::uuid`,
+      [OPERATOR_SESSION],
+    );
+    expect(await refusal(() => markOrdered(T2))).toMatchObject({
       status: 403,
       code: 'PERMISSION_DENIED',
     });

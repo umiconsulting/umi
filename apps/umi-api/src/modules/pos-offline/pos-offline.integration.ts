@@ -1281,17 +1281,14 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
    * same time, because that is decided by the CART, not by the replay: the snapshot freezes
    * a `cartId` and a cart version, and the commit re-reads both.
    *
-   * The platform issues ONE live cart per operator per location — `PosCartRepository.create`
-   * upserts on `(merchant_id, location_id, operator_user_id)` for every non-terminal cart,
-   * and `pos_cart_active_operator_uidx` refuses a second row anyway. So a cashier who rings
-   * a second sale before the first has synced is handed the SAME cart back, and the line
-   * goes into the cart the queued command already froze.
+   * The platform issues ONE live cart per operator per location. Explicitly opening
+   * another account parks the current cart first, then creates a distinct live cart;
+   * `pos_cart_active_operator_uidx` still refuses two simultaneous live carts.
    *
    * WHAT THIS TEST PINS IS ONLY THE SAFETY PART: the queued sale must NOT commit against a
-   * cart that has moved under it. The observations around it — the same cart id, the single
-   * cart row, and `price_changed` as the classification — are stated in the comments rather
-   * than asserted, because they are how the refusal is worded today and a better-handled
-   * cart should not fail this file for improving.
+   * different live account. The observations around it — the new cart id, the parked prior
+   * cart and `aggregate_version_conflict` as the classification — are the refusal the
+   * recovery centre needs to explain.
    */
   it('refuses to land a queued sale whose cart moved under it, instead of committing a total nobody agreed to', async () => {
     const till = tillOf(TILL_BOUNDARY);
@@ -1306,20 +1303,21 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
         idempotencyKey: randomUUID(),
       }),
     );
-    // OBSERVED: the same cart comes back — `create` upserts rather than inserting.
-    expect(second.id).toBe(first.cart.id);
+    // The queued account already has a line, so opening another account parks it
+    // and the next sale gets a distinct cart.
+    expect(second.id).not.toBe(first.cart.id);
     expect(
       await countOn(
         till,
         `SELECT count(*)::text AS value FROM merchant.pos_cart
-          WHERE merchant_id=$1::uuid AND operator_session_id=$2::uuid`,
+          WHERE merchant_id=$1::uuid AND operator_session_id=$2::uuid
+            AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')`,
         [MERCHANT, till.operatorSessionId],
       ),
     ).toBe(1);
 
-    // And it is still writable: the second `create` left it in `recovered`, which is one
-    // of the lifecycle states the line path accepts (`PosCartRepository.bump`), so the
-    // second sale's line goes into the SAME cart — and moves it back to `building_cart`.
+    // The queued account remains resumable but is no longer the live cart. The
+    // second sale's line belongs to the distinct cart returned above.
     await scoped(till, () =>
       carts.add(till.user, MERCHANT, {
         cartId: second.id,
@@ -1342,10 +1340,10 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
           WHERE merchant_id=$1::uuid AND id=$2::uuid`,
         [MERCHANT, first.cart.id],
       ),
-    ).toBe('building_cart');
+    ).toBe('suspended');
 
-    // The reconnection arrives. The queued command's snapshot holds the OLD cart version
-    // and the OLD totals fingerprint; the server recomputes both and disagrees.
+    // The reconnection arrives. Its snapshot names the account that was parked when
+    // the next sale began, so it cannot land against a different live cart.
     //
     // HOW THE REFUSAL IS WORDED, AND WHY THAT MATTERS. The stale `expectedCartVersion`
     // makes `lockCart` return nothing and the checkout answers
@@ -1358,7 +1356,7 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
     const result = await replay(TILL_BOUNDARY, [first.command]);
     expect(result.stopped).toBe(false);
     expect(result.results[0].status).toBe('conflict');
-    expect(result.results[0].failure?.classification).toBe('cart_mismatch');
+    expect(result.results[0].failure?.classification).toBe('aggregate_version_conflict');
     expect(result.results[0].failure?.blocksFollowing).toBe(false);
     expect(result.cursor).toMatchObject({
       lastAcceptedSequence: 0,
