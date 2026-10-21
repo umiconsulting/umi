@@ -75,6 +75,8 @@ SaleSnapshot sale({
 
 final class _Sales implements SaleRepository, CarriedOverSaleRepository {
   SaleSnapshot? currentSale = sale();
+  Completer<SaleSnapshot>? currentGate;
+  int currentReads = 0;
   int starts = 0;
   int suspends = 0;
   SuspendSaleRequest? lastSuspend;
@@ -101,6 +103,9 @@ final class _Sales implements SaleRepository, CarriedOverSaleRepository {
     String merchantId,
     SaleHistoryQuery query,
   ) async {
+    currentReads++;
+    final gate = currentGate;
+    if (gate != null) return gate.future;
     if (currentSale == null) {
       throw const AppException(
         category: AppErrorCategory.unknown,
@@ -522,6 +527,28 @@ void main() {
     },
   );
 
+  test(
+    'a fresh operator entry can bind the till without adopting the sale',
+    () async {
+      final sales = _Sales();
+      final lifecycle = _controller(sales);
+
+      await lifecycle.open(
+        merchantId,
+        locationId,
+        operatorId,
+        restoreCurrent: false,
+      );
+
+      expect(lifecycle.state.phase, SalePhase.idle);
+      expect(lifecycle.state.sale, isNull);
+      expect(sales.currentReads, 0);
+
+      expect(await lifecycle.newSale(), isTrue);
+      expect(sales.starts, 1);
+    },
+  );
+
   test('first login leaves the menu ready without an empty sale', () async {
     final sales = _Sales()..currentSale = null;
     final lifecycle = _controller(sales);
@@ -621,6 +648,24 @@ void main() {
       expect(lifecycle.state.sale, isNull);
       expect(await lifecycle.newSale(), isTrue);
       expect(sales.starts, 1);
+    },
+  );
+
+  test(
+    'a completed checkout clears the paid cart even when the lifecycle phase was missed',
+    () async {
+      final carts = _cartController();
+      await carts.open(merchantId, locationId, operatorId);
+      expect(carts.state.cart, isNotNull);
+      final lifecycle = _controller(_Sales(), cartController: carts);
+      await lifecycle.open(merchantId, locationId, operatorId);
+
+      // Split payment completed in CheckoutController, but the sale controller
+      // never observed `checkingOut`. The payment still proves this cart is no
+      // longer editable, so closing the receipt must clear it.
+      lifecycle.finishCheckoutPresentation(force: true);
+      expect(carts.state.cart, isNull);
+      expect(lifecycle.state.phase, SalePhase.idle);
     },
   );
 
@@ -1533,6 +1578,24 @@ void main() {
     await Future.wait([lifecycle.newSale(), lifecycle.newSale()]);
     expect(sales.starts, 1);
     expect(lifecycle.state.phase, SalePhase.buildingCart);
+  });
+
+  test('new sale waits for the current account restore', () async {
+    final gate = Completer<SaleSnapshot>();
+    final sales = _Sales()..currentGate = gate;
+    final lifecycle = _controller(sales);
+
+    final opening = lifecycle.open(merchantId, locationId, operatorId);
+    await Future<void>.delayed(Duration.zero);
+    expect(lifecycle.isRestoringCurrent, isTrue);
+    expect(await lifecycle.newSale(), isFalse);
+    expect(sales.starts, 0);
+
+    gate.complete(sale());
+    await opening;
+    expect(lifecycle.isRestoringCurrent, isFalse);
+    expect(lifecycle.state.sale?.id, saleId);
+    expect(sales.starts, 0);
   });
 
   test('a cancelled sale cannot be resumed', () async {

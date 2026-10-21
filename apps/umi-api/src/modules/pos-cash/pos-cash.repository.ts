@@ -1415,6 +1415,16 @@ export class PosCashRepository {
                  created_at::text AS "createdAt",version`,
       [current.registerId],
     );
+    const divergence = await client.query<{ count: string; total: string }>(
+      `SELECT count(*)::text AS count,
+              coalesce(sum(divergence_minor_units),0)::text AS total
+         FROM merchant.pos_committed_sale
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+          AND cash_shift_id=$3::uuid
+          AND divergence_minor_units IS NOT NULL
+          AND divergence_minor_units <> 0`,
+      [merchantId, current.locationId, current.id],
+    );
     const closedAt = new Date().toISOString();
     const shiftSummary: CashShiftSummary = {
       shift: {
@@ -1476,6 +1486,11 @@ export class PosCashRepository {
       reconciliationOutcome: reconciliation.rows[0].payload.outcome,
       countAttempts: Number(count.rows[0].attempts),
       handoffCount: 0,
+      priceDivergence: {
+        count: Number(divergence.rows[0]?.count ?? 0),
+        totalMinorUnits: Number(divergence.rows[0]?.total ?? 0),
+        currency: current.currency,
+      },
     };
     await client.query(
       `INSERT INTO merchant.cash_shift_close

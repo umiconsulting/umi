@@ -11,15 +11,19 @@ enum PosConnectivity {
   blocked,
 }
 
+enum PosHubState { unknown, notConfigured, selfHost, reachable, unreachable }
+
 /// Centralized hysteresis: one timeout degrades, three consecutive failures go
 /// offline, and two authoritative API successes restore online operation.
 final class ConnectivityController extends ChangeNotifier {
   PosConnectivity _state = PosConnectivity.unknown;
+  PosHubState _hubState = PosHubState.unknown;
   int _successes = 0;
   int _failures = 0;
   DateTime? _lastSynchronizedAt;
 
   PosConnectivity get state => _state;
+  PosHubState get hubState => _hubState;
   DateTime? get lastSynchronizedAt => _lastSynchronizedAt;
 
   void apiReachable({required bool authorityValid}) {
@@ -27,6 +31,12 @@ final class ConnectivityController extends ChangeNotifier {
       block();
       return;
     }
+    // A blocked till stays blocked until an operator resolves the device or
+    // credential problem. Reachability is a statement about the network, and a
+    // network that answers must not be able to un-block a device whose
+    // credentials were rejected: the probe would quietly re-open the till that
+    // `block()` exists to close.
+    if (_state == PosConnectivity.blocked) return;
     _failures = 0;
     _successes++;
     if (_state == PosConnectivity.offline) _set(PosConnectivity.recovering);
@@ -88,10 +98,20 @@ final class ConnectivityController extends ChangeNotifier {
   void replayStarted() => _set(PosConnectivity.replaying);
   void reconciliationNeeded() => _set(PosConnectivity.reconciliationRequired);
   void block() => _set(PosConnectivity.blocked);
+  void hubReachable({required bool selfHost}) =>
+      _setHub(selfHost ? PosHubState.selfHost : PosHubState.reachable);
+  void hubUnreachable() => _setHub(PosHubState.unreachable);
+  void hubNotConfigured() => _setHub(PosHubState.notConfigured);
 
   void _set(PosConnectivity value) {
     if (_state == value) return;
     _state = value;
+    notifyListeners();
+  }
+
+  void _setHub(PosHubState value) {
+    if (_hubState == value) return;
+    _hubState = value;
     notifyListeners();
   }
 }

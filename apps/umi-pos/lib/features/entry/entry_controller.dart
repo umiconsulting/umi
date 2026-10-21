@@ -78,6 +78,14 @@ final class EntryController extends ChangeNotifier {
   /// refresh). Past it, or with no saved session, the POS falls back to the
   /// personal PIN. An explicit [lock] always requires the PIN regardless.
   static const _restoreWindow = Duration(minutes: 5);
+
+  /// How long a server-issued operator session may reopen without the API.
+  ///
+  /// The five-minute window above protects an online restart: a PIN is one tap
+  /// away. Offline, that same rule blocks the only route back into a valid
+  /// shift. The snapshot still has to name this device, an active operator, a
+  /// matching tenant and branch, and an unexpired server session.
+  static const _offlineRestoreWindow = Duration(hours: 12);
   static const _localEntryTimeout = Duration(seconds: 10);
 
   int _pairingGeneration = 0;
@@ -154,7 +162,18 @@ final class EntryController extends ChangeNotifier {
           // acknowledgement with the same persisted pairing session.
         }
       }
-      final device = await _gateway.deviceStatus();
+      final DeviceSummary device;
+      try {
+        device = await _gateway.deviceStatus();
+      } on AppException catch (error) {
+        if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+          debugPrint(
+            '[umipos] entry deviceStatus failed code=${error.code} category=${error.category.name}',
+          );
+        }
+        if (await _restoreOffline(error)) return;
+        rethrow;
+      }
       if (device.state == 'revoked' || device.state == 'replaced') {
         await _vault.clearDeviceTrust();
         _set(EntryState(EntryPhase.deviceRevoked, device: device));
@@ -484,6 +503,23 @@ final class EntryController extends ChangeNotifier {
       await _resolveContext();
     } on AppException catch (error) {
       _event('authentication.pin_failed', error.code);
+      // The server rejected the proof, not the PIN. The device key that
+      // enrolled this till is not the key that signs now, so no PIN can pass.
+      // Send the operator to enrollment instead of clearing the PIN forever.
+      final reason = error.details?['reason'];
+      if (error.code == 'DEVICE_PROOF_INVALID' ||
+          error.code == 'DEVICE_CREDENTIAL_ROTATED' ||
+          reason == 'DEVICE_PROOF_INVALID' ||
+          reason == 'DEVICE_PROOF_REQUIRED') {
+        await _vault.clearDeviceTrust();
+        _set(
+          EntryState(
+            EntryPhase.enrollmentRequired,
+            errorCode: error.code,
+          ),
+        );
+        return;
+      }
       _set(
         EntryState(
           EntryPhase.pinRequired,
@@ -503,6 +539,14 @@ final class EntryController extends ChangeNotifier {
     if (lastActive == null) return false;
     return DateTime.now().toUtc().difference(lastActive.toUtc()) <=
         _restoreWindow;
+  }
+
+  Future<bool> _canRestoreOfflineSession() async {
+    if (await _vault.refreshToken() == null) return false;
+    final lastActive = await _vault.sessionActivityAt();
+    if (lastActive == null) return false;
+    return DateTime.now().toUtc().difference(lastActive.toUtc()) <=
+        _offlineRestoreWindow;
   }
 
   /// Renews and persists the access token without changing the entry phase.
@@ -602,6 +646,12 @@ final class EntryController extends ChangeNotifier {
     try {
       final operator = await _gateway.startOperator(tenant.id, branch.id);
       await _vault.saveOperatorSession(operator.id);
+      await _rememberResolvedState(
+        device: _state.device,
+        tenant: tenant,
+        branch: branch,
+        operator: operator,
+      );
       _event('operator.started');
       _set(
         EntryState(
@@ -629,6 +679,109 @@ final class EntryController extends ChangeNotifier {
     }
   }
 
+  /// Keep the state the server resolved, so a cold start with no uplink can
+  /// land on the catalogue instead of on "we could not finish preparing".
+  Future<void> _rememberResolvedState({
+    required DeviceSummary? device,
+    required EntryMerchant tenant,
+    required LocationAccess branch,
+    required OperatorSessionView operator,
+  }) async {
+    try {
+      await _vault.saveEntrySnapshot({
+        'device': device?.toJson(),
+        'tenant': tenant.toJson(),
+        'branch': branch.toJson(),
+        'operator': operator.toJson(),
+        'operatorName': _operatorName,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (_) {
+      // A cache write must never fail a login that already succeeded.
+    }
+  }
+
+  /// Boot from the remembered state when the API cannot be reached.
+  ///
+  /// Returns false — leaving the caller to report the failure it was already
+  /// reporting — unless this is a transport/timeout failure *and* the cached
+  /// session is still provably this device's: same device id, active, not yet
+  /// expired, and inside the same restore window the silent refresh uses.
+  /// Nothing here mints trust; it replays a state the server itself issued.
+  Future<bool> _restoreOffline(AppException error) async {
+    // `server` is in the list on purpose: the till talks to staging/production
+    // through a proxy, so a dead backend arrives as a 502 rather than as a
+    // transport error. Credential and permission failures are never in the
+    // list — those must fail closed.
+    final offline =
+        error.category == AppErrorCategory.transport ||
+        error.category == AppErrorCategory.timeout ||
+        error.category == AppErrorCategory.server ||
+        error.category == AppErrorCategory.unknown;
+    if (!offline) return false;
+    if (!await _canRestoreOfflineSession()) {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint('[umipos] entry offline restore skipped=no_session');
+      }
+      return false;
+    }
+    final snapshot = await _vault.entrySnapshot();
+    if (snapshot == null) {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint('[umipos] entry offline restore skipped=no_snapshot');
+      }
+      return false;
+    }
+    final identity = await _vault.deviceIdentity();
+    try {
+      final device = DeviceSummary.fromJson(
+        snapshot['device']! as Map<String, Object?>,
+      );
+      final tenant = EntryMerchant.fromJson(
+        snapshot['tenant']! as Map<String, Object?>,
+      );
+      final branch = LocationAccess.fromJson(
+        snapshot['branch']! as Map<String, Object?>,
+      );
+      final operator = OperatorSessionView.fromJson(
+        snapshot['operator']! as Map<String, Object?>,
+      );
+      if (identity.deviceId == null || operator.deviceId != identity.deviceId) {
+        return false;
+      }
+      if (operator.state != 'active') return false;
+      if (!DateTime.parse(operator.expiresAt).isAfter(DateTime.now())) {
+        return false;
+      }
+      if (tenant.id != identity.merchantId ||
+          branch.id != identity.locationId) {
+        return false;
+      }
+      final name = snapshot['operatorName'];
+      _operatorName = name is String && name.trim().isNotEmpty ? name : null;
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint('[umipos] entry offline restore device=${operator.deviceId}');
+      }
+      _event('entry.offline_restored');
+      _set(
+        EntryState(
+          EntryPhase.ready,
+          device: device,
+          merchants: [tenant],
+          selectedTenant: tenant,
+          selectedBranch: branch,
+          operator: operator,
+        ),
+      );
+      return true;
+    } catch (_) {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint('[umipos] entry offline restore skipped=invalid_snapshot');
+      }
+      return false;
+    }
+  }
+
   Future<void> lock() async {
     final operator = _state.operator;
     if (operator == null) return;
@@ -646,6 +799,7 @@ final class EntryController extends ChangeNotifier {
       // Server session expiry and the next PIN authentication fail closed.
     }
     await _vault.clearSession();
+    await _vault.clearEntrySnapshot();
     _event('operator.locked');
     _set(EntryState(EntryPhase.pinRequired, device: _state.device));
   }

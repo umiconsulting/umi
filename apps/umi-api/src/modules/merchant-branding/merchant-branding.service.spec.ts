@@ -88,6 +88,54 @@ describe('MerchantBrandingLogoService', () => {
     expect(logo.url.startsWith('http://localhost:4013/logos/')).toBe(true);
   });
 
+  it('rasterises an uploaded SVG and stores a bounded PNG', async () => {
+    const repo = repository();
+    const service = new MerchantBrandingLogoService(
+      config({}),
+      repo as unknown as MerchantBrandingLogoRepository,
+    );
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="802" height="802" viewBox="0 0 802 802">' +
+        '<circle cx="401" cy="401" r="399" fill="#ffffff"/>' +
+        '<path d="M200 200 L600 200 L600 600 L200 600 Z" fill="#151515"/></svg>',
+    );
+
+    const logo = await service.upload(
+      MERCHANT,
+      USER,
+      { contentType: 'image/svg+xml', dataBase64: svg.toString('base64') },
+      null,
+    );
+
+    expect(logo.contentType).toBe('image/png');
+    expect(logo.width).toBeLessThanOrEqual(768);
+    expect(logo.height).toBeLessThanOrEqual(768);
+    const stored = repo.save.mock.calls[0][2];
+    expect(stored.contentType).toBe('image/png');
+    expect(stored.bytes.subarray(0, 8)).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+  });
+
+  it('refuses something that claims to be SVG but is not', async () => {
+    const repo = repository();
+    const service = new MerchantBrandingLogoService(
+      config({}),
+      repo as unknown as MerchantBrandingLogoRepository,
+    );
+    const html = Buffer.from('<!doctype html><html><body>not a logo</body></html>');
+
+    await expect(
+      service.upload(
+        MERCHANT,
+        USER,
+        { contentType: 'image/svg+xml', dataBase64: html.toString('base64') },
+        null,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
   it('refuses bytes that are not the type the caller declared', async () => {
     const repo = repository();
     const service = new MerchantBrandingLogoService(

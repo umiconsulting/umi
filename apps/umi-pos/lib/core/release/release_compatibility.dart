@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
+
 import '../config/app_config.dart';
+import '../errors/app_error.dart';
 import '../network/api_client.dart';
 
 enum ReleaseCompatibility {
@@ -32,6 +35,17 @@ final class ApiReleaseCompatibilityGateway
         method: ApiMethod.get,
         path: '/health/release',
       );
+    } on AppException catch (error) {
+      debugPrint(
+        '[umipos] release compatibility unavailable '
+        'category=${error.category.name} code=${error.code}',
+      );
+      if (error.category == AppErrorCategory.transport ||
+          error.category == AppErrorCategory.timeout ||
+          error.category == AppErrorCategory.server) {
+        return ReleaseCompatibility.apiUnavailable;
+      }
+      rethrow;
     } catch (_) {
       return ReleaseCompatibility.apiUnavailable;
     }

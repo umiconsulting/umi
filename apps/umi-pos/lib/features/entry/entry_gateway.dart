@@ -57,10 +57,12 @@ final class ApiEntryGateway implements EntryGateway {
     this._vault, {
     PairingSocketClient? socketClient,
     DeviceKey? deviceKey,
+    this.deviceKind = 'pos_terminal',
   }) : _socketClient = socketClient,
        _deviceKey = deviceKey;
   final ApiClient _api;
   final CredentialVault _vault;
+  final String deviceKind;
 
   /// Signs proofs of device possession. Null on a build that has not wired one
   /// yet; the device then pairs without registering a public key.
@@ -92,7 +94,7 @@ final class ApiEntryGateway implements EntryGateway {
           // its catch-all sentence — while the enrollment code sat untouched on
           // the server, which is what made this look like a network failure.
           platform: kIsWeb ? 'web' : defaultTargetPlatform.name.toLowerCase(),
-          deviceType: 'pos_terminal',
+          deviceType: deviceKind,
           ephemeralPublicKey: publicKey,
         ).toJson(),
       ),

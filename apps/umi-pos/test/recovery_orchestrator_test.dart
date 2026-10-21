@@ -67,6 +67,51 @@ void main() {
     },
   );
 
+  test('a confirmed absent command returns to the replay queue', () async {
+    final store = _Store();
+    final journal = EncryptedOfflineJournal(store, web: false);
+    await journal.append(
+      commandId: _id(1),
+      deviceId: _id(2),
+      credentialVersion: 1,
+      merchantId: _id(3),
+      locationId: _id(4),
+      operatorSessionId: _id(5),
+      idempotencyKey: _id(6),
+      commandType: 'pos.cart.fire',
+      payload: const {'cartId': 'safe-cart'},
+    );
+    await OfflineRecoveryController(
+      journal: journal,
+      gateway: _Gateway(loseSubmitResponse: true),
+      connectivity: _online(),
+    ).recover(_scope());
+    expect((await journal.load()).entries.single.status, JournalStatus.unknown);
+
+    final restarted = EncryptedOfflineJournal(store, web: false);
+    final gateway = _Gateway(
+      recoveredResult: null,
+      acceptSubmit: true,
+      serverSequence: 1,
+    );
+    final controller = OfflineRecoveryController(
+      journal: restarted,
+      gateway: gateway,
+      connectivity: _online(),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.recover(_scope());
+
+    expect(gateway.resultQueries, 1);
+    expect(gateway.submissions, 1);
+    expect(
+      (await restarted.load()).entries.single.status,
+      JournalStatus.accepted,
+    );
+    expect(controller.status.phase, RecoveryPhase.completed);
+  });
+
   test('the queue replays by itself when the connection comes back', () async {
     final journal = EncryptedOfflineJournal(_Store(), web: false);
     await journal.append(
@@ -115,6 +160,151 @@ void main() {
     expect(controller.status.phase, RecoveryPhase.completed);
   });
 
+  test(
+    'a cart that no longer exists is resolved without trapping the local lane',
+    () async {
+      final journal = EncryptedOfflineJournal(_Store(), web: false);
+      await journal.append(
+        commandId: _id(1),
+        deviceId: _id(2),
+        credentialVersion: 1,
+        merchantId: _id(3),
+        locationId: _id(4),
+        operatorSessionId: _id(5),
+        idempotencyKey: _id(6),
+        commandType: 'pos.cart.line.add',
+        payload: const {'cartId': 'missing-cart'},
+      );
+      final gateway = _Gateway(acceptSubmit: true, conflictCartNotFound: true);
+      final controller = OfflineRecoveryController(
+        journal: journal,
+        gateway: gateway,
+        connectivity: _online(),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.recover(_scope());
+
+      expect(gateway.resolveCalls, 1);
+      expect(
+        (await journal.load()).entries.single.status,
+        JournalStatus.resolved,
+      );
+      expect(controller.status.phase, RecoveryPhase.completed);
+      expect(gateway.acknowledgements, 1);
+    },
+  );
+
+  test(
+    'restart resolves a pre-existing obsolete cart conflict before replay',
+    () async {
+      final journal = EncryptedOfflineJournal(_Store(), web: false);
+      await journal.append(
+        commandId: _id(1),
+        deviceId: _id(2),
+        credentialVersion: 1,
+        merchantId: _id(3),
+        locationId: _id(4),
+        operatorSessionId: _id(5),
+        idempotencyKey: _id(6),
+        commandType: 'pos.cart.line.add',
+        payload: const {'cartId': 'missing-cart'},
+      );
+      await journal.apply(
+        ReplayResult(
+          commandId: _id(1),
+          deviceSequence: 1,
+          status: 'conflict',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: _id(12),
+          failure: const {
+            'classification': 'server_validation_failed',
+            'retryable': false,
+            'blocksFollowing': false,
+            'operatorActionRequired': true,
+            'managerActionRequired': false,
+            'guidanceCode': 'server_refused:CART_NOT_FOUND',
+            'correlationId': '00000000-0000-4000-8000-000000000099',
+          },
+        ),
+      );
+      final gateway = _Gateway(
+        acceptSubmit: false,
+        serverSequence: 1,
+        reconciliationRequired: true,
+      );
+      final controller = OfflineRecoveryController(
+        journal: journal,
+        gateway: gateway,
+        connectivity: _online(),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.recover(_scope());
+
+      expect(gateway.resolveCalls, 1);
+      expect(gateway.submissions, 0);
+      expect(
+        (await journal.load()).entries.single.status,
+        JournalStatus.resolved,
+      );
+      expect(controller.status.phase, RecoveryPhase.completed);
+    },
+  );
+
+  test(
+    'a definitively refused line is closed without operator review',
+    () async {
+      final journal = EncryptedOfflineJournal(_Store(), web: false);
+      await journal.append(
+        commandId: _id(1),
+        deviceId: _id(2),
+        credentialVersion: 1,
+        merchantId: _id(3),
+        locationId: _id(4),
+        operatorSessionId: _id(5),
+        idempotencyKey: _id(6),
+        commandType: 'pos.cart.line.add',
+        payload: const {'cartId': 'stale-cart'},
+      );
+      await journal.apply(
+        ReplayResult(
+          commandId: _id(1),
+          deviceSequence: 1,
+          status: 'conflict',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: _id(12),
+          failure: const {
+            'classification': 'server_validation_failed',
+            'retryable': false,
+            'blocksFollowing': true,
+            'operatorActionRequired': true,
+            'managerActionRequired': false,
+            'correlationId': '00000000-0000-4000-8000-000000000099',
+          },
+        ),
+      );
+      final gateway = _Gateway(acceptSubmit: false);
+      final controller = OfflineRecoveryController(
+        journal: journal,
+        gateway: gateway,
+        connectivity: _online(),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.recover(_scope());
+
+      expect(gateway.resolveCalls, 1);
+      expect(
+        (await journal.load()).entries.single.status,
+        JournalStatus.resolved,
+      );
+      expect(controller.status.phase, RecoveryPhase.completed);
+    },
+  );
+
   for (final code in ['DEVICE_REVOKED', 'DEVICE_CREDENTIAL_ROTATED']) {
     test('$code blocks recovery before replay', () async {
       final journal = EncryptedOfflineJournal(_Store(), web: false);
@@ -153,6 +343,7 @@ ConnectivityController _online() {
 }
 
 ReplayScope _scope() => ReplayScope(
+  deviceId: _id(2),
   merchantId: _id(3),
   locationId: _id(4),
   operatorSessionId: _id(5),
@@ -182,6 +373,8 @@ final class _Gateway implements ReplayGateway {
     this.serverSequence = 0,
     this.authorityError,
     this.acceptSubmit = false,
+    this.conflictCartNotFound = false,
+    this.reconciliationRequired = false,
   });
   final bool loseSubmitResponse;
   final ReplayResult? recoveredResult;
@@ -191,8 +384,12 @@ final class _Gateway implements ReplayGateway {
   /// Accept whatever arrives, as the server does on a happy replay. Off by
   /// default so a test that did not expect a replay still fails loudly.
   final bool acceptSubmit;
+  final bool conflictCartNotFound;
+  final bool reconciliationRequired;
   int submissions = 0;
   int resultQueries = 0;
+  int resolveCalls = 0;
+  int acknowledgements = 0;
 
   OfflinePolicy get _policy => OfflinePolicy(
     cash: OfflineCashPolicy(
@@ -264,6 +461,42 @@ final class _Gateway implements ReplayGateway {
       );
     }
     if (!acceptSubmit) throw StateError('no replay expected');
+    if (conflictCartNotFound) {
+      final commands = batch.commands
+          .map(OfflineCommand.fromJson)
+          .toList(growable: false);
+      return ReplayBatchResult(
+        replaySessionId: batch.replaySessionId,
+        results: [
+          for (final command in commands)
+            ReplayResult(
+              commandId: command.commandId,
+              deviceSequence: command.deviceSequence,
+              status: 'conflict',
+              officialId: null,
+              officialCommit: null,
+              serverConflictReference: _id(12),
+              failure: const {
+                'classification': 'server_validation_failed',
+                'retryable': false,
+                'blocksFollowing': false,
+                'operatorActionRequired': true,
+                'managerActionRequired': false,
+                'guidanceCode': 'server_refused:CART_NOT_FOUND',
+                'correlationId': '00000000-0000-4000-8000-000000000099',
+              },
+            ).toJson(),
+        ],
+        cursor: ReplayCursor(
+          deviceId: _id(2),
+          credentialVersion: 1,
+          lastAcceptedSequence: 0,
+          reconciliationRequired: false,
+          updatedAt: DateTime.now().toUtc().toIso8601String(),
+        ).toJson(),
+        stopped: false,
+      );
+    }
     final results = batch.commands.map((encoded) {
       final command = OfflineCommand.fromJson(encoded);
       return ReplayResult(
@@ -312,16 +545,33 @@ final class _Gateway implements ReplayGateway {
     duplicates: const [],
     conflicts: const [],
     provisionalMappings: const [],
-    reconciliationRequired: false,
+    reconciliationRequired: reconciliationRequired,
   );
 
   @override
   Future<OfflinePolicy> policy(ReplayScope scope) async => _policy;
   @override
-  Future<void> acknowledge(ReplayScope scope, String reconciliationId) async {}
+  Future<void> acknowledge(ReplayScope scope, String reconciliationId) async {
+    acknowledgements++;
+  }
+
   @override
   Future<ConflictSummary> conflicts(ReplayScope scope) async =>
       const ConflictSummary(items: []);
+  @override
+  Future<ResolvedReplayConflict> resolveConflict(
+    ReplayScope scope,
+    String commandId,
+  ) async {
+    resolveCalls++;
+    return ResolvedReplayConflict(
+      resolved: true,
+      commandId: commandId,
+      deviceSequence: 1,
+      nextAcceptedSequence: 1,
+    );
+  }
+
   @override
   Future<ReplayCursor> cursor(ReplayScope scope) async =>
       throw UnimplementedError();

@@ -121,7 +121,16 @@ export const SaveFloorPlanRequest = z
     document: FloorPlanDocument,
   })
   .strict();
-export const PublishFloorPlanRequest = SaveFloorPlanRequest.omit({ document: true }).strict();
+export const PublishFloorPlanRequest = SaveFloorPlanRequest.omit({ document: true })
+  .extend({
+    /**
+     * The dashboard's explicit choice when occupied tables block publication:
+     * close the accounts that hold them and publish in the same command.
+     * Default false because a publish must never discard a party by omission.
+     */
+    closeBlockingAccounts: z.boolean().default(false),
+  })
+  .strict();
 export const FloorPlanState = z
   .object({
     locationId: Id,

@@ -142,7 +142,49 @@ import type { ZodTypeAny } from 'zod';
  * dos numeraciones describe al artefacto que resulta de unirlas, así que el
  * contrato combinado toma el siguiente número libre. Aditivo sobre ambas.
  */
-export const CONTRACT_VERSION = '2.39.0';
+/**
+ * 2.40.0 — the floor plan joins the offline journal. One additive replay
+ * command (`pos.table.command`) carries seat, move, merge, split, clear, open
+ * and the three service states; its action selects the existing request shape.
+ * No live route changed meaning.
+ */
+/**
+ * 2.41.0 — replay now carries a processed cursor beside the accepted cursor.
+ * A semantic refusal blocks only its account stream. The new `stream_blocked`
+ * conflict keeps later commands on that account visible and retryable.
+ */
+/**
+ * 2.41.1 — a command group accepted by the LAN hub carries the origin device
+ * and operator session for attribution while the host owns cloud delivery.
+ */
+/**
+ * 2.42.0 — the LAN hub accepts host-owned cart intents and retains peer origin
+ * metadata on the replay envelope for audit.
+ */
+/**
+ * 2.42.1 — the till's durable provisional line id becomes the official line id
+ * for new adds, so hub-routed updates and removals keep one identity.
+ */
+/**
+ * 2.43.0 — peer journal entries can be marked hub-owned. A cloud replay
+ * refuses them so the hub entry is the only delivery path.
+ */
+/**
+ * 2.43.1 — optional replay envelope fields accept the explicit null values the
+ * Dart journal emits, so a valid local command is not refused before replay.
+ */
+/**
+ * 2.43.2 — an absent party size is accepted as null on the table routes and in
+ * the offline effect, because the till sends null for "no party stated".
+ */
+/**
+ * 2.43.3 — an absent durable line id is accepted as null on the cart line
+ * route, matching the Dart model that writes every field.
+ */
+/**
+ * 2.44.0 — a split-payment tip names its attribution policy.
+ */
+export const CONTRACT_VERSION = '2.44.0';
 
 /** The major in the URL. A v1 client never silently receives v2 behaviour. */
 export const API_MAJOR_VERSION = 1;

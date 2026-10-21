@@ -51,6 +51,23 @@ Widget _page(OpenAccountsList list) => PosApp(
 );
 
 void main() {
+  testWidgets('a named temporary table does not also claim to have no table', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _page(
+        OpenAccountsList(
+          load: () async => [_account('temporary', name: 'Mesa temporal')],
+          onSelected: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Mesa temporal'), findsOneWidget);
+    expect(find.textContaining('Sin mesa'), findsNothing);
+  });
+
   testWidgets('previous days filter selects and voids only old accounts', (
     tester,
   ) async {
@@ -146,6 +163,54 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(selected.single.id, 'old');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a previous-day account is selectable in the all-dates list', (
+    tester,
+  ) async {
+    final old = _account('old', businessDate: '2026-10-13');
+    Cart? opened;
+    List<Cart>? cancelled;
+    var dismissed = 0;
+    await tester.pumpWidget(
+      _page(
+        OpenAccountsList(
+          showDateFilter: true,
+          clock: () => DateTime(2026, 10, 14, 11),
+          currentBusinessDate: '2026-10-14',
+          load: () async => [old],
+          onSelected: (account) => opened = account,
+          onCancelCarriedOver: (accounts) async => cancelled = accounts,
+          onDismissNotice: () => dismissed += 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final row = find.byKey(const ValueKey('open-account-old'));
+    expect(
+      find.descendant(of: row, matching: find.byTooltip('Seleccionar cuenta')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.descendant(of: row, matching: find.byTooltip('Seleccionar cuenta')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(opened, isNull);
+    expect(dismissed, 1);
+    expect(find.text('Anular seleccionadas (1)'), findsOneWidget);
+    await tester.tap(find.text('Anular seleccionadas (1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(PosAlertDialog),
+        matching: find.text('Anular'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(cancelled?.single.id, 'old');
     expect(tester.takeException(), isNull);
   });
 

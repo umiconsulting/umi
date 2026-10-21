@@ -85,4 +85,20 @@ void main() {
       isTrue,
     );
   });
+
+  test('a refusal the till can act on offers the right next step', () {
+    RecoveryActionKind only(String code) {
+      final actions = RecoveryActionCatalog.forFailure(code);
+      expect(actions, hasLength(1), reason: code);
+      return RecoveryActionCatalog.kind(actions.single);
+    }
+
+    // Re-sending the same command cannot help either of these: the world moved
+    // (another till took the table, or the account changed), so the till has to
+    // read it again before the operator retries.
+    expect(only('table_unavailable'), RecoveryActionKind.refreshSnapshots);
+    expect(only('cart_mismatch'), RecoveryActionKind.refreshSnapshots);
+    // A valid sale over an offline limit is a person's decision.
+    expect(only('offline_limit_exceeded'), RecoveryActionKind.managerReview);
+  });
 }

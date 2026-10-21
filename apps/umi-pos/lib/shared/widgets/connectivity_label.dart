@@ -34,3 +34,30 @@ String connectivityLabel(BuildContext context, PosConnectivity state) {
 /// be announced.
 bool showsConnectivityWarning(PosConnectivity state) =>
     state != PosConnectivity.online;
+
+String hubLaneLabel(BuildContext context, PosHubState state) {
+  final spanish = Localizations.localeOf(context).languageCode == 'es';
+  return switch (state) {
+    PosHubState.unknown => spanish ? 'sin comprobar' : 'not checked',
+    PosHubState.notConfigured => spanish ? 'sin configurar' : 'not configured',
+    PosHubState.selfHost => spanish ? 'este equipo' : 'this device',
+    PosHubState.reachable => spanish ? 'disponible' : 'reachable',
+    PosHubState.unreachable => spanish ? 'sin respuesta' : 'unreachable',
+  };
+}
+
+String syncLaneSummary(
+  BuildContext context, {
+  required PosConnectivity cloud,
+  required PosHubState hub,
+  required int pending,
+}) {
+  final spanish = Localizations.localeOf(context).languageCode == 'es';
+  final local = pending > 0
+      ? (spanish
+            ? '$pending guardados en este equipo'
+            : '$pending saved on this device')
+      : (spanish ? 'local confirmado' : 'local confirmed');
+  return '$local · LAN ${hubLaneLabel(context, hub)} · '
+      '${spanish ? 'Nube' : 'Cloud'} ${connectivityLabel(context, cloud)}';
+}

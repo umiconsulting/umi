@@ -26,9 +26,10 @@ void main() {
       // decimal string is parsed back into the tender command. These are
       // command values, while visible totals use `formatMinorUnits`.
       'lib/features/checkout/checkout_surface.dart': 16,
-      // The partial-payment form pre-fills editable portion, tip, and cash
-      // received fields. Its visible balances and charge use formatMinorUnits.
-      'lib/features/checkout/partial_checkout_surface.dart': 6,
+      // The partial-payment form pre-fills editable portion, tip, cash received
+      // and a selected preset tip. Its visible balances and charge use
+      // formatMinorUnits.
+      'lib/features/checkout/partial_checkout_surface.dart': 7,
     };
 
     final found = <String, int>{};

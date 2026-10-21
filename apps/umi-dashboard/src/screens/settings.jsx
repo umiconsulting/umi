@@ -1359,7 +1359,7 @@ function BusinessLogoCard({ logoUrl, merchantName, onChanged }) {
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg"
+            accept="image/png,image/jpeg,image/svg+xml,.svg"
             style={{ display: 'none' }}
             onChange={pick}
           />

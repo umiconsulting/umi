@@ -52,6 +52,7 @@ const cart = {
       productId: id(9),
       variantId: null,
       quantity: 2,
+      courseNumber: 1,
       note: null,
       modifiers: [],
     },
@@ -80,6 +81,7 @@ function harness() {
         customFixedEnabled: true,
         maximumTip: { minorUnits: 5000, currency: 'MXN' },
         requiredPermission: null,
+        attribution: 'account_owner',
         version: '1',
       },
       discount: {
@@ -182,6 +184,7 @@ function harness() {
         _idempotencyKey: unknown,
         _customerValueBasisFingerprint: unknown,
         _customerValue: unknown,
+        _divergence: unknown,
       ) => ({
         sale: {
           id: id(12),
@@ -236,6 +239,147 @@ function harness() {
 }
 
 describe('PosCheckoutService', () => {
+  it('commits an offline cash sale at the amount the customer paid', async () => {
+    const { service, repo } = harness();
+    const fingerprint = 'a'.repeat(64);
+    const money = (minorUnits: number) => ({ minorUnits, currency: 'MXN' });
+    const trusted = {
+      cartVersion: 3,
+      fingerprint,
+      totals: {
+        subtotal: money(20_000),
+        tax: money(0),
+        discounts: { total: money(0), entries: [] },
+        grandTotal: money(20_000),
+        businessDate: '2026-07-28',
+      },
+      taxes: { total: money(0), entries: [] },
+      discounts: { total: money(0), entries: [] },
+      catalogVersion: 'catalog-1',
+      pricingVersion: 'pricing-1',
+      taxVersion: 'tax-1',
+      snapshotAt: '2026-07-28T18:55:00.000Z',
+      confirmedAt: null,
+    };
+    const command = {
+      ...base,
+      totalsFingerprint: fingerprint,
+      tenderDrafts: [
+        {
+          ...base.tenderDrafts[0],
+          amount: money(20_000),
+          amountReceived: money(20_000),
+          status: 'confirmed_success' as const,
+        },
+      ],
+    };
+
+    const result = await service.checkout(user, id(1), command, {
+      trustedConfirmation: trusted,
+      trustedLineSnapshot: [
+        {
+          id: id(8),
+          productId: id(9),
+          productName: 'Café',
+          saleAction: 'merchandise',
+          quantity: 2,
+          courseNumber: 1,
+          variant: null,
+          modifiers: [],
+          note: null,
+          fired: true,
+          price: {
+            unitPrice: money(10_000),
+            lineSubtotal: money(20_000),
+            tax: money(0),
+            lineTotal: money(20_000),
+            taxRateBasisPoints: 0,
+          },
+        },
+      ],
+    });
+
+    expect(result.status).toBe('completed');
+    expect(result.confirmation.totals.grandTotal.minorUnits).toBe(20_000);
+    expect(repo.commit.mock.calls[0][15]).toMatchObject({
+      divergenceMinorUnits: -3_200,
+      serverRepricedTotals: {
+        totals: { grandTotal: { minorUnits: 23_200, currency: 'MXN' } },
+      },
+    });
+  });
+
+  it('refuses a trusted price for different cart content', async () => {
+    const { service } = harness();
+    const fingerprint = 'b'.repeat(64);
+    await expect(
+      service.checkout(
+        user,
+        id(1),
+        {
+          ...base,
+          totalsFingerprint: fingerprint,
+          tenderDrafts: [
+            {
+              ...base.tenderDrafts[0],
+              status: 'confirmed_success',
+            },
+          ],
+        },
+        {
+          trustedConfirmation: {
+            cartVersion: 3,
+            fingerprint,
+            totals: {
+              subtotal: { minorUnits: 23_200, currency: 'MXN' },
+              tax: { minorUnits: 0, currency: 'MXN' },
+              discounts: {
+                total: { minorUnits: 0, currency: 'MXN' },
+                entries: [],
+              },
+              grandTotal: { minorUnits: 23_200, currency: 'MXN' },
+              businessDate: '2026-07-28',
+            },
+            taxes: {
+              total: { minorUnits: 0, currency: 'MXN' },
+              entries: [],
+            },
+            discounts: {
+              total: { minorUnits: 0, currency: 'MXN' },
+              entries: [],
+            },
+            catalogVersion: 'catalog-1',
+            pricingVersion: 'pricing-1',
+            taxVersion: 'tax-1',
+            snapshotAt: '2026-07-28T18:55:00.000Z',
+            confirmedAt: null,
+          },
+          trustedLineSnapshot: [
+            {
+              id: id(8),
+              productId: id(90),
+              productName: 'Otra cosa',
+              saleAction: 'merchandise',
+              quantity: 2,
+              courseNumber: 1,
+              variant: null,
+              modifiers: [],
+              note: null,
+              fired: true,
+              price: {
+                unitPrice: { minorUnits: 11_600, currency: 'MXN' },
+                lineSubtotal: { minorUnits: 23_200, currency: 'MXN' },
+                tax: { minorUnits: 0, currency: 'MXN' },
+                lineTotal: { minorUnits: 23_200, currency: 'MXN' },
+                taxRateBasisPoints: 0,
+              },
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'CHECKOUT_CART_CHANGED' } });
+  });
+
   it('rechaza cierre si la lista de cobros no coincide con el ledger parcial', async () => {
     const { service, repo } = harness();
     repo.partialRows.mockResolvedValueOnce([

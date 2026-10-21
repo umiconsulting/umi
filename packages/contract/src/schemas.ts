@@ -50,7 +50,14 @@ export type SessionUser = z.infer<typeof SessionUser>;
  */
 export const MerchantBrandingLogoUpload = z
   .object({
-    contentType: z.enum(['image/png', 'image/jpeg']),
+    /**
+     * SVG is accepted at the edge and rasterised before it is stored: a café's
+     * mark is usually vector art, and a 768 px raster of it is already twice
+     * what a 203 dpi receipt can draw. What the table and the receipts serve
+     * stays PNG/JPEG, so every reader keeps its size and content-type
+     * guarantees — see `MerchantBrandingLogo` below.
+     */
+    contentType: z.enum(['image/png', 'image/jpeg', 'image/svg+xml']),
     dataBase64: z
       .string()
       .min(1)

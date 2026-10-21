@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
+import 'print_trace.dart';
 import 'thermal_printer_adapter.dart';
 
 /// The terminal's own USB host port, as a printer link.
@@ -98,7 +99,8 @@ final class MethodChannelUsbPrinter implements UsbPrinterChannel {
 /// the drawer pulse that leaves through the printer's DK port — does not depend
 /// on the LAN at all. That is the whole argument for this transport over the
 /// network one.
-final class UsbPrinterByteTransport implements HardwareByteTransport {
+final class UsbPrinterByteTransport
+    implements HardwareByteTransport, BackgroundHardwareHealth {
   UsbPrinterByteTransport({
     UsbPrinterChannel? channel,
     this.timeout = const Duration(seconds: 10),
@@ -111,69 +113,125 @@ final class UsbPrinterByteTransport implements HardwareByteTransport {
   final Duration timeout;
 
   bool _isOpen = false;
+  HardwareByteTransportHealth? _lastHealth;
+  // Android's method channel already runs USB work on one worker, but the
+  // operations reach it in whatever order concurrently-started Dart futures
+  // invoke the channel. Printing and the drawer share this link, so queue them
+  // here as well: a status probe can no longer overtake a pulse or a receipt,
+  // and the open flag has one owner.
+  Future<void> _tail = Future<void>.value();
 
   @override
-  Future<HardwareByteTransportResult> send(List<int> bytes) async {
-    try {
-      await _ensureOpen();
-      await _channel.write(bytes).timeout(timeout);
-      return const HardwareByteTransportResult.sent();
-    } on TimeoutException {
-      return const HardwareByteTransportResult.unknown(
-        failureCode: 'transport_timeout',
-      );
-    } catch (_) {
-      // No permission, unplugged printer, a claim that failed: nothing reached
-      // the printer, so the command is safe to send again.
-      _isOpen = false;
-      return const HardwareByteTransportResult.notSent(
-        failureCode: 'transport_unavailable',
-      );
-    }
-  }
+  Future<HardwareByteTransportResult> send(List<int> bytes) =>
+      _serialized(() async {
+        printTrace('usb.send_start', {'bytes': bytes.length});
+        try {
+          await _ensureOpen();
+          final started = DateTime.now();
+          await _channel.write(bytes).timeout(timeout);
+          _lastHealth = HardwareByteTransportHealth.connected(
+            latencyMs: DateTime.now().difference(started).inMilliseconds,
+          );
+          printTrace('usb.send_sent', {'bytes': bytes.length});
+          return const HardwareByteTransportResult.sent();
+        } on TimeoutException {
+          _lastHealth = const HardwareByteTransportHealth.disconnected(
+            failureCode: 'transport_timeout',
+          );
+          printTrace('usb.send_timeout', {'bytes': bytes.length});
+          return const HardwareByteTransportResult.unknown(
+            failureCode: 'transport_timeout',
+          );
+        } catch (_) {
+          _lastHealth = const HardwareByteTransportHealth.disconnected(
+            failureCode: 'transport_unavailable',
+          );
+          printTrace('usb.send_failed', {'bytes': bytes.length});
+          // No permission, unplugged printer, a claim that failed: nothing
+          // reached the printer, so the command is safe to send again.
+          _isOpen = false;
+          return const HardwareByteTransportResult.notSent(
+            failureCode: 'transport_unavailable',
+          );
+        }
+      }, stage: 'send');
 
   @override
-  Future<HardwareByteTransportHealth> health() async {
+  Future<HardwareByteTransportHealth> health() => _serialized(() async {
     final started = DateTime.now();
+    printTrace('usb.health_start');
     try {
       await _ensureOpen();
       final status = await _channel.status().timeout(timeout);
       final latencyMs = DateTime.now().difference(started).inMilliseconds;
-      // DLE EOT 1: bit 3 is "offline", bit 5 is "an error occurred". Every other
-      // bit is fixed by the printer. A printer that answers at all is on the
-      // wire; these two bits say whether it is ready to print.
+      printTrace('usb.health_done', {'latencyMs': latencyMs, 'status': status});
+      // DLE EOT 1: bit 3 is "offline", bit 5 is "an error occurred". Every
+      // other bit is fixed by the printer. A printer that answers at all is
+      // on the wire; these two bits say whether it is ready to print.
       final ready = (status & 0x08) == 0 && (status & 0x20) == 0;
-      return ready
+      final health = ready
           ? HardwareByteTransportHealth.connected(latencyMs: latencyMs)
           : const HardwareByteTransportHealth.disconnected(
               failureCode: 'printer_not_ready',
             );
+      _lastHealth = health;
+      return health;
     } on TimeoutException {
       _isOpen = false;
+      _lastHealth = const HardwareByteTransportHealth.disconnected(
+        failureCode: 'transport_timeout',
+      );
+      printTrace('usb.health_timeout');
       return const HardwareByteTransportHealth.disconnected(
         failureCode: 'transport_timeout',
       );
     } catch (_) {
       _isOpen = false;
+      _lastHealth = const HardwareByteTransportHealth.disconnected(
+        failureCode: 'transport_unavailable',
+      );
+      printTrace('usb.health_failed');
       return const HardwareByteTransportHealth.disconnected(
         failureCode: 'transport_unavailable',
       );
     }
-  }
+  }, stage: 'health');
 
   @override
-  Future<void> close() async {
+  Future<HardwareByteTransportHealth> backgroundHealth() async =>
+      _lastHealth ??
+      const HardwareByteTransportHealth.disconnected(
+        failureCode: 'not_measured_since_start',
+      );
+
+  @override
+  Future<void> close() => _serialized(() async {
     _isOpen = false;
     try {
       await _channel.close();
     } catch (_) {
       // Closing a link that is already gone is not a failure to report.
     }
+  }, stage: 'close');
+
+  Future<T> _serialized<T>(
+    Future<T> Function() operation, {
+    required String stage,
+  }) {
+    printTrace('usb.queue', {'stage': stage});
+    final result = _tail.then((_) => operation());
+    _tail = result.then<void>(
+      (_) => printTrace('usb.complete', {'stage': stage}),
+      onError: (Object _) => printTrace('usb.complete_error', {'stage': stage}),
+    );
+    return result;
   }
 
   Future<void> _ensureOpen() async {
     if (_isOpen) return;
+    printTrace('usb.open_start');
     await _channel.open().timeout(timeout);
     _isOpen = true;
+    printTrace('usb.open_done');
   }
 }

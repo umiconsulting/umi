@@ -8,6 +8,8 @@ import { runWithRequestContext } from '../../shared/database/request-context';
 import type { MerchantAccess } from '../auth/auth.types';
 import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
+import { PosCartRepository } from '../pos-cart/pos-cart.repository';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
 import { FloorPlanRepository } from './floor-plan.repository';
 import { FloorPlanService } from './floor-plan.service';
 
@@ -63,6 +65,7 @@ describe('floor-plan publication under real RLS', () => {
     locationId,
     expectedVersion,
     idempotencyKey: randomUUID(),
+    closeBlockingAccounts: false,
   });
 
   beforeAll(async () => {
@@ -78,6 +81,7 @@ describe('floor-plan publication under real RLS', () => {
     service = new FloorPlanService(
       new FloorPlanRepository(pg),
       new IntegrityService(new IntegrityRepository(pg)),
+      new PosSaleRepository(pg, new PosCartRepository(pg)),
     );
     await pg.query('INSERT INTO merchant.merchant(id,name) VALUES ($1,$2)', [
       merchantId,
@@ -263,5 +267,64 @@ describe('floor-plan publication under real RLS', () => {
     expect(
       (await pg.query('SELECT * FROM merchant.pos_cart WHERE id=$1', [cartId])).rows[0],
     ).toEqual(before);
+  });
+  it('closes only the blocking current-day account when the operator chooses to publish', async () => {
+    const actor = (
+      await pg.query<{ id: string; user_id: string }>(
+        'SELECT id,user_id FROM runtime.operator_session WHERE merchant_id=$1 LIMIT 1',
+        [merchantId],
+      )
+    ).rows[0];
+    const closeAccess = {
+      ...access,
+      permissions: ['merchant.manage', 'sale.resume.any'],
+    };
+    const user = {
+      id: actor.user_id,
+      email: null,
+      sessionId: randomUUID(),
+      deviceId: null,
+    };
+    const current = await scoped(() => service.read(access, locationId));
+    const restored = await scoped(() =>
+      service.change(access, { ...command(current.version), document }),
+    );
+    const published = await scoped(() => service.change(access, command(restored.version)));
+    const cartId = randomUUID();
+    await pg.query(
+      `INSERT INTO merchant.pos_cart
+      (id,merchant_id,location_id,operator_session_id,original_operator_session_id,
+       operator_user_id,original_operator_user_id,table_id,table_name,lifecycle_state)
+      VALUES ($1,$2,$3,$4,$4,$5,$5,$6,'T1','suspended')`,
+      [cartId, merchantId, locationId, actor.id, actor.user_id, document.areas[0].elements[0].id],
+    );
+    const empty = structuredClone(document);
+    empty.areas[0].elements = [];
+    const blocked = await scoped(() =>
+      service.change(access, { ...command(published.version), document: empty }),
+    );
+    await expect(
+      scoped(() => service.change(access, command(blocked.version))),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+        fieldErrors: {
+          tableIds: [document.areas[0].elements[0].id],
+          blockers: ['T1'],
+        },
+      },
+    });
+    const closed = await scoped(() =>
+      service.change(
+        closeAccess,
+        { ...command(blocked.version), closeBlockingAccounts: true },
+        user,
+      ),
+    );
+    expect(closed.published).toEqual(empty);
+    expect(
+      (await pg.query('SELECT status,lifecycle_state FROM merchant.pos_cart WHERE id=$1', [cartId]))
+        .rows[0],
+    ).toEqual({ status: 'abandoned', lifecycle_state: 'cancelled' });
   });
 });

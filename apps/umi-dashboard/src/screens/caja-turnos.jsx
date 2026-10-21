@@ -95,6 +95,7 @@ function CheckoutRules({ merchantId, locationId }) {
         manualTerminalEnabled: policy.manualTerminalEnabled,
         mixedTenderEnabled: policy.mixedTenderEnabled,
         allowDineInWithoutTable: policy.allowDineInWithoutTable,
+        tipAttribution: policy.tipAttribution ?? 'account_owner',
         bankTransferEnabled: policy.bankTransferEnabled,
         bankTransferDetails: policy.bankTransferDetails,
         [key]: value,
@@ -129,6 +130,7 @@ function CheckoutRules({ merchantId, locationId }) {
         manualTerminalEnabled: policy.manualTerminalEnabled,
         mixedTenderEnabled: policy.mixedTenderEnabled,
         allowDineInWithoutTable: policy.allowDineInWithoutTable,
+        tipAttribution: policy.tipAttribution ?? 'account_owner',
         ...prepared,
       });
       setPolicy(changed);
@@ -183,6 +185,27 @@ function CheckoutRules({ merchantId, locationId }) {
           </span>
         </label>
       ))}
+      <label className="field" style={{ marginTop: 18, maxWidth: 560 }}>
+        <span className="field-label">
+          <Trans>Atribución de propinas en cuentas divididas</Trans>
+        </span>
+        <select
+          className="input"
+          value={policy?.tipAttribution ?? 'account_owner'}
+          disabled={!policy || saving}
+          onChange={(event) => change('tipAttribution', event.target.value)}
+        >
+          <option value="account_owner">
+            {t`Mesero de la cuenta, aunque otro cajero procese el cobro`}
+          </option>
+          <option value="payment_processor">{t`Cajero que procesa cada cobro`}</option>
+        </select>
+        <span style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+          <Trans>
+            Cada pago conserva ambos empleados y la política decide cuál recibe la propina.
+          </Trans>
+        </span>
+      </label>
       <form
         onSubmit={saveBankTransfer}
         style={{

@@ -668,7 +668,14 @@ async function saveMerchantSettings(patch) {
 const LOGO_MAX_EDGE = 768;
 /** The same cap the API enforces, so we only send what would be stored. */
 const LOGO_MAX_BYTES = 262_144;
-const LOGO_TYPES = ['image/png', 'image/jpeg'];
+/**
+ * SVG is accepted because a café's mark is usually vector art. The browser
+ * rasterises it on the canvas below exactly as it does a PNG; if the drawing is
+ * not safe to read back (an SVG that references external resources taints the
+ * canvas), the original file is sent instead and the API rasterises it. Either
+ * way what gets stored is a bounded PNG.
+ */
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml'];
 
 function _canvasBlob(canvas, type, quality) {
   return new Promise((resolve, reject) => {
@@ -693,28 +700,38 @@ async function saveMerchantLogo(file) {
   const merchantId = window.localStorage.getItem('umi-dashboard-selected-merchant');
   if (!merchantId) throw new Error(t`No hay un negocio seleccionado`);
   if (!LOGO_TYPES.includes(file.type)) {
-    throw new Error(t`Elige una imagen PNG o JPG.`);
+    throw new Error(t`Elige una imagen PNG, JPG o SVG.`);
   }
 
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close?.();
+  let blob;
+  let contentType;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
 
-  // PNG first: a logo is flat art and keeps its edges and transparency. A
-  // photographic JPEG can still exceed the cap at 768 px as a PNG, so it goes back
-  // to JPEG — the same choice the API makes when it normalises.
-  let blob = await _canvasBlob(canvas, 'image/png');
-  let contentType = 'image/png';
-  if (blob.size > LOGO_MAX_BYTES) {
-    blob = await _canvasBlob(canvas, 'image/jpeg', 0.9);
-    contentType = 'image/jpeg';
+    // PNG first: a logo is flat art and keeps its edges and transparency. A
+    // photographic JPEG can still exceed the cap at 768 px as a PNG, so it goes back
+    // to JPEG — the same choice the API makes when it normalises.
+    blob = await _canvasBlob(canvas, 'image/png');
+    contentType = 'image/png';
+    if (blob.size > LOGO_MAX_BYTES) {
+      blob = await _canvasBlob(canvas, 'image/jpeg', 0.9);
+      contentType = 'image/jpeg';
+    }
+  } catch (error) {
+    // A vector that cannot be drawn into a readable canvas: send the file as it
+    // is and let the API do the rasterising it already knows how to do.
+    if (file.type !== 'image/svg+xml') throw error;
+    blob = file;
+    contentType = 'image/svg+xml';
   }
-  if (blob.size > LOGO_MAX_BYTES) {
+  if (blob.size > LOGO_MAX_BYTES && contentType !== 'image/svg+xml') {
     throw new Error(t`La imagen es demasiado pesada. Prueba con una más simple.`);
   }
 

@@ -52,6 +52,20 @@ abstract interface class TableStateRepository {
   );
 }
 
+/// Updates the cached room after an account command already claimed the table.
+///
+/// The account server transaction writes `seated`; a second table command would
+/// duplicate the claim. This projection keeps the local map and timer current
+/// without creating another journal entry.
+abstract interface class TableSeatProjectionRepository {
+  Future<TableStateMap> projectSeat(
+    String merchantId,
+    String locationId,
+    String tableId,
+    int partySize,
+  );
+}
+
 final class ApiTableStateRepository implements TableStateRepository {
   const ApiTableStateRepository(this._api);
   final ApiClient _api;

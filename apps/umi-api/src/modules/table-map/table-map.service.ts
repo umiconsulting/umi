@@ -2,16 +2,17 @@ import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/co
 import {
   TableStateChangeResult,
   TableStateMap,
-  type ClearTableRequest,
-  type MarkTableAwaitingPaymentRequest,
-  type MarkTableOrderedRequest,
-  type MarkTableServedRequest,
-  type MergeTablesRequest,
-  type MovePartyRequest,
-  type OpenTableRequest,
+  ClearTableRequest,
+  MarkTableAwaitingPaymentRequest,
+  MarkTableOrderedRequest,
+  MarkTableServedRequest,
+  MergeTablesRequest,
+  MovePartyRequest,
+  OfflineTableCommandPayload,
+  OpenTableRequest,
   type PosTableStateQuery,
-  type SeatTableRequest,
-  type SplitPartyRequest,
+  SeatTableRequest,
+  SplitPartyRequest,
   type TableStateEntry,
 } from '@umi/contract';
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
@@ -175,6 +176,68 @@ export class TableMapService {
         }),
       { tableIds: [dto.tableId] },
     );
+  }
+
+  /**
+   * Replay one operation written while the cloud was unreachable.
+   *
+   * This stops at the same public methods as the live routes. Permission, the
+   * live operator session, idempotency, audit and the database's room rules
+   * therefore have one implementation whether the tap happened before or after
+   * the uplink returned.
+   */
+  replayCommand(user: AuthUser, merchantId: string, value: unknown) {
+    const envelope = OfflineTableCommandPayload.safeParse(value);
+    if (!envelope.success) throw new ConflictException({ code: 'VALIDATION_FAILED' });
+    const request = envelope.data.request;
+    const invalid = () => new ConflictException({ code: 'VALIDATION_FAILED' });
+    switch (envelope.data.action) {
+      case 'seat': {
+        const parsed = SeatTableRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.seat(user, merchantId, parsed.data);
+      }
+      case 'move': {
+        const parsed = MovePartyRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.move(user, merchantId, parsed.data);
+      }
+      case 'merge': {
+        const parsed = MergeTablesRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.merge(user, merchantId, parsed.data);
+      }
+      case 'split': {
+        const parsed = SplitPartyRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.split(user, merchantId, parsed.data);
+      }
+      case 'clear': {
+        const parsed = ClearTableRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.clear(user, merchantId, parsed.data);
+      }
+      case 'open': {
+        const parsed = OpenTableRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.openTable(user, merchantId, parsed.data);
+      }
+      case 'ordered': {
+        const parsed = MarkTableOrderedRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.markOrdered(user, merchantId, parsed.data);
+      }
+      case 'served': {
+        const parsed = MarkTableServedRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.markServed(user, merchantId, parsed.data);
+      }
+      case 'awaiting_payment': {
+        const parsed = MarkTableAwaitingPaymentRequest.safeParse(request);
+        if (!parsed.success) throw invalid();
+        return this.markAwaitingPayment(user, merchantId, parsed.data);
+      }
+    }
   }
 
   /**

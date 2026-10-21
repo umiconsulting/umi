@@ -107,7 +107,7 @@ describe('POS startup against the canonical database', () => {
     expect(total.openingFloat.minorUnits).toBe(1000);
     expect(total.paidIn.minorUnits).toBe(1100);
   });
-  it('creates and recovers the same cart without permission to edit its business date', async () => {
+  it('parks an empty cart before opening a new one without permission to edit its business date', async () => {
     const repo = new PosCartRepository(pg);
     const create = () =>
       pg.runWithMerchant(
@@ -116,29 +116,32 @@ describe('POS startup against the canonical database', () => {
         (client) => repo.create(client, merchantId, locationId, operatorId),
         locationId,
       );
-    const id = await create();
+    const firstId = await create();
     // A cart can survive overnight. Its creation date remains authoritative.
     await pg.query("UPDATE merchant.pos_cart SET created_at=now()-interval '2 days' WHERE id=$1", [
-      id,
+      firstId,
     ]);
     const before = await pg.query('SELECT business_date::text FROM merchant.pos_cart WHERE id=$1', [
-      id,
+      firstId,
     ]);
-    expect(await create()).toBe(id);
-    const after = await pg.query(
-      'SELECT business_date::text,lifecycle_state,operator_session_id::text AS "operatorSessionId",version FROM merchant.pos_cart WHERE id=$1',
-      [id],
+    const secondId = await create();
+    // "Create" is the explicit request for another account. The prior empty cart
+    // is closed rather than silently returned as the next sale.
+    expect(secondId).not.toBe(firstId);
+    const prior = await pg.query(
+      'SELECT business_date::text,status,lifecycle_state FROM merchant.pos_cart WHERE id=$1',
+      [firstId],
     );
-    // THE SESSION THAT HOLDS THE CART GETS IT BACK UNTOUCHED.
-    //
-    // `create()` is idempotent for its own holder: asking again returns the row
-    // it already has, with the same session and the same version, and it does not
-    // stamp 'recovered' on a cart that was never suspended — the counter release
-    // (2026-10-14) reserves 'recovered' for the OTHER path, the one where a new
-    // session claims a cart whose previous session died. Before that change this
-    // call marked a live draft as recovered on every press of "Nueva cuenta".
-    expect(after.rows[0]).toMatchObject({
+    expect(prior.rows[0]).toMatchObject({
       ...before.rows[0],
+      status: 'abandoned',
+      lifecycle_state: 'cancelled',
+    });
+    const current = await pg.query(
+      'SELECT business_date::text,lifecycle_state,operator_session_id::text AS "operatorSessionId",version FROM merchant.pos_cart WHERE id=$1',
+      [secondId],
+    );
+    expect(current.rows[0]).toMatchObject({
       lifecycle_state: 'building_cart',
       operatorSessionId: operatorId,
       version: 1,

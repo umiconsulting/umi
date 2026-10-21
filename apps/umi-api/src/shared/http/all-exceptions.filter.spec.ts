@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,7 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 function harness() {
   const send = vi.fn();
   const status = vi.fn(() => ({ send }));
+  const header = vi.fn();
   // The real `ArgumentsHost` carries the REQUEST too, and the filter reads its
   // method and URL for the refusal line. A double that offers only the response
   // is not a smaller host — it is a different one, and the filter crashed on it
@@ -16,14 +18,14 @@ function harness() {
   const host = {
     getType: () => 'http',
     switchToHttp: () => ({
-      getResponse: () => ({ status }),
+      getResponse: () => ({ status, header }),
       getRequest: () => ({
         method: 'POST',
         url: '/api/v1/pos/merchants/x/cart?operatorSessionId=y',
       }),
     }),
   };
-  return { host, status, send };
+  return { host, status, send, header };
 }
 
 describe('AllExceptionsFilter public contract', () => {
@@ -69,6 +71,34 @@ describe('AllExceptionsFilter public contract', () => {
           message: 'Invalid request',
           retryable: false,
           fieldErrors: { email: ['Invalid email'] },
+        }),
+      }),
+    );
+  });
+
+  it('states the wait a rate limit asks the client to observe', () => {
+    const { host, status, send, header } = harness();
+    new AllExceptionsFilter().catch(
+      new HttpException(
+        {
+          code: 'RATE_LIMITED',
+          message: 'Request rate limit exceeded.',
+          retryAfterSeconds: 42,
+        },
+        429,
+      ),
+      host as never,
+    );
+
+    expect(status).toHaveBeenCalledWith(429);
+    expect(header).toHaveBeenCalledWith('retry-after', '42');
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 429,
+        error: expect.objectContaining({
+          code: 'RATE_LIMITED',
+          retryable: true,
+          details: { retryAfterSeconds: 42 },
         }),
       }),
     );

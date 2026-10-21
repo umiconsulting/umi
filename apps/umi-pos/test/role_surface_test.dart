@@ -723,7 +723,7 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(_navLabel(language == 'es' ? 'Comanda' : 'Order'));
           await tester.pumpAndSettle();
-          final label = language == 'es' ? 'Nueva venta' : 'New sale';
+          final label = language == 'es' ? 'Iniciar pedido' : 'Start order';
           final icon = find
               .descendant(
                 of: find.descendant(
@@ -791,17 +791,17 @@ void main() {
         await tester.pumpAndSettle();
         final action = find.descendant(
           of: find.byType(PosHeader),
-          matching: find.text('Nueva venta'),
+          matching: find.text('Iniciar pedido'),
         );
         final original = Focus.of(tester.element(action));
         original.requestFocus();
         await tester.pump();
         // Controlled session data; this is not a server authorization assertion.
-        permissions.remove('sale.lifecycle');
+        permissions.remove('cart.write');
         tester.view.physicalSize = const Size(812, 375);
         await tester.pumpAndSettle();
-        expect(find.text('Nueva venta'), findsNothing);
-        expect(find.byTooltip('Nueva venta'), findsNothing);
+        expect(find.text('Iniciar pedido'), findsNothing);
+        expect(find.byTooltip('Iniciar pedido'), findsNothing);
         expect(FocusManager.instance.primaryFocus, isNot(same(original)));
         expect(cart.state.cart?.id, _openCart().id);
         expect(cart.state.cart?.version, 1);
@@ -852,11 +852,11 @@ void main() {
             if (action == 'newSale' && !compact) {
               return find.descendant(
                 of: header,
-                matching: find.text(spanish ? 'Nueva venta' : 'New sale'),
+                matching: find.text(spanish ? 'Iniciar pedido' : 'Start order'),
               );
             }
             final label = switch (action) {
-              'newSale' => spanish ? 'Nueva venta' : 'New sale',
+              'newSale' => spanish ? 'Iniciar pedido' : 'Start order',
               'overflow' => spanish ? 'Más' : 'More',
               _ => spanish ? 'Cuenta' : 'Account',
             };

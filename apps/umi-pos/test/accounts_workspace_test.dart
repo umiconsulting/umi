@@ -122,7 +122,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Plano de mesas'), findsOneWidget);
-      await tester.tap(find.text('Nueva cuenta sin mesa'));
+      await tester.tap(find.text('Iniciar pedido'));
       expect(newAccounts, 1);
       await tester.tap(find.text('Lista'));
       await tester.pumpAndSettle();
@@ -134,7 +134,7 @@ void main() {
       expect(find.byKey(const ValueKey('open-account-table')), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('open-account-counter')));
       expect(selected, same(account));
-      await tester.tap(find.text('Nueva cuenta sin mesa'));
+      await tester.tap(find.text('Iniciar pedido'));
       expect(newAccounts, 2);
       await tester.tap(find.text('Mapa'));
       await tester.pumpAndSettle();
@@ -178,11 +178,11 @@ void main() {
       expect(find.text('Mesas'), findsNothing);
       await tester.tap(find.text('Cuenta 024 · 2026-10-12'));
       expect(selected, same(account));
-      await tester.tap(find.text('Nueva cuenta sin mesa'));
+      await tester.tap(find.text('Iniciar pedido'));
       expect(newAccounts, 1);
       update(() => busy = true);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Nueva cuenta sin mesa'));
+      await tester.tap(find.text('Iniciar pedido'));
       expect(newAccounts, 1);
       expect(viewChanges, 0);
       expect(tester.takeException(), isNull);

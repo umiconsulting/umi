@@ -11,6 +11,7 @@ import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
 import { PosCartRepository } from '../pos-cart/pos-cart.repository';
 import { PosCartService } from '../pos-cart/pos-cart.service';
+import type { KdsService } from '../kds/kds.service';
 import { PosCashRepository } from '../pos-cash/pos-cash.repository';
 import { PosCashService } from '../pos-cash/pos-cash.service';
 import { PosCheckoutRepository } from '../pos-checkout/pos-checkout.repository';
@@ -252,8 +253,10 @@ const TILL_BATCH = tillSpec('Caja lote', 0x1200);
 const TILL_OUT_OF_ORDER = tillSpec('Caja desordenada', 0x1300);
 /** The till that measures what happens when a SECOND sale is rung before the first syncs. */
 const TILL_BOUNDARY = tillSpec('Caja limite', 0x1400);
+/** The till that exercises independent account streams. */
+const TILL_STREAM = tillSpec('Caja flujos', 0x1500);
 
-const TILLS = [TILL_MAIN, TILL_REFUSED, TILL_BATCH, TILL_OUT_OF_ORDER, TILL_BOUNDARY];
+const TILLS = [TILL_MAIN, TILL_REFUSED, TILL_BATCH, TILL_OUT_OF_ORDER, TILL_BOUNDARY, TILL_STREAM];
 
 /**
  * The merchant's own trading day, read from the same expression the trigger uses
@@ -336,8 +339,10 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
     // ONE checkout service, handed to the fixture AND to the offline service, so the
     // preview this file runs and the preview the replay runs are the same object.
     checkout = new PosCheckoutService(new PosCheckoutRepository(pg), cartRepository, integrity);
-    offline = new PosOfflineService(new PosOfflineRepository(pg), checkout);
     carts = new PosCartService(cartRepository, integrity);
+    offline = new PosOfflineService(new PosOfflineRepository(pg), checkout, carts, {
+      commandForReplay: async () => undefined,
+    } as unknown as KdsService);
     const cash = new PosCashService(new PosCashRepository(pg), integrity);
 
     // ── The merchant, its branch, its catalog and its inventory authority ──
@@ -748,6 +753,44 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
     return { ...unsigned, fingerprint: fingerprintOf(unsigned) };
   }
 
+  function tableAccountGroup(
+    spec: TillSpec | Till,
+    sequence: number,
+    provisionalCartId: string,
+    tableId: string,
+  ): OfflineCommand {
+    const until = tillOf(spec);
+    const idempotencyKey = randomUUID();
+    const unsigned = {
+      commandId: randomUUID(),
+      provisionalId: provisionalCartId,
+      deviceId: until.deviceId,
+      deviceCredentialVersion: CREDENTIAL_VERSION,
+      deviceSequence: sequence,
+      merchantId: MERCHANT,
+      locationId: LOCATION,
+      operatorSessionId: until.operatorSessionId,
+      commandType: 'pos.command.group' as const,
+      idempotencyKey,
+      contractVersion: CONTRACT_VERSION,
+      schemaVersion: SCHEMA_VERSION,
+      createdAt: new Date().toISOString(),
+      payload: {
+        groupId: idempotencyKey,
+        aggregateKeys: [`account:${provisionalCartId}`, `table:${tableId}`],
+        effects: [
+          {
+            type: 'open_table_account',
+            provisionalCartId,
+            tableId,
+            partySize: 2,
+          },
+        ],
+      },
+    };
+    return { ...unsigned, fingerprint: fingerprintOf(unsigned) };
+  }
+
   const replay = (spec: TillSpec | Till, commands: OfflineCommand[]) =>
     scoped(spec, () =>
       offline.batch(tillOf(spec).user, MERCHANT, { replaySessionId: randomUUID(), commands }),
@@ -1058,6 +1101,83 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
     expect(await ledgerSumForShift(till, till.shiftId)).toBe(String(OPENING_FLOAT));
   });
 
+  it('keeps independent account streams moving after refusals', async () => {
+    const till = tillOf(TILL_STREAM);
+    const accountA = randomUUID();
+    const accountB = randomUUID();
+    const groupA = tableAccountGroup(TILL_STREAM, 1, accountA, randomUUID());
+    const groupB = tableAccountGroup(TILL_STREAM, 2, accountB, randomUUID());
+    const groupAgainA = tableAccountGroup(TILL_STREAM, 3, accountA, randomUUID());
+    const ack = ackCommand(TILL_STREAM, 4);
+
+    const result = await replay(TILL_STREAM, [groupA, groupB, groupAgainA, ack]);
+
+    expect(result.stopped).toBe(false);
+    expect(result.results.map((item) => item.status)).toEqual([
+      'conflict',
+      'conflict',
+      'conflict',
+      'accepted',
+    ]);
+    expect(result.results.map((item) => item.failure?.classification ?? null)).toEqual([
+      'table_unavailable',
+      'table_unavailable',
+      'stream_blocked',
+      null,
+    ]);
+    expect(result.results[2].failure).toMatchObject({
+      retryable: true,
+      blocksFollowing: false,
+    });
+    expect(result.cursor).toMatchObject({
+      lastAcceptedSequence: 4,
+      lastProcessedSequence: 4,
+    });
+    expect(await journalRowsForDevice(till, till.deviceId)).toBe(1);
+    expect(
+      await readOn(
+        till,
+        `SELECT string_agg(classification,',' ORDER BY device_sequence) AS value
+         FROM merchant.offline_replay_conflict
+         WHERE merchant_id=$1::uuid AND device_id=$2::uuid`,
+        [MERCHANT, till.deviceId],
+      ),
+    ).toBe('table_unavailable,table_unavailable,stream_blocked');
+    expect(
+      await readOn(
+        till,
+        `SELECT last_accepted_sequence::text||':'||last_processed_sequence::text AS value
+         FROM merchant.device_replay_cursor
+         WHERE device_id=$1::uuid AND credential_version=$2`,
+        [till.deviceId, CREDENTIAL_VERSION],
+      ),
+    ).toBe('4:4');
+
+    const resolved = await scoped(till, () =>
+      offline.resolveConflict(
+        till.user,
+        MERCHANT,
+        {
+          locationId: LOCATION,
+          operatorSessionId: till.operatorSessionId,
+          credentialVersion: CREDENTIAL_VERSION,
+        },
+        groupA.commandId,
+      ),
+    );
+    expect(resolved.resolved).toBe(true);
+    expect(
+      await readOn(
+        till,
+        `SELECT count(*)::text AS value
+         FROM merchant.offline_replay_conflict
+         WHERE merchant_id=$1::uuid AND device_id=$2::uuid
+           AND stream_key=$3 AND resolution_state <> 'resolved'`,
+        [MERCHANT, till.deviceId, `account:${accountA}`],
+      ),
+    ).toBe('0');
+  });
+
   // ── 4. One batch, two commands, once each ──────────────────────────────────
 
   it('lands a two-command batch once, and answers each re-delivered sequence from the journal', async () => {
@@ -1161,17 +1281,14 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
    * same time, because that is decided by the CART, not by the replay: the snapshot freezes
    * a `cartId` and a cart version, and the commit re-reads both.
    *
-   * The platform issues ONE live cart per operator per location — `PosCartRepository.create`
-   * upserts on `(merchant_id, location_id, operator_user_id)` for every non-terminal cart,
-   * and `pos_cart_active_operator_uidx` refuses a second row anyway. So a cashier who rings
-   * a second sale before the first has synced is handed the SAME cart back, and the line
-   * goes into the cart the queued command already froze.
+   * The platform issues ONE live cart per operator per location. Explicitly opening
+   * another account parks the current cart first, then creates a distinct live cart;
+   * `pos_cart_active_operator_uidx` still refuses two simultaneous live carts.
    *
    * WHAT THIS TEST PINS IS ONLY THE SAFETY PART: the queued sale must NOT commit against a
-   * cart that has moved under it. The observations around it — the same cart id, the single
-   * cart row, and `price_changed` as the classification — are stated in the comments rather
-   * than asserted, because they are how the refusal is worded today and a better-handled
-   * cart should not fail this file for improving.
+   * different live account. The observations around it — the new cart id, the parked prior
+   * cart and `aggregate_version_conflict` as the classification — are the refusal the
+   * recovery centre needs to explain.
    */
   it('refuses to land a queued sale whose cart moved under it, instead of committing a total nobody agreed to', async () => {
     const till = tillOf(TILL_BOUNDARY);
@@ -1186,20 +1303,21 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
         idempotencyKey: randomUUID(),
       }),
     );
-    // OBSERVED: the same cart comes back — `create` upserts rather than inserting.
-    expect(second.id).toBe(first.cart.id);
+    // The queued account already has a line, so opening another account parks it
+    // and the next sale gets a distinct cart.
+    expect(second.id).not.toBe(first.cart.id);
     expect(
       await countOn(
         till,
         `SELECT count(*)::text AS value FROM merchant.pos_cart
-          WHERE merchant_id=$1::uuid AND operator_session_id=$2::uuid`,
+          WHERE merchant_id=$1::uuid AND operator_session_id=$2::uuid
+            AND lifecycle_state IN ('building_cart','ready_for_checkout','recovered')`,
         [MERCHANT, till.operatorSessionId],
       ),
     ).toBe(1);
 
-    // And it is still writable: the second `create` left it in `recovered`, which is one
-    // of the lifecycle states the line path accepts (`PosCartRepository.bump`), so the
-    // second sale's line goes into the SAME cart — and moves it back to `building_cart`.
+    // The queued account remains resumable but is no longer the live cart. The
+    // second sale's line belongs to the distinct cart returned above.
     await scoped(till, () =>
       carts.add(till.user, MERCHANT, {
         cartId: second.id,
@@ -1222,10 +1340,10 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
           WHERE merchant_id=$1::uuid AND id=$2::uuid`,
         [MERCHANT, first.cart.id],
       ),
-    ).toBe('building_cart');
+    ).toBe('suspended');
 
-    // The reconnection arrives. The queued command's snapshot holds the OLD cart version
-    // and the OLD totals fingerprint; the server recomputes both and disagrees.
+    // The reconnection arrives. Its snapshot names the account that was parked when
+    // the next sale began, so it cannot land against a different live cart.
     //
     // HOW THE REFUSAL IS WORDED, AND WHY THAT MATTERS. The stale `expectedCartVersion`
     // makes `lockCart` return nothing and the checkout answers
@@ -1233,13 +1351,17 @@ describe('offline cash replay · §8K, "a cash sale made offline lands once"', (
     // `ConflictException`, and it used to leave `PosOfflineService.batchLocked` at the
     // preview as an UNHANDLED 409: no `merchant.offline_replay_conflict` row, so the
     // recovery centre — the one place an operator is told what happened to a queued sale
-    // — showed nothing at all. It is journalled now, like every other refusal, and the
-    // batch stops. This test is the one that made that visible.
+    // — showed nothing at all. It is journalled now, like every other refusal. The
+    // command's account stream stops; unrelated account streams can continue.
     const result = await replay(TILL_BOUNDARY, [first.command]);
-    expect(result.stopped).toBe(true);
+    expect(result.stopped).toBe(false);
     expect(result.results[0].status).toBe('conflict');
     expect(result.results[0].failure?.classification).toBe('aggregate_version_conflict');
-    expect(result.results[0].failure?.blocksFollowing).toBe(true);
+    expect(result.results[0].failure?.blocksFollowing).toBe(false);
+    expect(result.cursor).toMatchObject({
+      lastAcceptedSequence: 0,
+      lastProcessedSequence: 1,
+    });
 
     // Nothing landed: no order, no sale, no journal row, and the drawer still holds only
     // its float.

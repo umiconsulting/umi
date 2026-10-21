@@ -5,6 +5,7 @@ import {
   ReconcileRequest,
   ReplayBatch,
   ReplayContextQuery,
+  ResolveReplayConflictRequest,
 } from '@umi/contract';
 import { ZodValidationPipe } from '../../shared/http/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
@@ -43,9 +44,16 @@ export class PosOfflineController {
   batch(
     @CurrentUser() user: AuthUser,
     @Param('merchantId') merchantId: string,
+    @Query('locationId') locationId: string,
+    @Query('operatorSessionId') operatorSessionId: string,
+    @Query('credentialVersion') credentialVersion: string,
     @Body(new ZodValidationPipe(ReplayBatch)) dto: ReplayBatch,
   ) {
-    return this.offline.batch(user, merchantId, dto);
+    return this.offline.batch(user, merchantId, dto, {
+      locationId,
+      operatorSessionId,
+      credentialVersion: Number(credentialVersion),
+    });
   }
 
   @Post('reconcile')
@@ -93,6 +101,18 @@ export class PosOfflineController {
     @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
   ) {
     return this.offline.conflicts(user, merchantId, query);
+  }
+
+  @Post('conflicts/:commandId/resolve')
+  resolveConflict(
+    @CurrentUser() user: AuthUser,
+    @Param('merchantId') merchantId: string,
+    @Param('commandId') commandId: string,
+    @Query(new ZodValidationPipe(ReplayContextQuery)) query: ReplayContextQuery,
+    @Body(new ZodValidationPipe(ResolveReplayConflictRequest))
+    _dto: ResolveReplayConflictRequest,
+  ) {
+    return this.offline.resolveConflict(user, merchantId, query, commandId);
   }
 
   @Get('diagnostics')

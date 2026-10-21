@@ -37,6 +37,7 @@ export interface CheckoutCart {
   merchantId: string;
   locationId: string;
   operatorSessionId: string;
+  originalOperatorUserId?: string;
   version: number;
   businessDate: string;
   merchantName: string;
@@ -107,6 +108,9 @@ export interface PartialPaymentRow {
   status: 'confirmed_success' | 'outcome_unknown' | 'operator_reported_failure';
   confirmationReference: string | null;
   cashShiftId: string | null;
+  serviceOperatorUserId: string | null;
+  processedByUserId: string | null;
+  tipRecipientUserId: string | null;
 }
 
 @Injectable()
@@ -125,7 +129,10 @@ export class PosCheckoutRepository {
               currency,tender_type AS "tenderType",amount_minor_units::text AS "amountMinorUnits",
               tip_minor_units::text AS "tipMinorUnits",received_minor_units::text AS "receivedMinorUnits",
               status,confirmation_reference AS "confirmationReference",
-              cash_shift_id::text AS "cashShiftId"
+              cash_shift_id::text AS "cashShiftId",
+              service_operator_user_id::text AS "serviceOperatorUserId",
+              processed_by_user_id::text AS "processedByUserId",
+              tip_recipient_user_id::text AS "tipRecipientUserId"
          FROM merchant.pos_partial_payment
         WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND cart_id=$3::uuid
         ORDER BY created_at,tender_id`,
@@ -227,6 +234,7 @@ export class PosCheckoutRepository {
       customTipFixedEnabled: boolean;
       maximumTipMinorUnits: string;
       tipRequiredPermission: string | null;
+      tipAttribution: 'account_owner' | 'payment_processor';
       discountsEnabled: boolean;
       maximumDiscountBasisPoints: number;
       maximumDiscountMinorUnits: string;
@@ -251,6 +259,7 @@ export class PosCheckoutRepository {
               custom_tip_fixed_enabled AS "customTipFixedEnabled",
               maximum_tip_minor_units::text AS "maximumTipMinorUnits",
               tip_required_permission AS "tipRequiredPermission",
+              tip_attribution AS "tipAttribution",
               discounts_enabled AS "discountsEnabled",
               maximum_discount_basis_points AS "maximumDiscountBasisPoints",
               maximum_discount_minor_units::text AS "maximumDiscountMinorUnits",
@@ -281,6 +290,7 @@ export class PosCheckoutRepository {
           customFixedEnabled: false,
           maximumTip: money(0),
           requiredPermission: null,
+          attribution: 'account_owner',
           version: 'default-deny',
         },
         discount: {
@@ -321,6 +331,7 @@ export class PosCheckoutRepository {
         customFixedEnabled: row.customTipFixedEnabled,
         maximumTip: money(Number(row.maximumTipMinorUnits)),
         requiredPermission: row.tipRequiredPermission,
+        attribution: row.tipAttribution,
         version: row.version,
       },
       discount: {
@@ -693,7 +704,8 @@ export class PosCheckoutRepository {
   ): Promise<CheckoutCart | null> {
     const cart = await client.query<Omit<CheckoutCart, 'lines'>>(
       `SELECT c.id::text,c.merchant_id::text AS "merchantId",c.location_id::text AS "locationId",
-              c.operator_session_id::text AS "operatorSessionId",c.version,
+              c.operator_session_id::text AS "operatorSessionId",
+              c.original_operator_user_id::text AS "originalOperatorUserId",c.version,
               c.business_date::text AS "businessDate",b.name AS "merchantName",
               b.logo_url AS "merchantLogoUrl",
               br.name AS "locationName",b.timezone,$6::text AS "operatorName",
@@ -1421,6 +1433,10 @@ export class PosCheckoutRepository {
     idempotencyKey: string,
     customerValueBasisFingerprint: string,
     customerValue: CustomerValueSelection | null,
+    divergence: {
+      serverRepricedTotals: TotalsConfirmation;
+      divergenceMinorUnits: number;
+    } | null = null,
   ): Promise<{
     sale: NonNullable<CheckoutResult['sale']>;
     /** The receipt as issued, with the ticket folio in `receiptRef` — not the provisional
@@ -1678,8 +1694,10 @@ export class PosCheckoutRepository {
     const sale = await client.query<{ id: string; committedAt: string }>(
       `INSERT INTO merchant.pos_committed_sale
          (merchant_id,location_id,cart_id,order_id,payment_attempt_id,
-          receipt_snapshot_id,totals_fingerprint,cash_shift_id,origin_order_id,origin_channel)
-       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid,$9::uuid,$10)
+          receipt_snapshot_id,totals_fingerprint,cash_shift_id,origin_order_id,origin_channel,
+          server_repriced_totals,divergence_minor_units)
+       VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7,$8::uuid,$9::uuid,$10,
+               $11::jsonb,$12)
        RETURNING id::text,committed_at::text AS "committedAt"`,
       [
         cart.merchantId,
@@ -1692,6 +1710,8 @@ export class PosCheckoutRepository {
         saleCashShiftId,
         cart.originOrderId,
         cart.originChannel,
+        divergence ? JSON.stringify(divergence.serverRepricedTotals) : null,
+        divergence?.divergenceMinorUnits ?? null,
       ],
     );
     // Link, don't merge (ADR 2026-09-13): when this sale settles an upstream commercial

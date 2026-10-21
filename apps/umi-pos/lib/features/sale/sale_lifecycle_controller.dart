@@ -58,6 +58,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   SaleLifecycleState get state => _state;
   bool get canResumeSuspendedSale => _isTerminalOrMissing && !_mutationActive;
   bool get canLoadMoreHistory => _historyNextCursor != null;
+  bool get isRestoringCurrent => _opening;
 
   /// Whether the sale on screen can take a command right now.
   ///
@@ -69,6 +70,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   /// no message, the screen unchanged. A control that cannot be honoured stands
   /// down and says why instead.
   bool get canEditSale =>
+      !_opening &&
       !_mutationActive &&
       _state.sale != null &&
       _cart.state.cart != null &&
@@ -82,6 +84,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   bool _useCartAuthority = false;
   String? _locationId;
   String? _operatorSessionId;
+  bool _opening = false;
   bool _mutationActive = false;
   bool _resumingFromHistory = false;
   bool _historyLoading = false;
@@ -99,11 +102,34 @@ final class SaleLifecycleController extends ChangeNotifier {
     String locationId,
     String operatorSessionId, {
     bool useCartAuthority = false,
+    bool restoreCurrent = true,
   }) async {
     final sameScope =
         _merchantId == merchantId &&
         _locationId == locationId &&
         _operatorSessionId == operatorSessionId;
+    // A fresh operator entry starts at the till, not inside whichever account
+    // that operator session happened to leave active. The account remains
+    // available in Cuentas and is resumed only after an explicit tap. Silent
+    // restoration made an empty Comanda immediately turn into yesterday's or
+    // another operator's work, with no way to tell whether that was intended.
+    //
+    // The scope still has to be bound here: `newSale` and the account commands
+    // need merchant, branch and operator before the operator chooses anything.
+    if (!restoreCurrent) {
+      _historyGeneration++;
+      _historyLoading = false;
+      _historyNextCursor = null;
+      _historyErrorCode = null;
+      _merchantId = merchantId;
+      _useCartAuthority = useCartAuthority;
+      _locationId = locationId;
+      _operatorSessionId = operatorSessionId;
+      _opening = false;
+      _set(const SaleLifecycleState());
+      _event('sale_startup_ready_without_current');
+      return;
+    }
     if (sameScope && _state.sale != null) return;
     if (!sameScope) {
       _historyGeneration++;
@@ -115,6 +141,7 @@ final class SaleLifecycleController extends ChangeNotifier {
     _useCartAuthority = useCartAuthority;
     _locationId = locationId;
     _operatorSessionId = operatorSessionId;
+    _opening = true;
     _set(const SaleLifecycleState(phase: SalePhase.loading));
     try {
       final recovered = await _repository.current(merchantId, _query());
@@ -123,18 +150,40 @@ final class SaleLifecycleController extends ChangeNotifier {
     } on AppException catch (error) {
       if (error.code != 'SALE_NOT_FOUND' &&
           error.code != 'RESOURCE_NOT_FOUND') {
+        // No answer is not a failure to sell. The cart queue is the authority
+        // for the sale being built and it works from the journal, so a cold
+        // start with no uplink used to paint "we could not complete the sale
+        // safely" over a till that could sell perfectly well. Reachability has
+        // its own indicator; this screen stays neutral and the next successful
+        // read fills it in.
+        if (error.category == AppErrorCategory.transport ||
+            error.category == AppErrorCategory.timeout ||
+            error.category == AppErrorCategory.server) {
+          _set(const SaleLifecycleState(phase: SalePhase.idle));
+          _event('sale_offline_unknown');
+          return;
+        }
         _failure(error);
         return;
       }
       // A new operator has no account yet. Keep the menu ready and allocate a
       // folio only when the operator starts an order.
       _set(const SaleLifecycleState());
+    } catch (_) {
+      // A malformed current-sale answer must not stop the catalogue from
+      // loading. Treat it like an unknown answer, not a refusal: the menu and
+      // the local cart stay usable, and the next explicit action reads again.
+      _set(const SaleLifecycleState());
+      _event('sale_restore_unavailable');
+    } finally {
+      _opening = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
   /// Refresh the lifecycle after the server selects an account for this operator.
   Future<bool> refreshCurrent({required String expectedCartId}) async {
-    if (_merchantId == null || _mutationActive) return false;
+    if (_merchantId == null || _opening || _mutationActive) return false;
     try {
       final sale = await _repository.current(_merchantId!, _query());
       if (sale.id != expectedCartId) {
@@ -179,7 +228,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   /// that does not take leaves the phase where it was, and starting anyway would
   /// put a second editable sale beside the one that refused to go.
   Future<bool> newSale({bool abandonCurrent = false}) async {
-    if (_mutationActive || _resumingFromHistory) return false;
+    if (_opening || _mutationActive || _resumingFromHistory) return false;
     if (!_isTerminalOrMissing) {
       if (!abandonCurrent) return false;
       final sale = _state.sale;
@@ -550,8 +599,8 @@ final class SaleLifecycleController extends ChangeNotifier {
 
   /// Release the paid account when its receipt screen closes. The receipt still
   /// needs the paid cart while it is visible.
-  void finishCheckoutPresentation() {
-    if (_state.phase != SalePhase.committed) return;
+  void finishCheckoutPresentation({bool force = false}) {
+    if (!force && _state.phase != SalePhase.committed) return;
     _cart.clearLocal();
     _set(
       SaleLifecycleState(
@@ -645,7 +694,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   }
 
   Future<void> _start({required bool readyForNextCustomer}) async {
-    if (_mutationActive || _merchantId == null) return;
+    if (_opening || _mutationActive || _merchantId == null) return;
     _mutationActive = true;
     _set(const SaleLifecycleState(phase: SalePhase.loading));
     try {
@@ -661,7 +710,16 @@ final class SaleLifecycleController extends ChangeNotifier {
             recoverable: true,
           );
         }
-        sale = await _repository.current(_merchantId!, _query());
+        try {
+          sale = await _repository.current(_merchantId!, _query());
+        } on AppException catch (error) {
+          if (_canContinueWithLocalCart(error)) {
+            _set(const SaleLifecycleState(phase: SalePhase.buildingCart));
+            _event('sale_started_local');
+            return;
+          }
+          rethrow;
+        }
         if (sale.id != created.id) {
           throw const AppException(
             category: AppErrorCategory.conflict,
@@ -687,6 +745,13 @@ final class SaleLifecycleController extends ChangeNotifier {
       _mutationActive = false;
     }
   }
+
+  bool _canContinueWithLocalCart(AppException error) =>
+      _cart.state.cart != null &&
+      (error.category == AppErrorCategory.transport ||
+          error.category == AppErrorCategory.timeout ||
+          error.category == AppErrorCategory.server ||
+          error.category == AppErrorCategory.unknown);
 
   Future<void> _mutation(
     Future<SaleSnapshot> Function() operation,

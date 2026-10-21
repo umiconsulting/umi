@@ -15,6 +15,7 @@ import 'package:umi_pos/features/cart/cart_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
 import 'package:umi_pos/features/checkout/checkout_surface.dart';
+import 'package:umi_pos/features/checkout/partial_checkout_surface.dart';
 import 'package:umi_pos/features/customer_value/customer_value_controller.dart';
 import 'package:umi_pos/features/customer_value/customer_value_repository.dart';
 import 'package:umi_pos/features/entry/entry_controller.dart';
@@ -65,6 +66,7 @@ const _policy = {
     'customFixedEnabled': true,
     'maximumTip': {'minorUnits': 5000, 'currency': 'MXN'},
     'requiredPermission': null,
+    'attribution': 'account_owner',
     'version': 'test-1',
   },
   'discount': {
@@ -449,6 +451,87 @@ final class _CheckoutRepository implements CheckoutRepository {
   }
 }
 
+/// A checkout repository that also owns a partial-payment ledger. The account
+/// Split action must reach that ledger without changing any other checkout
+/// behavior.
+final class _PartialCheckoutRepository
+    implements CheckoutRepository, PartialPaymentRepository {
+  final delegate = _CheckoutRepository();
+
+  CheckoutPolicy? get policyValue => delegate.policyValue;
+  set policyValue(CheckoutPolicy? value) => delegate.policyValue = value;
+
+  Map<String, Object?>? ledger;
+
+  @override
+  Future<CheckoutPolicy> policy(
+    String merchantId,
+    PosCheckoutPolicyQuery query,
+  ) => delegate.policy(merchantId, query);
+
+  @override
+  Future<TenderCaptureResult> captureTender(
+    String merchantId,
+    TenderCaptureRequest request,
+  ) => delegate.captureTender(merchantId, request);
+
+  @override
+  Future<TenderSettlementResult> settleTender(
+    String merchantId,
+    String commandIdentity,
+    TenderSettlementRequest request,
+  ) => delegate.settleTender(merchantId, commandIdentity, request);
+
+  @override
+  Future<CheckoutResult> checkout(String merchantId, CheckoutCommand command) =>
+      delegate.checkout(merchantId, command);
+
+  @override
+  Future<PaymentOutcome> paymentStatus(
+    String merchantId,
+    String paymentId,
+    PaymentStatusQuery query,
+  ) => delegate.paymentStatus(merchantId, paymentId, query);
+
+  @override
+  Future<CheckoutRecoverySnapshot> recovery(
+    String merchantId,
+    String cartId,
+    CheckoutRecoveryQuery query,
+  ) => delegate.recovery(merchantId, cartId, query);
+
+  @override
+  Future<CheckoutCancellationResult> cancel(
+    String merchantId,
+    String cartId,
+    CheckoutCancellationRequest request,
+  ) => delegate.cancel(merchantId, cartId, request);
+
+  @override
+  Future<CheckoutPartialPaymentResult> partialPayments(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentQuery query,
+  ) async {
+    final value = ledger;
+    if (value == null) {
+      throw const AppException(
+        category: AppErrorCategory.unknown,
+        code: 'RESOURCE_NOT_FOUND',
+        recoverable: false,
+      );
+    }
+    return CheckoutPartialPaymentResult(ok: true, data: value);
+  }
+
+  @override
+  Future<CheckoutPartialPaymentResult> collectPartialPayment(
+    String merchantId,
+    String cartId,
+    CheckoutPartialPaymentRequest command,
+  ) => throw UnimplementedError();
+}
+
 final class _CartRepository implements CartRepository {
   final cart = Cart(
     id: '00000000-0000-4000-8000-000000000004',
@@ -517,7 +600,7 @@ final class _CartRepository implements CartRepository {
 }
 
 CheckoutController _controller(
-  _CheckoutRepository repository, {
+  CheckoutRepository repository, {
   Future<String?> Function(CheckoutResult result)? afterCommit,
 }) => CheckoutController(
   repository: repository,
@@ -1493,6 +1576,391 @@ void main() {
     expect(controller.state.phase, CheckoutPhase.failure);
     expect(controller.state.errorCode, 'TENDER_PROVIDER_UNAVAILABLE');
     expect(repository.commands, isEmpty);
+  });
+
+  testWidgets('account split opens the ledger without an empty check', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 2400);
+    addTearDown(tester.view.reset);
+    final repository = _PartialCheckoutRepository()
+      ..policyValue = CheckoutPolicy.fromJson(_policy)
+      ..ledger = const {
+        'cartId': '00000000-0000-4000-8000-000000000004',
+        'cartVersion': 3,
+        'amountDue': {'minorUnits': 11600, 'currency': 'MXN'},
+        'appliedAmount': {'minorUnits': 0, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': 11600, 'currency': 'MXN'},
+        'tipAmount': {'minorUnits': 0, 'currency': 'MXN'},
+        'tenderDrafts': <Object?>[],
+        'confirmationReferences': <String, String>{},
+        'blockedByUnknown': false,
+        'unresolvedTender': null,
+        'canFinalize': false,
+      };
+    final cart = CartController(
+      repository: _CartRepository(),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+    await cart.open(
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    );
+    final entry = await _signedInEntry();
+    final checkout = _controller(repository);
+    await checkout.loadPolicy(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      currency: 'MXN',
+    );
+    final root = testRoot();
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showSplitCheckout(
+                context,
+                checkout: checkout,
+                cashShiftId: '00000000-0000-4000-8000-000000000005',
+                cart: cart,
+                entry: entry,
+                sales: root.sales,
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PartialCheckoutSurface), findsOneWidget);
+    expect(find.text('MXN 116.00'), findsWidgets);
+    expect(find.text('This portion'), findsOneWidget);
+    expect(find.text('Tip'), findsOneWidget);
+    expect(find.text('Charge now'), findsOneWidget);
+    expect(find.text('Remaining'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    root.dispose();
+    entry.dispose();
+    cart.dispose();
+    checkout.dispose();
+  });
+
+  testWidgets('account split suggests tips on the guest portion before tax', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 720);
+    addTearDown(tester.view.reset);
+    final repository = _PartialCheckoutRepository()
+      ..policyValue = CheckoutPolicy.fromJson(_policy)
+      ..ledger = const {
+        'cartId': '00000000-0000-4000-8000-000000000004',
+        'cartVersion': 3,
+        'amountDue': {'minorUnits': 11600, 'currency': 'MXN'},
+        'appliedAmount': {'minorUnits': 0, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': 11600, 'currency': 'MXN'},
+        'tipAmount': {'minorUnits': 0, 'currency': 'MXN'},
+        'tenderDrafts': <Object?>[],
+        'confirmationReferences': <String, String>{},
+        'blockedByUnknown': false,
+        'unresolvedTender': null,
+        'canFinalize': false,
+      };
+    final cart = CartController(
+      repository: _CartRepository(),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+    await cart.open(
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    );
+    final entry = await _signedInEntry();
+    final checkout = _controller(repository);
+    await checkout.loadPolicy(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      currency: 'MXN',
+    );
+    final root = testRoot();
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showSplitCheckout(
+                context,
+                checkout: checkout,
+                cashShiftId: '00000000-0000-4000-8000-000000000005',
+                cart: cart,
+                entry: entry,
+                sales: root.sales,
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tip for the account owner'), findsOneWidget);
+    expect(find.text('Suggested base · MXN 100.00 before tax'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('partial-tip-bp-1000')));
+    await tester.pumpAndSettle();
+
+    PosField tipField() =>
+        tester.widget<PosField>(find.byKey(const ValueKey('partial-tip')));
+    expect(tipField().controller?.text, '10.00');
+    expect(
+      find.text('Portion MXN 116.00 + tip MXN 10.00 = charge MXN 126.00'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('partial-principal')),
+      '58.00',
+    );
+    await tester.pumpAndSettle();
+    expect(tipField().controller?.text, '5.00');
+
+    await tester.tap(find.byKey(const ValueKey('partial-tip-zero')));
+    await tester.pumpAndSettle();
+    expect(tipField().controller?.text, '0.00');
+
+    await tester.tap(find.byKey(const ValueKey('partial-tip-bp-1500')));
+    await tester.pumpAndSettle();
+    expect(tipField().controller?.text, '7.50');
+
+    await tester.enterText(find.byKey(const ValueKey('partial-tip')), '7.25');
+    await tester.pumpAndSettle();
+    expect(tipField().controller?.text, '7.25');
+    expect(
+      find.text('Portion MXN 58.00 + tip MXN 7.25 = charge MXN 65.25'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(find.byKey(const ValueKey('partial-tip')), '50.01');
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<PosButton>(find.byKey(const ValueKey('partial-charge')))
+          .onPressed,
+      isNull,
+    );
+
+    await tester.pumpWidget(const SizedBox());
+    root.dispose();
+    entry.dispose();
+    cart.dispose();
+    checkout.dispose();
+  });
+
+  testWidgets('closing an existing account split does not reopen it', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 2400);
+    addTearDown(tester.view.reset);
+    final repository = _PartialCheckoutRepository()
+      ..policyValue = CheckoutPolicy.fromJson(_policy)
+      ..ledger = const {
+        'cartId': '00000000-0000-4000-8000-000000000004',
+        'cartVersion': 3,
+        'amountDue': {'minorUnits': 11600, 'currency': 'MXN'},
+        'appliedAmount': {'minorUnits': 4000, 'currency': 'MXN'},
+        'remainingBalance': {'minorUnits': 7600, 'currency': 'MXN'},
+        'tipAmount': {'minorUnits': 0, 'currency': 'MXN'},
+        'tenderDrafts': [
+          {
+            'id': '00000000-0000-4000-8000-000000000099',
+            'type': 'cash',
+            'amount': {'minorUnits': 4000, 'currency': 'MXN'},
+            'amountReceived': {'minorUnits': 4000, 'currency': 'MXN'},
+            'status': 'draft',
+            'correlationId': null,
+          },
+        ],
+        'confirmationReferences': <String, String>{},
+        'blockedByUnknown': false,
+        'unresolvedTender': null,
+        'canFinalize': false,
+      };
+    final cart = CartController(
+      repository: _CartRepository(),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+    await cart.open(
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    );
+    final entry = await _signedInEntry();
+    final checkout = _controller(repository);
+    await checkout.loadPolicy(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      currency: 'MXN',
+    );
+    final root = testRoot();
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showSplitCheckout(
+                context,
+                checkout: checkout,
+                cashShiftId: '00000000-0000-4000-8000-000000000005',
+                cart: cart,
+                entry: entry,
+                sales: root.sales,
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PartialCheckoutSurface), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PartialCheckoutSurface), findsNothing);
+    expect(find.text('open'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    root.dispose();
+    entry.dispose();
+    cart.dispose();
+    checkout.dispose();
+  });
+
+  testWidgets('regular checkout does not open a new split ledger', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 2400);
+    addTearDown(tester.view.reset);
+    final repository = _PartialCheckoutRepository()
+      ..policyValue = CheckoutPolicy.fromJson(_policy);
+    final cart = CartController(
+      repository: _CartRepository(),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+    );
+    await cart.open(
+      '00000000-0000-4000-8000-000000000001',
+      '00000000-0000-4000-8000-000000000002',
+      '00000000-0000-4000-8000-000000000003',
+    );
+    final entry = await _signedInEntry();
+    final checkout = _controller(repository);
+    await checkout.loadPolicy(
+      merchantId: '00000000-0000-4000-8000-000000000001',
+      locationId: '00000000-0000-4000-8000-000000000002',
+      operatorSessionId: '00000000-0000-4000-8000-000000000003',
+      currency: 'MXN',
+    );
+    final root = testRoot();
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('en'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () => showCheckoutSheet(
+                context,
+                checkout: checkout,
+                cashShiftId: '00000000-0000-4000-8000-000000000005',
+                cart: cart,
+                entry: entry,
+                sales: root.sales,
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PartialCheckoutSurface), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    root.dispose();
+    entry.dispose();
+    cart.dispose();
+    checkout.dispose();
   });
 
   testWidgets('a tender corrected after the preview re-keys the pair before the charge', (

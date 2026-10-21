@@ -50,4 +50,40 @@ describe('OperationalInterceptor', () => {
       'http:branch:branch-1',
     ]);
   });
+
+  it('never refuses a liveness probe, whose job is to report the process', async () => {
+    const hit = vi.fn();
+    const request = {
+      method: 'GET',
+      url: '/health/live',
+      ip: '127.0.0.1',
+      headers: { 'x-umi-device-id': 'device-1' },
+      routeOptions: { url: '/health/live' },
+      authUser: { id: 'user-1' },
+    } as unknown as FastifyRequest;
+    const reply = { statusCode: 200, header: vi.fn() } as unknown as FastifyReply;
+    const context = {
+      getType: () => 'http',
+      switchToHttp: () => ({ getRequest: () => request, getResponse: () => reply }),
+    } as unknown as ExecutionContext;
+    const interceptor = new OperationalInterceptor(
+      { hit } as unknown as RateLimitService,
+      new MetricsService(),
+    );
+    const next: CallHandler = { handle: () => of('ok') };
+
+    await expect(
+      runWithRequestContext(
+        {
+          requestId: 'request-1',
+          correlationId: 'correlation-1',
+          userId: 'user-1',
+          merchantId: 'tenant-1',
+          locationId: 'branch-1',
+        },
+        () => lastValueFrom(interceptor.intercept(context, next)),
+      ),
+    ).resolves.toBe('ok');
+    expect(hit).not.toHaveBeenCalled();
+  });
 });

@@ -21,4 +21,14 @@ describe('canonical command data', () => {
     });
     expect(canonicalJson({ z: 1, a: 2 })).toBe('{"a":2,"z":1}');
   });
+
+  it('orders camelCase keys by code unit, as the till does', () => {
+    // `taxVersion` (…'V') precedes `taxes` (…'e') by code unit; locale collation
+    // puts them the other way and made every offline cash checkout replay as
+    // `fingerprint_mismatch` while the cart commands beside it passed.
+    expect(canonicalJson({ taxes: [], taxVersion: 'v1' })).toBe('{"taxVersion":"v1","taxes":[]}');
+    expect(commandFingerprint('x', { taxes: [], taxVersion: 'v1' })).toBe(
+      commandFingerprint('x', { taxVersion: 'v1', taxes: [] }),
+    );
+  });
 });

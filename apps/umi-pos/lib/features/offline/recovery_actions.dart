@@ -220,7 +220,14 @@ abstract final class RecoveryActionCatalog {
       'tax_changed' ||
       'availability_changed' ||
       'inventory_unavailable' ||
-      'catalog_version_expired' => const [RecoveryActionKind.refreshSnapshots],
+      'catalog_version_expired' ||
+      // The cart the server would price is not the one that was rung up, or the
+      // table was taken while this till was away. Neither is fixed by sending
+      // the same command again; both need the till to look at the world first.
+      'cart_mismatch' ||
+      'table_unavailable' => const [RecoveryActionKind.refreshSnapshots],
+      // Valid sale, over an offline limit: a person has to decide, not a retry.
+      'offline_limit_exceeded' => const [RecoveryActionKind.managerReview],
       'policy_changed' ||
       'command_expired' => const [RecoveryActionKind.refreshPolicy],
       'reconciliation_required' ||

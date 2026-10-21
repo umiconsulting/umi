@@ -554,6 +554,27 @@ void main() {
     },
   );
 
+  testWidgets('the all-stations board shows station-less tickets inline', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    repository.board.businessDate = '2026-09-15';
+    final controller = await _loaded(repository);
+    final entry = await _mount(tester, controller, board: true);
+
+    final card = find.byKey(ValueKey('unassigned-board-ticket-$orderId'));
+    expect(card, findsOneWidget);
+    expect(find.text('Cuenta 004 · Mesa 1'), findsOneWidget);
+    expect(find.text('Sin estación'), findsOneWidget);
+    expect(find.text('1 × Latte'), findsOneWidget);
+    expect(find.text('1 × Toast'), findsOneWidget);
+
+    await tester.tap(find.byKey(ValueKey('open-unassigned-ticket-$orderId')));
+    await tester.pumpAndSettle();
+    expect(find.byType(KitchenUnassignedSurface), findsOneWidget);
+    entry.dispose();
+  });
+
   testWidgets(
     'queue at 360px and 200 percent text remains scrollable without overflow',
     (tester) async {

@@ -8,6 +8,7 @@ import 'package:umi_contract/umi_contract.dart';
 import '../config/app_config.dart';
 import '../errors/app_error.dart';
 import '../observability/telemetry.dart';
+import 'lan_discovery.dart';
 
 enum ApiMethod { get, head, post, put, patch, delete }
 
@@ -71,6 +72,7 @@ final class BoundedApiClient implements ApiClient {
     DeviceCredentialProvider deviceCredentialProvider =
         const NoDeviceCredentialProvider(),
     this.sessionRefresh,
+    this.lanHubResolver,
     http.Client? client,
   }) : // ignore: prefer_initializing_formals
        _config = config,
@@ -86,19 +88,61 @@ final class BoundedApiClient implements ApiClient {
   /// dependent), or injected directly in tests. Null disables auto-refresh.
   SessionRefresh? sessionRefresh;
 
+  /// Routes the kitchen surface to the LAN node while the cloud is known to be
+  /// down. The heartbeat never uses this predicate: it must still test the
+  /// cloud so the till can notice recovery.
+  bool Function(String path)? preferLanRoute;
+
   /// Holds the one in-progress refresh so a burst of concurrent 401s triggers
   /// a single renewal that they all await.
   Future<bool>? _refreshInFlight;
 
+  /// The moment the cloud will accept our traffic again after a 429.
+  ///
+  /// A rate limit is a statement about the server's budget, not about the
+  /// wire. Without this gate every surface retries on its own cadence, the
+  /// retries keep the bucket empty, and the till shows "offline" while the API
+  /// is healthy. The gate is process-wide because the bucket belongs to the
+  /// device, not to one screen.
+  DateTime? _cloudRetryNotBefore;
+
   static const requestTimeout = Duration(seconds: 15);
   static const maxResponseBytes = 2 * 1024 * 1024;
   static const maxSafeReadAttempts = 2;
+
+  /// The one transport failure that proves the request never left this device.
+  /// [request] may move such a call to the LAN lane; every other failure stays
+  /// where it happened.
+  static const _preSendTransport = 'TRANSPORT_FAILURE_PRE_SEND';
+  static const _upstreamUnavailable = 'UPSTREAM_UNAVAILABLE';
 
   final AppConfig _config;
   final Telemetry _telemetry;
   final AccessTokenProvider _tokenProvider;
   final DeviceCredentialProvider _deviceCredentialProvider;
   final http.Client _client;
+  final LanHubResolver? lanHubResolver;
+
+  /// Probe the LAN hub without changing the cloud request path.
+  ///
+  /// Null means this build has no LAN hub. False means a hub is configured but
+  /// did not answer. The main station reports true because it is the hub.
+  Future<bool?> probeLanHub() async {
+    if (_config.lanNodeEnabled) return true;
+    final hub = await lanHubResolver?.resolve() ?? _config.lanHubUri;
+    if (hub == null || hub == _config.apiBaseUri) return null;
+    try {
+      final answer = await _send(
+        method: ApiMethod.get,
+        path: '/health/live',
+        idempotent: true,
+        base: hub,
+      ).timeout(const Duration(seconds: 2));
+      return answer['lanNode'] == true;
+    } on Object {
+      return false;
+    }
+  }
 
   @override
   Future<Map<String, Object?>> request({
@@ -125,6 +169,31 @@ final class BoundedApiClient implements ApiClient {
         recoverable: false,
       );
     }
+    if (preferLanRoute?.call(path) ?? false) {
+      final hub = await lanHubResolver?.resolve() ?? _config.lanHubUri;
+      if (hub != null && hub != base) {
+        _telemetry.event(const ClientEvent(name: 'network.lan_lane_preferred'));
+        try {
+          return await _send(
+            method: method,
+            path: path,
+            body: body,
+            cancellation: cancellation,
+            idempotent: idempotent,
+            base: hub,
+            extraHeaders: extraHeaders,
+          );
+        } on AppException catch (error) {
+          final safeRead = method == ApiMethod.get || method == ApiMethod.head;
+          if (!safeRead || error.code == 'REQUEST_CANCELLED') rethrow;
+          // A read cannot change money or stock. If the local node cannot
+          // answer, the cloud is still a valid read lane.
+          _telemetry.event(
+            const ClientEvent(name: 'network.lan_lane_read_fallback'),
+          );
+        }
+      }
+    }
     // The auth guard rejects an expired access token before the handler runs,
     // so no side effect has occurred and one retry after a token renewal is
     // safe even for a POST. A single renewal per request, shared across a
@@ -132,15 +201,40 @@ final class BoundedApiClient implements ApiClient {
     var didRefresh = false;
     while (true) {
       try {
-        return await _send(
-          method: method,
-          path: path,
-          body: body,
-          cancellation: cancellation,
-          idempotent: idempotent,
-          base: base,
-          extraHeaders: extraHeaders,
-        );
+        try {
+          return await _send(
+            method: method,
+            path: path,
+            body: body,
+            cancellation: cancellation,
+            idempotent: idempotent,
+            base: base,
+            extraHeaders: extraHeaders,
+          );
+        } on AppException catch (error) {
+          // The LAN node is a *lane*, not a retry. It is used only when the
+          // request provably never left this device — a refused connection, a
+          // dead DNS name, no route — because anything later than that could
+          // have been executed by the cloud, and replaying it against a second
+          // server is how one sale becomes two.
+          final hub = await lanHubResolver?.resolve() ?? _config.lanHubUri;
+          final cloudDidNotRun =
+              error.code == _preSendTransport ||
+              (error.code == _upstreamUnavailable && _isKitchenPath(path));
+          if (hub == null || !cloudDidNotRun || hub == base) {
+            rethrow;
+          }
+          _telemetry.event(const ClientEvent(name: 'network.lan_lane_used'));
+          return await _send(
+            method: method,
+            path: path,
+            body: body,
+            cancellation: cancellation,
+            idempotent: idempotent,
+            base: hub,
+            extraHeaders: extraHeaders,
+          );
+        }
       } on AppException catch (error) {
         if (!didRefresh &&
             authRefresh &&
@@ -159,6 +253,61 @@ final class BoundedApiClient implements ApiClient {
       _refreshInFlight ??= sessionRefresh!().whenComplete(() {
         _refreshInFlight = null;
       });
+
+  /// Send one read straight to the configured LAN node.
+  ///
+  /// The hub validates the presented device credential with the cloud and
+  /// stores its hash while the cloud is healthy. A peer therefore has an
+  /// offline trust entry before the first outage.
+  Future<void> warmLanHub(String path) async {
+    final hub = await lanHubResolver?.resolve() ?? _config.lanHubUri;
+    if (hub == null) return;
+    await _send(
+      method: ApiMethod.get,
+      path: path,
+      cancellation: null,
+      idempotent: true,
+      base: hub,
+      extraHeaders: null,
+    );
+  }
+
+  /// Send one explicit command to the main station.
+  ///
+  /// This does not fall back to the cloud. A peer command must have one writer.
+  /// The hub assigns the cloud sequence and keeps the durable copy.
+  Future<Map<String, Object?>> sendLanHub({
+    required ApiMethod method,
+    required String path,
+    Map<String, Object?>? body,
+    Map<String, String>? extraHeaders,
+  }) async {
+    if (!path.startsWith('/')) {
+      throw const AppException(
+        category: AppErrorCategory.configuration,
+        code: 'INVALID_API_PATH',
+        recoverable: false,
+      );
+    }
+    final hub = await lanHubResolver?.resolve() ?? _config.lanHubUri;
+    if (hub == null) {
+      throw const AppException(
+        category: AppErrorCategory.configuration,
+        code: 'LAN_HUB_NOT_CONFIGURED',
+        recoverable: true,
+      );
+    }
+    _telemetry.event(const ClientEvent(name: 'network.lan_hub_command'));
+    return _send(
+      method: method,
+      path: path,
+      body: body,
+      cancellation: null,
+      idempotent: true,
+      base: hub,
+      extraHeaders: extraHeaders,
+    );
+  }
 
   Future<Map<String, Object?>> _send({
     required ApiMethod method,
@@ -181,12 +330,36 @@ final class BoundedApiClient implements ApiClient {
           recoverable: true,
         );
       }
+      // The probe is the one request that must pass the gate. It is how the
+      // till learns that the API is healthy again, and it costs one row.
+      final gate = _cloudRetryNotBefore;
+      if (base == _config.apiBaseUri &&
+          path != '/health/live' &&
+          gate != null &&
+          DateTime.now().isBefore(gate)) {
+        throw _rateLimited(
+          gate.difference(DateTime.now()).inSeconds.clamp(1, 300).toInt(),
+        );
+      }
       final correlationId = _correlationId();
       try {
-        final token = await _tokenProvider.accessToken();
-        final deviceHeaders = await _deviceCredentialProvider.deviceHeaders(
-          path: path,
-        );
+        final String? token;
+        final Map<String, String> deviceHeaders;
+        try {
+          token = await _tokenProvider.accessToken();
+          deviceHeaders = await _deviceCredentialProvider.deviceHeaders(
+            path: path,
+          );
+        } on AppException {
+          rethrow;
+        } catch (_) {
+          throw AppException(
+            category: AppErrorCategory.storage,
+            code: 'LOCAL_CREDENTIAL_READ_FAILED',
+            recoverable: false,
+            correlationId: correlationId,
+          );
+        }
         final request =
             http.Request(method.name.toUpperCase(), base.resolve(path))
               ..headers.addAll({
@@ -194,6 +367,7 @@ final class BoundedApiClient implements ApiClient {
                 'x-correlation-id': correlationId,
                 'x-umi-client': 'umi-pos',
                 'x-umi-app': 'pos',
+                'x-umi-client-time': DateTime.now().toUtc().toIso8601String(),
                 ...deviceHeaders,
                 // A route whose contract names no credential of ours can still
                 // ask for one under its own header name. Applied last so the
@@ -205,7 +379,22 @@ final class BoundedApiClient implements ApiClient {
           request.headers['content-type'] = 'application/json';
           request.body = jsonEncode(body);
         }
-        final streamed = await _client.send(request).timeout(requestTimeout);
+        final http.StreamedResponse streamed;
+        try {
+          streamed = await _client.send(request).timeout(requestTimeout);
+        } catch (error) {
+          // Nothing was delivered: the socket was refused, the name did not
+          // resolve, or there was no route. Only this shape may move to the LAN
+          // lane; a failure while reading the response is "unknown outcome" and
+          // must stay with the lane that may have executed it.
+          if (error is TimeoutException) rethrow;
+          throw AppException(
+            category: AppErrorCategory.transport,
+            code: _preSendTransport,
+            recoverable: safeRetry,
+            correlationId: correlationId,
+          );
+        }
         final bytes = await streamed.stream
             .fold<List<int>>(<int>[], (buffer, chunk) {
               if (buffer.length + chunk.length > maxResponseBytes) {
@@ -218,10 +407,48 @@ final class BoundedApiClient implements ApiClient {
               return buffer..addAll(chunk);
             })
             .timeout(requestTimeout);
-        final decoded = bytes.isEmpty ? <String, Object?>{} : _decode(bytes);
         if (streamed.statusCode >= 200 && streamed.statusCode < 300) {
-          return decoded;
+          // The probe answers even while the window is closed. Only a normal
+          // request proves that the window is open again.
+          if (path != '/health/live' && path != '/health/ready') {
+            _cloudRetryNotBefore = null;
+          }
+          return bytes.isEmpty ? <String, Object?>{} : _decode(bytes);
         }
+        if (streamed.statusCode == 429) {
+          final decoded = bytes.isEmpty ? <String, Object?>{} : _decode(bytes);
+          final refusal = _publicError(decoded, correlationId);
+          final stated = int.tryParse(streamed.headers['retry-after'] ?? '');
+          final seconds = (stated ??
+                  (refusal.details?['retryAfterSeconds'] as num?)?.ceil() ??
+                  30)
+              .clamp(1, 300)
+              .toInt();
+          _cloudRetryNotBefore = DateTime.now().add(Duration(seconds: seconds));
+          _telemetry.event(
+            ClientEvent(
+              name: 'network.rate_limited',
+              values: {'waitSeconds': seconds},
+            ),
+          );
+          // The refusal already names the wait. Retrying inside this call
+          // would charge the same bucket again before its window closes.
+          throw refusal;
+        }
+        if (streamed.statusCode == 502 ||
+            streamed.statusCode == 503 ||
+            streamed.statusCode == 504) {
+          // The proxy could not reach its upstream, so no API handler ran.
+          // Kitchen reads and idempotent commands may use the LAN lane for
+          // this same reason they use it after a refused connection.
+          throw AppException(
+            category: AppErrorCategory.server,
+            code: _upstreamUnavailable,
+            recoverable: safeRetry,
+            correlationId: correlationId,
+          );
+        }
+        final decoded = bytes.isEmpty ? <String, Object?>{} : _decode(bytes);
         throw _publicError(decoded, correlationId);
       } on TimeoutException {
         lastFailure = AppException(
@@ -232,6 +459,7 @@ final class BoundedApiClient implements ApiClient {
         );
       } on AppException catch (error) {
         lastFailure = error;
+        if (error.code == 'RATE_LIMITED') rethrow;
         if (!error.recoverable) rethrow;
       } catch (_) {
         lastFailure = AppException(
@@ -251,9 +479,19 @@ final class BoundedApiClient implements ApiClient {
           },
         ),
       );
+      if (attempt < attempts) {
+        await Future<void>.delayed(Duration(milliseconds: 200 * attempt));
+      }
     }
     throw lastFailure!;
   }
+
+  AppException _rateLimited(int seconds) => AppException(
+    category: AppErrorCategory.server,
+    code: 'RATE_LIMITED',
+    recoverable: true,
+    details: {'retryAfterSeconds': seconds},
+  );
 
   Map<String, Object?> _decode(List<int> bytes) {
     final value = jsonDecode(utf8.decode(bytes));
@@ -338,6 +576,9 @@ final class BoundedApiClient implements ApiClient {
     return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
   }
+
+  bool _isKitchenPath(String path) =>
+      path.startsWith('/api/kds/') || path.contains('/kitchen/');
 
   @override
   void dispose() => _client.close();

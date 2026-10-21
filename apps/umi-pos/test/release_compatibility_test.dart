@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/release/release_compatibility.dart';
 
@@ -28,13 +29,42 @@ void main() {
     );
     expect(await gateway.check(), ReleaseCompatibility.unsupported);
   });
+
+  test('a local storage failure stays visible by category', () async {
+    final gateway = ApiReleaseCompatibilityGateway(
+      api: _ReleaseApi(
+        error: const AppException(
+          category: AppErrorCategory.storage,
+          code: 'LOCAL_CREDENTIAL_READ_FAILED',
+          recoverable: false,
+        ),
+      ),
+      config: pilotTestConfig,
+    );
+
+    await expectLater(
+      gateway.check(),
+      throwsA(
+        isA<AppException>().having(
+          (error) => error.category,
+          'category',
+          AppErrorCategory.storage,
+        ),
+      ),
+    );
+  });
 }
 
 final class _ReleaseApi implements ApiClient {
-  _ReleaseApi({this.environment = 'pilot', this.minimumPosVersion = '0.1.0'});
+  _ReleaseApi({
+    this.environment = 'pilot',
+    this.minimumPosVersion = '0.1.0',
+    this.error,
+  });
 
   final String environment;
   final String minimumPosVersion;
+  final AppException? error;
 
   @override
   Future<Map<String, Object?>> request({
@@ -45,11 +75,14 @@ final class _ReleaseApi implements ApiClient {
     bool idempotent = false,
     bool authRefresh = true,
     Map<String, String>? extraHeaders,
-  }) async => {
-    'environment': environment,
-    'contractVersion': '2.12.0',
-    'minimumPosVersion': minimumPosVersion,
-  };
+  }) async {
+    if (error != null) throw error!;
+    return {
+      'environment': environment,
+      'contractVersion': '2.12.0',
+      'minimumPosVersion': minimumPosVersion,
+    };
+  }
 
   @override
   void dispose() {}

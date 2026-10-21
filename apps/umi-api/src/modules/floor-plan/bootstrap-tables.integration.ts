@@ -7,6 +7,8 @@ import { PgService } from '../../shared/database/pg.service';
 import { runWithRequestContext } from '../../shared/database/request-context';
 import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
+import { PosCartRepository } from '../pos-cart/pos-cart.repository';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
 import { FloorPlanRepository } from './floor-plan.repository';
 import { FloorPlanService } from './floor-plan.service';
 
@@ -117,6 +119,7 @@ describe('POS initial table grid under real API authorization and RLS', () => {
     service = new FloorPlanService(
       new FloorPlanRepository(pg),
       new IntegrityService(new IntegrityRepository(pg)),
+      new PosSaleRepository(pg, new PosCartRepository(pg)),
     );
     await pg.query(`INSERT INTO merchant.merchant(id,name,handle) VALUES ($1,'POS grid test',$2)`, [
       merchant,

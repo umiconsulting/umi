@@ -9,5 +9,6 @@ import { TableMapService } from './table-map.service';
   imports: [AuthModule, IntegrityModule],
   controllers: [TableMapController, PosTableMapController],
   providers: [TableMapRepository, TableMapService],
+  exports: [TableMapService],
 })
 export class TableMapModule {}

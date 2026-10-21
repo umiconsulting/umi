@@ -18,9 +18,12 @@ final class AppConfig {
     required this.release,
     this.runningOnWeb = false,
     this.deviceKeyKind = '',
+    this.deviceKind = 'pos_terminal',
     this.secureStorageKind = '',
     this.updateGithubOwner = '',
     this.updateGithubRepo = '',
+    this.lanHubUri,
+    this.lanNodeEnabled = false,
   });
 
   factory AppConfig.fromEnvironment() {
@@ -56,6 +59,13 @@ final class AppConfig {
       'UMIPOS_DEVICE_KEY',
       defaultValue: '',
     );
+    // One binary serves the till and the kitchen board. The enrolled device kind
+    // is a build decision because the enrollment claim must match the setup code
+    // the owner created; a KDS request cannot be claimed as a POS terminal.
+    const deviceKind = String.fromEnvironment(
+      'UMIPOS_DEVICE_KIND',
+      defaultValue: 'pos_terminal',
+    );
     // Which secure-storage backend the build uses: '' (default) keeps the
     // platform credential service. 'tpm' seals the vault to the TPM 2.0 with
     // systemd-creds, so no keyring prompter can appear on a counter terminal.
@@ -74,6 +84,11 @@ final class AppConfig {
       'UMIPOS_UPDATE_GH_REPO',
       defaultValue: '',
     );
+    // The main station's LAN node, when this build should be able to reach it.
+    // Empty (the default) means this till talks to the cloud only, which is
+    // every environment until a café turns the local node on.
+    const lanHub = String.fromEnvironment('UMIPOS_LAN_HUB', defaultValue: '');
+    const lanNode = String.fromEnvironment('UMIPOS_LAN_NODE', defaultValue: '');
     return AppConfig(
       environment: AppEnvironment.values.firstWhere(
         (value) => value.name == environmentValue,
@@ -90,14 +105,25 @@ final class AppConfig {
       release: ReleaseIdentity.fromEnvironment(),
       runningOnWeb: kIsWeb,
       deviceKeyKind: deviceKey,
+      deviceKind: deviceKind,
       secureStorageKind: secureStorage,
       updateGithubOwner: updateOwner,
       updateGithubRepo: updateRepo,
+      lanHubUri: lanHub.isEmpty ? null : Uri.tryParse(lanHub),
+      lanNodeEnabled: lanNode == 'host',
     );
   }
 
   final AppEnvironment environment;
   final Uri? apiBaseUri;
+
+  /// The LAN node this till falls back to when the cloud cannot be reached at
+  /// all. Not a second API: the same routes, served by the main station.
+  final Uri? lanHubUri;
+
+  /// True only on the main station. It starts the local HTTP node and the
+  /// mDNS service announcement. Every other till uses [lanHubUri] or discovery.
+  final bool lanNodeEnabled;
   final bool telemetryEnabled;
   final bool developmentDiagnostics;
   final FeatureBootstrapMode featureBootstrapMode;
@@ -112,6 +138,7 @@ final class AppConfig {
   /// (desktop TPM), or 'keystore' (mobile Android Keystore / iOS Secure
   /// Enclave).
   final String deviceKeyKind;
+  final String deviceKind;
 
   /// True when the build opted into the hardware TPM device key (desktop).
   bool get useTpmDeviceKey => deviceKeyKind == 'tpm';
@@ -201,6 +228,13 @@ final class AppConfig {
       return const AppException(
         category: AppErrorCategory.configuration,
         code: 'RELEASE_IDENTITY_INVALID',
+        recoverable: false,
+      );
+    }
+    if (!{'pos_terminal', 'kds'}.contains(deviceKind)) {
+      return const AppException(
+        category: AppErrorCategory.configuration,
+        code: 'DEVICE_KIND_INVALID',
         recoverable: false,
       );
     }

@@ -643,6 +643,7 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
   }
 
   Widget _receipt(AppLocalizations l, SaleExceptionResult? result) {
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
     if (result == null) {
       return _status(
         PosGlyphs.receiptLongOutlined,
@@ -651,12 +652,15 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
       );
     }
     final receipt = result.receipt;
+    final voided = result.exceptionType == 'void';
     return Column(
       children: [
         const PosIcon(PosGlyphs.checkCircleOutline, size: 56),
         const SizedBox(height: UmiSpacing.md),
         Text(
-          l.compensatingReceiptTitle,
+          voided
+              ? (spanish ? 'Anulación confirmada' : 'Sale voided')
+              : l.compensatingReceiptTitle,
           style: PosTheme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: UmiSpacing.sm),
@@ -666,10 +670,18 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
         ),
         const SizedBox(height: UmiSpacing.lg),
         _moneyRow(
-          l.refundAmountLabel,
+          voided
+              ? (spanish ? 'Importe anulado' : 'Voided amount')
+              : l.refundAmountLabel,
           result.allocation['total']! as Map<String, Object?>,
         ),
-        Text(l.refundCommittedMessage),
+        Text(
+          voided
+              ? (spanish
+                    ? 'La venta quedó anulada.'
+                    : 'The sale has been voided.')
+              : l.refundCommittedMessage,
+        ),
       ],
     );
   }
@@ -766,6 +778,14 @@ final class _SaleExceptionSurfaceState extends State<_SaleExceptionSurface> {
       spanish
           ? 'Se desconoce el resultado del pago original. Verifícalo antes de reembolsar.'
           : 'The original payment outcome is unknown. Verify it before you refund.',
+    'bank_transfer_refund_requires_support' =>
+      spanish
+          ? 'Los reembolsos de transferencia bancaria requieren soporte. Abre el Centro de recuperación y comparte la referencia de la venta.'
+          : 'Bank-transfer refunds require support. Open the Recovery centre and share the sale reference.',
+    'other_operator_permission_required' =>
+      spanish
+          ? 'La venta la cobró otro operador. Pide a un gerente que la revise y autorice.'
+          : 'Another operator took this sale. Ask a manager to review and authorize it.',
     _ =>
       spanish
           ? 'Esta venta no cumple una regla del reembolso. Pide apoyo a un gerente.'

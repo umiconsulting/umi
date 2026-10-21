@@ -220,23 +220,42 @@ final class TableStateController extends ChangeNotifier {
     ),
   );
 
+  Future<void> adoptSeat(String tableId, int partySize) async {
+    final repository = _repository;
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    if (repository is! TableSeatProjectionRepository ||
+        merchantId == null ||
+        locationId == null) {
+      return;
+    }
+    final projector = repository as TableSeatProjectionRepository;
+    final map = await projector.projectSeat(
+      merchantId,
+      locationId,
+      tableId,
+      partySize,
+    );
+    if (_disposed) return;
+    _install(map);
+    notifyListeners();
+  }
+
   /// Move a party to another table. The turn timer travels: the server refuses
   /// to move `seated_at`, so the party keeps its clock.
-  Future<bool> move({
-    required String fromTableId,
-    required String toTableId,
-  }) => _command(
-    (key) => _repository.move(
-      _merchantId!,
-      MovePartyRequest(
-        locationId: _locationId!,
-        operatorSessionId: _operatorSessionId!,
-        idempotencyKey: key,
-        fromTableId: fromTableId,
-        toTableId: toTableId,
-      ),
-    ),
-  );
+  Future<bool> move({required String fromTableId, required String toTableId}) =>
+      _command(
+        (key) => _repository.move(
+          _merchantId!,
+          MovePartyRequest(
+            locationId: _locationId!,
+            operatorSessionId: _operatorSessionId!,
+            idempotencyKey: key,
+            fromTableId: fromTableId,
+            toTableId: toTableId,
+          ),
+        ),
+      );
 
   /// Merge free tables into one party. They share one `groupId`, which is what
   /// makes them one bounded region on the map.

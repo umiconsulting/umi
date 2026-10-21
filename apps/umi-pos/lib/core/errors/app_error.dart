@@ -64,6 +64,19 @@ final class AppException implements Exception {
   /// besides tap the same button again (`ApiError.details`).
   final Map<String, Object?>? details;
 
+  /// The wait the server asked for, when it refused because of its own limit.
+  ///
+  /// A 429 is not an outage and not a conflict: the request was not executed,
+  /// and sending it again before the window closes only extends the refusal.
+  /// Null means the server did not state a wait, so the caller picks one.
+  Duration? get retryAfter {
+    final value = details?['retryAfterSeconds'];
+    if (value is num && value.isFinite && value > 0) {
+      return Duration(seconds: value.ceil().clamp(1, 300).toInt());
+    }
+    return null;
+  }
+
   @override
   String toString() => 'AppException(${category.name}, $code)';
 }

@@ -29,6 +29,7 @@ void main() {
             journal: journal,
             recovery: recovery,
             scope: ReplayScope(
+              deviceId: _id(4),
               merchantId: _id(1),
               locationId: _id(2),
               operatorSessionId: _id(3),
@@ -42,6 +43,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Centro de recuperación'), findsOneWidget);
     expect(find.text('Sincronizar ahora'), findsOneWidget);
+    // The server's own count of this till's queue, in one line for support.
+    expect(
+      find.text('Servidor: 12 · aceptadas: 12 · conflictos: 1 · cola: 3'),
+      findsOneWidget,
+    );
     final semantics = tester.getSemantics(find.text('Sincronizar ahora'));
     expect(semantics.flagsCollection.isButton, isTrue);
     await tester.tap(find.text('Sincronizar ahora'));
@@ -70,6 +76,7 @@ void main() {
               journal: journal,
               recovery: recovery,
               scope: ReplayScope(
+                deviceId: _id(4),
                 merchantId: _id(1),
                 locationId: _id(2),
                 operatorSessionId: _id(3),
@@ -109,6 +116,7 @@ void main() {
               journal: journal,
               recovery: recovery,
               scope: ReplayScope(
+                deviceId: _id(4),
                 merchantId: _id(1),
                 locationId: _id(2),
                 operatorSessionId: _id(3),
@@ -171,10 +179,25 @@ final class _Gateway implements ReplayGateway {
   @override
   Future<ConflictSummary> conflicts(ReplayScope scope) async => _unused();
   @override
+  Future<ResolvedReplayConflict> resolveConflict(
+    ReplayScope scope,
+    String commandId,
+  ) async => _unused();
+  @override
   Future<ReplayCursor> cursor(ReplayScope scope) async => _unused();
   @override
   Future<SafeReplayDiagnostic> diagnostics(ReplayScope scope) async =>
-      _unused();
+      SafeReplayDiagnostic.fromJson({
+        'contractVersion': '2.39.0',
+        'serverLastAcceptedSequence': 12,
+        'acceptedCount': 12,
+        'conflictCount': 1,
+        'lastReplayAt': null,
+        'lastSafeErrorCategory': 'table_unavailable',
+        'queueDepth': 3,
+        'unresolvedCount': 1,
+        'audit': <Object?>[],
+      });
   @override
   Future<OfflinePolicy> policy(ReplayScope scope) async => _unused();
   @override

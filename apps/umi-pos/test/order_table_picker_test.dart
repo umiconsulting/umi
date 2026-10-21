@@ -445,7 +445,13 @@ void main() {
         find.byKey(const ValueKey('floor-plan-element-busy-table')),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Cuenta 141'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('order-table-detail')),
+          matching: find.text('Cuenta 141'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Mesa con otra cuenta'), findsOneWidget);
       expect(
         tester
@@ -590,7 +596,13 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('confirm-table')));
       await tester.pumpAndSettle();
       expect(returned, isFalse);
-      expect(find.text('Cuenta 142'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('order-table-detail')),
+          matching: find.text('Cuenta 142'),
+        ),
+        findsOneWidget,
+      );
       expect(
         tester
             .widget<PosButton>(find.byKey(const ValueKey('confirm-table')))

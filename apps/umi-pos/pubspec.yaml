@@ -21,7 +21,11 @@ dependencies:
   cryptography: 2.7.0
   crypto: 3.0.7
   http: 1.5.0
+  path: ^1.9.1
+  path_provider: ^2.1.5
   shared_preferences: 2.5.3
+  sqflite: ^2.4.2
+  sqflite_common_ffi: ^2.3.6
   umi_contract:
     path: ../../packages/contract/generated/dart
   socket_io_client: 3.1.6
@@ -31,6 +35,7 @@ dependencies:
   # the iOS target. An exact pin breaks one of the two; the range is what lets
   # both resolve.
   intl: ^0.20.2
+  multicast_dns: 0.3.3+1
 dev_dependencies:
   flutter_test:
     sdk: flutter

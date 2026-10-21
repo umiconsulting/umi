@@ -242,6 +242,14 @@
   "recoverySupportDescription": "Copy the safe diagnostic reference without exposing sale contents.",
   "saleActionsTitle": "Sale actions",
   "newSaleAction": "New sale",
+  "cartRestoringAccount": "Restoring your account…",
+  "@cartRestoringAccount": {
+    "description": "Shown in the order panel during startup while the till reads the account that was already open. It deliberately replaces the new-sale action so an old account cannot appear after the operator has tapped it."
+  },
+  "cartRestoringAccountHint": "Wait a moment while we restore the open account.",
+  "@cartRestoringAccountHint": {
+    "description": "Explains why starting a new account is unavailable during startup account restoration."
+  },
   "suspendSaleAction": "Suspend sale",
   "resumeSaleAction": "Resume sale",
   "renameSaleAction": "Rename suspended sale",
@@ -293,6 +301,7 @@
   "saleSearchHint": "Search by name, customer, or receipt",
   "saleNameFallback": "Sale",
   "editCartLineAction": "Edit item",
+  "repeatCartLineAction": "Repeat item",
   "saveCartLineAction": "Save changes",
   "clearCartAction": "Clear order",
   "confirmClearCartTitle": "Clear this order?",
@@ -332,6 +341,7 @@
   "expectedCashLabel": "Expected cash",
   "countedCashLabel": "Counted cash",
   "cashVarianceLabel": "Variance",
+  "offlinePriceDivergenceLabel": "Offline price differences",
   "cashOverageLabel": "Overage",
   "cashShortageLabel": "Shortage",
   "cashToleranceLabel": "Tolerance",
@@ -768,6 +778,7 @@
   "keepCartAction": "Keep this order",
   "tenderConflictTitle": "This order cannot be paid like this",
   "tenderConflictBody": "It holds a split between cash and card, and this location takes one method per sale. The payment record stays for review; to carry on, start a new sale.",
+  "splitCheckAction": "Split check",
   "splitTenderTitle": "Split payment",
   "splitTenderAction": "Split payment",
   "splitTenderCancelAction": "Single method",

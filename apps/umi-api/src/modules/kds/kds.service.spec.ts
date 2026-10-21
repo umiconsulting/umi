@@ -76,6 +76,9 @@ function make() {
       result: { kitchenOrderId: 'o1', status: 'in_preparation', version: 2, sequence: 5 },
     }),
     loadOrderForScope: vi.fn(),
+    replayKitchenActor: vi.fn(),
+    resolveReplayCartId: vi.fn(),
+    resolveReplayOrderItemIds: vi.fn(),
     heartbeatTouch: vi.fn().mockResolvedValue(true),
     sessionLastUsedAt: vi.fn().mockResolvedValue(null),
   };
@@ -958,6 +961,37 @@ describe('KdsService.commandForPos', () => {
       svc.commandForPos(POS_USER, 't1', dto({ commandType: 'complete' })),
     ).rejects.toMatchObject({
       response: { code: 'KITCHEN_VERSION_CONFLICT', currentVersion: 2 },
+    });
+  });
+
+  it('maps local cart-line ids through the host line map before replay', async () => {
+    const { svc, repo } = make();
+    repo.replayKitchenActor.mockResolvedValue({ kind: 'pos_terminal' });
+    repo.resolveReplayCartId.mockResolvedValue('official-cart');
+    repo.resolveReplayOrderItemIds.mockResolvedValue([ITEM]);
+    repo.loadOrderForScope.mockResolvedValue(ORDER);
+    repo.listStations.mockResolvedValue([{ id: ST1 }]);
+
+    await svc.commandForReplay(
+      POS_USER,
+      't1',
+      dto({ commandType: 'mark_item_ready', itemIds: ['local-item'] }),
+      'actor-device',
+      ['kitchen.ready'],
+      'pos-cart:local-cart',
+      { 'local-item': 0 },
+    );
+
+    expect(repo.resolveReplayOrderItemIds).toHaveBeenCalledWith(
+      't1',
+      'official-cart',
+      ORDER.id,
+      ['local-item'],
+      { 'local-item': 0 },
+    );
+    expect(repo.executeKitchenCommand.mock.calls.at(-1)?.[0]).toMatchObject({
+      commandType: 'mark_item_ready',
+      itemIds: [ITEM],
     });
   });
 });

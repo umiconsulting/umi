@@ -50,6 +50,9 @@ export class IpRateLimitGuard implements CanActivate {
     const http = context.switchToHttp();
     const request = http.getRequest<FastifyRequest & AuthedRequest>();
     const reply = http.getResponse<FastifyReply>();
+    // Liveness and readiness probes answer a question about the process. A
+    // shared address at its ceiling must not make a healthy process look dead.
+    if (isHealthProbe(request)) return true;
 
     const userId = await this.verifiedUserId(request);
     const addressScope = userId ? 'ip_authenticated' : 'ip';
@@ -108,4 +111,10 @@ export class IpRateLimitGuard implements CanActivate {
       429,
     );
   }
+}
+
+function isHealthProbe(request: FastifyRequest): boolean {
+  if (typeof request.url !== 'string') return false;
+  const path = request.url.split('?')[0];
+  return path === '/health/live' || path === '/health/ready';
 }

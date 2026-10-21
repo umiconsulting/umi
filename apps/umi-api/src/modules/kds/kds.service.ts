@@ -757,13 +757,95 @@ export class KdsService {
       dto.operatorSessionId,
     );
     if (!access.allowed) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+    return this.executePosKitchenCommand(user, merchantId, dto, access.permissions);
+  }
 
+  /**
+   * Replay a kitchen command that the main station journalled for a trusted LAN
+   * peer. The replay caller is authorised by `PosOfflineService`; this method
+   * additionally proves the acting device is still active in the same merchant
+   * and location. The command keeps its original identity and optimistic
+   * version, so a duplicate replay is still a duplicate.
+   */
+  async commandForReplay(
+    user: AuthUser,
+    merchantId: string,
+    dto: PosKitchenCommandRequest,
+    actorDeviceId: string,
+    permissions: string[],
+    sourceReference: string | null = null,
+    lineMap: Record<string, number> | null = null,
+  ) {
+    if (!user.deviceId) throw new UnauthorizedException({ code: 'DEVICE_NOT_ENROLLED' });
+    const actor = await this.repo.replayKitchenActor(merchantId, dto.locationId, actorDeviceId);
+    if (!actor) throw new ConflictException({ code: 'DEVICE_REVOKED' });
+    // A KDS device is provisioned with the kitchen permission set. Its own
+    // credential proved that role at the LAN node; the replay operator need not
+    // hold the same kitchen permissions as the cook.
+    const effectivePermissions =
+      actor.kind === 'kds'
+        ? [
+            'kitchen.prepare',
+            'kitchen.ready',
+            'kitchen.complete',
+            'kitchen.recall',
+            'kitchen.cancel_ack',
+          ]
+        : permissions;
+    let command = dto;
+    if (sourceReference) {
+      let resolvedCartId: string | null = null;
+      if (sourceReference.startsWith('pos-cart:')) {
+        const provisionalCartId = sourceReference.slice('pos-cart:'.length);
+        resolvedCartId =
+          (await this.repo.resolveReplayCartId(merchantId, provisionalCartId)) ?? provisionalCartId;
+      }
+      let order = await this.repo.loadOrderForScope(merchantId, sourceReference, null);
+      if (!order && resolvedCartId) {
+        order = await this.repo.loadOrderForScope(merchantId, `pos-cart:${resolvedCartId}`, null);
+      }
+      if (!order) throw new ConflictException({ code: 'KITCHEN_ORDER_NOT_FOUND' });
+      command = {
+        ...dto,
+        kitchenOrderId: order.id,
+      };
+      if (resolvedCartId && lineMap && dto.itemIds.length > 0) {
+        const itemIds = await this.repo.resolveReplayOrderItemIds(
+          merchantId,
+          resolvedCartId,
+          order.id,
+          dto.itemIds,
+          lineMap,
+        );
+        if (!itemIds) {
+          throw new ConflictException({ code: 'KITCHEN_ITEM_NOT_FOUND' });
+        }
+        command = { ...command, itemIds };
+      }
+      return this.executePosKitchenCommand(
+        user,
+        merchantId,
+        command,
+        effectivePermissions,
+        order.version,
+      );
+    }
+    return this.executePosKitchenCommand(user, merchantId, command, effectivePermissions);
+  }
+
+  private async executePosKitchenCommand(
+    user: AuthUser,
+    merchantId: string,
+    dto: PosKitchenCommandRequest,
+    permissions: string[],
+    expectedVersionOverride?: number,
+  ) {
     // The route declares the base `kitchen.prepare`; the command's own permission is
     // checked here, because only here is the command type known. A refusal NAMES the
     // permission, so a cook whose role lacks `kitchen.recall` is told that, rather than
     // being shown a button that silently never works.
     const permission = kitchenPermission(dto.commandType);
-    if (!access.permissions.includes('*') && !access.permissions.includes(permission)) {
+    if (!permissions.includes('*') && !permissions.includes(permission)) {
       throw new ForbiddenException({
         code: 'KITCHEN_PERMISSION_REQUIRED',
         message: `This kitchen command needs the ${permission} permission.`,
@@ -854,7 +936,10 @@ export class KdsService {
       commandId: dto.commandId,
       idempotencyKey: dto.idempotencyKey,
       correlationId: dto.correlationId,
-      expectedVersion: dto.expectedVersion,
+      // The fingerprint above keeps the version the till saw, so a repeat
+      // still recognises its own prior outcome. The optimistic check below
+      // uses the server's current aggregate when a LAN ticket is replayed.
+      expectedVersion: expectedVersionOverride ?? dto.expectedVersion,
       commandType: dto.commandType,
       targetStatus: null,
       itemIds,

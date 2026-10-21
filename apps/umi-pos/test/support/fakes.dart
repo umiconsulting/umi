@@ -133,6 +133,7 @@ AppCompositionRoot testRoot({
   AppConfig? config,
   ReleaseCompatibilityGateway? releaseCompatibility,
   PlatformAdapters platform = const PlatformAdapters.unsupported(),
+  PreferencesStore? preferences,
 }) {
   config ??= testConfig;
   releaseCompatibility ??= const TestReleaseCompatibility(
@@ -146,6 +147,7 @@ AppCompositionRoot testRoot({
     exporter: exporter,
   );
   final credentials = CredentialVault(secureStorage);
+  final preferenceStore = preferences ?? TestPreferences();
   final api = TestApiClient();
   final cartRepository = ApiCartRepository(api);
   final cart = CartController(repository: cartRepository, telemetry: telemetry);
@@ -155,16 +157,18 @@ AppCompositionRoot testRoot({
   );
   return AppCompositionRoot(
     config: testConfig,
+    connectivityHeartbeat: false,
     controller: BootstrapController(
       config: config,
       contracts: contracts,
       releaseCompatibility: releaseCompatibility,
       secureStorage: secureStorage,
+      preferences: preferenceStore,
       telemetry: telemetry,
     ),
     telemetry: telemetry,
     secureStorage: secureStorage,
-    preferences: TestPreferences(),
+    preferences: preferenceStore,
     localDatabase: const UnsupportedLocalDatabase(),
     platform: platform,
     apiClient: api,

@@ -17,7 +17,9 @@ Future<void> showFloorPlan(
   required FloorPlanController controller,
   required EntryController entry,
   TableStateController? tableState,
-  Future<void> Function(FloorPlanElement table)? onOpenAccount,
+  Future<bool> Function(FloorPlanElement table, {int? partySize})?
+  onOpenAccount,
+  Future<bool> Function()? onOpenTemporaryAccount,
   VoidCallback? onShowAccounts,
 }) => Navigator.of(context).push(
   PosPageRoute<void>(
@@ -26,6 +28,7 @@ Future<void> showFloorPlan(
       entry: entry,
       tableState: tableState,
       onOpenAccount: onOpenAccount,
+      onOpenTemporaryAccount: onOpenTemporaryAccount,
       onShowAccounts: onShowAccounts,
     ),
   ),
@@ -39,6 +42,7 @@ class FloorPlanSurface extends StatefulWidget {
     this.tableState,
     this.embedded = false,
     this.onOpenAccount,
+    this.onOpenTemporaryAccount,
     this.onShowAccounts,
     this.directAccounts = false,
     this.onSetUpTables,
@@ -46,7 +50,14 @@ class FloorPlanSurface extends StatefulWidget {
   final FloorPlanController controller;
   final EntryController entry;
   final bool embedded;
-  final Future<void> Function(FloorPlanElement table)? onOpenAccount;
+  final Future<bool> Function(FloorPlanElement table, {int? partySize})?
+  onOpenAccount;
+
+  /// Opens a tableless account for a party that is physically present but has
+  /// no free table to claim. It is intentionally not a synthetic UUID in the
+  /// floor plan: the account is real and resumable, while the room keeps only
+  /// the tables that physically exist.
+  final Future<bool> Function()? onOpenTemporaryAccount;
   final VoidCallback? onShowAccounts;
   final bool directAccounts;
   final VoidCallback? onSetUpTables;
@@ -460,6 +471,16 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
               ),
             ),
         ],
+        if (widget.onOpenTemporaryAccount != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: UmiSpacing.xs),
+            child: PosOutlineButton.icon(
+              key: const ValueKey('open-temporary-table-account'),
+              onPressed: () => unawaited(widget.onOpenTemporaryAccount!()),
+              icon: const PosIcon(PosGlyphs.addCircleOutline, size: 18),
+              label: Text(es ? 'Mesa temporal' : 'Temporary table'),
+            ),
+          ),
         PosIconButton(
           tooltip: es ? 'Actualizar' : 'Refresh',
           onPressed: widget.controller.loading ? null : _load,
@@ -760,6 +781,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
             ),
           ),
         ),
+        if (entry?.openAccountFolio != null)
+          _panelRow(es ? 'Cuenta' : 'Account', entry!.openAccountFolio!),
         if (partySize != null)
           _panelRow(l10n.tableStatePartySizeField, '$partySize'),
         if (elapsed != null)
@@ -842,6 +865,8 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     ];
     final party = room?.stateOf(selected.id).partySize;
     if (party != null) facts.add(l10n.tableStatePartySizeLabel(party));
+    final account = room?.stateOf(selected.id).openAccountFolio;
+    if (account != null) facts.add(account);
     return Container(
       key: const ValueKey('selected-table-summary'),
       padding: const EdgeInsets.all(UmiSpacing.sm),
@@ -900,6 +925,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         table.id: FloorPlanTableVisual(
           state: room.stateOf(table.id).state,
           partySize: room.stateOf(table.id).partySize,
+          accountFolio: room.stateOf(table.id).openAccountFolio,
           turn: switch (room.elapsedOf(table.id)) {
             final elapsed? => formatTableTurn(elapsed),
             _ => null,
@@ -932,6 +958,7 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         AppLocalizations.of(
           context,
         ).tableStatePartySizeLabel(visual.partySize!),
+      if (visual.accountFolio != null) visual.accountFolio!,
       if (visual.turn != null) visual.turn!,
     ].join(' · ');
   }
@@ -1137,8 +1164,13 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
       l10n: l10n,
     );
     if (partySize == null) return;
-    final seated = await room.seat(element.id, partySize);
-    if (seated && mounted) await widget.onOpenAccount?.call(element);
+    final openAccount = widget.onOpenAccount;
+    if (openAccount != null) {
+      final opened = await openAccount(element, partySize: partySize);
+      if (opened) await room.adoptSeat(element.id, partySize);
+      return;
+    }
+    await room.seat(element.id, partySize);
   }
 
   Future<void> _splitTables(
@@ -1281,18 +1313,51 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final groupId = entry.groupId;
     final groupSize = groupId == null ? 0 : room.group(groupId).length;
     final actions = <({String label, PosGlyph icon, VoidCallback onTap})>[];
-    if (widget.onOpenAccount != null) {
-      actions.add((
-        label: es ? 'Abrir cuenta' : 'Open account',
-        icon: PosGlyphs.receiptLong,
-        onTap: () => unawaited(widget.onOpenAccount!(element)),
-      ));
-    }
     final permissions = OperatorPermissions(
       widget.entry.state.operator?.permissions ?? const [],
     );
-    if (!permissions.allows('sale.lifecycle')) return actions;
-    if (present) {
+    final canManage = permissions.allowsAny(const [
+      'cart.write',
+      'sale.lifecycle',
+    ]);
+    final openAccount = widget.onOpenAccount;
+
+    // The first action is the state's obvious next step. The remaining actions
+    // are consequences or exceptions, and the panel renders them with less
+    // weight.
+    if (entry.openAccountId != null && openAccount != null) {
+      actions.add((
+        label: es ? 'Continuar cuenta' : 'Resume account',
+        icon: PosGlyphs.receiptLong,
+        onTap: () => unawaited(openAccount(element)),
+      ));
+    } else if (present && openAccount != null) {
+      actions.add((
+        label: es ? 'Abrir cuenta' : 'Open account',
+        icon: PosGlyphs.receiptLong,
+        onTap: () => unawaited(openAccount(element)),
+      ));
+    } else if (entry.state == tableStateDirty && canManage) {
+      actions.add((
+        label: l10n.tableStateReadyAction,
+        icon: PosGlyphs.checkCircleOutline,
+        onTap: () => unawaited(room.markReady(element.id)),
+      ));
+    } else if (canManage) {
+      actions.add((
+        label: l10n.tableStateSeatAction,
+        icon: PosGlyphs.personAddAlt,
+        onTap: () => unawaited(_seat(element, l10n)),
+      ));
+    } else if (openAccount != null) {
+      actions.add((
+        label: es ? 'Abrir cuenta' : 'Open account',
+        icon: PosGlyphs.receiptLong,
+        onTap: () => unawaited(openAccount(element)),
+      ));
+    }
+
+    if (present && canManage) {
       actions.add((
         label: l10n.tableStateMoveAction,
         icon: PosGlyphs.arrowForward,
@@ -1330,17 +1395,12 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
         icon: PosGlyphs.cleaningServicesOutlined,
         onTap: () => unawaited(_clearTable(element, l10n, es)),
       ));
-    } else {
-      actions.add((
-        label: l10n.tableStateSeatAction,
-        icon: PosGlyphs.personAddAlt,
-        onTap: () => unawaited(_seat(element, l10n)),
-      ));
-      if (entry.state == tableStateDirty) {
+    } else if (!present && canManage) {
+      if (entry.openAccountId == null && openAccount != null) {
         actions.add((
-          label: l10n.tableStateReadyAction,
-          icon: PosGlyphs.checkCircleOutline,
-          onTap: () => unawaited(room.markReady(element.id)),
+          label: es ? 'Abrir cuenta' : 'Open account',
+          icon: PosGlyphs.receiptLong,
+          onTap: () => unawaited(openAccount(element)),
         ));
       }
       actions.add((
@@ -1394,6 +1454,9 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     final actions = _tableActions(element, room, l10n, es);
     await showPosDialog<void>(
       context: context,
+      // The explicit Close button owns dismissal. A dismissible modal barrier
+      // created a second full-screen "Cerrar" hit target over the action rows.
+      barrierDismissible: false,
       builder: (dialog) => PosAlertDialog(
         title: Text(element.label),
         content: SingleChildScrollView(
@@ -1448,14 +1511,19 @@ class _FloorPlanSurfaceState extends State<FloorPlanSurface>
     String label,
     PosGlyph icon,
     VoidCallback onTap,
-  ) => PosListRow(
-    leading: PosIcon(icon),
-    title: Text(label),
-    contentPadding: EdgeInsets.zero,
-    onTap: () {
-      Navigator.of(dialog).pop();
-      onTap();
-    },
+  ) => Padding(
+    padding: const EdgeInsets.only(top: UmiSpacing.xs),
+    child: SizedBox(
+      width: double.infinity,
+      child: PosOutlineButton.icon(
+        icon: PosIcon(icon),
+        label: Text(label),
+        onPressed: () {
+          Navigator.of(dialog).pop();
+          onTap();
+        },
+      ),
+    ),
   );
 }
 
@@ -1470,6 +1538,7 @@ final class FloorPlanTableVisual {
     this.selected = false,
     this.moving = false,
     this.partySize,
+    this.accountFolio,
   });
 
   final String state;
@@ -1477,6 +1546,7 @@ final class FloorPlanTableVisual {
   final String? groupId;
   final int? groupSize;
   final int? partySize;
+  final String? accountFolio;
   final bool selected;
   final bool moving;
 
@@ -1899,6 +1969,7 @@ class _FloorPlanElement extends StatelessWidget {
       if (isTable && visual != null) stateLabel,
       if (visual?.partySize != null)
         '${visual!.partySize} ${spanish ? 'personas' : 'guests'}',
+      if (visual?.accountFolio != null) visual!.accountFolio!,
       if (visual?.turn != null)
         '${spanish ? 'Tiempo' : 'Time'} ${visual!.turn}',
     ].join(', ');
@@ -1952,7 +2023,8 @@ class _FloorPlanElement extends StatelessWidget {
       height: 1.1,
     );
     final visual = state;
-    final turn = visual?.turn;
+    final accountFolio = visual?.accountFolio;
+    final subLabel = accountFolio ?? visual?.turn;
     final label = Padding(
       padding: EdgeInsets.symmetric(
         horizontal: width * (element.shape == 'round' ? .14 : .06),
@@ -1968,14 +2040,16 @@ class _FloorPlanElement extends StatelessWidget {
               textAlign: TextAlign.center,
               style: style,
             ),
-            if (turn != null)
+            if (subLabel != null)
               Text(
-                turn,
+                subLabel,
                 maxLines: 1,
                 textAlign: TextAlign.center,
                 style: style.copyWith(
                   fontSize: math.min(band * 0.32, width * 0.3).clamp(6.0, 15.0),
-                  color: palette.stateAccent(visual!.state),
+                  color: accountFolio != null
+                      ? palette.scheme.primary
+                      : palette.stateAccent(visual!.state),
                 ),
               ),
           ],

@@ -37,6 +37,8 @@ class MainActivity : FlutterActivity() {
   // reason again: every drawer device on this till rides this one board line.
   private var cashDrawer: CashDrawerChannel? = null
 
+  private var multicastLock: MulticastLockChannel? = null
+
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
     val messenger = flutterEngine.dartExecutor.binaryMessenger
@@ -50,6 +52,10 @@ class MainActivity : FlutterActivity() {
     cashDrawer = CashDrawerChannel(
       this,
       MethodChannel(messenger, CashDrawerChannel.CHANNEL),
+    )
+    multicastLock = MulticastLockChannel(
+      this,
+      MethodChannel(messenger, "umi/multicast"),
     )
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 
@@ -63,11 +65,13 @@ void main() {
       ),
     );
     expect(find.byTooltip('Back'), findsNothing);
-    navigator.currentState!.push(
-      PosPageRoute<void>(
-        builder: (_) => const PosPage(
-          appBar: PosHeader(title: Text('Settings')),
-          body: SizedBox.shrink(),
+    unawaited(
+      navigator.currentState!.push(
+        PosPageRoute<void>(
+          builder: (_) => const PosPage(
+            appBar: PosHeader(title: Text('Settings')),
+            body: SizedBox.shrink(),
+          ),
         ),
       ),
     );

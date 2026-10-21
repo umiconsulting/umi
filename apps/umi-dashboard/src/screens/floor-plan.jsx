@@ -14,6 +14,13 @@ import { useMerchant } from '@/lib/merchant-context.jsx';
 import { fetchFloorPlan, changeFloorPlan, fetchTableState } from '@/data.jsx';
 import { resolveTheme, subscribeTheme } from '@/lib/theme.js';
 import {
+  blockingTablesReleased,
+  clearPublishQueue,
+  floorPlanBlockers,
+  readPublishQueue,
+  writePublishQueue,
+} from './floor-plan-publish-queue';
+import {
   areaTableCount,
   createLayout,
   duplicateElement,
@@ -492,6 +499,11 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const [zoom, setZoom] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(640);
   const [pendingCommand, setPendingCommand] = useState(null);
+  const [blockerPrompt, setBlockerPrompt] = useState(null);
+  const [publishQueue, setPublishQueue] = useState(null);
+  const [queueConflict, setQueueConflict] = useState(false);
+  const [queueFailed, setQueueFailed] = useState(false);
+  const [notice, setNotice] = useState(null);
   const [initialName] = useState(() => t`Salón`);
   const recoveryKey = `umi:floor-plan:${merchantId}:${locationId}`;
   const alive = useRef(true);
@@ -500,6 +512,8 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   const saveTimer = useRef(null);
   const saving = useRef(false);
   const roomReadAt = useRef(0);
+  const queueRetryAfter = useRef(0);
+  const blockerDialog = useRef(null);
 
   const document = preview ? remote?.published : history.present;
   const area = document?.areas.find((item) => item.id === selectedArea) ?? document?.areas[0];
@@ -523,7 +537,11 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   );
   const elementCount =
     history.present?.areas.reduce((count, item) => count + item.elements.length, 0) ?? 0;
-  const disabled = preview || busy || !!pendingCommand || error === 'conflict';
+  const queueNeedsReview =
+    !!publishQueue &&
+    (queueConflict || (!!remote && publishQueue.expectedVersion !== remote.version));
+  const queueWaiting = !!publishQueue && !queueNeedsReview;
+  const disabled = preview || busy || !!pendingCommand || error === 'conflict' || !!publishQueue;
   const controlsDisabled = disabled || interactionId !== null;
 
   const startInteraction = (id) => {
@@ -543,6 +561,7 @@ export function FloorPlanEditor({ merchantId, locationId }) {
     fetchFloorPlan(merchantId, locationId)
       .then((value) => {
         if (cancelled) return;
+        setPublishQueue(readPublishQueue(window.localStorage, merchantId, locationId));
         const state = FloorPlanState.parse(value);
         setRemote(state);
         const draft = state.draft ?? createLayout(initialName);
@@ -672,10 +691,72 @@ export function FloorPlanEditor({ merchantId, locationId }) {
     }
   }, [remote, history.present, dirty, pendingCommand, valid, recoveryKey]);
 
-  const submit = useCallback(
-    async (publish = false) => {
+  const runCommand = useCallback(
+    async (command, { queued = false } = {}) => {
       if (saving.current || interaction.current !== null) return;
-      if (publish && !pendingCommand && (disabled || dirty || !valid || !remote?.draft)) return;
+      if (
+        !queued &&
+        command.publish &&
+        !pendingCommand &&
+        (disabled || dirty || !valid || !remote?.draft)
+      )
+        return;
+      saving.current = true;
+      if (queued) queueRetryAfter.current = Date.now() + TABLE_STATE_POLL_MS;
+      else setPendingCommand(command);
+      setBusy(true);
+      setError(null);
+      setQueueFailed(false);
+      try {
+        const state = FloorPlanState.parse(
+          await changeFloorPlan(merchantId, command.payload, command.publish),
+        );
+        if (!alive.current) return;
+        setPendingCommand(null);
+        setBlockerPrompt(null);
+        setRemote(state);
+        dispatch({ type: 'canonical', document: state.draft });
+        setSaved(JSON.stringify(state.draft));
+        if (queued) {
+          clearPublishQueue(window.localStorage, merchantId, locationId);
+          setPublishQueue(null);
+          setQueueConflict(false);
+          setNotice('publishedQueued');
+        } else setNotice(command.publish ? 'published' : null);
+      } catch (failure) {
+        if (!alive.current) return;
+        const blockers =
+          failure.code === 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED' ? floorPlanBlockers(failure) : null;
+        if (queued) {
+          if (blockers) {
+            setPublishQueue((current) =>
+              current
+                ? {
+                    ...current,
+                    tableIds: blockers.tableIds.length > 0 ? blockers.tableIds : current.tableIds,
+                    blockers: blockers.labels,
+                    details: blockers.details,
+                  }
+                : current,
+            );
+            queueRetryAfter.current = Date.now() + TABLE_STATE_POLL_MS;
+          } else if (failure.status === 409) setQueueConflict(true);
+          else setQueueFailed(true);
+        } else if (blockers) {
+          setPendingCommand(null);
+          setBlockerPrompt({ ...blockers, command });
+          setError(null);
+        } else setError(failure.status === 409 ? 'conflict' : 'save');
+      } finally {
+        saving.current = false;
+        if (alive.current) setBusy(false);
+      }
+    },
+    [pendingCommand, locationId, remote, merchantId, disabled, dirty, valid],
+  );
+
+  const submit = useCallback(
+    (publish = false) => {
       const command = pendingCommand ?? {
         publish,
         payload: {
@@ -685,27 +766,9 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           ...(publish ? {} : { document: history.present }),
         },
       };
-      saving.current = true;
-      setPendingCommand(command);
-      setBusy(true);
-      setError(null);
-      try {
-        const state = FloorPlanState.parse(
-          await changeFloorPlan(merchantId, command.payload, command.publish),
-        );
-        if (!alive.current) return;
-        setPendingCommand(null);
-        setRemote(state);
-        dispatch({ type: 'canonical', document: state.draft });
-        setSaved(JSON.stringify(state.draft));
-      } catch (failure) {
-        if (alive.current) setError(failure.status === 409 ? 'conflict' : 'save');
-      } finally {
-        saving.current = false;
-        if (alive.current) setBusy(false);
-      }
+      return runCommand(command);
     },
-    [pendingCommand, locationId, remote, history.present, merchantId, disabled, dirty, valid],
+    [pendingCommand, locationId, remote, history.present, runCommand],
   );
 
   useEffect(() => {
@@ -715,8 +778,36 @@ export function FloorPlanEditor({ merchantId, locationId }) {
     return () => clearTimeout(saveTimer.current);
   }, [dirty, valid, serialized, busy, error, preview, pendingCommand, submit, interactionId]);
 
+  useEffect(() => {
+    if (!queueWaiting || !remote || !room || busy || saving.current) return;
+    if (Date.now() < queueRetryAfter.current) return;
+    if (!blockingTablesReleased(room, publishQueue.tableIds)) return;
+    const timer = setTimeout(
+      () =>
+        void runCommand(
+          {
+            publish: true,
+            payload: {
+              locationId,
+              expectedVersion: publishQueue.expectedVersion,
+              idempotencyKey: publishQueue.idempotencyKey,
+            },
+          },
+          { queued: true },
+        ),
+      0,
+    );
+    return () => clearTimeout(timer);
+  }, [queueWaiting, publishQueue, remote, room, busy, runCommand, locationId]);
+
+  useEffect(() => {
+    if (!blockerPrompt || !blockerDialog.current) return;
+    blockerDialog.current.querySelector('button')?.focus();
+  }, [blockerPrompt]);
+
   const editArea = (patch) => {
     if (disabled || saving.current) return false;
+    setNotice(null);
     dispatch({
       type: 'edit',
       document: {
@@ -730,6 +821,46 @@ export function FloorPlanEditor({ merchantId, locationId }) {
   };
   const editElement = (next) => {
     return editArea({ elements: area.elements.map((item) => (item.id === next.id ? next : item)) });
+  };
+  const waitForRelease = () => {
+    if (!blockerPrompt) return;
+    const queue = {
+      schemaVersion: 1,
+      merchantId,
+      locationId,
+      expectedVersion: blockerPrompt.command.payload.expectedVersion,
+      idempotencyKey: blockerPrompt.command.payload.idempotencyKey,
+      tableIds: blockerPrompt.tableIds,
+      blockers: blockerPrompt.labels,
+      details: blockerPrompt.details,
+      queuedAt: new Date().toISOString(),
+    };
+    writePublishQueue(window.localStorage, queue);
+    sessionStorage.removeItem(recoveryKey);
+    setPublishQueue(queue);
+    setQueueConflict(false);
+    setBlockerPrompt(null);
+    setNotice(null);
+  };
+  const closeBlockersAndPublish = () => {
+    if (!blockerPrompt || !blockerPrompt.canCloseAccounts) return;
+    const command = {
+      publish: true,
+      payload: {
+        ...blockerPrompt.command.payload,
+        idempotencyKey: crypto.randomUUID(),
+        closeBlockingAccounts: true,
+      },
+    };
+    setBlockerPrompt(null);
+    void runCommand(command);
+  };
+  const cancelQueuedPublish = () => {
+    clearPublishQueue(window.localStorage, merchantId, locationId);
+    setPublishQueue(null);
+    setQueueConflict(false);
+    setQueueFailed(false);
+    setNotice(null);
   };
   const add = (kind, shape = 'rectangle') => {
     const size =
@@ -823,12 +954,18 @@ export function FloorPlanEditor({ merchantId, locationId }) {
         <div className="fp-actions">
           <span role="status" className="fp-status">
             {busy
-              ? t`Guardado en curso…`
-              : dirty
-                ? t`Cambios pendientes`
-                : remote.draft
-                  ? t`Borrador guardado`
-                  : t`Nuevo borrador`}
+              ? queueWaiting
+                ? t`Publicando plano en espera…`
+                : t`Guardado en curso…`
+              : queueNeedsReview
+                ? t`Publicación en espera · requiere revisión`
+                : publishQueue
+                  ? t`Publicación en espera · mesas ocupadas`
+                  : dirty
+                    ? t`Cambios pendientes`
+                    : remote.draft
+                      ? t`Borrador guardado`
+                      : t`Nuevo borrador`}
           </span>
           <button
             className="btn"
@@ -855,6 +992,75 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           </button>
         </div>
       </div>
+      {publishQueue && (
+        <section
+          className={queueNeedsReview ? 'fp-queue fp-queue-review' : 'fp-queue'}
+          role={queueNeedsReview ? 'alert' : 'status'}
+          aria-labelledby="fp-queue-title"
+        >
+          <div>
+            <h2 id="fp-queue-title">
+              {queueNeedsReview
+                ? t`La publicación automática necesita revisión`
+                : t`Publicación en espera`}
+            </h2>
+            {queueNeedsReview ? (
+              <p>
+                {t`El plano cambió en otra sesión. No publicaremos tu borrador sobre esos cambios. Recarga la versión actual y publícala de nuevo.`}
+              </p>
+            ) : (
+              <p>
+                {room && blockingTablesReleased(room, publishQueue.tableIds)
+                  ? t`Todas las mesas bloqueantes están libres. Publicando el plano…`
+                  : t`El plano se publicará automáticamente cuando estas mesas se liberen. La caja sigue usando el plano actual mientras espera.`}
+              </p>
+            )}
+            <ul className="fp-queue-tables">
+              {(publishQueue.details ?? []).map((item) => (
+                <li key={item.tableId}>
+                  <strong>{item.label}</strong>
+                  {item.accountReference
+                    ? ` · ${t`Cuenta`} ${item.accountReference}`
+                    : ` · ${t`sin cuenta abierta`}`}
+                </li>
+              ))}
+            </ul>
+            {queueFailed && (
+              <p role="alert">
+                <Trans>
+                  El último intento no se completó. La publicación sigue en espera y se reintentará
+                  con la próxima lectura del salón.
+                </Trans>
+              </p>
+            )}
+          </div>
+          <div className="fp-queue-actions">
+            {queueNeedsReview ? (
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  sessionStorage.removeItem(recoveryKey);
+                  clearPublishQueue(window.localStorage, merchantId, locationId);
+                  window.location.reload();
+                }}
+              >
+                <Trans>Descartar espera y recargar</Trans>
+              </button>
+            ) : (
+              <button className="btn" onClick={cancelQueuedPublish}>
+                <Trans>Cancelar espera</Trans>
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+      {notice && (
+        <p role="status" className="fp-success">
+          {notice === 'publishedQueued'
+            ? t`Plano publicado. Las mesas bloqueantes ya están libres.`
+            : t`Plano publicado.`}
+        </p>
+      )}
       {error && (
         <div role="alert" className="fp-alert">
           {error === 'conflict'
@@ -876,6 +1082,61 @@ export function FloorPlanEditor({ merchantId, locationId }) {
           >
             <Trans>Recargar</Trans>
           </button>
+        </div>
+      )}
+      {blockerPrompt && (
+        <div className="fp-dialog-backdrop">
+          <section
+            ref={blockerDialog}
+            className="fp-dialog card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fp-blocker-title"
+            aria-describedby="fp-blocker-description"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setBlockerPrompt(null);
+            }}
+          >
+            <h2 id="fp-blocker-title">
+              <Trans>No se publicó el plano</Trans>
+            </h2>
+            <p id="fp-blocker-description">
+              <Trans>
+                Estas mesas están ocupadas o tienen una cuenta abierta. Elige cómo continuar.
+              </Trans>
+            </p>
+            <ul className="fp-queue-tables">
+              {blockerPrompt.details.map((item) => (
+                <li key={item.tableId}>
+                  <strong>{item.label}</strong>
+                  {item.accountReference
+                    ? ` · ${t`Cuenta`} ${item.accountReference}`
+                    : ` · ${t`sin cuenta abierta`}`}
+                </li>
+              ))}
+            </ul>
+            {!blockerPrompt.canCloseAccounts && (
+              <p>
+                <Trans>
+                  Una de estas mesas no tiene una cuenta que se pueda cerrar. Espera a que se
+                  libere.
+                </Trans>
+              </p>
+            )}
+            <div className="fp-dialog-actions">
+              <button className="btn btn-primary" onClick={waitForRelease}>
+                <Trans>Esperar y publicar automáticamente</Trans>
+              </button>
+              {blockerPrompt.canCloseAccounts && (
+                <button className="btn fp-danger" onClick={closeBlockersAndPublish}>
+                  <Trans>Cerrar cuentas bloqueantes y publicar</Trans>
+                </button>
+              )}
+              <button className="btn" onClick={() => setBlockerPrompt(null)}>
+                <Trans>Volver a editar</Trans>
+              </button>
+            </div>
+          </section>
         </div>
       )}
       {!valid && !preview && (

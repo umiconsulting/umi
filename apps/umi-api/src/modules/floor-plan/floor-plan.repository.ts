@@ -72,6 +72,40 @@ async function assertOccupiedTablesUndisturbed(
   locationId: string,
   current: Row,
 ) {
+  const blockers = await occupiedBlockers(client, merchantId, locationId, current);
+  if (blockers.length === 0) return;
+  const tableIds = blockers.map((blocker) => blocker.tableId);
+  throw new ConflictException({
+    code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
+    message: 'A table with a party or an open account would be removed or moved by this layout.',
+    fieldErrors: {
+      tableIds,
+      blockers: blockers.slice(0, 20).map((blocker) => blocker.label),
+      blockerAccounts: blockers
+        .filter((blocker) => blocker.accountId)
+        .slice(0, 20)
+        .map(
+          (blocker) =>
+            `${blocker.tableId}|${blocker.accountId}|${blocker.accountVersion}|${blocker.accountReference}`,
+        ),
+    },
+  });
+}
+
+type OccupiedBlocker = {
+  tableId: string;
+  label: string;
+  accountId: string | null;
+  accountVersion: number | null;
+  accountReference: string | null;
+};
+
+async function occupiedBlockers(
+  client: PoolClient,
+  merchantId: string,
+  locationId: string,
+  current: Row,
+): Promise<OccupiedBlocker[]> {
   const occupied = await client.query<{ table_id: string }>(
     `SELECT table_id::text AS table_id FROM merchant.table_state
      WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND seated_at IS NOT NULL
@@ -83,26 +117,77 @@ async function assertOccupiedTablesUndisturbed(
     [merchantId, locationId],
   );
   const tableIds = occupied.rows.map((row) => row.table_id);
-  if (tableIds.length === 0) return;
-  if (current.published === null)
-    throw new ConflictException({
-      code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
-      message:
-        'A party is on the floor and this location has no published layout to compare the draft against.',
-      fieldErrors: { tableIds },
-    });
-  const disturbed = occupiedTablesDisturbed(current.published, current.draft, tableIds);
-  if (disturbed.length > 0)
-    throw new ConflictException({
-      code: 'FLOOR_PLAN_OCCUPIED_TABLE_CHANGED',
-      message: 'A table with a party or an open account would be removed or moved by this layout.',
-      fieldErrors: { tableIds: disturbed },
-    });
+  if (tableIds.length === 0) return [];
+  const disturbed =
+    current.published === null
+      ? tableIds
+      : occupiedTablesDisturbed(current.published, current.draft, tableIds);
+  if (disturbed.length === 0) return [];
+
+  const draft = current.draft ? FloorPlanDocument.safeParse(current.draft).data : null;
+  const published = current.published ? FloorPlanDocument.safeParse(current.published).data : null;
+  const labels = new Map<string, string>();
+  for (const document of [published, draft]) {
+    for (const area of document?.areas ?? []) {
+      for (const element of area.elements) {
+        if (element.kind === 'table') labels.set(element.id, element.label);
+      }
+    }
+  }
+  const accounts = await client.query<{
+    id: string;
+    version: number;
+    tableId: string;
+    accountNumber: number;
+    dailyAccountNumber: number | null;
+  }>(
+    `SELECT c.id::text,c.version,c.table_id::text AS "tableId",
+            c.account_number AS "accountNumber",
+            c.daily_account_number AS "dailyAccountNumber"
+       FROM merchant.pos_cart c
+      WHERE c.merchant_id=$1::uuid AND c.location_id=$2::uuid
+        AND c.table_id=ANY($3::uuid[]) AND c.status IN ('draft','prepared')
+      ORDER BY c.daily_account_number NULLS LAST,c.account_number`,
+    [merchantId, locationId, disturbed],
+  );
+  const accountByTable = new Map(accounts.rows.map((account) => [account.tableId, account]));
+  return disturbed.map((tableId) => {
+    const account = accountByTable.get(tableId);
+    return {
+      tableId,
+      label: labels.get(tableId) ?? `Mesa ${tableId.slice(0, 8)}`,
+      accountId: account?.id ?? null,
+      accountVersion: account?.version ?? null,
+      accountReference: account
+        ? String(account.dailyAccountNumber ?? account.accountNumber).padStart(3, '0')
+        : null,
+    };
+  });
 }
 
 @Injectable()
 export class FloorPlanRepository {
   constructor(private readonly pg: PgService) {}
+
+  /**
+   * Accounts currently preventing this draft from being published.
+   *
+   * Used only by the dashboard's explicit "close accounts and publish" choice.
+   * The publish itself still runs the same occupied-table guard afterwards, so a
+   * race that creates another account refuses instead of publishing over it.
+   */
+  async blockingAccounts(client: PoolClient, merchantId: string, locationId: string) {
+    const locked = await client.query<Row>(
+      `SELECT version,draft,published_version,published,published_at
+         FROM merchant.floor_plan
+        WHERE merchant_id=$1::uuid AND location_id=$2::uuid
+        FOR UPDATE`,
+      [merchantId, locationId],
+    );
+    const current = locked.rows[0];
+    if (!current) return [];
+    return occupiedBlockers(client, merchantId, locationId, current);
+  }
 
   async assertLocation(client: PoolClient, merchantId: string, locationId: string) {
     const result = await client.query(

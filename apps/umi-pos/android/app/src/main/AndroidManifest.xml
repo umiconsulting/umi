@@ -5,6 +5,7 @@
          healthy. The debug and profile manifests declared it; the release one
          did not. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- The till drives its receipt printer on its own USB host port, so the
          money path (the receipt and the drawer pulse that leaves through the

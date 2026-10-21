@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:umi_contract/umi_contract.dart';
 
@@ -10,6 +12,7 @@ import '../offline/connectivity_controller.dart';
 import '../offline/offline_checkout_service.dart';
 import '../offline/offline_journal.dart';
 import '../offline/offline_policy.dart';
+import '../offline/replay_engine.dart';
 import 'checkout_repository.dart';
 import 'tender_identity.dart';
 
@@ -42,6 +45,10 @@ enum CheckoutPhase {
   paymentUnknown,
   completed,
   provisional,
+
+  /// The provisional sale was accepted on replay; the receipt on screen now
+  /// names the official sale instead of asking the operator to keep waiting.
+  provisionalSynced,
   failure,
 }
 
@@ -51,6 +58,7 @@ final class CheckoutState {
     this.result,
     this.errorCode,
     this.provisionalReceipt,
+    this.officialSaleId,
     this.failureDetails,
     this.postCommitWarning,
   });
@@ -58,6 +66,9 @@ final class CheckoutState {
   final CheckoutResult? result;
   final String? errorCode;
   final ProvisionalReceipt? provisionalReceipt;
+
+  /// Set once the provisional sale in `provisionalReceipt` has landed.
+  final String? officialSaleId;
 
   /// A warning from the hardware that ran AFTER a completed sale — the drawer's
   /// pulse especially. The money is recorded either way; what failed is the
@@ -90,7 +101,11 @@ final class CheckoutState {
   /// D3-504 on 2026-10-11: the till held the shift id in the refusal and pressed
   /// the resume anyway with nothing to resume.
   String? _detailString(String key) {
-    for (final bag in [failureDetails, failureDetails?['details'], failureDetails?['error']]) {
+    for (final bag in [
+      failureDetails,
+      failureDetails?['details'],
+      failureDetails?['error'],
+    ]) {
       if (bag is! Map) continue;
       final value = bag[key];
       if (value is String && value.isNotEmpty) return value;
@@ -104,24 +119,39 @@ final class CheckoutController extends ChangeNotifier {
     required CheckoutRepository repository,
     OfflineCheckoutService? offlineCheckout,
     ConnectivityController? connectivity,
+    EncryptedOfflineJournal? journal,
+    OfflineRecoveryController? recovery,
+    bool Function()? pendingLocalCommands,
+    Future<void> Function()? refreshOfflinePolicy,
     required Telemetry telemetry,
     Future<String?> Function(CheckoutResult result)? afterCommit,
     Future<void> Function(ProvisionalReceipt receipt)? afterOfflineCommit,
   }) : _repository = repository,
        _offlineCheckout = offlineCheckout,
        _connectivity = connectivity,
+       _journal = journal,
+       _recovery = recovery,
+       _pendingLocalCommands = pendingLocalCommands,
+       _refreshOfflinePolicy = refreshOfflinePolicy,
        _telemetry = telemetry,
        _afterCommit = afterCommit,
-       _afterOfflineCommit = afterOfflineCommit;
+       _afterOfflineCommit = afterOfflineCommit {
+    _recovery?.addListener(_recoveryChanged);
+  }
 
   final CheckoutRepository _repository;
   final OfflineCheckoutService? _offlineCheckout;
   final ConnectivityController? _connectivity;
+  final EncryptedOfflineJournal? _journal;
+  final OfflineRecoveryController? _recovery;
+  final bool Function()? _pendingLocalCommands;
+  final Future<void> Function()? _refreshOfflinePolicy;
   final Telemetry _telemetry;
   final Future<String?> Function(CheckoutResult result)? _afterCommit;
   final Future<void> Function(ProvisionalReceipt receipt)? _afterOfflineCommit;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
+  bool get usesLocalCheckout => !_worthTryingOnline;
   List<Map<String, Object?>> get tenderDrafts => _tenderDrafts;
   Map<String, Object?>? get tipDraft => _tipDraft;
   List<Map<String, Object?>> get discountDrafts => _discountDrafts;
@@ -152,7 +182,8 @@ final class CheckoutController extends ChangeNotifier {
   CheckoutPolicy? _policy;
   CheckoutPolicy? get policy => _policy;
   bool get supportsPartialPayments => _repository is PartialPaymentRepository;
-  bool get canCollectPartialPayments => supportsPartialPayments && _worthTryingOnline;
+  bool get canCollectPartialPayments =>
+      supportsPartialPayments && _worthTryingOnline;
 
   Future<Map<String, Object?>> partialPayments({
     required String merchantId,
@@ -164,14 +195,34 @@ final class CheckoutController extends ChangeNotifier {
     if (repository is! PartialPaymentRepository || !_worthTryingOnline) {
       throw StateError('PARTIAL_PAYMENTS_UNAVAILABLE');
     }
-    return (repository as PartialPaymentRepository).partialPayments(
-      merchantId,
-      cartId,
-      CheckoutPartialPaymentQuery(
-        locationId: locationId,
-        operatorSessionId: operatorSessionId,
-      ),
-    ).then((result) => result.data);
+    return (repository as PartialPaymentRepository)
+        .partialPayments(
+          merchantId,
+          cartId,
+          CheckoutPartialPaymentQuery(
+            locationId: locationId,
+            operatorSessionId: operatorSessionId,
+          ),
+        )
+        .then((result) => result.data);
+  }
+
+  /// Bind the identifiers a partial-payment write needs without first reading
+  /// checkout recovery. Opening Split check is a ledger read, and the ledger is
+  /// already authoritative about its own drafts. Recovery used to turn a normal
+  /// "no checkout yet" answer into a multi-second 404 on the critical path.
+  void bindPartialLedger({
+    required String merchantId,
+    required String locationId,
+    required String operatorSessionId,
+    required String cartId,
+    required int cartVersion,
+  }) {
+    _merchantId = merchantId;
+    _locationId = locationId;
+    _operatorSessionId = operatorSessionId;
+    _cartId = cartId;
+    _cartVersion = cartVersion;
   }
 
   Future<Map<String, Object?>> collectPartialPayment({
@@ -183,11 +234,13 @@ final class CheckoutController extends ChangeNotifier {
     if (repository is! PartialPaymentRepository || !_worthTryingOnline) {
       throw StateError('PARTIAL_PAYMENTS_UNAVAILABLE');
     }
-    return (repository as PartialPaymentRepository).collectPartialPayment(
-      merchantId,
-      cartId,
-      CheckoutPartialPaymentRequest.fromJson(command),
-    ).then((result) => result.data);
+    return (repository as PartialPaymentRepository)
+        .collectPartialPayment(
+          merchantId,
+          cartId,
+          CheckoutPartialPaymentRequest.fromJson(command),
+        )
+        .then((result) => result.data);
   }
 
   /// The card-present provider this location may actually use, or null.
@@ -272,19 +325,12 @@ final class CheckoutController extends ChangeNotifier {
         return;
       }
       final cached = _confirmationCache['${cart.id}:${cart.version}'];
-      if (cached == null) {
-        _set(
-          const CheckoutState(
-            phase: CheckoutPhase.failure,
-            errorCode: 'OFFLINE_SNAPSHOT_REFRESH_REQUIRED',
-          ),
-        );
-        return;
-      }
+      final confirmation = cached ?? _localConfirmation(cart);
+      _confirmationCache['${cart.id}:${cart.version}'] = confirmation;
       _set(
         CheckoutState(
           phase: CheckoutPhase.confirmationRequired,
-          result: cached,
+          result: confirmation,
         ),
       );
       return;
@@ -461,6 +507,10 @@ final class CheckoutController extends ChangeNotifier {
     required String cartId,
     required int cartVersion,
   }) async {
+    if (usesLocalCheckout && _state.result == null) {
+      _set(const CheckoutState());
+      return;
+    }
     try {
       _merchantId = merchantId;
       _locationId = locationId;
@@ -532,6 +582,16 @@ final class CheckoutController extends ChangeNotifier {
       }
       _event('checkout_recovered');
     } on AppException catch (error) {
+      if (_state.result == null &&
+          (error.category == AppErrorCategory.transport ||
+              error.category == AppErrorCategory.timeout ||
+              error.category == AppErrorCategory.server ||
+              error.category == AppErrorCategory.unknown)) {
+        // There is no prior checkout state to recover. A network failure here
+        // is not a checkout refusal; leave the screen clean for the local path.
+        _set(const CheckoutState());
+        return;
+      }
       if (error.code != 'RESOURCE_NOT_FOUND') _failure(error);
     }
   }
@@ -611,7 +671,9 @@ final class CheckoutController extends ChangeNotifier {
     // the till as long as the cart does.
     final carried = payment['attempt'];
     final method =
-        (carried is Map<String, Object?> ? carried['method'] as String? : null) ??
+        (carried is Map<String, Object?>
+            ? carried['method'] as String?
+            : null) ??
         payment['method'] as String?;
     final tenderIdentity =
         payment['tenderId'] as String? ??
@@ -840,6 +902,30 @@ final class CheckoutController extends ChangeNotifier {
         _cartVersion == null) {
       return;
     }
+    // When the till already knows the API is unreachable, committing locally is
+    // the answer, not another request. Waiting for the 15 s client timeout to
+    // expire first is what turned "offline" into "the till froze": the cashier
+    // sees nothing, taps again, and the queue grows behind a sale that was
+    // never ambiguous. The confirmation step still runs, because the operator
+    // is entitled to see the totals before the sale is written.
+    if (_shouldCommitLocally()) {
+      if (fingerprint == null && _cart != null) {
+        final confirmation = _localConfirmation(_cart!);
+        _confirmationCache['${_cart!.id}:${_cart!.version}'] = confirmation;
+        _event('totals_confirmed_offline');
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.confirmationRequired,
+            result: confirmation,
+          ),
+        );
+        return;
+      }
+      if (fingerprint != null) {
+        await _submitOffline(fingerprint);
+        return;
+      }
+    }
     try {
       final result = await _repository.checkout(
         _merchantId!,
@@ -907,41 +993,128 @@ final class CheckoutController extends ChangeNotifier {
         _event('payment_unknown');
       }
     } on AppException catch (error) {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint(
+          '[umipos] checkout submit failed category=${error.category.name} '
+          'code=${error.code} fallback=${_canFallbackOffline(error)}',
+        );
+      }
+      if (_canFallbackOffline(error)) {
+        _connectivity?.networkDown();
+        if (fingerprint == null && _cart != null) {
+          final confirmation = _localConfirmation(_cart!);
+          _confirmationCache['${_cart!.id}:${_cart!.version}'] = confirmation;
+          _set(
+            CheckoutState(
+              phase: CheckoutPhase.confirmationRequired,
+              result: confirmation,
+            ),
+          );
+          return;
+        }
+        if (fingerprint != null) {
+          await _submitOffline(fingerprint);
+          return;
+        }
+      }
       _failure(error);
     } catch (error) {
       _unexpected(error);
     }
   }
 
+  CheckoutResult _localConfirmation(Cart cart) {
+    final taxes = <String, Object?>{
+      'total': cart.totals['tax'],
+      'entries': const <Map<String, Object?>>[],
+    };
+    final fingerprint = sha256
+        .convert(
+          utf8.encode(
+            jsonEncode({
+              'cartVersion': cart.version,
+              'items': cart.items,
+              'totals': cart.totals,
+              'taxes': taxes,
+            }),
+          ),
+        )
+        .toString();
+    final now = DateTime.now().toUtc().toIso8601String();
+    return CheckoutResult(
+      status: 'confirmation_required',
+      confirmation: TotalsConfirmation(
+        cartVersion: cart.version,
+        fingerprint: fingerprint,
+        totals: cart.totals,
+        taxes: taxes,
+        discounts:
+            cart.totals['discounts'] as Map<String, Object?>? ??
+            const {'total': {}, 'entries': <Map<String, Object?>>[]},
+        catalogVersion: fingerprint,
+        pricingVersion: fingerprint,
+        taxVersion: fingerprint,
+        snapshotAt: now,
+        confirmedAt: now,
+      ).toJson(),
+      payment: null,
+      reservation: null,
+      sale: null,
+      receipt: null,
+      failure: null,
+      recoveryState: 'none',
+    );
+  }
+
+  bool _canFallbackOffline(AppException error) =>
+      _offlineCheckout != null &&
+      _cart != null &&
+      _authority != null &&
+      (error.category == AppErrorCategory.transport ||
+          error.category == AppErrorCategory.timeout ||
+          error.category == AppErrorCategory.server ||
+          error.category == AppErrorCategory.unknown);
+
+  /// The offline evidence is strong enough to skip the round trip.
+  ///
+  /// Only [PosConnectivity.offline] qualifies: it takes three consecutive failed
+  /// calls (or the OS saying there is no interface), so it is a fact about the
+  /// API rather than a guess. `degraded` and `unknown` still try the network —
+  /// committing locally on a single hiccup would journal sales that the server
+  /// could have taken immediately.
+  bool _shouldCommitLocally() =>
+      _connectivity?.state == PosConnectivity.offline &&
+      _offlineCheckout != null &&
+      _cart != null &&
+      _authority != null;
+
   void _runPostCommit(CheckoutResult result) {
     final callback = _afterCommit;
     if (callback == null) return;
-    unawaited(
-      () async {
-        try {
-          final warning = await callback(result);
-          if (warning == null || _state.phase != CheckoutPhase.completed) {
-            return;
-          }
-          // The sale is done; this is a fact about the drawer the operator is
-          // standing in front of. It rides the state the receipt screen reads,
-          // so it appears where the cashier is rather than in a log.
-          final current = _state;
-          _set(
-            CheckoutState(
-              phase: current.phase,
-              result: current.result,
-              errorCode: current.errorCode,
-              provisionalReceipt: current.provisionalReceipt,
-              failureDetails: current.failureDetails,
-              postCommitWarning: warning,
-            ),
-          );
-        } catch (_) {
-          _event('hardware_recovery_required');
+    unawaited(() async {
+      try {
+        final warning = await callback(result);
+        if (warning == null || _state.phase != CheckoutPhase.completed) {
+          return;
         }
-      }(),
-    );
+        // The sale is done; this is a fact about the drawer the operator is
+        // standing in front of. It rides the state the receipt screen reads,
+        // so it appears where the cashier is rather than in a log.
+        final current = _state;
+        _set(
+          CheckoutState(
+            phase: current.phase,
+            result: current.result,
+            errorCode: current.errorCode,
+            provisionalReceipt: current.provisionalReceipt,
+            failureDetails: current.failureDetails,
+            postCommitWarning: warning,
+          ),
+        );
+      } catch (_) {
+        _event('hardware_recovery_required');
+      }
+    }());
   }
 
   Future<void> _submitOffline(String fingerprint) async {
@@ -963,6 +1136,14 @@ final class CheckoutController extends ChangeNotifier {
         _tipDraft != null ||
         _discountDrafts.isNotEmpty ||
         _cashShiftId == null) {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint(
+          '[umipos] offline checkout unsupported tender=$unsupportedTender '
+          'customer=${_customerValueSelection != null} '
+          'tip=${_tipDraft != null} discounts=${_discountDrafts.length} '
+          'shift=${_cashShiftId != null}',
+        );
+      }
       _set(
         CheckoutState(
           phase: CheckoutPhase.failure,
@@ -985,7 +1166,7 @@ final class CheckoutController extends ChangeNotifier {
         OfflineCheckoutRequest(
           commandId: commandId,
           idempotencyKey: _uuid(),
-          provisionalSaleId: 'prov-$commandId',
+          provisionalSaleId: _uuid(),
           authority: authority,
           checkoutCommand: CheckoutCommand(
             commandId: commandId,
@@ -996,6 +1177,13 @@ final class CheckoutController extends ChangeNotifier {
             paymentMethod: 'cash',
             totalsFingerprint: fingerprint,
             idempotencyKey: _uuid(),
+            // The contract types this as a UUID, and the online path always
+            // sends one even when no customer value is being redeemed. Leaving
+            // it null here made every offline cash sale fail contract
+            // validation on replay — the sale reached the journal, showed a
+            // receipt, and could never land.
+            customerValueFingerprintCommandId:
+                _customerValueFingerprintCommandId ??= _uuid(),
             tenderDrafts: _tenderDrafts,
             tipDraft: _tipDraft,
             discountDrafts: _discountDrafts,
@@ -1044,6 +1232,9 @@ final class CheckoutController extends ChangeNotifier {
         );
       }
     } on OfflineJournalException catch (error) {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint('[umipos] offline checkout blocked=${error.category}');
+      }
       _set(
         CheckoutState(
           phase: CheckoutPhase.failure,
@@ -1055,6 +1246,12 @@ final class CheckoutController extends ChangeNotifier {
   }
 
   void _failure(AppException error) {
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] checkout failure category=${error.category.name} '
+        'code=${error.code}',
+      );
+    }
     _event('checkout_failed');
     _set(
       CheckoutState(
@@ -1079,6 +1276,9 @@ final class CheckoutController extends ChangeNotifier {
   /// the operator has to see, and the failure surface is where a cashier gets
   /// told what happened and is offered the exit.
   void _unexpected(Object error) {
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint('[umipos] checkout unexpected error=$error');
+    }
     _event('checkout_failed');
     _set(
       CheckoutState(
@@ -1125,6 +1325,7 @@ final class CheckoutController extends ChangeNotifier {
   /// `apiReachable`, so nothing necessarily would. A request that really cannot
   /// reach the API fails on its own and marks the failure.
   bool get _worthTryingOnline {
+    if (_pendingLocalCommands?.call() == true) return false;
     final connectivity = _connectivity?.state ?? PosConnectivity.online;
     return switch (connectivity) {
       PosConnectivity.offline ||
@@ -1141,6 +1342,58 @@ final class CheckoutController extends ChangeNotifier {
   void _set(CheckoutState value) {
     _state = value;
     notifyListeners();
+  }
+
+  /// Follow the provisional sale until the journal says it landed.
+  ///
+  /// The receipt on screen used to say "pending synchronisation" for the rest
+  /// of the shift, because nothing told it otherwise: replay happens in another
+  /// controller, and the surface is a snapshot of the state at commit time. The
+  /// operator is left holding a slip that may already be an official sale — the
+  /// exact kind of doubt that makes staff re-check work they have already done.
+  Future<void> _recoveryChanged() async {
+    final recovery = _recovery;
+    final journal = _journal;
+    if (recovery == null || journal == null) return;
+    if (_state.phase != CheckoutPhase.provisional) return;
+    final phase = recovery.status.phase;
+    if (phase != RecoveryPhase.completed &&
+        phase != RecoveryPhase.readyToReplay) {
+      return;
+    }
+    final provisionalId = _state.provisionalReceipt?.provisionalSaleId;
+    if (provisionalId == null) return;
+    try {
+      final snapshot = await journal.load();
+      final entry = snapshot.entries
+          .where(
+            (candidate) =>
+                candidate.command.provisionalId == provisionalId &&
+                (candidate.status == JournalStatus.accepted ||
+                    candidate.status == JournalStatus.duplicate),
+          )
+          .toList();
+      if (entry.isEmpty) return;
+      final officialId = entry.first.officialId;
+      if (officialId == null) return;
+      if (_state.phase != CheckoutPhase.provisional) return;
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.provisionalSynced,
+          result: _state.result,
+          provisionalReceipt: _state.provisionalReceipt,
+          officialSaleId: officialId,
+        ),
+      );
+    } catch (_) {
+      // An unreadable journal is the recovery centre's to report.
+    }
+  }
+
+  @override
+  void dispose() {
+    _recovery?.removeListener(_recoveryChanged);
+    super.dispose();
   }
 
   /// Ask what this location may offer, before anything is charged.
@@ -1168,6 +1421,14 @@ final class CheckoutController extends ChangeNotifier {
           currency: currency,
         ),
       );
+      if (_worthTryingOnline) {
+        try {
+          await _refreshOfflinePolicy?.call();
+        } catch (_) {
+          // The server checkout policy is already usable. A failed refresh
+          // leaves the last signed offline policy in place.
+        }
+      }
       notifyListeners();
     } catch (_) {
       // Cash only, exactly as a location with no policy is. The charge itself

@@ -110,12 +110,16 @@ Map<String, Object?> entryJson(
   String? seatedAt,
   int? partySize,
   String? group,
+  String? openAccountId,
+  String? openAccountFolio,
 }) => {
   'tableId': tableId,
   'state': state,
   'seatedAt': seatedAt,
   'partySize': partySize,
   'groupId': group,
+  'openAccountId': openAccountId,
+  'openAccountFolio': openAccountFolio,
 };
 
 final class RoomRepository implements TableStateRepository {
@@ -370,7 +374,9 @@ Future<SurfaceHarness> pumpSurface(
   WidgetTester tester, {
   RoomRepository? repository,
   List<String> permissions = const ['sale.lifecycle'],
-  Future<void> Function(FloorPlanElement table)? onOpenAccount,
+  Future<bool> Function(FloorPlanElement table, {int? partySize})?
+  onOpenAccount,
+  Future<bool> Function()? onOpenTemporaryAccount,
   bool directAccounts = false,
 }) async {
   final entry = await readyEntryController(permissions: permissions);
@@ -401,6 +407,7 @@ Future<SurfaceHarness> pumpSurface(
           entry: entry,
           tableState: tableState,
           onOpenAccount: onOpenAccount,
+          onOpenTemporaryAccount: onOpenTemporaryAccount,
           directAccounts: directAccounts,
         ),
       ),
@@ -416,6 +423,29 @@ Future<SurfaceHarness> pumpSurface(
 }
 
 void main() {
+  testWidgets('a full room can still open a tableless temporary account', (
+    tester,
+  ) async {
+    var opened = false;
+    final harness = await pumpSurface(
+      tester,
+      permissions: const ['cart.write', 'sale.lifecycle'],
+      directAccounts: true,
+      onOpenTemporaryAccount: () async {
+        opened = true;
+        return true;
+      },
+    );
+
+    final action = find.byKey(const ValueKey('open-temporary-table-account'));
+    expect(action, findsOneWidget);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(opened, isTrue);
+    expect(harness.tableState.anyPartyPresent, isFalse);
+    await harness.dispose(tester);
+  });
+
   testWidgets('accounts show the plan and open only through the detail panel', (
     tester,
   ) async {
@@ -424,7 +454,10 @@ void main() {
       tester,
       permissions: const ['cart.write', 'sale.lifecycle'],
       directAccounts: true,
-      onOpenAccount: (table) async => opened.add(table.id),
+      onOpenAccount: (table, {partySize}) async {
+        opened.add(table.id);
+        return true;
+      },
     );
     await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
     await tester.pumpAndSettle();
@@ -440,9 +473,13 @@ void main() {
     expect(find.byTooltip('Show list'), findsNothing);
     expect(find.byKey(const ValueKey('table-detail-panel')), findsOneWidget);
     expect(
+      find.ancestor(of: find.text('Seat'), matching: find.byType(PosButton)),
+      findsOneWidget,
+    );
+    expect(
       find.ancestor(
         of: find.text('Open account'),
-        matching: find.byType(PosButton),
+        matching: find.byType(PosOutlineButton),
       ),
       findsOneWidget,
     );
@@ -455,33 +492,55 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
-    expect(harness.room.seated!.tableId, t1);
+    expect(opened, [t1, t1]);
+    expect(
+      harness.room.seated,
+      isNull,
+      reason: 'The account transaction owns the table claim.',
+    );
     expect(tester.takeException(), isNull);
     await harness.dispose(tester);
   });
 
-  testWidgets(
-    'waiter opens the table account without room management permissions',
-    (tester) async {
-      final opened = <String>[];
-      final harness = await pumpSurface(
-        tester,
-        permissions: const ['cart.write', 'order.fire'],
-        directAccounts: true,
-        onOpenAccount: (table) async => opened.add(table.id),
-      );
-      await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
-      await tester.pumpAndSettle();
-      expect(find.text('Open account'), findsOneWidget);
-      expect(find.text('Seat'), findsNothing);
-      expect(find.text('Move'), findsNothing);
-      await tester.tap(find.text('Open account'));
-      await tester.pumpAndSettle();
-      expect(opened, [t1]);
-      expect(tester.takeException(), isNull);
-      await harness.dispose(tester);
-    },
-  );
+  testWidgets('waiter receives the full table action set from cart.write', (
+    tester,
+  ) async {
+    final opened = <String>[];
+    final harness = await pumpSurface(
+      tester,
+      permissions: const ['cart.write', 'order.fire'],
+      repository: RoomRepository(
+        states: [
+          entryJson(
+            t1,
+            tableStateSeated,
+            seatedAt: '2026-09-16T17:58:00.000Z',
+            partySize: 2,
+            openAccountId: '00000000-0000-4000-8000-000000000099',
+            openAccountFolio: 'Cuenta 002',
+          ),
+        ],
+      ),
+      directAccounts: true,
+      onOpenAccount: (table, {partySize}) async {
+        opened.add(table.id);
+        return true;
+      },
+    );
+    await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Resume account'), findsOneWidget);
+    expect(find.text('Move'), findsOneWidget);
+    expect(find.text('Order sent'), findsOneWidget);
+    expect(find.text('Mark served'), findsOneWidget);
+    expect(find.text('Bill requested'), findsOneWidget);
+    expect(find.text('Clear table'), findsOneWidget);
+    await tester.tap(find.text('Resume account'));
+    await tester.pumpAndSettle();
+    expect(opened, [t1]);
+    expect(tester.takeException(), isNull);
+    await harness.dispose(tester);
+  });
 
   for (final textScale in [1.0, 2.0]) {
     testWidgets('narrow accounts keep detail and summary at scale $textScale', (
@@ -497,7 +556,10 @@ void main() {
         tester,
         permissions: const ['cart.write'],
         directAccounts: true,
-        onOpenAccount: (table) async => opened.add(table.id),
+        onOpenAccount: (table, {partySize}) async {
+          opened.add(table.id);
+          return true;
+        },
       );
       expect(
         find.byType(FloorPlanMap),
@@ -513,7 +575,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Open account'), findsOneWidget);
-      expect(find.text('Seat'), findsNothing);
+      expect(find.text('Seat'), findsOneWidget);
       await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Details'));
@@ -552,6 +614,34 @@ void main() {
     expect(tester.takeException(), isNull);
     await harness.dispose(tester);
   });
+
+  testWidgets(
+    'seating from the order surface opens the account in the same intent',
+    (tester) async {
+      final openedPartySizes = <int?>[];
+      final harness = await pumpSurface(
+        tester,
+        onOpenAccount: (table, {partySize}) async {
+          openedPartySizes.add(partySize);
+          return true;
+        },
+      );
+      await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Seat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      expect(openedPartySizes, [2]);
+      expect(
+        harness.room.seated,
+        isNull,
+        reason: 'The account transaction owns the table claim.',
+      );
+      expect(tester.takeException(), isNull);
+      await harness.dispose(tester);
+    },
+  );
 
   testWidgets('a seated table draws its state, a filled marker and a timer', (
     tester,
@@ -749,6 +839,57 @@ void main() {
         '2026-09-16T17:30:00.000Z',
       );
       expect(harness.tableState.elapsedOf(t2), const Duration(minutes: 30));
+      expect(tester.takeException(), isNull);
+      await harness.dispose(tester);
+    },
+  );
+
+  testWidgets(
+    'an occupied table names its account and resumes it as the primary action',
+    (tester) async {
+      final opened = <String>[];
+      final harness = await pumpSurface(
+        tester,
+        permissions: const ['cart.write', 'sale.lifecycle'],
+        directAccounts: true,
+        onOpenAccount: (table, {partySize}) async {
+          opened.add(table.id);
+          return true;
+        },
+        repository: RoomRepository(
+          states: [
+            entryJson(
+              t1,
+              tableStateSeated,
+              seatedAt: '2026-09-16T17:58:00.000Z',
+              partySize: 2,
+              openAccountId: '00000000-0000-4000-8000-000000000099',
+              openAccountFolio: 'Cuenta 009',
+            ),
+          ],
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('floor-plan-element-$t1')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('table-detail-panel')),
+          matching: find.text('Cuenta 009'),
+        ),
+        findsOneWidget,
+      );
+      final primary = find.text('Resume account');
+      expect(primary, findsOneWidget);
+      expect(
+        find.ancestor(of: primary, matching: find.byType(PosButton)),
+        findsOneWidget,
+      );
+
+      await tester.tap(primary);
+      await tester.pumpAndSettle();
+      expect(opened, [t1]);
       expect(tester.takeException(), isNull);
       await harness.dispose(tester);
     },

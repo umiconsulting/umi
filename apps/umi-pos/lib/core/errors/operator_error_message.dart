@@ -203,6 +203,10 @@ String operatorErrorMessage(
       spanish
           ? 'Esta cuenta sigue abierta en otra pantalla. Guárdala allí antes de recuperarla.'
           : 'This account is still open on another screen. Save it there before recovering it.',
+    'OFFLINE_SYNC_PENDING' =>
+      spanish
+          ? 'Hay cambios de esta terminal pendientes de sincronizar. Mantén la conexión y espera a que termine; después vuelve a abrir la cuenta.'
+          : 'This terminal has changes waiting to synchronize. Keep the connection open and wait for them to finish, then open the account again.',
     'CART_ACTOR_BUSY' =>
       spanish
           ? 'Ya tienes otra cuenta abierta. Vuelve a Cuentas para retomarla o guardarla.'

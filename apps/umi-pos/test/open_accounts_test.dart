@@ -4,6 +4,7 @@ import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/operator_permissions.dart';
+import 'package:umi_pos/core/storage/local_working_copy.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/features/cart/account_details_surface.dart';
 import 'package:umi_pos/features/cart/cart_controller.dart';
@@ -99,6 +100,29 @@ class _Telemetry implements Telemetry {
   final events = <String>[];
   @override
   void event(ClientEvent event) => events.add(event.name);
+}
+
+final class _AccountCache implements LocalWorkingCopy {
+  _AccountCache(this.accounts);
+
+  final List<Cart> accounts;
+
+  @override
+  Future<List<Cart>?> readOpenAccounts(
+    String merchantId,
+    CartQuery query,
+  ) async => accounts;
+
+  @override
+  Future<void> writeOpenAccounts(
+    String merchantId,
+    CartQuery query,
+    List<Cart> accounts,
+  ) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected local-store call: ${invocation.memberName}');
 }
 
 class _Repository
@@ -219,6 +243,7 @@ class _Repository
     String merchantId, {
     required CartQuery query,
     required String tableId,
+    int? partySize,
     required String idempotencyKey,
   }) async {
     calls.add('open:$tableId');
@@ -340,6 +365,30 @@ class _AccountApi implements ApiClient {
 }
 
 void main() {
+  test(
+    'the account list reads server truth before falling back to cache',
+    () async {
+      final repository = _Repository();
+      final fresh = _account('fresh');
+      final stale = _account('stale');
+      repository.accounts[fresh.id] = fresh;
+      final cart = CartController(
+        repository: repository,
+        telemetry: _Telemetry(),
+        workingCopy: _AccountCache([stale]),
+      );
+      addTearDown(cart.dispose);
+
+      final accounts = await cart.openAccounts(
+        'merchant',
+        'branch',
+        'operator',
+      );
+
+      expect(accounts.map((account) => account.id), [fresh.id]);
+    },
+  );
+
   test(
     'waiter bootstrap waits for an order before creating an account',
     () async {

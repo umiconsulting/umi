@@ -10,6 +10,7 @@ import 'hardware_fingerprint.dart';
 import 'hardware_recovery_store.dart';
 import 'hardware_repository.dart';
 import 'hardware_runtime.dart';
+import 'print_trace.dart';
 
 final class HardwareScope {
   const HardwareScope({
@@ -344,6 +345,7 @@ final class HardwareService {
   Future<HardwareRuntimeSnapshot> snapshot(
     HardwareScope scope, {
     bool includeDisabled = false,
+    bool probeHealth = true,
   }) async {
     final result = await _repository.snapshot(
       scope.merchantId,
@@ -358,7 +360,11 @@ final class HardwareService {
     final resolver = _adapterResolver;
     if (resolver is HardwareConnectionStateResolver) {
       final stateResolver = resolver as HardwareConnectionStateResolver;
-      await stateResolver.refreshHealth();
+      // A screen asking for the hardware wants a measurement now. The relay
+      // reading the same registry in the background does not: a DLE EOT probe
+      // shares the printer's only USB worker, and starting one just before a
+      // receipt is the one avoidable wait that lands INSIDE the paper path.
+      if (probeHealth) await stateResolver.refreshHealth();
       final effective = HardwareRuntimeSnapshot.fromJson({
         ...result.toJson(),
         'devices': result.devices.map((raw) {
@@ -388,6 +394,21 @@ final class HardwareService {
     _bindRuntime(scope);
     await _cacheRuntime(scope, result);
     return result;
+  }
+
+  /// The hardware configuration a committed action should use.
+  ///
+  /// A sale has already been accepted; the receipt and drawer are consequences,
+  /// not a reason to ask the cloud and USB port to describe themselves again.
+  /// The relay keeps this reading fresh in the background, and the durable copy
+  /// covers a cold start. Only a till that has never completed either gets a
+  /// registry read here — and even then it does not probe hardware first.
+  Future<HardwareRuntimeSnapshot> _runtimeForCommittedAction(
+    HardwareScope scope,
+  ) async {
+    final runtime = await _runtimeForOffline(scope);
+    if (runtime != null) return runtime;
+    return snapshot(scope, probeHealth: false);
   }
 
   /// Records the newest reading, and shows it to the screens that follow it.
@@ -538,6 +559,11 @@ final class HardwareService {
     String merchantId,
     HardwareCommandRequest command,
   ) async {
+    final trace = Stopwatch()..start();
+    printTrace('execute.start', {
+      'command': command.commandId,
+      'type': command.commandType,
+    });
     final expectedFingerprint = hardwarePayloadFingerprint(
       _fingerprintInput(command),
     );
@@ -545,6 +571,9 @@ final class HardwareService {
       throw StateError('HARDWARE_PAYLOAD_FINGERPRINT_MISMATCH');
     }
     final server = await _repository.createCommand(merchantId, command);
+    printTrace('execute.server_created', {
+      'elapsedMs': trace.elapsedMilliseconds,
+    });
     final serverStatus = server.command['status'];
     if (_terminalServerStatus(serverStatus)) return server;
 
@@ -593,7 +622,13 @@ final class HardwareService {
         state: HardwareDispatchState.dispatching,
       ),
     );
+    printTrace('execute.recovery_dispatching', {
+      'elapsedMs': trace.elapsedMilliseconds,
+    });
     await _transition(merchantId, command, status: 'dispatching');
+    printTrace('execute.server_dispatching', {
+      'elapsedMs': trace.elapsedMilliseconds,
+    });
     final local = await _coordinator.dispatch(
       RuntimeCommand(
         id: command.commandId,
@@ -610,6 +645,11 @@ final class HardwareService {
             const {},
       ),
     );
+    printTrace('execute.local_done', {
+      'elapsedMs': trace.elapsedMilliseconds,
+      'status': local.status.name,
+      'failure': local.failureCode,
+    });
     final state = switch (local.status) {
       RuntimeCommandStatus.succeeded => HardwareDispatchState.succeeded,
       RuntimeCommandStatus.retryable => HardwareDispatchState.retryable,
@@ -627,6 +667,9 @@ final class HardwareService {
         safeMetadata: local.safeMetadata,
       ),
     );
+    printTrace('execute.recovery_result', {
+      'elapsedMs': trace.elapsedMilliseconds,
+    });
     final result = await _transition(
       merchantId,
       command,
@@ -634,6 +677,10 @@ final class HardwareService {
       failureCode: local.failureCode,
       safeMetadata: local.safeMetadata,
     );
+    printTrace('execute.server_result', {
+      'elapsedMs': trace.elapsedMilliseconds,
+      'status': result.command['status'],
+    });
     final terminalStatus = result.command['status'];
     if (terminalStatus == 'succeeded' ||
         terminalStatus == 'failed' ||
@@ -764,7 +811,11 @@ final class HardwareService {
     required String receiptId,
     required Map<String, Object?> receiptSnapshot,
   }) async {
-    final runtime = await snapshot(scope);
+    // A reprint must know whether THIS receipt already has an official job;
+    // using the bound reading would miss the job the sale just created and ask
+    // for a second "first" impression, which the server refuses by design.
+    // Refresh that registry fact, but never put a USB probe in front of paper.
+    final runtime = await snapshot(scope, probeHealth: false);
     final printers = runtime.devices
         .map(HardwareDevice.fromJson)
         .where(
@@ -1072,7 +1123,7 @@ final class HardwareService {
     if (result.status != 'completed') {
       return (drawerAnswered: true, results: const <Object>[]);
     }
-    final runtime = await snapshot(scope);
+    final runtime = await _runtimeForCommittedAction(scope);
     final devices = runtime.devices.map(HardwareDevice.fromJson).toList();
     final receipt = _receiptPayload(
       result.receipt,
@@ -1512,7 +1563,7 @@ final class HardwareService {
     SaleExceptionResult result,
   ) async {
     if (result.status != 'committed') return const [];
-    final runtime = await snapshot(scope);
+    final runtime = await _runtimeForCommittedAction(scope);
     final devices = runtime.devices.map(HardwareDevice.fromJson).toList();
     final receipt = _receiptPayload(
       result.receipt,
@@ -1593,7 +1644,7 @@ final class HardwareService {
     required String reason,
     required String reference,
   }) async {
-    final runtime = await snapshot(scope);
+    final runtime = await _runtimeForCommittedAction(scope);
     final drawers = runtime.devices
         .map(HardwareDevice.fromJson)
         .where(

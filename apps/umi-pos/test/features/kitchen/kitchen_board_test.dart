@@ -248,7 +248,7 @@ final class FakeCommandRepository implements KitchenCommandRepository {
     return KitchenCommandResult(
       kitchenOrderId: request.kitchenOrderId,
       status: 'ready',
-      version: 2,
+      version: request.expectedVersion + 1,
       sequence: 4,
       updatedAt: serverClock,
     );
@@ -394,19 +394,24 @@ void main() {
       expect(request.reasonNote, 'Sin queso');
     });
 
-    test(
-      'the board is re-read after a bump, so the ticket shows the server',
-      () async {
-        final harness = await loadedBoard();
-        final ticket = harness.board.state.orders.single;
-        expect(harness.room.reads, 1);
+    test('an accepted bump stays painted without a blocking re-read', () async {
+      final harness = await loadedBoard();
+      final ticket = harness.board.state.orders.single;
+      expect(harness.room.reads, 1);
 
-        await harness.board.markItemReady(ticket, itemLatte);
+      await harness.board.markItemReady(ticket, itemLatte);
 
-        expect(harness.room.reads, 2);
-        expect(harness.board.state.phase, KitchenBoardPhase.ready);
-      },
-    );
+      expect(harness.room.reads, 1);
+      expect(harness.board.state.phase, KitchenBoardPhase.ready);
+      expect(
+        KitchenOrderItem.fromJson(
+          harness.board.state.orders.single.items.firstWhere(
+            (item) => item['id'] == itemLatte,
+          ),
+        ).status,
+        'ready',
+      );
+    });
   });
 
   group('courses and staging (§8H step 4)', () {
@@ -459,78 +464,81 @@ void main() {
       },
     );
 
-    test('firing a course names it, and the board only moves on the server '
-        'answer', () async {
-      final harness = await loadedBoard(
-        orders: [
+    test(
+      'firing a course names it and paints locally before the answer',
+      () async {
+        final harness = await loadedBoard(
+          orders: [
+            order(
+              items: [
+                itemJson(itemLatte, 'Latte'),
+                itemJson(itemToast, 'Toast', courseNumber: 2, fired: false),
+              ],
+            ),
+          ],
+        );
+        final ticket = harness.board.state.orders.single;
+
+        // Hold the command open so the board can be looked at mid-flight, before
+        // the server has said anything.
+        final gate = Completer<void>();
+        harness.kitchen.gate = gate;
+
+        final firing = harness.board.fireCourse(ticket, courseNumber: 2);
+        await Future<void>.delayed(Duration.zero);
+
+        final request = harness.kitchen.sent.single;
+        expect(request.commandType, 'fire_course');
+        // The course, not an item: firing is the whole round at once, which is
+        // what the ticket-level watermark is for.
+        expect(request.courseNumber, 2);
+        expect(request.itemIds, isEmpty);
+        expect(request.kitchenOrderId, orderId);
+        expect(request.expectedVersion, ticket.version);
+
+        // The local node is the authority for the station while the cloud is
+        // away, so the course is tappable immediately. The request is still in
+        // flight and a refusal will replace this paint with the refreshed board.
+        final inFlight = harness.board.state.orders.single;
+        expect(nextHeldCourse(inFlight), isNull);
+        expect(
+          inFlight.items
+              .map(KitchenOrderItem.fromJson)
+              .where((item) => item.fired)
+              .length,
+          2,
+        );
+        // The tap is on the ticket's own spinner, not lost.
+        expect(
+          harness.board.state.busyTarget,
+          KitchenBoardController.fireTarget(2),
+        );
+
+        // The server answers, and ITS answer is what moves the board: the same
+        // ticket with the watermark advanced.
+        harness.room.orders = [
           order(
+            version: 2,
+            firedThroughCourse: 2,
             items: [
               itemJson(itemLatte, 'Latte'),
-              itemJson(itemToast, 'Toast', courseNumber: 2, fired: false),
+              itemJson(itemToast, 'Toast', courseNumber: 2),
             ],
           ),
-        ],
-      );
-      final ticket = harness.board.state.orders.single;
+        ];
+        gate.complete();
+        expect(await firing, isTrue);
 
-      // Hold the command open so the board can be looked at mid-flight, before
-      // the server has said anything.
-      final gate = Completer<void>();
-      harness.kitchen.gate = gate;
-
-      final firing = harness.board.fireCourse(ticket, courseNumber: 2);
-      await Future<void>.delayed(Duration.zero);
-
-      final request = harness.kitchen.sent.single;
-      expect(request.commandType, 'fire_course');
-      // The course, not an item: firing is the whole round at once, which is
-      // what the ticket-level watermark is for.
-      expect(request.courseNumber, 2);
-      expect(request.itemIds, isEmpty);
-      expect(request.kitchenOrderId, orderId);
-      expect(request.expectedVersion, ticket.version);
-
-      // NOTHING HAS FIRED YET. `fired` is derived from the ticket's watermark on
-      // the server, so a board that lit the course up here would be drawing a
-      // rail the kitchen is not working.
-      final inFlight = harness.board.state.orders.single;
-      expect(nextHeldCourse(inFlight), 2);
-      expect(
-        inFlight.items
-            .map(KitchenOrderItem.fromJson)
-            .where((item) => item.fired)
-            .length,
-        1,
-      );
-      // The tap is on the ticket's own spinner, not lost.
-      expect(
-        harness.board.state.busyTarget,
-        KitchenBoardController.fireTarget(2),
-      );
-
-      // The server answers, and ITS answer is what moves the board: the same
-      // ticket with the watermark advanced.
-      harness.room.orders = [
-        order(
-          version: 2,
-          firedThroughCourse: 2,
-          items: [
-            itemJson(itemLatte, 'Latte'),
-            itemJson(itemToast, 'Toast', courseNumber: 2),
-          ],
-        ),
-      ];
-      gate.complete();
-      expect(await firing, isTrue);
-
-      final after = harness.board.state.orders.single;
-      expect(after.firedThroughCourse, 2);
-      expect(nextHeldCourse(after), isNull);
-      expect(groupCourses(after).last.held, isEmpty);
-      // One command and one re-read: the board did not invent the second state.
-      expect(harness.kitchen.sent, hasLength(1));
-      expect(harness.room.reads, 2);
-    });
+        final after = harness.board.state.orders.single;
+        expect(after.firedThroughCourse, 2);
+        expect(nextHeldCourse(after), isNull);
+        expect(groupCourses(after).last.held, isEmpty);
+        // One command and no blocking re-read: the local queue kept the painted
+        // course, and the server version was accepted in place.
+        expect(harness.kitchen.sent, hasLength(1));
+        expect(harness.room.reads, 1);
+      },
+    );
 
     test('firing and a per-item bump take turns on the same route', () async {
       final harness = await loadedBoard(
@@ -550,13 +558,16 @@ void main() {
       final firing = harness.board.fireCourse(ticket, courseNumber: 2);
       await Future<void>.delayed(Duration.zero);
 
-      // The second tap is refused while the first is unanswered, rather than
-      // racing it — the same one-at-a-time rule the bumps already obey.
-      expect(await harness.board.markItemReady(ticket, itemLatte), isFalse);
+      // The second tap joins the local queue while the first is unanswered.
+      final bump = harness.board.markItemReady(ticket, itemLatte);
       expect(harness.kitchen.sent, hasLength(1));
 
       gate.complete();
       expect(await firing, isTrue);
+      expect(await bump, isTrue);
+      expect(harness.kitchen.sent, hasLength(2));
+      expect(harness.kitchen.sent.last.commandType, 'mark_item_ready');
+      expect(harness.kitchen.sent.last.expectedVersion, 2);
     });
   });
 
@@ -581,34 +592,39 @@ void main() {
       expect(harness.board.state.orders, hasLength(1));
     });
 
-    test(
-      'anything that is not an AppException still releases the surface',
-      () async {
-        final harness = await loadedBoard();
-        // Exactly the shape that left the sibling cash controller spinning:
-        // a failure the controller does not name, so it falls out of the typed
-        // catch and lands in the broad one.
-        harness.kitchen.failure = const FormatException('decode slipped');
+    test('an unknown failure keeps the local paint and retries it', () async {
+      final harness = await loadedBoard();
+      // Exactly the shape that left the sibling cash controller spinning:
+      // a failure the controller does not name, so it falls out of the typed
+      // catch and lands in the broad one.
+      harness.kitchen.failure = const FormatException('decode slipped');
 
-        final ok = await harness.board.markItemReady(
-          harness.board.state.orders.single,
-          itemLatte,
-        );
+      final ok = await harness.board.markItemReady(
+        harness.board.state.orders.single,
+        itemLatte,
+      );
 
-        expect(ok, isFalse);
-        expect(harness.board.state.busy, isFalse);
-        expect(harness.board.state.errorCode, 'KITCHEN_COMMAND_FAILED');
-        // And the board accepts the next tap: the cook is not stuck.
-        harness.kitchen.failure = null;
-        expect(
-          await harness.board.markItemReady(
-            harness.board.state.orders.single,
-            itemToast,
+      expect(ok, isFalse);
+      expect(harness.board.state.busy, isFalse);
+      expect(harness.board.state.errorCode, isNull);
+      expect(harness.board.pendingCommandCount, 1);
+      expect(
+        KitchenOrderItem.fromJson(
+          harness.board.state.orders.single.items.firstWhere(
+            (item) => item['id'] == itemLatte,
           ),
-          isTrue,
-        );
-      },
-    );
+        ).status,
+        'ready',
+      );
+      // The next board refresh retries the same intent instead of asking the
+      // cook to tap the line again.
+      harness.kitchen.failure = null;
+      await harness.board.load(merchantId, query);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(harness.kitchen.sent, hasLength(2));
+      expect(harness.board.pendingCommandCount, 0);
+      expect(harness.board.state.errorCode, isNull);
+    });
 
     test('a version conflict re-reads the board and reports, and does not '
         'retry the bump', () async {
@@ -761,10 +777,16 @@ void main() {
       await harness.board.load(merchantId, query);
       expect(harness.connectivity.state, PosConnectivity.offline);
 
-      // And an answered read is the way back, without anybody else's help.
+      // A kitchen read can come from the LAN node. It is not proof that the
+      // cloud returned, so it must not clear the outage by itself.
       harness.room.failure = null;
       await harness.board.load(merchantId, query);
-      expect(harness.connectivity.state, isNot(PosConnectivity.offline));
+      expect(harness.connectivity.state, PosConnectivity.offline);
+
+      // The cloud health probe is the one signal that restores the lane.
+      harness.connectivity.apiReachable(authorityValid: true);
+      harness.connectivity.apiReachable(authorityValid: true);
+      expect(harness.connectivity.state, PosConnectivity.online);
     });
 
     test('a typed refusal is not treated as a broken wire', () async {
@@ -815,6 +837,7 @@ void main() {
       addTearDown(harness.board.dispose);
       addTearDown(harness.connectivity.dispose);
       harness.connectivity.apiReachable(authorityValid: true);
+      harness.connectivity.apiReachable(authorityValid: true);
       final pending = Completer<List<KitchenOrderProjection>>();
       harness.room.onSnapshot = () => pending.future;
       final loading = harness.board.load(merchantId, query);
@@ -836,6 +859,7 @@ void main() {
       final harness = await loadedBoard();
       addTearDown(harness.board.dispose);
       addTearDown(harness.connectivity.dispose);
+      harness.connectivity.apiReachable(authorityValid: true);
       harness.connectivity.apiReachable(authorityValid: true);
       final pending = Completer<bool>();
       harness.room.onWatch = () => pending.future;
@@ -898,6 +922,86 @@ void main() {
   });
 
   group('the poll and the bump do not fight', () {
+    test(
+      'a read that started before a bump cannot take its mark back',
+      () async {
+        final harness = await loadedBoard();
+        final read = Completer<List<KitchenOrderProjection>>();
+        harness.room.onSnapshot = () => read.future;
+        final poll = harness.board.load(merchantId, query);
+        harness.room.onSnapshot = null;
+        final gate = Completer<void>();
+        harness.kitchen.gate = gate;
+
+        final bump = harness.board.markItemReady(
+          harness.board.state.orders.single,
+          itemLatte,
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          KitchenOrderItem.fromJson(
+            harness.board.state.orders.single.items.firstWhere(
+              (item) => item['id'] == itemLatte,
+            ),
+          ).status,
+          'ready',
+        );
+
+        // This is the stale snapshot that used to erase the checkmark: it left
+        // the server before the bump and arrives after the local paint.
+        read.complete([order()]);
+        await poll;
+        expect(
+          KitchenOrderItem.fromJson(
+            harness.board.state.orders.single.items.firstWhere(
+              (item) => item['id'] == itemLatte,
+            ),
+          ).status,
+          'ready',
+        );
+
+        gate.complete();
+        expect(await bump, isTrue);
+        expect(
+          KitchenOrderItem.fromJson(
+            harness.board.state.orders.single.items.firstWhere(
+              (item) => item['id'] == itemLatte,
+            ),
+          ).status,
+          'ready',
+        );
+      },
+    );
+
+    test('two quick marks both stay painted and leave in order', () async {
+      final harness = await loadedBoard();
+      final gate = Completer<void>();
+      harness.kitchen.gate = gate;
+      final first = harness.board.markItemReady(
+        harness.board.state.orders.single,
+        itemLatte,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final second = harness.board.markItemReady(
+        harness.board.state.orders.single,
+        itemToast,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(harness.board.pendingCommandCount, 2);
+      expect(harness.board.state.orders.single.status, 'ready');
+      expect(harness.kitchen.sent, hasLength(1));
+
+      gate.complete();
+      expect(await first, isTrue);
+      expect(await second, isTrue);
+      expect(harness.kitchen.sent, hasLength(2));
+      expect(harness.kitchen.sent.last.itemIds, [itemToast]);
+      expect(harness.kitchen.sent.last.expectedVersion, 2);
+      expect(harness.board.pendingCommandCount, 0);
+      expect(harness.board.state.orders.single.status, 'ready');
+    });
+
     test('the board keeps its tickets while a command is in flight', () async {
       final harness = await loadedBoard();
       final gate = Completer<void>();
@@ -935,7 +1039,7 @@ void main() {
       expect(await bump, isTrue);
 
       expect(harness.board.state.phase, KitchenBoardPhase.ready);
-      expect(harness.room.reads, greaterThanOrEqualTo(3));
+      expect(harness.room.reads, greaterThanOrEqualTo(2));
     });
   });
 
@@ -1398,9 +1502,10 @@ void main() {
       final request = harness.kitchen.sent.single;
       expect(request.commandType, 'fire_course');
       expect(request.courseNumber, 2);
-      // The board still shows the course held: the surface does not decide, it
-      // draws what the server answered, and this fake never advanced the ticket.
-      expect(find.text('Held · 1'), findsOneWidget);
+      // The course leaves the held block at once. The fake server never advanced
+      // the ticket, so this result proves the local queue is what keeps the tap
+      // painted while the answer is in flight.
+      expect(find.text('Held · 1'), findsNothing);
       await harness.dispose(tester);
     });
 

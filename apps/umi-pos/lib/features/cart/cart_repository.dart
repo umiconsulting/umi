@@ -44,6 +44,7 @@ abstract interface class OpenAccountCartRepository {
     String merchantId, {
     required CartQuery query,
     required String tableId,
+    int? partySize,
     required String idempotencyKey,
   });
   Future<Cart> suspendAccount(
@@ -176,6 +177,7 @@ final class ApiCartRepository
     String merchantId, {
     required CartQuery query,
     required String tableId,
+    int? partySize,
     required String idempotencyKey,
   }) async => Cart.fromJson(
     await _api.request(
@@ -185,6 +187,7 @@ final class ApiCartRepository
         locationId: query.locationId,
         operatorSessionId: query.operatorSessionId,
         tableId: tableId,
+        partySize: partySize,
         idempotencyKey: idempotencyKey,
       ).toJson()..remove('expectedVersion'),
       idempotent: true,

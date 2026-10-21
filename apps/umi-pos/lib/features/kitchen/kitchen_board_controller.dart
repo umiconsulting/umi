@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -223,6 +224,41 @@ final class ApiKitchenBoardRepository
 
 enum KitchenBoardPhase { idle, loading, ready, failure }
 
+/// One local kitchen intent that has not reached the server yet.
+///
+/// The board is a local work surface first. A tap paints the new state at once,
+/// and commands leave this queue in order. A stale poll can replace the server
+/// base, but it cannot remove an intent that is still waiting here.
+final class _PendingKitchenCommand {
+  _PendingKitchenCommand({
+    required this.commandId,
+    required this.idempotencyKey,
+    required this.correlationId,
+    required this.commandType,
+    required this.target,
+    required this.itemIds,
+    required this.completed,
+    this.courseNumber,
+    this.reasonCode,
+    this.reasonNote,
+  });
+
+  final String commandId;
+  final String idempotencyKey;
+  final String correlationId;
+  final String commandType;
+  final String target;
+  final List<String> itemIds;
+  final Completer<bool> completed;
+  final int? courseNumber;
+  final String? reasonCode;
+  final String? reasonNote;
+
+  /// True while this exact intent is on the wire. A read that already contains
+  /// its effect must not remove it before the answer arrives.
+  bool sending = false;
+}
+
 @immutable
 final class KitchenBoardState {
   const KitchenBoardState({
@@ -373,7 +409,9 @@ final class KitchenBoardController extends ChangeNotifier {
     this._repository, {
     required this.commands,
     required this.connectivity,
-  });
+  }) {
+    connectivity.addListener(_connectivityChanged);
+  }
 
   final KitchenBoardRepository _repository;
 
@@ -391,6 +429,25 @@ final class KitchenBoardController extends ChangeNotifier {
   KitchenBoardState get state => _state;
   bool _disposed = false;
   bool _watching = false;
+
+  /// The last answer the server gave, without local intents.
+  List<KitchenOrderProjection> _serverOrders = const [];
+
+  /// Intents the cook has made but the server has not confirmed yet, in order.
+  ///
+  /// The key is one CARD, not one order id: a till can draw two station cards
+  /// for the same kitchen order, and a bump on the bar card must not paint on
+  /// the pizza card.
+  final Map<String, List<_PendingKitchenCommand>> _pendingByOrder = {};
+  final Set<String> _drainingOrders = {};
+  String? _scope;
+
+  /// Local intents that still need a server answer. The surface uses no waiting
+  /// copy for them; this is diagnostic state and a test seam.
+  int get pendingCommandCount => _pendingByOrder.values.fold(
+    0,
+    (total, pending) => total + pending.length,
+  );
 
   /// How long to wait after a REFUSED watch before asking again.
   ///
@@ -430,10 +487,9 @@ final class KitchenBoardController extends ChangeNotifier {
   /// the wire, and guessing would make this state less trustworthy than the
   /// requests it is derived from.
   void _reportReachability({Object? failure}) {
-    if (failure == null) {
-      connectivity.apiReachable(authorityValid: true);
-      return;
-    }
+    // A successful kitchen read can come from the LAN node. It says nothing
+    // about the cloud. Only the cloud health probe may restore `online`.
+    if (failure == null) return;
     if (failure is AppException &&
         (failure.category == AppErrorCategory.transport ||
             failure.category == AppErrorCategory.timeout)) {
@@ -441,8 +497,41 @@ final class KitchenBoardController extends ChangeNotifier {
     }
   }
 
-  Future<void> load(String merchantId, PosKitchenOrderQuery query) async {
+  /// Load the board once per scope at a time.
+  ///
+  /// The poll and the held watch both ask for a read, and they can land in the
+  /// same tick. Two reads for one board is twice the traffic for one answer, so
+  /// a second call with the same scope awaits the read already in flight. A
+  /// different scope starts a new read, and [_generation] discards the old one.
+  Future<void> load(
+    String merchantId,
+    PosKitchenOrderQuery query, {
+    bool force = false,
+  }) {
     final scope = '$merchantId:${query.locationId}:${query.operatorSessionId}';
+    final inFlight = _loadInFlight;
+    if (!force && inFlight != null && _loadScope == scope) return inFlight;
+    _loadScope = scope;
+    late final Future<void> future;
+    future = _load(merchantId, query).whenComplete(() {
+      if (identical(_loadInFlight, future)) {
+        _loadInFlight = null;
+        _loadScope = null;
+      }
+    });
+    _loadInFlight = future;
+    return future;
+  }
+
+  Future<void>? _loadInFlight;
+  String? _loadScope;
+
+  Future<void> _load(String merchantId, PosKitchenOrderQuery query) async {
+    final scope = '$merchantId:${query.locationId}:${query.operatorSessionId}';
+    if (_scope != scope) {
+      _scope = scope;
+      _resetLocalIntents();
+    }
     if (_unassignedScope != scope) {
       _unassignedScope = scope;
       _unassignedCommandEpoch++;
@@ -459,7 +548,7 @@ final class KitchenBoardController extends ChangeNotifier {
     final generation = ++_generation;
     _state = KitchenBoardState(
       phase: KitchenBoardPhase.loading,
-      orders: _state.orders,
+      orders: _composedOrders,
       allDay: _state.allDay,
       stations: _state.stations,
       businessDate: _state.businessDate,
@@ -474,9 +563,11 @@ final class KitchenBoardController extends ChangeNotifier {
       final orders = await _repository.snapshot(merchantId, query);
       if (_disposed || generation != _generation) return;
       _reportReachability();
+      _serverOrders = orders;
+      _dropSettledPending();
       _state = KitchenBoardState(
         phase: KitchenBoardPhase.ready,
-        orders: orders,
+        orders: _composedOrders,
         allDay: _state.allDay,
         stations: _state.stations,
         businessDate: _state.businessDate,
@@ -494,13 +585,18 @@ final class KitchenBoardController extends ChangeNotifier {
       // tickets down with it.
       await _refreshStations(merchantId, query, generation);
       await _refreshUnassigned(merchantId, query, generation);
+      _drainPending();
       return;
     } catch (error) {
       if (_disposed || generation != _generation) return;
       _reportReachability(failure: error);
+      // A full server window is not a failed board. The tickets on screen are
+      // still the last answer the server gave, and replacing them with an
+      // error would tell the cook the kitchen is broken when it is not.
+      if (error is AppException && error.code == 'RATE_LIMITED') return;
       _state = KitchenBoardState(
         phase: KitchenBoardPhase.failure,
-        orders: _state.orders,
+        orders: _composedOrders,
         allDay: _state.allDay,
         stations: _state.stations,
         businessDate: _state.businessDate,
@@ -582,7 +678,7 @@ final class KitchenBoardController extends ChangeNotifier {
       if (_disposed || generation != _generation) return;
       _state = KitchenBoardState(
         phase: _state.phase,
-        orders: _state.orders,
+        orders: _composedOrders,
         allDay: {
           for (final item in counts.items)
             (item.productName, item.variantName): item,
@@ -612,7 +708,7 @@ final class KitchenBoardController extends ChangeNotifier {
       if (_disposed || generation != _generation) return;
       _state = KitchenBoardState(
         phase: _state.phase,
-        orders: _state.orders,
+        orders: _composedOrders,
         allDay: _state.allDay,
         stations: stations,
         businessDate: _state.businessDate,
@@ -628,7 +724,7 @@ final class KitchenBoardController extends ChangeNotifier {
 
   /// The cook marks ONE line done: the ticket stays, the dish leaves.
   Future<bool> markItemReady(KitchenOrderProjection order, String itemId) =>
-      _command(
+      _enqueueCommand(
         order,
         commandType: 'mark_item_ready',
         target: itemId,
@@ -636,19 +732,20 @@ final class KitchenBoardController extends ChangeNotifier {
       );
 
   /// The first move of a ticket: the station has begun it.
-  Future<bool> startPreparation(KitchenOrderProjection order) => _command(
-    order,
-    commandType: 'start_preparation',
-    target: order.id,
-    itemIds: order.items
-        .map(KitchenOrderItem.fromJson)
-        .where((item) => item.fired && item.status == 'queued')
-        .map((item) => item.id)
-        .toList(),
-  );
+  Future<bool> startPreparation(KitchenOrderProjection order) =>
+      _enqueueCommand(
+        order,
+        commandType: 'start_preparation',
+        target: order.id,
+        itemIds: order.items
+            .map(KitchenOrderItem.fromJson)
+            .where((item) => item.fired && item.status == 'queued')
+            .map((item) => item.id)
+            .toList(),
+      );
 
   /// The ticket is done and leaves the board.
-  Future<bool> complete(KitchenOrderProjection order) => _command(
+  Future<bool> complete(KitchenOrderProjection order) => _enqueueCommand(
     order,
     commandType: 'complete',
     target: order.id,
@@ -660,7 +757,7 @@ final class KitchenBoardController extends ChangeNotifier {
   );
 
   /// Confirma la cancelación sólo para los productos visibles de esta estación.
-  Future<bool> discard(KitchenOrderProjection order) => _command(
+  Future<bool> discard(KitchenOrderProjection order) => _enqueueCommand(
     order,
     commandType: 'cancel_ack',
     target: order.id,
@@ -676,7 +773,7 @@ final class KitchenBoardController extends ChangeNotifier {
     KitchenOrderProjection order, {
     required String reasonCode,
     String? reasonNote,
-  }) => _command(
+  }) => _enqueueCommand(
     order,
     commandType: 'recall',
     target: order.id,
@@ -691,12 +788,8 @@ final class KitchenBoardController extends ChangeNotifier {
 
   /// Tells the kitchen to start one whole course (§8H step 4).
   ///
-  /// The board does not move the course itself. `fired` is derived from the
-  /// ticket's watermark on the server, and a client that lit a course up
-  /// optimistically would draw a rail the kitchen is not working — the same
-  /// lie as a bump that never landed. So this sends the command and follows it
-  /// with a re-read, exactly like every other command here; the answer that
-  /// matters is the ticket the server sends back.
+  /// The board paints the course at once and keeps that paint while the command
+  /// waits in the local queue. A refusal removes the paint and shows the reason.
   ///
   /// A course at or below the watermark is accepted and changes nothing, which
   /// is why the surface only offers the control for a course the board can
@@ -704,15 +797,15 @@ final class KitchenBoardController extends ChangeNotifier {
   Future<bool> fireCourse(
     KitchenOrderProjection order, {
     required int courseNumber,
-  }) => _command(
+  }) => _enqueueCommand(
     order,
     commandType: 'fire_course',
     target: fireTarget(courseNumber),
     courseNumber: courseNumber,
   );
 
-  /// The `busyTarget` a fire in flight is published under, so the surface spins
-  /// the button that was tapped instead of the whole ticket.
+  /// The `busyTarget` a fire in flight is published under. It is diagnostic
+  /// state; the surface does not replace the ticket with a waiting message.
   static String fireTarget(int courseNumber) => 'course:$courseNumber';
 
   /// Clears the refusal banner. The message is not auto-dismissed: it says what
@@ -720,7 +813,7 @@ final class KitchenBoardController extends ChangeNotifier {
   void dismissError() {
     _state = KitchenBoardState(
       phase: _state.phase,
-      orders: _state.orders,
+      orders: _composedOrders,
       allDay: _state.allDay,
       stations: _state.stations,
       businessDate: _state.businessDate,
@@ -734,7 +827,9 @@ final class KitchenBoardController extends ChangeNotifier {
     final merchantId = _merchantId;
     final query = _query;
     if (merchantId == null || query == null) return;
-    await load(merchantId, query);
+    // This refresh follows a command. It must read the server again, even if a
+    // poll is in flight, or the ticket it just changed stays stale on screen.
+    await load(merchantId, query, force: true);
   }
 
   Future<void> _refreshUnassigned(
@@ -841,7 +936,12 @@ final class KitchenBoardController extends ChangeNotifier {
     }
   }
 
-  Future<bool> _command(
+  /// Paint an intent now and put it behind every earlier intent for this ticket.
+  ///
+  /// A cook often marks several lines in one pass. Each tap must survive the
+  /// next poll, and it must not wait for the previous network answer. The queue
+  /// gives both properties without inventing a second server order model.
+  Future<bool> _enqueueCommand(
     KitchenOrderProjection order, {
     required String commandType,
     required String target,
@@ -849,96 +949,473 @@ final class KitchenBoardController extends ChangeNotifier {
     String? reasonCode,
     String? reasonNote,
     int? courseNumber,
-  }) async {
-    if (_disposed || _state.busyTarget != null) return false;
-    final merchantId = _merchantId;
-    final query = _query;
-    if (merchantId == null || query == null) return false;
-    _state = KitchenBoardState(
-      phase: _state.phase,
-      orders: _state.orders,
-      busyTarget: target,
-      allDay: _state.allDay,
-      stations: _state.stations,
-      businessDate: _state.businessDate,
+  }) {
+    if (_disposed) return Future<bool>.value(false);
+    final cardKey = _cardKey(order);
+    final visible = _visibleOrder(cardKey);
+    if (visible == null) return Future<bool>.value(false);
+    if (_commandApplied(
+      visible,
+      commandType,
+      itemIds: itemIds,
+      courseNumber: courseNumber,
+    )) {
+      return Future<bool>.value(true);
+    }
+    if (_state.errorCode != null || _state.errorReference != null) {
+      _publishVisible(clearError: true);
+    }
+    final pending = _PendingKitchenCommand(
+      commandId: _uuid(),
+      idempotencyKey: _uuid(),
+      correlationId: _uuid(),
+      commandType: commandType,
+      target: target,
+      itemIds: List<String>.unmodifiable(itemIds),
+      courseNumber: courseNumber,
+      reasonCode: reasonCode,
+      reasonNote: reasonNote,
+      completed: Completer<bool>(),
     );
-    notifyListeners();
-    try {
-      await commands.command(
-        merchantId,
-        PosKitchenCommandRequest(
-          action: 'command',
-          commandId: _uuid(),
-          // A fresh key per attempt, so a lost response cannot bump the same
-          // dish twice: the server journals the command and replays its own
-          // outcome for a repeat of this key.
-          idempotencyKey: _uuid(),
-          correlationId: _uuid(),
-          // The version the cook's screen was drawn from. If the ticket moved
-          // since, the server refuses and the board re-reads.
-          expectedVersion: order.version,
-          kitchenOrderId: order.id,
-          commandType: commandType,
-          itemIds: itemIds,
-          reasonCode: reasonCode,
-          reasonNote: reasonNote,
-          // Only `fire_course` carries a course, and the contract says so: every
-          // other command leaves this null rather than defaulting it to 1,
-          // which would look like a request to fire the first course.
-          courseNumber: courseNumber,
-          // The location and the operator session are what this route scopes
-          // by — the same pair the board read above uses, so a cook can command
-          // exactly the tickets the board showed them.
-          locationId: query.locationId,
-          operatorSessionId: query.operatorSessionId,
-        ),
-      );
-      if (_disposed) return false;
-      _releaseBusy();
-      await refresh();
-      return true;
-    } on AppException catch (error) {
-      if (_disposed) return false;
-      // A conflict is not a fault: the ticket moved. Re-read the board first,
-      // then leave the typed message for the operator — never retry into a
-      // second bump.
-      _fail(error.code, order.publicReference);
-      if (error.category == AppErrorCategory.conflict) await refresh();
-      return false;
-    } catch (_) {
-      // ANYTHING ELSE STILL HAS TO RELEASE THE SURFACE.
-      //
-      // A sibling controller caught only `AppException`, so any other failure
-      // left `busy` true and the screen spun for ever with no message and no
-      // way out (defect D26). Whatever this failure is, the cook gets the board
-      // back and a refusal they can read.
-      if (_disposed) return false;
-      _fail('KITCHEN_COMMAND_FAILED', order.publicReference);
-      return false;
+    _pendingByOrder.putIfAbsent(cardKey, () => []).add(pending);
+    _publishVisible();
+    unawaited(_drainOrder(cardKey));
+    return pending.completed.future;
+  }
+
+  void _drainPending() {
+    for (final orderId in _pendingByOrder.keys.toList(growable: false)) {
+      unawaited(_drainOrder(orderId));
     }
   }
 
-  void _releaseBusy() {
+  /// Send one ticket's intents in order. Different tickets drain independently:
+  /// a slow bar ticket must not delay the grill.
+  Future<void> _drainOrder(String cardKey) async {
+    if (_disposed || _drainingOrders.contains(cardKey)) return;
+    _drainingOrders.add(cardKey);
+    _PendingKitchenCommand? failedAfterDrain;
+    try {
+      while (!_disposed) {
+        final pending = _pendingByOrder[cardKey];
+        if (pending == null || pending.isEmpty) {
+          _pendingByOrder.remove(cardKey);
+          break;
+        }
+        final command = pending.first;
+        final base = _serverOrder(cardKey);
+        if (base == null) {
+          pending.remove(command);
+          _finish(command, _leavesRail(command.commandType));
+          continue;
+        }
+        if (_commandApplied(
+          base,
+          command.commandType,
+          itemIds: command.itemIds,
+          courseNumber: command.courseNumber,
+        )) {
+          pending.remove(command);
+          _finish(command, true);
+          continue;
+        }
+        final merchantId = _merchantId;
+        final query = _query;
+        if (merchantId == null || query == null) {
+          _finish(command, false);
+          break;
+        }
+        command.sending = true;
+        _publishVisible();
+        try {
+          final result = await commands.command(
+            merchantId,
+            _requestFor(base, command, query),
+          );
+          if (_disposed) {
+            _finish(command, false);
+            return;
+          }
+          pending.remove(command);
+          if (pending.isEmpty) _pendingByOrder.remove(cardKey);
+          _acceptCommand(base, command, result);
+          _publishVisible();
+          _finish(command, true);
+        } on AppException catch (error) {
+          command.sending = false;
+          if (_isDefiniteRefusal(error)) {
+            pending.remove(command);
+            if (pending.isEmpty) _pendingByOrder.remove(cardKey);
+            _publishVisible();
+            if (error.category == AppErrorCategory.conflict) {
+              await load(merchantId, query, force: true);
+            }
+            _fail(error.code, base.publicReference);
+            _finish(command, false);
+            break;
+          }
+          // An unknown answer is not proof of refusal. The paint stays, the
+          // command stays queued, and the next poll or reconnect retries it.
+          _reportReachability(failure: error);
+          _publishVisible();
+          failedAfterDrain = command;
+          break;
+        } catch (_) {
+          command.sending = false;
+          // A decode fault or a dropped connection says nothing about whether
+          // the server applied the command. Keep the deterministic command
+          // identity and retry it later.
+          _publishVisible();
+          failedAfterDrain = command;
+          break;
+        }
+      }
+    } finally {
+      _drainingOrders.remove(cardKey);
+      if (failedAfterDrain != null) _finish(failedAfterDrain, false);
+      if (!_disposed) _publishVisible();
+    }
+  }
+
+  PosKitchenCommandRequest _requestFor(
+    KitchenOrderProjection base,
+    _PendingKitchenCommand command,
+    PosKitchenOrderQuery query,
+  ) => PosKitchenCommandRequest(
+    action: 'command',
+    commandId: command.commandId,
+    // A fresh key per attempt, so a lost response cannot bump the same dish
+    // twice: the server journals the command and replays its own outcome for a
+    // repeat of this key.
+    idempotencyKey: command.idempotencyKey,
+    correlationId: command.correlationId,
+    // The version of the last confirmed answer plus every earlier local intent
+    // that the server has now accepted.
+    expectedVersion: base.version,
+    kitchenOrderId: base.id,
+    commandType: command.commandType,
+    itemIds: command.itemIds,
+    reasonCode: command.reasonCode,
+    reasonNote: command.reasonNote,
+    // Only `fire_course` carries a course, and the contract says so: every other
+    // command leaves this null rather than defaulting it to 1, which would look
+    // like a request to fire the first course.
+    courseNumber: command.courseNumber,
+    locationId: query.locationId,
+    operatorSessionId: query.operatorSessionId,
+  );
+
+  void _acceptCommand(
+    KitchenOrderProjection base,
+    _PendingKitchenCommand command,
+    KitchenCommandResult result,
+  ) {
+    final baseKey = _cardKey(base);
+    final current = _serverOrder(baseKey);
+    if (current != null && current.version > result.version) return;
+    if (_leavesRail(command.commandType) ||
+        result.status == 'completed' ||
+        result.status == 'cancelled') {
+      _serverOrders = _serverOrders
+          .where((order) => order.id != base.id)
+          .toList(growable: false);
+      return;
+    }
+    final projected = _projectCommand(
+      base,
+      commandType: command.commandType,
+      itemIds: command.itemIds,
+      courseNumber: command.courseNumber,
+      clock: DateTime.now().toUtc(),
+    );
+    final raw = projected.toJson()
+      ..['version'] = result.version
+      ..['updatedAt'] = result.updatedAt;
+    final accepted = KitchenOrderProjection.fromJson(raw);
+    _serverOrders = [
+      for (final order in _serverOrders)
+        _cardKey(order) == baseKey
+            ? accepted
+            // One kitchen order can have one card per station. A command bumps
+            // the shared version, so every sibling card must read that version
+            // on its next command even when its own lines did not change.
+            : order.id == base.id
+            ? _withServerVersion(order, result)
+            : order,
+    ];
+  }
+
+  KitchenOrderProjection _withServerVersion(
+    KitchenOrderProjection order,
+    KitchenCommandResult result,
+  ) {
+    final raw = order.toJson()
+      ..['version'] = result.version
+      ..['updatedAt'] = result.updatedAt;
+    return KitchenOrderProjection.fromJson(raw);
+  }
+
+  /// Drop queued intents that a fresh server answer already contains.
+  ///
+  /// A command that is still on the wire stays in the queue: its answer has not
+  /// arrived, and removing it early would make the next local paint depend on
+  /// which request happened to finish first.
+  void _dropSettledPending() {
+    for (final entry in _pendingByOrder.entries.toList(growable: false)) {
+      final base = _serverOrder(entry.key);
+      if (base == null) {
+        for (final command in entry.value.where((item) => !item.sending)) {
+          _finish(command, _leavesRail(command.commandType));
+        }
+        entry.value.removeWhere((command) => !command.sending);
+      } else {
+        entry.value.removeWhere((command) {
+          if (command.sending) return false;
+          final settled = _commandApplied(
+            base,
+            command.commandType,
+            itemIds: command.itemIds,
+            courseNumber: command.courseNumber,
+          );
+          if (settled) _finish(command, true);
+          return settled;
+        });
+      }
+      if (entry.value.isEmpty) _pendingByOrder.remove(entry.key);
+    }
+  }
+
+  bool _commandApplied(
+    KitchenOrderProjection order,
+    String commandType, {
+    required List<String> itemIds,
+    required int? courseNumber,
+  }) {
+    final selected = itemIds.toSet();
+    final items = order.items.map(KitchenOrderItem.fromJson).toList();
+    bool selectedHave(bool Function(KitchenOrderItem item) test) =>
+        selected.isNotEmpty &&
+        items.where((item) => selected.contains(item.id)).every(test);
+    return switch (commandType) {
+      'mark_item_ready' => selectedHave((item) => item.status == 'ready'),
+      'start_preparation' =>
+        selected.isEmpty || selectedHave((item) => item.status != 'queued'),
+      'complete' => order.status == 'completed',
+      // A cancelled ticket is cancelled before the cook acknowledges it. The
+      // acknowledgement is the command that removes it from this station, so
+      // the server status alone does not prove that the command is done.
+      'cancel_ack' => false,
+      'recall' =>
+        order.status == 'in_preparation' &&
+            selectedHave((item) => item.status != 'ready'),
+      'fire_course' =>
+        courseNumber == null || order.firedThroughCourse >= courseNumber,
+      _ => false,
+    };
+  }
+
+  bool _leavesRail(String commandType) =>
+      commandType == 'complete' || commandType == 'cancel_ack';
+
+  String _cardKey(KitchenOrderProjection order) =>
+      '${order.id}:${order.stationId}:${order.businessDate}';
+
+  KitchenOrderProjection? _serverOrder(String cardKey) {
+    for (final order in _serverOrders) {
+      if (_cardKey(order) == cardKey) return order;
+    }
+    return null;
+  }
+
+  KitchenOrderProjection? _visibleOrder(String cardKey) {
+    for (final order in _state.orders) {
+      if (_cardKey(order) == cardKey) return order;
+    }
+    return null;
+  }
+
+  /// The server's last answer with every queued local intent layered on top.
+  List<KitchenOrderProjection> get _composedOrders {
+    final orders = <KitchenOrderProjection>[];
+    for (final base in _serverOrders) {
+      final pending = _pendingByOrder[_cardKey(base)];
+      if (pending == null || pending.isEmpty) {
+        orders.add(base);
+        continue;
+      }
+      var current = base;
+      var leavesRail = false;
+      for (final command in pending) {
+        if (_leavesRail(command.commandType)) {
+          leavesRail = true;
+          break;
+        }
+        current = _projectCommand(
+          current,
+          commandType: command.commandType,
+          itemIds: command.itemIds,
+          courseNumber: command.courseNumber,
+          clock: DateTime.now().toUtc(),
+        );
+      }
+      if (!leavesRail) orders.add(current);
+    }
+    return orders;
+  }
+
+  String? get _activeTarget {
+    for (final pending in _pendingByOrder.values) {
+      for (final command in pending) {
+        if (command.sending) return command.target;
+      }
+    }
+    return null;
+  }
+
+  void _publishVisible({bool clearError = false, KitchenBoardPhase? phase}) {
+    if (_disposed) return;
     _state = KitchenBoardState(
-      phase: _state.phase,
-      orders: _state.orders,
+      phase: phase ?? _state.phase,
+      orders: _composedOrders,
       allDay: _state.allDay,
       stations: _state.stations,
       businessDate: _state.businessDate,
-      errorCode: _state.errorCode,
-      errorReference: _state.errorReference,
+      errorCode: clearError ? null : _state.errorCode,
+      errorReference: clearError ? null : _state.errorReference,
+      busyTarget: _activeTarget,
     );
+    notifyListeners();
+  }
+
+  void _resetLocalIntents() {
+    for (final pending in _pendingByOrder.values) {
+      for (final command in pending) {
+        _finish(command, false);
+      }
+    }
+    _pendingByOrder.clear();
+    _drainingOrders.clear();
+    _serverOrders = const [];
+  }
+
+  void _finish(_PendingKitchenCommand command, bool accepted) {
+    if (!command.completed.isCompleted) command.completed.complete(accepted);
+  }
+
+  bool _isDefiniteRefusal(AppException error) => switch (error.category) {
+    AppErrorCategory.permission ||
+    AppErrorCategory.conflict ||
+    AppErrorCategory.authentication ||
+    AppErrorCategory.configuration ||
+    AppErrorCategory.unsupported => true,
+    _ => const {
+      'VALIDATION_FAILED',
+      'KITCHEN_ORDER_NOT_FOUND',
+      'KITCHEN_ORDER_NOT_ROUTED',
+      'KITCHEN_ITEM_NOT_FOUND',
+      'KITCHEN_INVALID_TRANSITION',
+      'TICKET_NOT_FOUND',
+      'RESOURCE_NOT_FOUND',
+      'DEVICE_REVOKED',
+    }.contains(error.code),
+  };
+
+  void _connectivityChanged() {
+    if (_disposed) return;
+    final state = connectivity.state;
+    if (state == PosConnectivity.online ||
+        state == PosConnectivity.recovering) {
+      _drainPending();
+    }
+  }
+
+  /// The ticket the cook should see before the LAN or cloud acknowledges the
+  /// command. The board already knows the operation and the lines it applies to;
+  /// leaving the old ticket under a spinner made a local command look like a
+  /// stalled network request.
+  KitchenOrderProjection _projectCommand(
+    KitchenOrderProjection order, {
+    required String commandType,
+    required List<String> itemIds,
+    required int? courseNumber,
+    required DateTime clock,
+  }) {
+    final raw = order.toJson();
+    final items = (raw['items'] as List<Object?>)
+        .cast<Map<String, Object?>>()
+        .map((item) => Map<String, Object?>.from(item))
+        .toList(growable: false);
+    final selected = itemIds.toSet();
+    var status = order.status;
+    switch (commandType) {
+      case 'start_preparation':
+        status = 'in_preparation';
+        raw['preparationStartedAt'] = clock.toIso8601String();
+        for (final item in items) {
+          if (item['status'] == 'queued') item['status'] = 'preparing';
+        }
+        break;
+      case 'mark_item_ready':
+        for (final item in items) {
+          if (selected.isEmpty || selected.contains(item['id'])) {
+            item['status'] = 'ready';
+          }
+        }
+        final active = items.where((item) => item['status'] != 'cancelled');
+        status =
+            active.isNotEmpty &&
+                active.every((item) => item['status'] == 'ready')
+            ? 'ready'
+            : 'partially_ready';
+        break;
+      case 'complete':
+        status = 'completed';
+        for (final item in items) {
+          if (item['status'] != 'cancelled') item['status'] = 'ready';
+        }
+        break;
+      case 'cancel_ack':
+        status = 'cancelled';
+        for (final item in items) {
+          if (selected.isEmpty || selected.contains(item['id'])) {
+            item['status'] = 'cancelled';
+          }
+        }
+        break;
+      case 'recall':
+        status = 'in_preparation';
+        for (final item in items) {
+          if (selected.isEmpty || selected.contains(item['id'])) {
+            if (item['status'] == 'ready') item['status'] = 'preparing';
+          }
+        }
+        break;
+      case 'fire_course':
+        final through = courseNumber ?? order.firedThroughCourse;
+        raw['firedThroughCourse'] = through;
+        for (final item in items) {
+          if ((item['courseNumber'] as num? ?? 1).toInt() <= through) {
+            item['fired'] = true;
+          }
+        }
+        break;
+    }
+    raw['status'] = status;
+    raw['items'] = items;
+    raw['updatedAt'] = clock.toIso8601String();
+    return KitchenOrderProjection.fromJson(raw);
   }
 
   void _fail(String code, String reference) {
     _state = KitchenBoardState(
       phase: _state.phase,
-      orders: _state.orders,
+      orders: _composedOrders,
       allDay: _state.allDay,
       stations: _state.stations,
       businessDate: _state.businessDate,
       errorCode: code,
       errorReference: reference,
+      busyTarget: _activeTarget,
     );
     notifyListeners();
   }
@@ -949,6 +1426,8 @@ final class KitchenBoardController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    connectivity.removeListener(_connectivityChanged);
+    _resetLocalIntents();
     // Ends the watch loop at its next await, so a disposed board stops asking.
     stopWatching();
     _generation++;

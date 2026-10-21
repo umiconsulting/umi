@@ -138,6 +138,10 @@ msgstr "No messages in this conversation."
 #~ msgstr "{value} {of} {noun}"
 
 #: src/data.jsx
+#~ msgid "Elige una imagen PNG o JPG."
+#~ msgstr "Choose a PNG or JPG image."
+
+#: src/data.jsx
 msgid "Sesión expirada"
 msgstr "Session expired"
 
@@ -199,8 +203,8 @@ msgid "No pudimos leer el archivo."
 msgstr "We couldn't read the file."
 
 #: src/data.jsx
-msgid "Elige una imagen PNG o JPG."
-msgstr "Choose a PNG or JPG image."
+msgid "Elige una imagen PNG, JPG o SVG."
+msgstr "Choose a PNG, JPG, or SVG image."
 
 #: src/data.jsx
 msgid "La imagen es demasiado pesada. Prueba con una más simple."
@@ -739,6 +743,22 @@ msgid "La cuenta conserva Comer aquí sin asignar una mesa ficticia."
 msgstr "The account remains dine-in without assigning a fictitious table."
 
 #: src/screens/caja-turnos.jsx
+msgid "Atribución de propinas en cuentas divididas"
+msgstr "Split-payment tip attribution"
+
+#: src/screens/caja-turnos.jsx
+msgid "Mesero de la cuenta, aunque otro cajero procese el cobro"
+msgstr "The account server, even when another cashier processes the payment"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cajero que procesa cada cobro"
+msgstr "The cashier who processes each payment"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cada pago conserva ambos empleados y la política decide cuál recibe la propina."
+msgstr "Each payment keeps both employees, and the policy selects who receives the tip."
+
+#: src/screens/caja-turnos.jsx
 msgid "Transferencia bancaria"
 msgstr "Bank transfer"
 
@@ -771,10 +791,6 @@ msgid "Escribe la CLABE o el número de cuenta. Puedes guardar ambos."
 msgstr "Enter a CLABE or account number. You can save both."
 
 #: src/screens/caja-turnos.jsx
-msgid "Guardar transferencia"
-msgstr "Save bank transfer"
-
-#: src/screens/caja-turnos.jsx
 #: src/screens/devices.jsx
 #: src/screens/hours.jsx
 #: src/screens/reset-password.jsx
@@ -782,6 +798,10 @@ msgstr "Save bank transfer"
 #: src/screens/staff.jsx
 msgid "Guardando…"
 msgstr "Saving…"
+
+#: src/screens/caja-turnos.jsx
+msgid "Guardar transferencia"
+msgstr "Save bank transfer"
 
 #: src/screens/caja-turnos.jsx
 msgid "Transferencia guardada para esta sucursal."
@@ -3149,8 +3169,20 @@ msgid "Diseña tu espacio y publica el plano en el punto de venta."
 msgstr "Design your space and publish the floor plan to the POS."
 
 #: src/screens/floor-plan.jsx
+msgid "Publicando plano en espera…"
+msgstr "Publishing queued floor plan…"
+
+#: src/screens/floor-plan.jsx
 msgid "Guardado en curso…"
 msgstr "Saving…"
+
+#: src/screens/floor-plan.jsx
+msgid "Publicación en espera · requiere revisión"
+msgstr "Publication queued · review required"
+
+#: src/screens/floor-plan.jsx
+msgid "Publicación en espera · mesas ocupadas"
+msgstr "Publication queued · occupied tables"
 
 #: src/screens/floor-plan.jsx
 msgid "Cambios pendientes"
@@ -3177,6 +3209,56 @@ msgid "Publicar"
 msgstr "Publish"
 
 #: src/screens/floor-plan.jsx
+msgid "La publicación automática necesita revisión"
+msgstr "Automatic publication needs review"
+
+#: src/screens/floor-plan.jsx
+msgid "Publicación en espera"
+msgstr "Publication queued"
+
+#: src/screens/floor-plan.jsx
+msgid "El plano cambió en otra sesión. No publicaremos tu borrador sobre esos cambios. Recarga la versión actual y publícala de nuevo."
+msgstr "The floor plan changed in another session. We will not publish your draft over those changes. Reload the current version and publish it again."
+
+#: src/screens/floor-plan.jsx
+msgid "Todas las mesas bloqueantes están libres. Publicando el plano…"
+msgstr "All blocking tables are free. Publishing the floor plan…"
+
+#: src/screens/floor-plan.jsx
+msgid "El plano se publicará automáticamente cuando estas mesas se liberen. La caja sigue usando el plano actual mientras espera."
+msgstr "The floor plan will publish automatically when these tables are free. The till keeps using the current plan while it waits."
+
+#: src/screens/floor-plan.jsx
+#: src/screens/staff.jsx
+#: src/shell.jsx
+msgid "Cuenta"
+msgstr "Account"
+
+#: src/screens/floor-plan.jsx
+msgid "sin cuenta abierta"
+msgstr "no open account"
+
+#: src/screens/floor-plan.jsx
+msgid "El último intento no se completó. La publicación sigue en espera y se reintentará con la próxima lectura del salón."
+msgstr "The last attempt did not finish. The publication stays queued and will retry on the next room read."
+
+#: src/screens/floor-plan.jsx
+msgid "Descartar espera y recargar"
+msgstr "Discard wait and reload"
+
+#: src/screens/floor-plan.jsx
+msgid "Cancelar espera"
+msgstr "Cancel wait"
+
+#: src/screens/floor-plan.jsx
+msgid "Plano publicado. Las mesas bloqueantes ya están libres."
+msgstr "Floor plan published. The blocking tables are now free."
+
+#: src/screens/floor-plan.jsx
+msgid "Plano publicado."
+msgstr "Floor plan published."
+
+#: src/screens/floor-plan.jsx
 msgid "Otro usuario cambió el plano. Recarga para obtener la versión actual."
 msgstr "Another user changed the floor plan. Reload to get the current version."
 
@@ -3187,6 +3269,30 @@ msgstr "Save was not confirmed. Retry before you continue."
 #: src/screens/floor-plan.jsx
 msgid "Se descartarán los cambios locales. ¿Recargar el plano?"
 msgstr "Local changes will be discarded. Reload the floor plan?"
+
+#: src/screens/floor-plan.jsx
+msgid "No se publicó el plano"
+msgstr "The floor plan was not published"
+
+#: src/screens/floor-plan.jsx
+msgid "Estas mesas están ocupadas o tienen una cuenta abierta. Elige cómo continuar."
+msgstr "These tables are occupied or have an open account. Choose how to continue."
+
+#: src/screens/floor-plan.jsx
+msgid "Una de estas mesas no tiene una cuenta que se pueda cerrar. Espera a que se libere."
+msgstr "One of these tables has no account to close. Wait for it to be released."
+
+#: src/screens/floor-plan.jsx
+msgid "Esperar y publicar automáticamente"
+msgstr "Wait and publish automatically"
+
+#: src/screens/floor-plan.jsx
+msgid "Cerrar cuentas bloqueantes y publicar"
+msgstr "Close blocking accounts and publish"
+
+#: src/screens/floor-plan.jsx
+msgid "Volver a editar"
+msgstr "Return to editing"
 
 #: src/screens/floor-plan.jsx
 msgid "Revisa nombres únicos, capacidad y dimensiones. Los elementos deben quedar dentro del área."
@@ -4666,6 +4772,7 @@ msgid "Etiqueta de {0}"
 msgstr "Label for {0}"
 
 #: src/screens/inventory-item-editor.jsx
+#: src/screens/operations-workspace.jsx
 #: src/screens/settings.jsx
 msgid "Activa"
 msgstr "Active"
@@ -5820,6 +5927,10 @@ msgstr "The class comes from those two figures, not from an opinion. If a dish c
 #~ msgstr "{0, plural, one {# effective permission} other {# effective permissions}}"
 
 #: src/screens/operations-workspace.jsx
+#~ msgid "Precio en centavos"
+#~ msgstr "Price in cents"
+
+#: src/screens/operations-workspace.jsx
 msgid "No tienes el permiso requerido para esta operación."
 msgstr "You do not have the permission required for this operation."
 
@@ -6142,6 +6253,20 @@ msgstr "Limit: {0}"
 msgid "Emitir y revelar"
 msgstr "Issue and reveal"
 
+#. placeholder {0}: invalidGroup.name
+#: src/screens/operations-workspace.jsx
+msgid "El grupo «{0}» necesita al menos una opción."
+msgstr "The “{0}” group needs at least one option."
+
+#. placeholder {0}: invalidGroup.name
+#: src/screens/operations-workspace.jsx
+msgid "El máximo del grupo «{0}» no puede ser menor que el mínimo."
+msgstr "The maximum for the “{0}” group cannot be less than the minimum."
+
+#: src/screens/operations-workspace.jsx
+msgid "No se pudo guardar el producto."
+msgstr "The product could not be saved."
+
 #: src/screens/operations-workspace.jsx
 msgid "Editar producto"
 msgstr "Edit product"
@@ -6155,16 +6280,24 @@ msgid "Cargar datos actuales"
 msgstr "Load current data"
 
 #: src/screens/operations-workspace.jsx
-msgid "Precio en centavos"
-msgstr "Price in cents"
+msgid "Descripción"
+msgstr "Description"
+
+#: src/screens/operations-workspace.jsx
+msgid "Precio base en centavos"
+msgstr "Base price in cents"
 
 #: src/screens/operations-workspace.jsx
 msgid "Código de barras"
 msgstr "Barcode"
 
 #: src/screens/operations-workspace.jsx
-msgid "UUID opcional"
-msgstr "Optional UUID"
+msgid "Sin categoría"
+msgstr "No category"
+
+#: src/screens/operations-workspace.jsx
+msgid "Impuesto (%)"
+msgstr "Tax (%)"
 
 #: src/screens/operations-workspace.jsx
 msgid "Requiere preparación"
@@ -6173,6 +6306,115 @@ msgstr "Requires preparation"
 #: src/screens/operations-workspace.jsx
 msgid "Artículo de inventario"
 msgstr "Inventory item"
+
+#: src/screens/operations-workspace.jsx
+msgid "UUID opcional"
+msgstr "Optional UUID"
+
+#: src/screens/operations-workspace.jsx
+msgid "Variantes vendibles"
+msgstr "Sellable variants"
+
+#: src/screens/operations-workspace.jsx
+msgid "Cada variante es una forma que se cobra: Caliente, Frío, tamaño o presentación. El precio final es el precio base más el ajuste."
+msgstr "Each variant is a sellable form: Hot, Cold, size, or presentation. The final price is the base price plus the adjustment."
+
+#: src/screens/operations-workspace.jsx
+#: src/screens/recipe-workspace.jsx
+msgid "Variante"
+msgstr "Variant"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ajuste (centavos)"
+msgstr "Adjustment (cents)"
+
+#: src/screens/operations-workspace.jsx
+msgid "Precio final"
+msgstr "Final price"
+
+#: src/screens/operations-workspace.jsx
+msgid "Caliente, Frío, Grande…"
+msgstr "Hot, Cold, Large…"
+
+#: src/screens/operations-workspace.jsx
+msgid "Nombre de la variante"
+msgstr "Variant name"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ajuste de precio de la variante en centavos"
+msgstr "Variant price adjustment in cents"
+
+#: src/screens/operations-workspace.jsx
+msgid "Quitar variante"
+msgstr "Remove variant"
+
+#: src/screens/operations-workspace.jsx
+msgid "Agregar variante"
+msgstr "Add variant"
+
+#: src/screens/operations-workspace.jsx
+msgid "Grupos de opciones"
+msgstr "Option groups"
+
+#: src/screens/operations-workspace.jsx
+msgid "Un grupo agrupa extras o elecciones de la línea: leche, endulzante, complementos. Define si es obligatorio y cuántas opciones acepta."
+msgstr "A group collects extras or line choices: milk, sweetener, or add-ons. Set whether it is required and how many options it accepts."
+
+#: src/screens/operations-workspace.jsx
+msgid "Leche, Extras, Endulzante…"
+msgstr "Milk, Extras, Sweetener…"
+
+#: src/screens/operations-workspace.jsx
+msgid "Nombre del grupo"
+msgstr "Group name"
+
+#: src/screens/operations-workspace.jsx
+msgid "Obligatorio"
+msgstr "Required"
+
+#: src/screens/operations-workspace.jsx
+msgid "Mín."
+msgstr "Min."
+
+#: src/screens/operations-workspace.jsx
+msgid "Máx."
+msgstr "Max."
+
+#: src/screens/operations-workspace.jsx
+msgid "Sin límite"
+msgstr "No limit"
+
+#: src/screens/operations-workspace.jsx
+msgid "Quitar grupo"
+msgstr "Remove group"
+
+#: src/screens/operations-workspace.jsx
+msgid "Opción"
+msgstr "Option"
+
+#: src/screens/operations-workspace.jsx
+msgid "Avena, sin azúcar, extra queso…"
+msgstr "Oat milk, no sugar, extra cheese…"
+
+#: src/screens/operations-workspace.jsx
+msgid "Nombre de la opción"
+msgstr "Option name"
+
+#: src/screens/operations-workspace.jsx
+msgid "Ajuste de precio de la opción en centavos"
+msgstr "Option price adjustment in cents"
+
+#: src/screens/operations-workspace.jsx
+msgid "Quitar opción"
+msgstr "Remove option"
+
+#: src/screens/operations-workspace.jsx
+msgid "Agregar opción"
+msgstr "Add option"
+
+#: src/screens/operations-workspace.jsx
+msgid "Agregar grupo de opciones"
+msgstr "Add option group"
 
 #: src/screens/operations-workspace.jsx
 msgid "Disponibilidad"
@@ -7950,10 +8192,6 @@ msgid "Elige un producto"
 msgstr "Choose a product"
 
 #: src/screens/recipe-workspace.jsx
-msgid "Variante"
-msgstr "Variant"
-
-#: src/screens/recipe-workspace.jsx
 msgid "Sin variante"
 msgstr "No variant"
 
@@ -8774,11 +9012,6 @@ msgid "Mesas"
 msgstr "Tables"
 
 #: src/screens/staff.jsx
-#: src/shell.jsx
-msgid "Cuenta"
-msgstr "Account"
-
-#: src/screens/staff.jsx
 msgid "Otros permisos"
 msgstr "Other permissions"
 
@@ -9006,8 +9239,24 @@ msgid "María García"
 msgstr "María García"
 
 #: src/screens/staff.jsx
+msgid "Correo para entrar al POS"
+msgstr "Email for POS sign-in"
+
+#: src/screens/staff.jsx
+msgid "Obligatorio si esta persona usará un PIN en el POS."
+msgstr "Required if this person will use a POS PIN."
+
+#: src/screens/staff.jsx
 msgid "El PIN debe tener de 4 a 8 dígitos y debe coincidir."
 msgstr "The PIN must have 4 to 8 digits and must match."
+
+#: src/screens/staff.jsx
+msgid "Escribe un correo válido."
+msgstr "Enter a valid email address."
+
+#: src/screens/staff.jsx
+msgid "Escribe un correo para usar el PIN en el POS."
+msgstr "Enter an email address to use a POS PIN."
 
 #: src/screens/staff.jsx
 msgid "No se pudo guardar el acceso."
@@ -9336,19 +9585,3 @@ msgstr "retry"
 #: src/shell.jsx
 msgid "Secciones"
 msgstr "Sections"
-
-#: src/screens/staff.jsx
-msgid "Correo para entrar al POS"
-msgstr "Email for POS sign-in"
-
-#: src/screens/staff.jsx
-msgid "Obligatorio si esta persona usará un PIN en el POS."
-msgstr "Required if this person will use a POS PIN."
-
-#: src/screens/staff.jsx
-msgid "Escribe un correo válido."
-msgstr "Enter a valid email address."
-
-#: src/screens/staff.jsx
-msgid "Escribe un correo para usar el PIN en el POS."
-msgstr "Enter an email address to use a POS PIN."

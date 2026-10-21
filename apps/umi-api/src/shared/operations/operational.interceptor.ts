@@ -27,7 +27,11 @@ export class OperationalInterceptor implements NestInterceptor {
     const http = context.switchToHttp();
     const request = http.getRequest<FastifyRequest & AuthedRequest>();
     const reply = http.getResponse<FastifyReply>();
-    const dimensions = this.dimensions(request);
+    // A liveness probe is not operator work and must never be refused. When a
+    // shared address is at its ceiling, a 429 here made the till believe the
+    // API was down, while the API was in fact healthy and asking for less
+    // traffic. Keep the request metric and skip only the principal buckets.
+    const dimensions = isHealthProbe(request) ? [] : this.dimensions(request);
     let minimumRemaining = Number.MAX_SAFE_INTEGER;
     let resetAt = 0;
     for (const [scope, identity] of dimensions) {
@@ -85,4 +89,10 @@ function header(request: FastifyRequest, name: string): string | null {
 function routeLabel(request: FastifyRequest): string {
   const route = request.routeOptions?.url;
   return typeof route === 'string' ? route : 'unmatched';
+}
+
+function isHealthProbe(request: FastifyRequest): boolean {
+  if (typeof request.url !== 'string') return false;
+  const path = request.url.split('?')[0];
+  return path === '/health/live' || path === '/health/ready';
 }

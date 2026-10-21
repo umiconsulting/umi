@@ -1099,6 +1099,62 @@ void main() {
     await service.dispose();
   });
 
+  test(
+    'a committed sale prints from the bound runtime without a cloud or USB probe',
+    () async {
+      final repository = _HardwareRepository()
+        ..snapshotResult = HardwareRuntimeSnapshot(
+          merchantId: scope.merchantId,
+          locationId: scope.locationId,
+          registerId: null,
+          policy: const {
+            'autoPrintReceipt': true,
+            'openDrawerOnCashSale': false,
+            'receiptCopiesDefault': 1,
+          },
+          devices: [_simulatorPrinter.toJson()],
+          printJobs: const [],
+          recoveryStates: const [],
+          pendingJobs: 0,
+          retryableJobs: 0,
+          unknownCommands: 0,
+          capturedAt: '2026-08-09T00:00:00.000Z',
+        );
+      final printer = PrinterSimulatorAdapter();
+      final health = _CountingHealthResolver();
+      final service = HardwareService(
+        repository: repository,
+        coordinator: HardwareCoordinator(
+          adapters: {_simulatorPrinter.id: printer},
+          devices: [simulatedDevice(id: _simulatorPrinter.id, type: 'printer')],
+        ),
+        recovery: MemoryHardwareRecoveryStore(),
+        adapterResolver: health,
+      );
+
+      await service.snapshot(scope);
+      expect(repository.snapshotCalls, 1);
+      expect(health.refreshes, 1);
+
+      final sale = await service.afterCheckoutCompleted(scope, cashSale);
+
+      expect(sale.results, hasLength(1));
+      expect(printer.artifacts, hasLength(1));
+      expect(
+        repository.snapshotCalls,
+        1,
+        reason:
+            'the committed receipt uses the reading already bound to the till',
+      );
+      expect(
+        health.refreshes,
+        1,
+        reason: 'a DLE EOT probe is not a prerequisite for printing',
+      );
+      await service.dispose();
+    },
+  );
+
   test('a reading the relay takes reaches every screen that follows it', () async {
     // The state a centre shows is the state the till measured last. A screen that
     // keeps the reading it loaded when it opened shows the state of that moment:
@@ -1319,6 +1375,7 @@ final class _HardwareRepository implements HardwareRepository {
   HardwareDiagnosticRequest? lastDiagnostic;
   HardwareRuntimeSnapshot? snapshotResult;
   bool terminalizeRetryable = false;
+  int snapshotCalls = 0;
 
   @override
   Future<HardwareCommandResult> createCommand(
@@ -1373,7 +1430,11 @@ final class _HardwareRepository implements HardwareRepository {
   Future<HardwareRuntimeSnapshot> snapshot(
     String merchantId,
     HardwareRegistryQuery query,
-  ) async => snapshotResult ?? (throw UnimplementedError());
+  ) async {
+    snapshotCalls += 1;
+    return snapshotResult ?? (throw UnimplementedError());
+  }
+
   @override
   Future<HardwareDiagnosticResult> diagnostic(
     String merchantId,
@@ -1560,4 +1621,20 @@ final class _HeldDrawerAdapter implements DeviceAdapter {
       safeMetadata: {'acknowledged': true},
     );
   }
+}
+
+final class _CountingHealthResolver
+    implements DeviceAdapterResolver, HardwareConnectionStateResolver {
+  int refreshes = 0;
+
+  @override
+  DeviceAdapter? resolve(RuntimeDevice device) => null;
+
+  @override
+  Future<void> refreshHealth() async {
+    refreshes += 1;
+  }
+
+  @override
+  String? connectionStateFor(String hardwareId) => null;
 }

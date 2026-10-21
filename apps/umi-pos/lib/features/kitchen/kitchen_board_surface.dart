@@ -255,8 +255,16 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
             Padding(
               padding: const EdgeInsets.only(right: UmiSpacing.sm),
               child: _Pill(
-                label: connectivityLabel(context, widget.connectivity.state),
-                color: widget.connectivity.state == PosConnectivity.offline
+                label:
+                    state.phase == KitchenBoardPhase.ready &&
+                        widget.connectivity.state != PosConnectivity.online
+                    ? (l10n.localeName.startsWith('es')
+                          ? 'Modo local'
+                          : 'Local mode')
+                    : connectivityLabel(context, widget.connectivity.state),
+                color:
+                    widget.connectivity.state == PosConnectivity.offline &&
+                        state.phase != KitchenBoardPhase.ready
                     ? PosTheme.of(context).colorScheme.error
                     : PosTheme.of(context).colorScheme.outline,
               ),
@@ -301,19 +309,21 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
     widget.entry.state.operator?.permissions ?? const [],
   ).allows('kitchen.read');
 
+  void _openUnassigned() {
+    unawaited(widget.controller.refresh());
+    Navigator.of(context).push(
+      PosPageRoute<void>(
+        builder: (_) => KitchenUnassignedSurface(
+          controller: widget.controller,
+          entry: widget.entry,
+        ),
+      ),
+    );
+  }
+
   Widget _unassignedButton(AppLocalizations l10n) => PosTextButton(
     key: const ValueKey('open-unassigned-kitchen'),
-    onPressed: () {
-      unawaited(widget.controller.refresh());
-      Navigator.of(context).push(
-        PosPageRoute<void>(
-          builder: (_) => KitchenUnassignedSurface(
-            controller: widget.controller,
-            entry: widget.entry,
-          ),
-        ),
-      );
-    },
+    onPressed: _openUnassigned,
     child: Text(
       '${l10n.localeName.startsWith('es') ? 'Sin estación' : 'Unassigned'} · ${widget.controller.unassignedLoaded ? widget.controller.unassignedOrders.length : '…'}',
     ),
@@ -365,6 +375,50 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
       'all' => stationOrders,
       _ => today,
     };
+    // "Todas" is the complete kitchen, not only the tickets that already have a
+    // station. Station-less work used to live behind a separate count button, so
+    // a board whose device had no station could look empty while the kitchen owed
+    // food. Keep the unassigned queue on the all-stations view and let it open the
+    // routing decision from its own card.
+    final showUnassigned = _stationFilter == null;
+    final unassignedOrders = showUnassigned
+        ? widget.controller.unassignedOrders
+        : const <KitchenUnassignedOrderProjection>[];
+    final unassignedVisible = switch (_dayFilter) {
+      'previous' =>
+        businessDate == null
+            ? const <KitchenUnassignedOrderProjection>[]
+            : unassignedOrders
+                  .where(
+                    (order) => order.businessDate.compareTo(businessDate) < 0,
+                  )
+                  .toList(),
+      'all' => unassignedOrders,
+      _ =>
+        businessDate == null
+            ? unassignedOrders
+            : unassignedOrders
+                  .where((order) => order.businessDate == businessDate)
+                  .toList(),
+    };
+    final visibleCount = visible.length + unassignedVisible.length;
+    final todayCount =
+        today.length +
+        (businessDate == null
+            ? unassignedOrders.length
+            : unassignedOrders
+                  .where((order) => order.businessDate == businessDate)
+                  .length);
+    final previousCount =
+        previous.length +
+        (businessDate == null
+            ? 0
+            : unassignedOrders
+                  .where(
+                    (order) => order.businessDate.compareTo(businessDate) < 0,
+                  )
+                  .length);
+    final allCount = stationOrders.length + unassignedOrders.length;
     final spanish = Localizations.localeOf(context).languageCode == 'es';
     return LayoutBuilder(
       builder: (context, railConstraints) => Column(
@@ -401,17 +455,17 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                                 (
                                   id: 'today',
                                   label: spanish ? 'Hoy' : 'Today',
-                                  count: today.length,
+                                  count: todayCount,
                                 ),
                                 (
                                   id: 'previous',
                                   label: spanish ? 'Anteriores' : 'Previous',
-                                  count: previous.length,
+                                  count: previousCount,
                                 ),
                                 (
                                   id: 'all',
                                   label: spanish ? 'Todos' : 'All',
-                                  count: stationOrders.length,
+                                  count: allCount,
                                 ),
                               ])
                                 PosTooltip(
@@ -447,10 +501,10 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
           ),
           Expanded(
             child: switch (state.phase) {
-              KitchenBoardPhase.loading when orders.isEmpty => const Center(
+              KitchenBoardPhase.loading when visibleCount == 0 => const Center(
                 child: PosSpinner(),
               ),
-              KitchenBoardPhase.failure when orders.isEmpty => Center(
+              KitchenBoardPhase.failure when visibleCount == 0 => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -462,7 +516,7 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                   ],
                 ),
               ),
-              _ when visible.isEmpty => Center(
+              _ when visibleCount == 0 => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -505,7 +559,6 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                           order: order,
                           l10n: l10n,
                           allDayFor: state.allDayFor,
-                          busyTarget: state.busyTarget,
                           onItemTap: (itemId) =>
                               widget.controller.markItemReady(order, itemId),
                           onFire: (courseNumber) => widget.controller
@@ -515,6 +568,19 @@ class _KitchenBoardSurfaceState extends State<KitchenBoardSurface> {
                           onComplete: () => widget.controller.complete(order),
                           onDiscard: () => widget.controller.discard(order),
                           onRecall: () => _recall(order),
+                        ),
+                      for (final order in unassignedVisible)
+                        _UnassignedTicketCard(
+                          width:
+                              (320 * MediaQuery.textScalerOf(context).scale(1))
+                                  .clamp(
+                                    0.0,
+                                    (constraints.maxWidth - 2 * UmiSpacing.md)
+                                        .clamp(0.0, double.infinity),
+                                  )
+                                  .toDouble(),
+                          order: order,
+                          onOpen: _openUnassigned,
                         ),
                     ],
                   ),
@@ -734,6 +800,101 @@ final class _StationChip extends StatelessWidget {
   }
 }
 
+/// Station-less work is still kitchen work. The card names the ticket and its
+/// lines on the all-stations view, then opens the routing decision that the
+/// server-owned board cannot make by itself.
+final class _UnassignedTicketCard extends StatelessWidget {
+  const _UnassignedTicketCard({
+    required this.width,
+    required this.order,
+    required this.onOpen,
+  });
+
+  final double width;
+  final KitchenUnassignedOrderProjection order;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final es = Localizations.localeOf(context).languageCode == 'es';
+    final scheme = PosTheme.of(context).colorScheme;
+    final cancelled = order.status == 'cancelled';
+    return SizedBox(
+      width: width,
+      child: PosSurface(
+        key: ValueKey('unassigned-board-ticket-${order.id}'),
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(height: 4, color: scheme.error),
+            Padding(
+              padding: const EdgeInsets.all(UmiSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          order.publicReference,
+                          style: PosTheme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      _Pill(
+                        label: es ? 'Sin estación' : 'Unassigned',
+                        color: scheme.error,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  for (final raw in order.items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '${raw['quantity']} × ${raw['productName']}',
+                        style: PosTheme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  if (cancelled)
+                    Padding(
+                      padding: const EdgeInsets.only(top: UmiSpacing.xs),
+                      child: Text(
+                        es ? 'Cancelado' : 'Cancelled',
+                        style: TextStyle(
+                          color: scheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: UmiSpacing.sm),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: PosButton.tonal(
+                      key: ValueKey('open-unassigned-ticket-${order.id}'),
+                      onPressed: onOpen,
+                      child: Text(
+                        cancelled
+                            ? (es
+                                  ? 'Revisar cancelación'
+                                  : 'Review cancellation')
+                            : (es ? 'Asignar estación' : 'Assign station'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 final class _TicketCard extends StatelessWidget {
   const _TicketCard({
     required this.now,
@@ -743,7 +904,6 @@ final class _TicketCard extends StatelessWidget {
     required this.order,
     required this.l10n,
     required this.allDayFor,
-    required this.busyTarget,
     required this.onItemTap,
     required this.onFire,
     required this.onStart,
@@ -761,7 +921,6 @@ final class _TicketCard extends StatelessWidget {
 
   /// Today's count for a line, or null when the count is not available.
   final KitchenAllDayItem? Function(KitchenOrderItem item) allDayFor;
-  final String? busyTarget;
   final ValueChanged<String> onItemTap;
 
   /// Fires one whole course. The course number is the one the board read as
@@ -914,7 +1073,6 @@ final class _TicketCard extends StatelessWidget {
                       group: groups[index],
                       l10n: l10n,
                       allDayFor: allDayFor,
-                      busyTarget: busyTarget,
                       onItemTap: onItemTap,
                     ),
                   ],
@@ -928,13 +1086,6 @@ final class _TicketCard extends StatelessWidget {
                     _FireCourseAction(
                       courseNumber: nextCourse,
                       l10n: l10n,
-                      busy:
-                          busyTarget ==
-                          KitchenBoardController.fireTarget(nextCourse),
-                      // The route takes one command at a time. While any other
-                      // command is in flight this one says so with its face
-                      // rather than swallowing the tap.
-                      enabled: busyTarget == null,
                       onFire: () => onFire(nextCourse),
                     ),
                   ],
@@ -943,7 +1094,6 @@ final class _TicketCard extends StatelessWidget {
                     permissions: permissions,
                     order: order,
                     l10n: l10n,
-                    busy: busyTarget == order.id,
                     onStart: onStart,
                     onComplete: onComplete,
                     onDiscard: onDiscard,
@@ -972,7 +1122,6 @@ final class _CourseBlock extends StatelessWidget {
     required this.canMarkReady,
     required this.l10n,
     required this.allDayFor,
-    required this.busyTarget,
     required this.onItemTap,
   });
 
@@ -980,7 +1129,6 @@ final class _CourseBlock extends StatelessWidget {
   final bool canMarkReady;
   final AppLocalizations l10n;
   final KitchenAllDayItem? Function(KitchenOrderItem item) allDayFor;
-  final String? busyTarget;
   final ValueChanged<String> onItemTap;
 
   @override
@@ -1003,16 +1151,10 @@ final class _CourseBlock extends StatelessWidget {
             item: item,
             l10n: l10n,
             allDay: allDayFor(item),
-            busy: busyTarget == item.id,
             onTap: () => onItemTap(item.id),
           ),
         if (group.held.isNotEmpty)
-          _HeldCourseBlock(
-            group: group,
-            l10n: l10n,
-            allDayFor: allDayFor,
-            busyTarget: busyTarget,
-          ),
+          _HeldCourseBlock(group: group, l10n: l10n, allDayFor: allDayFor),
       ],
     );
   }
@@ -1031,13 +1173,11 @@ final class _HeldCourseBlock extends StatelessWidget {
     required this.group,
     required this.l10n,
     required this.allDayFor,
-    required this.busyTarget,
   });
 
   final KitchenCourseGroup group;
   final AppLocalizations l10n;
   final KitchenAllDayItem? Function(KitchenOrderItem item) allDayFor;
-  final String? busyTarget;
 
   @override
   Widget build(BuildContext context) {
@@ -1088,7 +1228,6 @@ final class _HeldCourseBlock extends StatelessWidget {
               item: item,
               l10n: l10n,
               allDay: allDayFor(item),
-              busy: busyTarget == item.id,
               held: true,
               onTap: () {},
             ),
@@ -1107,8 +1246,6 @@ final class _FireCourseAction extends StatelessWidget {
   const _FireCourseAction({
     required this.courseNumber,
     required this.l10n,
-    required this.busy,
-    required this.enabled,
     required this.onFire,
   });
 
@@ -1116,8 +1253,6 @@ final class _FireCourseAction extends StatelessWidget {
 
   final int courseNumber;
   final AppLocalizations l10n;
-  final bool busy;
-  final bool enabled;
   final VoidCallback onFire;
 
   @override
@@ -1125,14 +1260,8 @@ final class _FireCourseAction extends StatelessWidget {
     width: double.infinity,
     child: PosButton.icon(
       key: buttonKey,
-      onPressed: enabled && !busy ? onFire : null,
-      icon: busy
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: PosSpinner(strokeWidth: 2),
-            )
-          : const PosIcon(PosGlyphs.localFireDepartment, size: 18),
+      onPressed: onFire,
+      icon: const PosIcon(PosGlyphs.localFireDepartment, size: 18),
       label: Text(
         l10n.kitchenCourseFire(courseNumber),
         overflow: TextOverflow.ellipsis,
@@ -1151,7 +1280,6 @@ final class _ItemRow extends StatelessWidget {
     required this.item,
     required this.l10n,
     required this.allDay,
-    required this.busy,
     required this.onTap,
     this.held = false,
     this.canMarkReady = false,
@@ -1164,8 +1292,6 @@ final class _ItemRow extends StatelessWidget {
   /// Null when the count is not available, and nothing is rendered then: a `×0`
   /// would be a claim about the day that the till cannot make.
   final KitchenAllDayItem? allDay;
-
-  final bool busy;
 
   /// The line belongs to a course the kitchen has not been told to start. The
   /// row says so in its own mark and in what a screen reader hears, and it is
@@ -1356,13 +1482,7 @@ final class _ItemRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: UmiSpacing.sm),
-                if (busy)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: PosSpinner(strokeWidth: 2),
-                  )
-                else if (ready)
+                if (ready)
                   const PosIcon(
                     PosGlyphs.checkBox,
                     size: 22,
@@ -1432,7 +1552,6 @@ final class _TicketActions extends StatelessWidget {
     required this.order,
     required this.permissions,
     required this.l10n,
-    required this.busy,
     required this.onStart,
     required this.onComplete,
     required this.onDiscard,
@@ -1442,7 +1561,6 @@ final class _TicketActions extends StatelessWidget {
   final KitchenOrderProjection order;
   final OperatorPermissions permissions;
   final AppLocalizations l10n;
-  final bool busy;
   final VoidCallback onStart;
   final VoidCallback onComplete;
   final VoidCallback onDiscard;
@@ -1450,22 +1568,6 @@ final class _TicketActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (busy) {
-      return Row(
-        children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: PosSpinner(strokeWidth: 2),
-          ),
-          const SizedBox(width: UmiSpacing.sm),
-          Text(
-            l10n.kitchenTicketSending,
-            style: PosTheme.of(context).textTheme.bodySmall,
-          ),
-        ],
-      );
-    }
     if (order.status == 'cancelled') {
       if (!permissions.allows('kitchen.cancel_ack')) {
         return const SizedBox.shrink();

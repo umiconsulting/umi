@@ -137,13 +137,21 @@ export const Cart = z
   })
   .strict();
 export const CreateCartRequest = z
-  .object({ locationId: Uuid, operatorSessionId: Uuid, idempotencyKey: Idempotency })
+  .object({
+    locationId: Uuid,
+    operatorSessionId: Uuid,
+    idempotencyKey: Idempotency,
+    accountName: z.string().trim().min(1).max(120).nullable().optional(),
+  })
   .strict();
 export const OpenTableAccountRequest = z
   .object({
     locationId: Uuid,
     operatorSessionId: Uuid,
     tableId: Uuid,
+    // The POS sends null when the operator did not state a party size. Absent
+    // and null mean the same thing here: the account has no party count.
+    partySize: z.number().int().min(1).max(64).nullish(),
     expectedVersion: z.number().int().positive().optional(),
     idempotencyKey: Idempotency,
   })
@@ -170,7 +178,10 @@ export const SuspendCartRequest = ResumeCartAccountRequest.extend({
 export const SetCartAccountDetailsRequest = ResumeCartAccountRequest.extend({
   accountName: AccountName,
 });
-export const AssignCartTableRequest = ResumeCartAccountRequest.extend({ tableId: Uuid });
+export const AssignCartTableRequest = ResumeCartAccountRequest.extend({
+  tableId: Uuid,
+  partySize: z.number().int().min(1).max(64).nullish(),
+});
 export const OpenCartAccounts = z.object({ accounts: z.array(Cart).max(250) }).strict();
 export const RemoveSentCartLineRequest = z
   .object({
@@ -215,6 +226,14 @@ export const CartLineInput = z
      */
     courseNumber: z.number().int().min(1).max(20).default(1),
     note: SafeNote.nullable().default(null),
+    /**
+     * The durable line identity the till already painted. The server uses it as
+     * the official line id, so an offline update or remove keeps one identity
+     * when the command travels through a local hub.
+     */
+    // The Dart model writes every field. A null here means "the till has no
+    // durable line identity to send", which is the same as an absent field.
+    clientLineId: Uuid.nullish(),
     expectedVersion: z.number().int().positive(),
     idempotencyKey: Idempotency,
   })

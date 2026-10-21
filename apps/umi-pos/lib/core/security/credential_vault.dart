@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import '../network/api_client.dart';
@@ -59,6 +60,7 @@ final class CredentialVault
   static const _pairingSession = 'device.pairing_session_id';
   static const _pollingCredential = 'device.polling_credential';
   static const _pairingExpires = 'device.pairing_expires_at';
+  static const entrySnapshotKey = 'entry.resolved_snapshot';
 
   Future<DeviceIdentity> deviceIdentity() async {
     var installationId = await _storage.read(_installation);
@@ -124,8 +126,10 @@ final class CredentialVault
   /// Stamps the moment the session was last proven, on login or on refresh.
   /// A cold start reads this to decide whether it may restore the operator
   /// silently or must fall back to the personal PIN.
-  Future<void> markSessionActive() =>
-      _storage.write(_sessionActivity, DateTime.now().toUtc().toIso8601String());
+  Future<void> markSessionActive() => _storage.write(
+    _sessionActivity,
+    DateTime.now().toUtc().toIso8601String(),
+  );
 
   /// When the session was last proven, or null if none is recorded.
   Future<DateTime?> sessionActivityAt() async =>
@@ -165,6 +169,31 @@ final class CredentialVault
 
   Future<String?> refreshToken() => _storage.read(_refresh);
   Future<void> saveOperatorSession(String id) => _storage.write(_operator, id);
+
+  /// The last till state the server itself resolved: device, merchant, branch
+  /// and operator session, as JSON.
+  ///
+  /// A restaurant opens before its uplink does. Without this the POS cannot
+  /// start at all when the API is unreachable — it stops on "we could not
+  /// finish preparing" and the staff have nothing to sell with. The snapshot is
+  /// only ever written from a session the server issued, and it is only read
+  /// inside the same restore window as the silent session restore, so it is a
+  /// cache of a proven state rather than a way to invent one.
+  Future<void> saveEntrySnapshot(Map<String, Object?> value) =>
+      _storage.write(entrySnapshotKey, jsonEncode(value));
+
+  Future<Map<String, Object?>?> entrySnapshot() async {
+    final raw = await _storage.read(entrySnapshotKey);
+    if (raw == null) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map<String, Object?> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> clearEntrySnapshot() => _storage.delete(entrySnapshotKey);
 
   Future<void> selectTenant(String merchantId) async {
     await _storage.write(_tenant, merchantId);
@@ -218,6 +247,10 @@ final class CredentialVault
       'x-umi-device-public-id': identity.publicId!,
       'x-umi-device-credential': identity.credential!,
       'x-umi-installation-id': identity.installationId,
+      if (identity.merchantId != null)
+        'x-umi-merchant-id': identity.merchantId!,
+      if (identity.locationId != null)
+        'x-umi-location-id': identity.locationId!,
     };
   }
 

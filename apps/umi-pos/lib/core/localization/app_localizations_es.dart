@@ -770,6 +770,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get newSaleAction => 'Nueva venta';
 
   @override
+  String get cartRestoringAccount => 'Recuperando tu cuenta…';
+
+  @override
+  String get cartRestoringAccountHint =>
+      'Espera un momento mientras recuperamos la cuenta abierta.';
+
+  @override
   String get suspendSaleAction => 'Suspender venta';
 
   @override
@@ -907,6 +914,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get editCartLineAction => 'Editar producto';
 
   @override
+  String get repeatCartLineAction => 'Repetir producto';
+
+  @override
   String get saveCartLineAction => 'Guardar cambios';
 
   @override
@@ -1031,6 +1041,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cashVarianceLabel => 'Diferencia';
+
+  @override
+  String get offlinePriceDivergenceLabel =>
+      'Diferencias de precio sin conexión';
 
   @override
   String get cashOverageLabel => 'Sobrante';
@@ -1877,6 +1891,9 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get tenderConflictBody =>
       'Guarda un cobro dividido entre efectivo y tarjeta, y esta sucursal cobra un solo método por venta. El registro del cobro queda guardado para revisión; para seguir, empieza una venta nueva.';
+
+  @override
+  String get splitCheckAction => 'Dividir cuenta';
 
   @override
   String get splitTenderTitle => 'Cobro dividido';

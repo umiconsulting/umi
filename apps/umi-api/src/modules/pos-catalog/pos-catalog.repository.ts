@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { PoolClient } from 'pg';
+import { randomUUID } from 'node:crypto';
 import type { CatalogCategory, CatalogProductDetail, CatalogProductSummary } from '@umi/contract';
 import {
   availabilityStateSql,
@@ -121,7 +122,7 @@ export class PosCatalogRepository {
               EXISTS (SELECT 1 FROM merchant.product_variant v
                       WHERE v.product_id = p.id AND v.active) AS "hasVariants",
               EXISTS (SELECT 1 FROM merchant.product_option_group g
-                      WHERE g.product_id = p.id) AS "hasModifiers",
+                      WHERE g.product_id = p.id AND g.active) AS "hasModifiers",
               p.updated_at::text AS "updatedAt"
        FROM merchant.product p
        JOIN merchant.merchant business ON business.id = p.merchant_id
@@ -185,12 +186,13 @@ export class PosCatalogRepository {
   async administrativeDetail(merchantId: string, productId: string) {
     const { rows } = await this.pg.tquery(
       merchantId,
-      `SELECT p.id::text,p.name,p.sku,p.barcode,p.price::int AS "priceMinorUnits",
+      `SELECT p.id::text,p.name,p.description,p.sku,p.barcode,p.price::int AS "priceMinorUnits",
               p.tax_rate_basis_points AS "taxRateBasisPoints",
               p.requires_preparation AS "requiresPreparation",
               p.category_id::text AS "categoryId",m.inventory_item_id::text AS "inventoryItemId",
-              coalesce(v.version,1)::int AS version
+              coalesce(v.version,1)::int AS version, business.currency
          FROM merchant.product p
+         JOIN merchant.merchant business ON business.id=p.merchant_id
          LEFT JOIN merchant.aggregate_version v ON v.merchant_id=p.merchant_id
           AND v.aggregate_type='catalog_product' AND v.aggregate_id=p.id
          LEFT JOIN LATERAL (
@@ -218,7 +220,41 @@ export class PosCatalogRepository {
         ORDER BY lower(l.name), l.id`,
       [merchantId, productId],
     );
-    return { ...row, availability: availability.rows };
+    const variants = await this.pg.tquery(
+      merchantId,
+      `SELECT id::text,name,attributes,price_delta::int AS "priceDelta",
+              active,display_order AS "displayOrder"
+         FROM merchant.product_variant
+        WHERE merchant_id=$1::uuid AND product_id=$2::uuid
+        ORDER BY display_order,name,id`,
+      [merchantId, productId],
+    );
+    const optionGroups = await this.pg.tquery(
+      merchantId,
+      `SELECT g.id::text,g.name,(g.min_select>0) AS required,
+              g.min_select AS "minSelections",g.max_select AS "maxSelections",
+              g.active,g.display_order AS "displayOrder",
+              COALESCE(jsonb_agg(jsonb_build_object(
+                'id',m.id::text,'name',m.name,
+                'priceDelta',m.price_delta::int,
+                'active',m.active,
+                'displayOrder',m.display_order
+              ) ORDER BY m.display_order,m.name,m.id)
+                FILTER (WHERE m.id IS NOT NULL),'[]') AS modifiers
+         FROM merchant.product_option_group g
+         JOIN merchant.product p ON p.id=g.product_id AND p.merchant_id=$1::uuid
+         LEFT JOIN merchant.product_modifier m ON m.option_group_id=g.id
+        WHERE g.product_id=$2::uuid
+        GROUP BY g.id
+        ORDER BY g.display_order,g.name,g.id`,
+      [merchantId, productId],
+    );
+    return {
+      ...row,
+      availability: availability.rows,
+      variants: variants.rows,
+      optionGroups: optionGroups.rows,
+    };
   }
 
   /**
@@ -357,7 +393,7 @@ export class PosCatalogRepository {
        LEFT JOIN merchant.stock_balance b
          ON b.inventory_location_id=ip.inventory_location_id
         AND b.inventory_item_id=im.inventory_item_id
-       WHERE v.merchant_id=$1::uuid AND v.product_id=$2::uuid
+       WHERE v.merchant_id=$1::uuid AND v.product_id=$2::uuid AND v.active
        ORDER BY v.display_order,v.name,v.id`,
       [merchantId, summary.id, summary.price.currency, locationId],
     );
@@ -367,11 +403,12 @@ export class PosCatalogRepository {
               g.max_select AS "maxSelections",
               COALESCE(jsonb_agg(jsonb_build_object('id',m.id::text,'name',m.name,
                 'priceDelta',jsonb_build_object('minorUnits',m.price_delta,'currency',$3::text),
-                'available',true) ORDER BY m.name) FILTER (WHERE m.id IS NOT NULL),'[]') modifiers
+                'available',true) ORDER BY m.display_order,m.name) FILTER (WHERE m.id IS NOT NULL),'[]') modifiers
        FROM merchant.product_option_group g
        JOIN merchant.product p ON p.id=g.product_id AND p.merchant_id=$1::uuid
-       LEFT JOIN merchant.product_modifier m ON m.option_group_id=g.id
-       WHERE g.product_id=$2::uuid GROUP BY g.id ORDER BY g.name,g.id`,
+       LEFT JOIN merchant.product_modifier m ON m.option_group_id=g.id AND m.active
+       WHERE g.product_id=$2::uuid AND g.active
+       GROUP BY g.id ORDER BY g.display_order,g.name,g.id`,
       [merchantId, summary.id, summary.price.currency],
     );
     const barcode = await this.pg.tquery<{ barcode: string | null }>(
@@ -435,6 +472,7 @@ export class PosCatalogRepository {
     if ('inventoryItemId' in input) {
       await this.updateInventoryMapping(client, merchantId, productId, input.inventoryItemId);
     }
+    await this.writeProductChoices(client, merchantId, productId, input);
     return { ...result.rows[0], version: 1 };
   }
 
@@ -515,6 +553,7 @@ export class PosCatalogRepository {
     if ('inventoryItemId' in input) {
       await this.updateInventoryMapping(client, merchantId, productId, input.inventoryItemId);
     }
+    await this.writeProductChoices(client, merchantId, productId, input);
     const next = await client.query<{ version: string }>(
       `UPDATE merchant.aggregate_version SET version=version+1,updated_at=clock_timestamp()
         WHERE merchant_id=$1::uuid AND aggregate_type='catalog_product' AND aggregate_id=$2::uuid
@@ -543,6 +582,129 @@ export class PosCatalogRepository {
       [merchantId, productId],
     );
     return { ...updated, ...result.rows[0] };
+  }
+
+  /**
+   * Write the sellable forms and the add-on choices of one product.
+   *
+   * The product row is the base price. A variant is another sellable form with its
+   * own delta. An option group is chosen on the cart line and adds a delta. Both
+   * lists are replaced as a set: a row omitted by the owner becomes inactive, not
+   * deleted, because old carts and sales may still point at it.
+   */
+  private async writeProductChoices(
+    client: PoolClient,
+    merchantId: string,
+    productId: string,
+    input: Record<string, unknown>,
+  ) {
+    if (!('variants' in input) && !('optionGroups' in input)) return;
+
+    if ('variants' in input) {
+      const variants = parseCatalogVariants(input.variants);
+      for (const variant of variants) {
+        const written = await client.query(
+          `INSERT INTO merchant.product_variant(
+             id,merchant_id,product_id,name,attributes,price_delta,active,display_order
+           ) VALUES($1::uuid,$2::uuid,$3::uuid,$4,$5::jsonb,$6,$7,$8)
+           ON CONFLICT (id) DO UPDATE SET
+             name=excluded.name,
+             attributes=excluded.attributes,
+             price_delta=excluded.price_delta,
+             active=excluded.active,
+             display_order=excluded.display_order,
+             updated_at=clock_timestamp()
+           WHERE product_variant.merchant_id=$2::uuid
+             AND product_variant.product_id=$3::uuid
+           RETURNING id`,
+          [
+            variant.id,
+            merchantId,
+            productId,
+            variant.name,
+            JSON.stringify(variant.attributes),
+            variant.priceDelta,
+            variant.active,
+            variant.displayOrder,
+          ],
+        );
+        if (!written.rows[0]) throw new Error('CATALOG_VARIANT_SCOPE');
+      }
+      await client.query(
+        `UPDATE merchant.product_variant
+            SET active=false,updated_at=clock_timestamp()
+          WHERE merchant_id=$1::uuid AND product_id=$2::uuid
+            AND NOT (id=ANY($3::uuid[]))`,
+        [merchantId, productId, variants.map((variant) => variant.id)],
+      );
+    }
+
+    if ('optionGroups' in input) {
+      const groups = parseCatalogOptionGroups(input.optionGroups);
+      for (const group of groups) {
+        const writtenGroup = await client.query(
+          `INSERT INTO merchant.product_option_group(
+             id,product_id,name,min_select,max_select,active,display_order
+           ) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6,$7)
+           ON CONFLICT (id) DO UPDATE SET
+             name=excluded.name,
+             min_select=excluded.min_select,
+             max_select=excluded.max_select,
+             active=excluded.active,
+             display_order=excluded.display_order
+           WHERE product_option_group.product_id=$2::uuid
+           RETURNING id`,
+          [
+            group.id,
+            productId,
+            group.name,
+            group.minSelections,
+            group.maxSelections,
+            group.active,
+            group.displayOrder,
+          ],
+        );
+        if (!writtenGroup.rows[0]) throw new Error('CATALOG_OPTION_GROUP_SCOPE');
+
+        for (const modifier of group.modifiers) {
+          const writtenModifier = await client.query(
+            `INSERT INTO merchant.product_modifier(
+               id,option_group_id,name,price_delta,active,display_order
+             ) VALUES($1::uuid,$2::uuid,$3,$4,$5,$6)
+             ON CONFLICT (id) DO UPDATE SET
+               name=excluded.name,
+               price_delta=excluded.price_delta,
+               active=excluded.active,
+               display_order=excluded.display_order
+             WHERE product_modifier.option_group_id=$2::uuid
+             RETURNING id`,
+            [
+              modifier.id,
+              group.id,
+              modifier.name,
+              modifier.priceDelta,
+              modifier.active,
+              modifier.displayOrder,
+            ],
+          );
+          if (!writtenModifier.rows[0]) throw new Error('CATALOG_MODIFIER_SCOPE');
+        }
+        await client.query(
+          `UPDATE merchant.product_modifier
+              SET active=false
+            WHERE option_group_id=$1::uuid
+              AND NOT (id=ANY($2::uuid[]))`,
+          [group.id, group.modifiers.map((modifier) => modifier.id)],
+        );
+      }
+      await client.query(
+        `UPDATE merchant.product_option_group
+            SET active=false
+          WHERE product_id=$1::uuid
+            AND NOT (id=ANY($2::uuid[]))`,
+        [productId, groups.map((group) => group.id)],
+      );
+    }
   }
 
   private async assertCategory(client: PoolClient, merchantId: string, categoryId: string | null) {
@@ -617,6 +779,165 @@ function nullableUuid(value: unknown): string | null {
   if (typeof value !== 'string' || !/^[0-9a-f-]{36}$/i.test(value))
     throw new Error('CATALOG_UUID_INVALID');
   return value;
+}
+
+type CatalogVariantWrite = {
+  id: string;
+  name: string;
+  attributes: Record<string, string>;
+  priceDelta: number;
+  active: boolean;
+  displayOrder: number;
+};
+
+type CatalogModifierWrite = {
+  id: string;
+  name: string;
+  priceDelta: number;
+  active: boolean;
+  displayOrder: number;
+};
+
+type CatalogOptionGroupWrite = {
+  id: string;
+  name: string;
+  minSelections: number;
+  maxSelections: number | null;
+  active: boolean;
+  displayOrder: number;
+  modifiers: CatalogModifierWrite[];
+};
+
+function parseCatalogVariants(value: unknown): CatalogVariantWrite[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 100) throw new Error('CATALOG_VARIANTS_INVALID');
+  const names = new Set<string>();
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('CATALOG_VARIANTS_INVALID');
+    }
+    const input = raw as Record<string, unknown>;
+    const name = requiredText(input.name, 'VARIANT_NAME', 160);
+    if (names.has(name)) throw new Error('CATALOG_VARIANT_NAME_DUPLICATE');
+    names.add(name);
+    return {
+      id: input.id ? requiredUuid(input.id, 'VARIANT_ID') : randomUUID(),
+      name,
+      attributes: catalogAttributes(input.attributes),
+      priceDelta: boundedInteger(
+        input.priceDelta ?? 0,
+        'VARIANT_PRICE_DELTA',
+        -100_000_000,
+        100_000_000,
+      ),
+      active: input.active !== false,
+      displayOrder: boundedInteger(
+        input.displayOrder ?? index,
+        'VARIANT_DISPLAY_ORDER',
+        0,
+        100_000,
+      ),
+    };
+  });
+}
+
+function parseCatalogOptionGroups(value: unknown): CatalogOptionGroupWrite[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 50) throw new Error('CATALOG_OPTION_GROUPS_INVALID');
+  const groupNames = new Set<string>();
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('CATALOG_OPTION_GROUPS_INVALID');
+    }
+    const input = raw as Record<string, unknown>;
+    const name = requiredText(input.name, 'OPTION_GROUP_NAME', 160);
+    if (groupNames.has(name)) throw new Error('CATALOG_OPTION_GROUP_NAME_DUPLICATE');
+    groupNames.add(name);
+    const required = input.required === true;
+    const minSelections = boundedInteger(
+      input.minSelections ?? (required ? 1 : 0),
+      'OPTION_MIN_SELECTIONS',
+      0,
+      100,
+    );
+    const maxSelections =
+      input.maxSelections === null ||
+      input.maxSelections === undefined ||
+      input.maxSelections === ''
+        ? null
+        : boundedInteger(input.maxSelections, 'OPTION_MAX_SELECTIONS', 1, 100);
+    if (required && minSelections < 1) throw new Error('CATALOG_OPTION_REQUIRED_MINIMUM');
+    if (maxSelections !== null && maxSelections < minSelections) {
+      throw new Error('CATALOG_OPTION_MAX_BELOW_MIN');
+    }
+    const modifiers = parseCatalogModifiers(input.modifiers);
+    const active = input.active !== false;
+    if (active && modifiers.length === 0) throw new Error('CATALOG_OPTION_GROUP_EMPTY');
+    return {
+      id: input.id ? requiredUuid(input.id, 'OPTION_GROUP_ID') : randomUUID(),
+      name,
+      minSelections,
+      maxSelections,
+      active,
+      displayOrder: boundedInteger(
+        input.displayOrder ?? index,
+        'OPTION_GROUP_DISPLAY_ORDER',
+        0,
+        100_000,
+      ),
+      modifiers,
+    };
+  });
+}
+
+function parseCatalogModifiers(value: unknown): CatalogModifierWrite[] {
+  if (value === null || value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 100) throw new Error('CATALOG_MODIFIERS_INVALID');
+  const names = new Set<string>();
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('CATALOG_MODIFIERS_INVALID');
+    }
+    const input = raw as Record<string, unknown>;
+    const name = requiredText(input.name, 'MODIFIER_NAME', 160);
+    if (names.has(name)) throw new Error('CATALOG_MODIFIER_NAME_DUPLICATE');
+    names.add(name);
+    return {
+      id: input.id ? requiredUuid(input.id, 'MODIFIER_ID') : randomUUID(),
+      name,
+      priceDelta: boundedInteger(
+        input.priceDelta ?? 0,
+        'MODIFIER_PRICE_DELTA',
+        -100_000_000,
+        100_000_000,
+      ),
+      active: input.active !== false,
+      displayOrder: boundedInteger(
+        input.displayOrder ?? index,
+        'MODIFIER_DISPLAY_ORDER',
+        0,
+        100_000,
+      ),
+    };
+  });
+}
+
+function catalogAttributes(value: unknown): Record<string, string> {
+  if (value === null || value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('CATALOG_VARIANT_ATTRIBUTES_INVALID');
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > 12) throw new Error('CATALOG_VARIANT_ATTRIBUTES_INVALID');
+  const attributes: Record<string, string> = {};
+  for (const [key, raw] of entries) {
+    const name = key.trim();
+    if (!name || name.length > 60 || typeof raw !== 'string' || raw.trim().length > 120) {
+      throw new Error('CATALOG_VARIANT_ATTRIBUTES_INVALID');
+    }
+    attributes[name] = raw.trim();
+  }
+  return attributes;
 }
 
 function requiredUuid(value: unknown, field: string): string {

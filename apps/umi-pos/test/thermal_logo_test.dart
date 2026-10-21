@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:umi_pos/core/storage/local_working_copy.dart';
 import 'package:umi_pos/features/hardware/hardware_runtime.dart';
 import 'package:umi_pos/features/hardware/thermal_logo.dart';
 import 'package:umi_pos/features/hardware/thermal_printer_adapter.dart';
@@ -64,6 +67,56 @@ final class _FakeLogoSource implements ThermalLogoSource {
     lastUrl = url;
     return raster_;
   }
+}
+
+final class _MemoryLocal implements LocalWorkingCopy {
+  final Map<String, Map<String, Object?>> documents = {};
+
+  String _key(String namespace, String scopeKey, String id) =>
+      '$namespace|$scopeKey|$id';
+
+  Map<String, Object?>? document(
+    String namespace,
+    String scopeKey,
+    String id,
+  ) => documents[_key(namespace, scopeKey, id)];
+
+  void put(
+    String namespace,
+    String scopeKey,
+    String id,
+    Map<String, Object?> payload,
+  ) {
+    documents[_key(namespace, scopeKey, id)] = payload;
+  }
+
+  @override
+  Future<Map<String, Object?>?> readDocument(
+    String namespace,
+    String scopeKey,
+    String id,
+  ) async {
+    final payload = documents[_key(namespace, scopeKey, id)];
+    return payload == null
+        ? null
+        : jsonDecode(jsonEncode(payload)) as Map<String, Object?>;
+  }
+
+  @override
+  Future<void> writeDocument({
+    required String namespace,
+    required String scopeKey,
+    required String id,
+    required Map<String, Object?> payload,
+    String syncState = 'synced',
+  }) async {
+    documents[_key(namespace, scopeKey, id)] =
+        jsonDecode(jsonEncode(payload)) as Map<String, Object?>;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
 }
 
 RuntimeCommand receiptCommand({String? logoUrl}) => RuntimeCommand(
@@ -223,6 +276,10 @@ void main() {
       );
 
       expect(result.status, RuntimeCommandStatus.succeeded);
+      expect(
+        result.safeMetadata.keys,
+        everyElement(isIn({'acknowledged', 'latencyMs'})),
+      );
       expect(source.calls, 1);
       expect(source.lastUrl, 'https://api.test/logos/onca-abc.png');
       final index = () {
@@ -279,6 +336,92 @@ void main() {
         expect(source.calls, 0);
       },
     );
+  });
+
+  group('durable receipt mark', () {
+    final raster = ThermalRaster(
+      widthDots: 8,
+      heightDots: 2,
+      rows: const [0xff, 0x00],
+    );
+
+    test(
+      'a new process reads the persisted one-bit image, not the PNG',
+      () async {
+        final local = _MemoryLocal();
+        final network = _FakeLogoSource(raster);
+        const url = 'https://api.test/logos/onca-abc.png';
+
+        final firstProcess = CachedThermalLogoSource(network, local);
+        final first = await firstProcess.raster(url);
+        final secondProcess = CachedThermalLogoSource(network, local);
+        final second = await secondProcess.raster(url);
+
+        expect(first?.rows, raster.rows);
+        expect(second?.rows, raster.rows);
+        expect(
+          network.calls,
+          1,
+          reason: 'the durable copy survived the process',
+        );
+      },
+    );
+
+    test(
+      'a truncated durable image is a miss, never malformed paper',
+      () async {
+        final local = _MemoryLocal();
+        final network = _FakeLogoSource(raster);
+        const url = 'https://api.test/logos/onca-abc.png';
+        final source = CachedThermalLogoSource(network, local);
+        await source.raster(url);
+        final id = sha256.convert(utf8.encode(url)).toString();
+        local.put(CachedThermalLogoSource.namespace, '384:192', id, {
+          'url': url,
+          'widthDots': 8,
+          'heightDots': 2,
+          'rows': base64Encode(const [0xff]),
+        });
+
+        final restarted = CachedThermalLogoSource(network, local);
+        final printed = await restarted.raster(url);
+
+        expect(printed?.rows, raster.rows);
+        expect(network.calls, 2);
+      },
+    );
+
+    test('a failed fetch is not repeated for every tap that prints', () async {
+      final local = _MemoryLocal();
+      final network = _FakeLogoSource(null);
+      var now = DateTime.utc(2026, 10, 18, 12);
+      const url = 'https://api.test/logos/onca-abc.png';
+      final source = CachedThermalLogoSource(
+        network,
+        local,
+        negativeCacheDuration: const Duration(seconds: 30),
+        now: () => now,
+      );
+
+      expect(await source.raster(url), isNull);
+      expect(await source.raster(url), isNull);
+      expect(network.calls, 1);
+
+      now = now.add(const Duration(seconds: 31));
+      expect(await source.raster(url), isNull);
+      expect(network.calls, 2);
+    });
+
+    test('concurrent copies of one receipt share one fetch', () async {
+      final local = _MemoryLocal();
+      final network = _FakeLogoSource(raster);
+      const url = 'https://api.test/logos/onca-abc.png';
+      final source = CachedThermalLogoSource(network, local);
+
+      await Future.wait([source.raster(url), source.raster(url)]);
+
+      expect(network.calls, 1);
+    });
   });
 
   // The picture that is actually stored for the café, through the whole path: the

@@ -46,6 +46,7 @@ const policy: CheckoutPolicy = {
     customFixedEnabled: true,
     maximumTip: money(5_000),
     requiredPermission: null,
+    attribution: 'account_owner',
     version: '1',
   },
   discount: {
