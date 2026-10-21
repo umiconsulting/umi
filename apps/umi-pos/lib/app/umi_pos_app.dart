@@ -9,6 +9,8 @@ import '../bootstrap/bootstrap_state.dart';
 import '../bootstrap/composition_root.dart';
 import '../core/localization/app_localizations.dart';
 import '../core/navigation/app_navigation.dart';
+import '../core/observability/tap_latency_probe.dart';
+import '../core/observability/telemetry.dart';
 import '../core/security/operator_permissions.dart';
 import '../core/theme/display_preferences.dart';
 import '../core/theme/umi_theme.dart';
@@ -58,13 +60,25 @@ final class UmiPosApp extends StatefulWidget {
 
 final class _UmiPosAppState extends State<UmiPosApp>
     with WidgetsBindingObserver {
+  /// Set only when the build asks for the tap-latency counter
+  /// (`--dart-define=UMIPOS_TAP_LATENCY_PROBE=true`). A counter on every press
+  /// is a diagnostic: it costs a stopwatch per tap and a line of log, which a
+  /// till in service should not pay for.
+  static const _measureTaps = bool.fromEnvironment(
+    'UMIPOS_TAP_LATENCY_PROBE',
+    defaultValue: false,
+  );
+
   late final DisplayPreferences _display;
   late final KitchenPushNotifications _push;
+  TapLatencyProbe? _tapLatency;
   final KitchenAudio _pushAudio = KitchenAudio();
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   PushSession? _lastPushSession;
   OverlayEntry? _pushNotice;
   Timer? _pushNoticeTimer;
+  PushSession? _failedPushSession;
+  DateTime? _pushRetryAfter;
   final ValueNotifier<KitchenPushNotice?> _openedKitchenNotice = ValueNotifier(
     null,
   );
@@ -87,9 +101,24 @@ final class _UmiPosAppState extends State<UmiPosApp>
     widget.root.entry.addListener(_changed);
     widget.root.connectivity.addListener(_retryPushSession);
     WidgetsBinding.instance.addObserver(this);
+    if (_measureTaps) {
+      _tapLatency = TapLatencyProbe(report: _reportTapLatency)..attach();
+    }
     _syncPushSession();
     FocusManager.instance.addListener(_focusChanged);
     FocusManager.instance.addEarlyKeyEventHandler(_hardwareKeyEvent);
+  }
+
+  /// One line per tap: the number the owner asked for, taken from the engine
+  /// rather than from a camera pointed at the screen.
+  void _reportTapLatency(TapLatency latency) {
+    // Logcat as well as telemetry, because the telemetry exporter is a no-op in
+    // the builds that are actually on the till: a measurement nobody can read is
+    // not a measurement.
+    debugPrint('[umipos] $latency');
+    widget.root.telemetry.event(
+      ClientEvent(name: 'pos.tap_latency', values: latency.toJson()),
+    );
   }
 
   KeyEventResult _hardwareKeyEvent(KeyEvent event) {
@@ -131,6 +160,7 @@ final class _UmiPosAppState extends State<UmiPosApp>
     widget.root.entry.removeListener(_changed);
     widget.root.connectivity.removeListener(_retryPushSession);
     WidgetsBinding.instance.removeObserver(this);
+    _tapLatency?.dispose();
     FocusManager.instance.removeListener(_focusChanged);
     FocusManager.instance.removeEarlyKeyEventHandler(_hardwareKeyEvent);
     _display.dispose();
@@ -176,10 +206,36 @@ final class _UmiPosAppState extends State<UmiPosApp>
   void _retryPushSession() {
     final session = _lastPushSession;
     if (session == null) return;
+    // A push registration that keeps failing is a fact about the deployment
+    // (staging has no FCM credentials), not about this tap. Retrying it on every
+    // resume and every session tick produced six failed calls a minute per
+    // terminal and a log line for each — load on the API and noise in the field
+    // for a feature that is simply not switched on. One attempt per session per
+    // ten minutes is enough to notice when it comes back.
+    final blockedUntil = _pushRetryAfter;
+    if (_failedPushSession == session &&
+        blockedUntil != null &&
+        DateTime.now().isBefore(blockedUntil)) {
+      return;
+    }
+    final attemptSession = session;
     unawaited(
-      _push.updateSession(session).catchError((Object error) {
-        debugPrint('push.token registration=failed error=$error');
-      }),
+      _push
+          .updateSession(session)
+          .then((_) {
+            _failedPushSession = null;
+            _pushRetryAfter = null;
+          })
+          .catchError((Object error) {
+            final firstFailure = _failedPushSession != attemptSession;
+            _failedPushSession = attemptSession;
+            _pushRetryAfter = DateTime.now().add(
+              const Duration(minutes: 10),
+            );
+            if (firstFailure) {
+              debugPrint('push.token registration=failed error=$error');
+            }
+          }),
     );
   }
 
@@ -282,6 +338,7 @@ final class _UmiPosAppState extends State<UmiPosApp>
             ),
             child: ActivityListener(
               onActivity: widget.root.entry.noteActivity,
+              onPress: _tapLatency?.mark,
               child: child ?? const SizedBox.shrink(),
             ),
           ),

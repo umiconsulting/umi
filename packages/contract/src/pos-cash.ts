@@ -637,6 +637,19 @@ export const ReconcileCashShiftRequest = z
   })
   .strict();
 
+/**
+ * Replayed cash sales that the server would have priced differently from the
+ * amount the till charged. The sale stays at the charged amount. This summary
+ * is the record of the difference for the shift close report.
+ */
+export const CashPriceDivergenceSummary = z
+  .object({
+    count: z.number().int().nonnegative(),
+    totalMinorUnits: z.number().int(),
+    currency: z.string().regex(/^[A-Z]{3}$/),
+  })
+  .strict();
+
 export const CashShiftSummary = z
   .object({
     shift: CashShift,
@@ -649,6 +662,9 @@ export const CashShiftSummary = z
     reconciliationOutcome: CashReconciliationOutcome.nullable(),
     countAttempts: z.number().int().min(0),
     handoffCount: z.number().int().min(0),
+    // Optional so historical close snapshots, written before this field
+    // existed, stay readable.
+    priceDivergence: CashPriceDivergenceSummary.optional(),
   })
   .strict();
 export const ShiftCloseRequest = z
@@ -917,6 +933,7 @@ export type CashMovement = z.infer<typeof CashMovement>;
 export type ExpectedCash = z.infer<typeof ExpectedCash>;
 export type SubmitBlindCountRequest = z.infer<typeof SubmitBlindCountRequest>;
 export type CashCountSummary = z.infer<typeof CashCountSummary>;
+export type CashPriceDivergenceSummary = z.infer<typeof CashPriceDivergenceSummary>;
 export type CashShiftSummary = z.infer<typeof CashShiftSummary>;
 export type ResolveCashVarianceRequest = z.infer<typeof ResolveCashVarianceRequest>;
 export type ReconcileCashShiftRequest = z.infer<typeof ReconcileCashShiftRequest>;
@@ -983,6 +1000,7 @@ export const posCashModels = {
   CashReconciliationOutcome,
   ShiftReconciliation,
   ReconcileCashShiftRequest,
+  CashPriceDivergenceSummary,
   CashShiftSummary,
   ShiftCloseRequest,
   ShiftCloseResult,

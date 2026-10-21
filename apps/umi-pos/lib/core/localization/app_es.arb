@@ -248,6 +248,14 @@
   "recoverySupportDescription": "Copia la referencia de diagnóstico segura sin exponer el contenido de la venta.",
   "saleActionsTitle": "Acciones de venta",
   "newSaleAction": "Nueva venta",
+  "cartRestoringAccount": "Recuperando tu cuenta…",
+  "@cartRestoringAccount": {
+    "description": "Shown in the order panel during startup while the till reads the account that was already open. It deliberately replaces the new-sale action so an old account cannot appear after the operator has tapped it."
+  },
+  "cartRestoringAccountHint": "Espera un momento mientras recuperamos la cuenta abierta.",
+  "@cartRestoringAccountHint": {
+    "description": "Explains why starting a new account is unavailable during startup account restoration."
+  },
   "suspendSaleAction": "Suspender venta",
   "resumeSaleAction": "Reanudar venta",
   "renameSaleAction": "Cambiar nombre de venta suspendida",
@@ -306,6 +314,7 @@
   "saleSearchHint": "Buscar por nombre, cliente o recibo",
   "saleNameFallback": "Venta",
   "editCartLineAction": "Editar producto",
+  "repeatCartLineAction": "Repetir producto",
   "saveCartLineAction": "Guardar cambios",
   "clearCartAction": "Vaciar comanda",
   "confirmClearCartTitle": "¿Vaciar esta comanda?",
@@ -345,6 +354,7 @@
   "expectedCashLabel": "Efectivo esperado",
   "countedCashLabel": "Efectivo contado",
   "cashVarianceLabel": "Diferencia",
+  "offlinePriceDivergenceLabel": "Diferencias de precio sin conexión",
   "cashOverageLabel": "Sobrante",
   "cashShortageLabel": "Faltante",
   "cashToleranceLabel": "Tolerancia",
@@ -805,6 +815,7 @@
   "keepCartAction": "Seguir con esta comanda",
   "tenderConflictTitle": "Esta comanda no se puede cobrar así",
   "tenderConflictBody": "Guarda un cobro dividido entre efectivo y tarjeta, y esta sucursal cobra un solo método por venta. El registro del cobro queda guardado para revisión; para seguir, empieza una venta nueva.",
+  "splitCheckAction": "Dividir cuenta",
   "splitTenderTitle": "Cobro dividido",
   "splitTenderAction": "Dividir el pago",
   "splitTenderCancelAction": "Un solo método",

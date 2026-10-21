@@ -550,35 +550,85 @@ void main() {
     }
   });
 
+  testWidgets('a shift carried over from another day is said out loud', (
+    tester,
+  ) async {
+    // The owner's till had a drawer open for more than a hundred hours, and the
+    // screen showed the elapsed time in the same grey as everything else. A shift
+    // that crossed the 04:00 boundary is last night's until someone closes it.
+    final base = _FakeCashRepository().snapshot;
+    final repository = _FakeCashRepository()
+      ..snapshot = CashCenterSnapshot(
+        businessDate: base.businessDate,
+        policy: base.policy,
+        registers: base.registers,
+        ledger: const [],
+        adoptableShift: null,
+        currentShift: {
+          'id': '00000000-0000-4000-8000-000000000009',
+          'status': 'open',
+          'openedAt': DateTime.now()
+              .subtract(const Duration(hours: 30))
+              .toIso8601String(),
+        },
+        expectedCash: null,
+        latestCount: null,
+        varianceResolution: null,
+        reconciliation: null,
+        recoveryState: 'shift_required',
+        allowedActions: const [],
+        summary: null,
+      );
+    final controller = CashController(repository: repository);
+    addTearDown(controller.dispose);
+    controller.setContext(
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
+      operatorSessionId: '00000000-0000-4000-8000-000000000012',
+    );
+    await controller.load();
+
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        theme: UmiTheme.light(),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: CashCenter(
+          controller: controller,
+          permissions: OperatorPermissions(const ['cash.count.submit']),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('un día anterior'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'a shift carried over from another day is said out loud',
+    'operator mismatch still offers to bring the shift to this terminal',
     (tester) async {
-      // The owner's till had a drawer open for more than a hundred hours, and the
-      // screen showed the elapsed time in the same grey as everything else. A shift
-      // that crossed the 04:00 boundary is last night's until someone closes it.
+      tester.view.physicalSize = const Size(1280, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final base = _FakeCashRepository().snapshot;
       final repository = _FakeCashRepository()
-        ..snapshot = CashCenterSnapshot(
-          businessDate: base.businessDate,
-          policy: base.policy,
-          registers: base.registers,
-          ledger: const [],
-          adoptableShift: null,
-          currentShift: {
+        ..snapshot = CashCenterSnapshot.fromJson({
+          ...base.toJson(),
+          'currentShift': {
             'id': '00000000-0000-4000-8000-000000000009',
+            'registerId': '00000000-0000-4000-8000-000000000001',
             'status': 'open',
-            'openedAt': DateTime.now()
-                .subtract(const Duration(hours: 30))
-                .toIso8601String(),
+            'version': 3,
+            'operatorSessionId': '00000000-0000-4000-8000-000000000099',
+            'openedAt': '2026-07-28T18:00:00.000Z',
           },
-          expectedCash: null,
-          latestCount: null,
-          varianceResolution: null,
-          reconciliation: null,
-          recoveryState: 'shift_required',
-          allowedActions: const [],
-          summary: null,
-        );
+          'recoveryState': 'operator_mismatch',
+          'allowedActions': const ['resume'],
+        });
       final controller = CashController(repository: repository);
       addTearDown(controller.dispose);
       controller.setContext(
@@ -599,12 +649,20 @@ void main() {
           ],
           home: CashCenter(
             controller: controller,
-            permissions: OperatorPermissions(const ['cash.count.submit']),
+            permissions: OperatorPermissions(const [
+              'cash.shift.read',
+              'cash.shift.resume',
+            ]),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('un día anterior'), findsOneWidget);
+
+      expect(
+        find.text('Traer el turno a esta terminal').hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.text('Contar el cajón'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1848,70 +1906,73 @@ void main() {
     expect(field.numeric, isTrue);
   });
 
-  test('a refused close approval names itself and does not close the shift', () async {
-    final repository = _FakeCashRepository()
-      ..approvalFailureCode = 'VALIDATION_FAILED';
-    repository.snapshot = CashCenterSnapshot(
-      businessDate: '2026-07-29',
-      policy: repository.snapshot.policy,
-      registers: repository.snapshot.registers,
-      ledger: const [],
-      adoptableShift: null,
-      currentShift: const {
-        'id': '00000000-0000-4000-8000-000000000009',
-        'status': 'closing',
-        'version': 5,
-        'ledgerSequence': 3,
-        'currency': 'MXN',
-        'operatorSessionId': '00000000-0000-4000-8000-000000000012',
-        'responsibleOperatorId': '00000000-0000-4000-8000-000000000013',
-        'deviceId': '00000000-0000-4000-8000-000000000014',
-      },
-      expectedCash: null,
-      latestCount: null,
-      varianceResolution: null,
-      reconciliation: const {
-        'id': '00000000-0000-4000-8000-000000000030',
-        'shiftId': '00000000-0000-4000-8000-000000000009',
-        'countAttemptId': '00000000-0000-4000-8000-000000000020',
-        'expectedCash': {
-          'expectedDrawerCash': {'minorUnits': 132501, 'currency': 'MXN'},
+  test(
+    'a refused close approval names itself and does not close the shift',
+    () async {
+      final repository = _FakeCashRepository()
+        ..approvalFailureCode = 'VALIDATION_FAILED';
+      repository.snapshot = CashCenterSnapshot(
+        businessDate: '2026-07-29',
+        policy: repository.snapshot.policy,
+        registers: repository.snapshot.registers,
+        ledger: const [],
+        adoptableShift: null,
+        currentShift: const {
+          'id': '00000000-0000-4000-8000-000000000009',
+          'status': 'closing',
+          'version': 5,
+          'ledgerSequence': 3,
+          'currency': 'MXN',
+          'operatorSessionId': '00000000-0000-4000-8000-000000000012',
+          'responsibleOperatorId': '00000000-0000-4000-8000-000000000013',
+          'deviceId': '00000000-0000-4000-8000-000000000014',
         },
-        'selectedCount': {
-          'countedCash': {'minorUnits': 130000, 'currency': 'MXN'},
+        expectedCash: null,
+        latestCount: null,
+        varianceResolution: null,
+        reconciliation: const {
+          'id': '00000000-0000-4000-8000-000000000030',
+          'shiftId': '00000000-0000-4000-8000-000000000009',
+          'countAttemptId': '00000000-0000-4000-8000-000000000020',
+          'expectedCash': {
+            'expectedDrawerCash': {'minorUnits': 132501, 'currency': 'MXN'},
+          },
+          'selectedCount': {
+            'countedCash': {'minorUnits': 130000, 'currency': 'MXN'},
+          },
+          'variance': {
+            'signedVariance': {'minorUnits': -2501, 'currency': 'MXN'},
+          },
+          'resolution': null,
+          'outcome': 'approval_required',
+          'ledgerSequence': 3,
+          'closeApprovalRequired': true,
+          'closeApprovalFingerprint':
+              'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+          'reconciledAt': '2026-07-29T18:10:00.000Z',
         },
-        'variance': {
-          'signedVariance': {'minorUnits': -2501, 'currency': 'MXN'},
-        },
-        'resolution': null,
-        'outcome': 'approval_required',
-        'ledgerSequence': 3,
-        'closeApprovalRequired': true,
-        'closeApprovalFingerprint':
-            'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
-        'reconciledAt': '2026-07-29T18:10:00.000Z',
-      },
-      recoveryState: 'reconciliation_required',
-      allowedActions: const ['close', 'recount'],
-      summary: null,
-    );
-    final controller = CashController(repository: repository);
-    controller.setContext(
-      merchantId: '00000000-0000-4000-8000-000000000010',
-      locationId: '00000000-0000-4000-8000-000000000011',
-      operatorSessionId: '00000000-0000-4000-8000-000000000012',
-    );
-    await controller.load();
-    expect(controller.state.reconciliation?.closeApprovalRequired, isTrue);
+        recoveryState: 'reconciliation_required',
+        allowedActions: const ['close', 'recount'],
+        summary: null,
+      );
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: '00000000-0000-4000-8000-000000000012',
+      );
+      await controller.load();
+      expect(controller.state.reconciliation?.closeApprovalRequired, isTrue);
 
-    // The shape the till posted on the iMin: an approval with nothing in the PIN field.
-    final approvalId = await controller.approveClose('');
-    expect(approvalId, isNull);
-    expect(repository.approvalRequest?.managerPin, '');
-    // THE REFUSAL IS ON THE SCREEN. It used to escape `approveClose` as an unhandled exception, so
-    // the operator saw a dialog close and a screen that looked untouched.
-    expect(controller.state.errorCode, 'VALIDATION_FAILED');
-  });
+      // The shape the till posted on the iMin: an approval with nothing in the PIN field.
+      final approvalId = await controller.approveClose('');
+      expect(approvalId, isNull);
+      expect(repository.approvalRequest?.managerPin, '');
+      // THE REFUSAL IS ON THE SCREEN. It used to escape `approveClose` as an unhandled exception, so
+      // the operator saw a dialog close and a screen that looked untouched.
+      expect(controller.state.errorCode, 'VALIDATION_FAILED');
+    },
+  );
 
   test(
     'no-sale drawer request consumes an exact separate manager approval',
@@ -2094,14 +2155,19 @@ void main() {
       );
 
       expect(controller.state.errorCode, 'CASH_RECOVERY_ACTION_REQUIRED');
-      expect(repository.openCalls, 0, reason: 'nothing new started on top of it');
+      expect(
+        repository.openCalls,
+        0,
+        reason: 'nothing new started on top of it',
+      );
       expect(
         await store.load(
           '00000000-0000-4000-8000-000000000010',
           '00000000-0000-4000-8000-000000000011',
         ),
         isNotNull,
-        reason: 'an unsettled movement is not garbage: it stays until it is settled',
+        reason:
+            'an unsettled movement is not garbage: it stays until it is settled',
       );
     },
   );

@@ -743,6 +743,22 @@ msgid "La cuenta conserva Comer aquí sin asignar una mesa ficticia."
 msgstr "La cuenta conserva Comer aquí sin asignar una mesa ficticia."
 
 #: src/screens/caja-turnos.jsx
+msgid "Atribución de propinas en cuentas divididas"
+msgstr "Atribución de propinas en cuentas divididas"
+
+#: src/screens/caja-turnos.jsx
+msgid "Mesero de la cuenta, aunque otro cajero procese el cobro"
+msgstr "Mesero de la cuenta, aunque otro cajero procese el cobro"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cajero que procesa cada cobro"
+msgstr "Cajero que procesa cada cobro"
+
+#: src/screens/caja-turnos.jsx
+msgid "Cada pago conserva ambos empleados y la política decide cuál recibe la propina."
+msgstr "Cada pago conserva ambos empleados y la política decide cuál recibe la propina."
+
+#: src/screens/caja-turnos.jsx
 msgid "Transferencia bancaria"
 msgstr "Transferencia bancaria"
 

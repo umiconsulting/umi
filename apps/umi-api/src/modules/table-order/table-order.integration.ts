@@ -21,6 +21,7 @@ import { FloorPlanService } from '../floor-plan/floor-plan.service';
 import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
 import { PosCartRepository } from '../pos-cart/pos-cart.repository';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
 import { PosCartService } from '../pos-cart/pos-cart.service';
 import { PosCatalogRepository } from '../pos-catalog/pos-catalog.repository';
 import { TableOrderController } from './table-order.controller';
@@ -345,8 +346,12 @@ describe('table-order intake · §8I, "a QR order appears in the POS cart and on
     await pg.onModuleInit();
 
     const integrity = new IntegrityService(new IntegrityRepository(pg));
-    const floorPlan = new FloorPlanService(new FloorPlanRepository(pg), integrity);
     cartRepository = new PosCartRepository(pg);
+    const floorPlan = new FloorPlanService(
+      new FloorPlanRepository(pg),
+      integrity,
+      new PosSaleRepository(pg, cartRepository),
+    );
     carts = new PosCartService(cartRepository, integrity);
     credentials = new TableOrderRepository(pg);
     orders = new TableOrderService(
@@ -533,6 +538,7 @@ describe('table-order intake · §8I, "a QR order appears in the POS cart and on
         locationId: LOCATION,
         expectedVersion: saved.version,
         idempotencyKey: randomUUID(),
+        closeBlockingAccounts: false,
       }),
     );
 

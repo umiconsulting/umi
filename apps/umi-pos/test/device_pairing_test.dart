@@ -731,6 +731,38 @@ void main() {
     controller.dispose();
   });
 
+  testWidgets('the enrollment screen carries no station mark', (tester) async {
+    // Owner, 2026-10-16: the mark comes off the enrollment screens. A terminal that
+    // has not been registered yet is not the place to advertise whose software it
+    // runs, and the PIN screen already keeps that rule — this is the same assertion
+    // applied to the screen that asks for the setup code.
+    final storage = MemorySecureStorage();
+    storage.values['device.installation_id'] = _installationId;
+    final vault = CredentialVault(storage);
+    final controller = _controller(_PairingGateway(), vault);
+    await controller.initialize();
+
+    await tester.pumpWidget(
+      PosApp(
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: EntrySurface(controller: controller),
+      ),
+    );
+    await tester.pump();
+
+    expect(controller.state.phase, EntryPhase.enrollmentRequired);
+    expect(find.byType(StationSignature), findsNothing);
+    expect(find.text('Station'), findsNothing);
+    // The ask itself is still whole: the code field and its action survive the change.
+    expect(find.text('Enrollment code'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
+    controller.dispose();
+  });
+
   test(
     'restart within the grace window restores the operator without a PIN',
     () async {

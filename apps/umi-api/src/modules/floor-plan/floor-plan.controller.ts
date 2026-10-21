@@ -40,10 +40,11 @@ export class FloorPlanController {
   }
   @Post('publish')
   publish(
+    @CurrentUser() user: AuthUser,
     @Merchant() access: MerchantAccess,
     @Body(new ZodValidationPipe(PublishFloorPlanRequest)) dto: PublishFloorPlanRequest,
   ) {
-    return this.plans.change(access, dto);
+    return this.plans.change(access, dto, user);
   }
 }
 

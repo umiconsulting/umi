@@ -171,7 +171,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posFloorPlan',
     request: 'PosFloorPlanQuery',
     response: 'PublishedFloorPlan',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
   }),
   {
     id: 'floorPlan.read',
@@ -207,7 +207,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableState',
     request: 'PosTableStateQuery',
     response: 'TableStateMap',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     idempotent: false,
     errors: ['PERMISSION_DENIED'],
   }),
@@ -218,7 +218,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateSeat',
     request: 'SeatTableRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
@@ -235,7 +235,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateMove',
     request: 'MovePartyRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'TABLE_HAS_OPEN_ACCOUNT',
       'PERMISSION_DENIED',
@@ -254,7 +254,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateMerge',
     request: 'MergeTablesRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
@@ -271,7 +271,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateSplit',
     request: 'SplitPartyRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'TABLE_HAS_OPEN_ACCOUNT',
       'PERMISSION_DENIED',
@@ -289,7 +289,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateClear',
     request: 'ClearTableRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'TABLE_HAS_OPEN_ACCOUNT',
       'PERMISSION_DENIED',
@@ -306,7 +306,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateOpen',
     request: 'OpenTableRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
@@ -327,7 +327,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateOrdered',
     request: 'MarkTableOrderedRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
@@ -343,7 +343,7 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
     dart: 'posTableStateServed',
     request: 'MarkTableServedRequest',
     response: 'TableStateChangeResult',
-    permission: 'sale.lifecycle',
+    permission: 'cart.write',
     errors: [
       'PERMISSION_DENIED',
       'IDEMPOTENCY_CONFLICT',
@@ -2868,6 +2868,26 @@ export const ROUTE_TABLE: readonly RouteDef[] = [
       pin: false,
       approval: false,
       errors: ['PERMISSION_DENIED'],
+    },
+  },
+  {
+    id: 'pos.offlineResolveConflict',
+    method: 'POST',
+    path: '/api/v1/pos/merchants/:merchantId/offline/conflicts/:commandId/resolve',
+    params: ['merchantId', 'commandId'],
+    dart: 'posOfflineResolveConflict',
+    contract: {
+      request: 'ResolveReplayConflictRequest',
+      response: 'ResolvedReplayConflict',
+      auth: 'operator-session',
+      permission: 'offline.replay',
+      idempotent: true,
+      merchantContext: true,
+      locationContext: true,
+      offline: false,
+      pin: false,
+      approval: false,
+      errors: ['PERMISSION_DENIED', 'RESOURCE_NOT_FOUND', 'CONFLICT_NOT_RESOLVABLE'],
     },
   },
   {

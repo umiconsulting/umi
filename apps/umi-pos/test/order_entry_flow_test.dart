@@ -489,6 +489,7 @@ final class _Checkout extends _CheckoutBase
     implements PartialPaymentRepository {
   int policyLoads = 0;
   int partialReads = 0;
+  Completer<void>? partialReadGate;
 
   @override
   Future<CheckoutPolicy> policy(
@@ -542,6 +543,7 @@ final class _Checkout extends _CheckoutBase
     String cartId,
     CheckoutPartialPaymentQuery query,
   ) async {
+    if (partialReadGate != null) await partialReadGate!.future;
     partialReads++;
     throw const AppException(
       category: AppErrorCategory.unknown,
@@ -1002,13 +1004,27 @@ void main() {
   ) async {
     final f = await _fixture(lines: 1, type: 'takeout');
     addTearDown(f.dispose);
+    final ledgerGate = Completer<void>();
+    (f.checkoutRepo as _Checkout).partialReadGate = ledgerGate;
     await _mount(tester, f.surface);
     final split = find.byKey(const ValueKey('account-split-check'));
     expect(split, findsOneWidget);
     expect(find.text('Dividir cuenta'), findsOneWidget);
     await tester.tap(split);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(
+      find.byKey(const ValueKey('checkout-surface')),
+      findsNothing,
+      reason: 'Split check must not mount checkout before the split ledger.',
+    );
+    expect(find.byType(PartialCheckoutSurface), findsOneWidget);
+    expect(find.text('MXN 390.00'), findsWidgets);
+    expect(find.byType(PosSpinner), findsNothing);
+    ledgerGate.complete();
     await tester.pumpAndSettle();
     expect(find.byType(PartialCheckoutSurface), findsOneWidget);
+    expect(find.byKey(const ValueKey('checkout-surface')), findsNothing);
     expect((f.checkoutRepo as _Checkout).partialReads, greaterThan(0));
   });
   testWidgets('split check is absent when the checkout cannot split', (

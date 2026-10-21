@@ -77,6 +77,11 @@ void main() {
       ),
       'Mesero 2 tiene esta cuenta abierta en Tablet A9. Pídele guardar la cuenta desde Cuentas antes de recuperarla aquí.',
     );
+    expect(
+      operatorErrorMessage(context, 'OFFLINE_SYNC_PENDING'),
+      'Hay cambios de esta terminal pendientes de sincronizar. Mantén la '
+      'conexión y espera a que termine; después vuelve a abrir la cuenta.',
+    );
     // A body the server refuses before the domain sees it: the operator is told
     // what to do about it, and never reads the code. Three surfaces showed a
     // generic sentence for this code on the iMin D3-504 on 2026-10-11.

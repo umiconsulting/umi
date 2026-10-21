@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,7 @@ import 'package:umi_contract/umi_contract.dart';
 
 import '../../core/errors/app_error.dart';
 import '../../core/network/api_client.dart';
+import '../../core/storage/local_working_copy.dart';
 
 abstract interface class FloorPlanRepository {
   Future<PublishedFloorPlan> load(String merchantId, PosFloorPlanQuery query);
@@ -73,8 +75,10 @@ final class ApiFloorPlanRepository
 }
 
 final class FloorPlanController extends ChangeNotifier {
-  FloorPlanController(this._repository);
+  FloorPlanController(this._repository, {LocalWorkingCopy? workingCopy})
+    : _workingCopy = workingCopy;
   final FloorPlanRepository _repository;
+  final LocalWorkingCopy? _workingCopy;
   PublishedFloorPlan? plan;
   bool loading = false;
   bool failed = false;
@@ -133,6 +137,7 @@ final class FloorPlanController extends ChangeNotifier {
       plan = result;
       refreshedAt = DateTime.now();
       _addRequest = null;
+      unawaited(_persist(merchantId, query, result));
       return result;
     } catch (error) {
       if (_disposed || generation != _generation) return null;
@@ -199,6 +204,7 @@ final class FloorPlanController extends ChangeNotifier {
       plan = result;
       refreshedAt = DateTime.now();
       _bootstrapRequest = null;
+      unawaited(_persist(merchantId, query, result));
       return result;
     } on AppException catch (error) {
       if (_disposed || generation != _generation) return null;
@@ -265,9 +271,36 @@ final class FloorPlanController extends ChangeNotifier {
     if (_scope != scope) clear();
     _scope = scope;
     final generation = ++_generation;
-    loading = true;
     failed = false;
+    if (_workingCopy == null) {
+      loading = true;
+      notifyListeners();
+      await _refresh(merchantId, query, generation, preserveOnFailure: false);
+      return;
+    }
+    final local = await _readLocal(merchantId, query);
+    if (_disposed || generation != _generation) return;
+    if (local != null) {
+      plan = local;
+      refreshedAt = DateTime.now();
+      loading = false;
+      notifyListeners();
+      unawaited(
+        _refresh(merchantId, query, generation, preserveOnFailure: true),
+      );
+      return;
+    }
+    loading = true;
     notifyListeners();
+    await _refresh(merchantId, query, generation, preserveOnFailure: false);
+  }
+
+  Future<void> _refresh(
+    String merchantId,
+    PosFloorPlanQuery query,
+    int generation, {
+    required bool preserveOnFailure,
+  }) async {
     try {
       final result = await _repository.load(merchantId, query);
       if (_disposed || generation != _generation) return;
@@ -276,9 +309,10 @@ final class FloorPlanController extends ChangeNotifier {
       }
       plan = result;
       refreshedAt = DateTime.now();
+      unawaited(_persist(merchantId, query, result));
     } catch (error) {
       if (_disposed || generation != _generation) return;
-      failed = true;
+      failed = !preserveOnFailure;
       if (error is AppException &&
           (error.category == AppErrorCategory.authentication ||
               error.category == AppErrorCategory.permission)) {
@@ -290,6 +324,32 @@ final class FloorPlanController extends ChangeNotifier {
         loading = false;
         notifyListeners();
       }
+    }
+  }
+
+  Future<PublishedFloorPlan?> _readLocal(
+    String merchantId,
+    PosFloorPlanQuery query,
+  ) async {
+    final workingCopy = _workingCopy;
+    if (workingCopy == null) return null;
+    try {
+      return await workingCopy.readFloorPlan(merchantId, query);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _persist(
+    String merchantId,
+    PosFloorPlanQuery query,
+    PublishedFloorPlan plan,
+  ) async {
+    try {
+      await _workingCopy?.writeFloorPlan(merchantId, query, plan);
+    } catch (_) {
+      // The server answer is already painted. A failed local write does not
+      // turn a successful floor-plan read into a user-visible failure.
     }
   }
 

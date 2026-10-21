@@ -69,13 +69,20 @@ final class CashController extends ChangeNotifier {
   CashController({
     required CashRepository repository,
     CashRecoveryStore? recoveryStore,
+    OpenShiftCache? openShiftCache,
     Future<bool> Function(CommittedCashHardwareAction action)? afterCommit,
   }) : _repository = repository,
        _recoveryStore = recoveryStore ?? MemoryCashRecoveryStore(),
+       _openShiftCache = openShiftCache ?? MemoryOpenShiftCache(),
        _afterCommit = afterCommit;
 
   final CashRepository _repository;
   final CashRecoveryStore _recoveryStore;
+  final OpenShiftCache _openShiftCache;
+
+  /// The shift this till saw open when it last had an answer, used only while
+  /// the till has no snapshot at all (a cold start with no uplink).
+  String? _rememberedShiftId;
 
   /// Runs the hardware a committed command asks for, and answers whether the
   /// hardware took it. The controller does not know what a drawer is; it knows
@@ -100,8 +107,8 @@ final class CashController extends ChangeNotifier {
   String? get activeShiftId {
     final snapshot = _state.snapshot;
     final shift = snapshot?.currentShift;
-    if (shift == null ||
-        shift['status'] != 'open' ||
+    if (shift == null) return _rememberedShiftId;
+    if (shift['status'] != 'open' ||
         shift['operatorSessionId'] != _operatorSessionId ||
         snapshot!.recoveryState != 'none') {
       return null;
@@ -186,6 +193,7 @@ final class CashController extends ChangeNotifier {
     _locationId = locationId;
     _operatorSessionId = operatorSessionId;
     _state = const CashState();
+    unawaited(_hydrateRememberedShift());
   }
 
   void clear() {
@@ -243,7 +251,17 @@ final class CashController extends ChangeNotifier {
           errorCode: recoveryCode,
         ),
       );
+      await _rememberShift(restored.snapshot);
     } on AppException catch (error) {
+      final offline =
+          error.category == AppErrorCategory.transport ||
+          error.category == AppErrorCategory.timeout ||
+          error.category == AppErrorCategory.server;
+      if (offline && _state.snapshot == null) {
+        await _hydrateRememberedShift();
+        _set(const CashState());
+        return;
+      }
       _set(CashState(snapshot: _state.snapshot, errorCode: error.code));
     } catch (_) {
       // A load can fail for a reason the API did not describe: a socket that
@@ -264,6 +282,56 @@ final class CashController extends ChangeNotifier {
   /// Deliberately not an `AppException.code`: nothing in the contract describes
   /// this, and pretending a server code would make the operator's message lie.
   static const String unexpectedFailureCode = 'CASH_CENTER_UNAVAILABLE';
+
+  /// Keep the open shift this answer named, so the next cold start can belong
+  /// to it. A closed or foreign shift clears it: only this operator's own open
+  /// drawer is worth remembering.
+  Future<void> _rememberShift(CashCenterSnapshot? snapshot) async {
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    final operatorSessionId = _operatorSessionId;
+    if (merchantId == null || locationId == null || operatorSessionId == null) {
+      return;
+    }
+    final shiftId = activeShiftId;
+    try {
+      if (shiftId == null) {
+        _rememberedShiftId = null;
+        await _openShiftCache.clear(merchantId, locationId);
+        return;
+      }
+      _rememberedShiftId = shiftId;
+      await _openShiftCache.save(
+        OpenShiftSnapshot(
+          shiftId: shiftId,
+          merchantId: merchantId,
+          locationId: locationId,
+          operatorSessionId: operatorSessionId,
+        ),
+      );
+    } catch (_) {
+      // Remembering is an optimisation; never fail the screen for it.
+    }
+  }
+
+  Future<void> _hydrateRememberedShift() async {
+    final merchantId = _merchantId;
+    final locationId = _locationId;
+    final operatorSessionId = _operatorSessionId;
+    if (merchantId == null || locationId == null || operatorSessionId == null) {
+      return;
+    }
+    try {
+      final cached = await _openShiftCache.load(merchantId, locationId);
+      if (cached == null) return;
+      // A shift belongs to the operator session that opened it. A different
+      // operator on this till must not inherit somebody else's drawer id.
+      if (cached.operatorSessionId != operatorSessionId) return;
+      _rememberedShiftId = cached.shiftId;
+    } catch (_) {
+      _rememberedShiftId = null;
+    }
+  }
 
   /// Take this till's own shift back so it can charge again, without a human
   /// retyping anything. Returns the shift id in force afterwards, or null when

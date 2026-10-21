@@ -15,13 +15,13 @@ class AccountsWorkspace extends StatelessWidget {
     required this.onNewAccount,
     this.tables,
     this.busy = false,
-    this.chooseOrderType = false,
     this.currentBusinessDate,
     this.notice,
     this.watchedAccount,
     this.readAccount,
     this.onAccountReleased,
     this.onCancelCarriedOver,
+    this.onDismissNotice,
     super.key,
   });
 
@@ -32,12 +32,12 @@ class AccountsWorkspace extends StatelessWidget {
   final VoidCallback? onNewAccount;
   final Widget? tables;
   final bool busy;
-  final bool chooseOrderType;
   final String? notice;
   final Cart? watchedAccount;
   final Future<Cart> Function(Cart)? readAccount;
   final VoidCallback? onAccountReleased;
   final Future<void> Function(List<Cart>)? onCancelCarriedOver;
+  final VoidCallback? onDismissNotice;
 
   /// The date the server is trading under right now, taken from the cart the till is
   /// working on. The account list uses it to tell today's accounts from the ones left
@@ -82,13 +82,7 @@ class AccountsWorkspace extends StatelessWidget {
                     if (onNewAccount != null)
                       PosButton(
                         onPressed: busy ? null : onNewAccount,
-                        child: Text(
-                          chooseOrderType
-                              ? (es ? 'Nuevo pedido' : 'New order')
-                              : es
-                              ? 'Nueva cuenta sin mesa'
-                              : 'New account without table',
-                        ),
+                        child: Text(es ? 'Iniciar pedido' : 'Start order'),
                       ),
                   ],
                 ),
@@ -109,6 +103,7 @@ class AccountsWorkspace extends StatelessWidget {
                       showFulfillmentFilter: true,
                       showDateFilter: true,
                       onCancelCarriedOver: onCancelCarriedOver,
+                      onDismissNotice: onDismissNotice,
                       currentBusinessDate: currentBusinessDate,
                       onSelected: onSelected,
                     )

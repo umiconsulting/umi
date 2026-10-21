@@ -243,6 +243,7 @@ export class PosSaleRepository {
     actorUserId: string,
     mayCancelOtherOperator: boolean,
     dto: CancelCarriedOverAccountsRequest,
+    options: { allowCurrentBusinessDay?: boolean } = {},
   ): Promise<SaleSnapshot[]> {
     const selected = [...dto.accounts].sort((a, b) => a.cartId.localeCompare(b.cartId));
     const ids = selected.map((account) => account.cartId);
@@ -291,7 +292,7 @@ export class PosSaleRepository {
       if (
         !row ||
         row.version !== selectedAccount.expectedVersion ||
-        row.businessDate >= row.today ||
+        (!options.allowCurrentBusinessDay && row.businessDate >= row.today) ||
         row.committed ||
         !['draft', 'prepared'].includes(row.status) ||
         !['building_cart', 'ready_for_checkout', 'recovered', 'suspended'].includes(row.state)

@@ -200,6 +200,7 @@ describe('DashboardOperationsService.salesInsight', () => {
       },
       mixedTenderEnabled: true,
       allowDineInWithoutTable: true,
+      tipAttribution: 'account_owner' as const,
     };
     const repository = {
       checkoutPolicy: vi.fn().mockResolvedValue(policy),

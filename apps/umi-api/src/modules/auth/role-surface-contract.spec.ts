@@ -779,56 +779,56 @@ describe('Workstream C role surface contract', () => {
       id: 'pos.tableState',
       method: 'GET',
       path: '/api/v1/pos/merchants/{merchantId}/table-state',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'the room read: who is where and for how long',
     },
     {
       id: 'pos.tableStateSeat',
       method: 'POST',
       path: '/api/v1/pos/merchants/{merchantId}/table-state/seat',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'seating a party starts the turn timer',
     },
     {
       id: 'pos.tableStateMove',
       method: 'POST',
       path: '/api/v1/pos/merchants/{merchantId}/table-state/move',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'a move relocates a seated party, and the turn timer travels with it',
     },
     {
       id: 'pos.tableStateMerge',
       method: 'POST',
       path: '/api/v1/pos/merchants/{merchantId}/table-state/merge',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'a merge puts one party across several tables',
     },
     {
       id: 'pos.tableStateSplit',
       method: 'POST',
       path: '/api/v1/pos/merchants/{merchantId}/table-state/split',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'a split ends a merge and dirties the tables it releases',
     },
     {
       id: 'pos.tableStateClear',
       method: 'POST',
       path: '/api/v1/pos/merchants/{merchantId}/table-state/clear',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'clearing a table ends the party on it',
     },
     {
       id: 'pos.tableStateOpen',
       method: 'POST',
       path: '/api/v1/pos/merchants/{merchantId}/table-state/open',
-      permission: 'sale.lifecycle',
+      permission: 'cart.write',
       why: 'the wipe-done transition, from dirty back to open',
     },
   ];
 
   /** The module that owns the table-map routes, and the check that guards them. */
   const TABLE_MAP_REPOSITORY = 'apps/umi-api/src/modules/table-map/table-map.repository.ts';
-  const TABLE_MAP_PERMISSION = 'sale.lifecycle';
+  const TABLE_MAP_PERMISSION = 'cart.write';
 
   it('keeps the table-map guard in the repository, and proves where it lives', () => {
     const problems: string[] = [];

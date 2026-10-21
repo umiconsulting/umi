@@ -50,37 +50,47 @@ class DeviceKeySigner(channel: MethodChannel) {
     KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
   private fun ensureKey(): PrivateKey {
-    val store = keyStore()
-    (store.getEntry(KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry)?.let {
-      return it.privateKey
-    }
-    val builder = KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_SIGN)
-      .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-      .setDigests(KeyProperties.DIGEST_SHA256)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-      // Prefer a discrete StrongBox secure element; fall back if absent.
-      try {
-        builder.setIsStrongBoxBacked(true)
-      } catch (_: Exception) {
-        builder.setIsStrongBoxBacked(false)
-      }
-    }
-    val generator = KeyPairGenerator.getInstance(
-      KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE,
-    )
+    readKey()?.let { return it }
     return try {
-      generator.initialize(builder.build())
-      generator.generateKeyPair().private
+      generate(strongBox = true)
     } catch (_: Exception) {
-      // A device without StrongBox rejects the flag; retry TEE-backed.
-      generator.initialize(
-        KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_SIGN)
-          .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-          .setDigests(KeyProperties.DIGEST_SHA256)
-          .build(),
-      )
-      generator.generateKeyPair().private
+      // A failed StrongBox request can leave a half-created alias behind. The
+      // TEE-backed retry must start from a clean alias, or the keystore
+      // refuses it with KEY_ALREADY_EXISTS and the device loses its identity.
+      keyStore().deleteEntry(KEY_ALIAS)
+      generate(strongBox = false)
     }
+  }
+
+  private fun readKey(): PrivateKey? {
+    val store = keyStore()
+    val entry =
+      store.getEntry(KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry
+        ?: return null
+    if (entry.certificate == null) {
+      // A key without a certificate cannot produce a public key. Remove it
+      // instead of reporting a proof that no server can verify.
+      store.deleteEntry(KEY_ALIAS)
+      return null
+    }
+    return entry.privateKey
+  }
+
+  private fun generate(strongBox: Boolean): PrivateKey {
+    val builder =
+      KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_SIGN)
+        .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+        .setDigests(KeyProperties.DIGEST_SHA256)
+    if (strongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      builder.setIsStrongBoxBacked(true)
+    }
+    val generator =
+      KeyPairGenerator.getInstance(
+        KeyProperties.KEY_ALGORITHM_EC,
+        ANDROID_KEYSTORE,
+      )
+    generator.initialize(builder.build())
+    return generator.generateKeyPair().private
   }
 
   private fun ensurePublicKey(): ByteArray {

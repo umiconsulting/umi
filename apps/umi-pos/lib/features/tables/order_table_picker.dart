@@ -298,10 +298,17 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
 
   bool get _unavailable => _saving || _confirming || _roomUnavailable;
 
+  /// True only while the room is actually being read.
+  ///
+  /// An *unknown* room — no map at all, or one older than the freshness window
+  /// — is the ordinary state of a till with no uplink, and it used to disable
+  /// "Usar mesa" outright: the operator could see the published plan, pick a
+  /// table, and the button refused. Occupancy is a live fact the server owns;
+  /// it checks the claim again when the assignment lands, so an unknown room is
+  /// a reason to tell the operator the room is not current, not a reason to
+  /// stop them selling.
   bool get _roomUnavailable =>
-      (widget.room?.busy ?? false) ||
-      (widget.room?.loading ?? false) ||
-      (widget.room != null && (widget.room!.map == null || widget.room!.stale));
+      (widget.room?.busy ?? false) || (widget.room?.loading ?? false);
 
   bool get _otherAccount {
     final account = _selected == null
@@ -486,6 +493,9 @@ class _OrderTablePickerState extends State<OrderTablePicker> {
                                 tableStateOpen,
                             selected: selected?.id == table.table.id,
                             partySize: room?.stateOf(table.table.id).partySize,
+                            accountFolio: room
+                                ?.stateOf(table.table.id)
+                                .openAccountFolio,
                             groupId: room?.stateOf(table.table.id).groupId,
                           ),
                       },

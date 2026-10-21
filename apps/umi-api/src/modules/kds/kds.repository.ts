@@ -382,6 +382,29 @@ export class KdsRepository {
     );
   }
 
+  /**
+   * Prove that a LAN peer which authored a journalled kitchen command is still
+   * an active device of this merchant and location. The local hub pairs the
+   * device first; this is the server's own second check before replay.
+   */
+  async replayKitchenActor(
+    merchantId: string,
+    locationId: string,
+    deviceId: string,
+  ): Promise<{ kind: 'kds' | 'pos_terminal'; stationId: string | null } | null> {
+    const { rows } = await this.pg.query<{
+      kind: 'kds' | 'pos_terminal';
+      stationId: string | null;
+    }>(
+      `SELECT kind,station_id::text AS "stationId"
+         FROM merchant.device
+        WHERE id=$1::uuid AND merchant_id=$2::uuid AND location_id=$3::uuid
+          AND status='active'`,
+      [deviceId, merchantId, locationId],
+    );
+    return rows[0] ?? null;
+  }
+
   async posKitchenStatus(merchantId: string, locationId: string, sourceOrderId: string) {
     const { rows } = await this.pg.query<{
       kitchen_order_id: string;
@@ -1480,6 +1503,77 @@ export class KdsRepository {
       kitchen_order_status: row.status,
       kitchen_status: mapCanonicalKitchenStatus(row.status),
     };
+  }
+
+  /**
+   * Resolve a cart id that existed only on the till.
+   *
+   * A cart opened in the offline journal gets a server cart id when replay
+   * accepts `pos.cart.open`. The LAN KDS knows the provisional id, so the
+   * accepted replay ledger is the durable bridge between the two identities.
+   */
+  async resolveReplayCartId(
+    merchantId: string,
+    provisionalCartId: string,
+  ): Promise<string | null> {
+    const { rows } = await this.pg.query<{ official_id: string | null }>(
+      `SELECT result->>'officialId' AS official_id
+         FROM merchant.offline_replay_command
+        WHERE merchant_id=$1::uuid
+          AND command_type='pos.cart.open'
+          AND payload->>'cartId'=$2
+          AND result->>'status'='accepted'
+        ORDER BY device_sequence DESC
+        LIMIT 1`,
+      [merchantId, provisionalCartId],
+    );
+    return rows[0]?.official_id ?? null;
+  }
+
+  /**
+   * Resolve the local cart-line ids a LAN KDS command used to the official
+   * kitchen-order item ids.
+   *
+   * A ticket that was fired while the WAN was down is built from the cart's
+   * local lines, so its item ids are cart-line ids. The replay ledger has
+   * already turned those lines into kitchen-order items; `lineMap` carries the
+   * display order the host showed the cook. Without this translation a KDS
+   * command writes a `kitchen_command` row with an id that does not exist in
+   * `kitchen_order_item`, and PostgreSQL refuses the whole replay batch with
+   * `kitchen_command_item_fk`.
+   */
+  async resolveReplayOrderItemIds(
+    merchantId: string,
+    cartId: string,
+    kitchenOrderId: string,
+    itemIds: string[],
+    lineMap: Record<string, number>,
+  ): Promise<string[] | null> {
+    if (itemIds.length === 0) return [];
+    const { rows } = await this.pg.query<{
+      id: string;
+      orderItemId: string | null;
+    }>(
+      `SELECT line.id::text, koi.id::text AS "orderItemId"
+         FROM merchant.pos_cart_line line
+         JOIN merchant.kitchen_order_item koi
+           ON koi.merchant_id=line.merchant_id
+          AND koi.source_order_item_id=line.order_item_id
+          AND koi.kitchen_order_id=$3::uuid
+        WHERE line.merchant_id=$1::uuid AND line.cart_id=$2::uuid
+          AND line.order_item_id IS NOT NULL
+        ORDER BY line.created_at, line.id`,
+      [merchantId, cartId, kitchenOrderId],
+    );
+    const resolved: string[] = [];
+    for (const itemId of itemIds) {
+      const displayOrder = lineMap[itemId];
+      if (displayOrder == null) return null;
+      const line = rows[displayOrder];
+      if (!line?.orderItemId) return null;
+      resolved.push(line.orderItemId);
+    }
+    return [...new Set(resolved)];
   }
 
   async executeKitchenCommand(input: {

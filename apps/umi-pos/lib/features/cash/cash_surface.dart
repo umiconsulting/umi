@@ -762,6 +762,8 @@ final class _ClosedSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final divergence = summary['priceDivergence'] as Map<String, Object?>?;
+    final divergenceCount = (divergence?['count'] as num?)?.toInt() ?? 0;
     // The status strip already says the shift is closed; this card answers the
     // question that follows, in the same shape as the drawer's own count. The
     // closure announcement rides on the semantics node so a screen reader hears
@@ -809,6 +811,12 @@ final class _ClosedSummaryCard extends StatelessWidget {
                       summary['variance'] as Map<String, Object?>? ?? const {},
                     ),
                   ),
+                  if (divergenceCount > 0)
+                    _Figure(
+                      label: l.offlinePriceDivergenceLabel,
+                      value:
+                          '$divergenceCount · ${_money({'currency': divergence?['currency'], 'minorUnits': divergence?['totalMinorUnits']})}',
+                    ),
                 ],
               ),
             ],
@@ -1514,7 +1522,9 @@ final class _ActiveShiftSection extends StatelessWidget {
       if (actions.contains('resume') && permissions.allows('cash.shift.resume'))
         _Action(
           icon: PosGlyphs.playCircleOutline,
-          label: l.resumeShiftAction,
+          label: snapshot.recoveryState == 'operator_mismatch'
+              ? l.adoptShiftAction
+              : l.resumeShiftAction,
           onPressed: () => controller.suspendOrResume(suspend: false),
         ),
       if (actions.contains('handoff') &&
@@ -1774,9 +1784,9 @@ final class _ActiveShiftSection extends StatelessWidget {
     Widget buildClose() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        closeCard(),
+        if (showCloseFlow) closeCard(),
         if (lifecycle.isNotEmpty) ...[
-          const SizedBox(height: UmiSpacing.md),
+          if (showCloseFlow) const SizedBox(height: UmiSpacing.md),
           _SectionCard(
             title: spanish ? 'Custodia del turno' : 'Shift custody',
             child: _ActionGrid(actions: lifecycle),
@@ -1803,6 +1813,7 @@ final class _ActiveShiftSection extends StatelessWidget {
         // limited. The rail says which it is, and what to do instead.
         final readOnly =
             operations.isEmpty && lifecycle.isEmpty && !showCloseFlow;
+        final showShiftRail = showCloseFlow || lifecycle.isNotEmpty;
         if (!roomForTwoColumns) {
           return SingleChildScrollView(
             child: Column(
@@ -1813,7 +1824,7 @@ final class _ActiveShiftSection extends StatelessWidget {
                   const SizedBox(height: UmiSpacing.lg),
                   buildReadOnlyRail(),
                 ],
-                if (showCloseFlow) ...[
+                if (showShiftRail) ...[
                   const SizedBox(height: UmiSpacing.lg),
                   buildClose(),
                 ],
@@ -1831,7 +1842,7 @@ final class _ActiveShiftSection extends StatelessWidget {
             : SingleChildScrollView(child: buildDrawer(expanded: false));
         // Nothing to close yet: the drawer panel is the whole screen. It keeps a
         // readable width instead of stretching one tile across the full span.
-        if (!showCloseFlow) {
+        if (!showShiftRail) {
           if (readOnly) {
             return _ShiftShell(
               work: buildDrawer(expanded: false),
@@ -2118,6 +2129,7 @@ final class _Action extends StatelessWidget {
               backgroundColor: scheme.surfaceContainerHighest,
               iconColor: scheme.primary,
               textStyle: theme.textTheme.labelLarge,
+              minimumSize: const Size(0, UmiTouchTarget.minimum),
             ).copyWith(
               side: _focusSide(
                 theme,
@@ -2438,9 +2450,7 @@ Future<void> _noSale(BuildContext context, CashController controller) async {
     cancelLabel: l.closeAction,
     above: (context, _) =>
         _Note(icon: PosGlyphs.history, text: l.noSaleDialogHint),
-    fields: [
-      cashManagerPinField(l, autofocus: true),
-    ],
+    fields: [cashManagerPinField(l, autofocus: true)],
   );
   if (answer == null || !context.mounted) return;
   final approval = await controller.approveNoSale(
@@ -2693,7 +2703,8 @@ Future<void> _count(BuildContext context, CashController controller) async {
     // the count, so the shift could never leave `counting` and the drawer could
     // never be closed. The dialog below IS what submits it.
     final alreadyCounting =
-        (controller.state.snapshot?.currentShift?['status'] as String?) == 'counting';
+        (controller.state.snapshot?.currentShift?['status'] as String?) ==
+        'counting';
     if (!alreadyCounting) {
       await controller.requestRecount();
       if (controller.state.errorCode != null) return;
@@ -2911,11 +2922,7 @@ Future<void> _resolve(BuildContext context, CashController controller) async {
         ),
       ],
     ),
-    fields: approvalRequired
-        ? [
-            cashManagerPinField(l),
-          ]
-        : const [],
+    fields: approvalRequired ? [cashManagerPinField(l)] : const [],
   );
   if (answer == null || !context.mounted) return;
   final approvalId = approvalRequired
@@ -2969,11 +2976,7 @@ Future<void> _close(BuildContext context, CashController controller) async {
           ),
       ],
     ),
-    fields: approvalRequired
-        ? [
-            cashManagerPinField(l),
-          ]
-        : const [],
+    fields: approvalRequired ? [cashManagerPinField(l)] : const [],
   );
   if (answer == null || !context.mounted) return;
   final approvalId = approvalRequired
@@ -3176,35 +3179,34 @@ final class _CashFieldsDialogState extends State<CashFieldsDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-            if (widget.above != null) ...[
-              widget.above!(context, _state),
-              if (widget.fields.isNotEmpty)
-                const SizedBox(height: UmiSpacing.md),
-            ],
-            for (final (index, field) in widget.fields.indexed) ...[
-              if (index > 0) const SizedBox(height: UmiSpacing.md),
-              PosField(
-                controller: _controllers[index],
-                autofocus: field.autofocus,
-                obscureText: field.obscure,
-                maxLength: field.maxLength,
-                keyboardType: field.numeric
-                    ? TextInputType.number
-                    : TextInputType.text,
-                onChanged: (_) {
-                  if (_touched.add(index)) setState(() {});
-                },
-                decoration: PosFieldDecoration(
-                  labelText: field.label,
-                  prefixText: field.prefix,
-                  hintText: field.hint,
-                  helperText: field.helper,
-                  errorText: _errorAt(index),
-                ),
-              ),
-            ],
+          if (widget.above != null) ...[
+            widget.above!(context, _state),
+            if (widget.fields.isNotEmpty) const SizedBox(height: UmiSpacing.md),
           ],
-        ),
+          for (final (index, field) in widget.fields.indexed) ...[
+            if (index > 0) const SizedBox(height: UmiSpacing.md),
+            PosField(
+              controller: _controllers[index],
+              autofocus: field.autofocus,
+              obscureText: field.obscure,
+              maxLength: field.maxLength,
+              keyboardType: field.numeric
+                  ? TextInputType.number
+                  : TextInputType.text,
+              onChanged: (_) {
+                if (_touched.add(index)) setState(() {});
+              },
+              decoration: PosFieldDecoration(
+                labelText: field.label,
+                prefixText: field.prefix,
+                hintText: field.hint,
+                helperText: field.helper,
+                errorText: _errorAt(index),
+              ),
+            ),
+          ],
+        ],
+      ),
       actions: [
         PosTextButton(
           onPressed: () => Navigator.pop(context),

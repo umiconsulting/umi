@@ -266,7 +266,13 @@ export class AuthService {
   ): void {
     if (!publicKey) return;
     if (!proof.signature || !proof.timestamp) {
-      throw new UnauthorizedException({ code: 'DEVICE_PROOF_REQUIRED' });
+      throw new UnauthorizedException({
+        code: 'DEVICE_PROOF_REQUIRED',
+        // The public envelope publishes AUTHENTICATION_REQUIRED for every 401.
+        // The reason keeps the specific cause visible to the till, which must
+        // send the operator to enrollment instead of asking for the PIN again.
+        details: { reason: 'DEVICE_PROOF_REQUIRED' },
+      });
     }
     const verified = verifyDeviceProof({
       publicKeyB64Url: publicKey,
@@ -276,7 +282,10 @@ export class AuthService {
       algorithm: proof.algorithm === 'es256' ? 'es256' : 'ed25519',
     });
     if (!verified) {
-      throw new UnauthorizedException({ code: 'DEVICE_PROOF_INVALID' });
+      throw new UnauthorizedException({
+        code: 'DEVICE_PROOF_INVALID',
+        details: { reason: 'DEVICE_PROOF_INVALID' },
+      });
     }
   }
 

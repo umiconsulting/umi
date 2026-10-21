@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IsoTimestamp, Uuid } from './platform';
+import { IsoTimestamp, JsonPayload, Uuid } from './platform';
 
 /**
  * Live table state — workstream D, steps 3, 4 and 5 (plan §8D).
@@ -172,6 +172,37 @@ export type MarkTableServedRequest = z.infer<typeof MarkTableServedRequest>;
 export type MarkTableAwaitingPaymentRequest = z.infer<typeof MarkTableAwaitingPaymentRequest>;
 
 /**
+ * The offline replay envelope for a floor-plan command.
+ *
+ * One command type carries every table operation because they share the same
+ * authority, ordering and idempotency rules; `action` selects the existing POS
+ * route's request shape. Keeping the request as JSON here avoids a second copy
+ * of nine schemas, while the replayer still parses the exact route schema
+ * before it touches the room.
+ */
+export const OFFLINE_TABLE_ACTIONS = [
+  'seat',
+  'move',
+  'merge',
+  'split',
+  'clear',
+  'open',
+  'ordered',
+  'served',
+  'awaiting_payment',
+] as const;
+export const OfflineTableAction = z.enum(OFFLINE_TABLE_ACTIONS);
+export type OfflineTableAction = z.infer<typeof OfflineTableAction>;
+
+export const OfflineTableCommandPayload = z
+  .object({
+    action: OfflineTableAction,
+    request: JsonPayload,
+  })
+  .strict();
+export type OfflineTableCommandPayload = z.infer<typeof OfflineTableCommandPayload>;
+
+/**
  * What a write returns: the tables it changed, in their new state, plus the
  * server's clock. It is NOT the whole room — a replayed command returns the
  * outcome recorded the first time, and a whole-room snapshot replayed minutes
@@ -203,5 +234,6 @@ export const tableStateModels = {
   MarkTableOrderedRequest,
   MarkTableServedRequest,
   MarkTableAwaitingPaymentRequest,
+  OfflineTableCommandPayload,
   TableStateChangeResult,
 };

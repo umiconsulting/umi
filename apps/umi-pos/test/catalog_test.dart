@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
 import 'package:umi_pos/core/network/api_client.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
+import 'package:umi_pos/core/storage/local_working_copy.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
 import 'package:umi_pos/core/theme/umi_theme.dart';
 import 'package:umi_pos/features/catalog/catalog_controller.dart';
@@ -19,6 +22,8 @@ CatalogProductSummary product(
   String name = 'Café',
   Map<String, Object?>? category,
   String availability = 'enabled',
+  bool hasVariants = false,
+  bool hasModifiers = false,
 }) => CatalogProductSummary(
   id: id,
   name: name,
@@ -32,8 +37,8 @@ CatalogProductSummary product(
   availability: availability,
   availableFrom: null,
   primaryMedia: null,
-  hasVariants: false,
-  hasModifiers: false,
+  hasVariants: hasVariants,
+  hasModifiers: hasModifiers,
   updatedAt: '2026-07-28T00:00:00Z',
 );
 
@@ -43,6 +48,8 @@ final class FakeCatalogRepository implements CatalogRepository {
     this.productCategory,
     this.productAvailability = 'enabled',
     this.categoryItems = const [],
+    this.productHasVariants = false,
+    this.productHasModifiers = false,
   });
 
   /// What the one seeded product is called, and the category it carries. A test that
@@ -56,6 +63,8 @@ final class FakeCatalogRepository implements CatalogRepository {
 
   /// The dividers of the menu, when the test is about the category index.
   final List<Map<String, Object?>> categoryItems;
+  final bool productHasVariants;
+  final bool productHasModifiers;
   var calls = 0;
   String? lastBarcode;
   @override
@@ -85,6 +94,8 @@ final class FakeCatalogRepository implements CatalogRepository {
               name: productName,
               category: productCategory,
               availability: productAvailability,
+              hasVariants: productHasVariants,
+              hasModifiers: productHasModifiers,
             ).toJson(),
           ];
     return CatalogPage(
@@ -142,6 +153,82 @@ final class FakeCatalogRepository implements CatalogRepository {
   );
 }
 
+final class _LocalCatalog implements LocalWorkingCopy {
+  _LocalCatalog(this.root, this.byCategory);
+
+  final LocalCatalogSnapshot root;
+  final Map<String, LocalCatalogSnapshot> byCategory;
+
+  @override
+  Future<LocalCatalogSnapshot?> readCatalog(
+    LocalCatalogScope partition,
+  ) async => root;
+
+  @override
+  Future<LocalCatalogSnapshot?> readCatalogPage(
+    LocalCatalogScope partition, {
+    String? categoryId,
+    String? search,
+    String? barcode,
+  }) async => categoryId == null ? root : byCategory[categoryId];
+
+  @override
+  Future<CatalogProductDetail?> readProductDetail(
+    LocalCatalogScope partition,
+    String productId,
+  ) async => null;
+
+  @override
+  Future<void> writeCategories(
+    LocalCatalogScope partition,
+    CatalogCategoriesResponse response,
+  ) async {}
+
+  @override
+  Future<void> writeCatalogPage(
+    LocalCatalogScope partition,
+    CatalogPage page, {
+    String? categoryId,
+    String? search,
+    String? barcode,
+    bool append = false,
+  }) async {}
+
+  @override
+  Future<void> writeProductDetail(
+    LocalCatalogScope partition,
+    CatalogProductDetail detail,
+  ) async {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+final class _WaitingCatalogRepository implements CatalogRepository {
+  final categoriesResult = Completer<CatalogCategoriesResponse>();
+  final productsResult = Completer<CatalogPage>();
+
+  @override
+  Future<CatalogCategoriesResponse> categories(CatalogPartition partition) =>
+      categoriesResult.future;
+
+  @override
+  Future<CatalogPage> products(
+    CatalogPartition partition, {
+    String? categoryId,
+    String? search,
+    String? barcode,
+    String? cursor,
+    CancellationToken? cancellation,
+  }) => productsResult.future;
+
+  @override
+  Future<CatalogProductDetail> detail(
+    CatalogPartition partition,
+    String productId,
+  ) => throw UnimplementedError();
+}
+
 CatalogController controller(FakeCatalogRepository repository) {
   final telemetry = SafeTelemetry(
     enabled: true,
@@ -184,6 +271,52 @@ void main() {
     expect(value.state.products.map((item) => item.id), ['1', '2']);
     value.dispose();
   });
+
+  test(
+    'cached catalogue paints before a wide-area request can finish',
+    () async {
+      const category = CatalogCategory(
+        id: 'hot',
+        name: 'Calientes',
+        displayOrder: 0,
+        enabled: true,
+        color: null,
+      );
+      final hot = product(
+        'hot-latte',
+        name: 'Latte caliente',
+        category: category.toJson(),
+      );
+      final snapshot = LocalCatalogSnapshot(
+        categories: const [category],
+        products: [hot],
+        catalogVersion: 'v1',
+        updatedAt: '2026-07-28T00:00:00Z',
+        nextCursor: null,
+      );
+      final repository = _WaitingCatalogRepository();
+      final value = CatalogController(
+        repository: repository,
+        cache: CatalogCache(),
+        telemetry: SafeTelemetry(
+          enabled: true,
+          context: TelemetryContext.current(testConfig),
+          exporter: RecordingExporter(),
+        ),
+        workingCopy: _LocalCatalog(snapshot, {'hot': snapshot}),
+      );
+
+      await value.open(partition);
+      expect(value.state.phase, CatalogPhase.ready);
+      expect(value.state.products.single.name, 'Latte caliente');
+
+      await value.selectCategory('hot');
+      expect(value.state.phase, CatalogPhase.ready);
+      expect(value.state.selectedCategoryId, 'hot');
+      expect(value.state.products.single.id, 'hot-latte');
+      value.dispose();
+    },
+  );
 
   test('scanner lookup uses the exact barcode query', () async {
     final repository = FakeCatalogRepository();
@@ -299,10 +432,7 @@ void main() {
     await tester.pump();
 
     Rect ear(String label) => tester.getRect(
-      find.ancestor(
-        of: find.text(label),
-        matching: find.byType(PosTapRegion),
-      ),
+      find.ancestor(of: find.text(label), matching: find.byType(PosTapRegion)),
     );
     bool chosen(String label) =>
         tester
@@ -473,124 +603,126 @@ void main() {
     },
   );
 
-  testWidgets(
-    'product detail keeps variant choices horizontal inside its scroll surface',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(1400, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final repository = FakeCatalogRepository();
-      final value = controller(repository);
-      await value.open(partition);
-      final root = testRoot();
-      await tester.pumpWidget(
-        PosApp(
-          locale: const Locale('es'),
-          supportedLocales: AppLocalizations.supportedLocales,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
+  testWidgets('product detail keeps variant choices horizontal inside its scroll surface', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = FakeCatalogRepository(
+      productHasVariants: true,
+      productHasModifiers: true,
+    );
+    final value = controller(repository);
+    await value.open(partition);
+    final root = testRoot();
+    await tester.pumpWidget(
+      PosApp(
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
 
-            GlobalWidgetsLocalizations.delegate,
-          ],
-          home: CatalogSurface(
-            entry: root.entry,
-            catalog: value,
-            cart: root.cart,
-            cash: root.cash,
-            checkout: root.checkout,
-            sales: root.sales,
-            exceptions: root.exceptions,
-            connectivity: root.connectivity,
-            telemetry: root.telemetry,
-          ),
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: CatalogSurface(
+          entry: root.entry,
+          catalog: value,
+          cart: root.cart,
+          cash: root.cash,
+          checkout: root.checkout,
+          sales: root.sales,
+          exceptions: root.exceptions,
+          connectivity: root.connectivity,
+          telemetry: root.telemetry,
         ),
-      );
-      await tester.pump();
-      await tester.tap(find.text('Café'));
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Café'));
+    await tester.pumpAndSettle();
 
-      expect(find.byType(RawScrollbar), findsWidgets);
-      final small = tester.getCenter(find.text('Chico'));
-      final medium = tester.getCenter(find.text('Mediano'));
-      final large = tester.getCenter(find.text('Grande'));
-      expect(small.dy, medium.dy);
-      expect(medium.dy, large.dy);
+    expect(find.byType(RawScrollbar), findsWidgets);
+    final small = tester.getCenter(find.text('Chico'));
+    final medium = tester.getCenter(find.text('Mediano'));
+    final large = tester.getCenter(find.text('Grande'));
+    expect(small.dy, medium.dy);
+    expect(medium.dy, large.dy);
 
-      // Every option tile in a row is the same size, whether or not it carries a
-      // surcharge. The tile with a price used to be one line taller than the one
-      // without, which is the disproportion the owner reported from the till, and
-      // "Leche entera" above is the surcharge that reproduces it.
-      final plain = tester.getSize(
-        find
-            .ancestor(
-              of: find.text('Leche de avena'),
-              matching: find.byType(SizedBox),
-            )
-            .first,
-      );
-      final withPrice = tester.getSize(
-        find
-            .ancestor(
-              of: find.text('Leche entera'),
-              matching: find.byType(SizedBox),
-            )
-            .first,
-      );
-      expect(plain, withPrice);
-      expect(plain.width, 200);
+    // Every option tile in a row is the same size, whether or not it carries a
+    // surcharge. The tile with a price used to be one line taller than the one
+    // without, which is the disproportion the owner reported from the till, and
+    // "Leche entera" above is the surcharge that reproduces it.
+    final plain = tester.getSize(
+      find
+          .ancestor(
+            of: find.text('Leche de avena'),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    final withPrice = tester.getSize(
+      find
+          .ancestor(
+            of: find.text('Leche entera'),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    expect(plain, withPrice);
+    expect(plain.width, 200);
 
-      // AND THE NAME SITS IN THE MIDDLE OF ITS TILE.
-      //
-      // The tile is stretched to the tallest in its row, so a tile with no price
-      // used to draw an EMPTY price line under its name and the name ended up above
-      // the centre — which is what the owner saw and reported as "centra el texto
-      // verticalmente" (2026-10-12). The row centres what it is given; the bug was
-      // being handed a blank line.
-      final tileRect = tester.getRect(
-        find
-            .ancestor(
-              of: find.text('Leche de avena'),
-              matching: find.byType(SizedBox),
-            )
-            .first,
-      );
-      final labelRect = tester.getRect(find.text('Leche de avena'));
-      expect((labelRect.center.dy - tileRect.center.dy).abs(), lessThan(1.5));
+    // AND THE NAME SITS IN THE MIDDLE OF ITS TILE.
+    //
+    // The tile is stretched to the tallest in its row, so a tile with no price
+    // used to draw an EMPTY price line under its name and the name ended up above
+    // the centre — which is what the owner saw and reported as "centra el texto
+    // verticalmente" (2026-10-12). The row centres what it is given; the bug was
+    // being handed a blank line.
+    final tileRect = tester.getRect(
+      find
+          .ancestor(
+            of: find.text('Leche de avena'),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    final labelRect = tester.getRect(find.text('Leche de avena'));
+    expect((labelRect.center.dy - tileRect.center.dy).abs(), lessThan(1.5));
 
-      // And it stays level when one of them is SELECTED: a selected tile draws a
-      // 2 px border where an unselected one draws 1 px, which used to be absorbed
-      // by a pinned tile height and painted a "BOTTOM OVERFLOWED" stripe in a
-      // debug build. Now the row grows by those 2 px and both tiles grow with it.
-      await tester.tap(find.text('Leche entera'));
-      await tester.pumpAndSettle();
-      final selectedPlain = tester.getSize(
-        find
-            .ancestor(
-              of: find.text('Leche de avena'),
-              matching: find.byType(SizedBox),
-            )
-            .first,
-      );
-      final selectedWithPrice = tester.getSize(
-        find
-            .ancestor(
-              of: find.text('Leche entera'),
-              matching: find.byType(SizedBox),
-            )
-            .first,
-      );
-      expect(selectedPlain, selectedWithPrice);
-      expect(selectedWithPrice.height, plain.height + 2);
+    // And it stays level when one of them is SELECTED: a selected tile draws a
+    // 2 px border where an unselected one draws 1 px, which used to be absorbed
+    // by a pinned tile height and painted a "BOTTOM OVERFLOWED" stripe in a
+    // debug build. Now the row grows by those 2 px and both tiles grow with it.
+    await tester.tap(find.text('Leche entera'));
+    await tester.pumpAndSettle();
+    final selectedPlain = tester.getSize(
+      find
+          .ancestor(
+            of: find.text('Leche de avena'),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    final selectedWithPrice = tester.getSize(
+      find
+          .ancestor(
+            of: find.text('Leche entera'),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    expect(selectedPlain, selectedWithPrice);
+    expect(selectedWithPrice.height, plain.height + 2);
 
-      await tester.tap(find.text('Catálogo'));
-      await tester.pumpAndSettle();
-      expect(find.text('Variantes'), findsNothing);
-      expect(find.text('Café'), findsOneWidget);
+    await tester.tap(find.text('Catálogo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Variantes'), findsNothing);
+    expect(find.text('Café'), findsOneWidget);
 
-      await tester.pumpWidget(const SizedBox());
-      value.dispose();
-      root.dispose();
-    },
-  );
+    await tester.pumpWidget(const SizedBox());
+    value.dispose();
+    root.dispose();
+  });
   for (final size in [const Size(1280, 720), const Size(375, 812)]) {
     testWidgets('product action stays visible while options scroll at $size', (
       tester,
@@ -599,7 +731,12 @@ void main() {
       tester.view.devicePixelRatio = 1;
       tester.view.viewInsets = const FakeViewPadding(bottom: 200);
       addTearDown(tester.view.reset);
-      final value = controller(FakeCatalogRepository());
+      final value = controller(
+        FakeCatalogRepository(
+          productHasVariants: true,
+          productHasModifiers: true,
+        ),
+      );
       await value.open(partition);
       final root = testRoot();
       await tester.pumpWidget(
@@ -652,7 +789,12 @@ void main() {
         tester.view.physicalSize = const Size(1400, 900);
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
-        final value = controller(FakeCatalogRepository());
+        final value = controller(
+          FakeCatalogRepository(
+            productHasVariants: true,
+            productHasModifiers: true,
+          ),
+        );
         await value.open(partition);
         final root = testRoot();
         await tester.pumpWidget(

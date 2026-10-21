@@ -5,6 +5,7 @@ import {
   PublishedFloorPlan,
   InitializePosTablesRequest,
   AddPosTableRequest,
+  PublishFloorPlanRequest,
   floorElementBounds,
 } from '../dist/index.js';
 
@@ -88,6 +89,28 @@ test('published response rejects draft fields', () => {
   const state = { locationId: element.id, publishedVersion: 0, published: null, publishedAt: null };
   assert.equal(PublishedFloorPlan.safeParse(state).success, true);
   assert.equal(PublishedFloorPlan.safeParse({ ...state, draft: document() }).success, false);
+});
+
+test('publication does not close an occupied account unless the operator chooses it', () => {
+  const request = {
+    locationId: '00000000-0000-4000-8000-000000000001',
+    expectedVersion: 4,
+    idempotencyKey: '00000000-0000-4000-8000-000000000002',
+  };
+  const implicit = PublishFloorPlanRequest.parse(request);
+  assert.equal(implicit.closeBlockingAccounts, false);
+  assert.equal(
+    PublishFloorPlanRequest.parse({ ...request, closeBlockingAccounts: true })
+      .closeBlockingAccounts,
+    true,
+  );
+  assert.equal(
+    PublishFloorPlanRequest.safeParse({
+      ...request,
+      closeBlockingAccounts: 'yes',
+    }).success,
+    false,
+  );
 });
 
 const area = (id, name, elements = []) => ({

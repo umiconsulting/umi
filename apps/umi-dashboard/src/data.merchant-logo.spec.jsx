@@ -71,10 +71,12 @@ describe('the café logo client', () => {
     expect(fetch.mock.calls[0][1].method).toBe('DELETE');
   });
 
-  it('refuses a file that is not a PNG or JPG before anything leaves the browser', async () => {
+  it('refuses a file that is not a PNG, JPG or SVG before anything leaves the browser', async () => {
     installDom();
 
-    await expect(saveMerchantLogo(file('image/gif', 'logo.gif'))).rejects.toThrow(/PNG o JPG/);
+    await expect(saveMerchantLogo(file('image/gif', 'logo.gif'))).rejects.toThrow(
+      /PNG, JPG o SVG/,
+    );
     expect(fetch).not.toHaveBeenCalled();
   });
 

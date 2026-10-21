@@ -57,6 +57,10 @@ final class _EnrollmentState extends State<_Enrollment> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return _EntryFrame(
+      // The mark stays off the enrollment screens (owner, 2026-10-16). A terminal
+      // that has not been registered yet is not the place to advertise whose
+      // software it runs; the PIN screen keeps the same rule.
+      showSignature: false,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -131,6 +135,8 @@ final class _EnrollmentPending extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return _EntryFrame(
+      // Same rule as the code screen: no mark while the device waits to be let in.
+      showSignature: false,
       child: Semantics(
         liveRegion: true,
         label: l.enrollmentPendingTitle,

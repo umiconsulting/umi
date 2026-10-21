@@ -1,7 +1,7 @@
 {
   "apiMajorVersion": 1,
-  "contentHash": "1562d7725726b5b3aa2238089bd83af59232349d5ad46de5d8f1432534cf92b6",
-  "contractVersion": "2.43.3",
+  "contentHash": "8c493bc196297e63fc202e78936de9a853de6d9a69f2fb0966b71d5cc058462a",
+  "contractVersion": "2.44.0",
   "definitions": {
     "AcknowledgeDeviceCredentialRequest": {
       "additionalProperties": false,
@@ -14244,6 +14244,13 @@
         "tip": {
           "additionalProperties": false,
           "properties": {
+            "attribution": {
+              "enum": [
+                "account_owner",
+                "payment_processor"
+              ],
+              "type": "string"
+            },
             "customFixedEnabled": {
               "type": "boolean"
             },
@@ -14306,6 +14313,7 @@
             "customFixedEnabled",
             "maximumTip",
             "requiredPermission",
+            "attribution",
             "version"
           ],
           "type": "object"
@@ -17175,6 +17183,13 @@
                         "tip": {
                           "additionalProperties": false,
                           "properties": {
+                            "attribution": {
+                              "enum": [
+                                "account_owner",
+                                "payment_processor"
+                              ],
+                              "type": "string"
+                            },
                             "customFixedEnabled": {
                               "type": "boolean"
                             },
@@ -17237,6 +17252,7 @@
                             "customFixedEnabled",
                             "maximumTip",
                             "requiredPermission",
+                            "attribution",
                             "version"
                           ],
                           "type": "object"
@@ -20367,6 +20383,13 @@
                 "tip": {
                   "additionalProperties": false,
                   "properties": {
+                    "attribution": {
+                      "enum": [
+                        "account_owner",
+                        "payment_processor"
+                      ],
+                      "type": "string"
+                    },
                     "customFixedEnabled": {
                       "type": "boolean"
                     },
@@ -20429,6 +20452,7 @@
                     "customFixedEnabled",
                     "maximumTip",
                     "requiredPermission",
+                    "attribution",
                     "version"
                   ],
                   "type": "object"
@@ -69350,6 +69374,13 @@
             "tip": {
               "additionalProperties": false,
               "properties": {
+                "attribution": {
+                  "enum": [
+                    "account_owner",
+                    "payment_processor"
+                  ],
+                  "type": "string"
+                },
                 "customFixedEnabled": {
                   "type": "boolean"
                 },
@@ -69412,6 +69443,7 @@
                 "customFixedEnabled",
                 "maximumTip",
                 "requiredPermission",
+                "attribution",
                 "version"
               ],
               "type": "object"
@@ -102475,6 +102507,13 @@
     "TipPolicy": {
       "additionalProperties": false,
       "properties": {
+        "attribution": {
+          "enum": [
+            "account_owner",
+            "payment_processor"
+          ],
+          "type": "string"
+        },
         "customFixedEnabled": {
           "type": "boolean"
         },
@@ -102537,6 +102576,7 @@
         "customFixedEnabled",
         "maximumTip",
         "requiredPermission",
+        "attribution",
         "version"
       ],
       "type": "object"
@@ -105910,7 +105950,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "PosFloorPlanQuery",
       "response": "PublishedFloorPlan"
@@ -106369,7 +106409,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "PosTableStateQuery",
       "response": "TableStateMap"
@@ -108625,7 +108665,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "ClearTableRequest",
       "response": "TableStateChangeResult"
@@ -108645,7 +108685,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "MergeTablesRequest",
       "response": "TableStateChangeResult"
@@ -108667,7 +108707,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "MovePartyRequest",
       "response": "TableStateChangeResult"
@@ -108686,7 +108726,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "OpenTableRequest",
       "response": "TableStateChangeResult"
@@ -108705,7 +108745,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "MarkTableOrderedRequest",
       "response": "TableStateChangeResult"
@@ -108725,7 +108765,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "SeatTableRequest",
       "response": "TableStateChangeResult"
@@ -108744,7 +108784,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "MarkTableServedRequest",
       "response": "TableStateChangeResult"
@@ -108765,7 +108805,7 @@
       "locationContext": true,
       "merchantContext": true,
       "offline": false,
-      "permission": "sale.lifecycle",
+      "permission": "cart.write",
       "pin": false,
       "request": "SplitPartyRequest",
       "response": "TableStateChangeResult"

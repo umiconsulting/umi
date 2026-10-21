@@ -118,11 +118,17 @@ describe('table accounts under the API role', () => {
 
   it('persists one visit, transfers only on claim, and rejects stale or busy actors', async () => {
     const first = await scoped<Cart>((client) =>
-      repo.openTable(client, merchant, location, actors[0].operator, table),
+      repo.openTable(client, merchant, location, actors[0].operator, table, undefined, 4),
     );
     expect(first.tableId).toBe(table);
     expect(first.tableVisitId).toBeTruthy();
     expect(first.tableName).toBe('Mesa 1');
+    const state = await pg.query<{ partySize: number }>(
+      `SELECT party_size AS "partySize" FROM merchant.table_state
+       WHERE merchant_id=$1 AND location_id=$2 AND table_id=$3`,
+      [merchant, location, table],
+    );
+    expect(state.rows[0]?.partySize).toBe(4);
     expect(await repo.openAccountIds(merchant, location)).toEqual([first.id]);
     const read = await repo.readAccount(merchant, location, first.id);
     expect(read?.operatorSessionId).toBe(actors[0].operator);

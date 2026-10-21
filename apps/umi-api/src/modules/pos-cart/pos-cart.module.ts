@@ -10,6 +10,6 @@ import { PosCartService } from './pos-cart.service';
   imports: [AuthModule, IntegrityModule],
   controllers: [PosCartController, PosOrderController],
   providers: [PosCartRepository, PosCartService],
-  exports: [PosCartRepository],
+  exports: [PosCartRepository, PosCartService],
 })
 export class PosCartModule {}

@@ -1,8 +1,13 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:umi_pos/core/config/api_assets.dart';
+
+import '../../core/storage/local_working_copy.dart';
+import 'print_trace.dart';
 
 /// One picture the head can draw: 1 bit per dot, each row padded to whole bytes,
 /// most significant bit leftmost. That is the layout `GS v 0` wants, so the
@@ -131,6 +136,160 @@ abstract interface class ThermalLogoSource {
     int widthDots = kThermalLogoWidthDots,
     int maxHeightDots = kThermalLogoMaxHeightDots,
   });
+}
+
+/// A mark that survives an app restart.
+///
+/// The URL is content-addressed, so the same URL is always the same picture. The
+/// first print after a cold start used to fetch, decode and rasterize the 768 px
+/// source again; measured on the iMin, that was 1.31 s against 388 ms for the next
+/// copy in the same process. Persisting the one-bit raster moves that work off the
+/// subsequent cold print path.
+final class CachedThermalLogoSource implements ThermalLogoSource {
+  CachedThermalLogoSource(
+    this._source,
+    this._local, {
+    Duration negativeCacheDuration = const Duration(seconds: 30),
+    DateTime Function()? now,
+  }) : _negativeCacheDuration = negativeCacheDuration,
+       _now = now ?? DateTime.now;
+
+  static const namespace = 'thermal_logo';
+
+  final ThermalLogoSource _source;
+  final LocalWorkingCopy _local;
+  final Duration _negativeCacheDuration;
+  final DateTime Function() _now;
+  final Map<String, ThermalRaster> _memory = {};
+  final Map<String, Future<ThermalRaster?>> _loading = {};
+  final Map<String, DateTime> _negativeUntil = {};
+
+  String _scope(int widthDots, int maxHeightDots) =>
+      '$widthDots:$maxHeightDots';
+
+  String _id(String url) => sha256.convert(utf8.encode(url)).toString();
+
+  @override
+  Future<ThermalRaster?> raster(
+    String url, {
+    int widthDots = kThermalLogoWidthDots,
+    int maxHeightDots = kThermalLogoMaxHeightDots,
+  }) async {
+    final key = '$url@$widthDots:$maxHeightDots';
+    final remembered = _memory[key];
+    if (remembered != null) {
+      printTrace('logo.memory_hit', {'id': _id(url).substring(0, 8)});
+      return remembered;
+    }
+    final loading = _loading[key];
+    if (loading != null) {
+      printTrace('logo.join_inflight', {'id': _id(url).substring(0, 8)});
+      return loading;
+    }
+    final future = _load(key, url, widthDots, maxHeightDots);
+    _loading[key] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_loading[key], future)) _loading.remove(key)?.ignore();
+    }
+  }
+
+  Future<ThermalRaster?> _load(
+    String key,
+    String url,
+    int widthDots,
+    int maxHeightDots,
+  ) async {
+    final scope = _scope(widthDots, maxHeightDots);
+    final id = _id(url);
+    try {
+      final document = await _local.readDocument(namespace, scope, id);
+      final raster = _fromDocument(document, url, widthDots, maxHeightDots);
+      if (raster != null) {
+        printTrace('logo.disk_hit', {'id': id.substring(0, 8)});
+        _memory[key] = raster;
+        return raster;
+      }
+    } catch (_) {
+      // A damaged cache entry is a cache miss, never a failed receipt.
+    }
+    printTrace('logo.cache_miss', {'id': id.substring(0, 8)});
+    final negativeUntil = _negativeUntil[key];
+    final now = _now();
+    if (negativeUntil != null && now.isBefore(negativeUntil)) {
+      return null;
+    }
+    _negativeUntil.remove(key);
+    final ThermalRaster? raster;
+    try {
+      final fetchedAt = Stopwatch()..start();
+      raster = await _source.raster(
+        url,
+        widthDots: widthDots,
+        maxHeightDots: maxHeightDots,
+      );
+      printTrace('logo.fetched', {
+        'id': id.substring(0, 8),
+        'ms': fetchedAt.elapsedMilliseconds,
+      });
+    } catch (_) {
+      _negativeUntil[key] = now.add(_negativeCacheDuration);
+      return null;
+    }
+    if (raster == null) {
+      _negativeUntil[key] = now.add(_negativeCacheDuration);
+      return null;
+    }
+    _memory[key] = raster;
+    try {
+      final persistedAt = Stopwatch()..start();
+      await _local.writeDocument(
+        namespace: namespace,
+        scopeKey: scope,
+        id: id,
+        payload: {
+          'url': url,
+          'widthDots': raster.widthDots,
+          'heightDots': raster.heightDots,
+          'rows': base64Encode(raster.rows),
+        },
+      );
+      printTrace('logo.persisted', {
+        'id': id.substring(0, 8),
+        'ms': persistedAt.elapsedMilliseconds,
+      });
+    } catch (_) {
+      // The in-memory raster still makes this receipt fast; persistence is an
+      // optimisation for the next process, not a condition of printing.
+    }
+    return raster;
+  }
+
+  ThermalRaster? _fromDocument(
+    Map<String, Object?>? document,
+    String url,
+    int widthDots,
+    int maxHeightDots,
+  ) {
+    if (document == null || document['url'] != url) return null;
+    final savedWidth = (document['widthDots'] as num?)?.toInt();
+    final height = (document['heightDots'] as num?)?.toInt();
+    final encoded = document['rows'];
+    if (savedWidth == null ||
+        savedWidth < 1 ||
+        savedWidth > widthDots ||
+        height == null ||
+        height < 1 ||
+        height > maxHeightDots ||
+        encoded is! String) {
+      return null;
+    }
+    final rows = base64Decode(encoded);
+    final expectedBytes = ((savedWidth + 7) ~/ 8) * height;
+    if (rows.length != expectedBytes) return null;
+    return ThermalRaster(widthDots: savedWidth, heightDots: height, rows: rows);
+  }
 }
 
 /// The real one: fetch the café's mark and decode it.

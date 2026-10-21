@@ -79,7 +79,16 @@ const QUERIES: Record<DashboardOperationDomain, ReturnType<typeof row>> = {
   ),
   catalog: row(
     `SELECT p.id::text,coalesce(p.sku,p.barcode,p.id::text) AS "publicReference",p.name AS title,
-    coalesce(c.name,'Sin categoría') AS detail,CASE WHEN p.active THEN 'active' ELSE 'archived' END AS status,
+    concat_ws(' · ',coalesce(c.name,'Sin categoría'),
+      CASE WHEN (SELECT count(*) FROM merchant.product_variant v
+                  WHERE v.product_id=p.id AND v.active)>0
+           THEN (SELECT count(*)||' variantes' FROM merchant.product_variant v
+                  WHERE v.product_id=p.id AND v.active) END,
+      CASE WHEN (SELECT count(*) FROM merchant.product_option_group g
+                  WHERE g.product_id=p.id AND g.active)>0
+           THEN (SELECT count(*)||' grupos de opciones' FROM merchant.product_option_group g
+                  WHERE g.product_id=p.id AND g.active) END
+    ) AS detail,CASE WHEN p.active THEN 'active' ELSE 'archived' END AS status,
     NULL::text AS "locationId",p.updated_at::text AS "occurredAt",p.price AS "amountMinorUnits",m.currency,
     coalesce(v.version,1)::bigint AS version,NULL::text AS "correlationId" FROM merchant.product p
     JOIN merchant.merchant m ON m.id=p.merchant_id LEFT JOIN merchant.product_category c ON c.id=p.category_id
@@ -877,7 +886,8 @@ export class DashboardOperationsRepository {
             'accountNumber',bank_transfer_account_number
           ) END AS "bankTransferDetails",
           mixed_tender_enabled AS "mixedTenderEnabled",
-          allow_dine_in_without_table AS "allowDineInWithoutTable", version
+          allow_dine_in_without_table AS "allowDineInWithoutTable",
+          tip_attribution AS "tipAttribution", version
         FROM merchant.pos_checkout_policy WHERE merchant_id=$1::uuid AND location_id=$2::uuid`,
           [merchantId, locationId],
         );
@@ -902,6 +912,7 @@ export class DashboardOperationsRepository {
       } | null;
       mixedTenderEnabled: boolean;
       allowDineInWithoutTable: boolean;
+      tipAttribution: 'account_owner' | 'payment_processor';
     },
   ) {
     return this.pg.runWithMerchant(
@@ -914,6 +925,7 @@ export class DashboardOperationsRepository {
           bank_transfer_enabled=$6, bank_transfer_holder_name=$7,
           bank_transfer_bank_name=$8, bank_transfer_clabe=$9,
           bank_transfer_account_number=$10,
+          tip_attribution=$11,
           maximum_tender_lines=CASE WHEN $4 THEN greatest(maximum_tender_lines,2) ELSE maximum_tender_lines END,
           version=gen_random_uuid()::text, updated_at=now()
         WHERE merchant_id=$1::uuid AND location_id=$2::uuid
@@ -926,7 +938,8 @@ export class DashboardOperationsRepository {
             'accountNumber',bank_transfer_account_number
           ) END AS "bankTransferDetails",
           mixed_tender_enabled AS "mixedTenderEnabled",
-          allow_dine_in_without_table AS "allowDineInWithoutTable",version`,
+          allow_dine_in_without_table AS "allowDineInWithoutTable",
+          tip_attribution AS "tipAttribution",version`,
           [
             merchantId,
             locationId,
@@ -938,6 +951,7 @@ export class DashboardOperationsRepository {
             policy.bankTransferDetails?.bankName ?? null,
             policy.bankTransferDetails?.clabe ?? null,
             policy.bankTransferDetails?.accountNumber ?? null,
+            policy.tipAttribution,
           ],
         );
         return rows[0] ?? null;

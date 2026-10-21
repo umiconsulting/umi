@@ -14,8 +14,10 @@ Future<void> showPartialCheckout(
   required CheckoutController checkout,
   required CartController cart,
   required String operatorSessionId,
+  String? operatorName,
   required bool canConfirmManualTerminal,
   required String? cashShiftId,
+  Future<void> Function()? prepare,
   required Future<bool?> Function(int amountMinor, bool selected)
   onShowBankTransferDetails,
 }) => Navigator.of(context).push(
@@ -25,8 +27,10 @@ Future<void> showPartialCheckout(
       checkout: checkout,
       cart: cart,
       operatorSessionId: operatorSessionId,
+      operatorName: operatorName,
       canConfirmManualTerminal: canConfirmManualTerminal,
       cashShiftId: cashShiftId,
+      prepare: prepare,
       onShowBankTransferDetails: onShowBankTransferDetails,
     ),
   ),
@@ -39,8 +43,10 @@ final class PartialCheckoutSurface extends StatefulWidget {
     required this.checkout,
     required this.cart,
     required this.operatorSessionId,
+    this.operatorName,
     required this.canConfirmManualTerminal,
     required this.cashShiftId,
+    this.prepare,
     required this.onShowBankTransferDetails,
     super.key,
   });
@@ -48,8 +54,10 @@ final class PartialCheckoutSurface extends StatefulWidget {
   final CheckoutController checkout;
   final CartController cart;
   final String operatorSessionId;
+  final String? operatorName;
   final bool canConfirmManualTerminal;
   final String? cashShiftId;
+  final Future<void> Function()? prepare;
   final Future<bool?> Function(int amountMinor, bool selected)
   onShowBankTransferDetails;
 
@@ -64,10 +72,17 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   Map<String, Object?>? ledger;
   Map<String, Object?>? pendingCommand;
   bool busy = false;
+  bool _ledgerLoading = false;
+  bool _ledgerVerified = false;
   bool uncertain = false;
   bool finalizationUnknown = false;
   bool retryReady = false;
   bool cashReceivedEdited = false;
+  String? _seededPrincipal;
+  String? _seededTip;
+  int? _selectedTipBasisPoints;
+  bool _settingTip = false;
+  bool _prepared = false;
   String? error;
   String method = 'cash';
 
@@ -97,6 +112,69 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   int? get tipMinor => parseMinorUnits(tip.text);
   int? get receivedMinor => parseMinorUnits(cashReceived.text);
   int get charge => (principalMinor ?? 0) + (tipMinor ?? 0);
+  int get _netBeforeTaxTotal {
+    final subtotal = amount(cart.totals['subtotal']);
+    final tax = amount(cart.totals['tax']);
+    final discounts = amount(
+      cart.totals['discounts'] is Map
+          ? (cart.totals['discounts']! as Map)['total']
+          : null,
+    );
+    return max(0, subtotal - tax - discounts);
+  }
+
+  int get tipBaseMinor {
+    final portion = principalMinor ?? 0;
+    final grandTotal = amount(cart.totals['grandTotal']);
+    if (portion <= 0 || grandTotal <= 0) return 0;
+    return ((portion * _netBeforeTaxTotal) / grandTotal).round();
+  }
+
+  String get _tipAttribution =>
+      widget.checkout.policy?.tip['attribution'] as String? ?? 'account_owner';
+
+  String get tipOwnerLabel {
+    if (_tipAttribution == 'payment_processor') {
+      final name = widget.operatorName?.trim();
+      return name == null || name.isEmpty
+          ? label(
+              'Propina para quien procesa el cobro',
+              'Tip for the payment processor',
+            )
+          : label(
+              'Propina para $name, quien procesa el cobro',
+              'Tip for $name, the payment processor',
+            );
+    }
+    final name = cart.operatorName?.trim();
+    return name == null || name.isEmpty
+        ? label(
+            'Propina para el dueño de la cuenta',
+            'Tip for the account owner',
+          )
+        : label(
+            'Propina para $name, dueño de la cuenta',
+            'Tip for $name, the account owner',
+          );
+  }
+
+  Map<String, Object?> _localLedger() {
+    final total = Map<String, Object?>.from(cart.totals['grandTotal']! as Map);
+    return <String, Object?>{
+      'cartId': cart.id,
+      'cartVersion': cart.version,
+      'amountDue': total,
+      'appliedAmount': {'minorUnits': 0, 'currency': currency},
+      'remainingBalance': total,
+      'tipAmount': {'minorUnits': 0, 'currency': currency},
+      'tenderDrafts': <Object?>[],
+      'confirmationReferences': <String, String>{},
+      'blockedByUnknown': false,
+      'unresolvedTender': null,
+      'canFinalize': false,
+    };
+  }
+
   bool get manualAllowed =>
       widget.checkout.policy?.manualTerminalEnabled == true &&
       widget.canConfirmManualTerminal;
@@ -139,6 +217,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   bool get canCollect {
     if (busy ||
         ledger == null ||
+        !_ledgerVerified ||
         uncertain ||
         hasUnknown ||
         canFinalize ||
@@ -171,14 +250,18 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     if (widget.cashShiftId == null) {
       method = 'none';
     }
-    principal.addListener(_amountChanged);
-    tip.addListener(_amountChanged);
+    principal.addListener(_principalChanged);
+    tip.addListener(_tipChanged);
     cashReceived.addListener(_inputChanged);
+    widget.checkout.addListener(_checkoutChanged);
+    ledger = _localLedger();
+    _seedRemaining(ledger!);
     _refresh();
   }
 
   @override
   void dispose() {
+    widget.checkout.removeListener(_checkoutChanged);
     principal.dispose();
     tip.dispose();
     cashReceived.dispose();
@@ -186,6 +269,10 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   void _inputChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _checkoutChanged() {
     if (mounted) setState(() {});
   }
 
@@ -208,21 +295,87 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     _inputChanged();
   }
 
+  void _principalChanged() {
+    final basisPoints = _selectedTipBasisPoints;
+    if (basisPoints != null) {
+      _setTipForBasisPoints(basisPoints);
+      return;
+    }
+    _amountChanged();
+  }
+
+  void _tipChanged() {
+    if (!_settingTip && _selectedTipBasisPoints != null) {
+      _selectedTipBasisPoints = null;
+    }
+    _amountChanged();
+  }
+
+  int tipForBasisPoints(int basisPoints) =>
+      ((tipBaseMinor * basisPoints) / 10000).round();
+
+  void _setTipForBasisPoints(int basisPoints) {
+    _settingTip = true;
+    tip.text = (tipForBasisPoints(basisPoints) / 100).toStringAsFixed(2);
+    _settingTip = false;
+    if (mounted) {
+      setState(() => _selectedTipBasisPoints = basisPoints);
+    }
+    _amountChanged();
+  }
+
+  String _percentageLabel(int basisPoints) {
+    final whole = basisPoints ~/ 100;
+    final fraction = basisPoints % 100;
+    if (fraction == 0) return '$whole%';
+    return '$whole.${fraction.toString().padLeft(2, '0')}%';
+  }
+
   void _seedRemaining(Map<String, Object?> next) {
     final left = amount(next['remainingBalance']);
     cashReceivedEdited = false;
     principal.text = (left / 100).toStringAsFixed(2);
+    _settingTip = true;
     tip.text = '0.00';
+    _settingTip = false;
+    _selectedTipBasisPoints = 0;
+    _seededPrincipal = principal.text;
+    _seededTip = tip.text;
     cashReceived.text = (left / 100).toStringAsFixed(2);
   }
+
+  bool get _amountsAreUntouched =>
+      principal.text == _seededPrincipal && tip.text == _seededTip;
 
   Future<void> _refresh() async {
     if (busy) return;
     setState(() {
       busy = true;
+      _ledgerLoading = true;
+      _ledgerVerified = false;
       error = null;
     });
     try {
+      final prepare = _prepared
+          ? Future<void>.value()
+          : widget.prepare?.call() ?? Future<void>.value();
+      final ledgerRead = widget.checkout.partialPayments(
+        merchantId: cart.merchantId,
+        cartId: cart.id,
+        locationId: cart.locationId,
+        operatorSessionId: operatorSessionId,
+      );
+      // Attach an error listener to both reads immediately. Letting the ledger
+      // future reject while the policy request is still pending produced an
+      // unhandled 404 even though the method awaited that future a few hundred
+      // milliseconds later.
+      final values = await Future.wait<Object?>([prepare, ledgerRead]);
+      _prepared = true;
+      if (!mounted) return;
+      if (widget.checkout.state.phase == CheckoutPhase.completed) {
+        Navigator.of(context).pop();
+        return;
+      }
       if (finalizationUnknown) {
         await widget.checkout.recover(
           merchantId: cart.merchantId,
@@ -240,12 +393,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           finalizationUnknown = false;
         }
       }
-      final next = await widget.checkout.partialPayments(
-        merchantId: cart.merchantId,
-        cartId: cart.id,
-        locationId: cart.locationId,
-        operatorSessionId: operatorSessionId,
-      );
+      final next = Map<String, Object?>.from(values[1]! as Map);
       if (!mounted) return;
       final drafts = (next['tenderDrafts'] as List? ?? const [])
           .whereType<Map>();
@@ -258,6 +406,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           next['blockedByUnknown'] == false;
       setState(() {
         ledger = next;
+        _ledgerVerified = true;
         if (next['tenderDrafts'] is List &&
             (next['tenderDrafts'] as List).isNotEmpty &&
             widget.checkout.policy?.mixedTenderEnabled == false) {
@@ -273,27 +422,17 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
           // The GET is authoritative. The same command can be retried, with
           // the same key and tender id, without creating a second payment.
           retryReady = true;
-        } else if (principal.text.isEmpty) {
+        } else if (principal.text.isEmpty || _amountsAreUntouched) {
           _seedRemaining(next);
         }
       });
     } on AppException catch (failure) {
       if (!mounted) return;
       if (failure.code == 'RESOURCE_NOT_FOUND') {
-        final total = Map<String, Object?>.from(
-          cart.totals['grandTotal']! as Map,
-        );
-        final empty = <String, Object?>{
-          'cartId': cart.id,
-          'cartVersion': cart.version,
-          'amountDue': total,
-          'appliedAmount': {'minorUnits': 0, 'currency': currency},
-          'remainingBalance': total,
-          'tenderDrafts': <Object?>[],
-          'canFinalize': false,
-        };
+        final empty = _localLedger();
         setState(() {
           ledger = empty;
+          _ledgerVerified = true;
           if (!uncertain) _seedRemaining(empty);
           if (uncertain && pendingCommand != null) retryReady = true;
         });
@@ -310,7 +449,12 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         );
       }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() {
+          busy = false;
+          _ledgerLoading = false;
+        });
+      }
     }
   }
 
@@ -696,6 +840,21 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                                 value: money(paid),
                               ),
                               _BalanceTile(
+                                label: label(
+                                  'Consumo de esta persona',
+                                  'This portion',
+                                ),
+                                value: money(principalMinor ?? 0),
+                              ),
+                              _BalanceTile(
+                                label: label('Propina de este pago', 'Tip'),
+                                value: money(tipMinor ?? 0),
+                              ),
+                              _BalanceTile(
+                                label: label('Cobrar ahora', 'Charge now'),
+                                value: money(charge),
+                              ),
+                              _BalanceTile(
                                 label: label('Falta', 'Remaining'),
                                 value: money(remaining),
                                 emphasized: true,
@@ -835,10 +994,70 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                               ),
                             ),
                             const SizedBox(height: UmiSpacing.md),
-                            if (widget.checkout.policy?.tip['enabled'] == true)
+                            if (widget.checkout.policy?.tip['enabled'] ==
+                                true) ...[
+                              Text(
+                                tipOwnerLabel,
+                                key: const ValueKey('partial-tip-owner'),
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: UmiSpacing.xs),
+                              Text(
+                                '${label('Base sugerida', 'Suggested base')} · '
+                                '${money(tipBaseMinor)} '
+                                '${label('antes de impuestos', 'before tax')}',
+                                key: const ValueKey('partial-tip-base'),
+                              ),
+                              const SizedBox(height: UmiSpacing.sm),
+                              Wrap(
+                                spacing: UmiSpacing.sm,
+                                runSpacing: UmiSpacing.sm,
+                                children: [
+                                  PosButton.tonal(
+                                    key: const ValueKey('partial-tip-zero'),
+                                    selected: _selectedTipBasisPoints == 0,
+                                    onPressed: busy
+                                        ? null
+                                        : () => _setTipForBasisPoints(0),
+                                    child: Text(label('Sin propina', 'No tip')),
+                                  ),
+                                  for (final raw
+                                      in widget
+                                                  .checkout
+                                                  .policy
+                                                  ?.tip['presetBasisPoints']
+                                              as List? ??
+                                          const [])
+                                    if (raw is num && raw.toInt() > 0)
+                                      PosButton.tonal(
+                                        key: ValueKey(
+                                          'partial-tip-bp-${raw.toInt()}',
+                                        ),
+                                        selected:
+                                            _selectedTipBasisPoints ==
+                                            raw.toInt(),
+                                        onPressed: busy
+                                            ? null
+                                            : () => _setTipForBasisPoints(
+                                                raw.toInt(),
+                                              ),
+                                        child: Text(
+                                          '${_percentageLabel(raw.toInt())} · '
+                                          '${money(tipForBasisPoints(raw.toInt()))}',
+                                        ),
+                                      ),
+                                ],
+                              ),
+                              const SizedBox(height: UmiSpacing.sm),
                               PosField(
                                 key: const ValueKey('partial-tip'),
                                 controller: tip,
+                                readOnly:
+                                    widget
+                                        .checkout
+                                        .policy
+                                        ?.tip['customFixedEnabled'] !=
+                                    true,
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
@@ -849,8 +1068,20 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                                     'Propina de este pago',
                                     'Tip for this payment',
                                   ),
+                                  helperText:
+                                      widget
+                                              .checkout
+                                              .policy
+                                              ?.tip['customFixedEnabled'] ==
+                                          true
+                                      ? null
+                                      : label(
+                                          'Selecciona una opción de propina.',
+                                          'Choose a tip option.',
+                                        ),
                                 ),
                               ),
+                            ],
                             const SizedBox(height: UmiSpacing.md),
                             Text(
                               label('Método de pago', 'Payment method'),
@@ -899,7 +1130,9 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                                 key: const ValueKey(
                                   'partial-bank-view-details',
                                 ),
-                                onPressed: busy || pendingCommand != null
+                                onPressed:
+                                    (busy && !_ledgerLoading) ||
+                                        pendingCommand != null
                                     ? null
                                     : () => widget.onShowBankTransferDetails(
                                         charge,
@@ -997,7 +1230,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   Widget _methodButton(String value, String title) => PosButton.tonal(
     key: ValueKey('partial-method-$value'),
     selected: method == value,
-    onPressed: busy || pendingCommand != null
+    onPressed: (busy && !_ledgerLoading) || pendingCommand != null
         ? null
         : () async {
             if (value == 'bank_transfer') {

@@ -369,7 +369,12 @@ describe('AuthService.pinLogin — device possession proof', () => {
     });
     await expect(
       h.svc.pinLogin(pinLoginInput({ deviceProof: 'AAAA', deviceProofTimestamp: timestamp })),
-    ).rejects.toMatchObject({ response: { code: 'DEVICE_PROOF_INVALID' } });
+    ).rejects.toMatchObject({
+      response: {
+        code: 'DEVICE_PROOF_INVALID',
+        details: { reason: 'DEVICE_PROOF_INVALID' },
+      },
+    });
     expect(h.repo.findPosPinStaff).not.toHaveBeenCalled();
   });
 

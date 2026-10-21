@@ -443,6 +443,9 @@ export const API_ERROR_CODES = [
   // cannot transact at a location where it is not enrolled.
   'LOCATION_SCOPE_VIOLATION',
   'CONFLICT',
+  // A replay conflict exists, but the device cannot discard it through the
+  // automatic recovery path. Financial and kitchen commands stay protected.
+  'CONFLICT_NOT_RESOLVABLE',
   'IDEMPOTENCY_CONFLICT',
   // The idempotency key is older than the retention window (see
   // `IDEMPOTENCY_RETENTION_HOURS`). The recorded result is gone, so the command
@@ -478,6 +481,7 @@ export const API_ERROR_CODES = [
   'CART_ALREADY_ASSIGNED',
   'TABLE_HAS_OPEN_ACCOUNT',
   'KITCHEN_PREPARATION_STARTED',
+  'KITCHEN_ITEM_NOT_FOUND',
   // The ticket belongs to a business day the merchant has already closed. Cancelling a
   // sent line is a same-day act (Toast's rule, decided here for the same reason): the
   // day's takings and counts have been read, so a plate from an earlier day is resolved

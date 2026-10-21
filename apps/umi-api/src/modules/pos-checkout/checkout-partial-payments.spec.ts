@@ -18,6 +18,7 @@ const cart = {
   merchantId,
   locationId,
   operatorSessionId,
+  originalOperatorUserId: id(80),
   version: 3,
   businessDate: '2026-10-14',
   merchantName: 'ONCA',
@@ -60,6 +61,9 @@ function harness(mixedTenderEnabled = true) {
           status: params[13] as PartialPaymentRow['status'],
           cashShiftId: params[14] as string | null,
           confirmationReference: params[15] as string | null,
+          serviceOperatorUserId: params[17] as string,
+          processedByUserId: params[18] as string,
+          tipRecipientUserId: params[19] as string,
         });
       }
       if (sql.includes("SET status='operator_reported_failure'")) {
@@ -78,6 +82,7 @@ function harness(mixedTenderEnabled = true) {
   };
   const repo = {
     authorize: vi.fn().mockResolvedValue({
+      operatorId: user.id,
       operatorName: 'Caja',
       permissions: ['checkout.commit', 'checkout.terminal.confirm'],
     }),
@@ -100,6 +105,7 @@ function harness(mixedTenderEnabled = true) {
         customFixedEnabled: true,
         maximumTip: money(5_000),
         requiredPermission: null,
+        attribution: 'account_owner',
         version: '1',
       },
       discount: {
@@ -118,6 +124,11 @@ function harness(mixedTenderEnabled = true) {
     recordPartialCash: vi.fn().mockResolvedValue(id(12)),
   };
   const carts = {
+    readAccount: vi.fn().mockResolvedValue({
+      id: cartId,
+      version: 3,
+      totals: { grandTotal: money(10_000) },
+    }),
     price: vi.fn().mockResolvedValue({
       productId: id(10),
       productName: 'Pizza',
@@ -190,6 +201,25 @@ function request(
 }
 
 describe('cobro parcial durable', () => {
+  it('una cuenta sin abonos devuelve un saldo vacío, no un 404', async () => {
+    const { service } = harness();
+    const result = await service.partialPayments(user, merchantId, cartId, {
+      locationId,
+      operatorSessionId,
+    });
+    expect(result.data).toMatchObject({
+      cartId,
+      cartVersion: 3,
+      amountDue: money(10_000),
+      appliedAmount: money(0),
+      remainingBalance: money(10_000),
+      tipAmount: money(0),
+      tenderDrafts: [],
+      blockedByUnknown: false,
+      canFinalize: false,
+    });
+  });
+
   it('registra un tramo por terminal sin aprobación de gerente aunque el umbral sea cero', async () => {
     const { service, repo } = harness();
     repo.policy.mockResolvedValue({
@@ -243,6 +273,55 @@ describe('cobro parcial durable', () => {
       operatorSessionId,
     });
     expect(recovered.data.tenderDrafts).toEqual(third.data.tenderDrafts);
+  });
+
+  it.each([
+    ['account_owner', 'cash', id(80)],
+    ['account_owner', 'manual_terminal', id(80)],
+    ['account_owner', 'bank_transfer', id(80)],
+    ['payment_processor', 'cash', user.id],
+    ['payment_processor', 'manual_terminal', user.id],
+    ['payment_processor', 'bank_transfer', user.id],
+  ] as const)(
+    'guarda los dos empleados y aplica la atribución %s con %s',
+    async (attribution, tenderType, expectedRecipient) => {
+      const { service, repo, rows } = harness();
+      repo.policy.mockResolvedValue({
+        ...(await repo.policy()),
+        tip: {
+          ...(await repo.policy()).tip,
+          attribution,
+        },
+      });
+
+      await service.collectPartialPayment(
+        user,
+        merchantId,
+        cartId,
+        request(1, tenderType, 1000, 100),
+      );
+
+      expect(rows[0]).toMatchObject({
+        serviceOperatorUserId: id(80),
+        processedByUserId: user.id,
+        tipRecipientUserId: expectedRecipient,
+      });
+    },
+  );
+
+  it('rechaza propina negativa, propina igual al cobro y propina sobre el máximo', async () => {
+    const { service } = harness();
+    const invalidTips = [-1, 1000, 5001];
+    for (const [index, tip] of invalidTips.entries()) {
+      await expect(
+        service.collectPartialPayment(
+          user,
+          merchantId,
+          cartId,
+          request(10 + index, 'bank_transfer', 1000, tip),
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+    }
   });
 
   it('no repite el cobro si reenvía la misma identidad y bloquea importe alterado', async () => {

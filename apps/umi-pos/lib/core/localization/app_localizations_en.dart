@@ -765,6 +765,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newSaleAction => 'New sale';
 
   @override
+  String get cartRestoringAccount => 'Restoring your account…';
+
+  @override
+  String get cartRestoringAccountHint =>
+      'Wait a moment while we restore the open account.';
+
+  @override
   String get suspendSaleAction => 'Suspend sale';
 
   @override
@@ -902,6 +909,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editCartLineAction => 'Edit item';
 
   @override
+  String get repeatCartLineAction => 'Repeat item';
+
+  @override
   String get saveCartLineAction => 'Save changes';
 
   @override
@@ -1026,6 +1036,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cashVarianceLabel => 'Variance';
+
+  @override
+  String get offlinePriceDivergenceLabel => 'Offline price differences';
 
   @override
   String get cashOverageLabel => 'Overage';
@@ -1868,6 +1881,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tenderConflictBody =>
       'It holds a split between cash and card, and this location takes one method per sale. The payment record stays for review; to carry on, start a new sale.';
+
+  @override
+  String get splitCheckAction => 'Split check';
 
   @override
   String get splitTenderTitle => 'Split payment';

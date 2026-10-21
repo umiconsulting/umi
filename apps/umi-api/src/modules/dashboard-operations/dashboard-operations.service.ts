@@ -159,6 +159,7 @@ export class DashboardOperationsService {
       } | null;
       mixedTenderEnabled: boolean;
       allowDineInWithoutTable: boolean;
+      tipAttribution: 'account_owner' | 'payment_processor';
     },
   ) {
     if (!hasDashboardPermission(access.permissions, ['merchant.manage'])) {

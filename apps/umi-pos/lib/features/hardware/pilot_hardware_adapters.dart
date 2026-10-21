@@ -207,6 +207,7 @@ final class PilotHardwareLab
   final HardwareSocketClient Function() _socketClientFactory;
   final UsbPrinterChannel Function() _usbPrinterFactory;
   final TerminalCashboxChannel Function() _terminalCashboxFactory;
+
   /// One fetcher for the till: the mark it caches is the café's own.
   final ThermalLogoSource _logoSource;
   final bool allowSimulator;
@@ -371,10 +372,9 @@ final class PilotHardwareLab
   /// what the health poll walks. A link that is never filed is never asked
   /// whether it is there, so the card read "Desconectado" for good.
   UsbPrinterByteTransport _usbTransport(String deviceId) {
-    final transport =
-        _usbPrinterTransport ??= UsbPrinterByteTransport(
-          channel: _usbPrinterFactory(),
-        );
+    final transport = _usbPrinterTransport ??= UsbPrinterByteTransport(
+      channel: _usbPrinterFactory(),
+    );
     _transports[deviceId] = transport;
     return transport;
   }
@@ -437,7 +437,7 @@ final class PilotHardwareLab
       _healthTimer?.cancel();
       _healthTimer = Timer.periodic(
         _healthInterval,
-        (_) => unawaited(_pollHealth()),
+        (_) => unawaited(_pollHealth(background: true)),
       );
     }
     if (next == _retryLimit) return;
@@ -451,7 +451,7 @@ final class PilotHardwareLab
     _retryLimit = next;
   }
 
-  Future<void> _pollHealth() async {
+  Future<void> _pollHealth({bool background = false}) async {
     if (_healthActive) return;
     _healthActive = true;
     try {
@@ -464,7 +464,17 @@ final class PilotHardwareLab
       }
       await Future.wait(
         byTransport.entries.map((group) async {
-          final result = await group.key.health();
+          // A routine sweep reads what the last real operation proved. Asking
+          // a USB printer for `DLE EOT` here would occupy the same worker as a
+          // receipt; the Hardware Center and diagnostics call `health()` and
+          // still perform the real probe when somebody asked for one.
+          final transport = group.key;
+          final cached = transport is BackgroundHardwareHealth
+              ? transport as BackgroundHardwareHealth
+              : null;
+          final result = background && cached != null
+              ? await cached.backgroundHealth()
+              : await transport.health();
           for (final hardwareId in group.value) {
             _connectionStates[hardwareId] = result.state;
           }

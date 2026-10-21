@@ -294,6 +294,7 @@ describe('table state · the room, the turn timer, merge/split and the publish g
         locationId: LOCATION,
         expectedVersion,
         idempotencyKey: randomUUID(),
+        closeBlockingAccounts: false,
       }),
     );
 
@@ -320,7 +321,11 @@ describe('table state · the room, the turn timer, merge/split and the publish g
     await pg.onModuleInit();
     const integrity = new IntegrityService(new IntegrityRepository(pg));
     tables = new TableMapService(new TableMapRepository(pg), integrity);
-    plans = new FloorPlanService(new FloorPlanRepository(pg), integrity);
+    plans = new FloorPlanService(
+      new FloorPlanRepository(pg),
+      integrity,
+      new PosSaleRepository(pg, new PosCartRepository(pg)),
+    );
 
     await pg.query(
       `INSERT INTO merchant.merchant (id,name,handle) VALUES

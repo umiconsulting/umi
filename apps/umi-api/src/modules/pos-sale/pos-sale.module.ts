@@ -10,5 +10,6 @@ import { PosSaleService } from './pos-sale.service';
   imports: [AuthModule, IntegrityModule, PosCartModule],
   controllers: [PosSaleController],
   providers: [PosSaleRepository, PosSaleService],
+  exports: [PosSaleRepository],
 })
 export class PosSaleModule {}

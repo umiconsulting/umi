@@ -9,6 +9,7 @@ import { IntegrityRepository } from '../integrity/integrity.repository';
 import { IntegrityService } from '../integrity/integrity.service';
 import { TableMapRepository } from '../table-map/table-map.repository';
 import { PosCartRepository } from '../pos-cart/pos-cart.repository';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
 import type { PgService } from '../../shared/database/pg.service';
 
 // Every fixture and audit row stays inside one transaction, then rolls back.
@@ -96,9 +97,13 @@ describe('additional tables and account visibility in PostgreSQL', () => {
         work(client),
     } as unknown as PgService;
     repo = new FloorPlanRepository(pg);
-    service = new FloorPlanService(repo, new IntegrityService(new IntegrityRepository(pg)));
-    room = new TableMapRepository(pg);
     carts = new PosCartRepository(pg);
+    service = new FloorPlanService(
+      repo,
+      new IntegrityService(new IntegrityRepository(pg)),
+      new PosSaleRepository(pg, carts),
+    );
+    room = new TableMapRepository(pg);
   });
   afterEach(async () => {
     await client.query('ROLLBACK');

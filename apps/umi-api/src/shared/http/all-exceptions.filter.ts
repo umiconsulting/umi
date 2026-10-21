@@ -83,6 +83,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const context = getRequestContext();
     const requestId = context?.requestId ?? 'unavailable';
     const error = publicError(status, payload, context?.correlationId ?? requestId);
+    // The client needs the wait it must observe before it sends again. Without
+    // this header a refusal of type 429 is only a status, and every surface
+    // retries at its own cadence against a bucket that is still empty.
+    const retryAfterSeconds = error.details?.retryAfterSeconds;
+    if (status === 429 && typeof retryAfterSeconds === 'number') {
+      void reply.header('retry-after', String(retryAfterSeconds));
+    }
     void reply.status(status).send({
       statusCode: status,
       error,
@@ -119,6 +126,12 @@ function publicError(status: number, payload: string | object, correlationId: st
   // message is already replaced with "Internal server error", and a detail bag
   // on a server fault would leak whatever the failing code happened to know —
   // ids from another merchant, an internal path, a constraint name.
+  const retryAfterSeconds =
+    status === 429 &&
+    'retryAfterSeconds' in source &&
+    typeof source.retryAfterSeconds === 'number'
+      ? source.retryAfterSeconds
+      : undefined;
   const details =
     status < SERVER_ERROR_MIN &&
     'details' in source &&
@@ -133,7 +146,14 @@ function publicError(status: number, payload: string | object, correlationId: st
     retryable: status === 429 || status >= SERVER_ERROR_MIN,
     correlationId,
     ...(fieldErrors ? { fieldErrors } : {}),
-    ...(details ? { details } : {}),
+    ...(details || retryAfterSeconds !== undefined
+      ? {
+          details: {
+            ...(details ?? {}),
+            ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+          },
+        }
+      : {}),
   };
 }
 
@@ -167,6 +187,13 @@ function describeRefusal(payload: string | object): string {
     source.details !== null
   ) {
     parts.push(`details=${JSON.stringify(source.details).slice(0, 200)}`);
+  }
+  if (
+    'fieldErrors' in (source ?? {}) &&
+    typeof source.fieldErrors === 'object' &&
+    source.fieldErrors !== null
+  ) {
+    parts.push(`fields=${JSON.stringify(source.fieldErrors).slice(0, 500)}`);
   }
   return parts.join(' ') || 'no_detail';
 }

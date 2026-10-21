@@ -1484,6 +1484,18 @@ abstract class AppLocalizations {
   /// **'Nueva venta'**
   String get newSaleAction;
 
+  /// Shown in the order panel during startup while the till reads the account that was already open. It deliberately replaces the new-sale action so an old account cannot appear after the operator has tapped it.
+  ///
+  /// In es, this message translates to:
+  /// **'Recuperando tu cuenta…'**
+  String get cartRestoringAccount;
+
+  /// Explains why starting a new account is unavailable during startup account restoration.
+  ///
+  /// In es, this message translates to:
+  /// **'Espera un momento mientras recuperamos la cuenta abierta.'**
+  String get cartRestoringAccountHint;
+
   /// No description provided for @suspendSaleAction.
   ///
   /// In es, this message translates to:
@@ -1748,6 +1760,12 @@ abstract class AppLocalizations {
   /// **'Editar producto'**
   String get editCartLineAction;
 
+  /// No description provided for @repeatCartLineAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Repetir producto'**
+  String get repeatCartLineAction;
+
   /// No description provided for @saveCartLineAction.
   ///
   /// In es, this message translates to:
@@ -1981,6 +1999,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Diferencia'**
   String get cashVarianceLabel;
+
+  /// No description provided for @offlinePriceDivergenceLabel.
+  ///
+  /// In es, this message translates to:
+  /// **'Diferencias de precio sin conexión'**
+  String get offlinePriceDivergenceLabel;
 
   /// No description provided for @cashOverageLabel.
   ///
@@ -3451,6 +3475,12 @@ abstract class AppLocalizations {
   /// In es, this message translates to:
   /// **'Guarda un cobro dividido entre efectivo y tarjeta, y esta sucursal cobra un solo método por venta. El registro del cobro queda guardado para revisión; para seguir, empieza una venta nueva.'**
   String get tenderConflictBody;
+
+  /// No description provided for @splitCheckAction.
+  ///
+  /// In es, this message translates to:
+  /// **'Dividir cuenta'**
+  String get splitCheckAction;
 
   /// No description provided for @splitTenderTitle.
   ///

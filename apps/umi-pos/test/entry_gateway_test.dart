@@ -80,4 +80,30 @@ void main() {
 
     expect(sentBody['ephemeralPublicKey'], isNull);
   });
+
+  test(
+    'a kitchen build claims the KDS enrollment it was provisioned for',
+    () async {
+      final storage = MemorySecureStorage();
+      final vault = CredentialVault(storage);
+      Map<String, Object?> sentBody = const {};
+      final client = MockClient((request) async {
+        sentBody = jsonDecode(request.body) as Map<String, Object?>;
+        return http.Response(
+          jsonEncode(_claimResponse),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final gateway = ApiEntryGateway(
+        _api(client, vault),
+        vault,
+        deviceKind: 'kds',
+      );
+
+      await gateway.claimPairing('ABCD-1234');
+
+      expect(sentBody['deviceType'], 'kds');
+    },
+  );
 }

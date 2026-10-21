@@ -5,10 +5,19 @@ import { PageHead } from '@/components/page-head.jsx';
 import { useNavigate } from 'react-router-dom';
 import { msg } from '@lingui/core/macro';
 import { Plural, Trans, useLingui } from '@lingui/react/macro';
-import { loadSaleReceipt, useOperationsData } from '@/data.jsx';
+import { loadSaleReceipt, useCatalogCategories, useOperationsData } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { formatOperationDate, formatOperationMoney } from './operations-format.js';
 import { useAdministrativeCommand } from '@/lib/administrative-command.jsx';
+import {
+  blankModifier,
+  blankOptionGroup,
+  blankVariant,
+  catalogChoicesPayload,
+  optionGroupFromServer,
+  variantFromServer,
+  variantPrice,
+} from './catalog-product-draft.js';
 
 const ACTION_ROUTES = {
   organization: '/settings',
@@ -1033,7 +1042,10 @@ function CatalogDialog({ row, onClose, onComplete }) {
   const { t } = useLingui();
   const command = useAdministrativeCommand();
   useEscapeToClose(onClose, command.pending);
+  const categoryState = useCatalogCategories(0);
+  const categories = categoryState.data?.items || [];
   const [name, setName] = useState(row?.title || '');
+  const [description, setDescription] = useState('');
   const [price, setPrice] = useState(row?.amountMinorUnits ?? 0);
   const [sku, setSku] = useState(
     row?.publicReference === row?.id ? '' : row?.publicReference || '',
@@ -1041,12 +1053,17 @@ function CatalogDialog({ row, onClose, onComplete }) {
   const [barcode, setBarcode] = useState('');
   const [requiresPreparation, setRequiresPreparation] = useState(false);
   const [categoryId, setCategoryId] = useState('');
+  const [taxPercent, setTaxPercent] = useState(0);
   const [inventoryItemId, setInventoryItemId] = useState('');
+  const [currency, setCurrency] = useState(row?.currency || 'MXN');
+  const [variants, setVariants] = useState([]);
+  const [optionGroups, setOptionGroups] = useState([]);
   // One row per live location, as the till reads it (`catalog.detail` resolves it with
   // the same rule the menu uses). `null` means "not loaded yet", which is also the state
   // of a product that does not exist: it starts available everywhere.
   const [availability, setAvailability] = useState(null);
   const [loaded, setLoaded] = useState(!row);
+  const [formError, setFormError] = useState(null);
   const [productId] = useState(() => row?.id || crypto.randomUUID());
 
   async function loadDetail() {
@@ -1055,12 +1072,17 @@ function CatalogDialog({ row, onClose, onComplete }) {
     });
     const detail = response.result;
     setName(detail.name);
+    setDescription(detail.description || '');
     setPrice(detail.priceMinorUnits);
     setSku(detail.sku || '');
     setBarcode(detail.barcode || '');
     setRequiresPreparation(detail.requiresPreparation === true);
     setCategoryId(detail.categoryId || '');
+    setTaxPercent((Number(detail.taxRateBasisPoints) || 0) / 100);
     setInventoryItemId(detail.inventoryItemId || '');
+    setCurrency(detail.currency || row?.currency || 'MXN');
+    setVariants((detail.variants || []).map(variantFromServer));
+    setOptionGroups((detail.optionGroups || []).map(optionGroupFromServer));
     setAvailability(
       (detail.availability || []).map((entry) => ({ ...entry, saved: entry.status })),
     );
@@ -1080,20 +1102,44 @@ function CatalogDialog({ row, onClose, onComplete }) {
 
   async function save() {
     const operation = row ? 'catalog.update' : 'catalog.create';
+    const choices = catalogChoicesPayload(variants, optionGroups);
+    const invalidGroup = choices.optionGroups.find(
+      (group) =>
+        group.active &&
+        (group.modifiers.length === 0 ||
+          (group.maxSelections !== null && group.maxSelections < group.minSelections)),
+    );
+    if (invalidGroup) {
+      setFormError(
+        invalidGroup.modifiers.length === 0
+          ? t`El grupo «${invalidGroup.name}» necesita al menos una opción.`
+          : t`El máximo del grupo «${invalidGroup.name}» no puede ser menor que el mínimo.`,
+      );
+      return;
+    }
+    setFormError(null);
     const parameters = {
       name,
+      description: description || null,
       priceMinorUnits: Number(price),
       sku: sku || null,
       barcode: barcode || null,
       requiresPreparation,
       categoryId: categoryId || null,
       inventoryItemId: inventoryItemId || null,
-      taxRateBasisPoints: 0,
+      taxRateBasisPoints: Math.round((Number(taxPercent) || 0) * 100),
+      ...choices,
     };
-    const saved = await command.execute(operation, productId, {
-      targetVersion: row?.version ?? null,
-      parameters,
-    });
+    let saved;
+    try {
+      saved = await command.execute(operation, productId, {
+        targetVersion: row?.version ?? null,
+        parameters,
+      });
+    } catch (failure) {
+      setFormError(failure?.message || t`No se pudo guardar el producto.`);
+      return;
+    }
     // "No hay producto" is its own command, one per location, and it keeps the version
     // the previous command just wrote — the same guard every other catalogue write uses.
     // An unchanged row is not written: the command is a decision, not a heartbeat.
@@ -1118,9 +1164,42 @@ function CatalogDialog({ row, onClose, onComplete }) {
     onComplete();
   }
 
+  function updateVariant(id, patch) {
+    setVariants((current) =>
+      current.map((variant) => (variant.id === id ? { ...variant, ...patch } : variant)),
+    );
+  }
+
+  function updateGroup(id, patch) {
+    setOptionGroups((current) =>
+      current.map((group) => (group.id === id ? { ...group, ...patch } : group)),
+    );
+  }
+
+  function updateModifier(groupId, modifierId, patch) {
+    setOptionGroups((current) =>
+      current.map((group) =>
+        group.id === groupId
+          ? {
+              ...group,
+              modifiers: group.modifiers.map((modifier) =>
+                modifier.id === modifierId ? { ...modifier, ...patch } : modifier,
+              ),
+            }
+          : group,
+      ),
+    );
+  }
+
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="card modal-card" role="dialog" aria-modal="true" aria-label={t`Producto`}>
+      <section
+        className="card modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t`Producto`}
+        style={{ width: 780, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto' }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <h3 style={{ margin: 0 }}>
             {row ? <Trans>Editar producto</Trans> : <Trans>Crear producto</Trans>}
@@ -1140,111 +1219,432 @@ function CatalogDialog({ row, onClose, onComplete }) {
           </button>
         ) : (
           <>
-            <label>
-              <Trans>Nombre</Trans>
-              <input
-                value={name}
-                maxLength={240}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Precio en centavos</Trans>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={price}
-                onChange={(event) => setPrice(event.target.value)}
-              />
-            </label>
-            <label>
-              SKU
-              <input value={sku} maxLength={120} onChange={(event) => setSku(event.target.value)} />
-            </label>
-            <label>
-              <Trans>Código de barras</Trans>
-              <input
-                value={barcode}
-                maxLength={160}
-                onChange={(event) => setBarcode(event.target.value)}
-              />
-            </label>
-            <label>
-              <Trans>Categoría</Trans>
-              <input
-                value={categoryId}
-                onChange={(event) => setCategoryId(event.target.value)}
-                placeholder={t`UUID opcional`}
-              />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={requiresPreparation}
-                onChange={(event) => setRequiresPreparation(event.target.checked)}
-              />{' '}
-              <Trans>Requiere preparación</Trans>
-            </label>
-            <label>
-              <Trans>Artículo de inventario</Trans>
-              <input
-                value={inventoryItemId}
-                onChange={(event) => setInventoryItemId(event.target.value)}
-                placeholder={t`UUID opcional`}
-              />
-            </label>
-            {availability && availability.length > 0 && (
+            <div className="catalog-editor">
+              <label>
+                <Trans>Nombre</Trans>
+                <input
+                  value={name}
+                  maxLength={240}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+              <label>
+                <Trans>Descripción</Trans>
+                <textarea
+                  value={description}
+                  maxLength={1000}
+                  rows={2}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </label>
+              <label>
+                <Trans>Precio base en centavos</Trans>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={price}
+                  onChange={(event) => setPrice(event.target.value)}
+                />
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {formatOperationMoney(Number(price) || 0, currency)}
+                </span>
+              </label>
+              <label>
+                SKU
+                <input
+                  value={sku}
+                  maxLength={120}
+                  onChange={(event) => setSku(event.target.value)}
+                />
+              </label>
+              <label>
+                <Trans>Código de barras</Trans>
+                <input
+                  value={barcode}
+                  maxLength={160}
+                  onChange={(event) => setBarcode(event.target.value)}
+                />
+              </label>
+              <label>
+                <Trans>Categoría</Trans>
+                <Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                  <option value="">{t`Sin categoría`}</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label>
+                <Trans>Impuesto (%)</Trans>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={taxPercent}
+                  onChange={(event) => setTaxPercent(event.target.value)}
+                />
+              </label>
+              <label className="inline-check">
+                <input
+                  type="checkbox"
+                  checked={requiresPreparation}
+                  onChange={(event) => setRequiresPreparation(event.target.checked)}
+                />{' '}
+                <Trans>Requiere preparación</Trans>
+              </label>
+              <label>
+                <Trans>Artículo de inventario</Trans>
+                <input
+                  value={inventoryItemId}
+                  onChange={(event) => setInventoryItemId(event.target.value)}
+                  placeholder={t`UUID opcional`}
+                />
+              </label>
               <fieldset className="field-group">
                 <legend>
-                  <Trans>Disponibilidad</Trans>
+                  <Trans>Variantes vendibles</Trans>
                 </legend>
-                <p>
+                <p className="muted" style={{ margin: 0, fontSize: 12 }}>
                   <Trans>
-                    Marca «No disponible» cuando no haya producto en esa sucursal. La caja opaca la
-                    tarjeta, avisa «No disponible» y no deja agregarla a la cuenta.
+                    Cada variante es una forma que se cobra: Caliente, Frío, tamaño o presentación.
+                    El precio final es el precio base más el ajuste.
                   </Trans>
                 </p>
-                {availability.map((entry) => (
-                  <label key={entry.locationId}>
-                    {entry.name}
-                    <Select
-                      value={entry.status}
+                <div
+                  aria-hidden="true"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'minmax(140px, 1fr) 130px 130px auto auto',
+                    gap: 8,
+                    fontSize: 11,
+                    color: 'var(--ink-3)',
+                  }}
+                >
+                  <span>
+                    <Trans>Variante</Trans>
+                  </span>
+                  <span>
+                    <Trans>Ajuste (centavos)</Trans>
+                  </span>
+                  <span>
+                    <Trans>Precio final</Trans>
+                  </span>
+                </div>
+                {variants.map((variant) => (
+                  <div
+                    key={variant.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(140px, 1fr) 130px 130px auto auto',
+                      gap: 8,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <input
+                      value={variant.name}
+                      maxLength={160}
+                      placeholder={t`Caliente, Frío, Grande…`}
+                      aria-label={t`Nombre de la variante`}
+                      onChange={(event) => updateVariant(variant.id, { name: event.target.value })}
+                    />
+                    <input
+                      type="number"
+                      step="1"
+                      value={variant.priceDelta}
+                      aria-label={t`Ajuste de precio de la variante en centavos`}
                       onChange={(event) =>
-                        setAvailabilityStatus(entry.locationId, event.target.value)
+                        updateVariant(variant.id, { priceDelta: Number(event.target.value) || 0 })
+                      }
+                    />
+                    <span className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {formatOperationMoney(
+                        variantPrice(Number(price) || 0, variant.priceDelta),
+                        currency,
+                      )}
+                    </span>
+                    <label className="inline-check">
+                      <input
+                        type="checkbox"
+                        checked={variant.active !== false}
+                        onChange={(event) =>
+                          updateVariant(variant.id, { active: event.target.checked })
+                        }
+                      />
+                      <Trans>Activa</Trans>
+                    </label>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      aria-label={t`Quitar variante`}
+                      onClick={() =>
+                        setVariants((current) => current.filter((item) => item.id !== variant.id))
                       }
                     >
-                      <option value="enabled">{t`Disponible`}</option>
-                      <option value="temporarily_unavailable">{t`No disponible`}</option>
-                      <option value="out_of_assortment">{t`Fuera de surtido`}</option>
-                      <option value="disabled">{t`Descontinuado`}</option>
-                      {entry.status === 'future_availability' && (
-                        <option value="future_availability">{t`Programado`}</option>
-                      )}
-                    </Select>
-                  </label>
+                      ×
+                    </button>
+                  </div>
                 ))}
-              </fieldset>
-            )}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-primary"
-                type="button"
-                disabled={command.pending || !name.trim()}
-                onClick={save}
-              >
-                <Trans>Guardar</Trans>
-              </button>
-              {row && row.status !== 'archived' && (
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-secondary btn-sm"
                   type="button"
-                  disabled={command.pending}
-                  onClick={archive}
+                  onClick={() => setVariants((current) => [...current, blankVariant()])}
                 >
-                  <Trans>Archivar</Trans>
+                  <Trans>Agregar variante</Trans>
                 </button>
+              </fieldset>
+
+              <fieldset className="field-group">
+                <legend>
+                  <Trans>Grupos de opciones</Trans>
+                </legend>
+                <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+                  <Trans>
+                    Un grupo agrupa extras o elecciones de la línea: leche, endulzante,
+                    complementos. Define si es obligatorio y cuántas opciones acepta.
+                  </Trans>
+                </p>
+                {optionGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    style={{
+                      display: 'grid',
+                      gap: 8,
+                      padding: 10,
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto auto',
+                        gap: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <input
+                        value={group.name}
+                        maxLength={160}
+                        placeholder={t`Leche, Extras, Endulzante…`}
+                        aria-label={t`Nombre del grupo`}
+                        onChange={(event) => updateGroup(group.id, { name: event.target.value })}
+                      />
+                      <label className="inline-check">
+                        <input
+                          type="checkbox"
+                          checked={group.required === true}
+                          onChange={(event) =>
+                            updateGroup(group.id, {
+                              required: event.target.checked,
+                              minSelections: event.target.checked
+                                ? Math.max(1, Number(group.minSelections) || 0)
+                                : Math.min(Number(group.minSelections) || 0, 0),
+                            })
+                          }
+                        />
+                        <Trans>Obligatorio</Trans>
+                      </label>
+                      <label className="compact-field">
+                        <Trans>Mín.</Trans>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={group.minSelections}
+                          onChange={(event) =>
+                            updateGroup(group.id, {
+                              minSelections: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="compact-field">
+                        <Trans>Máx.</Trans>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={group.maxSelections ?? ''}
+                          placeholder={t`Sin límite`}
+                          onChange={(event) =>
+                            updateGroup(group.id, {
+                              maxSelections:
+                                event.target.value === '' ? null : Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        type="button"
+                        aria-label={t`Quitar grupo`}
+                        onClick={() =>
+                          setOptionGroups((current) =>
+                            current.filter((item) => item.id !== group.id),
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(140px, 1fr) 130px auto auto',
+                        gap: 8,
+                        paddingLeft: 14,
+                        fontSize: 11,
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      <span>
+                        <Trans>Opción</Trans>
+                      </span>
+                      <span>
+                        <Trans>Ajuste (centavos)</Trans>
+                      </span>
+                    </div>
+                    {group.modifiers.map((modifier) => (
+                      <div
+                        key={modifier.id}
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'minmax(140px, 1fr) 130px auto auto',
+                          gap: 8,
+                          alignItems: 'center',
+                          paddingLeft: 14,
+                        }}
+                      >
+                        <input
+                          value={modifier.name}
+                          maxLength={160}
+                          placeholder={t`Avena, sin azúcar, extra queso…`}
+                          aria-label={t`Nombre de la opción`}
+                          onChange={(event) =>
+                            updateModifier(group.id, modifier.id, { name: event.target.value })
+                          }
+                        />
+                        <input
+                          type="number"
+                          step="1"
+                          value={modifier.priceDelta}
+                          aria-label={t`Ajuste de precio de la opción en centavos`}
+                          onChange={(event) =>
+                            updateModifier(group.id, modifier.id, {
+                              priceDelta: Number(event.target.value) || 0,
+                            })
+                          }
+                        />
+                        <label className="inline-check">
+                          <input
+                            type="checkbox"
+                            checked={modifier.active !== false}
+                            onChange={(event) =>
+                              updateModifier(group.id, modifier.id, {
+                                active: event.target.checked,
+                              })
+                            }
+                          />
+                          <Trans>Activa</Trans>
+                        </label>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          type="button"
+                          aria-label={t`Quitar opción`}
+                          onClick={() =>
+                            updateGroup(group.id, {
+                              modifiers: group.modifiers.filter((item) => item.id !== modifier.id),
+                            })
+                          }
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      style={{ justifySelf: 'start' }}
+                      onClick={() =>
+                        updateGroup(group.id, {
+                          modifiers: [...group.modifiers, blankModifier()],
+                        })
+                      }
+                    >
+                      <Trans>Agregar opción</Trans>
+                    </button>
+                  </div>
+                ))}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  type="button"
+                  onClick={() => setOptionGroups((current) => [...current, blankOptionGroup()])}
+                >
+                  <Trans>Agregar grupo de opciones</Trans>
+                </button>
+              </fieldset>
+              {availability && availability.length > 0 && (
+                <fieldset className="field-group">
+                  <legend>
+                    <Trans>Disponibilidad</Trans>
+                  </legend>
+                  <p>
+                    <Trans>
+                      Marca «No disponible» cuando no haya producto en esa sucursal. La caja opaca
+                      la tarjeta, avisa «No disponible» y no deja agregarla a la cuenta.
+                    </Trans>
+                  </p>
+                  {availability.map((entry) => (
+                    <label key={entry.locationId}>
+                      {entry.name}
+                      <Select
+                        value={entry.status}
+                        onChange={(event) =>
+                          setAvailabilityStatus(entry.locationId, event.target.value)
+                        }
+                      >
+                        <option value="enabled">{t`Disponible`}</option>
+                        <option value="temporarily_unavailable">{t`No disponible`}</option>
+                        <option value="out_of_assortment">{t`Fuera de surtido`}</option>
+                        <option value="disabled">{t`Descontinuado`}</option>
+                        {entry.status === 'future_availability' && (
+                          <option value="future_availability">{t`Programado`}</option>
+                        )}
+                      </Select>
+                    </label>
+                  ))}
+                </fieldset>
               )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={command.pending || !name.trim()}
+                  onClick={save}
+                >
+                  <Trans>Guardar</Trans>
+                </button>
+                {row && row.status !== 'archived' && (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={command.pending}
+                    onClick={archive}
+                  >
+                    <Trans>Archivar</Trans>
+                  </button>
+                )}
+              </div>
+              {formError ? (
+                <p role="alert" style={{ color: 'var(--danger)', margin: 0 }}>
+                  {formError}
+                </p>
+              ) : null}
             </div>
           </>
         )}

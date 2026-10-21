@@ -1,5 +1,11 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import {
+  type CancelCarriedOverAccountsRequest,
   PublishedFloorPlan,
   type FloorPlanState,
   type PosFloorPlanQuery,
@@ -11,6 +17,7 @@ import {
 import type { AuthUser, MerchantAccess } from '../auth/auth.types';
 import { resolveLocationAuthority } from '../auth/location-authority';
 import { IntegrityService } from '../integrity/integrity.service';
+import { PosSaleRepository } from '../pos-sale/pos-sale.repository';
 import { FloorPlanRepository } from './floor-plan.repository';
 
 @Injectable()
@@ -18,6 +25,7 @@ export class FloorPlanService {
   constructor(
     private readonly repo: FloorPlanRepository,
     private readonly integrity: IntegrityService,
+    private readonly sales: PosSaleRepository,
   ) {}
 
   read(access: MerchantAccess, locationId: string) {
@@ -30,9 +38,15 @@ export class FloorPlanService {
     return PublishedFloorPlan.parse(await this.repo.readForPos(user, merchantId, query));
   }
 
-  async change(access: MerchantAccess, dto: SaveFloorPlanRequest | PublishFloorPlanRequest) {
+  async change(
+    access: MerchantAccess,
+    dto: SaveFloorPlanRequest | PublishFloorPlanRequest,
+    user?: AuthUser,
+  ) {
     resolveLocationAuthority(access, dto.locationId);
     const document = 'document' in dto ? dto.document : undefined;
+    const closeBlockingAccounts =
+      !document && 'closeBlockingAccounts' in dto && dto.closeBlockingAccounts === true;
     const result = await this.integrity.execute<FloorPlanState>(
       {
         merchantId: access.merchantId,
@@ -44,6 +58,61 @@ export class FloorPlanService {
         expectedVersion: dto.expectedVersion,
       },
       async (context) => {
+        if (closeBlockingAccounts) {
+          if (!user) throw new UnauthorizedException({ code: 'AUTHENTICATION_REQUIRED' });
+          if (
+            !access.permissions.includes('sale.resume.any') &&
+            !access.permissions.includes('*')
+          ) {
+            throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
+          }
+          const blockers = await this.repo.blockingAccounts(
+            context.client,
+            access.merchantId,
+            dto.locationId,
+          );
+          const accounts = blockers.flatMap((blocker) =>
+            blocker.accountId && blocker.accountVersion
+              ? [{ cartId: blocker.accountId, expectedVersion: blocker.accountVersion }]
+              : [],
+          );
+          // A table with a party but no commercial account cannot be "closed" by
+          // this choice. Leave it to the existing occupied-table refusal, which
+          // names it in the response.
+          if (accounts.length === blockers.length && accounts.length > 0) {
+            const request: CancelCarriedOverAccountsRequest = {
+              locationId: dto.locationId,
+              operatorSessionId: user.id,
+              idempotencyKey: dto.idempotencyKey,
+              accounts,
+              reasonCode: 'other',
+              reason: 'Cuentas cerradas para publicar plano de mesas',
+            };
+            const cancelled = await this.sales.cancelCarriedOver(
+              context.client,
+              access.merchantId,
+              user.id,
+              true,
+              request,
+              { allowCurrentBusinessDay: true },
+            );
+            for (const sale of cancelled) {
+              await context.appendAudit({
+                eventType: 'sale.cancelled',
+                entityType: 'pos_sale_lifecycle',
+                entityId: sale.id,
+                outcome: 'success',
+                publicData: {
+                  state: sale.state,
+                  version: sale.cart.version,
+                  cancellationReasonCode: sale.cancellationReasonCode,
+                  cancellationReason: sale.cancellationReason,
+                  closedForFloorPlanPublish: true,
+                },
+              });
+            }
+          }
+        }
         const state = await this.repo.change(
           context.client,
           access.merchantId,

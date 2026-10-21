@@ -93,15 +93,25 @@ export class MerchantBrandingLogoService {
     if (source.length > MAX_STORED_BYTES) {
       throw refused('La imagen pesa más de 256 KB. Elige una más ligera.');
     }
+    // An SVG is vector art, so its byte size says nothing about what it will
+    // render as. It is accepted here and rasterised in `normalise`, which is the
+    // same door every other upload goes through — the stored row is still a
+    // bounded PNG that the receipts and wallet passes can draw.
+    const isVector = upload.contentType === 'image/svg+xml';
+    if (isVector && !looksLikeSvg(source)) {
+      throw refused('El archivo no es un SVG válido.');
+    }
     if (!matchesDeclaredType(source, upload.contentType)) {
       throw refused(
         upload.contentType === 'image/png'
           ? 'El archivo no es un PNG válido.'
-          : 'El archivo no es un JPG válido.',
+          : upload.contentType === 'image/jpeg'
+            ? 'El archivo no es un JPG válido.'
+            : 'El archivo no es un SVG válido.',
       );
     }
 
-    const normalised = await this.normalise(source);
+    const normalised = await this.normalise(source, isVector);
     const sha = createHash('sha256').update(normalised.bytes).digest();
     // 16 hex characters = 64 bits of the digest. Enough that two logos of the same
     // café never collide, short enough to stay readable in a URL.
@@ -164,14 +174,25 @@ export class MerchantBrandingLogoService {
    * which is what it came from. Both are content types the table and the contract
    * accept; the stored pair always agrees with itself.
    */
-  private async normalise(source: Buffer): Promise<{
+  private async normalise(
+    source: Buffer,
+    vector = false,
+  ): Promise<{
     bytes: Buffer;
     contentType: 'image/png' | 'image/jpeg';
     extension: 'png' | 'jpg';
     width: number;
     height: number;
   }> {
-    const fitted = sharp(source, { limitInputPixels: MAX_INPUT_PIXELS })
+    // A vector has no pixels to fit "inside": it is rendered once, at a density
+    // that makes its own viewBox larger than the 768 px ceiling, and then the
+    // same resize brings it down. Without the density, sharp renders an SVG at
+    // its intrinsic size — an 802-unit viewBox becomes 802 px — which is fine
+    // for this logo and wrong for a 32 px icon somebody uploads.
+    const fitted = sharp(source, {
+      limitInputPixels: MAX_INPUT_PIXELS,
+      density: vector ? 300 : 72,
+    })
       .rotate()
       .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true });
 
@@ -213,10 +234,28 @@ export class MerchantBrandingLogoService {
   }
 }
 
-/** The bytes must be what the caller says they are, before sharp is asked anything. */
-function matchesDeclaredType(bytes: Buffer, declared: 'image/png' | 'image/jpeg'): boolean {
+/**
+ * The bytes must be what the caller says they are, before sharp is asked
+ * anything.
+ *
+ * SVG has no magic number, so it is checked by shape instead: an XML prolog or
+ * whitespace, then a root `<svg` element within the first kilobyte. Anything
+ * else claiming to be SVG — an HTML error page, a renamed JPEG — is refused
+ * here rather than handed to the renderer.
+ */
+function matchesDeclaredType(
+  bytes: Buffer,
+  declared: 'image/png' | 'image/jpeg' | 'image/svg+xml',
+): boolean {
+  if (declared === 'image/svg+xml') return looksLikeSvg(bytes);
   if (bytes.length < PNG_MAGIC.length) return false;
   return declared === 'image/png'
     ? bytes.subarray(0, 8).equals(PNG_MAGIC)
     : bytes.subarray(0, 3).equals(JPEG_MAGIC);
+}
+
+function looksLikeSvg(bytes: Buffer): boolean {
+  const head = bytes.subarray(0, Math.min(bytes.length, 1024)).toString('utf8').trimStart();
+  if (!head.startsWith('<')) return false;
+  return /<svg[\s>]/i.test(head);
 }

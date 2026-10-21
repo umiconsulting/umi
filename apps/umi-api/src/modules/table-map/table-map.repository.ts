@@ -12,8 +12,10 @@ import { syncCartOrderContext } from '../../shared/orders/cart-order-context';
 import { planTables, type PlanTable } from '../../shared/floor-plan/plan-tables';
 import type { AuthUser } from '../auth/auth.types';
 
-/** The permission a POS operator needs to see or move the room. */
-const POS_PERMISSION = 'sale.lifecycle';
+/** The permission a POS operator needs to operate the room. */
+const POS_PERMISSION = 'cart.write';
+/** Existing cashier and manager roles already carry this broader permission. */
+const LEGACY_POS_PERMISSION = 'sale.lifecycle';
 
 /** A row of `merchant.table_state`, as node-postgres hands it back. */
 type StateRow = {
@@ -86,7 +88,6 @@ export class TableMapRepository {
     merchantId: string,
     locationId: string,
     operatorSessionId: string,
-    readOnly = false,
   ) {
     const authorization = await client.query(
       `SELECT 1 FROM runtime.operator_session os
@@ -94,8 +95,8 @@ export class TableMapRepository {
        WHERE os.id=$1::uuid AND os.user_id=$2::uuid AND os.durable_session_id=$3::uuid
          AND os.device_id=$4::uuid AND os.merchant_id=$5::uuid AND os.location_id=$6::uuid
          AND os.state='active' AND os.expires_at>now() AND d.status='active'
-         AND ($7::text=ANY(os.permissions) OR '*'=ANY(os.permissions)
-           OR ($8::boolean AND 'cart.write'=ANY(os.permissions)))
+         AND ($7::text=ANY(os.permissions) OR $8::text=ANY(os.permissions)
+           OR '*'=ANY(os.permissions))
          AND EXISTS (SELECT 1 FROM jsonb_array_elements(os.entitlements) e
            WHERE e->>'featureKey'='pos' AND coalesce((e->>'enabled')::boolean,false))`,
       [
@@ -106,7 +107,7 @@ export class TableMapRepository {
         merchantId,
         locationId,
         POS_PERMISSION,
-        readOnly,
+        LEGACY_POS_PERMISSION,
       ],
     );
     if (!authorization.rowCount) throw new ForbiddenException({ code: 'PERMISSION_DENIED' });
@@ -212,7 +213,6 @@ export class TableMapRepository {
           merchantId,
           query.locationId,
           query.operatorSessionId,
-          true,
         );
         await this.assertLocation(client, merchantId, query.locationId);
         return this.readInTransaction(client, merchantId, query.locationId);

@@ -16,6 +16,23 @@ final class _FakeUsbPrinter implements UsbPrinterChannel {
   int statusByte = 0x16; // online, no error
   Object? statusFailure;
   Duration? writeDelay;
+  Duration? statusDelay;
+  final List<String> operations = [];
+  int activeOperations = 0;
+  int maximumConcurrentOperations = 0;
+
+  Future<void> _operation(String name, Future<void> Function() body) async {
+    operations.add(name);
+    activeOperations += 1;
+    if (activeOperations > maximumConcurrentOperations) {
+      maximumConcurrentOperations = activeOperations;
+    }
+    try {
+      await body();
+    } finally {
+      activeOperations -= 1;
+    }
+  }
 
   @override
   Future<List<UsbPrinterInfo>> attached() async => const [
@@ -36,19 +53,27 @@ final class _FakeUsbPrinter implements UsbPrinterChannel {
 
   @override
   Future<void> write(List<int> bytes) async {
-    final failure = writeFailure;
-    if (failure != null) throw failure;
-    final delay = writeDelay;
-    if (delay != null) await Future<void>.delayed(delay);
-    written.addAll(bytes);
+    await _operation('write', () async {
+      final failure = writeFailure;
+      if (failure != null) throw failure;
+      final delay = writeDelay;
+      if (delay != null) await Future<void>.delayed(delay);
+      written.addAll(bytes);
+    });
   }
 
   @override
   Future<int> status() async {
-    final failure = statusFailure;
-    if (failure != null) throw failure;
-    statusReads += 1;
-    return statusByte;
+    var result = statusByte;
+    await _operation('status', () async {
+      final failure = statusFailure;
+      if (failure != null) throw failure;
+      final delay = statusDelay;
+      if (delay != null) await Future<void>.delayed(delay);
+      statusReads += 1;
+      result = statusByte;
+    });
+    return result;
   }
 
   @override
@@ -86,19 +111,22 @@ void main() {
     expect(result.failureCode, 'transport_unavailable');
   });
 
-  test('a write that never lands is unknown, so a retry could double', () async {
-    final printer = _FakeUsbPrinter()
-      ..writeDelay = const Duration(seconds: 30);
-    final transport = UsbPrinterByteTransport(
-      channel: printer,
-      timeout: const Duration(milliseconds: 40),
-    );
+  test(
+    'a write that never lands is unknown, so a retry could double',
+    () async {
+      final printer = _FakeUsbPrinter()
+        ..writeDelay = const Duration(seconds: 30);
+      final transport = UsbPrinterByteTransport(
+        channel: printer,
+        timeout: const Duration(milliseconds: 40),
+      );
 
-    final result = await transport.send([0x1b, 0x40]);
+      final result = await transport.send([0x1b, 0x40]);
 
-    expect(result.outcome, HardwareByteTransportOutcome.unknown);
-    expect(result.failureCode, 'transport_timeout');
-  });
+      expect(result.outcome, HardwareByteTransportOutcome.unknown);
+      expect(result.failureCode, 'transport_timeout');
+    },
+  );
 
   test('health reads the printer status and reports it ready', () async {
     final printer = _FakeUsbPrinter();
@@ -145,6 +173,46 @@ void main() {
     );
     expect(printer.opens, 2);
   });
+
+  test('a receipt write and a status probe never overlap', () async {
+    final printer = _FakeUsbPrinter()
+      ..writeDelay = const Duration(milliseconds: 30)
+      ..statusDelay = const Duration(milliseconds: 30);
+    final transport = UsbPrinterByteTransport(channel: printer);
+
+    final printed = transport.send([0x1b, 0x40]);
+    final health = transport.health();
+    await Future.wait([printed, health]);
+
+    expect(printer.operations, ['write', 'status']);
+    expect(printer.maximumConcurrentOperations, 1);
+  });
+
+  test(
+    'a routine health refresh does not put a query behind a receipt',
+    () async {
+      final printer = _FakeUsbPrinter();
+      final transport = UsbPrinterByteTransport(channel: printer);
+      await transport.send([0x1b, 0x40]);
+
+      final background = await transport.backgroundHealth();
+
+      expect(background.state, 'connected');
+      expect(
+        printer.statusReads,
+        0,
+        reason: 'the successful write is evidence',
+      );
+
+      final explicit = await transport.health();
+      expect(explicit.state, 'connected');
+      expect(
+        printer.statusReads,
+        1,
+        reason: 'an operator request still probes',
+      );
+    },
+  );
 
   test('the lab resolves a usb printer and its drawer onto one link', () async {
     final printer = _FakeUsbPrinter();
@@ -200,62 +268,68 @@ void main() {
     await lab.dispose();
   });
 
-  test('the health poll asks the USB printer, so it stops reading as gone', () async {
-    final printer = _FakeUsbPrinter();
-    final lab = PilotHardwareLab(usbPrinterFactory: () => printer);
+  test(
+    'the health poll asks the USB printer, so it stops reading as gone',
+    () async {
+      final printer = _FakeUsbPrinter();
+      final lab = PilotHardwareLab(usbPrinterFactory: () => printer);
 
-    lab.resolve(
-      const RuntimeDevice(
-        id: 'printer-1',
-        type: 'printer',
-        transport: 'usb_foundation',
-        capabilities: {'printer.receipt'},
-        enabled: true,
-      ),
-    );
+      lab.resolve(
+        const RuntimeDevice(
+          id: 'printer-1',
+          type: 'printer',
+          transport: 'usb_foundation',
+          capabilities: {'printer.receipt'},
+          enabled: true,
+        ),
+      );
 
-    // The first answer is the pessimistic one the card starts from.
-    expect(lab.connectionStateFor('printer-1'), 'disconnected');
+      // The first answer is the pessimistic one the card starts from.
+      expect(lab.connectionStateFor('printer-1'), 'disconnected');
 
-    await lab.refreshHealth();
+      await lab.refreshHealth();
 
-    expect(lab.connectionStateFor('printer-1'), 'connected');
-    expect(printer.statusReads, 1, reason: 'the link was actually asked');
-    await lab.dispose();
-  });
+      expect(lab.connectionStateFor('printer-1'), 'connected');
+      expect(printer.statusReads, 1, reason: 'the link was actually asked');
+      await lab.dispose();
+    },
+  );
 
-  test('a shared USB link is asked once for the printer and the drawer', () async {
-    final printer = _FakeUsbPrinter();
-    final lab = PilotHardwareLab(usbPrinterFactory: () => printer);
+  test(
+    'a shared USB link is asked once for the printer and the drawer',
+    () async {
+      final printer = _FakeUsbPrinter();
+      final lab = PilotHardwareLab(usbPrinterFactory: () => printer);
 
-    lab.resolve(
-      const RuntimeDevice(
-        id: 'printer-1',
-        type: 'printer',
-        transport: 'usb_foundation',
-        capabilities: {'printer.receipt'},
-        enabled: true,
-      ),
-    );
-    lab.resolve(
-      const RuntimeDevice(
-        id: 'drawer-1',
-        type: 'cash_drawer',
-        transport: 'usb_foundation',
-        capabilities: {'drawer.open'},
-        enabled: true,
-      ),
-    );
+      lab.resolve(
+        const RuntimeDevice(
+          id: 'printer-1',
+          type: 'printer',
+          transport: 'usb_foundation',
+          capabilities: {'printer.receipt'},
+          enabled: true,
+        ),
+      );
+      lab.resolve(
+        const RuntimeDevice(
+          id: 'drawer-1',
+          type: 'cash_drawer',
+          transport: 'usb_foundation',
+          capabilities: {'drawer.open'},
+          enabled: true,
+        ),
+      );
 
-    await lab.refreshHealth();
+      await lab.refreshHealth();
 
-    // Two opens of one interface would fight over the claim.
-    expect(printer.opens, 1);
-    expect(printer.statusReads, 1);
-    expect(lab.connectionStateFor('printer-1'), 'connected');
-    expect(lab.connectionStateFor('drawer-1'), 'connected');
-    await lab.dispose();
-  });
+      // Two opens of one interface would fight over the claim.
+      expect(printer.opens, 1);
+      expect(printer.statusReads, 1);
+      expect(lab.connectionStateFor('printer-1'), 'connected');
+      expect(lab.connectionStateFor('drawer-1'), 'connected');
+      await lab.dispose();
+    },
+  );
 
   test('a printer that answers offline is reported as disconnected', () async {
     final printer = _FakeUsbPrinter()..statusByte = 0x1e; // 0x08 = offline

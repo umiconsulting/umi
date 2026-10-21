@@ -39,6 +39,7 @@ const CheckoutPolicyUpdate = z
       .nullable(),
     mixedTenderEnabled: z.boolean(),
     allowDineInWithoutTable: z.boolean(),
+    tipAttribution: z.enum(['account_owner', 'payment_processor']),
   })
   .strict()
   .superRefine((value, ctx) => {

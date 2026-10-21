@@ -157,6 +157,7 @@ export const ManualTerminalAttempt = z
       });
     }
   });
+export const TipAttribution = z.enum(['account_owner', 'payment_processor']);
 export const TipPolicy = z
   .object({
     enabled: z.boolean(),
@@ -165,6 +166,7 @@ export const TipPolicy = z
     customFixedEnabled: z.boolean(),
     maximumTip: Money,
     requiredPermission: z.string().min(1).max(100).nullable(),
+    attribution: TipAttribution,
     version: z.string().min(1).max(64),
   })
   .strict();
@@ -701,6 +703,7 @@ export type TenderDraft = z.infer<typeof TenderDraft>;
 export type TenderAllocation = z.infer<typeof TenderAllocation>;
 export type PaymentSummary = z.infer<typeof PaymentSummary>;
 export type TipPolicy = z.infer<typeof TipPolicy>;
+export type TipAttribution = z.infer<typeof TipAttribution>;
 export type TipDraft = z.infer<typeof TipDraft>;
 export type DiscountPolicy = z.infer<typeof DiscountPolicy>;
 export type DiscountDraft = z.infer<typeof DiscountDraft>;

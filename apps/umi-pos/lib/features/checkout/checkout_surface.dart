@@ -23,6 +23,116 @@ import 'checkout_controller.dart';
 import 'partial_checkout_surface.dart';
 import 'tender_identity.dart';
 
+Future<bool?> _showBankTransferDetailsDialog(
+  BuildContext context, {
+  required CheckoutController checkout,
+  required CartController cart,
+  required EntryController entry,
+  required int amountMinor,
+  String? currency,
+  required bool selected,
+}) {
+  final policy = checkout.policy;
+  final details = policy?.bankTransferDetails;
+  if (policy == null || details == null) {
+    return Future<bool?>.value(false);
+  }
+  final total = cart.state.cart?.totals['grandTotal'];
+  final resolvedCurrency =
+      currency ??
+      (total is Map ? total['currency'] as String? ?? 'MXN' : 'MXN');
+  return showPosDialog<bool>(
+    context: context,
+    builder: (dialogContext) => BankTransferDialog(
+      details: details,
+      merchantName: entry.state.selectedTenant?.name ?? 'ONCA',
+      logoUrl: policy.merchantLogoUrl,
+      amount: formatMinorUnits(amountMinor, resolvedCurrency),
+      accountFolio: cart.state.cart?.accountFolio,
+      selected: selected,
+    ),
+  );
+}
+
+/// Opens an account's partial-payment ledger directly.
+///
+/// Split check starts from the cart, so mounting the full checkout first and
+/// immediately pushing the ledger over it makes one operator tap look like two
+/// navigation events. The ledger is the requested destination; recovery and
+/// policy loading happen inside that route instead.
+Future<void> showSplitCheckout(
+  BuildContext context, {
+  required CheckoutController checkout,
+  required String? cashShiftId,
+  required CartController cart,
+  required EntryController entry,
+  required SaleLifecycleController sales,
+}) async {
+  checkout.reset();
+  await showPartialCheckout(
+    context,
+    checkout: checkout,
+    cart: cart,
+    operatorSessionId:
+        entry.state.operator?.id ?? cart.state.cart!.operatorSessionId,
+    operatorName: entry.operatorName,
+    canConfirmManualTerminal:
+        entry.state.operator?.permissions.contains(
+          'checkout.terminal.confirm',
+        ) ==
+        true,
+    cashShiftId: cashShiftId,
+    prepare: () =>
+        _prepareSplitCheckout(checkout: checkout, cart: cart, entry: entry),
+    onShowBankTransferDetails: (amountMinor, selected) =>
+        _showBankTransferDetailsDialog(
+          context,
+          checkout: checkout,
+          cart: cart,
+          entry: entry,
+          amountMinor: amountMinor,
+          selected: selected,
+        ),
+  );
+  if (checkout.state.phase == CheckoutPhase.completed) {
+    await sales.checkoutCommitted();
+  } else {
+    sales.checkoutStopped();
+  }
+  sales.finishCheckoutPresentation(
+    force:
+        checkout.state.phase == CheckoutPhase.completed ||
+        sales.state.phase == SalePhase.committed,
+  );
+}
+
+Future<void> _prepareSplitCheckout({
+  required CheckoutController checkout,
+  required CartController cart,
+  required EntryController entry,
+}) async {
+  final currentCart = cart.state.cart;
+  final operator = entry.state.operator;
+  if (currentCart == null || operator == null) return;
+  checkout.bindPartialLedger(
+    merchantId: currentCart.merchantId,
+    locationId: currentCart.locationId,
+    operatorSessionId: operator.id,
+    cartId: currentCart.id,
+    cartVersion: currentCart.version,
+  );
+  final currency = currentCart.totals['grandTotal'] is Map
+      ? (currentCart.totals['grandTotal'] as Map)['currency'] as String?
+      : null;
+  if (currency == null) return;
+  await checkout.loadPolicy(
+    merchantId: currentCart.merchantId,
+    locationId: currentCart.locationId,
+    operatorSessionId: operator.id,
+    currency: currency,
+  );
+}
+
 Future<void> showCheckoutSheet(
   BuildContext context, {
   required CheckoutController checkout,
@@ -81,7 +191,21 @@ Future<void> showCheckoutSheet(
       ),
     ),
   );
-  sales.finishCheckoutPresentation();
+  // A hardware back press on the paid receipt returns here without the
+  // "Nuevo pedido" action. Mark the sale committed before the cart is
+  // cleared, or the paid account stays visible and offers "Cobrar" again.
+  if (checkout.state.phase == CheckoutPhase.completed) {
+    await sales.checkoutCommitted();
+  }
+  // The payment is the authority that this cart is no longer editable. Clear
+  // the local cart even when the lifecycle controller did not observe the
+  // `checkingOut -> committed` transition. A completed split used to leave the
+  // paid account painted and offer `Cobrar` again.
+  sales.finishCheckoutPresentation(
+    force:
+        checkout.state.phase == CheckoutPhase.completed ||
+        sales.state.phase == SalePhase.committed,
+  );
 }
 
 final class _CheckoutSheet extends StatefulWidget {
@@ -288,7 +412,9 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (widget.cart.state.cart == null || widget.entry.state.operator == null) {
       return;
     }
-    await widget.cart.refresh();
+    if (!widget.checkout.usesLocalCheckout) {
+      await widget.cart.refresh();
+    }
     if (!mounted) return;
     final cart = widget.cart.state.cart;
     final operator = widget.entry.state.operator;
@@ -321,13 +447,13 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     await _syncPartialLedger(openWhenFound: true);
   }
 
-  Future<void> _syncPartialLedger({bool openWhenFound = false}) async {
+  Future<bool> _syncPartialLedger({bool openWhenFound = false}) async {
     final cart = widget.cart.state.cart;
     final operator = widget.entry.state.operator;
     if (cart == null ||
         operator == null ||
         !widget.checkout.canCollectPartialPayments) {
-      return;
+      return false;
     }
     try {
       final snapshot = await widget.checkout.partialPayments(
@@ -336,16 +462,18 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         locationId: cart.locationId,
         operatorSessionId: operator.id,
       );
-      if (!mounted) return;
+      if (!mounted) return false;
       final found = (snapshot['tenderDrafts'] as List? ?? const []).isNotEmpty;
       setState(() => _partialInProgress = found);
       if (found && openWhenFound && !_partialRouteOpen) {
         await _presentPartialCheckout();
       }
+      return found;
     } on AppException catch (failure) {
       if (failure.code == 'RESOURCE_NOT_FOUND' && mounted) {
         setState(() => _partialInProgress = false);
       }
+      return false;
     }
   }
 
@@ -360,6 +488,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         operatorSessionId:
             widget.entry.state.operator?.id ??
             widget.cart.state.cart!.operatorSessionId,
+        operatorName: widget.entry.operatorName,
         canConfirmManualTerminal:
             widget.entry.state.operator?.permissions.contains(
               'checkout.terminal.confirm',
@@ -634,6 +763,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         ? null
         : PaymentSummary.fromJson(state.result!.paymentSummary!);
     return SafeArea(
+      key: const ValueKey('checkout-surface'),
       child: Padding(
         padding: const EdgeInsets.all(UmiSpacing.lg),
         child: switch (state.phase) {
@@ -645,6 +775,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
           CheckoutPhase.provisional => _provisional(
             context,
             state.provisionalReceipt!,
+          ),
+          CheckoutPhase.provisionalSynced => _provisional(
+            context,
+            state.provisionalReceipt!,
+            officialSaleId: state.officialSaleId,
           ),
           CheckoutPhase.paymentUnknown => _unknown(context, state.result!),
           CheckoutPhase.processing || CheckoutPhase.repricing => Center(
@@ -2749,16 +2884,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     required int amountMinor,
     required String currency,
     required bool selected,
-  }) => showPosDialog<bool>(
-    context: context,
-    builder: (dialogContext) => BankTransferDialog(
-      details: policy.bankTransferDetails!,
-      merchantName: widget.entry.state.selectedTenant?.name ?? 'ONCA',
-      logoUrl: policy.merchantLogoUrl,
-      amount: _money({'currency': currency, 'minorUnits': amountMinor}),
-      accountFolio: widget.cart.state.cart?.accountFolio,
-      selected: selected,
-    ),
+  }) => _showBankTransferDetailsDialog(
+    context,
+    checkout: widget.checkout,
+    cart: widget.cart,
+    entry: widget.entry,
+    amountMinor: amountMinor,
+    currency: currency,
+    selected: selected,
   );
 
   Future<bool> _confirmBankReceived() async {
@@ -3878,28 +4011,55 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     _ => l.checkoutFailed,
   };
 
-  Widget _provisional(BuildContext context, ProvisionalReceipt receipt) {
+  Widget _provisional(
+    BuildContext context,
+    ProvisionalReceipt receipt, {
+    String? officialSaleId,
+  }) {
     final l = AppLocalizations.of(context);
+    final spanish = Localizations.localeOf(context).languageCode == 'es';
+    final synced = officialSaleId != null;
     final snapshot = OfflineCheckoutSnapshot.fromJson(receipt.snapshot);
     final totals = TotalsConfirmation.fromJson(snapshot.totals);
     final preview = TotalsPreview.fromJson(totals.totals);
     final cart = Cart.fromJson(snapshot.cartSnapshot);
     return Semantics(
       liveRegion: true,
-      label: l.provisionalSalePendingTitle,
+      label: synced
+          ? (spanish ? 'Venta sincronizada' : 'Sale synchronised')
+          : l.provisionalSalePendingTitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PosIcon(PosGlyphs.cloudOffOutlined, size: 64),
+          // Centered, not stretched. A `PosIcon` is a `SizedBox.square` around
+          // a painter that scales by the box's width and height separately, and
+          // this Column stretches its children — so the 64 px cloud was being
+          // laid out 1 800 px wide and painted 28:1 flat, which on the receipt
+          // screen looked like a torn dark ribbon above the title.
+          Center(
+            child: PosIcon(
+              synced ? PosGlyphs.cloudDoneOutlined : PosGlyphs.cloudOffOutlined,
+              size: 64,
+            ),
+          ),
           Text(
-            l.provisionalSalePendingTitle,
+            synced
+                ? (spanish ? 'Venta sincronizada' : 'Sale synchronised')
+                : l.provisionalSalePendingTitle,
             textAlign: TextAlign.center,
             style: PosTheme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: UmiSpacing.md),
-          Text(l.provisionalSalePendingBody, textAlign: TextAlign.center),
+          Text(
+            synced
+                ? (spanish
+                      ? 'La venta ya es oficial. El folio de abajo identifica la venta en el servidor.'
+                      : 'The sale is official. The reference below identifies it on the server.')
+                : l.provisionalSalePendingBody,
+            textAlign: TextAlign.center,
+          ),
           PosSelectableText(
-            receipt.provisionalSaleId,
+            officialSaleId ?? receipt.provisionalSaleId,
             textAlign: TextAlign.center,
           ),
           Text(receipt.locationName, textAlign: TextAlign.center),
@@ -4322,6 +4482,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                     committed = true;
                     await widget.sales.checkoutCommitted();
                   }
+                  widget.sales.finishCheckoutPresentation(force: true);
                   if (context.mounted) Navigator.pop(context);
                 },
                 child: Text(es ? 'Nuevo pedido' : 'New order'),

@@ -5128,6 +5128,17 @@ final class _CartPanel extends StatelessWidget {
   Future<void> _openCheckout(BuildContext context, {bool split = false}) async {
     if (beforeCheckout != null && !await beforeCheckout!()) return;
     if (!context.mounted) return;
+    if (split) {
+      await showSplitCheckout(
+        context,
+        checkout: checkout,
+        cashShiftId: cash.activeShiftId,
+        cart: controller,
+        entry: entry,
+        sales: sales,
+      );
+      return;
+    }
     await showCheckoutSheet(
       context,
       checkout: checkout,
@@ -5137,7 +5148,6 @@ final class _CartPanel extends StatelessWidget {
       sales: sales,
       customerValue: customerValue,
       deviceChannel: deviceChannel,
-      openSplitOnLoad: split,
       // The sale's completion screen prints through the same call
       // Ventas uses. It is the customer asking for their receipt at
       // the counter — the most ordinary reason a ticket is printed

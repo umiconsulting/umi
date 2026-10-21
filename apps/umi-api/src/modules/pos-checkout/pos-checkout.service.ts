@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import type {
+  Cart,
   CartItem,
   CartLineInput,
   CheckoutCancellationRequest,
@@ -101,6 +102,27 @@ function partialResult(cartId: string, rows: PartialPaymentRow[]): CheckoutParti
   };
 }
 
+function emptyPartialResult(cart: Cart): CheckoutPartialPaymentResult {
+  const total = cart.totals.grandTotal;
+  const zero = { minorUnits: 0, currency: total.currency };
+  return {
+    ok: true,
+    data: {
+      cartId: cart.id,
+      cartVersion: cart.version,
+      amountDue: total,
+      appliedAmount: zero,
+      remainingBalance: total,
+      tipAmount: zero,
+      tenderDrafts: [],
+      unresolvedTender: null,
+      confirmationReferences: {},
+      blockedByUnknown: false,
+      canFinalize: false,
+    },
+  };
+}
+
 @Injectable()
 export class PosCheckoutService {
   constructor(
@@ -130,7 +152,11 @@ export class PosCheckoutService {
       authorization.permissions.includes('checkout.recover.any') ||
         authorization.permissions.includes('*'),
     );
-    if (!rows || rows.length === 0) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+    if (!rows || rows.length === 0) {
+      const cart = await this.carts.readAccount(merchantId, query.locationId, cartId);
+      if (!cart) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+      return emptyPartialResult(cart);
+    }
     return partialResult(cartId, rows);
   }
 
@@ -215,6 +241,12 @@ export class PosCheckoutService {
           const amount = requested.amount.minorUnits;
           const tip = requested.tipAmount?.minorUnits ?? 0;
           const principal = amount - tip;
+          const serviceOperatorUserId = cart.originalOperatorUserId ?? authorization.operatorId;
+          const processedByUserId = authorization.operatorId;
+          const tipRecipientUserId =
+            policy.tip.attribution === 'payment_processor'
+              ? processedByUserId
+              : serviceOperatorUserId;
           if (
             requested.amount.currency !== currency ||
             (requested.tipAmount && requested.tipAmount.currency !== currency) ||
@@ -361,9 +393,10 @@ export class PosCheckoutService {
                  (merchant_id,location_id,cart_id,tender_id,position,cart_version,
                   cart_fingerprint,base_due_minor_units,currency,tender_type,
                   amount_minor_units,tip_minor_units,received_minor_units,status,
-                  cash_shift_id,confirmation_reference,operator_session_id,command_id)
+                  cash_shift_id,confirmation_reference,operator_session_id,
+                  service_operator_user_id,processed_by_user_id,tip_recipient_user_id,command_id)
                VALUES ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-                       $14,$15::uuid,$16,$17::uuid,$18::uuid)`,
+                       $14,$15::uuid,$16,$17::uuid,$18::uuid,$19::uuid,$20::uuid,$21::uuid)`,
               [
                 merchantId,
                 dto.locationId,
@@ -382,6 +415,9 @@ export class PosCheckoutService {
                 dto.cashShiftId,
                 dto.confirmationReference,
                 dto.operatorSessionId,
+                serviceOperatorUserId,
+                processedByUserId,
+                tipRecipientUserId,
                 context.commandId,
               ],
             );
@@ -462,6 +498,7 @@ export class PosCheckoutService {
               tenderId: requested.id,
               principalMinorUnits: principal,
               tipMinorUnits: tip,
+              tipRecipientUserId,
             },
           });
           return { ok: true, value: partialResult(cartId, rows) };
@@ -474,7 +511,24 @@ export class PosCheckoutService {
     return result.result;
   }
 
-  async checkout(user: AuthUser, merchantId: string, dto: CheckoutCommand) {
+  /**
+   * Complete a sale.
+   *
+   * `trustedConfirmation` is reserved for offline replay. The till already took
+   * the cash at these totals, so these totals are the sale. The caller must
+   * supply the line snapshot that produced them; the cart's identity and line
+   * content are still checked against the live cart below. Orders that arrive
+   * from an HTTP checkout route never set it.
+   */
+  async checkout(
+    user: AuthUser,
+    merchantId: string,
+    dto: CheckoutCommand,
+    ownership?: {
+      trustedConfirmation?: TotalsConfirmation;
+      trustedLineSnapshot?: CartItem[];
+    },
+  ) {
     const authorization = await this.authorize(
       user,
       merchantId,
@@ -517,6 +571,32 @@ export class PosCheckoutService {
               failureClass: 'validation',
               retryable: false,
             };
+          }
+          const trustedConfirmation = ownership?.trustedConfirmation;
+          const trustedLineSnapshot = ownership?.trustedLineSnapshot;
+          const trusted = trustedConfirmation != null;
+          if (trusted) {
+            const cashTenderOnly =
+              dto.paymentMethod === 'cash' &&
+              dto.tenderDrafts.length === 1 &&
+              dto.tenderDrafts[0].type === 'cash' &&
+              (dto.tenderDrafts[0].status === 'confirmed_success' ||
+                dto.tenderDrafts[0].status === 'draft') &&
+              (dto.tenderDrafts[0].tipAmount?.minorUnits ?? 0) === 0;
+            const supported =
+              cashTenderOnly &&
+              dto.discountDrafts.length === 0 &&
+              dto.tipDraft === null &&
+              dto.customerValue == null &&
+              dto.approvalIds.length === 0 &&
+              trustedLineSnapshot != null &&
+              trustedLineSnapshot.length > 0 &&
+              this.trustedLinesMatch(cart, trustedLineSnapshot);
+            if (!supported) {
+              throw new ConflictException({
+                code: 'CHECKOUT_CART_CHANGED',
+              });
+            }
           }
           const partialRows = await this.repo.partialRows(
             context.client,
@@ -563,6 +643,13 @@ export class PosCheckoutService {
               };
             }
           }
+          if (
+            trustedConfirmation &&
+            trustedConfirmation.totals.grandTotal.currency !==
+              repriced.public.totals.grandTotal.currency
+          ) {
+            throw new ConflictException({ code: 'CHECKOUT_CART_CHANGED' });
+          }
           const policy = await this.repo.policy(
             context.client,
             merchantId,
@@ -574,11 +661,12 @@ export class PosCheckoutService {
             cart,
             dto.customerValue,
           );
+          const pricedLines = trustedLineSnapshot ?? repriced.lineSnapshot;
           const lineAmounts = new Map(
-            repriced.lineSnapshot.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
+            pricedLines.map((line) => [line.id, line.price.lineSubtotal.minorUnits]),
           );
           const calculation = calculateCheckout(
-            repriced.public,
+            trustedConfirmation ?? repriced.public,
             dto,
             policy,
             lineAmounts,
@@ -586,7 +674,7 @@ export class PosCheckoutService {
             registeredPartial,
           );
           const customerValueBasisFingerprint = calculateCheckout(
-            repriced.public,
+            trustedConfirmation ?? repriced.public,
             {
               ...dto,
               customerValue: null,
@@ -763,7 +851,8 @@ export class PosCheckoutService {
               ),
             };
           }
-          if (dto.totalsFingerprint !== confirmation.fingerprint) {
+          const requiredFingerprint = trustedConfirmation?.fingerprint ?? confirmation.fingerprint;
+          if (dto.totalsFingerprint !== requiredFingerprint) {
             const code =
               dto.totalsFingerprint === null
                 ? 'CHECKOUT_CONFIRMATION_REQUIRED'
@@ -793,7 +882,13 @@ export class PosCheckoutService {
             };
           }
           const confirmed: TotalsConfirmation = {
-            ...confirmation,
+            ...(trustedConfirmation ?? confirmation),
+            // The trusted path refuses discounts, tips and stored value, so the
+            // calculator cannot change the money. Its one derived field on this
+            // path is the optional stored-value binding.
+            storedValueFingerprint:
+              calculation.confirmation.storedValueFingerprint ??
+              (trustedConfirmation ?? confirmation).storedValueFingerprint,
             confirmedAt: new Date().toISOString(),
           };
           const discountPermissionDenied =
@@ -993,14 +1088,9 @@ export class PosCheckoutService {
             summary,
             context.correlationId,
           );
-          const receipt = this.receipt(
-            cart,
-            confirmed,
-            payments,
-            summary,
-            repriced.lineSnapshot,
-            dto,
-          );
+          const receipt = this.receipt(cart, confirmed, payments, summary, pricedLines, dto);
+          const serverTotal = repriced.public.totals.grandTotal.minorUnits;
+          const chargedTotal = confirmed.totals.grandTotal.minorUnits;
           const committed = await this.repo.commit(
             context.client,
             cart,
@@ -1017,6 +1107,12 @@ export class PosCheckoutService {
             dto.idempotencyKey,
             customerValueBasisFingerprint,
             dto.customerValue ?? null,
+            trusted
+              ? {
+                  serverRepricedTotals: repriced.public,
+                  divergenceMinorUnits: chargedTotal - serverTotal,
+                }
+              : null,
           );
           const sale = committed.sale;
           // THE RECEIPT AS ISSUED, NOT AS DRAFTED.
@@ -1076,6 +1172,36 @@ export class PosCheckoutService {
       });
     }
     return result.result;
+  }
+
+  /**
+   * A trusted sale may differ in PRICE, never in WHAT was sold.
+   *
+   * The server cart and the till snapshot are compared line by line on product,
+   * variant, modifiers, quantity, course and note. Local line ids are ignored
+   * because an offline cart receives official ids during replay.
+   */
+  private trustedLinesMatch(cart: CheckoutCart, lines: CartItem[]): boolean {
+    if (cart.lines.length !== lines.length) return false;
+    return cart.lines.every((cartLine, index) => {
+      const line = lines[index];
+      const cartModifiers = cartLine.modifiers
+        .map((modifier) => `${modifier.modifierId}:${modifier.quantity}`)
+        .sort()
+        .join(',');
+      const lineModifiers = line.modifiers
+        .map((modifier) => `${modifier.modifierId}:${modifier.quantity}`)
+        .sort()
+        .join(',');
+      return (
+        cartLine.productId === line.productId &&
+        cartLine.variantId === (line.variant?.variantId ?? null) &&
+        cartLine.quantity === line.quantity &&
+        cartLine.courseNumber === line.courseNumber &&
+        (cartLine.note ?? null) === (line.note ?? null) &&
+        cartModifiers === lineModifiers
+      );
+    });
   }
 
   private async withInventoryErrors<T>(promise: Promise<T>): Promise<T> {

@@ -416,11 +416,27 @@ final class CartController extends ChangeNotifier {
     if (journal == null) return false;
     try {
       final snapshot = await journal.load();
-      if (snapshot.pendingCount != 0) return false;
+      if (snapshot.pendingCount != 0) {
+        _failure(
+          const AppException(
+            category: AppErrorCategory.conflict,
+            code: 'OFFLINE_SYNC_PENDING',
+            recoverable: true,
+          ),
+        );
+        return false;
+      }
       queue.clearSettledCommands();
       _setQueueBusy(false);
       return true;
     } catch (_) {
+      _failure(
+        const AppException(
+          category: AppErrorCategory.storage,
+          code: 'OFFLINE_SYNC_PENDING',
+          recoverable: true,
+        ),
+      );
       return false;
     }
   }

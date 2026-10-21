@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { IsoTimestamp, JsonPayload, ReceiptSnapshot, Uuid } from './platform';
 import { CheckoutCommand, TotalsConfirmation } from './pos-checkout';
+import { TotalsPreview } from './pos-cart';
 
 export const ConnectivityState = z.enum([
   'unknown',
@@ -14,7 +15,22 @@ export const ConnectivityState = z.enum([
 ]);
 export type ConnectivityState = z.infer<typeof ConnectivityState>;
 
-export const OfflineCommandType = z.enum(['operational.ack', 'pos.checkout.cash']);
+export const OfflineCommandType = z.enum([
+  'operational.ack',
+  'pos.checkout.cash',
+  'pos.cart.open',
+  'pos.cart.line.add',
+  'pos.cart.line.update',
+  'pos.cart.line.remove',
+  'pos.cart.clear',
+  'pos.cart.prepare',
+  'pos.cart.fire',
+  'pos.cart.fulfillment.set',
+  'pos.cart.table.set',
+  'pos.table.command',
+  'pos.kds.command',
+  'pos.command.group',
+]);
 export type OfflineCommandType = z.infer<typeof OfflineCommandType>;
 
 export const ConflictClassification = z.enum([
@@ -22,6 +38,8 @@ export const ConflictClassification = z.enum([
   'fingerprint_mismatch',
   'sequence_gap',
   'sequence_behind',
+  /** An earlier command on the same account still needs a decision. */
+  'stream_blocked',
   'credential_rotated',
   'device_revoked',
   'merchant_mismatch',
@@ -32,6 +50,14 @@ export const ConflictClassification = z.enum([
   'catalog_version_expired',
   'price_changed',
   'tax_changed',
+  /** The cart the server would price is not the account the till rang up. */
+  'cart_mismatch',
+  /** The sale is valid but exceeds one of the offline cash limits. */
+  'offline_limit_exceeded',
+  /** The table the till chose cannot be claimed: another account has it. */
+  'table_unavailable',
+  /** The sale was accepted at the charged total and the server re-price is on record. */
+  'price_divergence_recorded',
   'availability_changed',
   'inventory_unavailable',
   'aggregate_version_conflict',
@@ -100,7 +126,15 @@ export type OfflinePolicy = z.infer<typeof OfflinePolicy>;
 export const OfflineCommand = z
   .object({
     commandId: Uuid,
-    provisionalId: Uuid.nullable(),
+    /**
+     * `prov-<uuid>` is accepted for journals written by an early checkout
+     * build. The prefix was never persisted as an official identity; the
+     * replay service removes it before it touches a UUID column.
+     */
+    provisionalId: z
+      .string()
+      .regex(/^(prov-)?[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+      .nullable(),
     deviceId: Uuid,
     deviceCredentialVersion: z.number().int().positive(),
     deviceSequence: z.number().int().positive(),
@@ -113,10 +147,36 @@ export const OfflineCommand = z
     contractVersion: z.string().min(1).max(64),
     schemaVersion: z.number().int().positive(),
     createdAt: IsoTimestamp,
+    originDeviceId: Uuid.nullish(),
+    originOperatorSessionId: Uuid.nullish(),
+    hubReceivedAt: IsoTimestamp.nullish(),
+    hubOwned: z.boolean().nullish(),
     payload: JsonPayload,
   })
   .strict();
 export type OfflineCommand = z.infer<typeof OfflineCommand>;
+
+export const OfflineOpenTableAccountEffect = z
+  .object({
+    type: z.literal('open_table_account'),
+    provisionalCartId: Uuid,
+    tableId: Uuid,
+    partySize: z.number().int().min(1).max(64).nullish(),
+    expectedVersion: z.number().int().positive().nullish(),
+  })
+  .strict();
+export const OfflineCommandEffect = z.discriminatedUnion('type', [OfflineOpenTableAccountEffect]);
+export const OfflineCommandGroupPayload = z
+  .object({
+    groupId: Uuid,
+    aggregateKeys: z.array(z.string().min(1).max(160)).min(1).max(16),
+    effects: z.array(OfflineCommandEffect).min(1).max(16),
+    originDeviceId: Uuid.nullish(),
+    originOperatorSessionId: Uuid.nullish(),
+    hubReceivedAt: IsoTimestamp.nullish(),
+  })
+  .strict();
+export type OfflineCommandGroupPayload = z.infer<typeof OfflineCommandGroupPayload>;
 
 export const OfflineCheckoutSnapshot = z
   .object({
@@ -244,6 +304,17 @@ export const OfficialCommitResult = z
     acceptedAt: IsoTimestamp,
     paymentSummary: JsonPayload,
     reconciliationReference: Uuid,
+    /**
+     * The server's own price for the same accepted sale. It is present only
+     * when the server total differs from the amount the customer paid.
+     */
+    divergence: z
+      .object({
+        serverTotals: TotalsPreview,
+        deltaMinorUnits: z.number().int(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type OfficialCommitResult = z.infer<typeof OfficialCommitResult>;
@@ -287,6 +358,7 @@ export const ReplayCursor = z
     deviceId: Uuid,
     credentialVersion: z.number().int().positive(),
     lastAcceptedSequence: z.number().int().nonnegative(),
+    lastProcessedSequence: z.number().int().nonnegative().optional(),
     reconciliationRequired: z.boolean(),
     updatedAt: IsoTimestamp,
   })
@@ -412,6 +484,7 @@ export const ReconciliationSummary = z
     localLastAllocatedSequence: z.number().int().nonnegative(),
     localLastAcknowledgedSequence: z.number().int().nonnegative(),
     serverLastAcceptedSequence: z.number().int().nonnegative(),
+    serverLastProcessedSequence: z.number().int().nonnegative().optional(),
     missingSequences: z.array(z.number().int().positive()).max(100),
     duplicates: z.array(Uuid).max(100),
     conflicts: z.array(ReplayResult).max(100),
@@ -444,6 +517,21 @@ export const AcknowledgeReconciliationRequest = z
   })
   .strict();
 export type AcknowledgeReconciliationRequest = z.infer<typeof AcknowledgeReconciliationRequest>;
+export const ResolveReplayConflictRequest = z
+  .object({
+    resolution: z.literal('discard_refused'),
+  })
+  .strict();
+export type ResolveReplayConflictRequest = z.infer<typeof ResolveReplayConflictRequest>;
+export const ResolvedReplayConflict = z
+  .object({
+    resolved: z.boolean(),
+    commandId: Uuid,
+    deviceSequence: z.number().int().positive(),
+    nextAcceptedSequence: z.number().int().nonnegative(),
+  })
+  .strict();
+export type ResolvedReplayConflict = z.infer<typeof ResolvedReplayConflict>;
 export const ReplayDiagnostics = z
   .object({
     contractVersion: z.string().min(1).max(64),
@@ -496,6 +584,7 @@ export const posOfflineModels = {
   OfflineCashPolicy,
   OfflinePolicy,
   OfflineCommand,
+  OfflineCommandGroupPayload,
   OfflineCheckoutSnapshot,
   OfflineCheckoutCommand,
   OfflineCheckoutBlockReason,
@@ -521,6 +610,8 @@ export const posOfflineModels = {
   ReconciliationSummary,
   ReconcileRequest,
   AcknowledgeReconciliationRequest,
+  ResolveReplayConflictRequest,
+  ResolvedReplayConflict,
   ReplayDiagnostics,
   ReplayContextQuery,
   ReplayCommandResultQuery,

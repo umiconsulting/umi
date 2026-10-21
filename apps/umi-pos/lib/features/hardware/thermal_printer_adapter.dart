@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../shared/receipt_time.dart';
 import 'hardware_runtime.dart';
+import 'print_trace.dart';
 import 'thermal_logo.dart';
 
 enum ThermalAlignment { left, center, right }
@@ -105,6 +106,7 @@ final class ThermalReceiptLabels {
   final String order;
   final String ticket;
   final String originalTicket;
+
   /// The word in front of the hour the paper carries.
   final String time;
   final String refund;
@@ -334,10 +336,7 @@ final class ThermalReceiptRenderer {
     final issuedAt = receipt['issuedAt'];
     final clock = issuedAt is String ? receiptClockTime(issuedAt) : null;
     if (clock != null) {
-      text(
-        '${labels.time} $clock',
-        alignment: ThermalAlignment.center,
-      );
+      text('${labels.time} $clock', alignment: ThermalAlignment.center);
     }
     text('-' * widthColumns);
 
@@ -649,6 +648,17 @@ abstract interface class HardwareByteTransport {
   Future<void> close();
 }
 
+/// A link whose routine health sweep can use what its last real operation
+/// proved, instead of putting another command on the paper path.
+///
+/// USB is one serial resource: a background `DLE EOT` query and a receipt
+/// cannot happen together. The hardware centre and a diagnostic call [health]
+/// because the operator asked for a measurement now; the periodic sweep asks
+/// this method and records the last send or probe.
+abstract interface class BackgroundHardwareHealth {
+  Future<HardwareByteTransportHealth> backgroundHealth();
+}
+
 final class GenericThermalPrinterAdapter implements DeviceAdapter {
   GenericThermalPrinterAdapter({
     required this.byteTransport,
@@ -705,11 +715,31 @@ final class GenericThermalPrinterAdapter implements DeviceAdapter {
         },
       );
     }
+    final dispatchStarted = Stopwatch()..start();
+    var documentBuildMs = 0;
+    var encodeMs = 0;
+    var writeMs = 0;
     try {
+      printTrace('printer.document_start', {
+        'bytesLimit': maximumDocumentBytes,
+        'columns': widthColumns,
+      });
+      final documentStarted = Stopwatch()..start();
       final document = command.type == 'print_test_page'
           ? _testDocument()
           : await _receiptDocument(command);
+      documentBuildMs = documentStarted.elapsedMilliseconds;
+      printTrace('printer.document_done', {
+        'documentMs': documentBuildMs,
+        'commands': document.commands.length,
+      });
+      final encodeStarted = Stopwatch()..start();
       final bytes = _encoder.encode(document);
+      encodeMs = encodeStarted.elapsedMilliseconds;
+      printTrace('printer.encode_done', {
+        'encodeMs': encodeMs,
+        'bytes': bytes.length,
+      });
       if (bytes.length > maximumDocumentBytes) {
         return const RuntimeCommandResult(
           status: RuntimeCommandStatus.failed,
@@ -719,7 +749,19 @@ final class GenericThermalPrinterAdapter implements DeviceAdapter {
           safeMetadata: {'statusMessage': 'THERMAL_DOCUMENT_TOO_LARGE'},
         );
       }
-      return _runtimeResult(await byteTransport.send(bytes));
+      final writeStarted = Stopwatch()..start();
+      printTrace('printer.usb_write_start', {'bytes': bytes.length});
+      final result = await byteTransport.send(bytes);
+      writeMs = writeStarted.elapsedMilliseconds;
+      printTrace('printer.usb_write_done', {
+        'writeMs': writeMs,
+        'outcome': result.outcome.name,
+        'failure': result.failureCode,
+      });
+      return _runtimeResult(
+        result,
+        latencyMs: dispatchStarted.elapsedMilliseconds,
+      );
     } on FormatException catch (error) {
       return RuntimeCommandResult(
         status: RuntimeCommandStatus.failed,
@@ -825,25 +867,32 @@ final class PrinterAttachedDrawerAdapter implements DeviceAdapter {
   }
 }
 
-RuntimeCommandResult _runtimeResult(HardwareByteTransportResult result) =>
-    switch (result.outcome) {
-      HardwareByteTransportOutcome.sent => const RuntimeCommandResult(
-        status: RuntimeCommandStatus.succeeded,
-        failureCode: null,
-        retryable: false,
-        recovered: false,
-        safeMetadata: {'acknowledged': true},
-      ),
-      HardwareByteTransportOutcome.notSent => RuntimeCommandResult(
-        status: RuntimeCommandStatus.retryable,
-        failureCode: result.failureCode ?? 'retryable_transport_failure',
-        retryable: true,
-        recovered: false,
-      ),
-      HardwareByteTransportOutcome.unknown => RuntimeCommandResult(
-        status: RuntimeCommandStatus.unknown,
-        failureCode: result.failureCode ?? 'unknown_outcome',
-        retryable: false,
-        recovered: false,
-      ),
-    };
+RuntimeCommandResult _runtimeResult(
+  HardwareByteTransportResult result, {
+  int? latencyMs,
+}) {
+  final metadata = Map<String, Object?>.unmodifiable({'latencyMs': ?latencyMs});
+  return switch (result.outcome) {
+    HardwareByteTransportOutcome.sent => RuntimeCommandResult(
+      status: RuntimeCommandStatus.succeeded,
+      failureCode: null,
+      retryable: false,
+      recovered: false,
+      safeMetadata: {'acknowledged': true, ...metadata},
+    ),
+    HardwareByteTransportOutcome.notSent => RuntimeCommandResult(
+      status: RuntimeCommandStatus.retryable,
+      failureCode: result.failureCode ?? 'retryable_transport_failure',
+      retryable: true,
+      recovered: false,
+      safeMetadata: metadata,
+    ),
+    HardwareByteTransportOutcome.unknown => RuntimeCommandResult(
+      status: RuntimeCommandStatus.unknown,
+      failureCode: result.failureCode ?? 'unknown_outcome',
+      retryable: false,
+      recovered: false,
+      safeMetadata: metadata,
+    ),
+  };
+}
