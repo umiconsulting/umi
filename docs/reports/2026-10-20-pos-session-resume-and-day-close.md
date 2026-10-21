@@ -149,3 +149,58 @@ Artifacts:
 The remaining 5–6 second cold launch to the PIN must be profiled separately from
 post-login performance. Its delay occurs before the first network request and is
 not explained by POS/API response time.
+
+## Follow-up: CART_ACTOR_BUSY after re-enrollment
+
+The iMin produced `CART_ACTOR_BUSY` when opening Cardón while an empty account
+from the same operator was still active on the server. The table write was then
+incorrectly journaled locally, so the till painted a provisional table account
+that the server never accepted.
+
+Two changes close that path:
+
+- A table or new-order command now parks the operator's active server account
+  before creating the next one. Empty accounts are closed; accounts with content
+  become suspended and remain available in Cuentas. Unresolved payments still
+  block the switch.
+- The client treats `CART_ACTOR_BUSY` as a definite server refusal and never
+  queues a local replacement.
+
+The device had also been re-enrolled, leaving replay commands from the previous
+device ID. The server correctly refused that mixed stream with
+`REPLAY_SCOPE_INVALID`. Recovery now resets a stale non-financial replay scope;
+foreign-device cash commands remain untouched for explicit reconciliation.
+
+Final proof: Cuenta 002 was created for Cardón while the previous empty account
+was closed. There is no error banner, no local pending queue, and no replay-scope
+refusal.
+
+## Follow-up: resuming an account while another one is hidden
+
+The next cold entry exposed a second path to the same refusal. The server still
+held Cuenta 003 as `building_cart`, but that empty counter account was not present
+in the visible Cuentas list. Selecting Cuenta 002 therefore returned
+`CART_ACTOR_BUSY` from `accounts/:cartId/resume`: the hidden cart belonged to the
+same operator, so it did not conflict with the selected account's ownership, but
+the actor-availability check treated it as a blocker.
+
+`claimAccount` now performs the same safe switch used by new orders and table
+creation before checking actor availability. An empty hidden cart is cancelled;
+a cart with content is suspended and remains resumable; unresolved payments still
+stop the switch. The selected account is only claimed after that write succeeds.
+
+Final device proof:
+
+- Selecting Cuenta 002 returned `201` and opened Cardón with no generic banner.
+- The hidden empty Cuenta 003 was cancelled rather than orphaned.
+- Account 002 was saved, reopened and saved again after the corrected staging
+  container was recreated from image
+  `ghcr.io/umiconsulting/umi-api:account-resume-d17c24fe`.
+- Release identity reports commit
+  `d17c24fe657b0c417d9db30817795fe2b596e9a4`.
+- The app was left on a clean menu with the account visible in Cuentas.
+
+Artifacts:
+
+- [Account 002 resumed](evidence/2026-10-20-session-resume/imin-account002-resumed.png)
+- [Final clean menu](evidence/2026-10-20-session-resume/imin-final-clean-menu.png)
