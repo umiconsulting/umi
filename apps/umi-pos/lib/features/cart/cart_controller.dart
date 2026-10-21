@@ -409,6 +409,22 @@ final class CartController extends ChangeNotifier {
     return queue.preservePendingCommands();
   }
 
+  Future<bool> _settleConfirmedQueueForAccountSwitch() async {
+    final queue = _queue;
+    if (queue == null || !queue.hasPending) return true;
+    final journal = _journal;
+    if (journal == null) return false;
+    try {
+      final snapshot = await journal.load();
+      if (snapshot.pendingCount != 0) return false;
+      queue.clearSettledCommands();
+      _setQueueBusy(false);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<List<Cart>> openAccounts(
     String merchantId,
     String locationId,
@@ -706,6 +722,7 @@ final class CartController extends ChangeNotifier {
       // current account into an unreachable one.
       return true;
     }
+    if (!await _settleConfirmedQueueForAccountSwitch()) return false;
     if (_busy) return false;
     if (_state.cart != null && !await saveAccount()) return false;
     clearLocal();
