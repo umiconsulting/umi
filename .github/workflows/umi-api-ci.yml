@@ -156,6 +156,23 @@ jobs:
       - name: Build workspace deps
         run: pnpm --filter @umi/api... build
 
+      - name: EGR activation migration guards
+        env:
+          EGR_ACTIVATION_TEST_DATABASE: umi_egr_activation_test_ci
+        run: |
+          set -euo pipefail
+          createdb "$EGR_ACTIVATION_TEST_DATABASE"
+          node --test scripts/umi-egr-reward-activation.spec.cjs
+
+      - name: EGR canonical fixture and activation rehearsal
+        env:
+          EGR_CANONICAL_TEST_DATABASE: umi_egr_pilot_fixture_ci
+        run: |
+          set -euo pipefail
+          createdb "$EGR_CANONICAL_TEST_DATABASE"
+          bash docs/migration/build-v3/00_run.sh "$EGR_CANONICAL_TEST_DATABASE"
+          node --test scripts/umi-egr-canonical-rehearsal.spec.cjs
+
       # A pristine build, every time. No production snapshot, so no customer PII
       # ever reaches CI — and the run proves the DDL applies to an EMPTY database,
       # which is the mode the cutover itself uses (AB#14).
