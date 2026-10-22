@@ -309,6 +309,34 @@ describe('cobro parcial durable', () => {
     expect(recovered.data.tenderDrafts).toEqual(third.data.tenderDrafts);
   });
 
+  it('continúa el cobro cuando la cuenta avanzó pero el contenido no cambió', async () => {
+    const { service, rows } = harness();
+    await service.collectPartialPayment(
+      user,
+      merchantId,
+      cartId,
+      request(1, 'bank_transfer', 4000),
+    );
+    // Suspending/resuming an account advances its version without changing the
+    // frozen order. The first tender's historical version must not make the
+    // remaining balance unpayable.
+    rows[0].cartVersion = 2;
+
+    const second = await service.collectPartialPayment(
+      user,
+      merchantId,
+      cartId,
+      request(2, 'cash', 6000),
+    );
+
+    expect(second.data).toMatchObject({
+      cartVersion: 3,
+      appliedAmount: money(10_000),
+      remainingBalance: money(0),
+      canFinalize: true,
+    });
+  });
+
   it.each([
     ['account_owner', 'cash', id(80)],
     ['account_owner', 'manual_terminal', id(80)],
