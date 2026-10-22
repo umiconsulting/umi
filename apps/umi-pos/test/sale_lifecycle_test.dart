@@ -577,6 +577,106 @@ void main() {
     },
   );
 
+  testWidgets('a local pending cash sale appears in Sales with retry', (
+    tester,
+  ) async {
+    final journal = EncryptedOfflineJournal(_JournalStore(), web: false);
+    final localCart = cart(id: '00000000-0000-4000-8000-000000000021');
+    final confirmedAt = DateTime.utc(2026, 7, 29, 12).toIso8601String();
+    await journal.append(
+      commandId: '00000000-0000-4000-8000-000000000022',
+      deviceId: '00000000-0000-4000-8000-000000000023',
+      credentialVersion: 1,
+      merchantId: merchantId,
+      locationId: locationId,
+      operatorSessionId: operatorId,
+      idempotencyKey: '00000000-0000-4000-8000-000000000024',
+      provisionalId: '00000000-0000-4000-8000-000000000021',
+      commandType: 'pos.checkout.cash',
+      cashAmountMinorUnits: 0,
+      maxPendingCashCount: 3,
+      maxPendingCashMinorUnits: 30000,
+      payload: {
+        'policyVersion': 'policy-1',
+        'policyFingerprint': List.filled(64, 'a').join(),
+        'checkoutIdentity': List.filled(64, 'b').join(),
+        'snapshot': {
+          'checkoutCommand': {
+            'cartId': localCart.id,
+            'locationId': locationId,
+            'operatorSessionId': operatorId,
+            'expectedCartVersion': localCart.version,
+            'paymentMethod': 'cash',
+            'totalsFingerprint': List.filled(64, 'c').join(),
+            'idempotencyKey': '00000000-0000-4000-8000-000000000025',
+            'tenderDrafts': <Object?>[],
+            'tipDraft': null,
+            'discountDrafts': <Object?>[],
+            'approvalIds': <Object?>[],
+            'receiptDelivery': {
+              'destination': 'display',
+              'channel': null,
+              'customerContactId': null,
+            },
+            'cashShiftId': '00000000-0000-4000-8000-000000000026',
+            'customerValue': null,
+          },
+          'cartSnapshot': localCart.toJson(),
+          'totals': {
+            'cartVersion': localCart.version,
+            'fingerprint': List.filled(64, 'c').join(),
+            'totals': localCart.totals,
+            'taxes': {
+              'total': {'currency': 'MXN', 'minorUnits': 0},
+              'entries': <Object?>[],
+            },
+            'discounts': {
+              'total': {'currency': 'MXN', 'minorUnits': 0},
+              'entries': <Object?>[],
+            },
+            'catalogVersion': 'catalog-1',
+            'pricingVersion': 'pricing-1',
+            'taxVersion': 'tax-1',
+            'snapshotAt': confirmedAt,
+            'confirmedAt': confirmedAt,
+          },
+          'catalogVersion': 'catalog-1',
+          'pricingVersion': 'pricing-1',
+          'taxVersion': 'tax-1',
+          'catalogSnapshotAt': confirmedAt,
+          'pricingSnapshotAt': confirmedAt,
+          'taxSnapshotAt': confirmedAt,
+          'currency': 'MXN',
+          'amountDueMinorUnits': 0,
+          'amountReceivedMinorUnits': 0,
+          'changeDueMinorUnits': 0,
+          'businessDate': '2026-07-29',
+        },
+      },
+    );
+    final lifecycle = _controller(_Sales());
+    await lifecycle.open(merchantId, locationId, operatorId);
+
+    await tester.pumpWidget(
+      _scaledHistoryApp(
+        SaleCenterSurface(
+          lifecycle: lifecycle,
+          embedded: true,
+          permissions: OperatorPermissions(['sale.lifecycle']),
+          offlineJournal: journal,
+        ),
+        1,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Venta pendiente de sincronización'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(PosButton, 'Reintentar'), findsOneWidget);
+  });
+
   test(
     'a fresh operator entry can bind the till without adopting the sale',
     () async {

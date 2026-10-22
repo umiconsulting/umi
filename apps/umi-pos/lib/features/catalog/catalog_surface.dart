@@ -2968,6 +2968,28 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
         embedded: true,
         onResumed: () => setState(() => _setSection(TillSurface.order)),
         onPrint: _receiptPrinter,
+        offlineJournal: widget.offlineJournal,
+        offlineRecovery: widget.offlineRecovery,
+        offlineScope: () {
+          final state = widget.entry.state;
+          final device = state.device;
+          final merchant = state.selectedTenant;
+          final location = state.selectedBranch;
+          final operator = state.operator;
+          if (device == null ||
+              merchant == null ||
+              location == null ||
+              operator == null) {
+            return null;
+          }
+          return ReplayScope(
+            deviceId: device.id,
+            merchantId: merchant.id,
+            locationId: location.id,
+            operatorSessionId: operator.id,
+            credentialVersion: device.credentialVersion,
+          );
+        },
         onKitchenStatus: widget.kitchenStatus == null
             ? null
             : (sale) {

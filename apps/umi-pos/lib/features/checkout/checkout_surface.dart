@@ -4050,108 +4050,85 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     ProvisionalReceipt receipt, {
     String? officialSaleId,
   }) {
-    final l = AppLocalizations.of(context);
-    final spanish = Localizations.localeOf(context).languageCode == 'es';
-    final synced = officialSaleId != null;
     final snapshot = OfflineCheckoutSnapshot.fromJson(receipt.snapshot);
     final totals = TotalsConfirmation.fromJson(snapshot.totals);
     final preview = TotalsPreview.fromJson(totals.totals);
     final cart = Cart.fromJson(snapshot.cartSnapshot);
-    return Semantics(
-      liveRegion: true,
-      label: synced
-          ? (spanish ? 'Venta sincronizada' : 'Sale synchronised')
-          : l.provisionalSalePendingTitle,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Centered, not stretched. A `PosIcon` is a `SizedBox.square` around
-          // a painter that scales by the box's width and height separately, and
-          // this Column stretches its children — so the 64 px cloud was being
-          // laid out 1 800 px wide and painted 28:1 flat, which on the receipt
-          // screen looked like a torn dark ribbon above the title.
-          Center(
-            child: PosIcon(
-              synced ? PosGlyphs.cloudDoneOutlined : PosGlyphs.cloudOffOutlined,
-              size: 64,
-            ),
-          ),
-          Text(
-            synced
-                ? (spanish ? 'Venta sincronizada' : 'Sale synchronised')
-                : l.provisionalSalePendingTitle,
-            textAlign: TextAlign.center,
-            style: PosTheme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: UmiSpacing.md),
-          Text(
-            synced
-                ? (spanish
-                      ? 'La venta ya es oficial. El folio de abajo identifica la venta en el servidor.'
-                      : 'The sale is official. The reference below identifies it on the server.')
-                : l.provisionalSalePendingBody,
-            textAlign: TextAlign.center,
-          ),
-          PosSelectableText(
-            officialSaleId ?? receipt.provisionalSaleId,
-            textAlign: TextAlign.center,
-          ),
-          Text(receipt.locationName, textAlign: TextAlign.center),
-          Text(receipt.operatorName, textAlign: TextAlign.center),
-          const PosDivider(),
-          Expanded(
-            child: ListView(
-              children: [
-                for (final raw in cart.items)
-                  Builder(
-                    builder: (context) {
-                      final line = CartItem.fromJson(raw);
-                      return PosListRow(
-                        title: Text(line.productName),
-                        subtitle: Text(
-                          [
-                            if (line.variant != null)
-                              line.variant!['name'] as String,
-                            ...line.modifiers.map(
-                              (modifier) => modifier['name']! as String,
-                            ),
-                          ].join(' · '),
-                        ),
-                        trailing: Text('${line.quantity}'),
-                      );
-                    },
-                  ),
-              ],
-            ),
-          ),
-          _AmountRow(label: l.taxLabel, value: _money(preview.tax)),
-          _AmountRow(
-            label: l.totalLabel,
-            value: _money(preview.grandTotal),
-            emphasized: true,
-          ),
-          _AmountRow(
-            label: l.cashReceivedLabel,
-            value: _money({
-              'currency': snapshot.currency,
-              'minorUnits': snapshot.amountReceivedMinorUnits,
-            }),
-          ),
-          _AmountRow(
-            label: l.changeDueLabel,
-            value: _money({
-              'currency': snapshot.currency,
-              'minorUnits': snapshot.changeDueMinorUnits,
-            }),
-          ),
-          Text('${l.businessDateLabel}: ${snapshot.businessDate}'),
-          const Spacer(),
-          PosButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l.returnToCatalogAction),
-          ),
-        ],
+    final currency = preview.grandTotal['currency'] as String? ?? 'MXN';
+    final grandTotal = preview.grandTotal;
+    final receiptSnapshot = ReceiptSnapshot(
+      receiptRef: officialSaleId ?? receipt.provisionalSaleId,
+      merchantId: cart.merchantId,
+      locationId: cart.locationId,
+      issuedAt: receipt.createdAt,
+      businessDate: preview.businessDate,
+      lines: [
+        for (final raw in cart.items)
+          ReceiptLineSnapshot(
+            lineRef: CartItem.fromJson(raw).id,
+            description: CartItem.fromJson(raw).productName,
+            quantity: CartItem.fromJson(raw).quantity,
+            unitPrice:
+                CartItem.fromJson(raw).price['unitPrice']
+                    as Map<String, Object?>? ??
+                grandTotal,
+            lineTotal:
+                CartItem.fromJson(raw).price['lineSubtotal']
+                    as Map<String, Object?>? ??
+                grandTotal,
+            variantName: CartItem.fromJson(raw).variant?['name'] as String?,
+            modifiers: [
+              for (final modifier in CartItem.fromJson(raw).modifiers)
+                modifier['name']! as String,
+            ],
+            note: CartItem.fromJson(raw).note,
+          ).toJson(),
+      ],
+      subtotal:
+          totals.totals['subtotal'] as Map<String, Object?>? ?? grandTotal,
+      taxTotal:
+          totals.totals['tax'] as Map<String, Object?>? ??
+          {'currency': currency, 'minorUnits': 0},
+      grandTotal: grandTotal,
+      currency: currency,
+      version: 1,
+      locationName: receipt.locationName,
+      operatorName: receipt.operatorName,
+      payment: {'method': 'cash', 'amount': grandTotal},
+      receiptDestination: 'display',
+      discountTotal: totals.totals['discounts'] as Map<String, Object?>?,
+    );
+    final paymentSummary = PaymentSummary(
+      checkoutId: cart.id,
+      state: 'completed',
+      tenders: const [],
+      amountDue: grandTotal,
+      appliedAmount: grandTotal,
+      remainingBalance: {'currency': currency, 'minorUnits': 0},
+      change: {
+        'currency': currency,
+        'minorUnits': snapshot.changeDueMinorUnits,
+      },
+      partialPaymentState: 'completed',
+      tip: null,
+      discounts: const {},
+    );
+    return _receipt(
+      context,
+      CheckoutResult(
+        status: 'completed',
+        confirmation: totals.toJson(),
+        payment: null,
+        reservation: null,
+        sale: officialSaleId == null
+            ? null
+            : {'id': officialSaleId, 'receiptRef': officialSaleId},
+        receipt: receiptSnapshot.toJson(),
+        failure: null,
+        paymentSummary: paymentSummary.toJson(),
+        recoveryState: officialSaleId == null ? 'pending_sync' : 'none',
       ),
+      null,
     );
   }
 
@@ -5111,14 +5088,9 @@ final class _KeyButton extends StatelessWidget {
 }
 
 final class _AmountRow extends StatelessWidget {
-  const _AmountRow({
-    required this.label,
-    required this.value,
-    this.emphasized = false,
-  });
+  const _AmountRow({required this.label, required this.value});
   final String label;
   final String value;
-  final bool emphasized;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -5128,17 +5100,7 @@ final class _AmountRow extends StatelessWidget {
       children: [
         Expanded(child: Text(label)),
         const SizedBox(width: UmiSpacing.sm),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: emphasized
-                ? const UmiOperatorTokens()
-                      .money(PosTheme.of(context).textTheme)
-                      .copyWith(fontSize: 24)
-                : null,
-          ),
-        ),
+        Flexible(child: Text(value, textAlign: TextAlign.right)),
       ],
     ),
   );
