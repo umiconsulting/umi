@@ -40,7 +40,7 @@ APK enable it.
 Static verification:
 
 - `flutter analyze --no-fatal-infos`: no issues.
-- Full Flutter suite: **1,135 tests passed**.
+- Full Flutter suite: **1,137 tests passed**.
 
 Focused cases prove that:
 
@@ -50,6 +50,7 @@ Focused cases prove that:
 - a failed journal barrier stops checkout before the repository call;
 - policy age starts at the latest server refresh;
 - a resumed operator session refreshes its product entitlements;
+- a role without hardware permissions does not start the hardware relay;
 - the existing path remains unchanged when the flag is disabled.
 
 The complete suite also covers the existing offline replay, duplicate response,
@@ -69,6 +70,8 @@ The iMin D3 completed a cash sale for one Americano at MXN 50.00 on
   `fc3f8409-67cc-437c-adec-2ff219c7f3cd`.
 - The receipt changed from pending to `Venta sincronizada`.
 - The committed sale had zero price divergence.
+- No API error or refused request appeared during more than one minute after
+  the KDS and counter terminal restarted on build `313`.
 
 The API release is `f0908e1` and reports contract `2.44.0` with schema
 `build-v3-79`. Both API containers are healthy. Pull request #225 passed every
@@ -85,8 +88,8 @@ The production APK was built with contract `2.44.0` and installed on:
 
 | Device         | Result                                                            |
 | -------------- | ----------------------------------------------------------------- |
-| iMin D3        | Build `312`, signed in as Admin ONCA and online                   |
-| Galaxy Tab A9  | Build `312`, signed in as Barista and showing the KDS             |
+| iMin D3        | Build `313`, signed in as Admin ONCA and online                   |
+| Galaxy Tab A9  | Build `313`, signed in as Barista and showing the KDS             |
 | Galaxy Tab A11 | Build `309`; ADB is offline and the device needs a new connection |
 
 The iMin credential was replaced through the official dashboard replacement
@@ -104,12 +107,12 @@ financial result from this verification.
 SHA-256:
 
 ```text
-d5d6433d30a4751fd108cc658b63da3047023d11fb8b1e317c7df2aba0ea8f03
+cae14b6e68ea79467f306544eaced9b3e49f2e85beec7fe8cac62abe2885df41
 ```
 
 Package: `co.umiconsulting.umi_pos.estacion`
 
-Version: `1.0.0` (`312`)
+Version: `1.0.0` (`313`)
 
 Signer SHA-256:
 
