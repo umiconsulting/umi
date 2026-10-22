@@ -30,12 +30,16 @@ Pass compile-time values with `--dart-define`:
 - `UMIPOS_DEVELOPMENT_DIAGNOSTICS=true|false`
 - `UMIPOS_FEATURE_BOOTSTRAP=localSafeDefaults|disabled`
 - `UMIPOS_HARDWARE_SIMULATOR_ENABLED=true|false`
+- `UMIPOS_LOCAL_FIRST_FAST_PATH=true|false`
 - `UMIPOS_RELEASE_VERSION=0.1.0`
 - `UMIPOS_CONTRACT_VERSION=2.13.0`
 - `UMIPOS_CONFIG_SCHEMA_VERSION=1`
 
 Production configuration fails closed. Use a local API URL for development, an approved staging
 endpoint for staging, and the approved TLS production endpoint for production.
+
+`UMIPOS_LOCAL_FIRST_FAST_PATH` enables the local account and cash commit paths. The
+default is `false`. The pilot and native launcher builds enable it.
 
 Start the backend with its documented UMI API command before running authenticated flows.
 

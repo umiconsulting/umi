@@ -38,6 +38,7 @@ final class OfflineCheckoutFacts {
     required this.taxSnapshotAt,
     required this.connectivity,
     required this.paymentMethod,
+    this.localCommitWhileOnline = false,
     this.ambiguousPayment = false,
     this.reconciliationRequired = false,
     this.storagePressure = false,
@@ -48,6 +49,7 @@ final class OfflineCheckoutFacts {
   final DateTime taxSnapshotAt;
   final PosConnectivity connectivity;
   final String paymentMethod;
+  final bool localCommitWhileOnline;
   final bool ambiguousPayment;
   final bool reconciliationRequired;
   final bool storagePressure;
@@ -173,7 +175,8 @@ final class OfflineCheckoutEligibilityEngine {
       correlationId: policy.cash.correlationId,
     );
 
-    if (facts.connectivity == PosConnectivity.online) {
+    if (facts.connectivity == PosConnectivity.online &&
+        !facts.localCommitWhileOnline) {
       return blocked('policy_invalid', [
         'retry',
       ], status: 'requires_online_refresh');

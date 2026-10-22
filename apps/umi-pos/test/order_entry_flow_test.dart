@@ -284,6 +284,18 @@ final class _CartRepo
   }
 
   @override
+  Future<Cart> create(String merchantId, CreateCartRequest request) async {
+    creations++;
+    return cart = Cart.fromJson({
+      ...cart.toJson(),
+      'id': '00000000-0000-4000-8000-0000000000c2',
+      'operatorSessionId': request.operatorSessionId,
+      'lifecycleState': 'building_cart',
+      'version': cart.version + 1,
+    });
+  }
+
+  @override
   Future<Cart> read(String merchantId, CartQuery query) async => cart;
   @override
   Future<Cart> account(
@@ -938,7 +950,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');
       expect(find.text('¿Dónde se sirve este pedido?'), findsNothing);
-      expect(f.plan.loads, 0);
+      expect(f.plan.loads, 1);
     },
   );
   testWidgets('mobile dine in chooses a table and continues with its account', (
@@ -1155,7 +1167,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(f.repo.startAttempts, 1);
+      expect(f.repo.startAttempts, 0);
       expect(f.repo.creations, 1);
       expect(f.repo.additions, 1);
       expect(f.cart.state.cart!.fulfillmentType, 'takeout');

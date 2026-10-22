@@ -2,6 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/core/config/app_config.dart';
 
 void main() {
+  test('the local fast path is opt-in', () {
+    final config = AppConfig(
+      environment: AppEnvironment.development,
+      apiBaseUri: Uri.parse('http://127.0.0.1:4001'),
+      telemetryEnabled: false,
+      developmentDiagnostics: true,
+      featureBootstrapMode: FeatureBootstrapMode.disabled,
+      hardwareSimulatorEnabled: true,
+      realtimeEnrollmentEnabled: false,
+      release: testReleaseIdentity,
+    );
+    expect(config.localFirstFastPathEnabled, isFalse);
+  });
+
   test('production configuration fails closed without TLS', () {
     final config = AppConfig(
       environment: AppEnvironment.production,

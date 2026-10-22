@@ -24,6 +24,7 @@ final class AppConfig {
     this.updateGithubRepo = '',
     this.lanHubUri,
     this.lanNodeEnabled = false,
+    this.localFirstFastPathEnabled = false,
   });
 
   factory AppConfig.fromEnvironment() {
@@ -89,6 +90,10 @@ final class AppConfig {
     // every environment until a café turns the local node on.
     const lanHub = String.fromEnvironment('UMIPOS_LAN_HUB', defaultValue: '');
     const lanNode = String.fromEnvironment('UMIPOS_LAN_NODE', defaultValue: '');
+    const localFirstFastPath = bool.fromEnvironment(
+      'UMIPOS_LOCAL_FIRST_FAST_PATH',
+      defaultValue: false,
+    );
     return AppConfig(
       environment: AppEnvironment.values.firstWhere(
         (value) => value.name == environmentValue,
@@ -111,6 +116,7 @@ final class AppConfig {
       updateGithubRepo: updateRepo,
       lanHubUri: lanHub.isEmpty ? null : Uri.tryParse(lanHub),
       lanNodeEnabled: lanNode == 'host',
+      localFirstFastPathEnabled: localFirstFastPath,
     );
   }
 
@@ -124,6 +130,7 @@ final class AppConfig {
   /// True only on the main station. It starts the local HTTP node and the
   /// mDNS service announcement. Every other till uses [lanHubUri] or discovery.
   final bool lanNodeEnabled;
+  final bool localFirstFastPathEnabled;
   final bool telemetryEnabled;
   final bool developmentDiagnostics;
   final FeatureBootstrapMode featureBootstrapMode;
@@ -248,6 +255,7 @@ final class AppConfig {
     'developmentDiagnostics': developmentDiagnostics,
     'featureBootstrapMode': featureBootstrapMode.name,
     'hardwareSimulatorEnabled': hardwareSimulatorEnabled,
+    'localFirstFastPathEnabled': localFirstFastPathEnabled,
     'runningOnWeb': runningOnWeb,
     'release': release.safeSummary(),
   };

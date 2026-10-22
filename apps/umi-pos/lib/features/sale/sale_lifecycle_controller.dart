@@ -47,6 +47,7 @@ final class SaleLifecycleController extends ChangeNotifier {
     required SaleRepository repository,
     required CartController cart,
     required Telemetry telemetry,
+    this.localFirstFastPathEnabled = false,
   }) : _repository = repository,
        _cart = cart,
        _telemetry = telemetry;
@@ -54,6 +55,7 @@ final class SaleLifecycleController extends ChangeNotifier {
   final SaleRepository _repository;
   final CartController _cart;
   final Telemetry _telemetry;
+  final bool localFirstFastPathEnabled;
   SaleLifecycleState _state = const SaleLifecycleState();
   SaleLifecycleState get state => _state;
   bool get canResumeSuspendedSale => _isTerminalOrMissing && !_mutationActive;
@@ -699,6 +701,21 @@ final class SaleLifecycleController extends ChangeNotifier {
     _set(const SaleLifecycleState(phase: SalePhase.loading));
     try {
       final SaleSnapshot sale;
+      if (localFirstFastPathEnabled && _cart.supportsLocalWrites) {
+        _cart.clearLocal();
+        await _cart.open(_merchantId!, _locationId!, _operatorSessionId!);
+        final created = _cart.state.cart;
+        if (created == null) {
+          throw AppException(
+            category: AppErrorCategory.conflict,
+            code: _cart.state.errorCode ?? 'CART_VALIDATION_FAILED',
+            recoverable: true,
+          );
+        }
+        _apply(_localSale(created), readyForNextCustomer: readyForNextCustomer);
+        _event('sale_started_local');
+        return;
+      }
       if (_useCartAuthority) {
         _cart.clearLocal();
         await _cart.open(_merchantId!, _locationId!, _operatorSessionId!);
@@ -814,6 +831,25 @@ final class SaleLifecycleController extends ChangeNotifier {
     search: '',
     sort: 'newest',
     limit: 50,
+  );
+
+  SaleSnapshot _localSale(Cart cart) => SaleSnapshot(
+    id: cart.id,
+    state: cart.lifecycleState ?? 'building_cart',
+    cart: cart.toJson(),
+    label: cart.accountName,
+    customer: null,
+    originalOperatorSessionId: _operatorSessionId!,
+    currentOperatorSessionId: _operatorSessionId!,
+    suspendedAt: null,
+    cancelledAt: null,
+    cancellationReasonCode: null,
+    cancellationReason: null,
+    committedSaleId: null,
+    sourceOrderId: null,
+    receiptId: null,
+    receiptRef: null,
+    updatedAt: cart.updatedAt,
   );
 
   bool get _isTerminalOrMissing =>

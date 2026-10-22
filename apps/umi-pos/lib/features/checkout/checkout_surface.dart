@@ -94,15 +94,14 @@ Future<void> showSplitCheckout(
           selected: selected,
         ),
   );
-  if (checkout.state.phase == CheckoutPhase.completed) {
+  final paid = _checkoutHasFinancialResult(checkout.state.phase);
+  if (paid) {
     await sales.checkoutCommitted();
   } else {
     sales.checkoutStopped();
   }
   sales.finishCheckoutPresentation(
-    force:
-        checkout.state.phase == CheckoutPhase.completed ||
-        sales.state.phase == SalePhase.committed,
+    force: paid || sales.state.phase == SalePhase.committed,
   );
 }
 
@@ -191,10 +190,11 @@ Future<void> showCheckoutSheet(
       ),
     ),
   );
+  final paid = _checkoutHasFinancialResult(checkout.state.phase);
   // A hardware back press on the paid receipt returns here without the
   // "Nuevo pedido" action. Mark the sale committed before the cart is
   // cleared, or the paid account stays visible and offers "Cobrar" again.
-  if (checkout.state.phase == CheckoutPhase.completed) {
+  if (paid) {
     await sales.checkoutCommitted();
   }
   // The payment is the authority that this cart is no longer editable. Clear
@@ -202,11 +202,14 @@ Future<void> showCheckoutSheet(
   // `checkingOut -> committed` transition. A completed split used to leave the
   // paid account painted and offer `Cobrar` again.
   sales.finishCheckoutPresentation(
-    force:
-        checkout.state.phase == CheckoutPhase.completed ||
-        sales.state.phase == SalePhase.committed,
+    force: paid || sales.state.phase == SalePhase.committed,
   );
 }
+
+bool _checkoutHasFinancialResult(CheckoutPhase phase) =>
+    phase == CheckoutPhase.completed ||
+    phase == CheckoutPhase.provisional ||
+    phase == CheckoutPhase.provisionalSynced;
 
 final class _CheckoutSheet extends StatefulWidget {
   const _CheckoutSheet({
@@ -554,10 +557,13 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     }
     if (mounted) setState(() {});
     _loadCustomerValuePreview();
-    if (widget.checkout.state.phase == CheckoutPhase.completed && !committed) {
+    if (_checkoutHasFinancialResult(widget.checkout.state.phase) &&
+        !committed) {
       committed = true;
       unawaited(widget.sales.checkoutCommitted());
-      unawaited(_revealFundedGiftCardAfterCommit());
+      if (widget.checkout.state.phase == CheckoutPhase.completed) {
+        unawaited(_revealFundedGiftCardAfterCommit());
+      }
     }
   }
 

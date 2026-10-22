@@ -122,16 +122,19 @@ final class CheckoutController extends ChangeNotifier {
     EncryptedOfflineJournal? journal,
     OfflineRecoveryController? recovery,
     bool Function()? pendingLocalCommands,
+    Future<bool> Function()? preserveLocalCommands,
     Future<void> Function()? refreshOfflinePolicy,
     required Telemetry telemetry,
     Future<String?> Function(CheckoutResult result)? afterCommit,
     Future<void> Function(ProvisionalReceipt receipt)? afterOfflineCommit,
+    this.localFirstFastPathEnabled = false,
   }) : _repository = repository,
        _offlineCheckout = offlineCheckout,
        _connectivity = connectivity,
        _journal = journal,
        _recovery = recovery,
        _pendingLocalCommands = pendingLocalCommands,
+       _preserveLocalCommands = preserveLocalCommands,
        _refreshOfflinePolicy = refreshOfflinePolicy,
        _telemetry = telemetry,
        _afterCommit = afterCommit,
@@ -145,13 +148,15 @@ final class CheckoutController extends ChangeNotifier {
   final EncryptedOfflineJournal? _journal;
   final OfflineRecoveryController? _recovery;
   final bool Function()? _pendingLocalCommands;
+  final Future<bool> Function()? _preserveLocalCommands;
   final Future<void> Function()? _refreshOfflinePolicy;
   final Telemetry _telemetry;
   final Future<String?> Function(CheckoutResult result)? _afterCommit;
   final Future<void> Function(ProvisionalReceipt receipt)? _afterOfflineCommit;
+  final bool localFirstFastPathEnabled;
   CheckoutState _state = const CheckoutState();
   CheckoutState get state => _state;
-  bool get usesLocalCheckout => !_worthTryingOnline;
+  bool get usesLocalCheckout => !_worthTryingOnline || _localFastCheckout;
   List<Map<String, Object?>> get tenderDrafts => _tenderDrafts;
   Map<String, Object?>? get tipDraft => _tipDraft;
   List<Map<String, Object?>> get discountDrafts => _discountDrafts;
@@ -314,7 +319,7 @@ final class CheckoutController extends ChangeNotifier {
     _customerValueFingerprintCommandId ??= _uuid();
     _set(const CheckoutState(phase: CheckoutPhase.repricing));
     _event('checkout_opened');
-    if (!_worthTryingOnline) {
+    if (!_worthTryingOnline || _localFastCheckout) {
       if (cart == null || authority == null) {
         _set(
           const CheckoutState(
@@ -922,8 +927,15 @@ final class CheckoutController extends ChangeNotifier {
         return;
       }
       if (fingerprint != null) {
-        await _submitOffline(fingerprint);
-        return;
+        final storedLocally = await _submitOffline(
+          fingerprint,
+          fallbackOnline: localFirstFastPathEnabled && _worthTryingOnline,
+        );
+        if (storedLocally ||
+            !localFirstFastPathEnabled ||
+            !_worthTryingOnline) {
+          return;
+        }
       }
     }
     try {
@@ -1083,10 +1095,28 @@ final class CheckoutController extends ChangeNotifier {
   /// committing locally on a single hiccup would journal sales that the server
   /// could have taken immediately.
   bool _shouldCommitLocally() =>
-      _connectivity?.state == PosConnectivity.offline &&
+      (_connectivity?.state == PosConnectivity.offline ||
+          (localFirstFastPathEnabled &&
+              _worthTryingOnline &&
+              _cashShiftId != null &&
+              _isSimpleCashTender)) &&
       _offlineCheckout != null &&
       _cart != null &&
       _authority != null;
+
+  bool get _localFastCheckout =>
+      localFirstFastPathEnabled &&
+      _offlineCheckout != null &&
+      _isSimpleCashTender;
+
+  bool get _isSimpleCashTender =>
+      _paymentMethod == 'cash' &&
+      _tenderDrafts.length == 1 &&
+      _tenderDrafts.single['type'] == 'cash' &&
+      _customerValueSelection == null &&
+      _tipDraft == null &&
+      _discountDrafts.isEmpty &&
+      _approvalIds.isEmpty;
 
   void _runPostCommit(CheckoutResult result) {
     final callback = _afterCommit;
@@ -1117,7 +1147,10 @@ final class CheckoutController extends ChangeNotifier {
     }());
   }
 
-  Future<void> _submitOffline(String fingerprint) async {
+  Future<bool> _submitOffline(
+    String fingerprint, {
+    bool fallbackOnline = false,
+  }) async {
     final offlineCheckout = _offlineCheckout;
     final cart = _cart;
     final authority = _authority;
@@ -1126,7 +1159,7 @@ final class CheckoutController extends ChangeNotifier {
         cart == null ||
         authority == null ||
         raw == null) {
-      return;
+      return false;
     }
     final unsupportedTender =
         _tenderDrafts.length != 1 ||
@@ -1144,14 +1177,16 @@ final class CheckoutController extends ChangeNotifier {
           'shift=${_cashShiftId != null}',
         );
       }
-      _set(
-        CheckoutState(
-          phase: CheckoutPhase.failure,
-          result: _state.result,
-          errorCode: 'OFFLINE_ADVANCED_TENDER_BLOCKED',
-        ),
-      );
-      return;
+      if (!fallbackOnline) {
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.failure,
+            result: _state.result,
+            errorCode: 'OFFLINE_ADVANCED_TENDER_BLOCKED',
+          ),
+        );
+      }
+      return false;
     }
     final totals = TotalsConfirmation.fromJson(raw);
     final grandTotal = totals.totals['grandTotal']! as Map<String, Object?>;
@@ -1159,6 +1194,17 @@ final class CheckoutController extends ChangeNotifier {
     final snapshotAt = DateTime.parse(
       totals.confirmedAt ?? cart.updatedAt,
     ).toUtc();
+    final preserved = await _preserveLocalCommands?.call() ?? true;
+    if (!preserved) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: 'OFFLINE_SYNC_PENDING',
+        ),
+      );
+      return true;
+    }
     _set(CheckoutState(phase: CheckoutPhase.processing, result: _state.result));
     try {
       final commandId = _uuid();
@@ -1212,6 +1258,8 @@ final class CheckoutController extends ChangeNotifier {
           taxSnapshotAt: snapshotAt,
           connectivity: _connectivity?.state ?? PosConnectivity.unknown,
           paymentMethod: _paymentMethod,
+          localCommitWhileOnline:
+              localFirstFastPathEnabled && _worthTryingOnline,
         ),
         now: DateTime.now().toUtc(),
       );
@@ -1223,6 +1271,20 @@ final class CheckoutController extends ChangeNotifier {
         ),
       );
       _event('offline_checkout_journaled');
+      final recovery = _recovery;
+      if (recovery != null) {
+        unawaited(
+          recovery.recover(
+            ReplayScope(
+              deviceId: authority.deviceId,
+              merchantId: authority.merchantId,
+              locationId: authority.locationId,
+              operatorSessionId: authority.operatorSessionId,
+              credentialVersion: authority.credentialVersion,
+            ),
+          ),
+        );
+      }
       final callback = _afterOfflineCommit;
       if (callback != null) {
         unawaited(
@@ -1231,9 +1293,14 @@ final class CheckoutController extends ChangeNotifier {
           }),
         );
       }
+      return true;
     } on OfflineJournalException catch (error) {
       if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
         debugPrint('[umipos] offline checkout blocked=${error.category}');
+      }
+      if (fallbackOnline && error.category != 'cash_received_insufficient') {
+        _event('offline_checkout_fallback_online');
+        return false;
       }
       _set(
         CheckoutState(
@@ -1242,6 +1309,7 @@ final class CheckoutController extends ChangeNotifier {
           errorCode: error.category,
         ),
       );
+      return false;
     }
   }
 

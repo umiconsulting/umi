@@ -469,6 +469,7 @@ final class AppCompositionRoot {
         repository: ApiSaleRepository(apiClient),
         cart: cart,
         telemetry: telemetry,
+        localFirstFastPathEnabled: config.localFirstFastPathEnabled,
       ),
       floorPlan: FloorPlanController(
         ApiFloorPlanRepository(apiClient),
@@ -516,7 +517,9 @@ final class AppCompositionRoot {
         connectivity: connectivity,
         journal: offlineJournal,
         recovery: offlineRecovery,
+        localFirstFastPathEnabled: config.localFirstFastPathEnabled,
         pendingLocalCommands: () => cart.pendingSyncCount > 0,
+        preserveLocalCommands: cart.preservePendingCommands,
         refreshOfflinePolicy: () async {
           final state = entry.state;
           final tenant = state.selectedTenant;
