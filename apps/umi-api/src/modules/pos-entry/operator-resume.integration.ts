@@ -83,7 +83,8 @@ describe('same device operator recovery preserves account authority', () => {
     );
     await pg.query(
       `INSERT INTO umi.entitlement_override(subscription_id,feature_id)
-      SELECT s.id,f.id FROM umi.subscription s CROSS JOIN umi.feature f WHERE s.merchant_id=$1 AND f.key='pos'`,
+      SELECT s.id,f.id FROM umi.subscription s CROSS JOIN umi.feature f
+      WHERE s.merchant_id=$1 AND f.key IN ('pos','pos.offline_cash')`,
       [merchant],
     );
     for (const id of [user, otherUser]) {
@@ -173,6 +174,12 @@ describe('same device operator recovery preserves account authority', () => {
     const operator = await repo.startOperator(input());
     expect(operator?.id).toBe(oldOperator);
     expect(operator?.permissions).toEqual(['cart.write']);
+    expect(operator?.entitlements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ featureKey: 'pos', enabled: true }),
+        expect.objectContaining({ featureKey: 'pos.offline_cash', enabled: true }),
+      ]),
+    );
     expect(await read()).toEqual(before);
     const session = (
       await pg.query('SELECT * FROM runtime.operator_session WHERE id=$1', [oldOperator])
