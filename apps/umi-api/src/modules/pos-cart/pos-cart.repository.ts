@@ -411,7 +411,7 @@ export class PosCartRepository {
     );
     const current = active.rows[0];
     if (!current) return;
-    await this.assertAccountPaymentSafe(client, merchantId, current.id);
+    await this.assertAccountPaymentSafe(client, merchantId, current.id, 'account_switch');
     await client.query(
       `UPDATE merchant.pos_cart
           SET status=CASE WHEN $4::boolean THEN 'abandoned' ELSE status END,
@@ -490,10 +490,15 @@ export class PosCartRepository {
       `SELECT id FROM merchant.pos_cart WHERE merchant_id=$1::uuid AND id=$2::uuid FOR UPDATE`,
       [merchantId, cartId],
     );
-    await this.assertAccountPaymentSafe(client, merchantId, cartId);
+    await this.assertAccountPaymentSafe(client, merchantId, cartId, 'line_mutation');
   }
 
-  private async assertAccountPaymentSafe(client: PoolClient, merchantId: string, cartId: string) {
+  private async assertAccountPaymentSafe(
+    client: PoolClient,
+    merchantId: string,
+    cartId: string,
+    blockedBy: string,
+  ) {
     const payment = await client.query(
       `SELECT 1 FROM merchant.pos_cart c WHERE c.id=$2::uuid AND c.merchant_id=$1::uuid
       AND (EXISTS (SELECT 1 FROM merchant.pos_checkout_draft d WHERE d.cart_id=c.id AND d.merchant_id=c.merchant_id
@@ -506,7 +511,11 @@ export class PosCartRepository {
         AND t.status IN ('operator_processing_externally','awaiting_operator_confirmation','confirmed_success','outcome_unknown','committed')))`,
       [merchantId, cartId],
     );
-    if (payment.rowCount) throw new ConflictException({ code: 'CART_PAYMENT_UNRESOLVED' });
+    if (payment.rowCount)
+      throw new ConflictException({
+        code: 'CART_PAYMENT_UNRESOLVED',
+        details: { blockedBy },
+      });
   }
 
   /**
@@ -573,19 +582,21 @@ export class PosCartRepository {
     const result = await client.query<{
       version: number;
       operatorSessionId: string;
+      sameSession: boolean;
       lifecycleState: string;
       ownerActive: boolean;
       ownerName: string;
       deviceName: string;
     }>(
-      `SELECT c.version,c.operator_session_id::text AS "operatorSessionId",c.lifecycle_state AS "lifecycleState",
+      `SELECT c.version,c.operator_session_id::text AS "operatorSessionId",
+        (c.operator_session_id=$4::uuid) AS "sameSession",c.lifecycle_state AS "lifecycleState",
         (os.state='active' AND os.expires_at>now() AND d.status='active') AS "ownerActive",
         owner.name AS "ownerName",d.name AS "deviceName"
        FROM merchant.pos_cart c JOIN runtime.operator_session os ON os.id=c.operator_session_id
        LEFT JOIN merchant.staff owner ON owner.id=os.staff_id AND owner.merchant_id=c.merchant_id
        JOIN merchant.device d ON d.id=os.device_id WHERE c.id=$3::uuid AND c.merchant_id=$1::uuid
        AND c.location_id=$2::uuid AND c.status IN ('draft','prepared') FOR UPDATE OF c`,
-      [merchantId, locationId, cartId],
+      [merchantId, locationId, cartId, operatorSessionId],
     );
     const row = result.rows[0];
     if (!row) return null;
@@ -596,17 +607,13 @@ export class PosCartRepository {
     // must block edits and hand-offs, but it must not stop the same operator
     // from recovering the screen that can finish checkout. Blocking this path
     // left the POS retrying resume against its own paid part forever.
-    if (row.operatorSessionId === operatorSessionId && row.lifecycleState !== 'suspended')
+    if (row.sameSession && row.lifecycleState !== 'suspended')
       return this.snapshotWithClient(client, merchantId, cartId);
     // Taking over another operator's account remains protected while money is
     // in flight. The same-owner case above is deliberately narrower.
-    if (row.operatorSessionId !== operatorSessionId)
-      await this.assertAccountPaymentSafe(client, merchantId, cartId);
-    if (
-      row.operatorSessionId !== operatorSessionId &&
-      row.lifecycleState !== 'suspended' &&
-      row.ownerActive
-    )
+    if (!row.sameSession)
+      await this.assertAccountPaymentSafe(client, merchantId, cartId, 'account_resume');
+    if (!row.sameSession && row.lifecycleState !== 'suspended' && row.ownerActive)
       throw new ConflictException({
         code: 'CART_ACCOUNT_BUSY',
         details: {
@@ -772,7 +779,7 @@ export class PosCartRepository {
     if (!row) return null;
     if (row.version !== dto.expectedVersion)
       throw new ConflictException({ code: 'CART_VERSION_CONFLICT' });
-    await this.assertAccountPaymentSafe(client, merchantId, cartId);
+    await this.assertAccountPaymentSafe(client, merchantId, cartId, 'table_assignment');
     if (row.tableId && row.tableId !== dto.tableId)
       throw new ConflictException({ code: 'CART_ALREADY_ASSIGNED' });
     const plan = await client.query<{ plan: unknown }>(
@@ -832,7 +839,7 @@ export class PosCartRepository {
        AND c.location_id=$3::uuid FOR UPDATE`,
       [dto.cartId, merchantId, dto.locationId],
     );
-    await this.assertAccountPaymentSafe(client, merchantId, dto.cartId);
+    await this.assertAccountPaymentSafe(client, merchantId, dto.cartId, 'account_suspend');
     // AN EMPTY ACCOUNT IS CLOSED, NOT KEPT.
     //
     // A cart with no lines, no table, no name and no fired order holds nothing that a
