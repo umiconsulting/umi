@@ -268,6 +268,60 @@ final class _FakeCashRepository implements CashRepository {
     return CashShift.fromJson(snapshot.currentShift!);
   }
 
+  ShiftTransitionRequest? resumedWith;
+
+  @override
+  Future<CashShift> transition(
+    String merchantId,
+    String shiftId,
+    ShiftTransitionRequest request, {
+    required bool suspend,
+  }) async {
+    resumedWith = request;
+    snapshot = CashCenterSnapshot(
+      businessDate: snapshot.businessDate,
+      policy: snapshot.policy,
+      registers: snapshot.registers,
+      ledger: snapshot.ledger,
+      adoptableShift: null,
+      currentShift: {
+        ...?snapshot.currentShift,
+        'status': 'open',
+        'operatorSessionId': request.operatorSessionId,
+        'version': (snapshot.currentShift?['version'] as int? ?? 1) + 1,
+      },
+      expectedCash: snapshot.expectedCash,
+      latestCount: snapshot.latestCount,
+      varianceResolution: null,
+      reconciliation: null,
+      recoveryState: 'none',
+      allowedActions: const ['movement', 'suspend', 'count'],
+      summary: null,
+    );
+    return CashShift(
+      id: shiftId,
+      merchantId: merchantId,
+      locationId: '00000000-0000-4000-8000-000000000011',
+      registerId: '00000000-0000-4000-8000-000000000001',
+      deviceId: '00000000-0000-4000-8000-000000000099',
+      deviceCredentialVersion: 1,
+      holdingDeviceId: '00000000-0000-4000-8000-000000000099',
+      holdingDeviceCredentialVersion: 1,
+      openingOperatorId: '00000000-0000-4000-8000-000000000012',
+      responsibleOperatorId: '00000000-0000-4000-8000-000000000012',
+      operatorSessionId: request.operatorSessionId,
+      currency: 'MXN',
+      businessDate: snapshot.businessDate,
+      status: 'open',
+      openingCommandId: '00000000-0000-4000-8000-000000000081',
+      openedAt: '2026-07-29T08:00:00.000Z',
+      suspendedAt: null,
+      closedAt: null,
+      ledgerSequence: 1,
+      version: 4,
+    );
+  }
+
   @override
   Future<AdoptCashShiftResult> adopt(
     String merchantId,
@@ -278,6 +332,7 @@ final class _FakeCashRepository implements CashRepository {
     final adopted = {
       ...?snapshot.adoptableShift,
       'holdingDeviceId': '00000000-0000-4000-8000-000000000099',
+      'operatorSessionId': request.operatorSessionId,
       'version': 4,
     };
     snapshot = CashCenterSnapshot(
@@ -2270,6 +2325,57 @@ void main() {
       expect(controller.state.snapshot?.currentShift?['status'], 'open');
     },
   );
+
+  test('checkout adopts an orphaned shift before charging', () async {
+    final repository = _FakeCashRepository();
+    repository.snapshot = orphanedSnapshot(repository.snapshot);
+    final controller = CashController(repository: repository);
+    controller.setContext(
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
+      operatorSessionId: '00000000-0000-4000-8000-000000000012',
+    );
+
+    final shiftId = await controller.ensureCheckoutShift(canAdopt: true);
+
+    expect(repository.adoptedWith?.shiftId, orphanShift['id']);
+    expect(shiftId, orphanShift['id']);
+    expect(controller.activeShiftId, orphanShift['id']);
+  });
+
+  test('checkout resumes a shift from the previous operator session', () async {
+    final repository = _FakeCashRepository();
+    repository.snapshot = CashCenterSnapshot(
+      businessDate: repository.snapshot.businessDate,
+      policy: repository.snapshot.policy,
+      registers: repository.snapshot.registers,
+      ledger: const [],
+      adoptableShift: null,
+      currentShift: {
+        ...orphanShift,
+        'operatorSessionId': '00000000-0000-4000-8000-000000000013',
+      },
+      expectedCash: null,
+      latestCount: null,
+      varianceResolution: null,
+      reconciliation: null,
+      recoveryState: 'operator_mismatch',
+      allowedActions: const ['resume'],
+      summary: null,
+    );
+    final controller = CashController(repository: repository);
+    controller.setContext(
+      merchantId: '00000000-0000-4000-8000-000000000010',
+      locationId: '00000000-0000-4000-8000-000000000011',
+      operatorSessionId: '00000000-0000-4000-8000-000000000012',
+    );
+
+    final shiftId = await controller.ensureCheckoutShift(canAdopt: true);
+
+    expect(repository.resumedWith?.shiftId, orphanShift['id']);
+    expect(shiftId, orphanShift['id']);
+    expect(controller.activeShiftId, orphanShift['id']);
+  });
 
   testWidgets(
     'offers to bring the shift over instead of a dead open-shift form',

@@ -208,6 +208,61 @@ void main() {
     expect((await journal.load()).pendingCount, 0);
     checkout.dispose();
   });
+
+  test('a local cash sale stops when the drawer shift is missing', () async {
+    final store = _MemoryCipherStore();
+    final journal = EncryptedOfflineJournal(store, web: false);
+    final now = DateTime.now().toUtc();
+    final policyCache = OfflinePolicyCache(journal, web: false);
+    await policyCache.save(_policy(now), now);
+    final repository = _NeverCheckout();
+    final checkout = CheckoutController(
+      repository: repository,
+      offlineCheckout: OfflineCheckoutService(
+        journal: journal,
+        policyCache: policyCache,
+        eligibility: const OfflineCheckoutEligibilityEngine(),
+      ),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
+        ),
+        exporter: NoopTelemetryExporter(),
+      ),
+      localFirstFastPathEnabled: true,
+    );
+    final cart = _cart(now);
+
+    await checkout.preview(
+      merchantId: _merchant,
+      locationId: _location,
+      operatorSessionId: _operator,
+      cartId: _cartId,
+      cartVersion: cart.version,
+      paymentMethod: 'cash',
+      cart: cart,
+      authority: _authority(),
+      cashReceivedMinorUnits: 5000,
+      tenderDrafts: const [
+        {
+          'id': '00000000-0000-4000-8000-000000000007',
+          'type': 'cash',
+          'amount': {'minorUnits': 5000, 'currency': 'MXN'},
+          'amountReceived': {'minorUnits': 5000, 'currency': 'MXN'},
+        },
+      ],
+    );
+    await checkout.confirm();
+
+    expect(checkout.state.phase, CheckoutPhase.failure);
+    expect(checkout.state.errorCode, 'CASH_SHIFT_REQUIRED');
+    expect(repository.checkouts, 0);
+    expect((await journal.load()).pendingCount, 0);
+    checkout.dispose();
+  });
 }
 
 final class _NeverCheckout implements CheckoutRepository {

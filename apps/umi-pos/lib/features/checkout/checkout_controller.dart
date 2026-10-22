@@ -923,6 +923,23 @@ final class CheckoutController extends ChangeNotifier {
         _cartVersion == null) {
       return;
     }
+    // A local cash sale must never continue through the online partial-payment
+    // path without a drawer. That path records the cash, redisplays Cobrar on
+    // the same total, and asks the operator for a second tap. Stop before money
+    // unless Cash Center has produced this terminal's shift.
+    if (localFirstFastPathEnabled &&
+        _worthTryingOnline &&
+        _isSimpleCashTender &&
+        _cashShiftId == null) {
+      _set(
+        CheckoutState(
+          phase: CheckoutPhase.failure,
+          result: _state.result,
+          errorCode: 'CASH_SHIFT_REQUIRED',
+        ),
+      );
+      return;
+    }
     // When the till already knows the API is unreachable, committing locally is
     // the answer, not another request. Waiting for the 15 s client timeout to
     // expire first is what turned "offline" into "the till froze": the cashier

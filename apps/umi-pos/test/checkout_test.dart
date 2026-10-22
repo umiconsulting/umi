@@ -653,6 +653,7 @@ Future<_TenderSheet> _openTenderSheet(
   _CheckoutRepository repository, {
   required CheckoutPolicy policy,
   Future<String?> Function()? onOpenCashShift,
+  Future<String?> Function()? onEnsureCashShift,
 }) async {
   tester.view.devicePixelRatio = 1;
   // Tall enough that the whole tender surface lays out at once, so every
@@ -705,6 +706,7 @@ Future<_TenderSheet> _openTenderSheet(
               entry: root.entry,
               sales: root.sales,
               onOpenCashShift: onOpenCashShift,
+              onEnsureCashShift: onEnsureCashShift,
             ),
             child: const Text('open'),
           ),
@@ -2067,6 +2069,35 @@ void main() {
       await sheet.dispose();
     },
   );
+
+  testWidgets('checkout resolves a missing shift before the first charge', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository()
+      ..requireCashShift = true
+      ..policyValue = CheckoutPolicy.fromJson(_policy);
+    var ensures = 0;
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      onEnsureCashShift: () async {
+        ensures++;
+        return '00000000-0000-4000-8000-000000000009';
+      },
+    );
+
+    await tester.tap(find.widgetWithText(PosButton, 'Checkout · MXN 116.00'));
+    await tester.pumpAndSettle();
+
+    expect(ensures, 1);
+    expect(sheet.checkout.state.phase, CheckoutPhase.completed);
+    expect(
+      repository.commands.last.cashShiftId,
+      '00000000-0000-4000-8000-000000000009',
+    );
+    await sheet.dispose();
+  });
 
   testWidgets('a tip is collected: the tender covers the amount due it creates', (
     tester,

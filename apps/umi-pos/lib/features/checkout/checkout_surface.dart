@@ -147,6 +147,7 @@ Future<void> showCheckoutSheet(
   ReceiptPrintRequest? onPrint,
   Future<String?> Function(String holdState)? onRecoverCashShift,
   Future<String?> Function()? onOpenCashShift,
+  Future<String?> Function()? onEnsureCashShift,
   // The till's wake-up from the API: the server resolves a card attempt about a
   // second after the terminal answers, and this is what tells the waiting screen
   // so instead of the terminal's own ten- and forty-second windows.
@@ -181,6 +182,7 @@ Future<void> showCheckoutSheet(
           onPrint: onPrint,
           onRecoverCashShift: onRecoverCashShift,
           onOpenCashShift: onOpenCashShift,
+          onEnsureCashShift: onEnsureCashShift,
           deviceChannel: deviceChannel,
           cardTerminalPollStart: cardTerminalPollStart,
           cardTerminalPollCap: cardTerminalPollCap,
@@ -222,6 +224,7 @@ final class _CheckoutSheet extends StatefulWidget {
     this.onPrint,
     required this.onRecoverCashShift,
     required this.onOpenCashShift,
+    required this.onEnsureCashShift,
     required this.deviceChannel,
     required this.cardTerminalPollStart,
     required this.cardTerminalPollCap,
@@ -244,6 +247,7 @@ final class _CheckoutSheet extends StatefulWidget {
   /// drawer but left no shift to charge against.
   final Future<String?> Function(String holdState)? onRecoverCashShift;
   final Future<String?> Function()? onOpenCashShift;
+  final Future<String?> Function()? onEnsureCashShift;
   final DeviceChannelSocketClient? deviceChannel;
   final Duration cardTerminalPollStart;
   final Duration cardTerminalPollCap;
@@ -284,6 +288,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   bool _partialInProgress = false;
   bool _partialRouteOpen = false;
   bool _chargeInFlight = false;
+  late String? _checkoutCashShiftId;
 
   /// The recovered draft holds a tender combination this location cannot take.
   ///
@@ -377,6 +382,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   @override
   void initState() {
     super.initState();
+    _checkoutCashShiftId = widget.cashShiftId;
     widget.checkout.reset();
     widget.checkout.addListener(_changed);
     widget.customerValue?.addListener(_changed);
@@ -498,7 +504,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
               'checkout.terminal.confirm',
             ) ==
             true,
-        cashShiftId: widget.cashShiftId,
+        cashShiftId: _checkoutCashShiftId,
         onShowBankTransferDetails: (amountMinor, selected) {
           final policy = widget.checkout.policy;
           if (policy?.bankTransferDetails == null) {
@@ -2796,7 +2802,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   bool _partialControlOffered(CheckoutPolicy? policy) =>
       widget.checkout.canCollectPartialPayments &&
-      (widget.cashShiftId != null ||
+      (_checkoutCashShiftId != null ||
           (policy?.manualTerminalEnabled == true &&
               widget.entry.state.operator?.permissions.contains(
                     'checkout.terminal.confirm',
@@ -3466,6 +3472,10 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         return;
       }
       if (bankEnabled && !await _confirmBankReceived()) return;
+      if (cashEnabled && _checkoutCashShiftId == null) {
+        _checkoutCashShiftId = await widget.onEnsureCashShift?.call();
+        if (!mounted) return;
+      }
       dirty = false;
       widget.sales.checkoutStarted();
       await _sendReview(totals);
@@ -3549,7 +3559,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       authority: offlineAuthority,
       locationName: entry.selectedBranch?.name ?? '',
       operatorName: operator?.staffId ?? cart.operatorSessionId,
-      cashShiftId: widget.cashShiftId,
+      cashShiftId: _checkoutCashShiftId,
       cashReceivedMinorUnits: cashEnabled
           ? _minorUnits(cashReceived.text)
           : null,

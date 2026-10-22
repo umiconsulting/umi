@@ -5127,12 +5127,15 @@ final class _CartPanel extends StatelessWidget {
 
   Future<void> _openCheckout(BuildContext context, {bool split = false}) async {
     if (beforeCheckout != null && !await beforeCheckout!()) return;
+    final cashShiftId = await cash.ensureCheckoutShift(
+      canAdopt: permissions.allows('cash.shift.resume'),
+    );
     if (!context.mounted) return;
     if (split) {
       await showSplitCheckout(
         context,
         checkout: checkout,
-        cashShiftId: cash.activeShiftId,
+        cashShiftId: cashShiftId,
         cart: controller,
         entry: entry,
         sales: sales,
@@ -5142,7 +5145,7 @@ final class _CartPanel extends StatelessWidget {
     await showCheckoutSheet(
       context,
       checkout: checkout,
-      cashShiftId: cash.activeShiftId,
+      cashShiftId: cashShiftId,
       cart: controller,
       entry: entry,
       sales: sales,
@@ -5203,6 +5206,9 @@ final class _CartPanel extends StatelessWidget {
         }
         return cash.recoverOwnShift();
       },
+      onEnsureCashShift: () => cash.ensureCheckoutShift(
+        canAdopt: permissions.allows('cash.shift.resume'),
+      ),
     );
   }
 
