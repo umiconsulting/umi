@@ -71,7 +71,8 @@ The iMin D3 completed a cash sale for one Americano at MXN 50.00 on
 - The committed sale had zero price divergence.
 
 The API release is `f0908e1` and reports contract `2.44.0` with schema
-`build-v3-79`. Both API containers are healthy.
+`build-v3-79`. Both API containers are healthy. Pull request #225 passed every
+required CI check, and the production deployment workflow completed.
 
 Evidence:
 
