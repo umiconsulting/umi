@@ -33,6 +33,11 @@ function harness() {
     sweepCarriedOverAccounts: vi.fn().mockResolvedValue(0),
     openAccountIds: vi.fn().mockResolvedValue([]),
     readAccount: vi.fn().mockResolvedValue(null),
+    claimAccount: vi.fn().mockResolvedValue({
+      id: '00000000-0000-4000-8000-000000000007',
+      items: [],
+      version: 1,
+    }),
     snapshotWithClient: vi.fn().mockResolvedValue({
       id: '00000000-0000-4000-8000-000000000007',
       items: [],
@@ -89,6 +94,30 @@ describe('PosCartService', () => {
     // would change nothing.
     repo.authorize.mockResolvedValue({ allowed: false, permissions: ['sale.lifecycle'] });
     await expect(service.create(user, user.id, dto)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets account recovery reach its own financial guard', async () => {
+    const { service, repo } = harness();
+    const result = await service.resumeAccount(
+      user,
+      user.id,
+      '00000000-0000-4000-8000-000000000007',
+      {
+        ...dto,
+        expectedVersion: 1,
+      },
+    );
+
+    expect(result.version).toBe(1);
+    expect(repo.assertFinanciallyMutable).not.toHaveBeenCalled();
+    expect(repo.claimAccount).toHaveBeenCalledWith(
+      expect.anything(),
+      user.id,
+      dto.locationId,
+      dto.operatorSessionId,
+      '00000000-0000-4000-8000-000000000007',
+      1,
+    );
   });
 
   it('answers a session with no permissions as a dead session, not a role gap', async () => {
