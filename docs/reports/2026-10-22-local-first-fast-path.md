@@ -59,9 +59,9 @@ The production APK was built with contract `2.44.0` and installed on:
 
 | Device | Result |
 | --- | --- |
-| iMin D3 | Build `302`, launched to operator PIN |
-| Galaxy Tab A11 | Build `302`, installed; the tablet is system-locked at 9% battery |
-| Galaxy Tab A9 | Build `302`, app started after a retry and reached operator PIN |
+| iMin D3 | Build `303`, launched to operator PIN |
+| Galaxy Tab A11 | Build `303`, installed; the tablet is system-locked at 9% battery |
+| Galaxy Tab A9 | Build `303`, app started after a retry and reached operator PIN |
 
 The iMin credential was replaced through the official dashboard replacement
 flow during environment testing. The old device is `replaced` and points to the
@@ -72,17 +72,17 @@ test.
 
 ## Artifact
 
-`/home/juan/Downloads/UmiPOS-1.0.0-production-fastpath-build302.apk`
+`/home/juan/Downloads/UmiPOS-1.0.0-production-fastpath-build303.apk`
 
 SHA-256:
 
 ```text
-61166c714f0ed83dba7b07785b20c49b47682e2fdf74ad8983492aabf3745f33
+bd5e9cda83b90a5e47ee74710f9459c8001794e6aa92f9fd6684f582a9bf6634
 ```
 
 Package: `co.umiconsulting.umi_pos.estacion`
 
-Version: `1.0.0` (`302`)
+Version: `1.0.0` (`303`)
 
 Signer SHA-256:
 
