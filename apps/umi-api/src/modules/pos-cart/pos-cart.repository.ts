@@ -589,9 +589,19 @@ export class PosCartRepository {
     );
     const row = result.rows[0];
     if (!row) return null;
-    await this.assertAccountPaymentSafe(client, merchantId, cartId);
     if (expectedVersion !== undefined && row.version !== expectedVersion)
       throw new ConflictException({ code: 'CART_VERSION_CONFLICT' });
+    // Reopening the account already held by this operator is a READ of its
+    // current state, not permission to rewrite it. A confirmed partial payment
+    // must block edits and hand-offs, but it must not stop the same operator
+    // from recovering the screen that can finish checkout. Blocking this path
+    // left the POS retrying resume against its own paid part forever.
+    if (row.operatorSessionId === operatorSessionId && row.lifecycleState !== 'suspended')
+      return this.snapshotWithClient(client, merchantId, cartId);
+    // Taking over another operator's account remains protected while money is
+    // in flight. The same-owner case above is deliberately narrower.
+    if (row.operatorSessionId !== operatorSessionId)
+      await this.assertAccountPaymentSafe(client, merchantId, cartId);
     if (
       row.operatorSessionId !== operatorSessionId &&
       row.lifecycleState !== 'suspended' &&
@@ -612,8 +622,6 @@ export class PosCartRepository {
     // remain resumable from Cuentas.
     await this.parkActiveActorCartForNewAccount(client, merchantId, locationId, operatorSessionId);
     await this.assertActorAvailable(client, merchantId, locationId, operatorSessionId, cartId);
-    if (row.operatorSessionId === operatorSessionId && row.lifecycleState !== 'suspended')
-      return this.snapshotWithClient(client, merchantId, cartId);
     await client.query(
       `UPDATE merchant.pos_cart SET operator_session_id=$4::uuid,
       operator_user_id=(SELECT user_id FROM runtime.operator_session WHERE id=$4::uuid),
