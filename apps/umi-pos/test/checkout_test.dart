@@ -85,11 +85,13 @@ final class _CheckoutRepository implements CheckoutRepository {
   _CheckoutRepository({
     this.unknown = false,
     this.loseCommitResponseOnce = false,
+    this.idempotencyConflictOnce = false,
     this.recoverySnapshot,
     this.paymentStatusValue = 'unknown',
   });
   final bool unknown;
   final bool loseCommitResponseOnce;
+  final bool idempotencyConflictOnce;
   final CheckoutRecoverySnapshot? recoverySnapshot;
   final String paymentStatusValue;
 
@@ -113,6 +115,7 @@ final class _CheckoutRepository implements CheckoutRepository {
   /// confirmation screen instead of the one-tap charge.
   int? repricedGrandTotalMinorUnits;
   bool responseLost = false;
+  bool idempotencyConflictSent = false;
   bool requireCashShift = false;
   String cashHoldState = 'free';
   final commands = <CheckoutCommand>[];
@@ -310,6 +313,14 @@ final class _CheckoutRepository implements CheckoutRepository {
       throw const AppException(
         category: AppErrorCategory.transport,
         code: 'TRANSPORT_FAILURE',
+        recoverable: true,
+      );
+    }
+    if (idempotencyConflictOnce && !idempotencyConflictSent) {
+      idempotencyConflictSent = true;
+      throw const AppException(
+        category: AppErrorCategory.conflict,
+        code: 'IDEMPOTENCY_CONFLICT',
         recoverable: true,
       );
     }
@@ -1212,6 +1223,30 @@ void main() {
     },
   );
 
+  test(
+    'an idempotency refusal is recovered and retried automatically with a new identity',
+    () async {
+      final repository = _CheckoutRepository(idempotencyConflictOnce: true);
+      final controller = _controller(repository);
+      await controller.preview(
+        merchantId: '00000000-0000-4000-8000-000000000001',
+        locationId: '00000000-0000-4000-8000-000000000002',
+        operatorSessionId: '00000000-0000-4000-8000-000000000003',
+        cartId: '00000000-0000-4000-8000-000000000004',
+        cartVersion: 3,
+        paymentMethod: 'cash',
+      );
+      await controller.confirm();
+      expect(controller.state.phase, CheckoutPhase.completed);
+      final commits = repository.commands
+          .where((command) => command.totalsFingerprint != null)
+          .toList();
+      expect(commits, hasLength(2));
+      expect(commits.first.idempotencyKey, isNot(commits.last.idempotencyKey));
+      expect(commits.first.commandId, isNot(commits.last.commandId));
+    },
+  );
+
   test('restart recovery restores tender drafts and unknown state', () async {
     final repository = _CheckoutRepository(
       paymentStatusValue: 'timeout',
@@ -1981,7 +2016,7 @@ void main() {
       // fingerprint for it, exactly as the calculator's hash of the tender drafts does.
       ..fingerprintFollowsTheCommand = true;
     final value = sheet.value;
-    await tester.tap(find.widgetWithText(PosButton, 'Checkout · MXN 116.00'));
+    await tester.tap(find.widgetWithText(PosButton, 'Pay · MXN 116.00'));
     await tester.pumpAndSettle();
     expect(value.requests, hasLength(1));
     final firstBasis = value.requests.first.checkoutFingerprint;
@@ -1990,7 +2025,7 @@ void main() {
     await tester.tap(find.text('MXN 500.00'));
     await tester.pumpAndSettle();
     // The sheet is showing the repriced total, and the edit turns the confirm back into a charge.
-    await tester.tap(find.widgetWithText(PosButton, 'Checkout · MXN 399.00'));
+    await tester.tap(find.widgetWithText(PosButton, 'Confirm and pay'));
     await tester.pumpAndSettle();
     expect(
       value.requests,
@@ -2023,7 +2058,7 @@ void main() {
       );
       await tester.tap(find.text('MXN 100.00'));
       await tester.pumpAndSettle();
-      final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      final charge = find.widgetWithText(PosButton, 'Pay · MXN 116.00');
       expect(tester.widget<PosButton>(charge).onPressed, isNull);
       expect(repository.commands, isEmpty);
       await tester.tap(find.text('MXN 200.00'));
@@ -2186,6 +2221,10 @@ void main() {
     expect(find.text('Change due'), findsOneWidget);
     expect(find.text('Receipt destination'), findsNothing);
     expect(find.text('MXN 116.00'), findsWidgets);
+    // Changing the received cash must not add another confirmation. The
+    // operator has already reviewed the visible total and tender.
+    await tester.tap(find.text('MXN 500.00'));
+    await tester.pumpAndSettle();
     // One-tap checkout: the charge button reviews the total server-side and, when
     // it matches what the cashier saw, commits in the same action. It is the last
     // PosButton (after the harness's own "open" button).
@@ -2763,14 +2802,14 @@ void main() {
     expect(find.text('Terminal charge'), findsNothing);
     expect(repository.commands, isEmpty);
 
-    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.tap(find.textContaining('Pay ·'));
     await tester.pumpAndSettle();
     expect(find.text('Confirm deposit received'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('bank-transfer-confirm-close')));
     await tester.pumpAndSettle();
     expect(repository.commands, isEmpty);
 
-    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.tap(find.textContaining('Pay ·'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('bank-transfer-confirm')));
     await tester.pumpAndSettle();
@@ -2804,7 +2843,7 @@ void main() {
     expect(find.text('Payment failed'), findsNothing);
     expect(find.text('Receipt destination'), findsNothing);
 
-    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.tap(find.textContaining('Pay ·'));
     await tester.pumpAndSettle();
     expect(find.text('Confirm the terminal charge'), findsOneWidget);
     await tester.tap(
@@ -2813,7 +2852,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.commands, isEmpty);
 
-    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.tap(find.textContaining('Pay ·'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('manual-terminal-confirm')));
     await tester.pumpAndSettle();
@@ -3007,7 +3046,7 @@ void main() {
     );
     expect(terminal.controller?.text, '130.50');
     expect(find.text('MXN 130.50'), findsWidgets);
-    expect(find.text('Checkout · MXN 130.50'), findsOneWidget);
+    expect(find.text('Pay · MXN 130.50'), findsOneWidget);
     await tester.tap(
       find.descendant(of: keypad, matching: find.text('Confirm')),
     );
@@ -3147,7 +3186,7 @@ void main() {
       final repository = sheet.repository;
       final value = sheet.value;
       final checkout = sheet.checkout;
-      final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      final charge = find.widgetWithText(PosButton, 'Pay · MXN 116.00');
       await tester.ensureVisible(charge);
       await tester.tap(charge);
       await tester.pump();
@@ -3213,7 +3252,7 @@ void main() {
       // A repriced total that differs from the one on screen is how the operator reaches the
       // confirmation screen, where the panel HAS its answer and the charge is still ahead.
       sheet.repository.repricedGrandTotalMinorUnits = 99900;
-      final charge = find.widgetWithText(PosButton, 'Checkout · MXN 116.00');
+      final charge = find.widgetWithText(PosButton, 'Pay · MXN 116.00');
       await tester.ensureVisible(charge);
       await tester.tap(charge);
       await tester.pump();

@@ -317,6 +317,13 @@ final class CheckoutController extends ChangeNotifier {
     _commitCommandId = _uuid();
     _commitIdempotencyKey = _uuid();
     _customerValueFingerprintCommandId ??= _uuid();
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] checkout preview fast=$_localFastCheckout '
+        'tenders=${_tenderDrafts.length} method=$_paymentMethod '
+        'tip=${_tipDraft != null} discounts=${_discountDrafts.length}',
+      );
+    }
     _set(const CheckoutState(phase: CheckoutPhase.repricing));
     _event('checkout_opened');
     if (!_worthTryingOnline || _localFastCheckout) {
@@ -637,6 +644,12 @@ final class CheckoutController extends ChangeNotifier {
   Future<void> confirm() async {
     final fingerprint = _state.result?.confirmation['fingerprint'] as String?;
     if (fingerprint == null) return;
+    if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+      debugPrint(
+        '[umipos] checkout confirm fast=$_shouldCommitLocally '
+        'online=$_worthTryingOnline fingerprint=${fingerprint.substring(0, 8)}',
+      );
+    }
     if (!_worthTryingOnline) {
       await _submitOffline(fingerprint);
       return;
@@ -899,7 +912,10 @@ final class CheckoutController extends ChangeNotifier {
     }
   }
 
-  Future<void> _submit(String? fingerprint) async {
+  Future<void> _submit(
+    String? fingerprint, {
+    bool retryIdempotencyConflict = true,
+  }) async {
     if (_merchantId == null ||
         _locationId == null ||
         _operatorSessionId == null ||
@@ -939,6 +955,13 @@ final class CheckoutController extends ChangeNotifier {
       }
     }
     try {
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        debugPrint(
+          '[umipos] checkout request fingerprint=${fingerprint == null ? "preview" : fingerprint.substring(0, 8)} '
+          'command=${_commitCommandId ?? "preview"} '
+          'idempotency=${_commitIdempotencyKey ?? "preview"}',
+        );
+      }
       final result = await _repository.checkout(
         _merchantId!,
         CheckoutCommand(
@@ -1010,6 +1033,35 @@ final class CheckoutController extends ChangeNotifier {
           '[umipos] checkout submit failed category=${error.category.name} '
           'code=${error.code} fallback=${_canFallbackOffline(error)}',
         );
+      }
+      if (error.code == 'IDEMPOTENCY_CONFLICT') {
+        await recover(
+          merchantId: _merchantId!,
+          locationId: _locationId!,
+          operatorSessionId: _operatorSessionId!,
+          cartId: _cartId!,
+          cartVersion: _cartVersion!,
+        );
+        if (_state.phase == CheckoutPhase.completed ||
+            _state.phase == CheckoutPhase.paymentUnknown) {
+          return;
+        }
+        _commitCommandId = _uuid();
+        _commitIdempotencyKey = _uuid();
+        if (retryIdempotencyConflict) {
+          await _submit(fingerprint, retryIdempotencyConflict: false);
+          return;
+        }
+        final priorResult = _state.result;
+        _set(
+          CheckoutState(
+            phase: CheckoutPhase.failure,
+            result: priorResult,
+            errorCode: error.code,
+            failureDetails: error.details,
+          ),
+        );
+        return;
       }
       if (_canFallbackOffline(error)) {
         _connectivity?.networkDown();

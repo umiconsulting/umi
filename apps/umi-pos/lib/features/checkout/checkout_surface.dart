@@ -283,6 +283,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   bool splitArmed = false;
   bool _partialInProgress = false;
   bool _partialRouteOpen = false;
+  bool _chargeInFlight = false;
 
   /// The recovered draft holds a tender combination this location cannot take.
   ///
@@ -1533,6 +1534,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       // live again, because those are decisions.
                       onPressed:
                           !_amountsReadable ||
+                              _chargeInFlight ||
                               (cashEnabled &&
                                   _minorUnits(cashReceived.text) <
                                       ((terminalEnabled ||
@@ -1562,13 +1564,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       child: Text(
                         state.phase == CheckoutPhase.awaitingApproval
                             ? l.managerApprovalAction
-                            : state.phase ==
-                                      CheckoutPhase.confirmationRequired &&
-                                  !dirty
+                            : state.phase == CheckoutPhase.confirmationRequired
                             ? l.confirmAndPayAction
                             // The total rides on the button, so the cashier confirms
                             // the amount at the moment of the tap (SOTA convention).
-                            : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
+                            : '${Localizations.localeOf(context).languageCode == 'es' ? 'Pagar' : 'Pay'} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
                       ),
                     ),
                     const SizedBox(height: UmiSpacing.sm),
@@ -3435,58 +3435,78 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   String _stableId(String kind) => tenderId(widget.cart.state.cart!.id, kind);
 
   Future<void> _review(TotalsPreview totals) async {
-    final shownDue = _dueMinorUnits(totals);
-    // Nothing is left to type once the operator commits, so the field lets go of the focus here.
-    //
-    // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
-    // otherwise: measured on 2026-10-11, `dumpsys input_method` still reports `mInputShown=true`
-    // three to ten seconds after `Pagado`, Gboard's log shows the numeric IME being attached
-    // (`inputType=8001`) at the moment of the charge, and no editable is focused in the semantics
-    // tree. `unfocus` here, `unfocus` plus `TextInput.hide` on the result screen, and
-    // `TextInput.hide` here as well were each measured — none of them closed it, and `BACK` does.
-    // The defect and the evidence are in `docs/reports/2026-10-11-imin-keyboard-stays-open.md`; the
-    // next step is to trace the text-input channel during a charge rather than guess again.
-    FocusManager.instance.primaryFocus?.unfocus();
-    unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
-    // A card tender is charged on a real terminal BEFORE the checkout runs, and
-    // the checkout waits for the terminal's answer. Every other path (cash, the
-    // manual terminal, an already-answered card) falls through to the ordinary
-    // review below.
-    if (cardEnabled && cardStatus == 'not_started') {
-      await _chargeCardTerminal(totals);
-      if (!mounted) return;
-      return;
-    }
-    if (terminalEnabled &&
-        (terminalStatus != 'confirmed_success' ||
-            _confirmedManualTerminalMinorUnits !=
-                _minorUnits(terminalAmount.text)) &&
-        !await _confirmManualTerminalCharge()) {
-      return;
-    }
-    if (bankEnabled && !await _confirmBankReceived()) return;
-    dirty = false;
-    widget.sales.checkoutStarted();
-    await _sendReview(totals);
-    if (!mounted) return;
-    // One-tap checkout: the cashier saw and verified this total before tapping
-    // Cobrar. The preview is a server recompute for integrity — if it matches
-    // what they saw, commit now in the same action. If UMI recomputed a
-    // DIFFERENT total, fall through to the confirmation screen so the cashier
-    // sees the new number (an inaccurate charge is the costly error to prevent).
-    final reviewed = widget.checkout.state;
-    if (reviewed.phase == CheckoutPhase.confirmationRequired && !dirty) {
-      final repriced =
-          reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
-      final newTotal = repriced == null
-          ? null
-          : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits'] as num?)
-                ?.toInt();
-      if (newTotal != null && newTotal == shownDue) {
-        await _makeValuePairWhole(totals);
+    if (_chargeInFlight) return;
+    setState(() => _chargeInFlight = true);
+    try {
+      final shownDue = _dueMinorUnits(totals);
+      // Nothing is left to type once the operator commits, so the field lets go of the focus here.
+      //
+      // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
+      // otherwise: measured on 2026-10-11, `dumpsys input_method` still reports `mInputShown=true`
+      // three to ten seconds after `Pagado`, Gboard's log shows the numeric IME being attached
+      // (`inputType=8001`) at the moment of the charge, and no editable is focused in the semantics
+      // tree. `unfocus` here, `unfocus` plus `TextInput.hide` on the result screen, and
+      // `TextInput.hide` here as well were each measured — none of them closed it, and `BACK` does.
+      // The defect and the evidence are in `docs/reports/2026-10-11-imin-keyboard-stays-open.md`; the
+      // next step is to trace the text-input channel during a charge rather than guess again.
+      FocusManager.instance.primaryFocus?.unfocus();
+      unawaited(SystemChannels.textInput.invokeMethod<void>('TextInput.hide'));
+      // A card tender is charged on a real terminal BEFORE the checkout runs, and
+      // the checkout waits for the terminal's answer. Every other path (cash, the
+      // manual terminal, an already-answered card) falls through to the ordinary
+      // review below.
+      if (cardEnabled && cardStatus == 'not_started') {
+        await _chargeCardTerminal(totals);
         if (!mounted) return;
-        await widget.checkout.confirm();
+        return;
       }
+      if (terminalEnabled &&
+          (terminalStatus != 'confirmed_success' ||
+              _confirmedManualTerminalMinorUnits !=
+                  _minorUnits(terminalAmount.text)) &&
+          !await _confirmManualTerminalCharge()) {
+        return;
+      }
+      if (bankEnabled && !await _confirmBankReceived()) return;
+      dirty = false;
+      widget.sales.checkoutStarted();
+      await _sendReview(totals);
+      if (!mounted) return;
+      // One-tap checkout: the cashier saw and verified this total before tapping
+      // Cobrar. The preview is a server recompute for integrity — if it matches
+      // what they saw, commit now in the same action. If UMI recomputed a
+      // DIFFERENT total, fall through to the confirmation screen so the cashier
+      // sees the new number (an inaccurate charge is the costly error to prevent).
+      final reviewed = widget.checkout.state;
+      if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
+        final repricedProbe =
+            reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
+        final newTotalProbe = repricedProbe == null
+            ? null
+            : (TotalsPreview.fromJson(repricedProbe).grandTotal['minorUnits']
+                      as num?)
+                  ?.toInt();
+        debugPrint(
+          '[umipos] checkout review phase=${reviewed.phase.name} '
+          'dirty=$dirty newTotal=$newTotalProbe shownDue=$shownDue',
+        );
+      }
+      if (reviewed.phase == CheckoutPhase.confirmationRequired) {
+        final repriced =
+            reviewed.result?.confirmation['totals'] as Map<String, Object?>?;
+        final newTotal = repriced == null
+            ? null
+            : (TotalsPreview.fromJson(repriced).grandTotal['minorUnits']
+                      as num?)
+                  ?.toInt();
+        if (newTotal != null && newTotal == shownDue) {
+          await _makeValuePairWhole(totals);
+          if (!mounted) return;
+          await widget.checkout.confirm();
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _chargeInFlight = false);
     }
   }
 
@@ -4128,29 +4148,35 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
   }
 
   Future<void> _confirm(TotalsPreview totals) async {
-    if (terminalEnabled &&
-        (terminalStatus != 'confirmed_success' ||
-            _confirmedManualTerminalMinorUnits !=
-                _minorUnits(terminalAmount.text))) {
-      if (!await _confirmManualTerminalCharge()) return;
+    if (_chargeInFlight) return;
+    setState(() => _chargeInFlight = true);
+    try {
+      if (terminalEnabled &&
+          (terminalStatus != 'confirmed_success' ||
+              _confirmedManualTerminalMinorUnits !=
+                  _minorUnits(terminalAmount.text))) {
+        if (!await _confirmManualTerminalCharge()) return;
+        if (!mounted) return;
+        await _sendReview(totals);
+        if (!mounted) return;
+      }
+      if (bankEnabled && !bankConfirmed) {
+        if (!await _confirmBankReceived()) return;
+        if (!mounted) return;
+        await _sendReview(totals);
+        if (!mounted) return;
+      }
+      // The confirmationRequired screen already shows the recomputed totals and
+      // the "Confirmar y cobrar" button, so a second modal asking the same thing
+      // was pure friction — commit directly. A customer's value still owes its
+      // half of the pair, so the charge goes through the same three steps the
+      // one-tap path uses.
+      await _makeValuePairWhole(totals);
       if (!mounted) return;
-      await _sendReview(totals);
-      if (!mounted) return;
+      await widget.checkout.confirm();
+    } finally {
+      if (mounted) setState(() => _chargeInFlight = false);
     }
-    if (bankEnabled && !bankConfirmed) {
-      if (!await _confirmBankReceived()) return;
-      if (!mounted) return;
-      await _sendReview(totals);
-      if (!mounted) return;
-    }
-    // The confirmationRequired screen already shows the recomputed totals and
-    // the "Confirmar y cobrar" button, so a second modal asking the same thing
-    // was pure friction — commit directly. A customer's value still owes its
-    // half of the pair, so the charge goes through the same three steps the
-    // one-tap path uses.
-    await _makeValuePairWhole(totals);
-    if (!mounted) return;
-    await widget.checkout.confirm();
   }
 
   /// Wait for the customer-value preview the commit has to carry, then push it to the checkout.
