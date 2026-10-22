@@ -84,7 +84,7 @@ describe('table accounts under the API role', () => {
     await pg?.onModuleDestroy();
   });
 
-  it('allows a cart writer to read tables while lifecycle writes remain restricted', async () => {
+  it('allows cart.write to read and operate tables', async () => {
     const actor = actors[0];
     const user = { id: actor.user, sessionId: actor.session, deviceId: actor.device } as AuthUser;
     const tables = new TableMapRepository(pg);
@@ -96,7 +96,7 @@ describe('table accounts under the API role', () => {
     ).resolves.toMatchObject({ locationId: location });
     await expect(
       scoped((client) => tables.assertOperator(client, user, merchant, location, actor.operator)),
-    ).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    ).resolves.toBeUndefined();
   });
 
   it('refuses to open a table that exists only in the draft plan', async () => {
@@ -165,6 +165,14 @@ describe('table accounts under the API role', () => {
       VALUES ($1,$2,$3,'external_terminal',100,'MXN','unknown',true,$4)`,
       [merchant, location, first.id, randomUUID()],
     );
+    // Reopening the account already held by this operator is how the till gets
+    // back to the checkout that must finish the payment. It is a read of the
+    // account, not permission to edit it.
+    const reopened = await scoped<Cart>((client) =>
+      repo.claimAccount(client, merchant, location, actors[0].operator, first.id, first.version),
+    );
+    expect(reopened.id).toBe(first.id);
+    expect(reopened.operatorSessionId).toBe(actors[0].operator);
     await expect(
       scoped((client) =>
         repo.suspendAccount(client, merchant, {
@@ -176,11 +184,13 @@ describe('table accounts under the API role', () => {
         }),
       ),
     ).rejects.toMatchObject({ response: { code: 'CART_PAYMENT_UNRESOLVED' } });
-    await expect(
-      scoped((client) =>
-        repo.openTable(client, merchant, location, actors[0].operator, table, first.version),
-      ),
-    ).rejects.toMatchObject({ response: { code: 'CART_PAYMENT_UNRESOLVED' } });
+    // The same operator can return to the occupied table's account to finish
+    // checkout. This is the recovery route that was previously looping.
+    const reopenedByTable = await scoped<Cart>((client) =>
+      repo.openTable(client, merchant, location, actors[0].operator, table, first.version),
+    );
+    expect(reopenedByTable.id).toBe(first.id);
+    expect(reopenedByTable.operatorSessionId).toBe(actors[0].operator);
     await expect(
       scoped((client) =>
         repo.claimAccount(client, merchant, location, actors[1].operator, first.id, first.version),
