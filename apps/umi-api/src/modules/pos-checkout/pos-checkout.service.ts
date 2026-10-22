@@ -64,7 +64,11 @@ const partialTender = (row: PartialPaymentRow): CheckoutCommand['tenderDrafts'][
   correlationId: null,
 });
 
-function partialResult(cartId: string, rows: PartialPaymentRow[]): CheckoutPartialPaymentResult {
+function partialResult(
+  cartId: string,
+  cartVersion: number,
+  rows: PartialPaymentRow[],
+): CheckoutPartialPaymentResult {
   const first = rows[0];
   const confirmed = rows
     .filter((row) => row.status === 'confirmed_success')
@@ -82,7 +86,10 @@ function partialResult(cartId: string, rows: PartialPaymentRow[]): CheckoutParti
     ok: true,
     data: {
       cartId,
-      cartVersion: first.cartVersion,
+      // A partial row is a snapshot of the version at which that tender was
+      // collected. The account may have advanced afterwards, and the command
+      // that applies the next tender must use the account's CURRENT version.
+      cartVersion,
       amountDue: money(Number(first.baseDueMinorUnits)),
       appliedAmount: money(applied),
       remainingBalance: money(remaining),
@@ -152,12 +159,10 @@ export class PosCheckoutService {
       authorization.permissions.includes('checkout.recover.any') ||
         authorization.permissions.includes('*'),
     );
-    if (!rows || rows.length === 0) {
-      const cart = await this.carts.readAccount(merchantId, query.locationId, cartId);
-      if (!cart) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
-      return emptyPartialResult(cart);
-    }
-    return partialResult(cartId, rows);
+    const cart = await this.carts.readAccount(merchantId, query.locationId, cartId);
+    if (!cart) throw new NotFoundException({ code: 'RESOURCE_NOT_FOUND' });
+    if (!rows || rows.length === 0) return emptyPartialResult(cart);
+    return partialResult(cartId, cart.version, rows);
   }
 
   async collectPartialPayment(
@@ -299,7 +304,7 @@ export class PosCheckoutService {
             ) {
               throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
             }
-            return { ok: true, value: partialResult(cartId, rows) };
+            return { ok: true, value: partialResult(cartId, cart.version, rows) };
           }
           if (existing?.status === 'operator_reported_failure') {
             throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT' });
@@ -366,7 +371,7 @@ export class PosCheckoutService {
               publicData: { tenderId: requested.id, evidence: dto.confirmationReference },
             });
             rows = await this.repo.partialRows(context.client, merchantId, dto.locationId, cartId);
-            return { ok: true, value: partialResult(cartId, rows) };
+            return { ok: true, value: partialResult(cartId, cart.version, rows) };
           }
           const normalizedStatus =
             requested.status === 'outcome_unknown' ? 'outcome_unknown' : 'confirmed_success';
@@ -431,7 +436,7 @@ export class PosCheckoutService {
               outcome: 'failure',
               publicData: { tenderId: requested.id },
             });
-            return { ok: true, value: partialResult(cartId, rows) };
+            return { ok: true, value: partialResult(cartId, cart.version, rows) };
           }
           const tenders = rows
             .filter((row) => row.status === 'confirmed_success')
@@ -501,7 +506,7 @@ export class PosCheckoutService {
               tipRecipientUserId,
             },
           });
-          return { ok: true, value: partialResult(cartId, rows) };
+          return { ok: true, value: partialResult(cartId, cart.version, rows) };
         },
       ),
     );
