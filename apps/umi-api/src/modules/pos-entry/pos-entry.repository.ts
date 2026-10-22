@@ -249,12 +249,20 @@ export class PosEntryRepository {
       const result = prior
         ? await client.query<OperatorSessionView>(
             `UPDATE runtime.operator_session SET durable_session_id=$6::uuid, permissions=$7::text[],
+               entitlements=$8::jsonb,
                state=CASE WHEN durable_session_id<>$6::uuid OR state='ended' THEN 'active' ELSE state END,
                ended_at=NULL,
-               last_activity_at=now(),expires_at=$8
+               last_activity_at=now(),expires_at=$9
              WHERE merchant_id=$1::uuid AND location_id=$2::uuid AND device_id=$3::uuid
                AND user_id=$4::uuid AND id=$5::uuid RETURNING ${view}`,
-            [...scope, prior.id, input.durableSessionId, permissions, input.expiresAt],
+            [
+              ...scope,
+              prior.id,
+              input.durableSessionId,
+              permissions,
+              JSON.stringify(authorized.entitlements),
+              input.expiresAt,
+            ],
           )
         : await client.query<OperatorSessionView>(
             `INSERT INTO runtime.operator_session
