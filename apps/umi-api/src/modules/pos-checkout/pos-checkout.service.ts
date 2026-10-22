@@ -235,7 +235,6 @@ export class PosCheckoutService {
           if (
             rows.some(
               (row) =>
-                row.cartVersion !== cart.version ||
                 row.cartFingerprint !== repriced.public.fingerprint ||
                 Number(row.baseDueMinorUnits) !== baseDue ||
                 row.currency !== currency,
