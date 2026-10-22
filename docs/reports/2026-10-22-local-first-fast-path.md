@@ -96,8 +96,8 @@ The iMin credential was replaced through the official dashboard replacement
 flow during environment testing. The old device is `replaced` and points to the
 new active `Caja principal`. ONCA has one active counter device.
 
-The two interrupted test accounts, `007` and `009`, were cancelled with no
-confirmed payment. The completed MXN 50.00 sale is the only production
+The three interrupted test accounts, `006`, `007` and `009`, were cancelled
+with no confirmed payment. The completed MXN 50.00 sale is the only production
 financial result from this verification.
 
 ## Artifact
