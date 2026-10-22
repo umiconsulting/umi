@@ -97,8 +97,8 @@ The production APK was built with contract `2.44.0` and installed on:
 
 | Device         | Result                                                            |
 | -------------- | ----------------------------------------------------------------- |
-| iMin D3        | Build `319`, signed in as Admin ONCA and online                   |
-| Galaxy Tab A9  | Build `319`, signed in as Barista and showing the KDS             |
+| iMin D3        | Build `321`, signed in as Admin ONCA and online                   |
+| Galaxy Tab A9  | Build `321`, signed in as Barista and showing the KDS             |
 | Galaxy Tab A11 | Build `309`; ADB is offline and the device needs a new connection |
 
 The iMin credential was replaced through the official dashboard replacement
@@ -116,12 +116,12 @@ results from this verification.
 SHA-256:
 
 ```text
-5d1fb5e605c70396abac9642bb86e02bccabe43f8a30b91a602e65882c3a877e
+a2ef6a1ba0c3a546d3b326bc8de38353e759afd71acec0bfb1c2241b5057c6c0
 ```
 
 Package: `co.umiconsulting.umi_pos.estacion`
 
-Version: `1.0.0` (`319`)
+Version: `1.0.0` (`321`)
 
 Signer SHA-256:
 
@@ -132,5 +132,5 @@ Signer SHA-256:
 ## Remaining device action
 
 The Galaxy Tab A11 is reachable at `192.168.0.101`, but its ADB transport is
-offline. Reconnect wireless debugging and install build `319` when the tablet is
+offline. Reconnect wireless debugging and install build `321` when the tablet is
 available.
