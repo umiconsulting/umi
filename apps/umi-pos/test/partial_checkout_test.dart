@@ -68,6 +68,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
   bool writeSkipped = false;
   bool loseFinalResponseOnce = false;
   bool finalResponseLost = false;
+  bool accountMissing = false;
 
   Map<String, Object?> get snapshot {
     final applied = drafts.fold<int>(0, (sum, draft) {
@@ -106,7 +107,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
     String cartId,
     CheckoutPartialPaymentQuery query,
   ) async {
-    if (drafts.isEmpty && unresolved == null) {
+    if (accountMissing) {
       throw const AppException(
         category: AppErrorCategory.unknown,
         code: 'RESOURCE_NOT_FOUND',
@@ -375,8 +376,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
       await tester.tap(find.text('Refresh'));
       await tester.pumpAndSettle();
       expect(
@@ -572,12 +571,6 @@ void main() {
       expect(find.text('Charge MXN 40.00'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
       await tester.pumpAndSettle();
-      expect(
-        find.text('After the first payment', findRichText: true),
-        findsNothing,
-      );
-      await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
       expect(repository.commands, hasLength(1));
       expect((repository.commands.single['tender'] as Map)['amount'], {
         'minorUnits': 4000,
@@ -624,6 +617,26 @@ void main() {
     },
   );
 
+  testWidgets('a closed account shows a refusal and no charge action', (
+    tester,
+  ) async {
+    final repository = _Repo()..accountMissing = true;
+    final (cart, checkout) = await _pump(tester, repository);
+
+    expect(
+      find.text(
+        'This account was already closed or saved from another screen. Return to Accounts to open it again.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('partial-charge')), findsNothing);
+    expect(repository.commands, isEmpty);
+
+    await tester.pumpWidget(const SizedBox());
+    cart.dispose();
+    checkout.dispose();
+  });
+
   testWidgets(
     'lost response requires ledger read and never creates a new leg',
     (tester) async {
@@ -631,8 +644,6 @@ void main() {
       final (cart, checkout) = await _pump(tester, repository);
       await tester.tap(find.byKey(const ValueKey('partial-equal-2')));
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       expect(find.textContaining('may have been recorded'), findsOneWidget);
       expect(

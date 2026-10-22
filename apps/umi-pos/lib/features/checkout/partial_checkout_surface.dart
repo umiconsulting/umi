@@ -429,12 +429,15 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
     } on AppException catch (failure) {
       if (!mounted) return;
       if (failure.code == 'RESOURCE_NOT_FOUND') {
-        final empty = _localLedger();
         setState(() {
-          ledger = empty;
-          _ledgerVerified = true;
-          if (!uncertain) _seedRemaining(empty);
-          if (uncertain && pendingCommand != null) retryReady = true;
+          ledger = null;
+          _ledgerVerified = false;
+          pendingCommand = null;
+          retryReady = false;
+          error = label(
+            'Esta cuenta ya se cerró o se guardó desde otra pantalla. Vuelve a Cuentas para abrirla de nuevo.',
+            'This account was already closed or saved from another screen. Return to Accounts to open it again.',
+          );
         });
       } else {
         setState(() => error = _errorMessage(failure));
@@ -456,34 +459,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
         });
       }
     }
-  }
-
-  Future<bool> _confirmFreeze() async {
-    if (tenderDrafts.isNotEmpty) return true;
-    return await showPosDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => PosAlertDialog(
-            title: Text(label('Iniciar cobro dividido', 'Start split payment')),
-            content: Text(
-              label(
-                'Después del primer pago, la comanda queda fija hasta cerrar la cuenta. Verifica los productos antes de continuar.',
-                'After the first payment, the order stays fixed until the account closes. Check the items before continuing.',
-              ),
-            ),
-            actions: [
-              PosTextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: Text(label('Volver', 'Back')),
-              ),
-              PosButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: Text(label('Continuar', 'Continue')),
-              ),
-            ],
-          ),
-        ) ??
-        false;
   }
 
   Future<String?> _confirmExternal() async {
@@ -640,7 +615,7 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   Future<void> _collect() async {
-    if (!canCollect || !await _confirmFreeze() || !mounted) return;
+    if (!canCollect || !mounted) return;
     String? reference;
     if (method != 'cash') {
       reference = await _confirmExternal();
@@ -826,6 +801,10 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                       children: [
                         if (ledger == null && busy)
                           const Center(child: PosSpinner()),
+                        if (error != null) ...[
+                          _notice(error!),
+                          const SizedBox(height: UmiSpacing.md),
+                        ],
                         if (ledger != null) ...[
                           Wrap(
                             spacing: UmiSpacing.md,
@@ -1161,10 +1140,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                               style: theme.textTheme.titleMedium,
                             ),
                           ],
-                        ],
-                        if (error != null) ...[
-                          const SizedBox(height: UmiSpacing.md),
-                          _notice(error!),
                         ],
                       ],
                     ),
