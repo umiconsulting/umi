@@ -3196,8 +3196,9 @@ void main() {
       // parked, only the repricing command may exist: a commit here is the defect.
       expect(value.requests, hasLength(1));
       expect(repository.commands, hasLength(1));
-      expect(find.text('Payment is processing'), findsOneWidget);
+      expect(find.text('Checkout · MXN 116.00'), findsOneWidget);
       expect(find.text('Confirm and pay'), findsNothing);
+      expect(tester.widget<PosButton>(charge).onPressed, isNull);
       value.answer();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));

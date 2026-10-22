@@ -125,9 +125,8 @@ final class OfflinePolicyCache {
     }
     final elapsed = now.difference(trustedLocal);
     final conservativeServerNow = trustedServer.add(elapsed);
-    final issuedAt = DateTime.parse(cash.issuedAt);
     if (conservativeServerNow.isAfter(DateTime.parse(cash.expiresAt)) ||
-        conservativeServerNow.difference(issuedAt) >
+        conservativeServerNow.difference(trustedServer) >
             Duration(seconds: cash.maxPolicyAgeSeconds)) {
       throw const OfflineJournalException('policy_expired');
     }

@@ -1564,8 +1564,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       child: Text(
                         state.phase == CheckoutPhase.awaitingApproval
                             ? l.managerApprovalAction
-                            : _chargeInFlight
-                            ? l.paymentProcessing
                             // The total rides on the button, so the cashier confirms
                             // the amount at the moment of the tap (SOTA convention).
                             : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',

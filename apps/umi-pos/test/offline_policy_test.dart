@@ -94,6 +94,38 @@ void main() {
     );
   });
 
+  test('policy age starts at the latest server refresh', () async {
+    final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+    final cache = OfflinePolicyCache(journal, web: false);
+    final refreshedAt = DateTime.now().toUtc();
+    final policy = _policy(
+      refreshedAt,
+      issuedAt: refreshedAt.subtract(const Duration(days: 3)),
+      expiresAt: refreshedAt.add(const Duration(days: 365)),
+    );
+    await cache.save(policy, refreshedAt);
+
+    final fresh = await cache.validated(
+      authority: _authority(),
+      now: refreshedAt.add(const Duration(minutes: 5)),
+    );
+    expect(fresh.cash.version, 'policy-1');
+
+    await expectLater(
+      cache.validated(
+        authority: _authority(),
+        now: refreshedAt.add(const Duration(minutes: 11)),
+      ),
+      throwsA(
+        isA<OfflineJournalException>().having(
+          (error) => error.category,
+          'category',
+          'policy_expired',
+        ),
+      ),
+    );
+  });
+
   test(
     'eligible cash checkout appends one encrypted provisional sale',
     () async {
@@ -237,12 +269,13 @@ OfflineAuthorityContext _authority({String? locationId}) =>
       deviceTrusted: true,
     );
 
-OfflinePolicy _policy(DateTime now) {
+OfflinePolicy _policy(DateTime now, {DateTime? issuedAt, DateTime? expiresAt}) {
   final cash = <String, Object?>{
     'enabled': true,
     'version': 'policy-1',
-    'issuedAt': now.toIso8601String(),
-    'expiresAt': now.add(const Duration(minutes: 10)).toIso8601String(),
+    'issuedAt': (issuedAt ?? now).toIso8601String(),
+    'expiresAt': (expiresAt ?? now.add(const Duration(minutes: 10)))
+        .toIso8601String(),
     'maxPolicyAgeSeconds': 600,
     'merchantId': _id(1),
     'locationId': _id(2),
