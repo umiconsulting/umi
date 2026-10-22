@@ -30,6 +30,43 @@ Future<void> fonts() async {
 }
 
 void main() {
+  testWidgets('the official receipt renders its totals on the iMin', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1014);
+    tester.view.devicePixelRatio = 1.375;
+    addTearDown(tester.view.reset);
+    await fonts();
+    await tester.pumpWidget(
+      PosApp(
+        theme: UmiTheme.light(),
+        locale: const Locale('es'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        home: Builder(
+          builder: (context) => PosPage(
+            body: PosButton(
+              onPressed: () =>
+                  showReceiptDocument(context, receiptTestSnapshot()),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ReceiptDocument), findsOneWidget);
+    expect(find.text('MXN 185.00'), findsOneWidget);
+    expect(find.text('Powered by Umi: umiconsulting.co'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the on-screen receipt names a bank transfer', (tester) async {
     tester.view.physicalSize = const Size(800, 900);
     tester.view.devicePixelRatio = 1;

@@ -171,7 +171,7 @@ void main() {
       final request = OfflineCheckoutRequest(
         commandId: _id(21),
         idempotencyKey: _id(22),
-        provisionalSaleId: _id(23),
+        localCommitId: _id(23),
         authority: _authority(),
         checkoutCommand: CheckoutCommand(
           cartId: cart.id,
@@ -192,8 +192,6 @@ void main() {
         taxSnapshotAt: now,
         amountReceivedMinorUnits: 5000,
         businessDate: '2026-07-28',
-        locationName: 'Branch',
-        operatorName: 'Operator',
       );
       final facts = OfflineCheckoutFacts(
         amountMinorUnits: 5000,
@@ -203,7 +201,7 @@ void main() {
         connectivity: PosConnectivity.offline,
         paymentMethod: 'cash',
       );
-      final receipt = await service.checkout(
+      final commit = await service.checkout(
         request,
         facts: facts,
         now: DateTime.now().toUtc(),
@@ -220,7 +218,7 @@ void main() {
         OfflineCheckoutRequest(
           commandId: _id(31),
           idempotencyKey: _id(32),
-          provisionalSaleId: _id(33),
+          localCommitId: _id(33),
           authority: request.authority,
           checkoutCommand: request.checkoutCommand,
           cart: request.cart,
@@ -233,17 +231,13 @@ void main() {
           taxSnapshotAt: request.taxSnapshotAt,
           amountReceivedMinorUnits: request.amountReceivedMinorUnits,
           businessDate: request.businessDate,
-          locationName: request.locationName,
-          operatorName: request.operatorName,
         ),
         facts: facts,
         now: DateTime.now().toUtc(),
       );
-      expect(receipt.status, 'pending_sync');
-      expect(recovered.provisionalSaleId, receipt.provisionalSaleId);
+      expect(recovered.localCommitId, commit.localCommitId);
       expect((await journal.load()).entries, hasLength(1));
       expect(store.ciphertext, isNot(contains('catalog-1')));
-      expect(receipt.officialReceipt, isNull);
     },
   );
 }

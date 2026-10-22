@@ -532,7 +532,6 @@ final class AppCompositionRoot {
         repository: ApiCheckoutRepository(apiClient),
         offlineCheckout: offlineCheckout,
         connectivity: connectivity,
-        journal: offlineJournal,
         recovery: offlineRecovery,
         localFirstFastPathEnabled: config.localFirstFastPathEnabled,
         pendingLocalCommands: () => cart.pendingSyncCount > 0,
@@ -592,7 +591,7 @@ final class AppCompositionRoot {
           // answer, the receipt screen says so (plan §8.2 F5).
           return outcome.drawerAnswered ? null : 'DRAWER_UNANSWERED';
         },
-        afterOfflineCommit: (receipt) async {
+        afterOfflineCommit: (commit) async {
           final state = entry.state;
           final merchant = state.selectedTenant;
           final location = state.selectedBranch;
@@ -604,7 +603,7 @@ final class AppCompositionRoot {
               posDevice == null) {
             return;
           }
-          await hardware.afterOfflineCheckoutCompleted(
+          await hardware.afterOfflineCashSale(
             HardwareScope(
               merchantId: merchant.id,
               locationId: location.id,
@@ -614,7 +613,7 @@ final class AppCompositionRoot {
               permissions: operator.permissions.toSet(),
               registerId: cash.activeRegisterId,
             ),
-            receipt,
+            commit,
           );
         },
       ),

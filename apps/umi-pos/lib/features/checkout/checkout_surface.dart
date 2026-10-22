@@ -209,9 +209,7 @@ Future<void> showCheckoutSheet(
 }
 
 bool _checkoutHasFinancialResult(CheckoutPhase phase) =>
-    phase == CheckoutPhase.completed ||
-    phase == CheckoutPhase.provisional ||
-    phase == CheckoutPhase.provisionalSynced;
+    phase == CheckoutPhase.completed;
 
 final class _CheckoutSheet extends StatefulWidget {
   const _CheckoutSheet({
@@ -784,15 +782,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
             context,
             state.result!,
             state.postCommitWarning,
-          ),
-          CheckoutPhase.provisional => _provisional(
-            context,
-            state.provisionalReceipt!,
-          ),
-          CheckoutPhase.provisionalSynced => _provisional(
-            context,
-            state.provisionalReceipt!,
-            officialSaleId: state.officialSaleId,
           ),
           CheckoutPhase.paymentUnknown => _unknown(context, state.result!),
           CheckoutPhase.processing || CheckoutPhase.repricing => Center(
@@ -4045,93 +4034,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     _ => l.checkoutFailed,
   };
 
-  Widget _provisional(
-    BuildContext context,
-    ProvisionalReceipt receipt, {
-    String? officialSaleId,
-  }) {
-    final snapshot = OfflineCheckoutSnapshot.fromJson(receipt.snapshot);
-    final totals = TotalsConfirmation.fromJson(snapshot.totals);
-    final preview = TotalsPreview.fromJson(totals.totals);
-    final cart = Cart.fromJson(snapshot.cartSnapshot);
-    final currency = preview.grandTotal['currency'] as String? ?? 'MXN';
-    final grandTotal = preview.grandTotal;
-    final receiptSnapshot = ReceiptSnapshot(
-      receiptRef: officialSaleId ?? receipt.provisionalSaleId,
-      merchantId: cart.merchantId,
-      locationId: cart.locationId,
-      issuedAt: receipt.createdAt,
-      businessDate: preview.businessDate,
-      lines: [
-        for (final raw in cart.items)
-          ReceiptLineSnapshot(
-            lineRef: CartItem.fromJson(raw).id,
-            description: CartItem.fromJson(raw).productName,
-            quantity: CartItem.fromJson(raw).quantity,
-            unitPrice:
-                CartItem.fromJson(raw).price['unitPrice']
-                    as Map<String, Object?>? ??
-                grandTotal,
-            lineTotal:
-                CartItem.fromJson(raw).price['lineSubtotal']
-                    as Map<String, Object?>? ??
-                grandTotal,
-            variantName: CartItem.fromJson(raw).variant?['name'] as String?,
-            modifiers: [
-              for (final modifier in CartItem.fromJson(raw).modifiers)
-                modifier['name']! as String,
-            ],
-            note: CartItem.fromJson(raw).note,
-          ).toJson(),
-      ],
-      subtotal:
-          totals.totals['subtotal'] as Map<String, Object?>? ?? grandTotal,
-      taxTotal:
-          totals.totals['tax'] as Map<String, Object?>? ??
-          {'currency': currency, 'minorUnits': 0},
-      grandTotal: grandTotal,
-      currency: currency,
-      version: 1,
-      locationName: receipt.locationName,
-      operatorName: receipt.operatorName,
-      payment: {'method': 'cash', 'amount': grandTotal},
-      receiptDestination: 'display',
-      discountTotal: totals.totals['discounts'] as Map<String, Object?>?,
-    );
-    final paymentSummary = PaymentSummary(
-      checkoutId: cart.id,
-      state: 'completed',
-      tenders: const [],
-      amountDue: grandTotal,
-      appliedAmount: grandTotal,
-      remainingBalance: {'currency': currency, 'minorUnits': 0},
-      change: {
-        'currency': currency,
-        'minorUnits': snapshot.changeDueMinorUnits,
-      },
-      partialPaymentState: 'completed',
-      tip: null,
-      discounts: const {},
-    );
-    return _receipt(
-      context,
-      CheckoutResult(
-        status: 'completed',
-        confirmation: totals.toJson(),
-        payment: null,
-        reservation: null,
-        sale: officialSaleId == null
-            ? null
-            : {'id': officialSaleId, 'receiptRef': officialSaleId},
-        receipt: receiptSnapshot.toJson(),
-        failure: null,
-        paymentSummary: paymentSummary.toJson(),
-        recoveryState: officialSaleId == null ? 'pending_sync' : 'none',
-      ),
-      null,
-    );
-  }
-
   Future<void> _confirm(TotalsPreview totals) async {
     if (_chargeInFlight) return;
     setState(() => _chargeInFlight = true);
@@ -4387,12 +4289,25 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     });
     final l = AppLocalizations.of(context);
     final es = Localizations.localeOf(context).languageCode == 'es';
-    final receipt = ReceiptSnapshot.fromJson(result.receipt!);
     final summary = result.paymentSummary == null
         ? null
         : PaymentSummary.fromJson(result.paymentSummary!);
-    final currency = receipt.grandTotal['currency'] as String? ?? '';
-    final totalMinor = (receipt.grandTotal['minorUnits'] as num?)?.toInt() ?? 0;
+    final receipt = result.receipt == null
+        ? null
+        : ReceiptSnapshot.fromJson(result.receipt!);
+    final confirmedTotals = result.confirmation['totals'];
+    final confirmedGrandTotal = confirmedTotals is Map
+        ? confirmedTotals['grandTotal']
+        : null;
+    final total =
+        receipt?.grandTotal ??
+        summary?.amountDue ??
+        (confirmedGrandTotal is Map
+            ? confirmedGrandTotal.cast<String, Object?>()
+            : null) ??
+        const <String, Object?>{'minorUnits': 0, 'currency': 'MXN'};
+    final currency = total['currency'] as String? ?? 'MXN';
+    final totalMinor = (total['minorUnits'] as num?)?.toInt() ?? 0;
     final changeMinor = summary == null
         ? 0
         : (summary.change['minorUnits'] as num?)?.toInt() ?? 0;
@@ -4458,58 +4373,59 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(
-            _money(receipt.grandTotal),
+            _money(total),
             style: display?.copyWith(fontWeight: FontWeight.w800),
           ),
         ),
         const SizedBox(height: UmiSpacing.md),
         Text(
           '${es ? 'Recibiste' : 'Received'}: ${_money(money(receivedMinor))}   ·   '
-          '${es ? 'Consumo' : 'Total'}: ${_money(receipt.grandTotal)}',
+          '${es ? 'Consumo' : 'Total'}: ${_money(total)}',
           textAlign: TextAlign.center,
           style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
             color: PosTheme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const Spacer(),
-        Row(
-          children: [
-            Expanded(
-              child: PosOutlineButton.icon(
-                onPressed: () => _showReceiptDetail(
-                  context,
-                  receipt,
-                  // The receipt's own id is what the server files the print job
-                  // against, and it comes from the committed sale.
-                  receiptId: result.sale?['receiptId'] as String?,
-                  snapshot: result.receipt,
+        if (receipt != null)
+          Row(
+            children: [
+              Expanded(
+                child: PosOutlineButton.icon(
+                  onPressed: () => _showReceiptDetail(
+                    context,
+                    receipt,
+                    // The receipt's own id is what the server files the print job
+                    // against, and it comes from the committed sale.
+                    receiptId: result.sale?['receiptId'] as String?,
+                    snapshot: result.receipt,
+                  ),
+                  icon: const PosIcon(PosGlyphs.receiptLongOutlined),
+                  label: Text(es ? 'Ver comprobante' : 'View receipt'),
                 ),
-                icon: const PosIcon(PosGlyphs.receiptLongOutlined),
-                label: Text(es ? 'Ver comprobante' : 'View receipt'),
               ),
-            ),
-            const SizedBox(width: UmiSpacing.md),
-            Expanded(
-              child: PosButton(
-                style: PosButton.styleFrom(
-                  minimumSize: const Size.fromHeight(56),
-                ),
-                onPressed: () async {
-                  if (!committed) {
-                    committed = true;
-                    await widget.sales.checkoutCommitted();
-                  }
-                  widget.sales.finishCheckoutPresentation(force: true);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: Text(es ? 'Nuevo pedido' : 'New order'),
-              ),
-            ),
-          ],
-        ),
+              const SizedBox(width: UmiSpacing.md),
+              Expanded(child: _nextOrder(context, committed, es)),
+            ],
+          )
+        else
+          _nextOrder(context, committed, es),
       ],
     );
   }
+
+  Widget _nextOrder(BuildContext context, bool committed, bool es) => PosButton(
+    style: PosButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+    onPressed: () async {
+      if (!committed) {
+        committed = true;
+        await widget.sales.checkoutCommitted();
+      }
+      widget.sales.finishCheckoutPresentation(force: true);
+      if (context.mounted) Navigator.pop(context);
+    },
+    child: Text(es ? 'Nuevo pedido' : 'New order'),
+  );
 
   Future<void> _showReceiptDetail(
     BuildContext context,

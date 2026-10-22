@@ -6,6 +6,7 @@ import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
+import 'package:umi_pos/features/offline/connectivity_controller.dart';
 import 'package:umi_pos/features/offline/offline_checkout_service.dart';
 import 'package:umi_pos/features/offline/offline_journal.dart';
 import 'package:umi_pos/features/offline/offline_policy.dart';
@@ -19,7 +20,7 @@ const _shift = '00000000-0000-4000-8000-000000000006';
 
 void main() {
   test(
-    'a simple online cash sale reaches paid locally and journals once',
+    'an offline cash sale shows paid totals without a receipt',
     () async {
       final store = _MemoryCipherStore();
       final journal = EncryptedOfflineJournal(store, web: false);
@@ -27,9 +28,11 @@ void main() {
       final now = DateTime.now().toUtc();
       await policyCache.save(_policy(now), now);
       final repository = _NeverCheckout();
+      final connectivity = ConnectivityController()..networkDown();
       var preserveCalls = 0;
       final checkout = CheckoutController(
         repository: repository,
+        connectivity: connectivity,
         offlineCheckout: OfflineCheckoutService(
           journal: journal,
           policyCache: policyCache,
@@ -80,14 +83,13 @@ void main() {
       expect(repository.checkouts, 0);
 
       await checkout.confirm();
-      expect(checkout.state.phase, CheckoutPhase.provisional);
+      expect(checkout.state.phase, CheckoutPhase.completed);
+      expect(checkout.state.result?.receipt, isNull);
       expect(preserveCalls, 1);
       expect(repository.checkouts, 0);
       final first = await journal.load();
       expect(first.pendingCount, 1);
       expect(first.entries.single.command.commandType, 'pos.checkout.cash');
-
-      await checkout.confirm();
       final repeated = await journal.load();
       expect(repeated.pendingCount, 1);
       expect(repeated.entries, hasLength(1));
@@ -97,10 +99,11 @@ void main() {
       );
       expect(repository.checkouts, 0);
       checkout.dispose();
+      connectivity.dispose();
     },
   );
 
-  test('a missing local policy falls back to the online checkout', () async {
+  test('an online cash sale uses the server receipt', () async {
     final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
     final repository = _CompletedCheckout();
     final checkout = CheckoutController(
@@ -145,7 +148,7 @@ void main() {
     );
     await checkout.confirm();
 
-    expect(repository.checkouts, 1);
+    expect(repository.checkouts, 2);
     expect(checkout.state.phase, CheckoutPhase.completed);
     expect((await journal.load()).pendingCount, 0);
     checkout.dispose();
@@ -154,9 +157,11 @@ void main() {
   test('a cart that cannot reach the journal stops before money', () async {
     final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
     final repository = _NeverCheckout();
+    final connectivity = ConnectivityController()..networkDown();
     var preserveCalls = 0;
     final checkout = CheckoutController(
       repository: repository,
+      connectivity: connectivity,
       offlineCheckout: OfflineCheckoutService(
         journal: journal,
         policyCache: OfflinePolicyCache(journal, web: false),
@@ -207,6 +212,7 @@ void main() {
     expect(checkout.state.errorCode, 'OFFLINE_SYNC_PENDING');
     expect((await journal.load()).pendingCount, 0);
     checkout.dispose();
+    connectivity.dispose();
   });
 
   test('a local cash sale stops when the drawer shift is missing', () async {
@@ -216,8 +222,10 @@ void main() {
     final policyCache = OfflinePolicyCache(journal, web: false);
     await policyCache.save(_policy(now), now);
     final repository = _NeverCheckout();
+    final connectivity = ConnectivityController()..networkDown();
     final checkout = CheckoutController(
       repository: repository,
+      connectivity: connectivity,
       offlineCheckout: OfflineCheckoutService(
         journal: journal,
         policyCache: policyCache,
@@ -262,6 +270,7 @@ void main() {
     expect(repository.checkouts, 0);
     expect((await journal.load()).pendingCount, 0);
     checkout.dispose();
+    connectivity.dispose();
   });
 }
 

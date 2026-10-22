@@ -12,6 +12,7 @@ import 'package:umi_pos/features/hardware/hardware_runtime.dart';
 import 'package:umi_pos/features/hardware/hardware_service.dart';
 import 'package:umi_pos/features/hardware/pilot_hardware_adapters.dart';
 import 'package:umi_pos/features/hardware/terminal_cashbox_transport.dart';
+import 'package:umi_pos/features/offline/offline_checkout_service.dart';
 
 const scope = HardwareScope(
   merchantId: '10000000-0000-4000-8000-000000000001',
@@ -630,164 +631,51 @@ void main() {
     },
   );
 
-  test(
-    'offline recovery restores runtime and controls an unknown print',
-    () async {
-      final recovery = MemoryHardwareRecoveryStore();
-      final repository = _HardwareRepository()
-        ..snapshotResult = HardwareRuntimeSnapshot(
-          merchantId: scope.merchantId,
-          locationId: scope.locationId,
-          registerId: null,
-          policy: const {
-            'autoPrintReceipt': true,
-            'openDrawerOnCashSale': false,
-            'receiptCopiesDefault': 1,
-            'hardwareRetryLimit': 2,
-            'hardwareHealthIntervalSeconds': 30,
-            'scannerEnabled': true,
-            'customerDisplayEnabled': false,
-          },
-          devices: [_simulatorPrinter.toJson()],
-          printJobs: const [],
-          recoveryStates: const [],
-          pendingJobs: 0,
-          retryableJobs: 0,
-          unknownCommands: 0,
-          capturedAt: '2026-08-09T00:00:00.000Z',
-        );
-      final firstLab = SimulatorHardwareLab();
-      final first = HardwareService(
-        repository: repository,
-        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
-        recovery: recovery,
-        adapterResolver: firstLab,
-      );
-      await first.snapshot(scope);
-      await first.dispose();
-
-      const provisionalId = '10000000-0000-4000-8000-000000000041';
-      final unknownCommandId = _deterministicTestId(
-        'offline-print-1:$provisionalId:${_simulatorPrinter.id}',
-      );
-      final secondLab = SimulatorHardwareLab(
-        failures: {
-          _simulatorPrinter.id: {
-            unknownCommandId: SimulatorFailure.unknownOutcome,
-          },
+  test('an offline cash sale never prints a receipt', () async {
+    final repository = _HardwareRepository()
+      ..snapshotResult = HardwareRuntimeSnapshot(
+        merchantId: scope.merchantId,
+        locationId: scope.locationId,
+        registerId: null,
+        policy: const {
+          'autoPrintReceipt': true,
+          'openDrawerOnCashSale': false,
+          'receiptCopiesDefault': 1,
+          'hardwareRetryLimit': 2,
+          'hardwareHealthIntervalSeconds': 30,
+          'scannerEnabled': true,
+          'customerDisplayEnabled': false,
         },
+        devices: [_simulatorPrinter.toJson()],
+        printJobs: const [],
+        recoveryStates: const [],
+        pendingJobs: 0,
+        retryableJobs: 0,
+        unknownCommands: 0,
+        capturedAt: '2026-08-09T00:00:00.000Z',
       );
-      final second = HardwareService(
-        repository: repository,
-        coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
-        recovery: recovery,
-        adapterResolver: secondLab,
-        identifiers: const _FixedIdentifierFactory(
-          '10000000-0000-4000-8000-000000000042',
-        ),
-      );
-      const totals = {
-        'subtotal': {'minorUnits': 100, 'currency': 'MXN'},
-        'tax': {'minorUnits': 0, 'currency': 'MXN'},
-        'discounts': {
-          'total': {'minorUnits': 0, 'currency': 'MXN'},
-          'entries': <Object?>[],
-        },
-        'grandTotal': {'minorUnits': 100, 'currency': 'MXN'},
-        'businessDate': '2026-08-09',
-      };
-      const cart = Cart(
-        id: '10000000-0000-4000-8000-000000000040',
-        merchantId: '10000000-0000-4000-8000-000000000001',
-        locationId: '10000000-0000-4000-8000-000000000002',
-        operatorSessionId: '10000000-0000-4000-8000-000000000003',
-        status: 'prepared',
-        version: 1,
-        firedOrderId: null,
-        fulfillmentType: 'dine_in',
-        items: [],
-        totals: totals,
-        checkoutEnabled: true,
-        checkoutMessageCode: 'ready',
-        updatedAt: '2026-08-09T00:00:00.000Z',
-      );
-      const confirmation = TotalsConfirmation(
-        cartVersion: 1,
-        fingerprint:
-            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        totals: totals,
-        taxes: {'groups': <Object?>[]},
-        discounts: {
-          'total': {'minorUnits': 0, 'currency': 'MXN'},
-        },
-        catalogVersion: 'catalog-1',
-        pricingVersion: 'pricing-1',
-        taxVersion: 'tax-1',
-        snapshotAt: '2026-08-09T00:00:00.000Z',
-        confirmedAt: '2026-08-09T00:00:00.000Z',
-      );
-      final offline = OfflineCheckoutSnapshot(
-        checkoutCommand: {},
-        cartSnapshot: cart.toJson(),
-        totals: confirmation.toJson(),
-        catalogVersion: 'catalog-1',
-        pricingVersion: 'pricing-1',
-        taxVersion: 'tax-1',
-        catalogSnapshotAt: '2026-08-09T00:00:00.000Z',
-        pricingSnapshotAt: '2026-08-09T00:00:00.000Z',
-        taxSnapshotAt: '2026-08-09T00:00:00.000Z',
-        currency: 'MXN',
-        amountDueMinorUnits: 100,
-        amountReceivedMinorUnits: 100,
-        changeDueMinorUnits: 0,
-        businessDate: '2026-08-09',
-      );
-      final provisional = ProvisionalReceipt(
-        provisionalSaleId: provisionalId,
-        status: 'pending_sync',
-        locationName: 'Pilot',
-        operatorName: 'Cashier',
-        snapshot: offline.toJson(),
-        createdAt: '2026-08-09T00:00:00.000Z',
-        lastSynchronizationAt: null,
-        officialReceipt: null,
-      );
+    final lab = SimulatorHardwareLab();
+    final service = HardwareService(
+      repository: repository,
+      coordinator: HardwareCoordinator(adapters: const {}, devices: const []),
+      recovery: MemoryHardwareRecoveryStore(),
+      adapterResolver: lab,
+    );
+    await service.snapshot(scope);
+    final results = await service.afterOfflineCashSale(
+      scope,
+      const OfflineCashCommit(
+        localCommitId: '10000000-0000-4000-8000-000000000041',
+      ),
+    );
 
-      final results = await second.afterOfflineCheckoutCompleted(
-        scope,
-        provisional,
-      );
-
-      expect(results, hasLength(1));
-      final unknown = results.single as RuntimeCommandResult;
-      expect(unknown.status, RuntimeCommandStatus.unknown);
-      expect(unknown.safeMetadata['commandId'], unknownCommandId);
-      final copy = await second.controlledOfflineReprint(
-        scope: scope,
-        commandId: unknownCommandId,
-      );
-      expect(copy.status, RuntimeCommandStatus.succeeded);
-      await second.verifyOfflinePrint(
-        scope: scope,
-        commandId: unknownCommandId,
-      );
-      final verified = await second.retryOfflineCheckoutHardware(
-        scope,
-        provisional,
-      );
-      expect(
-        (verified.single as RuntimeCommandResult).status,
-        RuntimeCommandStatus.succeeded,
-      );
-      expect(
-        secondLab
-            .adapter<PrinterSimulatorAdapter>(_simulatorPrinter.id)!
-            .artifacts,
-        hasLength(1),
-      );
-      await second.dispose();
-    },
-  );
+    expect(results, isEmpty);
+    expect(
+      lab.adapter<PrinterSimulatorAdapter>(_simulatorPrinter.id)!.artifacts,
+      isEmpty,
+    );
+    await service.dispose();
+  });
 
   test(
     'simulated cashier journey keeps financial and physical facts separate',
@@ -1343,13 +1231,6 @@ HardwareCommandRequest _printCommand(String commandId) {
     display: null,
     printPayload: receipt.toJson(),
   );
-}
-
-String _deterministicTestId(String source) {
-  final hex = hardwarePayloadFingerprint({'source': source}).substring(0, 32);
-  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
-      '5${hex.substring(13, 16)}-8${hex.substring(17, 20)}-'
-      '${hex.substring(20)}';
 }
 
 final class _HardwareRepository implements HardwareRepository {
