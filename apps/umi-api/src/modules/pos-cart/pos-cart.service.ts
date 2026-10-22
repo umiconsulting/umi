@@ -513,7 +513,13 @@ export class PosCartService {
       },
       async (context) => {
         const cartId = (payload as { cartId?: unknown } | null)?.cartId;
-        if (typeof cartId === 'string')
+        // Resume is the one command whose job is to recover the account that
+        // already carries the money. The repository decides whether THIS caller
+        // may reopen it: the same operator may recover checkout, while another
+        // operator remains blocked. Running the generic financial preflight
+        // here rejected even the owner before `claimAccount` could make that
+        // distinction, which is the retry loop observed in production.
+        if (typeof cartId === 'string' && commandType !== 'cart.account.resume')
           await this.repo.assertFinanciallyMutable(context.client, merchantId, cartId);
         const cart = await operation(context.client, commandId);
         if (!cart) {
