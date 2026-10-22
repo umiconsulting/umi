@@ -68,6 +68,8 @@ Evidence:
 - Signer:
   `8146b847a358a9cd54eddecbe8921a998287d3f59e1e52bdca5e121d21da3346`
 - iMin D3: build 322 installed and online as Admin ONCA.
+- Galaxy Tab A9: build 322 installed and showing the KDS.
+- Galaxy Tab A11: build 322 installed and showing the catalogue.
 - API production: `f0908e1`, healthy.
 
 ## Remaining risk
