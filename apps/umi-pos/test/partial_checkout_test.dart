@@ -592,6 +592,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Charge MXN 86.00'), findsOneWidget);
+      expect(find.byKey(const ValueKey('partial-tip-owner')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('partial-cash-received')),
+        '100.00',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('partial-cash-change')),
+          matching: find.text('MXN 14.00'),
+        ),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const ValueKey('partial-charge')));
       await tester.pumpAndSettle();
       expect(repository.commands, hasLength(2));

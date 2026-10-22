@@ -1152,30 +1152,6 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                                   'Open a cash shift or enable a payment method to split this account.',
                                 ),
                               ),
-                            if (method == 'cash') ...[
-                              const SizedBox(height: UmiSpacing.md),
-                              PosField(
-                                key: const ValueKey('partial-cash-received'),
-                                controller: cashReceived,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                inputFormatters: cashAmountFormatters,
-                                decoration: PosFieldDecoration(
-                                  labelText: label(
-                                    'Efectivo recibido',
-                                    'Cash received',
-                                  ),
-                                ),
-                                onChanged: (_) => cashReceivedEdited = true,
-                              ),
-                              if (receivedMinor != null &&
-                                  receivedMinor! >= charge)
-                                Text(
-                                  '${label('Cambio', 'Change')}: ${money(receivedMinor! - charge)}',
-                                ),
-                            ],
                             const SizedBox(height: UmiSpacing.md),
                             Text(
                               '${label('Consumo', 'Portion')} ${money(principalMinor ?? 0)} + '
@@ -1200,30 +1176,91 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               Padding(
                 padding: const EdgeInsets.all(UmiSpacing.lg),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: PosButton(
-                      key: ValueKey(
-                        canFinalize ? 'partial-finalize' : 'partial-charge',
-                      ),
-                      onPressed: canFinalize && !busy && !finalizationUnknown
-                          ? _finalize
-                          : canCollect
-                          ? _collect
-                          : null,
-                      child: Text(
-                        canFinalize
-                            ? label('Cerrar cuenta', 'Close account')
-                            : '${label('Cobrar', 'Charge')} ${money(charge)}',
-                      ),
-                    ),
-                  ),
+                  constraints: const BoxConstraints(maxWidth: 1400),
+                  child: _checkoutBar(),
                 ),
               ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _checkoutBar() {
+    final action = PosButton(
+      key: ValueKey(canFinalize ? 'partial-finalize' : 'partial-charge'),
+      onPressed: canFinalize && !busy && !finalizationUnknown
+          ? _finalize
+          : canCollect
+          ? _collect
+          : null,
+      child: Text(
+        canFinalize
+            ? label('Cerrar cuenta', 'Close account')
+            : '${label('Cobrar', 'Charge')} ${money(charge)}',
+      ),
+    );
+    final blockedHere = hasUnknown || uncertain || finalizationUnknown;
+    if (canFinalize || blockedHere || method != 'cash') return action;
+
+    final received = receivedMinor;
+    final difference = received == null ? null : received - charge;
+    final cash = PosField(
+      key: const ValueKey('partial-cash-received'),
+      controller: cashReceived,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: cashAmountFormatters,
+      decoration: PosFieldDecoration(
+        labelText: label('Efectivo recibido', 'Cash received'),
+      ),
+      onChanged: (_) => cashReceivedEdited = true,
+    );
+    final change = Column(
+      key: const ValueKey('partial-cash-change'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          difference != null && difference < 0
+              ? label('Falta', 'Amount due')
+              : label('Cambio', 'Change'),
+          style: PosTheme.of(context).textTheme.bodySmall?.copyWith(
+            color: PosTheme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          difference == null ? '—' : money(difference.abs()),
+          style: PosTheme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 760) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              cash,
+              const SizedBox(height: UmiSpacing.sm),
+              change,
+              const SizedBox(height: UmiSpacing.sm),
+              action,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            SizedBox(width: 280, child: cash),
+            const SizedBox(width: UmiSpacing.lg),
+            SizedBox(width: 180, child: change),
+            const SizedBox(width: UmiSpacing.lg),
+            Expanded(child: action),
+          ],
+        );
+      },
     );
   }
 
