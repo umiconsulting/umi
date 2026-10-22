@@ -1426,8 +1426,8 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                           ),
                         ),
                       ],
-                      if (state.phase ==
-                          CheckoutPhase.confirmationRequired) ...[
+                      if (state.phase == CheckoutPhase.confirmationRequired &&
+                          !_chargeInFlight) ...[
                         const SizedBox(height: UmiSpacing.lg),
                         Semantics(
                           liveRegion: true,
@@ -1564,11 +1564,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                       child: Text(
                         state.phase == CheckoutPhase.awaitingApproval
                             ? l.managerApprovalAction
-                            : state.phase == CheckoutPhase.confirmationRequired
-                            ? l.confirmAndPayAction
+                            : _chargeInFlight
+                            ? l.paymentProcessing
                             // The total rides on the button, so the cashier confirms
                             // the amount at the moment of the tap (SOTA convention).
-                            : '${Localizations.localeOf(context).languageCode == 'es' ? 'Pagar' : 'Pay'} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
+                            : '${l.checkoutAction} · ${_money({'currency': totals.grandTotal['currency'], 'minorUnits': grandTotal})}',
                       ),
                     ),
                     const SizedBox(height: UmiSpacing.sm),
