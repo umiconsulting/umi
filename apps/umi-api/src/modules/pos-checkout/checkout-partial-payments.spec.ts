@@ -201,6 +201,40 @@ function request(
 }
 
 describe('cobro parcial durable', () => {
+  it('devuelve la versión vigente de la cuenta, no la del primer abono', async () => {
+    const { service, repo, rows } = harness();
+    rows.push({
+      tenderId: id(30),
+      position: 0,
+      cartVersion: 2,
+      cartFingerprint: 'a'.repeat(64),
+      baseDueMinorUnits: '10000',
+      currency: 'MXN',
+      tenderType: 'bank_transfer',
+      amountMinorUnits: '4000',
+      tipMinorUnits: '0',
+      receivedMinorUnits: null,
+      status: 'confirmed_success',
+      confirmationReference: 'transfer-1',
+      cashShiftId: null,
+      serviceOperatorUserId: null,
+      processedByUserId: null,
+      tipRecipientUserId: null,
+    });
+    repo.partialRowsForPos.mockResolvedValueOnce([...rows]);
+
+    const result = await service.partialPayments(user, merchantId, cartId, {
+      locationId,
+      operatorSessionId,
+    });
+
+    expect(result.data).toMatchObject({
+      cartVersion: 3,
+      appliedAmount: money(4_000),
+      remainingBalance: money(6_000),
+    });
+  });
+
   it('una cuenta sin abonos devuelve un saldo vacío, no un 404', async () => {
     const { service } = harness();
     const result = await service.partialPayments(user, merchantId, cartId, {
@@ -273,6 +307,36 @@ describe('cobro parcial durable', () => {
       operatorSessionId,
     });
     expect(recovered.data.tenderDrafts).toEqual(third.data.tenderDrafts);
+  });
+
+  it('continúa el cobro cuando la cuenta avanzó pero el contenido no cambió', async () => {
+    const { service } = harness();
+    const currentVersion = cart.version;
+    cart.version = 2;
+    await service.collectPartialPayment(
+      user,
+      merchantId,
+      cartId,
+      request(1, 'bank_transfer', 4000),
+    );
+    // Suspending/resuming an account advances its version without changing the
+    // frozen order. The first tender's historical version must not make the
+    // remaining balance unpayable.
+    cart.version = 3;
+    const second = await service.collectPartialPayment(
+      user,
+      merchantId,
+      cartId,
+      request(2, 'cash', 6000),
+    );
+    cart.version = currentVersion;
+
+    expect(second.data).toMatchObject({
+      cartVersion: 3,
+      appliedAmount: money(10_000),
+      remainingBalance: money(0),
+      canFinalize: true,
+    });
   });
 
   it.each([
