@@ -310,7 +310,9 @@ describe('cobro parcial durable', () => {
   });
 
   it('continúa el cobro cuando la cuenta avanzó pero el contenido no cambió', async () => {
-    const { service, rows } = harness();
+    const { service } = harness();
+    const currentVersion = cart.version;
+    cart.version = 2;
     await service.collectPartialPayment(
       user,
       merchantId,
@@ -320,14 +322,14 @@ describe('cobro parcial durable', () => {
     // Suspending/resuming an account advances its version without changing the
     // frozen order. The first tender's historical version must not make the
     // remaining balance unpayable.
-    rows[0].cartVersion = 2;
-
+    cart.version = 3;
     const second = await service.collectPartialPayment(
       user,
       merchantId,
       cartId,
       request(2, 'cash', 6000),
     );
+    cart.version = currentVersion;
 
     expect(second.data).toMatchObject({
       cartVersion: 3,

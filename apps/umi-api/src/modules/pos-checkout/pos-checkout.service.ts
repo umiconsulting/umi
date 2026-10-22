@@ -204,7 +204,19 @@ export class PosCheckoutService {
               failureClass: 'conflict',
               retryable: false,
             };
-          const repriced = await this.reprice(context.client, cart, dto.idempotencyKey);
+          let rows = await this.repo.partialRows(
+            context.client,
+            merchantId,
+            dto.locationId,
+            cartId,
+          );
+          const frozenVersion = rows[0]?.cartVersion;
+          const repriced = await this.reprice(
+            context.client,
+            cart,
+            dto.idempotencyKey,
+            frozenVersion,
+          );
           if (!repriced)
             return {
               ok: false,
@@ -219,12 +231,6 @@ export class PosCheckoutService {
             merchantId,
             dto.locationId,
             currency,
-          );
-          let rows = await this.repo.partialRows(
-            context.client,
-            merchantId,
-            dto.locationId,
-            cartId,
           );
           if (
             rows.filter((row) => row.status !== 'operator_reported_failure').length >= 32 &&
@@ -567,7 +573,18 @@ export class PosCheckoutService {
               retryable: false,
             };
           }
-          const repriced = await this.reprice(context.client, cart, dto.idempotencyKey);
+          const partialRows = await this.repo.partialRows(
+            context.client,
+            merchantId,
+            dto.locationId,
+            dto.cartId,
+          );
+          const repriced = await this.reprice(
+            context.client,
+            cart,
+            dto.idempotencyKey,
+            partialRows[0]?.cartVersion,
+          );
           if (!repriced) {
             return {
               ok: false,
@@ -602,12 +619,6 @@ export class PosCheckoutService {
               });
             }
           }
-          const partialRows = await this.repo.partialRows(
-            context.client,
-            merchantId,
-            dto.locationId,
-            dto.cartId,
-          );
           const registeredPartial = partialRows.length > 0;
           if (registeredPartial) {
             const confirmed = partialRows
@@ -617,7 +628,6 @@ export class PosCheckoutService {
               partialRows.every(
                 (row) =>
                   row.status !== 'outcome_unknown' &&
-                  row.cartVersion === cart.version &&
                   row.cartFingerprint === repriced.public.fingerprint &&
                   Number(row.baseDueMinorUnits) === repriced.public.totals.grandTotal.minorUnits,
               ) &&
@@ -1442,6 +1452,7 @@ export class PosCheckoutService {
     client: Parameters<Parameters<IntegrityService['execute']>[1]>[0]['client'],
     cart: CheckoutCart,
     idempotencyKey: string,
+    fingerprintVersion = cart.version,
   ): Promise<{
     public: TotalsConfirmation;
     lineSnapshot: CartItem[];
@@ -1536,7 +1547,7 @@ export class PosCheckoutService {
       businessDate: cart.businessDate,
     };
     const fingerprint = createHash('sha256')
-      .update(JSON.stringify({ cartVersion: cart.version, items, totals, taxes }))
+      .update(JSON.stringify({ cartVersion: fingerprintVersion, items, totals, taxes }))
       .digest('hex');
     const snapshotAt = new Date().toISOString();
     return {
