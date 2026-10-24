@@ -21,6 +21,7 @@ import 'support/pos_finders.dart';
 
 final class _FakeCashRepository implements CashRepository {
   int openCalls = 0;
+  int centerCalls = 0;
 
   /// True makes `center` never answer, which is the state a slow network
   /// produces and the one the screen draws its own shape for.
@@ -63,6 +64,8 @@ final class _FakeCashRepository implements CashRepository {
   );
   OpenCashShiftRequest? openedWith;
   ManagerApprovalRequest? approvalRequest;
+  CashMovementRequest? movedWith;
+  String? movementFailureCode;
 
   /// A code makes `approve` refuse the way the API does, which is the branch
   /// that used to leave the screen with nothing to say.
@@ -82,7 +85,10 @@ final class _FakeCashRepository implements CashRepository {
   Future<CashCenterSnapshot> center(
     String merchantId,
     CashCenterQuery query,
-  ) async => holdCenter ? Completer<CashCenterSnapshot>().future : snapshot;
+  ) async {
+    centerCalls += 1;
+    return holdCenter ? Completer<CashCenterSnapshot>().future : snapshot;
+  }
 
   @override
   Future<CashCommandRecoveryResult> commandRecovery(
@@ -171,6 +177,40 @@ final class _FakeCashRepository implements CashRepository {
       verifiedHardwareResult: false,
       requestedAt: '2026-08-09T00:00:00.000Z',
       correlationId: 'cash-no-sale',
+    );
+  }
+
+  @override
+  Future<CashMovement> movement(
+    String merchantId,
+    String shiftId,
+    CashMovementRequest request,
+  ) async {
+    movedWith = request;
+    final failure = movementFailureCode;
+    if (failure == null) throw UnimplementedError();
+    snapshot = CashCenterSnapshot(
+      businessDate: snapshot.businessDate,
+      policy: snapshot.policy,
+      registers: snapshot.registers,
+      ledger: snapshot.ledger,
+      adoptableShift: snapshot.adoptableShift,
+      currentShift: {
+        ...?snapshot.currentShift,
+        'version': (snapshot.currentShift?['version'] as int? ?? 1) + 1,
+      },
+      expectedCash: snapshot.expectedCash,
+      latestCount: snapshot.latestCount,
+      varianceResolution: snapshot.varianceResolution,
+      reconciliation: snapshot.reconciliation,
+      recoveryState: snapshot.recoveryState,
+      allowedActions: snapshot.allowedActions,
+      summary: snapshot.summary,
+    );
+    throw AppException(
+      category: AppErrorCategory.conflict,
+      code: failure,
+      recoverable: true,
     );
   }
 
@@ -1120,6 +1160,34 @@ void main() {
     expect(repository.cancelledCountWith?.expectedShiftVersion, 2);
     expect(repository.cancelledCountWith?.reasonCode, 'count_opened_in_error');
   });
+
+  test(
+    'a stale movement reloads the drawer and keeps the conflict visible',
+    () async {
+      final repository = _FakeCashRepository();
+      await _seedOpenShift(repository);
+      repository.movementFailureCode = 'OPTIMISTIC_VERSION_CONFLICT';
+      final controller = CashController(repository: repository);
+      controller.setContext(
+        merchantId: '00000000-0000-4000-8000-000000000010',
+        locationId: '00000000-0000-4000-8000-000000000011',
+        operatorSessionId: '00000000-0000-4000-8000-000000000012',
+      );
+      await controller.load();
+      final readsBefore = repository.centerCalls;
+
+      await controller.movement(
+        type: 'paid_out',
+        amountMinorUnits: 100,
+        reasonCode: 'test_withdrawal',
+      );
+
+      expect(repository.movedWith?.expectedShiftVersion, 1);
+      expect(repository.centerCalls, readsBefore + 1);
+      expect(controller.state.errorCode, 'OPTIMISTIC_VERSION_CONFLICT');
+      expect(controller.state.snapshot?.currentShift?['version'], 2);
+    },
+  );
 
   testWidgets('offers the count exit only when the server says it is open', (
     tester,

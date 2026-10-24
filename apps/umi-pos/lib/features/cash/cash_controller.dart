@@ -1217,12 +1217,32 @@ final class CashController extends ChangeNotifier {
         '[umipos] cash op refused: ${error.code} '
         '(${error.runtimeType}) details=${error.details}',
       );
+      var snapshot = before.snapshot;
+      var count = before.count;
+      var resolution = before.resolution;
+      var reconciliation = before.reconciliation;
+      if (error.code == 'OPTIMISTIC_VERSION_CONFLICT') {
+        try {
+          // The server refused because this screen holds an older shift version.
+          // Read the current drawer before asking the operator to try again.
+          // The movement dialog keeps the amount and reason, so the next attempt
+          // uses the fresh version without retyping.
+          await _reload();
+          snapshot = _state.snapshot;
+          count = _state.count;
+          resolution = _state.resolution;
+          reconciliation = _state.reconciliation;
+        } catch (_) {
+          // A refused write may be followed by a failed read. Keep the previous
+          // figures and expose the original conflict instead of masking it.
+        }
+      }
       _set(
         CashState(
-          snapshot: before.snapshot,
-          count: before.count,
-          resolution: before.resolution,
-          reconciliation: before.reconciliation,
+          snapshot: snapshot,
+          count: count,
+          resolution: resolution,
+          reconciliation: reconciliation,
           errorCode: error.code,
         ),
       );
