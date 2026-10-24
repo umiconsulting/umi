@@ -183,6 +183,13 @@ final class CartController extends ChangeNotifier {
     return _queue?.pendingCount ?? 0;
   }
 
+  bool get hasPendingForCurrentCart {
+    final cartId = _state.cart?.id;
+    if (cartId == null) return pendingSyncCount > 0;
+    return (_queue?.hasPending ?? false) ||
+        (_journal?.hasPendingForCart(cartId) ?? false);
+  }
+
   void _journalCountChanged() {
     if (!_disposed) notifyListeners();
   }

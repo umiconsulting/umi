@@ -204,6 +204,31 @@ final class OfflineJournalSnapshot {
             e.status == JournalStatus.conflict,
       )
       .length;
+
+  /// A refused sale for one account must not stop an unrelated online sale.
+  /// Unknown command shapes block checkout until recovery can identify them.
+  bool hasPendingForCart(String cartId) {
+    for (final entry in entries) {
+      if (entry.status != JournalStatus.pending &&
+          entry.status != JournalStatus.replaying &&
+          entry.status != JournalStatus.unknown &&
+          entry.status != JournalStatus.conflict) {
+        continue;
+      }
+      final command = entry.command;
+      if (command.commandType == 'pos.table.command') continue;
+      final snapshot = command.payload['snapshot'];
+      final checkout = snapshot is Map ? snapshot['checkoutCommand'] : null;
+      final rawId =
+          command.payload['cartId'] ??
+          (checkout is Map ? checkout['cartId'] : null) ??
+          command.provisionalId;
+      if (rawId is! String || rawId.isEmpty) return true;
+      if (rawId == cartId || mappings[rawId] == cartId) return true;
+    }
+    return false;
+  }
+
   Iterable<JournalEntry> get activeCash => entries.where(
     (entry) =>
         entry.command.commandType == 'pos.checkout.cash' &&
@@ -257,6 +282,10 @@ final class EncryptedOfflineJournal {
   final bool _web;
   final _cipher = AesGcm.with256bits();
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
+  OfflineJournalSnapshot? _lastSnapshot;
+
+  bool hasPendingForCart(String cartId) =>
+      _lastSnapshot?.hasPendingForCart(cartId) ?? pendingCount.value > 0;
 
   bool get supportsSecureOffline => !_web;
 
@@ -991,6 +1020,7 @@ final class EncryptedOfflineJournal {
   }
 
   void _publishPending(OfflineJournalSnapshot snapshot) {
+    _lastSnapshot = snapshot;
     pendingCount.value = snapshot.entries
         .where(
           (entry) =>

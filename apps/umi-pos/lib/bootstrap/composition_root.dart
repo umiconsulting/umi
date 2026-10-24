@@ -534,7 +534,7 @@ final class AppCompositionRoot {
         connectivity: connectivity,
         recovery: offlineRecovery,
         localFirstFastPathEnabled: config.localFirstFastPathEnabled,
-        pendingLocalCommands: () => cart.pendingSyncCount > 0,
+        pendingLocalCommands: () => cart.hasPendingForCurrentCart,
         preserveLocalCommands: cart.preservePendingCommands,
         refreshOfflinePolicy: () async {
           final state = entry.state;
