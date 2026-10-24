@@ -2973,6 +2973,39 @@ void main() {
     await sheet.dispose();
   });
 
+  testWidgets('a single terminal amount above the bill cannot be charged', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    final terminalField = find.byWidgetPredicate(
+      (widget) =>
+          widget is PosField &&
+          widget.decoration?.labelText == 'Amount applied',
+    );
+    await tester.enterText(terminalField, '225.00');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Payment amount does not match the total'),
+      findsOneWidget,
+    );
+    expect(find.text('Over by MXN 109.00'), findsOneWidget);
+    expect(
+      tester.widget<PosButton>(find.byType(PosButton).last).onPressed,
+      isNull,
+    );
+    expect(repository.captures, isEmpty);
+    expect(repository.commands, isEmpty);
+    await sheet.dispose();
+  });
+
   testWidgets('bank transfer is absent until the location enables it', (
     tester,
   ) async {

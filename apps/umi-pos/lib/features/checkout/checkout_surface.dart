@@ -1543,11 +1543,11 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                               recoveredTenderConflict ||
                               cardCaptureInFlight ||
                               cardWaiting ||
-                              // A split whose legs do not add up to the bill
-                              // cannot be charged; the reading above says by
-                              // how much.
-                              (_splitMode &&
-                                  _tenderLegCount >= 2 &&
+                              // Never send an external payment for a different
+                              // amount than the bill, even with one tender.
+                              ((terminalEnabled ||
+                                      cardEnabled ||
+                                      bankEnabled) &&
                                   _tenderedLegsMinorUnits != grandTotal)
                           ? null
                           : state.phase == CheckoutPhase.awaitingApproval
@@ -1614,7 +1614,20 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
       if (terminalEnabled) '${l.manualTerminalLabel}: ${money(terminalAmount)}',
       if (bankEnabled) '${l.bankTransferLabel}: ${money(bankAmount)}',
     ];
+    final grandTotal = _dueMinorUnits(totals);
+    final difference = _tenderedLegsMinorUnits - grandTotal;
     if (legs.length < 2) {
+      if ((terminalEnabled || cardEnabled || bankEnabled) && difference != 0) {
+        return _TenderNotice(
+          tone: scheme.errorContainer,
+          ink: scheme.onErrorContainer,
+          icon: PosGlyphs.reportProblemOutlined,
+          title: l.tenderMismatchTitle,
+          body: difference < 0
+              ? l.tenderShortBy(amount(-difference))
+              : l.tenderOverBy(amount(difference)),
+        );
+      }
       // An armed split with one leg is half a decision: name the next step
       // instead of leaving the operator to guess what the control did.
       if (!_splitMode) return const SizedBox.shrink();
@@ -1626,8 +1639,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         body: l.splitTenderPickSecond,
       );
     }
-    final grandTotal = _dueMinorUnits(totals);
-    final difference = _tenderedLegsMinorUnits - grandTotal;
     return _TenderNotice(
       tone: scheme.surfaceContainerHighest,
       ink: scheme.onSurface,
@@ -3452,12 +3463,30 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     );
   }
 
+  Future<void> _showCartChanged() async {
+    final l = AppLocalizations.of(context);
+    await showPosDialog<void>(
+      context: context,
+      builder: (dialogContext) => PosAlertDialog(
+        title: Text(l.checkoutCartChangedTitle),
+        content: Text(l.checkoutCartChangedBody),
+        actions: [
+          PosButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l.closeAction),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _review(TotalsPreview totals) async {
     if (_chargeInFlight) return;
     setState(() => _chargeInFlight = true);
     try {
       final shownDue = _dueMinorUnits(totals);
       final externalTender = cardEnabled || terminalEnabled || bankEnabled;
+      final shownVersion = widget.cart.state.cart?.version;
       if (widget.checkout.usesLocalCheckout) {
         if (externalTender) {
           await _showCartNotReady();
@@ -3467,6 +3496,14 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         return;
       }
       if (!mounted) return;
+      if (externalTender && widget.cart.state.cart?.version != shownVersion) {
+        await _showCartChanged();
+        return;
+      }
+      if (externalTender && _tenderedLegsMinorUnits != shownDue) {
+        await _showCartChanged();
+        return;
+      }
       // Nothing is left to type once the operator commits, so the field lets go of the focus here.
       //
       // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
@@ -4082,11 +4119,16 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         final reviewedVersion = widget.cart.state.cart?.version;
         if (!await _refreshOnlineCart()) return;
         if (widget.cart.state.cart?.version != reviewedVersion) {
-          await _sendReview(totals);
+          await _showCartChanged();
           return;
         }
       }
       if (!mounted) return;
+      if ((cardEnabled || terminalEnabled || bankEnabled) &&
+          _tenderedLegsMinorUnits != _dueMinorUnits(totals)) {
+        await _showCartChanged();
+        return;
+      }
       if (terminalEnabled &&
           (terminalStatus != 'confirmed_success' ||
               _confirmedManualTerminalMinorUnits !=

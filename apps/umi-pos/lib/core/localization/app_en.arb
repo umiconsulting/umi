@@ -145,6 +145,8 @@
   "checkoutFailed": "Checkout could not be completed safely.",
   "checkoutCartNotReadyTitle": "Account update pending",
   "checkoutCartNotReadyBody": "The current account state could not be confirmed. Check the connection and Recovery Center before charging. If the terminal confirmed a payment, do not charge it again.",
+  "checkoutCartChangedTitle": "Review this payment",
+  "checkoutCartChangedBody": "The account or applied amount changed. Check that the amounts match before continuing. If the terminal already confirmed a payment, do not charge it again.",
   "provisionalSalePendingTitle": "Sale pending synchronization",
   "provisionalSalePendingBody": "Sale saved securely on this device and pending synchronization. Official receipt data will be assigned after server acceptance.",
   "returnToCatalogAction": "Return to catalog",
@@ -786,6 +788,7 @@
   "splitTenderCancelAction": "Single method",
   "splitTenderPickSecond": "Choose the second payment method.",
   "singleMethodOnlyNote": "This location charges one method per sale.",
+  "tenderMismatchTitle": "Payment amount does not match the total",
   "tenderShortBy": "Short by {amount}",
   "@tenderShortBy": {
     "description": "How much of a split payment the selected methods still do not cover.",
