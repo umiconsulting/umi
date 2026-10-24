@@ -50,7 +50,8 @@ La revisión `8a8ec541`:
 | --- | --- |
 | Revisión | `8a8ec541` |
 | Imagen API | `ghcr.io/umiconsulting/umi-api:onca-8a8ec541` |
-| Imagen SHA-256 | `sha256:f0d231fc9bdacf7f666eb3a7f5f1f98dbfeb5d93584feccecacd76810ba84fa6` |
+| Imagen SHA-256 | `sha256:b171d9ac1e451a39469a27080642362e0127ab93f9191fe439693e0c4efa218c` |
+| Identidad publicada | `1.0.0-onca.8a8ec541`; commit completo `8a8ec541d6d5c4ed8225512fa0ee7b872f0823f4` |
 | Salud | `/health/ready` respondió `200` |
 | Contrato | `2.44.0` |
 | Esquema esperado | `build-v3-79` |
