@@ -908,6 +908,18 @@ abstract class AppLocalizations {
   /// **'No fue posible completar el cobro de forma segura.'**
   String get checkoutFailed;
 
+  /// No description provided for @checkoutCartNotReadyTitle.
+  ///
+  /// In es, this message translates to:
+  /// **'Cuenta pendiente de actualizar'**
+  String get checkoutCartNotReadyTitle;
+
+  /// No description provided for @checkoutCartNotReadyBody.
+  ///
+  /// In es, this message translates to:
+  /// **'No pude confirmar el estado actual de la cuenta. Revisa la conexión y el Centro de recuperación antes de cobrar. Si la terminal ya confirmó un pago, no lo repitas.'**
+  String get checkoutCartNotReadyBody;
+
   /// No description provided for @provisionalSalePendingTitle.
   ///
   /// In es, this message translates to:

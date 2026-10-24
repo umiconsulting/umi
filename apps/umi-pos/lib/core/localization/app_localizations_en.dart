@@ -448,6 +448,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get checkoutFailed => 'Checkout could not be completed safely.';
 
   @override
+  String get checkoutCartNotReadyTitle => 'Account update pending';
+
+  @override
+  String get checkoutCartNotReadyBody =>
+      'The current account state could not be confirmed. Check the connection and Recovery Center before charging. If the terminal confirmed a payment, do not charge it again.';
+
+  @override
   String get provisionalSalePendingTitle => 'Sale pending synchronization';
 
   @override

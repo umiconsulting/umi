@@ -451,6 +451,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'No fue posible completar el cobro de forma segura.';
 
   @override
+  String get checkoutCartNotReadyTitle => 'Cuenta pendiente de actualizar';
+
+  @override
+  String get checkoutCartNotReadyBody =>
+      'No pude confirmar el estado actual de la cuenta. Revisa la conexión y el Centro de recuperación antes de cobrar. Si la terminal ya confirmó un pago, no lo repitas.';
+
+  @override
   String get provisionalSalePendingTitle => 'Venta pendiente de sincronización';
 
   @override

@@ -873,6 +873,33 @@ final class CartController extends ChangeNotifier {
     }
   }
 
+  /// Read the server cart before an online charge uses its version.
+  /// A pending local write can change that version after the read.
+  Future<Cart?> refreshForCheckout() async {
+    if (_state.cart == null ||
+        _merchantId == null ||
+        _locationId == null ||
+        _operatorSessionId == null ||
+        _inFlight ||
+        (_queue?.hasPending ?? false)) {
+      return null;
+    }
+    try {
+      final refreshed = await _readSelected();
+      if (_inFlight || (_queue?.hasPending ?? false)) return null;
+      if (!_isWritable(refreshed)) {
+        _releaseAccount();
+        return null;
+      }
+      unawaited(_persistCart(refreshed));
+      _set(CartState(phase: CartPhase.ready, cart: refreshed));
+      return refreshed;
+    } on AppException catch (error) {
+      _failure(error);
+      return null;
+    }
+  }
+
   /// Returns true only when the server took the line. A refusal lands in the cart's
   /// own error state — and the caller MUST read this answer before treating the add
   /// as done, because the counter on the frequent-products rail is fed from here

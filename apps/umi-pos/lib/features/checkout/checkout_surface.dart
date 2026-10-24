@@ -3427,11 +3427,46 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
 
   String _stableId(String kind) => tenderId(widget.cart.state.cart!.id, kind);
 
+  Future<bool> _refreshOnlineCart() async {
+    final cart = await widget.cart.refreshForCheckout();
+    if (!mounted) return false;
+    if (cart != null) return true;
+    await _showCartNotReady();
+    return false;
+  }
+
+  Future<void> _showCartNotReady() async {
+    final l = AppLocalizations.of(context);
+    await showPosDialog<void>(
+      context: context,
+      builder: (dialogContext) => PosAlertDialog(
+        title: Text(l.checkoutCartNotReadyTitle),
+        content: Text(l.checkoutCartNotReadyBody),
+        actions: [
+          PosButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l.closeAction),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _review(TotalsPreview totals) async {
     if (_chargeInFlight) return;
     setState(() => _chargeInFlight = true);
     try {
       final shownDue = _dueMinorUnits(totals);
+      final externalTender = cardEnabled || terminalEnabled || bankEnabled;
+      if (widget.checkout.usesLocalCheckout) {
+        if (externalTender) {
+          await _showCartNotReady();
+          return;
+        }
+      } else if (!await _refreshOnlineCart()) {
+        return;
+      }
+      if (!mounted) return;
       // Nothing is left to type once the operator commits, so the field lets go of the focus here.
       //
       // THIS DOES NOT DISMISS THE KEYBOARD ON THE iMin, and the comment says so rather than pretending
@@ -4038,6 +4073,20 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     if (_chargeInFlight) return;
     setState(() => _chargeInFlight = true);
     try {
+      if (widget.checkout.usesLocalCheckout) {
+        if (cardEnabled || terminalEnabled || bankEnabled) {
+          await _showCartNotReady();
+          return;
+        }
+      } else {
+        final reviewedVersion = widget.cart.state.cart?.version;
+        if (!await _refreshOnlineCart()) return;
+        if (widget.cart.state.cart?.version != reviewedVersion) {
+          await _sendReview(totals);
+          return;
+        }
+      }
+      if (!mounted) return;
       if (terminalEnabled &&
           (terminalStatus != 'confirmed_success' ||
               _confirmedManualTerminalMinorUnits !=

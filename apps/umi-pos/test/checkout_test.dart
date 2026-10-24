@@ -544,7 +544,8 @@ final class _PartialCheckoutRepository
 }
 
 final class _CartRepository implements CartRepository {
-  final cart = Cart(
+  bool failRead = false;
+  Cart cart = Cart(
     id: '00000000-0000-4000-8000-000000000004',
     merchantId: '00000000-0000-4000-8000-000000000001',
     locationId: '00000000-0000-4000-8000-000000000002',
@@ -564,7 +565,17 @@ final class _CartRepository implements CartRepository {
   Future<Cart> create(String merchantId, CreateCartRequest request) async =>
       cart;
   @override
-  Future<Cart> read(String merchantId, CartQuery query) async => cart;
+  Future<Cart> read(String merchantId, CartQuery query) async {
+    if (failRead) {
+      throw const AppException(
+        category: AppErrorCategory.transport,
+        code: 'NETWORK_UNAVAILABLE',
+        recoverable: true,
+      );
+    }
+    return cart;
+  }
+
   @override
   Future<Cart> add(String merchantId, CartLineInput input) async => cart;
   @override
@@ -652,6 +663,7 @@ Future<_TenderSheet> _openTenderSheet(
   WidgetTester tester,
   _CheckoutRepository repository, {
   required CheckoutPolicy policy,
+  _CartRepository? cartRepository,
   Future<String?> Function()? onOpenCashShift,
   Future<String?> Function()? onEnsureCashShift,
 }) async {
@@ -662,7 +674,7 @@ Future<_TenderSheet> _openTenderSheet(
   addTearDown(tester.view.reset);
   repository.policyValue = policy;
   final cart = CartController(
-    repository: _CartRepository(),
+    repository: cartRepository ?? _CartRepository(),
     telemetry: const SafeTelemetry(
       enabled: false,
       context: TelemetryContext(
@@ -1998,6 +2010,71 @@ void main() {
     entry.dispose();
     cart.dispose();
     checkout.dispose();
+  });
+
+  testWidgets('online checkout reads the current cart version before charge', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final carts = _CartRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      cartRepository: carts,
+    );
+    carts.cart = Cart.fromJson({...carts.cart.toJson(), 'version': 4});
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, isNotEmpty);
+    expect(repository.commands.last.expectedCartVersion, 4);
+    await sheet.dispose();
+  });
+
+  testWidgets('online checkout stops before payment when cart read fails', (
+    tester,
+  ) async {
+    final repository = _CheckoutRepository();
+    final carts = _CartRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      cartRepository: carts,
+    );
+    carts.failRead = true;
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+
+    expect(repository.commands, isEmpty);
+    expect(find.text('Account update pending'), findsOneWidget);
+    await sheet.dispose();
+  });
+
+  testWidgets('terminal payment waits for a current cart', (tester) async {
+    final repository = _CheckoutRepository();
+    final carts = _CartRepository();
+    final sheet = await _openTenderSheet(
+      tester,
+      repository,
+      policy: CheckoutPolicy.fromJson(_policy),
+      cartRepository: carts,
+    );
+    await tester.tap(find.text('Manual terminal'));
+    await tester.pumpAndSettle();
+    carts.failRead = true;
+
+    await tester.tap(find.textContaining('Checkout ·'));
+    await tester.pumpAndSettle();
+
+    expect(repository.captures, isEmpty);
+    expect(repository.settlements, isEmpty);
+    expect(repository.commands, isEmpty);
+    expect(find.text('Account update pending'), findsOneWidget);
+    await sheet.dispose();
   });
 
   testWidgets('a tender corrected after the preview re-keys the pair before the charge', (
