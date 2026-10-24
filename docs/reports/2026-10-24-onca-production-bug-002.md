@@ -66,3 +66,16 @@ caso y comprueba que la caché no resucita la comanda.
 La tablet real **Samsung A9 Barra** estaba desconectada al cerrar esta nota. Se
 debe instalar en ella el APK 329. La prueba normal de Barra debe terminar con
 **Complete**; esa acción es la que representa la entrega física.
+
+## Efecto secundario de la prueba
+
+La reproducción creó la venta **0031**, por MXN 50.00, con pago declarado como
+`bank_transfer`. No se recibió un depósito real. La consulta de elegibilidad
+impide anularla automáticamente:
+
+- La anulación devuelve `externally_settled`.
+- La devolución devuelve `bank_transfer_refund_requires_support`.
+
+El registro `967c35db-11cb-4c00-89ca-d0dd5057a00f` no debe contarse como ingreso
+real. Su corrección requiere una ruta de soporte o una intervención financiera
+autorizada. No se alteró la venta fuera de la API.
