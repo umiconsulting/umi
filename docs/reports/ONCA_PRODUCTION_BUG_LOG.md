@@ -4,4 +4,4 @@ Esta bitácora registra los incidentes que afectan ventas reales. Cada entrada s
 
 | Número | Fecha local | Incidente | Estado |
 | --- | --- | --- | --- |
-| [001](./2026-10-24-onca-production-bug-001.md) | 24 de octubre de 2026 | Cuenta 004: terminal cobró MXN 225, POS no creó la venta | Abierto: cuenta corregida; venta pendiente |
+| [001](./2026-10-24-onca-production-bug-001.md) | 24 de octubre de 2026 | Cuenta 004: terminal cobró MXN 225, POS no creó la venta; se detectaron también las cuentas 005 y 006 | Ventas 004, 005 y 006 conciliadas; defectos preventivos abiertos |

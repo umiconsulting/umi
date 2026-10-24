@@ -1,6 +1,8 @@
 # ONCA producción · error 001 · cobro confirmado sin venta POS
 
-**Fecha:** 24 de octubre de 2026. **Zona local:** `America/Mazatlan` (UTC−7). **Prioridad:** crítica para el cierre de caja. **Estado:** abierto. **Equipo:** iMin D3, caja principal. **Cuenta:** 004.
+**Fecha:** 24 de octubre de 2026. **Zona local:** `America/Mazatlan` (UTC−7). **Prioridad:** crítica para el cierre de caja. **Estado:** operaciones 004, 005 y 006 conciliadas; defectos y controles preventivos aún abiertos. **Equipo:** iMin D3, caja principal. **Cuenta inicial:** 004.
+
+> **Actualización a las 11:26 hora local:** Las secciones históricas de esta bitácora describen el estado antes de la reparación. La sección «Resultado de producción» al final contiene el estado vigente.
 
 ## Resumen e impacto
 
@@ -113,6 +115,40 @@ Después de identificar el origen, se preparó un cambio adicional en la API loc
 8. Añadir una alerta para `payment_attempt=succeeded` sin `pos_committed_sale`, y una instrucción operativa clara que impida repetir el cargo.
 
 El ajuste de la cuenta es una medida de recuperación de datos. **El incidente sigue abierto** hasta cerrar la venta, resolver la cola y demostrar una corrección permanente del flujo.
+
+## Resultado de producción · 24 de octubre, 11:26 hora local
+
+### Publicación y configuración
+
+- La API de producción quedó en la revisión `6d54a4e3fa9666f27c91658b54e707b01eb49e22`, imagen `ghcr.io/umiconsulting/umi-api:onca-6d54a4e3`, SHA-256 `fdd0fe384377cdc62af6f61dc0cc14443739c44a7979faae79b7dcf13b9469b6`. La API y el trabajador quedaron sanos. `/health/ready` respondió 200. El contrato sigue en 2.44.0 y el esquema en `build-v3-79`. La imagen anterior y una copia de `.env` permanecen disponibles para recuperación.
+- El APK 327 se instaló con la firma correcta, pero se compiló sin todas las definiciones de producción. El inicio rechazó esa configuración antes de abrir la sesión. Se reinstaló de inmediato el APK 324 respaldado, sin borrar datos. El usuario detectó esta falta al pedir revisar la configuración inicial.
+- Se compiló e instaló el APK **328** con `UMIPOS_ENVIRONMENT=production`, URL `https://api.umiconsulting.co`, contrato 2.44.0, esquema de configuración 1 y demás definiciones de producción. Su revisión es `a05c44edc527141fa93bebd0849492ec688d46bd`; SHA-256 del archivo `cb3628f9271edf16fd0fb8f9bb7cd3ad710cf0be580f5ccd6c7a9b821e8d85a7`. Se comprobó el mismo paquete y certificado de firma de la versión 324. La iMin conservó los datos, abrió la sesión de Cajero ONCA y mostró «En línea».
+- La prueba de interfaz añadió una Concha a un carrito temporal y pulsó `+` cuatro veces. Una sola línea pasó de 1 a 5 y el total de MXN 45.00 a MXN 225.00. Ese carrito no se guardó como cuenta ni se cobró; la consulta de producción mostró cero carritos nuevos después de las 18:00 UTC. La prueba automatizada de la API comprueba que la actualización 1→5 conserva el ID de línea. La prueba visual, por sí sola, no comprueba una venta ni una reconexión entre cada pulsación.
+
+### Permisos de Cajero ONCA
+
+La sesión activa usa el rol `cashier` y contiene `cart.write`, `checkout.commit`, `checkout.terminal.confirm`, `offline.cash.checkout`, `offline.replay` y `cash.register.use`. También tiene permisos de apertura, lectura y cierre de turno. Por ello, la falta de permisos **no explica** el fallo del botón `+` ni el error de cobro. No se modificó el rol. La sesión no contiene `order.fire`; si el cajero debe enviar productos a cocina, esa función requiere una decisión separada sobre el rol.
+
+### Conciliación comprobada
+
+| Cuenta | Producto y dinero confirmado | Venta oficial | Recibo oficial | Medio de pago |
+| --- | --- | --- | --- | --- |
+| 004 | Cinco conchas, MXN 225.00; foto de pago de terminal. | `97337c6a-9aac-44fc-becc-e417865aa732` | `0004`, MXN 225.00 | El **mismo** intento `f862a978-58ec-46c4-b52f-fa097d88367d` quedó enlazado a la venta. Un intento y una venta. |
+| 005 | Mesa Capirio, MXN 245.00; cobro de terminal confirmado por el personal, sin foto recibida. | `572c9b69-1351-4182-9f8d-21473a7cdd28` | `0005`, MXN 245.00 | Un intento de terminal manual, `75da18da-782e-40ed-bb8b-022247e5a934`, registrado por declaración del operador. Una venta. |
+| 006 | Una concha entregada y MXN 45.00 recibidos en efectivo, confirmados por el personal. | `41a8ba6a-0561-4188-b224-4a4c5c3b4187` | `0006`, MXN 45.00 | El **comando original #33** de efectivo se aceptó. Un intento `f654cfd5-d8d3-4dac-8946-3927e558a165` y una venta. |
+
+El servidor confirma las tres cuentas en estado `committed`, tres ventas, tres recibos y un intento de pago por cuenta. La pantalla de Cuentas de la iMin muestra «No hay cuentas abiertas». Nadie volvió a pasar una tarjeta. [Pago 004](./evidence/2026-10-24-onca-production-001/account-004-paid-pos.png), [pago 005](./evidence/2026-10-24-onca-production-001/account-005-paid-pos.png), [efectivo #33 aceptado](./evidence/2026-10-24-onca-production-001/cash-replay-33-accepted.png) y [lista final de cuentas](./evidence/2026-10-24-onca-production-001/no-open-accounts.png) muestran el resultado en la iMin.
+
+El reintento inicial del efectivo #33 después del arreglo de campos nulos llegó a `aggregate_version_conflict`, porque la Cuenta 006 seguía suspendida. Se comprobó de nuevo que no había venta, intento, borrador ni medio de pago. Una transacción controlada dejó el conflicto exacto #33 como resuelto para permitir repetir **ese mismo comando**; guardó auditoría `onca-2026-10-24-account-006-retry`. Se recuperó la Cuenta 006 en el POS, lo que la dejó activa en versión 5. El siguiente reintento del #33 fue aceptado y creó el recibo 0006. El conflicto permanece como historial resuelto. No se creó un segundo comando de efectivo. Esta secuencia demuestra que la recuperación depende también del ciclo de la cuenta; la normalización de campos nulos sola no basta.
+
+### Pendientes del defecto
+
+1. Reproducir con instrumentación la línea provisional y el Americano reportado. La API no conserva evidencia de un Americano confirmado en la Cuenta 004.
+2. Probar en la iMin la secuencia de pulsaciones sobre una **cuenta persistida**, con respuestas de red retrasadas y pérdida de conexión. La prueba visual de hoy usó un carrito temporal.
+3. Revisar la ruta de edición que cambia la identidad comercial de la línea. La corrección `6d54a4e3` garantiza ID estable cuando esa identidad no cambia.
+4. Añadir detección de `pos_payment_attempt.status=succeeded` sin venta, y una ruta explícita para reconciliar el cargo ya efectuado. El mensaje actual oculta la causa y puede inducir otro cobro.
+5. Ajustar la recuperación de efectivo para que la caja explique el conflicto de versión de una cuenta suspendida y permita un reintento seguro del mismo comando. La intervención de hoy requirió una transición de soporte con auditoría.
+6. Obtener la referencia del adquirente para la Cuenta 005 y conciliarla con el registro de la terminal. El POS contiene una declaración del operador, no la confirmación electrónica del adquirente.
 
 ## Herramientas y alcance
 
