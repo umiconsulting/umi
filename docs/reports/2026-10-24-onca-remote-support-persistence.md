@@ -71,6 +71,14 @@ El puerto ADB es dinámico por diseño de Android. No se intenta fijar ese puert
 el flujo persistente es Tailscale más el anuncio y reconexión automática del
 puerto vigente.
 
+Como prueba adicional, a las 17:28 se ejecutó `adb disconnect` contra Barra. El
+servicio detectó la ausencia en la siguiente revisión y restableció ADB por el
+mismo endpoint en 239 ms.
+
+El reinicio también llevó a UmiPOS a la pantalla normal de PIN de operador. La
+conexión de soporte siguió disponible, pero la sesión del operador debe
+autenticarse de nuevo; Tailscale y ADB no eluden el PIN.
+
 ## Operación
 
 Comprobar el receptor:
