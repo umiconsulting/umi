@@ -79,6 +79,14 @@ El reinicio también llevó a UmiPOS a la pantalla normal de PIN de operador. La
 conexión de soporte siguió disponible, pero la sesión del operador debe
 autenticarse de nuevo; Tailscale y ADB no eluden el PIN.
 
+## Despliegue de UmiPOS 329
+
+La compilación `329` quedó instalada en Barra y Mesero durante esta sesión. Las
+dos terminales reportan `versionName=1.0.0` y `versionCode=329`. Mesero volvió a
+la operación normal con el catálogo y los productos nuevos visibles. Barra quedó
+en la pantalla normal de PIN de operador después de la instalación; el acceso
+remoto continúa disponible para soporte.
+
 ## Operación
 
 Comprobar el receptor:

@@ -5,7 +5,7 @@ Esta bitácora registra los incidentes que afectan ventas reales. Cada entrada s
 | Número | Fecha local | Incidente | Estado |
 | --- | --- | --- | --- |
 | [001](./2026-10-24-onca-production-bug-001.md) | 24 de octubre de 2026 | Cuenta 004: terminal cobró MXN 225, POS no creó la venta; se detectaron también las cuentas 005 y 006 | Ventas 004, 005 y 006 conciliadas; defectos preventivos abiertos |
-| [002](./2026-10-24-onca-production-bug-002.md) | 24 de octubre de 2026 | Barra: una comanda completada en otra terminal puede permanecer en la caché local | Corregido en la compilación POS 329; falta actualizar la tablet de Barra. La venta de prueba 0031 requiere corrección de soporte |
+| [002](./2026-10-24-onca-production-bug-002.md) | 24 de octubre de 2026 | Barra: una comanda completada en otra terminal puede permanecer en la caché local | Corregido e instalado como POS 329 en Caja, Barra, Mesero y la A11 de pruebas. La venta de prueba 0031 requiere corrección de soporte |
 | [003](./2026-10-24-onca-production-bug-003.md) | 24 de octubre de 2026 | Caja principal: la salida de efectivo responde «No se completó la operación» | Corregido y verificado en producción con una salida y su reversa de MXN 1.00 |
 
 ## Cambios de catálogo del 24 de octubre
