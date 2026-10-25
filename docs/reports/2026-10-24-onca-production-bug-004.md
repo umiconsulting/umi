@@ -20,6 +20,16 @@ diálogo final ni prueba que esa pantalla sea el intento fallido.
   creó la venta `bfc795ab-2701-4745-9ade-073cabb344cf` y el recibo `0032`.
 - El intento de pago `b8f93b9c-88f2-4afa-8f80-fa3aed910ce1` quedó enlazado a
   esa venta y el cajón se abrió con el motivo `cash_sale`.
+- La auditoría de todo el día encontró cinco `pos.checkout` rechazados, todos
+  por `OPTIMISTIC_VERSION_CONFLICT` entre las 09:36 y las 11:19 locales. Esa
+  causa ya fue corregida con identidad estable de líneas, recarga del carrito y
+  límites de la cola por cuenta.
+- Después de las 16:19, hora de instalación de POS 329, las 65 solicitudes
+  `pos.checkout` registradas hasta las 17:31 terminaron correctamente.
+- La revisión por cuenta encontró **cero** intentos de pago exitosos sin una
+  venta enlazada. Los intentos que parecían sueltos pertenecen a ventas con pago
+  dividido y comparten el mismo carrito y recibo.
+- La revisión de borradores abiertos encontró **cero** cobros sin resolver.
 - No aparece un `pos.checkout` rechazado cerca de las 16:51 ni otro intento de
   efectivo exitoso sin venta en el periodo revisado.
 - Los fallos `OPTIMISTIC_VERSION_CONFLICT` de la mañana no explican por sí solos

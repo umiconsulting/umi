@@ -107,6 +107,6 @@ Para el POS, reinstalar el APK 328 respaldado. La copia está en
 
 ## Pendiente
 
-Instalar el APK 329 en la tablet de Barra y en las demás terminales cuando estén
-en línea. Las revisiones de código y la migración de datos no requieren cambios
-de esquema.
+El APK 329 quedó instalado en Caja, Barra y Mesero. Cocina continúa fuera de
+línea y deberá actualizarse cuando vuelva a conectarse. Las revisiones de código
+y la migración de datos no requieren cambios de esquema.
