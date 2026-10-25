@@ -23,6 +23,51 @@ import 'checkout_controller.dart';
 import 'partial_checkout_surface.dart';
 import 'tender_identity.dart';
 
+/// Name the refusal the server or the offline policy already identified.
+///
+/// The full-screen failure state used to ignore this mapping and reduce every
+/// known refusal to the generic "could not complete safely" sentence. Keep the
+/// fallback for genuinely unknown failures, but do not hide an actionable code.
+String checkoutFailureMessage(AppLocalizations l, String? code) {
+  if (code == null) return l.checkoutFailed;
+  return switch (code) {
+    'insufficient_cash' => l.insufficientCashMessage,
+    'invalid_amount' => l.invalidTenderMessage,
+    'totals_changed' => l.totalsConfirmedBody,
+    'remaining_balance' => l.remainingBalanceMessage,
+    'approval_required' => l.approvalRequiredMessage,
+    'terminal_outcome_unknown' ||
+    'CART_PAYMENT_UNRESOLVED' ||
+    'PAYMENT_UNKNOWN' ||
+    'PAYMENT_OUTCOME_UNKNOWN' ||
+    'TERMINAL_OUTCOME_UNKNOWN' => l.paymentUnknownBody,
+    'terminal_reported_failure' => l.terminalFailureMessage,
+    'terminal_declined' => l.terminalDeclinedNoChargeMessage,
+    'terminal_approved' => l.terminalApprovedCollectMessage,
+    'TENDER_PROVIDER_UNAVAILABLE' ||
+    'TERMINAL_TENDER_UNAVAILABLE' => l.terminalUnavailableMessage,
+    'TERMINAL_BUSY' => l.terminalBusyMessage,
+    'tip_rejected' => l.tipRejectedMessage,
+    'discount_rejected' => l.discountRejectedMessage,
+    'OFFLINE_ADVANCED_TENDER_BLOCKED' => l.offlineAdvancedTenderBlockedMessage,
+    'CART_VERSION_CONFLICT' ||
+    'CART_VALIDATION_FAILED' ||
+    'CHECKOUT_CART_CHANGED' ||
+    'OPTIMISTIC_VERSION_CONFLICT' => l.checkoutCartChangedBody,
+    'OFFLINE_SYNC_PENDING' ||
+    'policy_missing' ||
+    'policy_invalid' ||
+    'policy_disabled' ||
+    'policy_expired' ||
+    'trusted_time_unavailable' ||
+    'fingerprint_mismatch' ||
+    'sale_count_limit' ||
+    'accumulated_amount_limit' ||
+    'queue_capacity_exceeded' => l.checkoutCartNotReadyBody,
+    _ => l.checkoutFailed,
+  };
+}
+
 Future<bool?> _showBankTransferDetailsDialog(
   BuildContext context, {
   required CheckoutController checkout,
@@ -1414,7 +1459,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
                         Semantics(
                           liveRegion: true,
                           child: Text(
-                            _recoveryMessage(l, state.errorCode!),
+                            checkoutFailureMessage(l, state.errorCode!),
                             style: TextStyle(
                               color: PosTheme.of(context).colorScheme.error,
                             ),
@@ -3689,7 +3734,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
         cashEnabled = true;
         method = 'cash';
         _balanceTenderFields(totals);
-        cardMessage = _recoveryMessage(l, error.code);
+        cardMessage = checkoutFailureMessage(l, error.code);
       });
       return;
     }
@@ -4077,34 +4122,6 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     widget.checkout.applyCustomerValue(null);
     storedValueTenders = const [];
   }
-
-  String _recoveryMessage(AppLocalizations l, String code) => switch (code) {
-    'insufficient_cash' => l.insufficientCashMessage,
-    // The tender the server refused, at the moment it refused it. The checkout
-    // reports this as `invalid_amount`, which had no message, so every refusal
-    // of this kind fell through to "the charge could not be completed safely" -
-    // true, useless, and the reason a dead end looked like a server fault.
-    'invalid_amount' => l.invalidTenderMessage,
-    'totals_changed' => l.totalsConfirmedBody,
-    'remaining_balance' => l.remainingBalanceMessage,
-    'approval_required' => l.approvalRequiredMessage,
-    'terminal_outcome_unknown' => l.paymentUnknownBody,
-    'terminal_reported_failure' => l.terminalFailureMessage,
-    // The terminal's own answer, read back to the operator on the tender screen
-    // the sale returns to. A decline is not a failure of ours and not a sale:
-    // nothing was taken, so the sentence has to say so before it offers cash.
-    'terminal_declined' => l.terminalDeclinedNoChargeMessage,
-    'terminal_approved' => l.terminalApprovedCollectMessage,
-    // The card tile charges BEFORE the checkout, so a refusal here is a tender
-    // refusal and not a checkout failure: the sale is still open on this screen.
-    'TENDER_PROVIDER_UNAVAILABLE' ||
-    'TERMINAL_TENDER_UNAVAILABLE' => l.terminalUnavailableMessage,
-    'TERMINAL_BUSY' => l.terminalBusyMessage,
-    'tip_rejected' => l.tipRejectedMessage,
-    'discount_rejected' => l.discountRejectedMessage,
-    'OFFLINE_ADVANCED_TENDER_BLOCKED' => l.offlineAdvancedTenderBlockedMessage,
-    _ => l.checkoutFailed,
-  };
 
   Future<void> _confirm(TotalsPreview totals) async {
     if (_chargeInFlight) return;
@@ -4547,7 +4564,7 @@ final class _CheckoutSheetState extends State<_CheckoutSheet> {
     final l = AppLocalizations.of(context);
     final state = widget.checkout.state;
     final hold = state.holdState;
-    var body = l.checkoutFailed;
+    var body = checkoutFailureMessage(l, code);
     Widget action = PosButton.tonal(
       onPressed: widget.checkout.reset,
       child: Text(l.retryAction),

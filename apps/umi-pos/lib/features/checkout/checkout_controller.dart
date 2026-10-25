@@ -1377,7 +1377,7 @@ final class CheckoutController extends ChangeNotifier {
         debugPrint('[umipos] offline checkout blocked=${error.category}');
       }
       if (fallbackOnline && error.category != 'cash_received_insufficient') {
-        _event('offline_checkout_fallback_online');
+        _event('offline_checkout_fallback_online', {'code': error.category});
         return false;
       }
       _set(
@@ -1398,7 +1398,7 @@ final class CheckoutController extends ChangeNotifier {
         'code=${error.code}',
       );
     }
-    _event('checkout_failed');
+    _event('checkout_failed', {'code': error.code});
     _set(
       CheckoutState(
         phase: CheckoutPhase.failure,
@@ -1425,7 +1425,7 @@ final class CheckoutController extends ChangeNotifier {
     if (const bool.fromEnvironment('UMIPOS_TAP_LATENCY_PROBE')) {
       debugPrint('[umipos] checkout unexpected error=$error');
     }
-    _event('checkout_failed');
+    _event('checkout_failed', {'type': error.runtimeType.toString()});
     _set(
       CheckoutState(
         phase: CheckoutPhase.failure,
@@ -1448,8 +1448,8 @@ final class CheckoutController extends ChangeNotifier {
     await _submit(fingerprint);
   }
 
-  void _event(String name) =>
-      _telemetry.event(ClientEvent(name: name, values: const {}));
+  void _event(String name, [Map<String, Object?> values = const {}]) =>
+      _telemetry.event(ClientEvent(name: name, values: values));
 
   /// Whether the charge should be ATTEMPTED over the network.
   ///

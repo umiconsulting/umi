@@ -6,6 +6,7 @@ import 'package:umi_contract/umi_contract.dart';
 import 'package:umi_pos/bootstrap/composition_root.dart';
 import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/localization/app_localizations.dart';
+import 'package:umi_pos/core/localization/app_localizations_es.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 import 'package:umi_pos/core/theme/pos_ui.dart';
@@ -1058,6 +1059,23 @@ Future<_ValueSheet> _openValueSheet(
 }
 
 void main() {
+  test('known checkout refusals keep their actionable message', () {
+    final l = AppLocalizationsEs();
+    expect(
+      checkoutFailureMessage(l, 'OPTIMISTIC_VERSION_CONFLICT'),
+      l.checkoutCartChangedBody,
+    );
+    expect(
+      checkoutFailureMessage(l, 'PAYMENT_OUTCOME_UNKNOWN'),
+      l.paymentUnknownBody,
+    );
+    expect(
+      checkoutFailureMessage(l, 'policy_expired'),
+      l.checkoutCartNotReadyBody,
+    );
+    expect(checkoutFailureMessage(l, 'UNRECOGNIZED'), l.checkoutFailed);
+  });
+
   test('requires server repricing then explicit confirmation', () async {
     final repository = _CheckoutRepository();
     final controller = _controller(repository);
