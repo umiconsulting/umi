@@ -46,6 +46,16 @@ No reproducido después de actualizar Caja a la build 329. La venta en efectivo
 posterior a la actualización terminó correctamente y quedó conciliada. No se
 creó ni modificó ningún movimiento financiero durante esta revisión.
 
+La build **330** mejora además el diagnóstico: los rechazos conocidos de versión
+de cuenta, resultado desconocido, importe inválido y policy offline ya no se
+reducen al texto genérico. El evento `checkout_failed` incluye ahora el código de
+`AppException` o el tipo de una falla inesperada, sin datos del cliente ni
+secretos. Esto permitirá identificar la siguiente ocurrencia sin inferirla.
+
+La revisión POS `70c12f94` pasó `flutter analyze` y 1,155 pruebas. El APK 330,
+con SHA-256 `72fa5548ae126da880b980f5ea8598051d8d328cd3b8792a68259ff00242300d`,
+quedó instalado en Caja, Barra y Mesero.
+
 Si vuelve a ocurrir, se necesita registrar de inmediato:
 
 1. hora local y tablet;

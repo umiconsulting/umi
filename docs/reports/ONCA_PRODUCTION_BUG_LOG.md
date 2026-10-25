@@ -5,9 +5,9 @@ Esta bitácora registra los incidentes que afectan ventas reales. Cada entrada s
 | Número | Fecha local | Incidente | Estado |
 | --- | --- | --- | --- |
 | [001](./2026-10-24-onca-production-bug-001.md) | 24 de octubre de 2026 | Cuenta 004: terminal cobró MXN 225, POS no creó la venta; se detectaron también las cuentas 005 y 006 | Ventas 004, 005 y 006 conciliadas; defectos preventivos abiertos |
-| [002](./2026-10-24-onca-production-bug-002.md) | 24 de octubre de 2026 | Barra: una comanda completada en otra terminal puede permanecer en la caché local | Causa doble corregida: caché POS 329 y reapertura durante el cobro en API `2f5ea8e6`. Los tickets de los recibos 0005 y 0024 fueron reparados con auditoría. La venta de prueba 0031 requiere corrección de soporte |
-| [003](./2026-10-24-onca-production-bug-003.md) | 24 de octubre de 2026 | Caja principal: la salida de efectivo responde «No se completó la operación» | Corregido y verificado en producción con una salida y su reversa de MXN 1.00 |
-| [004](./2026-10-24-onca-production-bug-004.md) | 24 de octubre de 2026 | Caja principal: un cobro en efectivo mostró el mensaje genérico «No fue posible completar el cobro de forma segura» | No reproducido después de instalar POS 329; una venta posterior por MXN 180.00 terminó con recibo 0032. Vigilar una nueva ocurrencia |
+| [002](./2026-10-24-onca-production-bug-002.md) | 24 de octubre de 2026 | Barra: una comanda completada en otra terminal puede permanecer en la caché local | Causa doble corregida en POS 330/API `2f5ea8e6`: caché local y reapertura del ticket durante el cobro. Recibos 0005 y 0024 reparados con auditoría. La venta de prueba 0031 requiere corrección de soporte |
+| [003](./2026-10-24-onca-production-bug-003.md) | 24 de octubre de 2026 | Caja principal: la salida de efectivo responde «No se completó la operación» | Corregido y verificado en producción con una salida y su reversa de MXN 1.00; incluido en POS 330 |
+| [004](./2026-10-24-onca-production-bug-004.md) | 24 de octubre de 2026 | Caja principal: un cobro en efectivo mostró el mensaje genérico «No fue posible completar el cobro de forma segura» | No reproducido después de instalar POS 329; una venta posterior por MXN 180.00 terminó con recibo 0032. POS 330 muestra el motivo real y registra el código técnico |
 
 ## Cambios de catálogo del 24 de octubre
 

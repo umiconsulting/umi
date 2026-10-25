@@ -2,7 +2,7 @@
 
 **Fecha:** 24 de octubre de 2026. **Zona local:** `America/Mazatlan` (UTC−7).
 **Prioridad:** media para la operación de Barra. **Estado:** causa corregida en
-POS 329 y API `2f5ea8e6`, desplegada en producción; los dos tickets históricos
+POS 330 y API `2f5ea8e6`, desplegadas en producción; los dos tickets históricos
 inconsistentes quedaron reparados.
 
 ## Reporte
@@ -52,9 +52,12 @@ caso y comprueba que la caché no resucita la comanda.
 ### Segunda causa: el cobro reabría el ticket
 
 La consulta de producción reveló que el problema también existía en el servidor.
-Los recibos **0005** y **0024** tenían todos sus productos `ready`, sus horas de
-terminado por estación y una venta `committed`, pero el encabezado del ticket
-seguía `queued`.
+Los tickets de los recibos **0005**, **0017** y **0024** fueron terminados y,
+después del cobro, una operación `kitchen:append` los devolvió a `queued`. En los
+recibos 0005 y 0024 todos los productos ya estaban `ready`, tenían hora de
+terminado por estación y la venta estaba `committed`, pero el encabezado seguía
+abierto. El 0017 se volvió a completar manualmente y por eso ya estaba cerrado al
+revisar la base.
 
 Los eventos de cocina muestran la secuencia exacta:
 
@@ -79,15 +82,15 @@ ticket terminado y un append con una línea nueva sí lo reabre.
 | --- | --- |
 | Prueba focal de almacenamiento KDS | 12 pruebas aprobadas |
 | `flutter analyze` | Sin hallazgos |
-| Suite completa del POS | 1,151 pruebas aprobadas |
+| Suite completa del POS después de POS 330 | 1,155 pruebas aprobadas |
 | Suite completa de API después de `2f5ea8e6` | 2,095 aprobadas; 29 omitidas |
-| APK | Build 329, paquete `co.umiconsulting.umi_pos.estacion` |
-| SHA-256 del APK | `0800a7e468b3516edd0a15dd7c659a124b1584af70ef989c946eb736678ca548` |
-| Firma | Misma firma SHA-256 `8146b847…3346` que la compilación 328 |
-| iMin instalada | Build 329 |
-| Tablet de prueba | Build 329 |
-| Barra | Build 329 |
-| Mesero | Build 329 |
+| APK | Build 330, paquete `co.umiconsulting.umi_pos.estacion` |
+| SHA-256 del APK | `72fa5548ae126da880b980f5ea8598051d8d328cd3b8792a68259ff00242300d` |
+| Firma | Misma firma SHA-256 `8146b847…3346` que las compilaciones 328 y 329 |
+| iMin instalada | Build 330 |
+| Barra | Build 330 |
+| Mesero | Build 330 |
+| A11 de pruebas | Build 329; sin conexión para actualizarla |
 
 ### Despliegue API
 

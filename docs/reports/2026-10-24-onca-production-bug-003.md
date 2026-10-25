@@ -55,7 +55,9 @@ La revisión `8a8ec541`:
 | Salud | `/health/ready` respondió `200` |
 | Contrato | `2.44.0` |
 | Esquema esperado | `build-v3-79` |
-| POS instalado en iMin | 329 |
+| POS instalado en iMin | 330 |
+| Barra | 330 |
+| Mesero | 330 |
 | POS instalado en tablet de prueba | 329 |
 
 La imagen anterior
@@ -107,6 +109,7 @@ Para el POS, reinstalar el APK 328 respaldado. La copia está en
 
 ## Pendiente
 
-El APK 329 quedó instalado en Caja, Barra y Mesero. Cocina continúa fuera de
-línea y deberá actualizarse cuando vuelva a conectarse. Las revisiones de código
-y la migración de datos no requieren cambios de esquema.
+El APK 330 quedó instalado en Caja, Barra y Mesero e incluye la corrección de
+caja de la 329. Cocina continúa fuera de línea y deberá actualizarse cuando
+vuelva a conectarse. Las revisiones de código y la migración de datos no
+requieren cambios de esquema.
