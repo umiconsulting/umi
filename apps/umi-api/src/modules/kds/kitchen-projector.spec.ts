@@ -229,4 +229,157 @@ describe('projectKitchenOrder', () => {
       query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO merchant.kitchen_order')),
     ).toBe(true);
   });
+
+  it('does not reopen a completed ticket when an idempotent append adds no items', async () => {
+    const query = vi.fn(async (sqlValue: unknown) => {
+      const sql = String(sqlValue);
+      if (sql.includes('SELECT id::text FROM merchant.kitchen_order')) {
+        return { rows: [{ id: 'kitchen-1' }] };
+      }
+      if (sql.includes('SELECT o.id::text AS "orderId"')) {
+        return {
+          rows: [
+            {
+              orderId: 'order-1',
+              merchantId: 'merchant-1',
+              locationId: 'location-1',
+              publicReference: 'pos-cart:cart-1',
+              source: 'pos',
+              fulfillmentType: 'takeout',
+              businessDate: '2026-10-24',
+              queuedAt: '2026-10-24T20:00:00.000Z',
+              lineId: 'line-1',
+              productId: 'product-1',
+              categoryId: 'category-1',
+              requiresPreparation: true,
+              productName: 'Latte',
+              variantName: null,
+              quantity: 1,
+              courseNumber: 1,
+              preparationNote: null,
+              displayOrder: 0,
+              targetSeconds: 240,
+              modifiers: [],
+            },
+          ],
+        };
+      }
+      if (sql.includes('SELECT r.id::text')) {
+        return {
+          rows: [
+            {
+              id: 'route-1',
+              stationId: 'station-1',
+              productId: 'product-1',
+              categoryId: null,
+              priority: 1,
+              targetSeconds: 180,
+              stationName: 'Barra',
+            },
+          ],
+        };
+      }
+      if (sql.includes('INSERT INTO merchant.kitchen_order_item')) {
+        return { rows: [] };
+      }
+      if (sql.includes('UPDATE merchant.kitchen_order SET route_snapshot')) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+
+    await expect(appendKitchenItems({ query } as never, 'merchant-1', 'order-1')).resolves.toBe(
+      'kitchen-1',
+    );
+
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes("SET status = CASE WHEN status IN ('ready','completed','cancelled')"),
+      ),
+    ).toBe(false);
+    expect(
+      query.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO merchant.kitchen_event')),
+    ).toBe(false);
+    expect(
+      query.mock.calls.some(([sql]) => String(sql).includes("pg_notify('umi_kitchen_board'")),
+    ).toBe(false);
+  });
+
+  it('reopens a completed ticket only when the append inserts new kitchen items', async () => {
+    const query = vi.fn(async (sqlValue: unknown) => {
+      const sql = String(sqlValue);
+      if (sql.includes('SELECT id::text FROM merchant.kitchen_order')) {
+        return { rows: [{ id: 'kitchen-1' }] };
+      }
+      if (sql.includes('SELECT o.id::text AS "orderId"')) {
+        return {
+          rows: [
+            {
+              orderId: 'order-1',
+              merchantId: 'merchant-1',
+              locationId: 'location-1',
+              publicReference: 'pos-cart:cart-1',
+              source: 'pos',
+              fulfillmentType: 'takeout',
+              businessDate: '2026-10-24',
+              queuedAt: '2026-10-24T20:00:00.000Z',
+              lineId: 'line-2',
+              productId: 'product-2',
+              categoryId: 'category-1',
+              requiresPreparation: true,
+              productName: 'Danesa',
+              variantName: null,
+              quantity: 1,
+              courseNumber: 1,
+              preparationNote: null,
+              displayOrder: 1,
+              targetSeconds: 240,
+              modifiers: [],
+            },
+          ],
+        };
+      }
+      if (sql.includes('SELECT r.id::text')) {
+        return {
+          rows: [
+            {
+              id: 'route-1',
+              stationId: 'station-1',
+              productId: 'product-2',
+              categoryId: null,
+              priority: 1,
+              targetSeconds: 180,
+              stationName: 'Barra',
+            },
+          ],
+        };
+      }
+      if (sql.includes('INSERT INTO merchant.kitchen_order_item')) {
+        return { rows: [{ id: 'kitchen-item-2' }] };
+      }
+      if (sql.includes('UPDATE merchant.kitchen_order SET route_snapshot')) {
+        return { rows: [] };
+      }
+      if (sql.includes('UPDATE merchant.kitchen_order') && sql.includes('SET status = CASE')) {
+        return { rows: [{ version: 8, status: 'queued' }] };
+      }
+      if (sql.includes('INSERT INTO merchant.kitchen_event')) {
+        return { rows: [] };
+      }
+      if (sql.includes("pg_notify('umi_kitchen_board'")) {
+        return { rows: [] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    });
+
+    await expect(appendKitchenItems({ query } as never, 'merchant-1', 'order-1')).resolves.toBe(
+      'kitchen-1',
+    );
+
+    expect(
+      query.mock.calls.some(([sql]) =>
+        String(sql).includes("SET status = CASE WHEN status IN ('ready','completed','cancelled')"),
+      ),
+    ).toBe(true);
+  });
 });
