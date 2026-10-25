@@ -36,6 +36,14 @@ Tailscale quedó como VPN siempre activa en Caja, Barra y Mesero. Barra y Mesero
 también tienen KeepADB con reconexión automática y un webhook privado por
 Tailscale que informa a esta computadora cuando Android cambia el puerto ADB.
 
+Sesión de operador comprobada después de instalar POS 330:
+
+| Terminal | Perfil activo | Estado |
+| --- | --- | --- |
+| Caja principal | Cajero ONCA | Autenticado |
+| Barra | Barista | Autenticado |
+| Mesero | Mesero 1 | Autenticado |
+
 La prueba de reinicio de Barra confirmó el flujo completo: Tailscale regresó,
 Android abrió el puerto `44917` en lugar de `41827`, KeepADB lo publicó y ADB se
 reconectó solo. El procedimiento, estado por dispositivo y operación del receptor
