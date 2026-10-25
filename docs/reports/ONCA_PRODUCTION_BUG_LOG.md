@@ -23,16 +23,20 @@ evidencia visual está en
 
 ## Conectividad de soporte remoto
 
-| Dispositivo | IP de Tailscale | Estado al 24 de octubre, 16:51 |
+| Dispositivo | IP de Tailscale | Estado al 24 de octubre, 17:25 |
 | --- | --- | --- |
 | Caja principal | `100.64.178.95` | En línea; ADB fijo en el puerto `5555` |
-| Barra | `100.90.102.41` | Fuera de línea |
-| Cocina | `100.125.137.36` | Fuera de línea |
-| Mesero | `100.125.102.97` | Fuera de línea |
+| Barra | `100.90.102.41` | En línea; ADB automático en el puerto `44917` |
+| Cocina | `100.125.137.36` | Fuera de línea; configuración pendiente |
+| Mesero | `100.125.102.97` | En línea; ADB automático en el puerto `35893` |
 | A11 de pruebas | `100.107.181.80` | Fuera de línea después de reiniciar |
 
-Las claves de Tailscale no estaban caducadas. La prueba de reinicio de la A11
-confirmó que Tailscale volvió a conectarse, pero el puerto fijo `5555` de ADB no
-sobrevivió. Los `192.168.0.x` que muestran las tablets son direcciones privadas
-de la red de ONCA y no son alcanzables desde esta computadora. Para soporte
-remoto se debe usar la IP `100.x` de Tailscale de cada tablet.
+Tailscale quedó como VPN siempre activa en Caja, Barra y Mesero. Barra y Mesero
+también tienen KeepADB con reconexión automática y un webhook privado por
+Tailscale que informa a esta computadora cuando Android cambia el puerto ADB.
+
+La prueba de reinicio de Barra confirmó el flujo completo: Tailscale regresó,
+Android abrió el puerto `44917` en lugar de `41827`, KeepADB lo publicó y ADB se
+reconectó solo. El procedimiento, estado por dispositivo y operación del receptor
+están documentados en
+[`2026-10-24-onca-remote-support-persistence.md`](./2026-10-24-onca-remote-support-persistence.md).
