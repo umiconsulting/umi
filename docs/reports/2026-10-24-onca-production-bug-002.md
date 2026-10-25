@@ -2,7 +2,7 @@
 
 **Fecha:** 24 de octubre de 2026. **Zona local:** `America/Mazatlan` (UTC−7).
 **Prioridad:** media para la operación de Barra. **Estado:** causa corregida en
-la compilación POS 329; falta instalar esa compilación en la tablet de Barra.
+la compilación POS 329 e instalada en Caja, Barra, Mesero y la A11 de pruebas.
 
 ## Reporte
 
@@ -60,12 +60,26 @@ caso y comprueba que la caché no resucita la comanda.
 | Firma | Misma firma SHA-256 `8146b847…3346` que la compilación 328 |
 | iMin instalada | Build 329 |
 | Tablet de prueba | Build 329 |
+| Barra | Build 329 |
+| Mesero | Build 329 |
 
-## Pendiente
+## Prueba posterior en producción
 
-La tablet real **Samsung A9 Barra** estaba desconectada al cerrar esta nota. Se
-debe instalar en ella el APK 329. La prueba normal de Barra debe terminar con
-**Complete**; esa acción es la que representa la entrega física.
+A las 17:32 se creó una cuenta de prueba **039** desde Mesero con Corico
+individual y un Latte. La comanda apareció en el KDS. Las dos líneas se
+cancelaron desde la cuenta, sin cobro, y la API marcó el ticket de cocina como
+`cancelled`.
+
+Mesero conservó la tarjeta cancelada durante la primera sincronización. Caja sí
+mostró el estado **Cancelado** y permitió **Descartar**. Después del acuse y de
+la siguiente lectura de la nube, la Cuenta 039 desapareció también de Mesero.
+No se creó venta, intento de pago ni movimiento de efectivo.
+
+Esta prueba valida la convergencia del tablero cuando la nube deja de incluir el
+ticket, pero no reproduce por sí sola el caso original de una comanda pagada y
+entregada. La prueba normal de Barra debe comprobar el siguiente ticket que se
+complete desde otra terminal y terminará visualmente cuando la tarjeta
+desaparezca del tablero.
 
 ## Efecto secundario de la prueba
 
