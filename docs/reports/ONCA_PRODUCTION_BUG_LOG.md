@@ -20,3 +20,19 @@ Los productos siguientes se crearon y verificaron en el catálogo de producción
 La categoría se comprobó contra el producto existente **Coricos pack**. La
 evidencia visual está en
 [`products-after.png`](./evidence/2026-10-24-onca-production-catalog/products-after.png).
+
+## Conectividad de soporte remoto
+
+| Dispositivo | IP de Tailscale | Estado al 24 de octubre, 16:51 |
+| --- | --- | --- |
+| Caja principal | `100.64.178.95` | En línea; ADB fijo en el puerto `5555` |
+| Barra | `100.90.102.41` | Fuera de línea |
+| Cocina | `100.125.137.36` | Fuera de línea |
+| Mesero | `100.125.102.97` | Fuera de línea |
+| A11 de pruebas | `100.107.181.80` | Fuera de línea después de reiniciar |
+
+Las claves de Tailscale no estaban caducadas. La prueba de reinicio de la A11
+confirmó que Tailscale volvió a conectarse, pero el puerto fijo `5555` de ADB no
+sobrevivió. Los `192.168.0.x` que muestran las tablets son direcciones privadas
+de la red de ONCA y no son alcanzables desde esta computadora. Para soporte
+remoto se debe usar la IP `100.x` de Tailscale de cada tablet.
