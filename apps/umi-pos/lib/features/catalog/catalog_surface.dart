@@ -327,12 +327,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       final type = await showOrderTypePicker(context);
       if (type == null || !mounted) return false;
       _consumeModalPointer();
-      if (type == 'dine_in') {
-        final table = await _chooseOrderTable();
-        if (table == null || !mounted) return false;
-        await _openTableAccount(table);
-        return widget.cart.state.cart?.tableId == table.id;
-      }
       return _openTablelessAccount(type);
     }
     if (_preparedMobileCartId == cart.id ||
@@ -346,25 +340,9 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final type = await showOrderTypePicker(context);
     if (type == null || !mounted) return false;
     _consumeModalPointer();
-    if (type == 'dine_in') {
-      final table = await _chooseOrderTable();
-      if (table == null || !mounted) return false;
-      await _openTableAccount(table);
-      final selected = widget.cart.state.cart;
-      if (selected?.tableId != table.id) return false;
-      _preparedMobileCartId = selected!.id;
-    } else {
-      await widget.cart.setFulfillment(type);
-      if (!mounted || widget.cart.state.cart?.fulfillmentType != type) {
-        if (mounted) _refuseCartWrite();
-        return false;
-      }
-      _preparedMobileCartId = widget.cart.state.cart!.id;
-      setState(() {
-        _orderTypeTouched = false;
-        _orderType = type;
-      });
-    }
+    final opened = await _openTablelessAccount(type);
+    if (!opened || !mounted) return false;
+    _preparedMobileCartId = widget.cart.state.cart!.id;
     return true;
   }
 
@@ -377,19 +355,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
       return true;
     }
     if (cart.fulfillmentType != 'dine_in' || cart.tableId != null) return true;
-    final operator = widget.entry.state.operator;
-    if (operator != null) {
-      await widget.checkout.loadPolicy(
-        merchantId: cart.merchantId,
-        locationId: cart.locationId,
-        operatorSessionId: operator.id,
-        currency:
-            TotalsPreview.fromJson(cart.totals).grandTotal['currency']!
-                as String,
-      );
-      if (!mounted) return false;
-      if (widget.checkout.policy?.allowDineInWithoutTable == true) return true;
-    }
+    if (widget.floorPlan == null) return true;
     return _assignAccountTable();
   }
 
@@ -997,7 +963,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   onPrint: _receiptPrinter,
                   orderType: _orderType,
                   beforeCheckout: _prepareCheckout,
-                  beforeFire: _mobileDevice ? _prepareCheckout : null,
+                  beforeFire: _prepareCheckout,
                   onAssignTable:
                       canWriteCart &&
                           widget.cart.supportsAccountDetails &&
@@ -1804,11 +1770,6 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
     final type = await showOrderTypePicker(context);
     if (type == null || !mounted) return;
     _consumeModalPointer();
-    if (type == 'dine_in' && widget.floorPlan != null) {
-      final table = await _chooseOrderTable();
-      if (table != null && mounted) await _openTableAccount(table);
-      return;
-    }
     await _openTablelessAccount(type);
   }
 
@@ -2884,7 +2845,7 @@ final class _CatalogSurfaceState extends State<CatalogSurface> {
                   onPrint: _receiptPrinter,
                   orderType: _orderType,
                   beforeCheckout: _prepareCheckout,
-                  beforeFire: _mobileDevice ? _prepareCheckout : null,
+                  beforeFire: _prepareCheckout,
                   onAssignTable:
                       canWriteCart &&
                           widget.cart.supportsAccountDetails &&

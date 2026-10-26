@@ -58,6 +58,8 @@ final class _CartRepo implements CartRepository {
 
 final class _Repo implements CheckoutRepository, PartialPaymentRepository {
   bool enableBankTransfer = false;
+  bool enableManualTerminal = false;
+  bool enableMixedTender = false;
   final drafts = <Map<String, Object?>>[];
   final commands = <Map<String, Object?>>[];
   final finalCommands = <CheckoutCommand>[];
@@ -157,7 +159,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
     PosCheckoutPolicyQuery query,
   ) async => CheckoutPolicy.fromJson({
     'version': 'test',
-    'manualTerminalEnabled': false,
+    'manualTerminalEnabled': enableManualTerminal,
     'bankTransferEnabled': enableBankTransfer,
     'bankTransferDetails': enableBankTransfer
         ? <String, Object?>{
@@ -168,8 +170,8 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
           }
         : null,
     'merchantLogoUrl': null,
-    'mixedTenderEnabled': false,
-    'maximumTenderLines': 1,
+    'mixedTenderEnabled': enableMixedTender,
+    'maximumTenderLines': enableMixedTender ? 8 : 1,
     'manualTerminalApprovalThreshold': {'minorUnits': 50000, 'currency': 'MXN'},
     'manualTerminalApprovalPermission': 'checkout.terminal.approve',
     'tip': {
@@ -234,6 +236,7 @@ final class _Repo implements CheckoutRepository, PartialPaymentRepository {
 Future<(CartController, CheckoutController)> _pump(
   WidgetTester tester,
   _Repo repository, {
+  bool canConfirmManualTerminal = false,
   Future<bool?> Function(int amountMinor, bool selected)?
   onShowBankTransferDetails,
 }) async {
@@ -273,7 +276,7 @@ Future<(CartController, CheckoutController)> _pump(
         checkout: checkout,
         cart: cart,
         operatorSessionId: _operator,
-        canConfirmManualTerminal: false,
+        canConfirmManualTerminal: canConfirmManualTerminal,
         cashShiftId: _shift,
         onShowBankTransferDetails:
             onShowBankTransferDetails ?? (_, _) async => false,
@@ -285,6 +288,53 @@ Future<(CartController, CheckoutController)> _pump(
 }
 
 void main() {
+  testWidgets(
+    'a split terminal leg confirms without asking the operator to type a receipt folio',
+    (tester) async {
+      final repository = _Repo()
+        ..enableManualTerminal = true
+        ..enableMixedTender = true
+        ..drafts.add({
+          'id': '00000000-0000-4000-8000-000000000080',
+          'type': 'cash',
+          'amount': {'minorUnits': 4000, 'currency': 'MXN'},
+          'amountReceived': {'minorUnits': 4000, 'currency': 'MXN'},
+          'status': 'confirmed_success',
+          'correlationId': null,
+        });
+      final (cart, checkout) = await _pump(
+        tester,
+        repository,
+        canConfirmManualTerminal: true,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('partial-principal')),
+        '76.00',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('partial-method-manual_terminal')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('partial-charge')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Receipt reference'), findsNothing);
+      await tester.tap(find.text('Yes, paid'));
+      await tester.pumpAndSettle();
+
+      expect(repository.commands, hasLength(1));
+      expect(
+        repository.commands.single['confirmationReference'],
+        'operator_confirmed_terminal_screen',
+      );
+
+      await tester.pumpWidget(const SizedBox());
+      cart.dispose();
+      checkout.dispose();
+    },
+  );
+
   testWidgets('transfer opens the existing bank card for this exact payment', (
     tester,
   ) async {

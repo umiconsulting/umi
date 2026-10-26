@@ -49,6 +49,7 @@ String checkoutFailureMessage(AppLocalizations l, String? code) {
     'TERMINAL_BUSY' => l.terminalBusyMessage,
     'tip_rejected' => l.tipRejectedMessage,
     'discount_rejected' => l.discountRejectedMessage,
+    'EXTERNAL_PAYMENT_NOT_COMMITTED' => l.externalPaymentNotCommittedMessage,
     'OFFLINE_ADVANCED_TENDER_BLOCKED' => l.offlineAdvancedTenderBlockedMessage,
     'CART_VERSION_CONFLICT' ||
     'CART_VALIDATION_FAILED' ||

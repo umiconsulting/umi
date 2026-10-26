@@ -580,6 +580,8 @@ export const API_ERROR_CODES = [
   // resume its own shift, reclaim an orphaned one, or ask a manager to count the
   // drawer out. It stays a CONFLICT, never a server fault.
   'CASH_SHIFT_REQUIRED',
+  'CASH_POLICY_DENIED',
+  'INSUFFICIENT_EXPECTED_CASH',
   // A shift that cannot make the move the caller asked for. The repository used
   // to answer with a bare `Error('INVALID_SHIFT_TRANSITION')` when the row it
   // meant to update did not match — a version the caller no longer had, a drawer
@@ -628,6 +630,7 @@ export const API_ERROR_CODES = [
   // because a bare PERMISSION_DENIED leaves the cook staring at a dead button.
   'KITCHEN_PERMISSION_REQUIRED',
   'APPROVAL_REQUIRED',
+  'APPROVAL_FINGERPRINT_REQUIRED',
   'APPROVAL_FINGERPRINT_MISMATCH',
   'APPROVAL_INVALID',
   'PAYMENT_DECLINED',

@@ -462,7 +462,8 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
   }
 
   Future<String?> _confirmExternal() async {
-    final reference = TextEditingController();
+    final needsReference = method != 'manual_terminal';
+    final reference = needsReference ? TextEditingController() : null;
     final policy = widget.checkout.policy;
     final details = policy?.bankTransferDetails;
     final result = await showPosDialog<String>(
@@ -499,17 +500,19 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
                   if (details['accountNumber'] != null)
                     Text('${details['accountNumber']}'),
                 ],
-                const SizedBox(height: UmiSpacing.md),
-                PosField(
-                  controller: reference,
-                  decoration: PosFieldDecoration(
-                    labelText: label(
-                      'Folio del comprobante',
-                      'Receipt reference',
+                if (needsReference) ...[
+                  const SizedBox(height: UmiSpacing.md),
+                  PosField(
+                    controller: reference,
+                    decoration: PosFieldDecoration(
+                      labelText: label(
+                        'Folio del comprobante',
+                        'Receipt reference',
+                      ),
                     ),
+                    onChanged: (_) => update(() {}),
                   ),
-                  onChanged: (_) => update(() {}),
-                ),
+                ],
               ],
             ),
           ),
@@ -519,17 +522,20 @@ final class _PartialCheckoutSurfaceState extends State<PartialCheckoutSurface> {
               child: Text(label('Cancelar', 'Cancel')),
             ),
             PosButton(
-              onPressed: reference.text.trim().isEmpty
+              onPressed: needsReference && reference!.text.trim().isEmpty
                   ? null
-                  : () =>
-                        Navigator.of(dialogContext).pop(reference.text.trim()),
+                  : () => Navigator.of(dialogContext).pop(
+                      needsReference
+                          ? reference!.text.trim()
+                          : 'operator_confirmed_terminal_screen',
+                    ),
               child: Text(label('Sí, se cobró', 'Yes, paid')),
             ),
           ],
         ),
       ),
     );
-    reference.dispose();
+    reference?.dispose();
     return result;
   }
 

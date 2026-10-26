@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_contract/umi_contract.dart';
+import 'package:umi_pos/core/errors/app_error.dart';
 import 'package:umi_pos/core/observability/telemetry.dart';
 import 'package:umi_pos/features/checkout/checkout_controller.dart';
 import 'package:umi_pos/features/checkout/checkout_repository.dart';
@@ -19,89 +20,86 @@ const _cartId = '00000000-0000-4000-8000-000000000005';
 const _shift = '00000000-0000-4000-8000-000000000006';
 
 void main() {
-  test(
-    'an offline cash sale shows paid totals without a receipt',
-    () async {
-      final store = _MemoryCipherStore();
-      final journal = EncryptedOfflineJournal(store, web: false);
-      final policyCache = OfflinePolicyCache(journal, web: false);
-      final now = DateTime.now().toUtc();
-      await policyCache.save(_policy(now), now);
-      final repository = _NeverCheckout();
-      final connectivity = ConnectivityController()..networkDown();
-      var preserveCalls = 0;
-      final checkout = CheckoutController(
-        repository: repository,
-        connectivity: connectivity,
-        offlineCheckout: OfflineCheckoutService(
-          journal: journal,
-          policyCache: policyCache,
-          eligibility: const OfflineCheckoutEligibilityEngine(),
+  test('an offline cash sale shows paid totals without a receipt', () async {
+    final store = _MemoryCipherStore();
+    final journal = EncryptedOfflineJournal(store, web: false);
+    final policyCache = OfflinePolicyCache(journal, web: false);
+    final now = DateTime.now().toUtc();
+    await policyCache.save(_policy(now), now);
+    final repository = _NeverCheckout();
+    final connectivity = ConnectivityController()..networkDown();
+    var preserveCalls = 0;
+    final checkout = CheckoutController(
+      repository: repository,
+      connectivity: connectivity,
+      offlineCheckout: OfflineCheckoutService(
+        journal: journal,
+        policyCache: policyCache,
+        eligibility: const OfflineCheckoutEligibilityEngine(),
+      ),
+      telemetry: const SafeTelemetry(
+        enabled: false,
+        context: TelemetryContext(
+          appVersion: 'test',
+          environment: 'test',
+          platform: 'test',
         ),
-        telemetry: const SafeTelemetry(
-          enabled: false,
-          context: TelemetryContext(
-            appVersion: 'test',
-            environment: 'test',
-            platform: 'test',
-          ),
-          exporter: NoopTelemetryExporter(),
-        ),
-        preserveLocalCommands: () async {
-          preserveCalls++;
-          return true;
+        exporter: NoopTelemetryExporter(),
+      ),
+      preserveLocalCommands: () async {
+        preserveCalls++;
+        return true;
+      },
+      localFirstFastPathEnabled: true,
+    );
+    final cart = _cart(now);
+    final authority = _authority();
+
+    await checkout.preview(
+      merchantId: _merchant,
+      locationId: _location,
+      operatorSessionId: _operator,
+      cartId: _cartId,
+      cartVersion: cart.version,
+      paymentMethod: 'cash',
+      cashShiftId: _shift,
+      cart: cart,
+      authority: authority,
+      locationName: 'ONCA',
+      operatorName: 'Ana',
+      cashReceivedMinorUnits: 5000,
+      tenderDrafts: const [
+        {
+          'id': '00000000-0000-4000-8000-000000000007',
+          'type': 'cash',
+          'amount': {'minorUnits': 5000, 'currency': 'MXN'},
+          'amountReceived': {'minorUnits': 5000, 'currency': 'MXN'},
         },
-        localFirstFastPathEnabled: true,
-      );
-      final cart = _cart(now);
-      final authority = _authority();
+      ],
+    );
 
-      await checkout.preview(
-        merchantId: _merchant,
-        locationId: _location,
-        operatorSessionId: _operator,
-        cartId: _cartId,
-        cartVersion: cart.version,
-        paymentMethod: 'cash',
-        cashShiftId: _shift,
-        cart: cart,
-        authority: authority,
-        locationName: 'ONCA',
-        operatorName: 'Ana',
-        cashReceivedMinorUnits: 5000,
-        tenderDrafts: const [
-          {
-            'id': '00000000-0000-4000-8000-000000000007',
-            'type': 'cash',
-            'amount': {'minorUnits': 5000, 'currency': 'MXN'},
-            'amountReceived': {'minorUnits': 5000, 'currency': 'MXN'},
-          },
-        ],
-      );
+    expect(checkout.state.phase, CheckoutPhase.confirmationRequired);
+    expect(repository.checkouts, 0);
 
-      expect(checkout.state.phase, CheckoutPhase.confirmationRequired);
-      expect(repository.checkouts, 0);
-
-      await checkout.confirm();
-      expect(checkout.state.phase, CheckoutPhase.completed);
-      expect(checkout.state.result?.receipt, isNull);
-      expect(preserveCalls, 1);
-      expect(repository.checkouts, 0);
-      final first = await journal.load();
-      expect(first.pendingCount, 1);
-      expect(first.entries.single.command.commandType, 'pos.checkout.cash');
-      final repeated = await journal.load();
-      expect(repeated.pendingCount, 1);
-      expect(repeated.entries, hasLength(1));
-      expect(
-        repeated.entries.single.command.commandId,
-        first.entries.single.command.commandId,
-      );
-      expect(repository.checkouts, 0);
-      checkout.dispose();
-      connectivity.dispose();
-    },
-  );
+    await checkout.confirm();
+    expect(checkout.state.phase, CheckoutPhase.completed);
+    expect(checkout.state.result?.receipt, isNull);
+    expect(preserveCalls, 1);
+    expect(repository.checkouts, 0);
+    final first = await journal.load();
+    expect(first.pendingCount, 1);
+    expect(first.entries.single.command.commandType, 'pos.checkout.cash');
+    final repeated = await journal.load();
+    expect(repeated.pendingCount, 1);
+    expect(repeated.entries, hasLength(1));
+    expect(
+      repeated.entries.single.command.commandId,
+      first.entries.single.command.commandId,
+    );
+    expect(repository.checkouts, 0);
+    checkout.dispose();
+    connectivity.dispose();
+  });
 
   test('an online cash sale uses the server receipt', () async {
     final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
@@ -153,6 +151,70 @@ void main() {
     expect((await journal.load()).pendingCount, 0);
     checkout.dispose();
   });
+
+  test(
+    'a confirmed terminal refusal stays a server refusal and never falls back to cash',
+    () async {
+      final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
+      final now = DateTime.now().toUtc();
+      final policyCache = OfflinePolicyCache(journal, web: false);
+      await policyCache.save(_policy(now), now);
+      final repository = _TerminalCommitRefused();
+      final connectivity = ConnectivityController();
+      final checkout = CheckoutController(
+        repository: repository,
+        connectivity: connectivity,
+        offlineCheckout: OfflineCheckoutService(
+          journal: journal,
+          policyCache: policyCache,
+          eligibility: const OfflineCheckoutEligibilityEngine(),
+        ),
+        telemetry: const SafeTelemetry(
+          enabled: false,
+          context: TelemetryContext(
+            appVersion: 'test',
+            environment: 'test',
+            platform: 'test',
+          ),
+          exporter: NoopTelemetryExporter(),
+        ),
+      );
+      final cart = _terminalCart(now);
+
+      await checkout.preview(
+        merchantId: _merchant,
+        locationId: _location,
+        operatorSessionId: _operator,
+        cartId: _cartId,
+        cartVersion: cart.version,
+        paymentMethod: 'external_terminal',
+        cashShiftId: _shift,
+        cart: cart,
+        authority: _authority(),
+        tenderDrafts: const [
+          {
+            'id': '00000000-0000-4000-8000-000000000007',
+            'type': 'manual_terminal',
+            'amount': {'minorUnits': 5000, 'currency': 'MXN'},
+            'amountReceived': null,
+            'status': 'draft',
+            'correlationId': 'terminal-test',
+          },
+        ],
+      );
+      await checkout.confirm();
+
+      expect(checkout.state.phase, CheckoutPhase.failure);
+      expect(checkout.state.errorCode, 'CHECKOUT_CART_CHANGED');
+      expect(
+        checkout.state.errorCode,
+        isNot('OFFLINE_ADVANCED_TENDER_BLOCKED'),
+      );
+      expect((await journal.load()).pendingCount, 0);
+      checkout.dispose();
+      connectivity.dispose();
+    },
+  );
 
   test('a cart that cannot reach the journal stops before money', () async {
     final journal = EncryptedOfflineJournal(_MemoryCipherStore(), web: false);
@@ -331,6 +393,57 @@ final class _CompletedCheckout implements CheckoutRepository {
   dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
 }
 
+final class _TerminalCommitRefused implements CheckoutRepository {
+  int checkouts = 0;
+
+  @override
+  Future<CheckoutResult> checkout(
+    String merchantId,
+    CheckoutCommand command,
+  ) async {
+    checkouts++;
+    if (checkouts == 1) {
+      return const CheckoutResult(
+        status: 'confirmation_required',
+        confirmation: {
+          'cartVersion': 2,
+          'fingerprint':
+              'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          'totals': _totals,
+          'taxes': {
+            'total': {'currency': 'MXN', 'minorUnits': 0},
+            'entries': <Object?>[],
+          },
+          'discounts': {
+            'total': {'currency': 'MXN', 'minorUnits': 0},
+            'entries': <Object?>[],
+          },
+          'catalogVersion': 'catalog-1',
+          'pricingVersion': 'pricing-1',
+          'taxVersion': 'tax-1',
+          'snapshotAt': '2026-10-22T12:00:00.000Z',
+          'confirmedAt': null,
+        },
+        payment: null,
+        payments: [],
+        reservation: null,
+        sale: null,
+        receipt: null,
+        failure: null,
+        recoveryState: 'none',
+      );
+    }
+    throw AppException(
+      category: AppErrorCategory.unknown,
+      code: 'CHECKOUT_CART_CHANGED',
+      recoverable: false,
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 final class _MemoryCipherStore implements JournalCipherStore {
   String? ciphertext;
   String? key;
@@ -361,6 +474,23 @@ OfflineAuthorityContext _authority() => const OfflineAuthorityContext(
 );
 
 Cart _cart(DateTime now) => Cart(
+  id: _cartId,
+  merchantId: _merchant,
+  locationId: _location,
+  operatorSessionId: _operator,
+  status: 'prepared',
+  lifecycleState: 'ready_for_checkout',
+  version: 2,
+  firedOrderId: null,
+  fulfillmentType: 'takeout',
+  items: const [],
+  totals: _totals,
+  checkoutEnabled: false,
+  checkoutMessageCode: 'CHECKOUT_GATE_NOT_AVAILABLE',
+  updatedAt: now.toIso8601String(),
+);
+
+Cart _terminalCart(DateTime now) => Cart(
   id: _cartId,
   merchantId: _merchant,
   locationId: _location,

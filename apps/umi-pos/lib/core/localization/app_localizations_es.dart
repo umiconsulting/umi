@@ -683,6 +683,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.';
 
   @override
+  String get externalPaymentNotCommittedMessage =>
+      'El pago externo quedó confirmado, pero la venta no se cerró. No cobres de nuevo: vuelve a intentar cerrar la cuenta o solicita ayuda.';
+
+  @override
   String get recoveryQueryTitle => 'Consultar resultado guardado';
 
   @override

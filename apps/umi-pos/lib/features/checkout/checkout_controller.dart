@@ -1136,10 +1136,10 @@ final class CheckoutController extends ChangeNotifier {
       _offlineCheckout != null &&
       _cart != null &&
       _authority != null &&
+      _isSimpleCashTender &&
       (error.category == AppErrorCategory.transport ||
           error.category == AppErrorCategory.timeout ||
-          error.category == AppErrorCategory.server ||
-          error.category == AppErrorCategory.unknown);
+          error.category == AppErrorCategory.server);
 
   /// The offline evidence is strong enough to skip the round trip.
   ///
@@ -1399,12 +1399,20 @@ final class CheckoutController extends ChangeNotifier {
       );
     }
     _event('checkout_failed', {'code': error.code});
+    final externalPaymentConfirmed = _tenderDrafts.any(
+      (tender) =>
+          tender['type'] != 'cash' && tender['status'] == 'confirmed_success',
+    );
     _set(
       CheckoutState(
         phase: CheckoutPhase.failure,
         result: _state.result,
-        errorCode: error.code,
-        failureDetails: error.details,
+        errorCode: externalPaymentConfirmed
+            ? 'EXTERNAL_PAYMENT_NOT_COMMITTED'
+            : error.code,
+        failureDetails: externalPaymentConfirmed
+            ? {...?error.details, 'causeCode': error.code}
+            : error.details,
       ),
     );
   }

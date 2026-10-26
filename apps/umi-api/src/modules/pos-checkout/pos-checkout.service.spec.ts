@@ -42,6 +42,7 @@ const cart = {
   version: 3,
   businessDate: '2026-07-28',
   merchantName: 'Umi Café',
+  currency: 'MXN',
   merchantLogoUrl: null,
   locationName: 'Centro',
   operatorName: 'Ada',
@@ -50,10 +51,17 @@ const cart = {
     {
       id: id(8),
       productId: id(9),
+      productName: 'Café',
+      saleAction: 'merchandise',
       variantId: null,
+      variantName: null,
+      variantAttributes: {},
       quantity: 2,
       courseNumber: 1,
       note: null,
+      basePrice: 11_600,
+      variantDelta: 0,
+      taxRateBasisPoints: 1_600,
       modifiers: [],
     },
   ],
@@ -235,10 +243,25 @@ function harness() {
   return {
     service: new PosCheckoutService(repo as never, carts as never, integrity as never),
     repo,
+    carts,
   };
 }
 
 describe('PosCheckoutService', () => {
+  it('checks out a frozen cart line after its product options change', async () => {
+    const { service, repo, carts } = harness();
+    repo.lockCart.mockResolvedValue(cart);
+    // The live product now requires a modifier that did not exist when this
+    // line entered the cart. Pricing the live menu must not retroactively make
+    // the already-fired line impossible to sell.
+    carts.price.mockResolvedValue(null);
+
+    const preview = await service.checkout(user, id(1), base);
+
+    expect(preview.status).toBe('confirmation_required');
+    expect(preview.confirmation.totals.grandTotal.minorUnits).toBe(23_200);
+  });
+
   it('commits an offline cash sale at the amount the customer paid', async () => {
     const { service, repo } = harness();
     const fingerprint = 'a'.repeat(64);
