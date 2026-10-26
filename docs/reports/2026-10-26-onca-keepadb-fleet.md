@@ -78,7 +78,8 @@ prepara un equipo cuando ADB está disponible:
 
 El servicio de esta computadora también ejecuta esa preparación cuando aparece
 un endpoint ADB nuevo. Sigue intentando los endpoints registrados cada 15
-segundos.
+segundos. No bloquea la revisión de equipos conectados cuando otro nodo de
+Tailscale está fuera de línea.
 
 ## Configuración que requiere confirmación en cada equipo
 
@@ -99,3 +100,9 @@ No evita un emparejamiento eliminado ni la confirmación de seguridad de Android
 
 Cocina está fuera de línea. El mismo procedimiento se aplicará cuando regrese.
 Su puerto local y su IP de Tailscale ya están registrados.
+
+## Prueba de reconexión
+
+Después de configurar los tres equipos, ADB se desconectó de forma manual.
+Barra volvió a conectar en el siguiente intento. Caja necesitó dos intentos
+mientras Android reabría el puerto y volvió a conectar sin intervención.
