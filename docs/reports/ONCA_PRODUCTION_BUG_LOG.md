@@ -51,3 +51,6 @@ lo publicó y ADB se reconectó solo. El 26 de octubre, Barra y Caja ya no
 ofrecían un puerto ADB. Mesero seguía accesible en el puerto `42845`. El
 procedimiento, estado por dispositivo y operación del receptor están documentados en
 [`2026-10-24-onca-remote-support-persistence.md`](./2026-10-24-onca-remote-support-persistence.md).
+
+El inventario vigente de KeepADB y la automatización de preparación están en
+[`2026-10-26-onca-keepadb-fleet.md`](./2026-10-26-onca-keepadb-fleet.md).
