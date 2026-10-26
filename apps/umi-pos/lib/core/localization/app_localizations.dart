@@ -1334,7 +1334,10 @@ abstract class AppLocalizations {
   /// **'Reconecta para usar la terminal manual, el pago mixto, las propinas o los descuentos. La venta se conserva.'**
   String get offlineAdvancedTenderBlockedMessage;
 
-  /// A terminal or bank payment was confirmed, but the sale did not close.
+  /// No description provided for @externalPaymentNotCommittedMessage.
+  ///
+  /// In es, this message translates to:
+  /// **'El pago externo quedó confirmado, pero la venta no se cerró. No cobres de nuevo: vuelve a intentar cerrar la cuenta o solicita ayuda.'**
   String get externalPaymentNotCommittedMessage;
 
   /// No description provided for @recoveryQueryTitle.
