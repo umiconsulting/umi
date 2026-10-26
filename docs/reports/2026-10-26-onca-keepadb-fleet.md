@@ -13,8 +13,8 @@ La flota de ONCA en Tailscale contiene cuatro equipos con nombre `onca-*`:
 | Cocina | `onca-cocina` | Equipo fuera de línea | No documentado |
 | Mesero | `onca-mesero` | `100.125.102.97:42845` conectado | Verificado: `1.8.38` |
 
-El endpoint de Cocina se registró como `100.125.137.36:33745` a partir del
-puerto local `192.168.1.200:33745`. El servicio intentará conectarlo cuando el
+El endpoint de Cocina se registró como `100.125.137.36:46331` a partir del
+puerto local `192.168.1.200:46331`. El servicio intentará conectarlo cuando el
 equipo regrese a Tailscale.
 
 No se incluye `test-umi-a11` porque su nombre no empieza con `onca-`.
