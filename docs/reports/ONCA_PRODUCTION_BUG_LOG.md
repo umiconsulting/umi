@@ -8,6 +8,7 @@ Esta bitácora registra los incidentes que afectan ventas reales. Cada entrada s
 | [002](./2026-10-24-onca-production-bug-002.md) | 24 de octubre de 2026 | Barra: una comanda completada en otra terminal puede permanecer en la caché local | Causa doble corregida en POS 330/API `2f5ea8e6`: caché local y reapertura del ticket durante el cobro. Recibos 0005 y 0024 reparados con auditoría. La venta de prueba 0031 requiere corrección de soporte |
 | [003](./2026-10-24-onca-production-bug-003.md) | 24 de octubre de 2026 | Caja principal: la salida de efectivo responde «No se completó la operación» | Corregido y verificado en producción con una salida y su reversa de MXN 1.00; incluido en POS 330 |
 | [004](./2026-10-24-onca-production-bug-004.md) | 24 de octubre de 2026 | Caja principal: un cobro en efectivo mostró el mensaje genérico «No fue posible completar el cobro de forma segura» | No reproducido después de instalar POS 329; una venta posterior por MXN 180.00 terminó con recibo 0032. POS 330 muestra el motivo real y registra el código técnico |
+| [005](./2026-10-26-onca-production-bug-005.md) | 26 de octubre de 2026 | Cobro de MXN 545 en terminal sin venta; KDS incompleto; mesas que no se liberan; envío a cocina bloqueado; capturas de errores en caja | API `onca-445bedac` y APK 331 corrigen las causas comprobadas. La instalación de APK 331 falta en Caja y Barra. El cobro de MXN 545 requiere reconciliación autorizada |
 
 ## Cambios de catálogo del 24 de octubre
 
@@ -44,8 +45,9 @@ Sesión de operador comprobada después de instalar POS 330:
 | Barra | Barista | Autenticado |
 | Mesero | Mesero 1 | Autenticado |
 
-La prueba de reinicio de Barra confirmó el flujo completo: Tailscale regresó,
-Android abrió el puerto `44917` en lugar de `41827`, KeepADB lo publicó y ADB se
-reconectó solo. El procedimiento, estado por dispositivo y operación del receptor
-están documentados en
+El 24 de octubre, la prueba de reinicio de Barra confirmó el flujo completo:
+Tailscale regresó, Android abrió el puerto `44917` en lugar de `41827`, KeepADB
+lo publicó y ADB se reconectó solo. El 26 de octubre, Barra y Caja ya no
+ofrecían un puerto ADB. Mesero seguía accesible en el puerto `42845`. El
+procedimiento, estado por dispositivo y operación del receptor están documentados en
 [`2026-10-24-onca-remote-support-persistence.md`](./2026-10-24-onca-remote-support-persistence.md).
