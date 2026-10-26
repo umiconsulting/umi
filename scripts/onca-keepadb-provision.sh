@@ -19,8 +19,10 @@ fi
 
 adb -s "$serial" shell pm grant "$package_name" \
   android.permission.WRITE_SECURE_SETTINGS
-adb -s "$serial" shell pm grant "$package_name" \
-  android.permission.POST_NOTIFICATIONS
+if [[ "$(adb -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')" -ge 33 ]]; then
+  adb -s "$serial" shell pm grant "$package_name" \
+    android.permission.POST_NOTIFICATIONS
+fi
 adb -s "$serial" shell cmd deviceidle whitelist "+$package_name"
 adb -s "$serial" shell settings put global adb_wifi_enabled 1
 adb -s "$serial" shell am start -n "$package_name/.MainActivity"

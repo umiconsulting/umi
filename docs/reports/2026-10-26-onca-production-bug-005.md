@@ -63,7 +63,9 @@ producto. Una edición del catálogo no cambia una cuenta ya abierta.
 | SQL de liberación de mesa | Una visita pasó a `dirty` y la transacción se revirtió |
 | Migración 054 | Aplicada en producción; `cashier` tiene `order.fire` |
 | Salud de la API | Healthy, versión `onca-445bedac`, contrato 2.45.0, esquema `build-v3-79` |
-| Mesero A11 | POS 331 instalado; `versionCode=331` |
+| Caja iMin | POS 331 y KeepADB permanente verificados; `versionCode=331` |
+| Barra A9+ | POS 331 y KeepADB permanente verificados; `versionCode=331` |
+| Mesero A11 | POS 331 y KeepADB permanente verificados; `versionCode=331` |
 
 APK: `/home/juan/Downloads/UmiPOS-1.0.0-production-build331.apk`
 
@@ -79,10 +81,11 @@ Mesero respondió en Tailscale en `100.125.102.97:42845`. Su Wi-Fi fue `UmiPOS`.
 Android informó `always_on_vpn_app=com.tailscale.ipn`. Tailscale y KeepADB
 estaban excluidos del ahorro de batería.
 
-Barra respondió a Tailscale ping, pero ningún puerto ADB actual aceptó la
-conexión. Caja respondió a Tailscale ping, pero sus puertos ADB estaban
-cerrados. Las dos necesitan una nueva vinculación en el equipo antes de instalar
-el POS 331.
+Barra necesitó una nueva vinculación. Después de vincularla, ADB conectó en
+`100.90.102.41:44965` y el POS 331 quedó instalado.
+
+Caja respondió en `100.64.178.95:37137`. Se instaló KeepADB, se habilitó
+**Mantener siempre activo**, se configuró el webhook y se instaló el POS 331.
 
 Android documenta que la depuración inalámbrica se vincula una sola vez y ofrece
 la opción **Permitir siempre en esta red**. KeepADB documenta que mantiene la
@@ -92,9 +95,6 @@ depuración activa después de reinicios y cambios de red.
 
 1. Conciliar el intento `e000fc83-5ec5-4cd5-a001-a926be585289` con la venta. No
    se debe cobrar el mismo dinero otra vez.
-2. Instalar el POS 331 en Caja y Barra.
-3. En cada tablet, abrir **Depuración inalámbrica**, activar **Permitir siempre
-   en esta red** para `UmiPOS`, mantener KeepADB activo y confirmar que su
-   webhook informa el puerto actual.
-4. Entrar de nuevo como Cajero ONCA. El cambio del rol cerró la sesión anterior
+2. Volver a conectar Cocina a Tailscale. Su endpoint ya está registrado.
+3. Entrar de nuevo como Cajero ONCA. El cambio del rol cerró la sesión anterior
    para activar `order.fire`.

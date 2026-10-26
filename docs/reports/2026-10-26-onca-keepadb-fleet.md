@@ -8,12 +8,45 @@ La flota de ONCA en Tailscale contiene cuatro equipos con nombre `onca-*`:
 
 | Equipo | Tailscale | Estado actual de ADB | KeepADB |
 | --- | --- | --- | --- |
-| Caja principal | `onca-caja-principal` | Puerto `5555` cerrado | No documentado |
-| Barra | `onca-barra` | Ningún puerto actual acepta ADB | Instalado y configurado el 24 de octubre |
+| Caja principal | `onca-caja-principal` | `100.64.178.95:37137` conectado | Verificado: `1.8.38` |
+| Barra | `onca-barra` | `100.90.102.41:44965` conectado | Verificado: `1.8.38` |
 | Cocina | `onca-cocina` | Equipo fuera de línea | No documentado |
 | Mesero | `onca-mesero` | `100.125.102.97:42845` conectado | Verificado: `1.8.38` |
 
+El endpoint de Cocina se registró como `100.125.137.36:33745` a partir del
+puerto local `192.168.1.200:33745`. El servicio intentará conectarlo cuando el
+equipo regrese a Tailscale.
+
 No se incluye `test-umi-a11` porque su nombre no empieza con `onca-`.
+
+## Verificación de Caja
+
+ADB leyó los siguientes valores en la iMin:
+
+- Modelo `D3`, Android 11.
+- Paquete `de.hohnepeople.keepadb`, versión `1.8.38`.
+- `WRITE_SECURE_SETTINGS` concedido.
+- `adb_wifi_enabled=1`.
+- **Mantener siempre activo** habilitado.
+- Webhook habilitado con
+  `http://100.109.51.39:47123/keepadb`.
+- Último informe correcto: `192.168.0.10:37137`.
+- Tailscale y KeepADB excluidos del ahorro de batería.
+- `always_on_vpn_app=com.tailscale.ipn`.
+- Wi-Fi `UmiPOS`.
+
+## Verificación de Barra
+
+ADB leyó los siguientes valores en la A9+:
+
+- Modelo `SM-X210`.
+- KeepADB `1.8.38` con ambos permisos.
+- **Mantener siempre activo** habilitado.
+- Webhook habilitado con `http://100.109.51.39:47123/keepadb`.
+- Último informe correcto: `192.168.0.101:44965`.
+- Tailscale y KeepADB excluidos del ahorro de batería.
+- `always_on_vpn_app=com.tailscale.ipn`.
+- Wi-Fi `UmiPOS`.
 
 ## Verificación de Mesero
 
@@ -64,8 +97,5 @@ No evita un emparejamiento eliminado ni la confirmación de seguridad de Android
 
 ## Acción pendiente
 
-Barra y Caja están encendidas y responden a Tailscale. Sus puertos ADB están
-cerrados. Hay que desbloquear ambas, abrir Depuración inalámbrica, permitir
-siempre la red `UmiPOS` y proporcionar los nuevos puertos de vinculación.
-
 Cocina está fuera de línea. El mismo procedimiento se aplicará cuando regrese.
+Su puerto local y su IP de Tailscale ya están registrados.
