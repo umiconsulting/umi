@@ -1,2 +1,14 @@
-# `health/diagnostics` is a public route name, not an API key.
-774fa72bd01d173717702108a93175a80136a9ec:docs/migration/build-v3/GATED_CUTOVER_PLAN.md:generic-api-key:492
+# Firebase client identifiers and fixture values already present on main.
+3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/google-services.json:gcp-api-key:18
+3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/google-services.json:gcp-api-key:37
+3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/src/production/google-services.json:gcp-api-key:18
+3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/src/staging/google-services.json:gcp-api-key:18
+3e9ecff033ff830c3bf10bd464aed412104f0a1f:scripts/umipos-role-surface-fixture.sql:generic-api-key:73
+3e9ecff033ff830c3bf10bd464aed412104f0a1f:scripts/umipos-role-surface-fixture.sql:generic-api-key:74
+38977b4dcca396345db527f95054a79f1e4dc20a:docs/migration/build-v3/CUTOVER_RUNBOOK.md:generic-api-key:280
+8a74c78cecc528e189a622fc1892f7df91d89816:docs/migration/build-v3/CUTOVER_RUNBOOK.md:generic-api-key:208
+244c6ba5768cc31afe5da9ca6a0c1e28508afdc4:docs/design/centro-de-caja/split.html:generic-api-key:1359
+95d0736cf09a4b2bc676c350446e483854dcd054:apps/umi-api/src/modules/tender/point-refund.integration.ts:generic-api-key:47
+3381ee5aa9401018a43d5c0e48bea08a182021ba:apps/umi-dashboard/src/data.devices.spec.jsx:generic-api-key:46
+3381ee5aa9401018a43d5c0e48bea08a182021ba:apps/umi-dashboard/src/data.devices.spec.jsx:generic-api-key:102
+8d174f7eeb78c2fb901b9c48b2bc61201575220c:apps/umi-api/src/modules/auth/auth.service.spec.ts:generic-api-key:120
