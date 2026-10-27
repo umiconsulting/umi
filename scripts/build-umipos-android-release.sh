@@ -20,6 +20,8 @@ Optional:
                              Default: Secret Service values for service
                              umipos-android-release, account juan
   UMIPOS_ARTIFACT_PATH      Default: ~/Downloads/UmiPOS-<version>-production-release-build<code>.apk
+  UMIPOS_ANDROID_CERT_SHA256
+                             Expected signing certificate fingerprint
   UMIPOS_ALLOW_DEBUG_SIGNER Set to 1 only for a controlled signing migration.
 EOF
 }
@@ -157,6 +159,16 @@ certificate="$("$apksigner" verify --print-certs "$apk")"
 if grep -q 'CN=Android Debug' <<<"$certificate" &&
   [[ "${UMIPOS_ALLOW_DEBUG_SIGNER:-0}" != "1" ]]; then
   printf 'Refusing to publish the Android debug certificate.\n' >&2
+  exit 1
+fi
+certificate_sha256="$(
+  grep 'certificate SHA-256 digest:' <<<"$certificate" |
+    head -1 |
+    sed 's/.*: //'
+)"
+expected_certificate_sha256="${UMIPOS_ANDROID_CERT_SHA256:-14975f2c374e03b155ab363e17d4a79d4ab32b888ab381bedc3264934cb5c051}"
+if [[ "${certificate_sha256,,}" != "${expected_certificate_sha256,,}" ]]; then
+  printf 'Unexpected signing certificate: %s\n' "$certificate_sha256" >&2
   exit 1
 fi
 

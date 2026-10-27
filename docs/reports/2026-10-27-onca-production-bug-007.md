@@ -69,6 +69,9 @@ La corrección conserva esas personas en la lista. Una persona inactiva muestra
 la acción **Restaurar acceso**. La prueba de regresión cubre el filtro general y
 el filtro por rol.
 
+La corrección está integrada en `main` mediante el PR 226 y desplegada en
+Cloudflare Pages. El PR 227 completó las traducciones y también está desplegado.
+
 ## Verificación
 
 | Prueba | Resultado |
@@ -80,6 +83,7 @@ el filtro por rol.
 | Mesero | POS cargó la carta y las acciones de pedido |
 | Dashboard | Suite completa: 381 pruebas aprobadas |
 | Script de build | Sintaxis válida |
+| Producción Dashboard | `Restaurar acceso` presente en los catálogos desplegados |
 
 ## Acceso remoto pendiente
 
