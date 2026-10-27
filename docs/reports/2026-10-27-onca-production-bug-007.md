@@ -92,6 +92,25 @@ máquina conserva conectividad Tailscale, pero KeepADB informó el cierre del
 puerto. La aplicación sigue instalada y la rotación se verificó antes de perder
 ADB.
 
+La documentación oficial de iMin confirma que la depuración USB se cierra
+automáticamente cuando el dispositivo se reinicia:
+<https://oss-sg.imin.sg/docs/en/DockingDebugging.html>.
+
+KeepADB documenta que envía `DELETE` cuando el endpoint deja de comprobarse,
+cuando se desactiva la sincronización o cuando cambia la URL:
+<https://github.com/m00sfett/KeepADB/blob/master/docs/webhook-register.md>.
+
+La secuencia observada es compatible con un reinicio de Caja:
+
+1. ADB dejó de responder.
+2. KeepADB envió `DELETE /keepadb` a las 18:21:52.
+3. Tailscale también perdió el contacto directo.
+4. Tailscale volvió a estar en línea después.
+5. Ningún puerto ADB volvió a publicarse.
+
+No se ejecutó ningún comando para desactivar ADB. La causa exacta requiere
+revisar `Settings.Global.boot_count` en Caja cuando vuelva el acceso.
+
 Para recuperar ADB, una persona debe abrir KeepADB en Caja y confirmar que
 **Mantener siempre activo** está habilitado. El servicio del host reconectará el
 puerto automáticamente cuando reciba el nuevo webhook.
