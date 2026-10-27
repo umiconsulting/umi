@@ -485,6 +485,254 @@ Future<void> _settle() =>
     Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
+  test('sync reads the official account after an offline open', () async {
+    final repository = _SyncReadRepository();
+    final value = _setup(repository: repository);
+    addTearDown(value.controller.dispose);
+    addTearDown(value.connectivity.dispose);
+    value.connectivity.networkDown();
+    await value.controller.open(_merchantId, _locationId, _operatorSessionId);
+    await _settle();
+    final provisionalId = value.controller.state.cart!.id;
+    final open = (await value.journal.load()).entries.single.command;
+    repository.current = _serverSnapshot(version: 6);
+    await value.journal.apply(
+      ReplayResult(
+        commandId: open.commandId,
+        deviceSequence: open.deviceSequence,
+        status: 'accepted',
+        officialId: repository.current.id,
+        officialCommit: null,
+        serverConflictReference: null,
+        failure: null,
+      ),
+    );
+    await _settle();
+    expect(repository.accountIds, [repository.current.id]);
+    expect(value.controller.state.cart!.id, isNot(provisionalId));
+    expect(value.controller.state.cart!.id, repository.current.id);
+    expect(value.controller.state.cart!.version, 6);
+    expect(
+      value.controller.state.cart!.items.single['id'],
+      '00000000-0000-4000-8000-0000000000c1',
+    );
+    expect(
+      (value.controller.state.cart!.totals['grandTotal']! as Map)['minorUnits'],
+      4500,
+    );
+    expect(value.controller.hasPendingLocalWrites, isFalse);
+  });
+
+  test('sync preserves a tap while the API snapshot is pending', () async {
+    final repository = _SyncReadRepository();
+    final value = _setup(repository: repository);
+    addTearDown(value.controller.dispose);
+    addTearDown(value.connectivity.dispose);
+    value.controller.restore(_cart());
+    await _settle();
+    value.connectivity.networkDown();
+    await value.controller.add(
+      productId: _productA,
+      provisional: _provisionalA,
+    );
+    await _settle();
+    final command = (await value.journal.load()).entries.single.command;
+    repository.current = _serverSnapshot(version: 2);
+    repository.wait = Completer<Cart>();
+    await value.journal.apply(
+      ReplayResult(
+        commandId: command.commandId,
+        deviceSequence: command.deviceSequence,
+        status: 'accepted',
+        officialId: null,
+        officialCommit: null,
+        serverConflictReference: null,
+        failure: null,
+      ),
+    );
+    await _settle();
+    expect(repository.accountIds, hasLength(1));
+    value.connectivity.apiReachable(authorityValid: true);
+    value.connectivity.apiReachable(authorityValid: true);
+    await value.controller.add(
+      productId: _productB,
+      provisional: _provisionalB,
+    );
+    await _settle();
+    repository.wait!.complete(repository.current);
+    await _settle();
+    expect(value.controller.state.cart!.items, hasLength(2));
+    expect(
+      (value.controller.state.cart!.totals['grandTotal']! as Map)['minorUnits'],
+      10300,
+    );
+    expect(value.controller.hasPendingLocalWrites, isTrue);
+    expect((await value.journal.load()).pendingCount, 1);
+    expect(repository.requests, isEmpty);
+  });
+
+  for (final changeAccount in [true, false]) {
+    test(
+      'late sync cannot replace a newer selection: $changeAccount',
+      () async {
+        final repository = _SyncReadRepository();
+        final value = _setup(repository: repository);
+        addTearDown(value.controller.dispose);
+        addTearDown(value.connectivity.dispose);
+        value.controller.restore(_cart());
+        await _settle();
+        value.connectivity.networkDown();
+        await value.controller.add(
+          productId: _productA,
+          provisional: _provisionalA,
+        );
+        await _settle();
+        final command = (await value.journal.load()).entries.single.command;
+        repository.current = _serverSnapshot(version: 2);
+        repository.wait = Completer<Cart>();
+        await value.journal.apply(
+          ReplayResult(
+            commandId: command.commandId,
+            deviceSequence: command.deviceSequence,
+            status: 'accepted',
+            officialId: null,
+            officialCommit: null,
+            serverConflictReference: null,
+            failure: null,
+          ),
+        );
+        await _settle();
+        final selected = _serverSnapshot(
+          id: changeAccount
+              ? '00000000-0000-4000-8000-000000000088'
+              : repository.current.id,
+          version: 9,
+        );
+        value.controller.clearLocal();
+        value.controller.restore(selected);
+        repository.wait!.complete(repository.current);
+        await _settle();
+        expect(value.controller.state.cart!.id, selected.id);
+        expect(value.controller.state.cart!.version, 9);
+      },
+    );
+  }
+
+  test(
+    'failed sync retains the local projection and confirmed history',
+    () async {
+      final repository = _SyncReadRepository();
+      final value = _setup(repository: repository);
+      addTearDown(value.controller.dispose);
+      addTearDown(value.connectivity.dispose);
+      value.controller.restore(_cart());
+      await _settle();
+      value.connectivity.networkDown();
+      await value.controller.add(
+        productId: _productA,
+        provisional: _provisionalA,
+      );
+      await _settle();
+      final command = (await value.journal.load()).entries.single.command;
+      repository.failure = const AppException(
+        category: AppErrorCategory.transport,
+        code: 'TRANSPORT_FAILURE',
+        recoverable: true,
+      );
+      await value.journal.apply(
+        ReplayResult(
+          commandId: command.commandId,
+          deviceSequence: command.deviceSequence,
+          status: 'accepted',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      await _settle();
+      expect(value.controller.state.cart!.items, hasLength(1));
+      expect(value.controller.hasPendingLocalWrites, isTrue);
+      final snapshot = await value.journal.load();
+      expect(snapshot.pendingCount, 0);
+      expect(snapshot.entries.single.status, JournalStatus.accepted);
+      expect(repository.requests, isEmpty);
+    },
+  );
+
+  test(
+    'resolved history does not keep accepted cart commands pending',
+    () async {
+      final value = _setup();
+      addTearDown(value.controller.dispose);
+      addTearDown(value.connectivity.dispose);
+      await value.controller.open(_merchantId, _locationId, _operatorSessionId);
+      await _settle();
+      final historical = await value.journal.append(
+        commandId: cartCommandId(),
+        deviceId: _deviceId,
+        credentialVersion: 1,
+        merchantId: _merchantId,
+        locationId: _locationId,
+        operatorSessionId: _operatorSessionId,
+        idempotencyKey: cartCommandId(),
+        commandType: 'pos.cart.line.update',
+        payload: {'cartId': '00000000-0000-4000-8000-000000000099'},
+      );
+      await value.journal.apply(
+        ReplayResult(
+          commandId: historical.commandId,
+          deviceSequence: historical.deviceSequence,
+          status: 'conflict',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: {'classification': 'version_conflict'},
+        ),
+      );
+      await value.journal.resolveConflictAndRetryFollowing(
+        historical.commandId,
+      );
+      value.connectivity.networkDown();
+      await value.controller.add(
+        productId: _productA,
+        provisional: _provisionalA,
+      );
+      await _settle();
+      final pending = (await value.journal.load()).entries.last.command;
+      value.repository.current = _cart(
+        version: 2,
+        items: [
+          _line(
+            id: '00000000-0000-4000-8000-0000000000c1',
+            productId: _productA,
+            name: 'Americano',
+          ),
+        ],
+      );
+      await value.journal.apply(
+        ReplayResult(
+          commandId: pending.commandId,
+          deviceSequence: pending.deviceSequence,
+          status: 'accepted',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      await _settle();
+
+      final snapshot = await value.journal.load();
+      expect(snapshot.pendingCount, 0);
+      expect(snapshot.entries.first.status, JournalStatus.resolved);
+      expect(snapshot.entries, hasLength(2));
+      expect(value.controller.hasPendingLocalWrites, isFalse);
+      expect(value.controller.hasPendingForCurrentCart, isFalse);
+      expect(value.controller.state.cart!.version, 2);
+    },
+  );
+
   test('a second tap paints while the first request is still open', () async {
     final value = _setup();
     await value.controller.open(_merchantId, _locationId, _operatorSessionId);
@@ -1190,3 +1438,55 @@ final class _HubGateway implements HubCommandGateway {
   Future<HubConflictResolution> resolveConflict(OfflineCommand command) async =>
       const HubConflictResolution(resolved: true, status: 'resolved');
 }
+
+final class _SyncReadRepository extends _QueuedRepository
+    implements OpenAccountCartRepository {
+  final accountIds = <String>[];
+  Completer<Cart>? wait;
+  Object? failure;
+
+  @override
+  Future<Cart> account(
+    String merchantId,
+    String cartId,
+    CartQuery query,
+  ) async {
+    accountIds.add(cartId);
+    if (cartId != current.id) {
+      throw const AppException(
+        category: AppErrorCategory.conflict,
+        code: 'CART_NOT_FOUND',
+        recoverable: true,
+      );
+    }
+    if (failure != null) throw failure!;
+    return wait?.future ?? current;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
+Cart _serverSnapshot({
+  String id = '00000000-0000-4000-8000-000000000001',
+  int version = 2,
+}) => Cart.fromJson({
+  ..._cart(
+    id: id,
+    version: version,
+    items: [
+      _line(
+        id: '00000000-0000-4000-8000-0000000000c1',
+        productId: _productA,
+        name: 'Americano',
+      ),
+    ],
+  ).toJson(),
+  'totals': {
+    'subtotal': _money(4500),
+    'tax': _money(621),
+    'discounts': {'total': _money(0), 'entries': <Map<String, Object?>>[]},
+    'grandTotal': _money(4500),
+    'businessDate': '2026-10-27',
+  },
+});

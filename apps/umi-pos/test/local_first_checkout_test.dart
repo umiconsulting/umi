@@ -20,6 +20,55 @@ const _cartId = '00000000-0000-4000-8000-000000000005';
 const _shift = '00000000-0000-4000-8000-000000000006';
 
 void main() {
+  test(
+    'local preview follows changed totals at the same cart version',
+    () async {
+      final connectivity = ConnectivityController()..networkDown();
+      final checkout = CheckoutController(
+        repository: _NeverCheckout(),
+        connectivity: connectivity,
+        telemetry: const SafeTelemetry(
+          enabled: false,
+          context: TelemetryContext(
+            appVersion: 'test',
+            environment: 'test',
+            platform: 'test',
+          ),
+          exporter: NoopTelemetryExporter(),
+        ),
+      );
+      addTearDown(checkout.dispose);
+      addTearDown(connectivity.dispose);
+      final now = DateTime.now().toUtc();
+      for (final amount in [6000, 10000]) {
+        final cart = Cart.fromJson({
+          ..._cart(now).toJson(),
+          'totals': {
+            ..._totals,
+            'subtotal': {'currency': 'MXN', 'minorUnits': amount},
+            'grandTotal': {'currency': 'MXN', 'minorUnits': amount},
+          },
+        });
+        await checkout.preview(
+          merchantId: _merchant,
+          locationId: _location,
+          operatorSessionId: _operator,
+          cartId: _cartId,
+          cartVersion: cart.version,
+          paymentMethod: 'cash',
+          cart: cart,
+          authority: _authority(),
+        );
+      }
+
+      expect(checkout.state.phase, CheckoutPhase.confirmationRequired);
+      final totals =
+          checkout.state.result!.confirmation['totals']!
+              as Map<String, Object?>;
+      expect((totals['grandTotal']! as Map)['minorUnits'], 10000);
+    },
+  );
+
   test('an offline cash sale shows paid totals without a receipt', () async {
     final store = _MemoryCipherStore();
     final journal = EncryptedOfflineJournal(store, web: false);
