@@ -453,10 +453,15 @@ final class _AcceptingGateway implements ReplayGateway {
   ConnectivityController connectivity,
   EncryptedOfflineJournal journal,
 })
-_setup({_QueuedRepository? repository}) {
+_setup({
+  _QueuedRepository? repository,
+  ConnectivityController? connectivity,
+  EncryptedOfflineJournal? journal,
+  OfflineRecoveryController? recovery,
+}) {
   repository ??= _QueuedRepository();
-  final connectivity = ConnectivityController();
-  final journal = EncryptedOfflineJournal(_TestJournalStore(), web: false);
+  connectivity ??= ConnectivityController();
+  journal ??= EncryptedOfflineJournal(_TestJournalStore(), web: false);
   final controller = CartController(
     repository: repository,
     telemetry: const SafeTelemetry(
@@ -472,6 +477,7 @@ _setup({_QueuedRepository? repository}) {
     deviceIdentity: () =>
         const CartDeviceIdentity(deviceId: _deviceId, credentialVersion: 1),
     connectivity: connectivity,
+    recovery: recovery,
   );
   return (
     controller: controller,
@@ -485,6 +491,145 @@ Future<void> _settle() =>
     Future<void>.delayed(const Duration(milliseconds: 20));
 
 void main() {
+  test(
+    'sync preserves exact line IDs for different notes on one product',
+    () async {
+      final repository = _SyncReadRepository();
+      final value = _setup(repository: repository);
+      addTearDown(value.controller.dispose);
+      addTearDown(value.connectivity.dispose);
+      final original = {
+        ..._line(
+          id: '00000000-0000-4000-8000-0000000000c1',
+          productId: _productA,
+          name: 'Americano',
+        ),
+        'note': 'normal',
+      };
+      value.controller.restore(_cart(items: [original]));
+      await _settle();
+      value.connectivity.networkDown();
+      await value.controller.add(
+        productId: _productA,
+        quantity: 3,
+        note: 'sin azúcar',
+        provisional: _provisionalA,
+      );
+      await _settle();
+      final command = (await value.journal.load()).entries.single.command;
+      final added = CartItem.fromJson(
+        value.controller.state.cart!.items.singleWhere(
+          (item) => item['note'] == 'sin azúcar',
+        ),
+      );
+      repository.current = Cart.fromJson({
+        ..._serverSnapshot(version: 2).toJson(),
+        'items': [
+          original,
+          {
+            ..._line(
+              id: added.id,
+              productId: _productA,
+              name: 'Americano',
+              quantity: 3,
+            ),
+            'note': 'sin azúcar',
+          },
+        ],
+      });
+      repository.wait = Completer<Cart>();
+      await value.journal.apply(
+        ReplayResult(
+          commandId: command.commandId,
+          deviceSequence: command.deviceSequence,
+          status: 'accepted',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      await _settle();
+      await value.controller.remove(added);
+      await _settle();
+      repository.wait!.complete(repository.current);
+      await _settle();
+      final remaining = value.controller.state.cart!.items.single;
+      expect(remaining['id'], '00000000-0000-4000-8000-0000000000c1');
+      expect(remaining['quantity'], 1);
+      expect((await value.journal.load()).pendingCount, 1);
+    },
+  );
+
+  test(
+    'a later manual sync retries a failed read without repeating a write',
+    () async {
+      final repository = _SyncReadRepository();
+      final journal = EncryptedOfflineJournal(_TestJournalStore(), web: false);
+      final connectivity = ConnectivityController()..networkDown();
+      final recovery = OfflineRecoveryController(
+        journal: journal,
+        gateway: _AcceptingGateway(),
+        connectivity: connectivity,
+      );
+      final value = _setup(
+        repository: repository,
+        journal: journal,
+        connectivity: connectivity,
+        recovery: recovery,
+      );
+      addTearDown(value.controller.dispose);
+      addTearDown(connectivity.dispose);
+      addTearDown(recovery.dispose);
+      value.controller.restore(_cart());
+      await _settle();
+      await value.controller.add(
+        productId: _productA,
+        provisional: _provisionalA,
+      );
+      await _settle();
+      final command = (await journal.load()).entries.single.command;
+      repository.failure = const AppException(
+        category: AppErrorCategory.transport,
+        code: 'TRANSPORT_FAILURE',
+        recoverable: true,
+      );
+      await journal.apply(
+        ReplayResult(
+          commandId: command.commandId,
+          deviceSequence: command.deviceSequence,
+          status: 'accepted',
+          officialId: null,
+          officialCommit: null,
+          serverConflictReference: null,
+          failure: null,
+        ),
+      );
+      await _settle();
+      expect(value.controller.hasPendingLocalWrites, isTrue);
+      repository.failure = null;
+      repository.current = _serverSnapshot(version: 7);
+      await recovery.recover(
+        const ReplayScope(
+          deviceId: _deviceId,
+          merchantId: _merchantId,
+          locationId: _locationId,
+          operatorSessionId: _operatorSessionId,
+          credentialVersion: 1,
+        ),
+      );
+      await _settle();
+      expect(value.controller.state.cart!.version, 7);
+      expect(value.controller.hasPendingLocalWrites, isFalse);
+      expect(
+        (await journal.load()).entries.single.status,
+        JournalStatus.accepted,
+      );
+      expect(repository.accountIds, hasLength(2));
+      expect(repository.requests, isEmpty);
+    },
+  );
+
   test('sync reads the official account after an offline open', () async {
     final repository = _SyncReadRepository();
     final value = _setup(repository: repository);

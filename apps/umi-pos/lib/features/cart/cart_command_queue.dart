@@ -858,12 +858,6 @@ final class CartCommandQueue {
       if (_disposed || generation != _selectionGeneration) return;
       if (_repository is OpenAccountCartRepository && cart.id != target) return;
 
-      for (final command in _commands) {
-        if (confirmed.contains(command.commandId) &&
-            command.commandType == 'pos.cart.line.add') {
-          _rememberAddedLine(command, cart);
-        }
-      }
       _commands.removeWhere((command) => confirmed.contains(command.commandId));
       _journaledCommands.removeAll(confirmed);
       _cartAliases.addAll(snapshot.mappings);
