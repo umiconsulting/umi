@@ -9,6 +9,7 @@ Esta bitácora registra los incidentes que afectan ventas reales. Cada entrada s
 | [003](./2026-10-24-onca-production-bug-003.md) | 24 de octubre de 2026 | Caja principal: la salida de efectivo responde «No se completó la operación» | Corregido y verificado en producción con una salida y su reversa de MXN 1.00; incluido en POS 330 |
 | [004](./2026-10-24-onca-production-bug-004.md) | 24 de octubre de 2026 | Caja principal: un cobro en efectivo mostró el mensaje genérico «No fue posible completar el cobro de forma segura» | No reproducido después de instalar POS 329; una venta posterior por MXN 180.00 terminó con recibo 0032. POS 330 muestra el motivo real y registra el código técnico |
 | [005](./2026-10-26-onca-production-bug-005.md) | 26 de octubre de 2026 | Cobro de MXN 545 en terminal sin venta; KDS incompleto; mesas que no se liberan; envío a cocina bloqueado; capturas de errores en caja | API `onca-445bedac` y APK 331 corrigen las causas comprobadas. POS 331 y KeepADB permanente verificados en Caja, Barra, Mesero y Cocina. El cobro de MXN 545 requiere reconciliación autorizada |
+| [006](./2026-10-26-onca-production-bug-006.md) | 26 de octubre de 2026 | Las cuatro tabletas detienen UmiPOS en un error de configuración | El APK 331 era una build `profile` y no tenía identidad de release. El APK 332 inicia en las cuatro tabletas. Cocina necesita registro; Cajero necesita cerrar una sesión anterior |
 
 ## Cambios de catálogo del 24 de octubre
 

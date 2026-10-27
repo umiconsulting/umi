@@ -63,10 +63,10 @@ producto. Una edición del catálogo no cambia una cuenta ya abierta.
 | SQL de liberación de mesa | Una visita pasó a `dirty` y la transacción se revirtió |
 | Migración 054 | Aplicada en producción; `cashier` tiene `order.fire` |
 | Salud de la API | Healthy, versión `onca-445bedac`, contrato 2.45.0, esquema `build-v3-79` |
-| Caja iMin | POS 331 y KeepADB permanente verificados; `versionCode=331` |
-| Barra A9+ | POS 331 y KeepADB permanente verificados; `versionCode=331` |
-| Mesero A11 | POS 331 y KeepADB permanente verificados; `versionCode=331` |
-| Cocina A9+ | POS 331 y KeepADB permanente verificados; `versionCode=331` |
+| Caja iMin | POS 331 instalado; el arranque falló después. Corregido en el incidente 006 |
+| Barra A9+ | POS 331 instalado; el arranque falló después. Corregido en el incidente 006 |
+| Mesero A11 | POS 331 instalado; el arranque falló después. Corregido en el incidente 006 |
+| Cocina A9+ | POS 331 instalado; el arranque falló después. Corregido en el incidente 006 |
 
 APK: `/home/juan/Downloads/UmiPOS-1.0.0-production-build331.apk`
 
