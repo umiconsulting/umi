@@ -77,6 +77,21 @@ La notificación es del servicio de KeepADB. También se recibió el webhook rea
 del equipo en esta estación. El receptor actualizó el endpoint a `42845` y
 ADB quedó conectado.
 
+## Integridad de la instalación
+
+La revisión final encontró el mismo paquete activo en los cuatro equipos:
+
+- nombre `de.hohnepeople.keepadb`;
+- `versionCode=135`;
+- versión `1.8.38`;
+- misma firma de instalación;
+- paquete habilitado;
+- `KeepADBService` en primer plano;
+- `WRITE_SECURE_SETTINGS` concedido.
+
+Las cuatro conexiones ADB respondieron en la misma revisión. No quedaron
+transportes duplicados ni equipos `onca-*` pendientes.
+
 ## Automatización
 
 [`scripts/onca-keepadb-provision.sh`](../../scripts/onca-keepadb-provision.sh)
