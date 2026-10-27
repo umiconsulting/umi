@@ -1470,6 +1470,7 @@ msgstr "En riesgo"
 
 #: src/screens/customers.jsx
 #: src/screens/operations-workspace.jsx
+#: src/screens/staff.jsx
 msgid "Inactivo"
 msgstr "Inactivo"
 
@@ -9023,8 +9024,12 @@ msgstr "Medio"
 msgid "No se pudo desactivar el acceso."
 msgstr "No se pudo desactivar el acceso."
 
-#. placeholder {0}: activeStaff.length
+#: src/screens/staff.jsx
+msgid "No se pudo restaurar el acceso."
+msgstr "No se pudo restaurar el acceso."
+
 #. placeholder {0}: role.assignedCount
+#. placeholder {0}: staff.length
 #: src/screens/staff.jsx
 msgid "{0, plural, one {# persona} other {# personas}}"
 msgstr "{0, plural, one {# persona} other {# personas}}"
@@ -9073,6 +9078,10 @@ msgstr "Sin PIN"
 #: src/screens/staff.jsx
 msgid "Administrar acceso al POS"
 msgstr "Administrar acceso al POS"
+
+#: src/screens/staff.jsx
+msgid "Restaurar acceso"
+msgstr "Restaurar acceso"
 
 #: src/screens/staff.jsx
 msgid "Desactivar acceso"
