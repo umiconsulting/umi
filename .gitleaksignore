@@ -1,4 +1,4 @@
-# Firebase client identifiers and fixture values already present on main.
+# Client identifiers, test fixtures, and commit-tag examples already on main.
 3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/google-services.json:gcp-api-key:18
 3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/google-services.json:gcp-api-key:37
 3e9ecff033ff830c3bf10bd464aed412104f0a1f:apps/umi-pos/android/app/src/production/google-services.json:gcp-api-key:18
@@ -12,3 +12,4 @@
 3381ee5aa9401018a43d5c0e48bea08a182021ba:apps/umi-dashboard/src/data.devices.spec.jsx:generic-api-key:46
 3381ee5aa9401018a43d5c0e48bea08a182021ba:apps/umi-dashboard/src/data.devices.spec.jsx:generic-api-key:102
 8d174f7eeb78c2fb901b9c48b2bc61201575220c:apps/umi-api/src/modules/auth/auth.service.spec.ts:generic-api-key:120
+e8beee4f6229eb8e16357041b1ef60aabfb05a21:docs/reports/2026-10-24-onca-production-bug-001.md:generic-api-key:98
