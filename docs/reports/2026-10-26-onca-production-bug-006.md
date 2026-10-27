@@ -70,6 +70,9 @@ SHA-256:
 | Cocina A9+ | Build 332 instalada con `-r` | Pantalla de registro; falta confirmar el código del dispositivo |
 | Mesero A11 | Build 332 instalada con `-r` | PIN válido; KDS muestra cero comandas |
 
+El incidente 007 corrigió el registro de Cocina, la sesión de Cajero, el modo de
+Mesero y la firma de producción.
+
 Las cuatro instalaciones informan `versionCode=332`. El manifiesto no tiene la
 marca `DEBUGGABLE`.
 
@@ -90,3 +93,5 @@ Soporte debe confirmar que el diario sin conexión está vacío.
 1. Registrar Cocina con un código emitido por el administrador.
 2. Cerrar la sesión anterior de Cajero y confirmar el acceso en Caja.
 3. Migrar las terminales a una llave de release privada.
+
+Estos tres pendientes quedaron cerrados en el incidente 007.

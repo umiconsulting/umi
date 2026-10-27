@@ -9,27 +9,49 @@ Required:
   UMIPOS_RELEASE_VERSION
   UMIPOS_BUILD_NUMBER
   UMIPOS_CONTRACT_VERSION
-  UMIPOS_ANDROID_KEYSTORE_PATH
-  UMIPOS_ANDROID_KEY_ALIAS
-  UMIPOS_ANDROID_KEYSTORE_PASSWORD
-  UMIPOS_ANDROID_KEY_PASSWORD
 
 Optional:
   UMIPOS_API_BASE_URL       Default: https://api.umiconsulting.co
   UMIPOS_ANDROID_APP_ID     Default: co.umiconsulting.umi_pos.estacion
+  UMIPOS_ANDROID_KEYSTORE_PATH
+                             Default: ~/.local/share/umi-pos-signing/umi-pos-release.jks
+  UMIPOS_ANDROID_KEY_ALIAS  Default: umi-pos-release
+  UMIPOS_ANDROID_KEYSTORE_PASSWORD and UMIPOS_ANDROID_KEY_PASSWORD
+                             Default: Secret Service values for service
+                             umipos-android-release, account juan
   UMIPOS_ARTIFACT_PATH      Default: ~/Downloads/UmiPOS-<version>-production-release-build<code>.apk
   UMIPOS_ALLOW_DEBUG_SIGNER Set to 1 only for a controlled signing migration.
 EOF
 }
 
+if [[ -z "${UMIPOS_ANDROID_KEYSTORE_PATH:-}" ]]; then
+  UMIPOS_ANDROID_KEYSTORE_PATH="$HOME/.local/share/umi-pos-signing/umi-pos-release.jks"
+fi
+if [[ -z "${UMIPOS_ANDROID_KEY_ALIAS:-}" ]]; then
+  UMIPOS_ANDROID_KEY_ALIAS=umi-pos-release
+fi
+if [[ -z "${UMIPOS_ANDROID_KEYSTORE_PASSWORD:-}" ||
+  -z "${UMIPOS_ANDROID_KEY_PASSWORD:-}" ]]; then
+  signing_secret="$(
+    secret-tool lookup service umipos-android-release account juan 2>/dev/null ||
+      true
+  )"
+  if [[ -z "$signing_secret" ]]; then
+    printf 'No signing password in Secret Service.\n' >&2
+    exit 2
+  fi
+  UMIPOS_ANDROID_KEYSTORE_PASSWORD="$signing_secret"
+  UMIPOS_ANDROID_KEY_PASSWORD="$signing_secret"
+fi
+export UMIPOS_ANDROID_KEYSTORE_PATH
+export UMIPOS_ANDROID_KEY_ALIAS
+export UMIPOS_ANDROID_KEYSTORE_PASSWORD
+export UMIPOS_ANDROID_KEY_PASSWORD
+
 required=(
   UMIPOS_RELEASE_VERSION
   UMIPOS_BUILD_NUMBER
   UMIPOS_CONTRACT_VERSION
-  UMIPOS_ANDROID_KEYSTORE_PATH
-  UMIPOS_ANDROID_KEY_ALIAS
-  UMIPOS_ANDROID_KEYSTORE_PASSWORD
-  UMIPOS_ANDROID_KEY_PASSWORD
 )
 
 missing=()
