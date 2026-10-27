@@ -131,4 +131,8 @@ jobs:
           # --log-opts="--all" scans every ref, so a secret on a side branch or in
           # rewritten history is caught too. --redact keeps the finding out of the
           # CI log, which is itself readable by anyone who can see the run.
-          ./gitleaks git --no-banner --redact --exit-code 1 --log-opts="--all"
+          if ! ./gitleaks git --no-banner --redact --exit-code 1 \
+            --log-opts="--all" --report-format json --report-path gitleaks.json; then
+            jq -r '.[] | [.RuleID, .File, .StartLine, .Commit, .Fingerprint] | @tsv' gitleaks.json
+            exit 1
+          fi
