@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:umi_pos/bootstrap/bootstrap_state.dart';
+import 'package:umi_pos/core/config/app_config.dart';
 import 'package:umi_pos/core/release/release_compatibility.dart';
 import 'package:umi_pos/core/security/credential_vault.dart';
 
@@ -34,30 +35,33 @@ void main() {
     root.dispose();
   });
 
-  test('a proven release starts offline after secure storage is replaced', () async {
-    final preferences = TestPreferences();
-    final online = testRoot(preferences: preferences);
-    await online.controller.initialize();
-    expect(
-      online.controller.state.phase,
-      BootstrapPhase.readyForAuthentication,
-    );
-    online.dispose();
+  test(
+    'a proven release starts offline after secure storage is replaced',
+    () async {
+      final preferences = TestPreferences();
+      final online = testRoot(preferences: preferences);
+      await online.controller.initialize();
+      expect(
+        online.controller.state.phase,
+        BootstrapPhase.readyForAuthentication,
+      );
+      online.dispose();
 
-    final offline = testRoot(
-      preferences: preferences,
-      storage: MemorySecureStorage(),
-      releaseCompatibility: const TestReleaseCompatibility(
-        ReleaseCompatibility.apiUnavailable,
-      ),
-    );
-    await offline.controller.initialize();
-    expect(
-      offline.controller.state.phase,
-      BootstrapPhase.readyForAuthentication,
-    );
-    offline.dispose();
-  });
+      final offline = testRoot(
+        preferences: preferences,
+        storage: MemorySecureStorage(),
+        releaseCompatibility: const TestReleaseCompatibility(
+          ReleaseCompatibility.apiUnavailable,
+        ),
+      );
+      await offline.controller.initialize();
+      expect(
+        offline.controller.state.phase,
+        BootstrapPhase.readyForAuthentication,
+      );
+      offline.dispose();
+    },
+  );
 
   test('a recent enrolled session opens without the proof marker', () async {
     final storage = MemorySecureStorage();
@@ -87,6 +91,34 @@ void main() {
     await root.controller.initialize();
     expect(root.controller.state.phase, BootstrapPhase.unrecoverableFailure);
     expect(root.controller.state.diagnosticCategory, 'upgradeRequired');
+    root.dispose();
+  });
+
+  test('invalid release identity reports its exact build defect', () async {
+    final invalidRelease = AppConfig(
+      environment: AppEnvironment.production,
+      apiBaseUri: Uri.parse('https://api.example.test'),
+      telemetryEnabled: true,
+      developmentDiagnostics: false,
+      featureBootstrapMode: FeatureBootstrapMode.disabled,
+      hardwareSimulatorEnabled: false,
+      realtimeEnrollmentEnabled: false,
+      release: const ReleaseIdentity(
+        application: 'umi-pos',
+        version: '1.0.0',
+        gitCommit: '',
+        buildTimestamp: '',
+        contractVersion: '2.45.0',
+        configurationSchemaVersion: '1',
+      ),
+    );
+    final root = testRoot(config: invalidRelease);
+
+    await root.controller.initialize();
+
+    expect(root.controller.state.phase, BootstrapPhase.configurationInvalid);
+    expect(root.controller.state.diagnosticCategory, 'configuration');
+    expect(root.controller.state.diagnosticCode, 'RELEASE_IDENTITY_INVALID');
     root.dispose();
   });
 
