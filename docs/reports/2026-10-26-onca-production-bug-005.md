@@ -4,7 +4,7 @@
 
 La API `onca-445bedac` conserva precios y modificadores en una cuenta abierta.
 También libera la visita pagada de una mesa y conserva el código de cada
-rechazo de efectivo. El POS 331 pide la mesa al enviar o cobrar. Además, quita
+rechazo de efectivo. El POS 332 pide la mesa al enviar o cobrar. Además, quita
 el folio manual del tramo de terminal y no convierte un pago externo fallido en
 un intento de efectivo.
 
@@ -73,8 +73,9 @@ APK: `/home/juan/Downloads/UmiPOS-1.0.0-production-build331.apk`
 SHA-256:
 `b9ee9e09bc32c63a7d0edaf0decac7299d4fa73febfb222f7c4714bd8f8e7c93`
 
-El APK contiene el contrato 2.45.0, la URL de producción y las dos protecciones
-nuevas del cobro.
+El código de POS contiene el contrato 2.45.0, la URL de producción y las dos
+protecciones nuevas del cobro. El APK operativo es la build 332 del incidente
+006.
 
 ## Soporte remoto
 
