@@ -56,15 +56,15 @@ escritura por USB.
 
 ## Verificación
 
-| Check | Result |
-| --- | --- |
-| Vista previa del recibo oficial | pass |
-| Logo en la vista previa | pass |
-| Totales y folio en la vista previa | pass |
-| Comando de imagen ESC/POS | present |
-| Escritura USB a la Epson | sent |
-| Pruebas Flutter | 1,144 passed |
-| Análisis estático | no issues |
+| Check                              | Result       |
+| ---------------------------------- | ------------ |
+| Vista previa del recibo oficial    | pass         |
+| Logo en la vista previa            | pass         |
+| Totales y folio en la vista previa | pass         |
+| Comando de imagen ESC/POS          | present      |
+| Escritura USB a la Epson           | sent         |
+| Pruebas Flutter                    | 1,144 passed |
+| Análisis estático                  | no issues    |
 
 ## Estado de dispositivos
 

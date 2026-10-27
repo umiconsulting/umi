@@ -6,12 +6,12 @@ Fecha local: 26 de octubre de 2026
 
 La flota de ONCA en Tailscale contiene cuatro equipos con nombre `onca-*`:
 
-| Equipo | Tailscale | Estado actual de ADB | KeepADB |
-| --- | --- | --- | --- |
-| Caja principal | `onca-caja-principal` | `100.64.178.95:37137` conectado | Verificado: `1.8.38` |
-| Barra | `onca-barra` | `100.90.102.41:44965` conectado | Verificado: `1.8.38` |
-| Cocina | `onca-cocina` | `100.125.137.36:37123` conectado | Verificado: `1.8.38` |
-| Mesero | `onca-mesero` | `100.125.102.97:42845` conectado | Verificado: `1.8.38` |
+| Equipo         | Tailscale             | Estado actual de ADB             | KeepADB              |
+| -------------- | --------------------- | -------------------------------- | -------------------- |
+| Caja principal | `onca-caja-principal` | `100.64.178.95:37137` conectado  | Verificado: `1.8.38` |
+| Barra          | `onca-barra`          | `100.90.102.41:44965` conectado  | Verificado: `1.8.38` |
+| Cocina         | `onca-cocina`         | `100.125.137.36:37123` conectado | Verificado: `1.8.38` |
+| Mesero         | `onca-mesero`         | `100.125.102.97:42845` conectado | Verificado: `1.8.38` |
 
 El endpoint de Cocina se registró como `100.125.137.36:37123` a partir del
 puerto local `192.168.0.102:37123`.

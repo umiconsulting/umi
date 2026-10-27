@@ -18,34 +18,34 @@ Durante el diagnóstico, el personal confirmó otra operación cobrada en termin
 
 ## Evidencia adjunta
 
-| Material | Qué comprueba | Límite |
-| --- | --- | --- |
-| [Foto del error del POS](./evidence/2026-10-24-onca-production-001/pos-error.png) | Mensaje de fallo de cobro y botones «Reintentar» y «Cerrar». | No muestra el carrito ni un identificador de pago. |
-| [Foto de la terminal](./evidence/2026-10-24-onca-production-001/terminal-payment.png) | «Pago completado», MXN 225.00, 24 Oct 2026 10:36 am; referencia visible `PUGvVaq7` (lectura visual). | La foto no expone por sí sola el registro del adquirente. |
-| [Estado posterior de la iMin](./evidence/2026-10-24-onca-production-001/pos-pending-sync.png) | Aviso de cambios pendientes, indicador «Sin conexión» y fallo al actuar sobre una mesa. | El sistema Android sí reportó Wi‑Fi y VPN validados. El indicador del POS requiere análisis. |
-| [Cola local, comandos #33 y #34](./evidence/2026-10-24-onca-production-001/recovery-33-34.png) | El efectivo #33 requiere revisión y el cambio de cantidad #34 figura como resuelto. | El efectivo no se volvió a enviar. |
-| [Cuenta 004 ya corregida](./evidence/2026-10-24-onca-production-001/account-004-five-conchas.png) | La iMin leyó cinco conchas y MXN 225.00 tras reiniciar. | La venta continuaba abierta. |
-| [Segundo error después del ajuste](./evidence/2026-10-24-onca-production-001/pos-error-after-reconcile.png) | El POS repitió el mensaje genérico al confirmar un cargo ya efectuado. | En esa ventana no apareció una nueva solicitud de cobro en la API. |
-| [Cuentas abiertas](./evidence/2026-10-24-onca-production-001/accounts-004-005-006.png) | La lista muestra 004 por MXN 225, 005 por MXN 245 y 006 por MXN 45. | La lista no demuestra cuáles recibieron dinero. |
-| Consultas de sólo lectura a PostgreSQL de producción | Un intento de pago exitoso por MXN 225; cero ventas y cero recibos para la cuenta. | El campo `proof_source=operator_attested` registra una confirmación manual, no una confirmación electrónica del adquirente. La foto aporta evidencia adicional. |
-| Auditoría de la cuenta | Cambio controlado de tres a cinco conchas, versión 8 a 9, acción `adjust`. | No cierra por sí solo la venta. |
+| Material                                                                                                    | Qué comprueba                                                                                        | Límite                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Foto del error del POS](./evidence/2026-10-24-onca-production-001/pos-error.png)                           | Mensaje de fallo de cobro y botones «Reintentar» y «Cerrar».                                         | No muestra el carrito ni un identificador de pago.                                                                                                              |
+| [Foto de la terminal](./evidence/2026-10-24-onca-production-001/terminal-payment.png)                       | «Pago completado», MXN 225.00, 24 Oct 2026 10:36 am; referencia visible `PUGvVaq7` (lectura visual). | La foto no expone por sí sola el registro del adquirente.                                                                                                       |
+| [Estado posterior de la iMin](./evidence/2026-10-24-onca-production-001/pos-pending-sync.png)               | Aviso de cambios pendientes, indicador «Sin conexión» y fallo al actuar sobre una mesa.              | El sistema Android sí reportó Wi‑Fi y VPN validados. El indicador del POS requiere análisis.                                                                    |
+| [Cola local, comandos #33 y #34](./evidence/2026-10-24-onca-production-001/recovery-33-34.png)              | El efectivo #33 requiere revisión y el cambio de cantidad #34 figura como resuelto.                  | El efectivo no se volvió a enviar.                                                                                                                              |
+| [Cuenta 004 ya corregida](./evidence/2026-10-24-onca-production-001/account-004-five-conchas.png)           | La iMin leyó cinco conchas y MXN 225.00 tras reiniciar.                                              | La venta continuaba abierta.                                                                                                                                    |
+| [Segundo error después del ajuste](./evidence/2026-10-24-onca-production-001/pos-error-after-reconcile.png) | El POS repitió el mensaje genérico al confirmar un cargo ya efectuado.                               | En esa ventana no apareció una nueva solicitud de cobro en la API.                                                                                              |
+| [Cuentas abiertas](./evidence/2026-10-24-onca-production-001/accounts-004-005-006.png)                      | La lista muestra 004 por MXN 225, 005 por MXN 245 y 006 por MXN 45.                                  | La lista no demuestra cuáles recibieron dinero.                                                                                                                 |
+| Consultas de sólo lectura a PostgreSQL de producción                                                        | Un intento de pago exitoso por MXN 225; cero ventas y cero recibos para la cuenta.                   | El campo `proof_source=operator_attested` registra una confirmación manual, no una confirmación electrónica del adquirente. La foto aporta evidencia adicional. |
+| Auditoría de la cuenta                                                                                      | Cambio controlado de tres a cinco conchas, versión 8 a 9, acción `adjust`.                           | No cierra por sí solo la venta.                                                                                                                                 |
 
 Las fotos originales las envió el usuario durante el incidente. Las copias anteriores forman parte de esta bitácora. La captura de la iMin se tomó por ADB después del ajuste. No se copian secretos, tokens de sesión ni credenciales.
 
 ## Identificadores y estado comprobado
 
-| Registro | Valor / resultado |
-| --- | --- |
-| Comercio | `dbfb6dd1-bf05-42cc-8f60-2035c1b6647b` |
-| Cuenta / carrito | 004 / `b4db9f17-ce76-469a-905e-8b7b666c0e10` |
-| Línea Concha | `d24accd2-745e-4a51-8231-a429b4c81b1a`; precio base 4500 centavos; sin modificadores |
-| Intento de pago | `f862a978-58ec-46c4-b52f-fa097d88367d`; `succeeded`; `external_terminal`; `manual_terminal`; MXN 22500 centavos |
-| Borrador de medio de pago | `72399275-e72e-4777-9d86-abc0a758332e`; `tender_id` nulo |
-| Venta / recibo | Cero filas en `pos_committed_sale` y `receipt_snapshot` para esta cuenta y pago |
-| Estado tras el ajuste | Carrito `draft`, ciclo `recovered`, versión 9; una línea de cinco conchas; pago sin cambio |
-| Auditoría del ajuste | `c6c0cf31-6e53-42e5-8c70-f60d7b312c73`; acción `adjust`; solicitud `onca-2026-10-24-account-004` |
-| POS instalado | Paquete `co.umiconsulting.umi_pos.estacion`, versión Android 324, firma SHA-256 `8146b847a358a9cd54eddecbe8921a998287d3f59e1e52bdca5e121d21da3346` |
-| API activa al verificar | Revisión `f0908e175458ff7c4a8e855135a916192de39697`; contrato 2.44.0; `/health/ready` sano |
+| Registro                  | Valor / resultado                                                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Comercio                  | `dbfb6dd1-bf05-42cc-8f60-2035c1b6647b`                                                                                                             |
+| Cuenta / carrito          | 004 / `b4db9f17-ce76-469a-905e-8b7b666c0e10`                                                                                                       |
+| Línea Concha              | `d24accd2-745e-4a51-8231-a429b4c81b1a`; precio base 4500 centavos; sin modificadores                                                               |
+| Intento de pago           | `f862a978-58ec-46c4-b52f-fa097d88367d`; `succeeded`; `external_terminal`; `manual_terminal`; MXN 22500 centavos                                    |
+| Borrador de medio de pago | `72399275-e72e-4777-9d86-abc0a758332e`; `tender_id` nulo                                                                                           |
+| Venta / recibo            | Cero filas en `pos_committed_sale` y `receipt_snapshot` para esta cuenta y pago                                                                    |
+| Estado tras el ajuste     | Carrito `draft`, ciclo `recovered`, versión 9; una línea de cinco conchas; pago sin cambio                                                         |
+| Auditoría del ajuste      | `c6c0cf31-6e53-42e5-8c70-f60d7b312c73`; acción `adjust`; solicitud `onca-2026-10-24-account-004`                                                   |
+| POS instalado             | Paquete `co.umiconsulting.umi_pos.estacion`, versión Android 324, firma SHA-256 `8146b847a358a9cd54eddecbe8921a998287d3f59e1e52bdca5e121d21da3346` |
+| API activa al verificar   | Revisión `f0908e175458ff7c4a8e855135a916192de39697`; contrato 2.44.0; `/health/ready` sano                                                         |
 
 ## Secuencia observada
 
@@ -88,12 +88,12 @@ La Cuenta 005 de Capirio contiene Latte MXN 80.00, Té con jazmín MXN 50.00, Pe
 
 ## Cambios de código preparados y pruebas
 
-| Revisión | Cambio | Comprobación | Estado |
-| --- | --- | --- | --- |
-| `2ff47dff` | El POS lee el carrito vigente y comprueba su cola antes de iniciar un cobro en línea. | Pruebas Flutter del flujo de cobro. | Código local; no instalado. |
-| `43f7d15d` | El POS bloquea el cobro externo cuando el importe aplicado difiere del total. También bloquea un cambio de versión después de actualizar la cuenta. | 48 pruebas del cobro; `flutter analyze` sin hallazgos. | Código local; no instalado. |
-| `408abef6` | La API elimina valores nulos de campos opcionales antes de validar una venta en efectivo de la cola histórica. | 21 pruebas de cola; TypeScript, ESLint y Prettier. | Código local; no publicado. |
-| `a05c44ed` | El POS limita el bloqueo por cola a la cuenta activa. El conflicto de efectivo de la 006 ya no bloquea el cobro en línea de la 004 o la 005. | 18 pruebas de diario, incluida la cuenta provisional; `flutter analyze` sin hallazgos. | Código local; no instalado. |
+| Revisión   | Cambio                                                                                                                                              | Comprobación                                                                           | Estado                      |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------- |
+| `2ff47dff` | El POS lee el carrito vigente y comprueba su cola antes de iniciar un cobro en línea.                                                               | Pruebas Flutter del flujo de cobro.                                                    | Código local; no instalado. |
+| `43f7d15d` | El POS bloquea el cobro externo cuando el importe aplicado difiere del total. También bloquea un cambio de versión después de actualizar la cuenta. | 48 pruebas del cobro; `flutter analyze` sin hallazgos.                                 | Código local; no instalado. |
+| `408abef6` | La API elimina valores nulos de campos opcionales antes de validar una venta en efectivo de la cola histórica.                                      | 21 pruebas de cola; TypeScript, ESLint y Prettier.                                     | Código local; no publicado. |
+| `a05c44ed` | El POS limita el bloqueo por cola a la cuenta activa. El conflicto de efectivo de la 006 ya no bloquea el cobro en línea de la 004 o la 005.        | 18 pruebas de diario, incluida la cuenta provisional; `flutter analyze` sin hallazgos. | Código local; no instalado. |
 
 Se compiló un APK de producción con versión Android 326 y la misma firma de la aplicación instalada. Está en `apps/umi-pos/build/app/outputs/flutter-apk/app-production-profile.apk`; SHA-256 `04a3bd2324986f262cb301109f88541c1b49f0f84513213cb8b3f527d195098e`. **No se instaló.** La versión 324 permanece en la iMin.
 
@@ -131,11 +131,11 @@ La sesión activa usa el rol `cashier` y contiene `cart.write`, `checkout.commit
 
 ### Conciliación comprobada
 
-| Cuenta | Producto y dinero confirmado | Venta oficial | Recibo oficial | Medio de pago |
-| --- | --- | --- | --- | --- |
-| 004 | Cinco conchas, MXN 225.00; foto de pago de terminal. | `97337c6a-9aac-44fc-becc-e417865aa732` | `0004`, MXN 225.00 | El **mismo** intento `f862a978-58ec-46c4-b52f-fa097d88367d` quedó enlazado a la venta. Un intento y una venta. |
-| 005 | Mesa Capirio, MXN 245.00; cobro de terminal confirmado por el personal, sin foto recibida. | `572c9b69-1351-4182-9f8d-21473a7cdd28` | `0005`, MXN 245.00 | Un intento de terminal manual, `75da18da-782e-40ed-bb8b-022247e5a934`, registrado por declaración del operador. Una venta. |
-| 006 | Una concha entregada y MXN 45.00 recibidos en efectivo, confirmados por el personal. | `41a8ba6a-0561-4188-b224-4a4c5c3b4187` | `0006`, MXN 45.00 | El **comando original #33** de efectivo se aceptó. Un intento `f654cfd5-d8d3-4dac-8946-3927e558a165` y una venta. |
+| Cuenta | Producto y dinero confirmado                                                               | Venta oficial                          | Recibo oficial     | Medio de pago                                                                                                              |
+| ------ | ------------------------------------------------------------------------------------------ | -------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| 004    | Cinco conchas, MXN 225.00; foto de pago de terminal.                                       | `97337c6a-9aac-44fc-becc-e417865aa732` | `0004`, MXN 225.00 | El **mismo** intento `f862a978-58ec-46c4-b52f-fa097d88367d` quedó enlazado a la venta. Un intento y una venta.             |
+| 005    | Mesa Capirio, MXN 245.00; cobro de terminal confirmado por el personal, sin foto recibida. | `572c9b69-1351-4182-9f8d-21473a7cdd28` | `0005`, MXN 245.00 | Un intento de terminal manual, `75da18da-782e-40ed-bb8b-022247e5a934`, registrado por declaración del operador. Una venta. |
+| 006    | Una concha entregada y MXN 45.00 recibidos en efectivo, confirmados por el personal.       | `41a8ba6a-0561-4188-b224-4a4c5c3b4187` | `0006`, MXN 45.00  | El **comando original #33** de efectivo se aceptó. Un intento `f654cfd5-d8d3-4dac-8946-3927e558a165` y una venta.          |
 
 El servidor confirma las tres cuentas en estado `committed`, tres ventas, tres recibos y un intento de pago por cuenta. La pantalla de Cuentas de la iMin muestra «No hay cuentas abiertas». Nadie volvió a pasar una tarjeta. [Pago 004](./evidence/2026-10-24-onca-production-001/account-004-paid-pos.png), [pago 005](./evidence/2026-10-24-onca-production-001/account-005-paid-pos.png), [efectivo #33 aceptado](./evidence/2026-10-24-onca-production-001/cash-replay-33-accepted.png) y [lista final de cuentas](./evidence/2026-10-24-onca-production-001/no-open-accounts.png) muestran el resultado en la iMin.
 

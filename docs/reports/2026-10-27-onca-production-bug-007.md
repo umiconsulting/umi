@@ -8,12 +8,12 @@ desde la llave de depuración.
 
 La configuración de las terminales quedó así:
 
-| Terminal | Modo | Acceso comprobado |
-| --- | --- | --- |
-| Caja iMin | UmiPOS | Cajero ONCA |
-| Barra A9+ | UmiKDS | Barista |
-| Cocina A9+ | UmiKDS | Cocinero 1 |
-| Mesero A11 | UmiPOS | Mesero 1 |
+| Terminal   | Modo   | Acceso comprobado |
+| ---------- | ------ | ----------------- |
+| Caja iMin  | UmiPOS | Cajero ONCA       |
+| Barra A9+  | UmiKDS | Barista           |
+| Cocina A9+ | UmiKDS | Cocinero 1        |
+| Mesero A11 | UmiPOS | Mesero 1          |
 
 ## Correcciones operativas
 
@@ -44,10 +44,10 @@ SHA-256 14:97:5F:2C:37:4E:03:B1:55:AB:36:3E:17:D4:A7:9D:4A:B3:2B:88:8A:B3:81:BE:
 
 Archivos de recuperación:
 
-| Archivo | Uso |
-| --- | --- |
-| `umi-pos-release.jks` | Llave privada de producción |
-| `umi-pos-release.pem` | Certificado público |
+| Archivo               | Uso                                        |
+| --------------------- | ------------------------------------------ |
+| `umi-pos-release.jks` | Llave privada de producción                |
+| `umi-pos-release.pem` | Certificado público                        |
 | `umi-pos-lineage.bin` | Prueba de rotación desde la llave anterior |
 
 El script `scripts/build-umipos-android-release.sh` obtiene la contraseña de
@@ -74,16 +74,16 @@ Cloudflare Pages. El PR 227 completó las traducciones y también está desplega
 
 ## Verificación
 
-| Prueba | Resultado |
-| --- | --- |
-| APK instalado en las cuatro terminales | `versionCode=333` |
-| Certificado instalado en las cuatro terminales | La llave nueva de release |
-| Barra | KDS cargó con la estación Barra |
-| Cocina | KDS cargó con la estación Cocina de pizzas |
-| Mesero | POS cargó la carta y las acciones de pedido |
-| Dashboard | Suite completa: 381 pruebas aprobadas |
-| Script de build | Sintaxis válida |
-| Producción Dashboard | `Restaurar acceso` presente en los catálogos desplegados |
+| Prueba                                         | Resultado                                                |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| APK instalado en las cuatro terminales         | `versionCode=333`                                        |
+| Certificado instalado en las cuatro terminales | La llave nueva de release                                |
+| Barra                                          | KDS cargó con la estación Barra                          |
+| Cocina                                         | KDS cargó con la estación Cocina de pizzas               |
+| Mesero                                         | POS cargó la carta y las acciones de pedido              |
+| Dashboard                                      | Suite completa: 381 pruebas aprobadas                    |
+| Script de build                                | Sintaxis válida                                          |
+| Producción Dashboard                           | `Restaurar acceso` presente en los catálogos desplegados |
 
 ## Acceso remoto pendiente
 
@@ -99,12 +99,12 @@ automáticamente cuando el dispositivo se reinicia:
 La guía oficial de iMin separa estos estados:
 <https://www.imin.com/faq/>.
 
-| Acción | Resultado documentado |
-| --- | --- |
-| Pulsar el botón una vez | Bloquea o desbloquea la pantalla |
-| Mantenerlo tres segundos | Muestra las opciones **Reiniciar** y **Apagar** |
-| Apagar y encender después | Android realiza un arranque completo |
-| Entrar en reposo | La red puede desconectarse si **Transmission Mode** está desactivado |
+| Acción                    | Resultado documentado                                                |
+| ------------------------- | -------------------------------------------------------------------- |
+| Pulsar el botón una vez   | Bloquea o desbloquea la pantalla                                     |
+| Mantenerlo tres segundos  | Muestra las opciones **Reiniciar** y **Apagar**                      |
+| Apagar y encender después | Android realiza un arranque completo                                 |
+| Entrar en reposo          | La red puede desconectarse si **Transmission Mode** está desactivado |
 
 Por tanto, apagar la pantalla no debe cerrar las aplicaciones. Un apagado
 completo sí detiene Android y requiere encender el equipo de nuevo. Un reinicio

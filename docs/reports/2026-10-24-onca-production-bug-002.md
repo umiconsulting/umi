@@ -78,31 +78,31 @@ ticket terminado y un append con una línea nueva sí lo reabre.
 
 ## Verificación
 
-| Comprobación | Resultado |
-| --- | --- |
-| Prueba focal de almacenamiento KDS | 12 pruebas aprobadas |
-| `flutter analyze` | Sin hallazgos |
-| Suite completa del POS después de POS 330 | 1,155 pruebas aprobadas |
-| Suite completa de API después de `2f5ea8e6` | 2,095 aprobadas; 29 omitidas |
-| APK | Build 330, paquete `co.umiconsulting.umi_pos.estacion` |
-| SHA-256 del APK | `72fa5548ae126da880b980f5ea8598051d8d328cd3b8792a68259ff00242300d` |
-| Firma | Misma firma SHA-256 `8146b847…3346` que las compilaciones 328 y 329 |
-| iMin instalada | Build 330 |
-| Barra | Build 330 |
-| Mesero | Build 330 |
-| A11 de pruebas | Build 329; sin conexión para actualizarla |
+| Comprobación                                | Resultado                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| Prueba focal de almacenamiento KDS          | 12 pruebas aprobadas                                                |
+| `flutter analyze`                           | Sin hallazgos                                                       |
+| Suite completa del POS después de POS 330   | 1,155 pruebas aprobadas                                             |
+| Suite completa de API después de `2f5ea8e6` | 2,095 aprobadas; 29 omitidas                                        |
+| APK                                         | Build 330, paquete `co.umiconsulting.umi_pos.estacion`              |
+| SHA-256 del APK                             | `72fa5548ae126da880b980f5ea8598051d8d328cd3b8792a68259ff00242300d`  |
+| Firma                                       | Misma firma SHA-256 `8146b847…3346` que las compilaciones 328 y 329 |
+| iMin instalada                              | Build 330                                                           |
+| Barra                                       | Build 330                                                           |
+| Mesero                                      | Build 330                                                           |
+| A11 de pruebas                              | Build 329; sin conexión para actualizarla                           |
 
 ### Despliegue API
 
-| Elemento | Valor |
-| --- | --- |
-| Revisión | `2f5ea8e65c032aec75150025270b6c5961b1a0a6` |
-| Imagen | `ghcr.io/umiconsulting/umi-api:onca-2f5ea8e6` |
-| Identidad | `1.0.0-onca.2f5ea8e6` |
-| Imagen SHA-256 | `sha256:bd1bf60b49d6f7d5372c18c69e56c1e23c89df7fabfdb6c404dcc3f37c4d96e5` |
-| Salud | `/health/ready` respondió `200`; API y worker sanos |
-| Respaldo de configuración | `.env.before-onca-2f5ea8e6-20261025T005356Z` |
-| Rollback | `UMI_API_TAG=onca-8a8ec541` |
+| Elemento                  | Valor                                                                     |
+| ------------------------- | ------------------------------------------------------------------------- |
+| Revisión                  | `2f5ea8e65c032aec75150025270b6c5961b1a0a6`                                |
+| Imagen                    | `ghcr.io/umiconsulting/umi-api:onca-2f5ea8e6`                             |
+| Identidad                 | `1.0.0-onca.2f5ea8e6`                                                     |
+| Imagen SHA-256            | `sha256:bd1bf60b49d6f7d5372c18c69e56c1e23c89df7fabfdb6c404dcc3f37c4d96e5` |
+| Salud                     | `/health/ready` respondió `200`; API y worker sanos                       |
+| Respaldo de configuración | `.env.before-onca-2f5ea8e6-20261025T005356Z`                              |
+| Rollback                  | `UMI_API_TAG=onca-8a8ec541`                                               |
 
 ### Reparación de los dos tickets históricos
 

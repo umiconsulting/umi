@@ -132,3 +132,13 @@ regexes = [
   '''e514b830de5067c1847d8028e002fa53054946c06de3942a94ab060971361815392b7362a7c9f3dcb8dcdc0c55f64eebb49363438f3dbf74b9931b7a4b41044c''',
   '''bc5847b3184062f8a9f75fa3f5c123d2''',
 ]
+
+[[allowlists]]
+description = "Etiqueta pública de la imagen local de ONCA, fijada a su revisión"
+# El reporte registra una imagen Docker de soporte. La etiqueta identifica
+# una compilación; no concede acceso a la API ni al registro.
+# La excepción permite sólo este valor completo, sin prefijos ni sufijos.
+regexTarget = 'secret'
+regexes = [
+  '''^onca-root-6d54a4e3$''',
+]

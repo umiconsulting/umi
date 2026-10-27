@@ -210,10 +210,7 @@ export class PosCheckoutService {
             cartId,
           );
           const frozenVersion = rows[0]?.cartVersion;
-          const repriced = await this.reprice(
-            cart,
-            frozenVersion,
-          );
+          const repriced = await this.reprice(cart, frozenVersion);
           if (!repriced)
             return {
               ok: false,
@@ -576,10 +573,7 @@ export class PosCheckoutService {
             dto.locationId,
             dto.cartId,
           );
-          const repriced = await this.reprice(
-            cart,
-            partialRows[0]?.cartVersion,
-          );
+          const repriced = await this.reprice(cart, partialRows[0]?.cartVersion);
           if (!repriced) {
             return {
               ok: false,
