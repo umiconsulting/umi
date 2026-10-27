@@ -66,6 +66,7 @@ producto. Una edición del catálogo no cambia una cuenta ya abierta.
 | Caja iMin | POS 331 y KeepADB permanente verificados; `versionCode=331` |
 | Barra A9+ | POS 331 y KeepADB permanente verificados; `versionCode=331` |
 | Mesero A11 | POS 331 y KeepADB permanente verificados; `versionCode=331` |
+| Cocina A9+ | POS 331 y KeepADB permanente verificados; `versionCode=331` |
 
 APK: `/home/juan/Downloads/UmiPOS-1.0.0-production-build331.apk`
 
@@ -95,6 +96,5 @@ depuración activa después de reinicios y cambios de red.
 
 1. Conciliar el intento `e000fc83-5ec5-4cd5-a001-a926be585289` con la venta. No
    se debe cobrar el mismo dinero otra vez.
-2. Volver a conectar Cocina a Tailscale. Su endpoint ya está registrado.
-3. Entrar de nuevo como Cajero ONCA. El cambio del rol cerró la sesión anterior
+2. Entrar de nuevo como Cajero ONCA. El cambio del rol cerró la sesión anterior
    para activar `order.fire`.

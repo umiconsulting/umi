@@ -10,12 +10,11 @@ La flota de ONCA en Tailscale contiene cuatro equipos con nombre `onca-*`:
 | --- | --- | --- | --- |
 | Caja principal | `onca-caja-principal` | `100.64.178.95:37137` conectado | Verificado: `1.8.38` |
 | Barra | `onca-barra` | `100.90.102.41:44965` conectado | Verificado: `1.8.38` |
-| Cocina | `onca-cocina` | Equipo fuera de línea | No documentado |
+| Cocina | `onca-cocina` | `100.125.137.36:37123` conectado | Verificado: `1.8.38` |
 | Mesero | `onca-mesero` | `100.125.102.97:42845` conectado | Verificado: `1.8.38` |
 
-El endpoint de Cocina se registró como `100.125.137.36:46331` a partir del
-puerto local `192.168.1.200:46331`. El servicio intentará conectarlo cuando el
-equipo regrese a Tailscale.
+El endpoint de Cocina se registró como `100.125.137.36:37123` a partir del
+puerto local `192.168.0.102:37123`.
 
 No se incluye `test-umi-a11` porque su nombre no empieza con `onca-`.
 
@@ -47,6 +46,19 @@ ADB leyó los siguientes valores en la A9+:
 - Tailscale y KeepADB excluidos del ahorro de batería.
 - `always_on_vpn_app=com.tailscale.ipn`.
 - Wi-Fi `UmiPOS`.
+
+## Verificación de Cocina
+
+ADB leyó los siguientes valores en la segunda A9+:
+
+- Modelo `SM-X210`.
+- KeepADB `1.8.38` con ambos permisos.
+- **Mantener siempre activo** habilitado.
+- Webhook habilitado con `http://100.109.51.39:47123/keepadb`.
+- Último informe correcto: `192.168.0.102:37123`.
+- Tailscale y KeepADB excluidos del ahorro de batería.
+- `always_on_vpn_app=com.tailscale.ipn`.
+- Wi-Fi `UmiPOS-5G`.
 
 ## Verificación de Mesero
 
@@ -85,7 +97,7 @@ Tailscale está fuera de línea.
 
 Android exige una vinculación por equipo. Después de emparejar una tablet, la
 persona debe abrir **Depuración inalámbrica** y elegir **Permitir siempre en
-esta red** para `UmiPOS`. Esto permite que Android reactive la depuración al
+esta red** para la red `UmiPOS` actual. Esto permite que Android reactive la depuración al
 volver a esa red.
 
 En KeepADB se deben confirmar dos opciones:
@@ -96,13 +108,9 @@ En KeepADB se deben confirmar dos opciones:
 KeepADB conserva la depuración activa después de reinicios y cambios de red.
 No evita un emparejamiento eliminado ni la confirmación de seguridad de Android.
 
-## Acción pendiente
-
-Cocina está fuera de línea. El mismo procedimiento se aplicará cuando regrese.
-Su puerto local y su IP de Tailscale ya están registrados.
-
 ## Prueba de reconexión
 
-Después de configurar los tres equipos, ADB se desconectó de forma manual.
+Después de configurar los cuatro equipos, ADB se desconectó de forma manual.
 Barra volvió a conectar en el siguiente intento. Caja necesitó dos intentos
 mientras Android reabría el puerto y volvió a conectar sin intervención.
+Cocina volvió a conectar en el siguiente intento sobre `37123`.
