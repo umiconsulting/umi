@@ -19,6 +19,7 @@ import {
 } from '@/data.jsx';
 import { useMerchant } from '@/lib/merchant-context.jsx';
 import { PERMISSION_LABELS } from './permission-labels.js';
+import { visibleStaffForRoster } from './staff-roster.js';
 
 // THE PLATFORM'S WORD, NOT ONE BUSINESS'S. `STAFF` was labelled "Barista" — a
 // word from one café's trade, shown to every business on the platform. The
@@ -120,9 +121,7 @@ const StaffScreen = () => {
   const roles = (roleData?.roles || []).filter((role) => role.status === 'active');
   const permissions = roleData?.permissions || [];
   const staff = staffData?.staff || [];
-  const activeStaff = staff.filter((person) => person.status !== 'disabled');
-  const filtered =
-    filter === 'ALL' ? activeStaff : activeStaff.filter((person) => person.roleId === filter);
+  const filtered = visibleStaffForRoster(staff, filter);
   const reload = () => setRefresh((value) => value + 1);
   const reloadRoles = () => {
     setRoleRefresh((value) => value + 1);
@@ -143,6 +142,19 @@ const StaffScreen = () => {
     }
   }
 
+  async function restore(person) {
+    setDisabling(true);
+    try {
+      setRosterError(null);
+      await updateStaffMember(person.id, { status: 'active' });
+      reload();
+    } catch (error) {
+      setRosterError(error.message || t`No se pudo restaurar el acceso.`);
+    } finally {
+      setDisabling(false);
+    }
+  }
+
   const people = section === 'people';
 
   return (
@@ -152,7 +164,7 @@ const StaffScreen = () => {
       <PageHead
         count={
           people ? (
-            <Plural value={activeStaff.length} one="# persona" other="# personas" />
+            <Plural value={staff.length} one="# persona" other="# personas" />
           ) : (
             <Plural value={roles.length} one="# rol" other="# roles" />
           )
@@ -311,7 +323,11 @@ const StaffScreen = () => {
                       {roleLabel}
                     </span>
                     <span style={{ minWidth: 116, fontSize: 13.5, color: 'var(--ink-2)' }}>
-                      {person.hasOperatorPin ? t`PIN configurado` : t`Sin PIN`}
+                      {person.status === 'disabled'
+                        ? t`Inactivo`
+                        : person.hasOperatorPin
+                          ? t`PIN configurado`
+                          : t`Sin PIN`}
                     </span>
                     <Menu
                       align="end"
@@ -324,16 +340,24 @@ const StaffScreen = () => {
                           disabled: locked,
                           onSelect: () => setSelectedStaff(person),
                         },
-                        {
-                          key: 'disable',
-                          label: t`Desactivar acceso`,
-                          icon: I.Trash,
-                          danger: true,
-                          disabled: locked,
-                          // Asks first. The action is reversible, but it is not
-                          // small: it ends a working session at the till.
-                          onSelect: () => setConfirmingDisable(person),
-                        },
+                        person.status === 'disabled'
+                          ? {
+                              key: 'restore',
+                              label: t`Restaurar acceso`,
+                              icon: I.Plus,
+                              disabled: locked || disabling,
+                              onSelect: () => restore(person),
+                            }
+                          : {
+                              key: 'disable',
+                              label: t`Desactivar acceso`,
+                              icon: I.Trash,
+                              danger: true,
+                              disabled: locked,
+                              // Asks first. The action is reversible, but it is not
+                              // small: it ends a working session at the till.
+                              onSelect: () => setConfirmingDisable(person),
+                            },
                       ]}
                       renderTrigger={({ ref, props }) => (
                         <button
