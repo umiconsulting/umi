@@ -11,13 +11,13 @@ publica el puerto nuevo a esta computadora.
 
 ## Dispositivos y accesos
 
-| Dispositivo | Modelo | IP de Tailscale | ADB observado |
-| --- | --- | --- | --- |
-| Caja principal | iMin D3 | `100.64.178.95` | `5555` fijo |
-| Barra | Samsung Galaxy Tab A9+ | `100.90.102.41` | Dinámico; `44917` después del reinicio de prueba |
-| Mesero | Samsung Galaxy Tab A11 | `100.125.102.97` | Dinámico; `35893` al momento de la configuración |
-| Cocina | Galaxy Tab A9+ | `100.125.137.36` | Sin conexión; configuración pendiente |
-| A11 de pruebas | Galaxy Tab A11 | `100.107.181.80` | Sin conexión; no se modificó |
+| Dispositivo    | Modelo                 | IP de Tailscale  | ADB observado                                    |
+| -------------- | ---------------------- | ---------------- | ------------------------------------------------ |
+| Caja principal | iMin D3                | `100.64.178.95`  | `5555` fijo                                      |
+| Barra          | Samsung Galaxy Tab A9+ | `100.90.102.41`  | Dinámico; `44917` después del reinicio de prueba |
+| Mesero         | Samsung Galaxy Tab A11 | `100.125.102.97` | Dinámico; `35893` al momento de la configuración |
+| Cocina         | Galaxy Tab A9+         | `100.125.137.36` | Sin conexión; configuración pendiente            |
+| A11 de pruebas | Galaxy Tab A11         | `100.107.181.80` | Sin conexión; no se modificó                     |
 
 Las direcciones `192.168.0.x` que muestran las tablets pertenecen a la red Wi-Fi
 de ONCA y no son alcanzables desde esta computadora. El soporte remoto debe usar

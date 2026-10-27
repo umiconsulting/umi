@@ -39,18 +39,18 @@ existe.
 
 ## Verificación
 
-| Check | Result | Evidence |
-| --- | --- | --- |
-| Primer abono, un toque | pass | screenshots below |
-| Primer POST parcial | `201`, 1054 ms | API log |
-| Segundo POST parcial | `201`, 1136 ms | API log |
-| Cierre de cuenta | `201`, 683 ms | API log |
-| Cart state | `committed`, version 3 | production DB |
-| Partial payments | two rows, MXN 40.00 each | production DB |
-| Flutter suite | 1,143 passed | local run |
-| Flutter analyze | no issues | local run |
-| API suite | 2,087 passed, 29 skipped | local run |
-| API typecheck and lint | pass | local run |
+| Check                  | Result                   | Evidence          |
+| ---------------------- | ------------------------ | ----------------- |
+| Primer abono, un toque | pass                     | screenshots below |
+| Primer POST parcial    | `201`, 1054 ms           | API log           |
+| Segundo POST parcial   | `201`, 1136 ms           | API log           |
+| Cierre de cuenta       | `201`, 683 ms            | API log           |
+| Cart state             | `committed`, version 3   | production DB     |
+| Partial payments       | two rows, MXN 40.00 each | production DB     |
+| Flutter suite          | 1,143 passed             | local run         |
+| Flutter analyze        | no issues                | local run         |
+| API suite              | 2,087 passed, 29 skipped | local run         |
+| API typecheck and lint | pass                     | local run         |
 
 Evidence:
 
