@@ -96,6 +96,20 @@ La documentación oficial de iMin confirma que la depuración USB se cierra
 automáticamente cuando el dispositivo se reinicia:
 <https://oss-sg.imin.sg/docs/en/DockingDebugging.html>.
 
+La guía oficial de iMin separa estos estados:
+<https://www.imin.com/faq/>.
+
+| Acción | Resultado documentado |
+| --- | --- |
+| Pulsar el botón una vez | Bloquea o desbloquea la pantalla |
+| Mantenerlo tres segundos | Muestra las opciones **Reiniciar** y **Apagar** |
+| Apagar y encender después | Android realiza un arranque completo |
+| Entrar en reposo | La red puede desconectarse si **Transmission Mode** está desactivado |
+
+Por tanto, apagar la pantalla no debe cerrar las aplicaciones. Un apagado
+completo sí detiene Android y requiere encender el equipo de nuevo. Un reinicio
+también cierra la depuración inalámbrica según iMin.
+
 KeepADB documenta que envía `DELETE` cuando el endpoint deja de comprobarse,
 cuando se desactiva la sincronización o cuando cambia la URL:
 <https://github.com/m00sfett/KeepADB/blob/master/docs/webhook-register.md>.
@@ -114,3 +128,7 @@ revisar `Settings.Global.boot_count` en Caja cuando vuelva el acceso.
 Para recuperar ADB, una persona debe abrir KeepADB en Caja y confirmar que
 **Mantener siempre activo** está habilitado. El servicio del host reconectará el
 puerto automáticamente cuando reciba el nuevo webhook.
+
+También debe activarse **Configuración > Batería > Transmission Mode**. iMin
+documenta esta opción para mantener la red activa mientras la pantalla está en
+reposo.
